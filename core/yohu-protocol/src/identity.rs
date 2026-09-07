@@ -110,9 +110,6 @@ pub struct SystemInfo {
     pub identity: AppIdentity,
     pub paths: AppPathCatalog,
     pub adb_path: String,
-    /// 最近一次设备扫描实际使用的 adb（诊断）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub adb_in_use: Option<String>,
     pub settings: AppSettings,
     /// 编译目标 OS：`windows` / `macos` / `linux`（`std::env::consts::OS`）。
     pub os: String,
