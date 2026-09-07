@@ -52,6 +52,22 @@ fn main() {
 
     let conf_path = manifest.join("tauri.conf.json");
     println!("cargo:rerun-if-changed={}", conf_path.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        manifest.join("capabilities/default.json").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        manifest
+            .join("..")
+            .join("..")
+            .join("ui")
+            .join("apps")
+            .join("shell")
+            .join("dist")
+            .join("index.html")
+            .display()
+    );
     assert_identity_sync(&conf_path);
 
     // scrcpy 版本单源校验（M5）：协议钉死 SERVER_VERSION 与 setup 脚本下载版本必须一致。

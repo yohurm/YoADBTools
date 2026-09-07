@@ -74,12 +74,11 @@ pub fn probe() -> Caps {
 
 impl PresentHost {
     pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
-        let caps = probe();
+        // HEVC 探测会走 Media Foundation，冷启动可达数秒；禁止挡 setup / 首屏。
         #[cfg(windows)]
         let geom = GeomHost::new();
-        tracing::info!(backend = caps.id, hevc_ok = caps.hevc, "投屏后端探测");
-        Arc::new(Self {
-            hevc_ok: AtomicBool::new(caps.hevc),
+        let host = Arc::new(Self {
+            hevc_ok: AtomicBool::new(false),
             event_tx,
             mirror,
             inner: Mutex::new(Inner {
@@ -88,7 +87,18 @@ impl PresentHost {
             }),
             #[cfg(windows)]
             geom,
-        })
+        });
+        let probe_host = Arc::clone(&host);
+        tauri::async_runtime::spawn(async move {
+            match tokio::task::spawn_blocking(probe).await {
+                Ok(caps) => {
+                    probe_host.hevc_ok.store(caps.hevc, Ordering::SeqCst);
+                    tracing::info!(backend = caps.id, hevc_ok = caps.hevc, "投屏后端探测");
+                }
+                Err(e) => tracing::warn!("投屏后端探测失败: {e}"),
+            }
+        });
+        host
     }
 
     pub fn hevc_ok(&self) -> bool {

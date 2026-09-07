@@ -94,6 +94,7 @@ windows = { version = "0.61", features = [
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_LibraryLoader",
+  "Win32_System_Registry",
   "Win32_System_Ole",
   "Win32_System_Memory",
   "Win32_System_SystemServices",
@@ -101,6 +102,7 @@ windows = { version = "0.61", features = [
   "Win32_Storage_FileSystem",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_Shell",
+  "Win32_UI_HiDpi",
   "Win32_UI_WindowsAndMessaging",
   "Win32_Media_MediaFoundation",
 ] }
@@ -108,3 +110,8 @@ windows = { version = "0.61", features = [
 [lib]
 name = "yohu_adbtools_lib"
 crate-type = ["lib"]
+
+[features]
+# `cargo tauri dev` 会 --no-default-features 走 devUrl；直接 cargo build --release 必须带此 feature 才嵌入 frontendDist。
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

@@ -15,6 +15,8 @@ mod mirror_plan;
 mod mirror_present;
 #[cfg(windows)]
 pub use mirror_present::MfDecoder;
+#[cfg(windows)]
+mod native_splash;
 mod panic_hook;
 mod paths;
 mod settings_store;
@@ -22,6 +24,7 @@ mod sidecar;
 mod state;
 mod tasks;
 mod terminal_eval;
+mod window_boot;
 mod yolog;
 
 use std::path::PathBuf;
@@ -45,6 +48,15 @@ use crate::state::AppState;
 use crate::tasks::TaskCenter;
 
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+    crate::window_boot::mark_origin();
+    // 原生小窗必须在 WebView2 / tracing 之前画出（AS / IntelliJ / keyhop）。
+    #[cfg(windows)]
+    {
+        let pref = SettingsStore::load(AppPaths::probe_settings_file())
+            .snapshot()
+            .theme;
+        crate::native_splash::show(pref);
+    }
     // WebView2 默认不挂无障碍树；UIA 联调与读屏都需要强制打开。
     // 必须在创建 WebView 之前设置（进程级环境变量）。
     if std::env::var_os("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_none() {
@@ -75,149 +87,211 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_writer(std::io::stdout.and(nb_writer))
         .init();
+    #[cfg(windows)]
+    if let Some(g) = crate::native_splash::last_geometry() {
+        tracing::info!(
+            ms = crate::window_boot::elapsed_ms(),
+            x = g.x,
+            y = g.y,
+            w = g.width,
+            h = g.height,
+            dpi = g.dpi,
+            work_left = g.work_left,
+            work_top = g.work_top,
+            work_right = g.work_right,
+            work_bottom = g.work_bottom,
+            "原生启动小窗已显示，开始装配壳"
+        );
+    }
+    #[cfg(not(windows))]
+    tracing::info!(ms = crate::window_boot::elapsed_ms(), "开始装配壳");
 
     let root_cancel = CancellationToken::new();
 
-    let builder = tauri::Builder::default().setup(move |app| {
-        let handle = app.handle().clone();
-
-        // 1) 设置（先探针读取，确定 data_root 冻结快照；设置根不随数据目录迁移）
-        let probe_file = AppPaths::probe_settings_file();
-        let settings = SettingsStore::load(probe_file);
-        let snapshot = settings.snapshot();
-        let paths = AppPaths::resolve(&snapshot.data_root);
-        crate::dnd::cleanup_stale(&paths.drag_out_dir());
-
-        // 2) 崩溃 hook（先于一切业务）
-        panic_hook::install(paths.logs_dir.clone());
-        tracing::info!("数据根: {}", paths.data_root.display());
-
-        // 3) sidecar 资源目录：应用旁 tools/（开发与 NSIS 默认）/ resources / 仓库 tools/
-        let resource_dir = sidecar::resolve_resource_dir(app);
-        let server_jar = resource_dir.join(yohu_protocol::dir::SCRCPY_SERVER);
-
-        // 4) core 服务装配
-        let user_adb = (!snapshot.adb_path.is_empty()).then(|| PathBuf::from(&snapshot.adb_path));
-        let tool = std::sync::Arc::new(ToolResolver::new(
-            user_adb,
-            resource_dir,
-            paths.adb_tools_dir(),
-        ));
-        let client = std::sync::Arc::new(AdbClient::new((*tool).clone(), 8));
-
-        let (event_tx, event_rx) = mpsc::channel::<AppEvent>(8192);
-        events::spawn_dispatcher(event_rx, handle.clone());
-
-        let capture = CaptureService::new(
-            client.clone(),
-            event_tx.clone(),
-            snapshot.buffer_capacity,
-            root_cancel.clone(),
-        );
-        let status = DeviceStatusHub::new(client.clone(), event_tx.clone(), root_cancel.clone());
-        let mirror = MirrorService::new(client.clone(), event_tx.clone(), server_jar);
-        let present = PresentHost::new(event_tx.clone(), std::sync::Arc::clone(&mirror));
-
-        let state = AppState {
-            client: client.clone(),
-            tool,
-            capture,
-            status,
-            mirror,
-            present: std::sync::Arc::clone(&present),
-            browser: FileBrowser::new(client.clone()),
-            mutator: FileMutator::new(client.clone()),
-            transfers: TransferRunner::new(client.clone()),
-            settings,
-            paths: paths.clone(),
-            app_log: AppLog::new(500),
-            tasks: std::sync::Arc::new(TaskCenter::new(event_tx.clone())),
-            event_tx: event_tx.clone(),
-            root_cancel: root_cancel.clone(),
-            last_devices: std::sync::Mutex::new(Vec::new()),
-            group_runs: std::sync::Mutex::new(std::collections::HashMap::new()),
-            group_next: std::sync::atomic::AtomicU32::new(0),
-            library: std::sync::Mutex::new(yohu_domain::CommandLibrary::empty()),
-            capture_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
-            mirror_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
-            transfer_cancels: std::sync::Arc::new(std::sync::Mutex::new(
-                std::collections::HashMap::new(),
-            )),
-            transfer_next: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
-            browse_cancel: std::sync::Mutex::new(CancellationToken::new()),
-            update_download_cancel: std::sync::Mutex::new(None),
-            catalog_gate: tokio::sync::Mutex::new(None),
-        };
-        app.manage(state);
-        crate::device_catalog::restore(&app.state::<AppState>());
-
-        if let Some(win) = app.get_webview_window("main") {
-            #[cfg(windows)]
-            match win.hwnd() {
-                Ok(hwnd) => present.set_owner(hwnd.0 as isize),
-                Err(e) => tracing::error!("无法取得主窗口 HWND: {e}"),
+    let builder = tauri::Builder::default()
+        .on_page_load(|webview, payload| {
+            let event = payload.event();
+            let started = matches!(event, tauri::webview::PageLoadEvent::Started);
+            let finished = matches!(event, tauri::webview::PageLoadEvent::Finished);
+            if started {
+                tracing::info!(
+                    ms = crate::window_boot::elapsed_ms(),
+                    label = webview.label(),
+                    "页面开始加载"
+                );
             }
-            #[cfg(target_os = "macos")]
-            match win.ns_view() {
-                Ok(view) => present.set_owner(view as isize),
-                Err(e) => tracing::error!("无法取得主窗口 NSView: {e}"),
+            if !finished {
+                return;
             }
-        }
-
-        let exit_handle = handle.clone();
-        let exit_cancel = root_cancel.clone();
-        tauri::async_runtime::spawn(async move {
-            exit_cancel.cancelled().await;
-            let state = exit_handle.state::<AppState>();
-            state.mirror.stop_all().await;
-            state.present.shutdown();
-        });
-
-        // 5) 启动预热（异步，不阻塞窗口）：解压 sidecar 后与 UI refresh 共用一趟 start-server + 扫描
-        let warm_handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let state = warm_handle.state::<AppState>();
-            let t0 = std::time::Instant::now();
-            state.tool.warm_up().await;
             tracing::info!(
-                ms = t0.elapsed().as_millis(),
-                "adb 解压完成，开始目录扫描"
+                ms = crate::window_boot::elapsed_ms(),
+                label = webview.label(),
+                "页面加载完成"
             );
-            if let Err(e) = crate::device_catalog::refresh(&state).await {
-                tracing::warn!("启动设备扫描失败: {e}");
-            } else {
-                tracing::info!(ms = t0.elapsed().as_millis(), "启动预热完成");
+            if let Some(win) = webview.app_handle().get_webview_window(webview.label()) {
+                crate::window_boot::on_main_page_finished(webview.label(), &win);
             }
-        });
+        })
+        .setup(move |app| {
+            let handle = app.handle().clone();
 
-        // 6) 可选设备自动刷新（settings 冻结快照决定）
-        if snapshot.devices_auto_refresh > 0 {
-            let handle = handle.clone();
-            let interval_secs = snapshot.devices_auto_refresh as u64;
+            // 1) 设置（先探针读取，确定 data_root 冻结快照；设置根不随数据目录迁移）
+            let probe_file = AppPaths::probe_settings_file();
+            let settings = SettingsStore::load(probe_file);
+            let snapshot = settings.snapshot();
+            // 先铺画布色。主窗保持隐藏，直到工作台 hydrate 完成再揭（关掉原生小窗）。
+            if let Some(win) = app.get_webview_window("main") {
+                crate::window_boot::prepare_main_window(&win, snapshot.theme);
+                crate::window_boot::spawn_reveal_fallback(win);
+            }
+            let paths = AppPaths::resolve(&snapshot.data_root);
+            crate::dnd::cleanup_stale(&paths.drag_out_dir());
+
+            // 2) 崩溃 hook（先于一切业务）
+            panic_hook::install(paths.logs_dir.clone());
+            tracing::info!(
+                ms = crate::window_boot::elapsed_ms(),
+                "数据根: {}",
+                paths.data_root.display()
+            );
+
+            // 3) sidecar 资源目录：应用旁 tools/（开发与 NSIS 默认）/ resources / 仓库 tools/
+            let resource_dir = sidecar::resolve_resource_dir(app);
+            let server_jar = resource_dir.join(yohu_protocol::dir::SCRCPY_SERVER);
+
+            // 4) core 服务装配
+            let user_adb =
+                (!snapshot.adb_path.is_empty()).then(|| PathBuf::from(&snapshot.adb_path));
+            let tool = std::sync::Arc::new(ToolResolver::new(
+                user_adb,
+                resource_dir,
+                paths.adb_tools_dir(),
+            ));
+            let client = std::sync::Arc::new(AdbClient::new((*tool).clone(), 8));
+
+            let (event_tx, event_rx) = mpsc::channel::<AppEvent>(8192);
+            events::spawn_dispatcher(event_rx, handle.clone());
+
+            let capture = CaptureService::new(
+                client.clone(),
+                event_tx.clone(),
+                snapshot.buffer_capacity,
+                root_cancel.clone(),
+            );
+            let status =
+                DeviceStatusHub::new(client.clone(), event_tx.clone(), root_cancel.clone());
+            let mirror = MirrorService::new(client.clone(), event_tx.clone(), server_jar);
+            let present = PresentHost::new(event_tx.clone(), std::sync::Arc::clone(&mirror));
+            tracing::info!(ms = crate::window_boot::elapsed_ms(), "投屏宿主已创建");
+
+            let state = AppState {
+                client: client.clone(),
+                tool,
+                capture,
+                status,
+                mirror,
+                present: std::sync::Arc::clone(&present),
+                browser: FileBrowser::new(client.clone()),
+                mutator: FileMutator::new(client.clone()),
+                transfers: TransferRunner::new(client.clone()),
+                settings,
+                paths: paths.clone(),
+                app_log: AppLog::new(500),
+                tasks: std::sync::Arc::new(TaskCenter::new(event_tx.clone())),
+                event_tx: event_tx.clone(),
+                root_cancel: root_cancel.clone(),
+                last_devices: std::sync::Mutex::new(Vec::new()),
+                group_runs: std::sync::Mutex::new(std::collections::HashMap::new()),
+                group_next: std::sync::atomic::AtomicU32::new(0),
+                library: std::sync::Mutex::new(yohu_domain::CommandLibrary::empty()),
+                capture_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
+                mirror_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
+                transfer_cancels: std::sync::Arc::new(std::sync::Mutex::new(
+                    std::collections::HashMap::new(),
+                )),
+                transfer_next: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                browse_cancel: std::sync::Mutex::new(CancellationToken::new()),
+                update_download_cancel: std::sync::Mutex::new(None),
+                catalog_gate: tokio::sync::Mutex::new(None),
+            };
+            app.manage(state);
+            crate::device_catalog::restore(&app.state::<AppState>());
+
+            if let Some(win) = app.get_webview_window("main") {
+                #[cfg(windows)]
+                match win.hwnd() {
+                    Ok(hwnd) => present.set_owner(hwnd.0 as isize),
+                    Err(e) => tracing::error!("无法取得主窗口 HWND: {e}"),
+                }
+                #[cfg(target_os = "macos")]
+                match win.ns_view() {
+                    Ok(view) => present.set_owner(view as isize),
+                    Err(e) => tracing::error!("无法取得主窗口 NSView: {e}"),
+                }
+            }
+
+            let exit_handle = handle.clone();
+            let exit_cancel = root_cancel.clone();
             tauri::async_runtime::spawn(async move {
-                let cancel = handle.state::<AppState>().root_cancel.clone();
-                let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
-                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-                // 首 tick 立即触发，会与启动预热扫描叠一次；跳过。
-                ticker.tick().await;
-                loop {
-                    tokio::select! {
-                        biased;
-                        _ = cancel.cancelled() => break,
-                        _ = ticker.tick() => {
-                            let state = handle.state::<AppState>();
-                            if let Err(e) = crate::device_catalog::refresh(&state).await {
-                                tracing::warn!("自动刷新失败: {e}");
+                exit_cancel.cancelled().await;
+                let state = exit_handle.state::<AppState>();
+                state.mirror.stop_all().await;
+                state.present.shutdown();
+            });
+
+            // 5) 启动预热（异步，不阻塞窗口）：解压 sidecar 后与 UI refresh 共用一趟 start-server + 扫描
+            let warm_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = warm_handle.state::<AppState>();
+                let t0 = std::time::Instant::now();
+                state.tool.warm_up().await;
+                tracing::info!(
+                    boot_ms = crate::window_boot::elapsed_ms(),
+                    ms = t0.elapsed().as_millis(),
+                    "adb 解压完成，开始目录扫描"
+                );
+                if let Err(e) = crate::device_catalog::refresh(&state).await {
+                    tracing::warn!("启动设备扫描失败: {e}");
+                } else {
+                    tracing::info!(
+                        boot_ms = crate::window_boot::elapsed_ms(),
+                        ms = t0.elapsed().as_millis(),
+                        "启动预热完成"
+                    );
+                }
+            });
+
+            // 6) 可选设备自动刷新（settings 冻结快照决定）
+            if snapshot.devices_auto_refresh > 0 {
+                let handle = handle.clone();
+                let interval_secs = snapshot.devices_auto_refresh as u64;
+                tauri::async_runtime::spawn(async move {
+                    let cancel = handle.state::<AppState>().root_cancel.clone();
+                    let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
+                    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                    // 首 tick 立即触发，会与启动预热扫描叠一次；跳过。
+                    ticker.tick().await;
+                    loop {
+                        tokio::select! {
+                            biased;
+                            _ = cancel.cancelled() => break,
+                            _ = ticker.tick() => {
+                                let state = handle.state::<AppState>();
+                                if let Err(e) = crate::device_catalog::refresh(&state).await {
+                                    tracing::warn!("自动刷新失败: {e}");
+                                }
                             }
                         }
                     }
-                }
-            });
-        }
+                });
+            }
 
-        tracing::info!("壳 setup 完成，窗口即将显示");
-        Ok(())
-    });
+            tracing::info!(
+                ms = crate::window_boot::elapsed_ms(),
+                "壳 setup 完成，等待启动层揭窗"
+            );
+            Ok(())
+        });
 
     let app = builder
         .plugin(tauri_plugin_dialog::init())
@@ -260,6 +334,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::system::system_open_path,
             commands::system::system_report_error,
             commands::system::system_log,
+            crate::window_boot::boot_show_main,
             commands::update::update_check,
             commands::update::update_info,
             commands::update::update_download,
