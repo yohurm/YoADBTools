@@ -102,11 +102,6 @@ export type Density = "compact" | "comfortable";
 
 export type MirrorProtocol = "usb" | "wifi";
 
-/** 日志写入方式（实时逐窗口日志文件）。 */
-export type LogWriteMode = "overwrite" | "append";
-/** 手动导出行为。 */
-export type ExportMode = "latest" | "select";
-
 export interface AppSettings {
   adb_path: string;
   data_root: string;
@@ -117,8 +112,6 @@ export interface AppSettings {
   density: Density;
   export_default_path: string;
   export_ask_every_time: boolean;
-  export_mode: ExportMode;
-  log_write_mode: LogWriteMode;
   log_display_columns: LogDisplayColumns;
   mirror_max_size: number;
   mirror_video_bit_rate: number;
@@ -147,8 +140,6 @@ export type SettingKey =
   | "density"
   | "export_default_path"
   | "export_ask_every_time"
-  | "export_mode"
-  | "log_write_mode"
   | "log_display_columns"
   | "mirror_max_size"
   | "mirror_video_bit_rate"
@@ -182,7 +173,6 @@ export interface AppPathCatalog {
   adb_tools_dir: string;
   library_file: string;
   exports_dir: string;
-  session_logs_dir: string;
   drag_out_dir: string;
 }
 
@@ -254,47 +244,12 @@ export interface ReplayRequest {
   serial: string;
   from_seq: number;
   limit: number;
-  filter?: LogFilter;
-}
-
-export interface SessionFileRequest {
-  serial: string;
-  window_id: number;
-  /** 窗口名（会话标题，如包名/PID/System；统一数据源） */
-  name: string;
-  mode: LogWriteMode;
-}
-
-export interface SessionFileInfo {
-  path: string;
-  name: string;
-  lines: number;
-}
-
-export interface SessionFileAppendRequest {
-  serial: string;
-  window_id: number;
-  lines: LogLine[];
-}
-
-export interface SessionFileCloseRequest {
-  serial: string;
-  window_id: number;
-}
-
-export interface SessionLogFile {
-  path: string;
-  serial: string;
-  window_id: number;
-  /** 窗口名（会话标题；统一数据源） */
-  name: string;
-  lines: number;
-  modified: string;
 }
 
 export interface ExportRequest {
-  /** 要合并的源日志文件路径（来自 `sessionFileList` / 当前窗口最新文件） */
-  sources: string[];
+  serial: string;
+  from_seq: number;
+  filter: LogFilter;
   path?: string;
 }
 

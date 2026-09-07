@@ -272,8 +272,6 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         density: "comfortable",
         export_default_path: "",
         export_ask_every_time: true,
-        export_mode: "latest",
-        log_write_mode: "overwrite",
         log_display_columns: { ts: true, uid: false, pid: true, tid: true, level: true, tag: true },
         mirror_max_size: 0,
         mirror_video_bit_rate: 16_000_000,
@@ -312,7 +310,6 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       adb_tools_dir: "C:/Local/YohuAdbTools/data/tools/adb",
       library_file: "C:/Local/YohuAdbTools/data/modules/adb-terminal/config/library.json",
       exports_dir: "C:/Local/YohuAdbTools/data/modules/log-analyzer/exports",
-      session_logs_dir: "C:/Local/YohuAdbTools/data/modules/log-analyzer/session-logs",
       drag_out_dir: "C:/Local/YohuAdbTools/data/modules/file-manager/drag-out",
     };
     expect(JSON.parse(JSON.stringify(paths))).toEqual(paths);
@@ -398,6 +395,5 @@ export type _SettingValue_Theme = Expect<Equal<SettingValue<"theme">, Theme>>;
 export type _SettingValue_Density = Expect<Equal<SettingValue<"density">, Density>>;
 export type _SettingValue_Number = Expect<Equal<SettingValue<"buffer_capacity">, number>>;
 export type _SettingValue_Bool = Expect<Equal<SettingValue<"clear_device_on_start">, boolean>>;
-export type _SettingValue_Enum = Expect<Equal<SettingValue<"log_write_mode">, "overwrite" | "append">>;
 export type _SettingValue_Object = Expect<Equal<SettingValue<"log_display_columns">, LogDisplayColumns>>;
 export type _SettingValue_MirrorProtocol = Expect<Equal<SettingValue<"mirror_protocol">, "usb" | "wifi">>;

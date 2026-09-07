@@ -58,6 +58,5 @@ export const EMPTY_PATH_CATALOG: AppPathCatalog = {
   adb_tools_dir: "",
   library_file: "",
   exports_dir: "",
-  session_logs_dir: "",
   drag_out_dir: "",
 };
