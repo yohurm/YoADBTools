@@ -92,6 +92,11 @@ impl AppPaths {
         self.module_data(module_id::FILES).join(dir::DRAG_OUT)
     }
 
+    /// 上次成功扫描的设备目录（启动先画出，再被本次扫描替换）。
+    pub fn devices_catalog_file(&self) -> PathBuf {
+        self.settings_dir.join("devices-catalog.json")
+    }
+
     /// IPC / 关于页用的绝对路径目录。
     pub fn catalog(&self) -> AppPathCatalog {
         AppPathCatalog {

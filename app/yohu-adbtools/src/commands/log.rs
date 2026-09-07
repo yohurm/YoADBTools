@@ -108,3 +108,12 @@ pub async fn log_process_snapshot(
 ) -> Result<Vec<ProcessEntry>, IpcError> {
     state.capture.process_snapshot(&serial).await.map_err(ipc)
 }
+
+/// `log.packageSnapshot`：已安装包名（新建窗口检索；不是当前进程）。
+#[tauri::command(rename = "log.packageSnapshot")]
+pub async fn log_package_snapshot(
+    state: State<'_, AppState>,
+    serial: String,
+) -> Result<Vec<String>, IpcError> {
+    state.capture.package_snapshot(&serial).await.map_err(ipc)
+}

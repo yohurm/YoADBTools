@@ -15,16 +15,10 @@ pub fn system_info(state: State<'_, AppState>) -> Result<SystemInfo, IpcError> {
         .resolve()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let adb_in_use = state
-        .adb_in_use
-        .lock()
-        .expect("adb_in_use lock poisoned")
-        .clone();
     Ok(SystemInfo {
         identity: AppIdentity::with_version(env!("CARGO_PKG_VERSION")),
         paths: state.paths.catalog(),
         adb_path,
-        adb_in_use,
         settings: state.settings.snapshot(),
         os: std::env::consts::OS.to_string(),
     })

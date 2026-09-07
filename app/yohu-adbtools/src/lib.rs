@@ -135,7 +135,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             event_tx: event_tx.clone(),
             root_cancel: root_cancel.clone(),
             last_devices: std::sync::Mutex::new(Vec::new()),
-            adb_in_use: std::sync::Mutex::new(None),
             group_runs: std::sync::Mutex::new(std::collections::HashMap::new()),
             group_next: std::sync::atomic::AtomicU32::new(0),
             library: std::sync::Mutex::new(yohu_domain::CommandLibrary::empty()),
@@ -147,8 +146,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             transfer_next: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
             browse_cancel: std::sync::Mutex::new(CancellationToken::new()),
             update_download_cancel: std::sync::Mutex::new(None),
+            catalog_gate: tokio::sync::Mutex::new(None),
         };
         app.manage(state);
+        crate::device_catalog::restore(&app.state::<AppState>());
 
         if let Some(win) = app.get_webview_window("main") {
             #[cfg(windows)]
@@ -172,15 +173,20 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             state.present.shutdown();
         });
 
-        // 5) 启动预热（异步，不阻塞窗口）：adb 解压 + 首扫设备
+        // 5) 启动预热（异步，不阻塞窗口）：解压 sidecar 后与 UI refresh 共用一趟 start-server + 扫描
         let warm_handle = handle.clone();
         tauri::async_runtime::spawn(async move {
             let state = warm_handle.state::<AppState>();
+            let t0 = std::time::Instant::now();
             state.tool.warm_up().await;
+            tracing::info!(
+                ms = t0.elapsed().as_millis(),
+                "adb 解压完成，开始目录扫描"
+            );
             if let Err(e) = crate::device_catalog::refresh(&state).await {
                 tracing::warn!("启动设备扫描失败: {e}");
             } else {
-                tracing::info!("启动预热完成");
+                tracing::info!(ms = t0.elapsed().as_millis(), "启动预热完成");
             }
         });
 
@@ -242,6 +248,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::log::log_replay,
             commands::log::log_export,
             commands::log::log_process_snapshot,
+            commands::log::log_package_snapshot,
             commands::mirror::mirror_start,
             commands::mirror::mirror_stop,
             commands::mirror::mirror_inject,

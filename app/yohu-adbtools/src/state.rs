@@ -47,8 +47,6 @@ pub struct AppState {
     // ===== 运行期状态（短临界区，std Mutex） =====
     /// 最近一次设备扫描快照
     pub last_devices: Mutex<Vec<DeviceInfo>>,
-    /// 最近一次扫描实际使用的 adb 路径（诊断）
-    pub adb_in_use: Mutex<Option<String>>,
     /// 命令组运行（run_id → 取消令牌）
     pub group_runs: Mutex<HashMap<u32, CancellationToken>>,
     pub group_next: AtomicU32,
@@ -65,6 +63,10 @@ pub struct AppState {
     pub browse_cancel: Mutex<CancellationToken>,
     /// 进行中的应用更新下载取消令牌
     pub update_download_cancel: Mutex<Option<CancellationToken>>,
+    /// 进行中的目录扫描：启动预热与 UI refresh 共用一趟，禁止双开 adb daemon。
+    pub catalog_gate: tokio::sync::Mutex<
+        Option<tokio::sync::watch::Receiver<Option<Result<Vec<DeviceInfo>, String>>>>,
+    >,
 }
 
 impl AppState {
