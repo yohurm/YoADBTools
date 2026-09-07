@@ -9,7 +9,7 @@
 | 命令 | 说明 |
 |------|------|
 | `device.list` | 读目录快照，不跑 adb |
-| `device.refresh` | `devices -l` 整表替换目录；推 `devices/changed`；先前 Online 且本次不再 Online 的 serial 推 `device/offline` 并停采集/投屏；Online 集合同步 `DeviceStatusHub` |
+| `device.refresh` | `start-server` + `devices -l` 整表替换目录并立刻推 `devices/changed`；与启动预热单飞；先前 Online 且本次不再 Online 的 serial 推 `device/offline`，采集/投屏后台收敛；Online 集合同步 `DeviceStatusHub`（先 getprop 再 dumpsys） |
 | `device.status` | 读运行时状态缓存（可选 `serial`）；不触发扫描 |
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
@@ -17,7 +17,7 @@
 | `commandlib.load` / `save` | 命令库；损坏备份后默认库 |
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
-| `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` | 环 / logcat -c / 回补 / ps |
+| `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
 | `mirror.start/stop/inject/closeControl/layout/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**（舞台透明洞，不是 contain 目标、不是视觉插值盒）。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。禁止 `video_width` / `stroke_px`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。可见则 HWND 独占占用矩形的像素；`visible=false` 才拆表面。Live 状态只信 `mirror/state`，无 `mirror.status` |
 | `settings.set` | 更新单键；推 `settings/changed` 全量快照。读走 `system.info` / 事件注入 |

@@ -18,13 +18,14 @@
 | 模块 | `@yohu/module-{terminal,files,logs,mirror}` |
 | 图标 | `app/yohu-adbtools/icons/`；UI 同源 `/app-icon.png` |
 
-`system.info` 返回 `{ identity, paths, adb_path, adb_in_use, settings }`。
+`system.info` 返回 `{ identity, paths, adb_path, settings }`。`adb_path` 是 ToolResolver 当前解析的那一份运行时 sidecar（用户设置或 DataRoot 解压副本）。
 
 ## 路径规划
 
 ```text
 <os_app_data>/<DATA_DIR_NAME>/     # local_root（不随 data_root 迁移）
 ├── settings/settings.json
+├── settings/devices-catalog.json  # 上次成功 `devices -l`（启动先画卡片，扫描再对账）
 ├── settings/update.json           # 更新通道密钥/仓库覆盖（ADR-v6-022）
 ├── logs/                          # app-*.log + panic-*.log
 └── data/                          # DataRoot（可配，重启生效）

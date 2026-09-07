@@ -19,13 +19,15 @@ UI：deviceStore 投影目录 + statuses
 
 ## 目录
 
-成功扫描（含空列表）整表替换。扫描失败不改目录。`require_online` 只信这份快照。
+成功扫描（含空列表）整表替换。扫描失败不改目录。`require_online` 只信这份快照。`devices/changed` 在 `devices -l` 解析后立刻发，掉线采集/投屏收敛不挡目录。
+
+启动：`settings/devices-catalog.json` 恢复上次成功目录，UI `device.list` 先画卡片；随后一趟 `start-server` + `devices -l` 对账。预热与 UI `device.refresh` 单飞。运行时 adb 只走 DataRoot 解压副本（或用户设置），安装包旁原件不解压成功后不再调用。恢复只用于冷启动首屏，成功空扫描仍整表清空。
 
 先前 Online 且本次不再 Online 的 serial：停采集/投屏/状态采样，推 `device/offline`。目录里仍可留下 unauthorized/offline 条目。
 
 ## 运行时状态
 
-`yohu-adb::DeviceStatusHub`：每 Online serial 一路 `CancellationToken`。采样脚本常量、无用户拼接。解析失败保留上次快照。
+`DeviceStatusHub`：每 Online serial 一路 `CancellationToken`。首采先 `getprop`（SDK/版本/品牌）推 `device/status`，再跑 dumpsys 补电量/深浅色/亮屏；周期仍 2s 整包。`None` 保留上次字段。采样脚本常量、无用户拼接。
 
 | 字段 | 来源 |
 |------|------|

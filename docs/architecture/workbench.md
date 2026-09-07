@@ -34,7 +34,7 @@ DeviceRail → deviceStore（目录 + statuses 投影）→ resolve_targets → 
 settings.json → settings.set / settings/changed → settingsStore → DeviceSession.settings
 ```
 
-成功扫描（含空列表）整表替换目录。扫描失败不改目录。禁止用上次快照顶替空扫描。
+成功扫描（含空列表）整表替换目录。扫描失败不改目录。禁止用上次快照顶替空扫描。启动可读 `devices-catalog.json` 先画卡片，再被本次扫描替换。目录事件在 `devices -l` 后立刻发；运行时字段经 `device/status` 分段到达。预热与 UI refresh 共用一趟 adb。
 
 选择策略在 domain 与 TS 各有一份，testdata JSON 对齐（点击不能等 IPC）。
 
