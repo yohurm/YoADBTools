@@ -94,6 +94,7 @@ fn server_argv(req: &MirrorSessionRequest, scid: u32, forward: bool) -> Vec<Stri
         format!("max_size={}", limits.max_size),
         format!("video_bit_rate={}", req.video_bit_rate),
         "cleanup=false".into(),
+        "power_on=true".into(),
         "video_codec_options=i-frame-interval=1".into(),
     ];
     if limits.max_fps > 0 {
@@ -448,7 +449,7 @@ async fn run_connected(
             tokio::select! {
                 biased;
                 _ = wake_cancel.cancelled() => {}
-                _ = tokio::time::sleep(Duration::from_millis(400)) => {
+                _ = tokio::time::sleep(Duration::from_millis(50)) => {
                     if wake_pkts.load(Ordering::Relaxed) == 0 {
                         tracing::info!(serial = %wake_serial, "Live 后无帧，注入 KEYCODE_WAKEUP");
                         let _ = wake_adb
@@ -488,6 +489,17 @@ async fn run_connected(
             }
         });
         control_write = Some(write_half);
+        if let Some(stream) = control_write.as_mut() {
+            let bytes = encode_control(&MirrorControlMessage::DisplayPower { on: true });
+            let write = stream.write_all(&bytes);
+            tokio::pin!(write);
+            let _ = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => false,
+                _ = tokio::time::sleep(Duration::from_millis(200)) => false,
+                res = &mut write => res.is_ok(),
+            };
+        }
     }
 
     let mut packets: u64 = 0;
