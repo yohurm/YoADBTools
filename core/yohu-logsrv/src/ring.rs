@@ -68,42 +68,15 @@ impl RingBuffer {
             .collect()
     }
 
-    /// 过滤快照（导出用；过滤语义与 UI 会话一致）。
-    pub fn snapshot_filtered(&self, filter: &LogFilter, limit: usize) -> Vec<LogLine> {
+    /// 过滤快照（导出用）：`seq >= from_seq` 且匹配 filter。环本身已受容量约束。
+    pub fn snapshot_filtered(&self, from_seq: u64, filter: &LogFilter) -> Vec<LogLine> {
         let state = self.inner.lock().expect("ring lock poisoned");
         state
             .buf
             .iter()
-            .filter(|l| log_filter_matches(filter, l))
-            .take(limit)
+            .filter(|l| l.seq >= from_seq && log_filter_matches(filter, l))
             .cloned()
             .collect()
-    }
-
-    /// 过滤 + `seq >= from_seq` 的快照（回补用；过滤语义与 UI 会话一致）。
-    /// 返回 `(lines, truncated)`：`truncated` 表示环内还有**匹配且 seq 更大**的行（需翻页/继续回补）。
-    pub fn snapshot_filtered_from(
-        &self,
-        from_seq: u64,
-        filter: &LogFilter,
-        limit: usize,
-    ) -> (Vec<LogLine>, bool) {
-        let state = self.inner.lock().expect("ring lock poisoned");
-        let lines: Vec<LogLine> = state
-            .buf
-            .iter()
-            .filter(|l| l.seq >= from_seq && log_filter_matches(filter, l))
-            .take(limit)
-            .cloned()
-            .collect();
-        let truncated = match lines.last() {
-            Some(last) => state
-                .buf
-                .iter()
-                .any(|l| l.seq > last.seq && log_filter_matches(filter, l)),
-            None => false,
-        };
-        (lines, truncated)
     }
 
     /// 从 `from_seq` 取至多 `limit` 行；`truncated` 表示环内还有更大 seq。
@@ -200,7 +173,7 @@ mod tests {
             scope: yohu_protocol::LogScope::Pid { pid: 1 },
             ..Default::default()
         };
-        assert_eq!(ring.snapshot_filtered(&filter, 100).len(), 5);
+        assert_eq!(ring.snapshot_filtered(0, &filter).len(), 5);
         let (page, truncated) = ring.snapshot_page(0, 2);
         assert_eq!(page.len(), 2);
         assert!(truncated);

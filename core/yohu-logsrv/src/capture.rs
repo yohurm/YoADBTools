@@ -1,12 +1,11 @@
-//! 设备级采集：跟流、环形缓冲、进程索引、一次性 dump。
+//! 设备级采集：跟流、环形缓冲、进程索引。
 //!
 //! 状态机（每 serial）：空 → Starting(gen) → Live(gen) → Stopping(gen) → 空。
 //! start 仅对 Live **adopt**；Starting/Stopping 等待后再决定。新流才 `ring.clear()`。
 //! 控制面 `CaptureState` 带 generation 且 `send().await` 必达；批次仍 `try_send`。
-//! 跟流始终 `ring.clear()`；`dump_into_ring` 只追加、不跟流。
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -23,7 +22,6 @@ use yohu_protocol::{
 
 const LOGCAT_FORMAT: &str = "threadtime,uid";
 const INDEX_INTERVAL: Duration = Duration::from_millis(2500);
-const EXEC_OUT_PROBE: Duration = Duration::from_secs(2);
 /// 取消后等跟流任务收敛的上限。超时则 abort，禁止握着 logcat 管道死等。
 const STOP_JOIN: Duration = Duration::from_secs(3);
 
@@ -43,17 +41,6 @@ struct AbortOnDrop<T>(Option<tokio::task::JoinHandle<T>>);
 impl<T> AbortOnDrop<T> {
     fn new(handle: tokio::task::JoinHandle<T>) -> Self {
         Self(Some(handle))
-    }
-
-    fn is_finished(&self) -> bool {
-        self.0.as_ref().is_some_and(|h| h.is_finished())
-    }
-
-    async fn wait(&mut self) {
-        if let Some(handle) = self.0.as_mut() {
-            let _ = handle.await;
-        }
-        self.0.take();
     }
 
     async fn join(mut self) {
@@ -131,33 +118,15 @@ pub struct CaptureService {
     root_cancel: CancellationToken,
 }
 
-fn follow_argv(exec_out: bool) -> Vec<String> {
-    if exec_out {
-        vec![
-            "exec-out".into(),
-            "logcat".into(),
-            "-v".into(),
-            LOGCAT_FORMAT.into(),
-        ]
-    } else {
-        vec!["logcat".into(), "-v".into(), LOGCAT_FORMAT.into()]
-    }
+fn follow_argv() -> Vec<String> {
+    vec!["logcat".into(), "-v".into(), LOGCAT_FORMAT.into()]
 }
 
-pub fn ingest_raw_lines(
-    ring: &RingBuffer,
-    raw_lines: impl IntoIterator<Item = impl AsRef<str>>,
-) -> u64 {
-    let mut added = 0u64;
-    for raw in raw_lines {
-        let raw = raw.as_ref();
-        if raw.trim().is_empty() || raw.trim_start().starts_with("---------") {
-            continue;
-        }
-        ring.push(parse_threadtime(raw));
-        added += 1;
+fn parse_logcat_line(raw: &str) -> Option<yohu_protocol::LogLine> {
+    if raw.trim().is_empty() || raw.trim_start().starts_with("---------") {
+        return None;
     }
-    added
+    Some(parse_threadtime(raw))
 }
 
 async fn run_follow(
@@ -168,15 +137,11 @@ async fn run_follow(
     cancel: CancellationToken,
 ) {
     let (line_tx, mut line_rx) = mpsc::channel::<String>(1024);
-    let seen = Arc::new(AtomicU64::new(0));
-    let pump_seen = Arc::clone(&seen);
     let pump = AbortOnDrop::new(tokio::spawn(async move {
         while let Some(raw) = line_rx.recv().await {
-            if raw.trim_start().starts_with("---------") {
+            let Some(mut line) = parse_logcat_line(&raw) else {
                 continue;
-            }
-            pump_seen.fetch_add(1, Ordering::Relaxed);
-            let mut line = parse_threadtime(&raw);
+            };
             // 单调 seq 由环分配：让送入批量器/推送链路的行也带上同一 seq，
             // 否则 UI 的 seq 去重/回补锚点全为 0（数据被误判为重复而丢弃）。
             line.seq = ring.push(line.clone());
@@ -186,72 +151,9 @@ async fn run_follow(
         }
     }));
 
-    let probe_cancel = cancel.child_token();
-    let mut probe = AbortOnDrop::new({
-        let adb = Arc::clone(&adb);
-        let serial = serial.clone();
-        let tx = line_tx.clone();
-        let token = probe_cancel.clone();
-        tokio::spawn(async move {
-            adb.stream_lines(&serial, &follow_argv(true), token, tx)
-                .await
-        })
-    });
-
-    let deadline = tokio::time::Instant::now() + EXEC_OUT_PROBE;
-    loop {
-        if cancel.is_cancelled() {
-            probe_cancel.cancel();
-            break;
-        }
-        if seen.load(Ordering::Relaxed) > 0 {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => probe_cancel.cancel(),
-                _ = probe.wait() => {}
-            }
-            break;
-        }
-        if probe.is_finished() {
-            probe.wait().await;
-            if seen.load(Ordering::Relaxed) == 0 && !cancel.is_cancelled() {
-                tracing::warn!("exec-out logcat 未产出，回退 adb logcat");
-                let _ = adb
-                    .stream_lines(
-                        &serial,
-                        &follow_argv(false),
-                        cancel.clone(),
-                        line_tx.clone(),
-                    )
-                    .await;
-            }
-            break;
-        }
-        if tokio::time::Instant::now() >= deadline {
-            probe_cancel.cancel();
-            probe.wait().await;
-            if seen.load(Ordering::Relaxed) == 0 && !cancel.is_cancelled() {
-                tracing::warn!("exec-out logcat 超时无行，回退 adb logcat");
-                let _ = adb
-                    .stream_lines(
-                        &serial,
-                        &follow_argv(false),
-                        cancel.clone(),
-                        line_tx.clone(),
-                    )
-                    .await;
-            }
-            break;
-        }
-        tokio::select! {
-            biased;
-            _ = cancel.cancelled() => {
-                probe_cancel.cancel();
-                break;
-            }
-            _ = tokio::time::sleep(Duration::from_millis(40)) => {}
-        }
-    }
+    let _ = adb
+        .stream_lines(&serial, &follow_argv(), cancel.clone(), line_tx.clone())
+        .await;
 
     drop(line_tx);
     pump.join().await;
@@ -295,10 +197,7 @@ impl CaptureService {
 
     pub fn replay(self: &Arc<Self>, req: ReplayRequest) -> LogBatch {
         let ring = self.ring(&req.serial);
-        let (lines, truncated) = match &req.filter {
-            Some(filter) => ring.snapshot_filtered_from(req.from_seq, filter, req.limit as usize),
-            None => ring.snapshot_page(req.from_seq, req.limit as usize),
-        };
+        let (lines, truncated) = ring.snapshot_page(req.from_seq, req.limit as usize);
         let from_seq = lines.first().map(|l| l.seq).unwrap_or(req.from_seq);
         LogBatch {
             serial: req.serial,
@@ -561,12 +460,6 @@ impl CaptureService {
         Ok(self.adb.ps(serial, CancellationToken::new()).await?)
     }
 
-    /// 一次性 `logcat -d` 写入环。不跟流、不清环、不推批次。
-    pub async fn dump_into_ring(self: &Arc<Self>, serial: &str) -> Result<u64, LogError> {
-        let raw = self.adb.dump_log(serial, CancellationToken::new()).await?;
-        Ok(ingest_raw_lines(&self.ring(serial), raw))
-    }
-
     async fn emit_state(&self, serial: &str, generation: u64, state: CaptureState) {
         let _ = self
             .sink
@@ -626,6 +519,17 @@ impl CaptureService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ingest_raw_lines(ring: &RingBuffer, raw_lines: impl IntoIterator<Item = impl AsRef<str>>) -> u64 {
+        let mut added = 0u64;
+        for raw in raw_lines {
+            if let Some(line) = parse_logcat_line(raw.as_ref()) {
+                ring.push(line);
+                added += 1;
+            }
+        }
+        added
+    }
 
     #[test]
     fn ingest_skips_headers_and_parses_threadtime() {

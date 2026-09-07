@@ -11,8 +11,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use yohu_adb::{AdbClient, ToolResolver};
-use yohu_logsrv::{CaptureService, SessionLogService};
-use yohu_protocol::{AppEvent, LogWriteMode};
+use yohu_logsrv::CaptureService;
+use yohu_protocol::{AppEvent, LogFilter};
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -171,9 +171,9 @@ async fn real_detach_clears_ring() {
     );
 }
 
-/// 日志写入端到端：采集 → 逐窗口实时文件 → 合并导出，内容与已采集行一致。
+/// 导出：采集后从环过滤快照写 txt，行数与环一致。
 #[tokio::test]
-async fn real_session_log_write_export() {
+async fn real_export_filtered_ring_snapshot() {
     let client = Arc::new(AdbClient::new(
         ToolResolver::new(
             Some(real_adb()),
@@ -202,28 +202,17 @@ async fn real_session_log_write_export() {
     assert!(!lines.is_empty(), "真实设备应产出至少一行");
 
     let root = std::env::temp_dir().join(format!(
-        "yohu-real-slog-{}-{:?}",
+        "yohu-real-export-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
-    let slog = SessionLogService::new(root.clone());
-    slog.open(&serial, 1, "System", LogWriteMode::Overwrite)
-        .expect("打开窗口日志文件");
-    // 窗口记录的是「UI 已过滤后的行」；真实设备场景直接写入采集到的行
-    for chunk in lines.chunks(500) {
-        slog.append(&serial, 1, chunk).expect("追加窗口日志");
-    }
-    slog.close(&serial, 1).expect("关闭窗口日志文件");
-
-    let listed = slog.list().expect("列出窗口日志文件");
-    assert_eq!(listed.len(), 1, "应恰好一个窗口日志文件");
-    assert_eq!(listed[0].lines, lines.len() as u64);
-
-    let srcs: Vec<String> = listed.iter().map(|f| f.path.clone()).collect();
-    let result = slog.export(&srcs, None, None).expect("合并导出");
+    let out = root.join("out.txt");
+    let result = service
+        .export(&serial, 0, &LogFilter::default(), Some(&out), None)
+        .expect("导出环快照");
     let content = std::fs::read_to_string(&result.path).expect("读导出文件");
     assert_eq!(content.lines().count() as u64, result.lines);
-    assert_eq!(result.lines, lines.len() as u64, "导出行数与采集行数一致");
+    assert!(result.lines >= lines.len() as u64, "导出行数应覆盖已收到的批次");
 
     let _ = std::fs::remove_dir_all(&root);
 }

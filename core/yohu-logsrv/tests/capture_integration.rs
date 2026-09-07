@@ -395,23 +395,6 @@ async fn process_snapshot_reads_ps() {
 }
 
 #[tokio::test]
-async fn dump_into_ring_ingests_logcat_d() {
-    let (service, _rx) = build_service(isolated_fake_adb(
-        r#"{
-            "logcat_lines": [
-                "--------- beginning of main",
-                "01-02 03:04:05.678  1234  5678 I TestTag: dumped"
-            ],
-            "logcat_delay_ms": 0
-        }"#,
-    ));
-    let added = service.dump_into_ring("R58M1234A").await.expect("dump");
-    assert_eq!(added, 1);
-    let snap = service.ring("R58M1234A").snapshot(0, 10);
-    assert_eq!(snap[0].msg, "dumped");
-}
-
-#[tokio::test]
 async fn adb_client_devices_parse_via_fake() {
     let exe = isolated_fake_adb(
         r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1", "Z9X unauthorized"] }"#,
