@@ -21,28 +21,6 @@ pub enum Density {
     Comfortable,
 }
 
-/// 日志写入方式（实时逐窗口日志文件）。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LogWriteMode {
-    /// 每个窗口固定文件名，下次采集任务截断重写。
-    #[default]
-    Overwrite,
-    /// 每个采集任务各开一个新文件（时间戳命名），旧文件保留。
-    Append,
-}
-
-/// 手动导出行为（`log.export`）。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExportMode {
-    /// 直接导出当前窗口最新的日志文件。
-    #[default]
-    Latest,
-    /// 弹窗列出窗口日志文件，多选（含全选/取消全选）后导出。
-    Select,
-}
-
 /// 日志清单显示哪些元数据列（消息列始终显示）。缺字段视为开启。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogDisplayColumns {
@@ -102,12 +80,6 @@ pub struct AppSettings {
     /// 手动导出每次询问保存位置（默认开）
     #[serde(default = "default_export_ask")]
     pub export_ask_every_time: bool,
-    /// 手动导出行为：最新 / 选择（导出实时逐窗口日志文件）
-    #[serde(default)]
-    pub export_mode: ExportMode,
-    /// 日志写入方式（实时逐窗口文件）：覆盖 / 续写（每次任务新开文件）
-    #[serde(default)]
-    pub log_write_mode: LogWriteMode,
     /// 日志清单显示列（立即生效；消息列始终在）
     #[serde(default)]
     pub log_display_columns: LogDisplayColumns,
@@ -174,8 +146,6 @@ impl Default for AppSettings {
             density: Density::Comfortable,
             export_default_path: String::new(),
             export_ask_every_time: default_export_ask(),
-            export_mode: ExportMode::Latest,
-            log_write_mode: LogWriteMode::Overwrite,
             log_display_columns: LogDisplayColumns::default(),
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
@@ -199,8 +169,6 @@ pub enum SettingKey {
     Density,
     ExportDefaultPath,
     ExportAskEveryTime,
-    ExportMode,
-    LogWriteMode,
     LogDisplayColumns,
     MirrorMaxSize,
     MirrorVideoBitRate,
@@ -222,8 +190,6 @@ impl SettingKey {
             SettingKey::Density => "density",
             SettingKey::ExportDefaultPath => "export_default_path",
             SettingKey::ExportAskEveryTime => "export_ask_every_time",
-            SettingKey::ExportMode => "export_mode",
-            SettingKey::LogWriteMode => "log_write_mode",
             SettingKey::LogDisplayColumns => "log_display_columns",
             SettingKey::MirrorMaxSize => "mirror_max_size",
             SettingKey::MirrorVideoBitRate => "mirror_video_bit_rate",
@@ -246,8 +212,6 @@ mod tests {
         assert_eq!(s.buffer_capacity, 10_000);
         assert!(s.clear_device_on_start);
         assert!(s.export_ask_every_time);
-        assert_eq!(s.export_mode, ExportMode::Latest);
-        assert_eq!(s.log_write_mode, LogWriteMode::Overwrite);
         assert!(s.export_default_path.is_empty());
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
         assert_eq!(s.mirror_max_size, 0);
@@ -277,8 +241,6 @@ mod tests {
         assert_eq!(s.theme, Theme::Dark);
         assert_eq!(s.density, Density::Comfortable);
         assert!(s.export_ask_every_time);
-        assert_eq!(s.export_mode, ExportMode::Latest);
-        assert_eq!(s.log_write_mode, LogWriteMode::Overwrite);
     }
 
     #[test]
@@ -335,8 +297,6 @@ mod tests {
             SettingKey::Density,
             SettingKey::ExportDefaultPath,
             SettingKey::ExportAskEveryTime,
-            SettingKey::ExportMode,
-            SettingKey::LogWriteMode,
             SettingKey::LogDisplayColumns,
             SettingKey::MirrorMaxSize,
             SettingKey::MirrorVideoBitRate,

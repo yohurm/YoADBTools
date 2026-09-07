@@ -90,7 +90,7 @@ pub enum LogScope {
     },
 }
 
-/// 日志过滤条件（会话过滤 / 导出 / 回补共用）。
+/// 日志过滤条件（会话过滤 / 导出共用；回补读环不过滤）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LogFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
