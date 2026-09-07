@@ -36,6 +36,7 @@ import { NewSessionDialog } from "./NewSessionDialog";
 import { copyLogText, LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
 import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns, type LogColumnSpec } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
+import { formatSessionDevice } from "./session-device";
 import { deviceSlice, logStore } from "./store";
 import type { LogSessionState } from "./workspace";
 import "./logs.css";
@@ -564,7 +565,9 @@ export function LogAnalyzerView(props: DeviceSession) {
                       ? "启动中"
                       : "已停止"}
                 </span>
-                <span>设备 {session.serial ?? "—"}</span>
+                <span>
+                  {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}
+                </span>
                 <span>行数 {session.visible.length}</span>
                 <Show when={selectedKeys().size > 0}>
                   <span>已选 {selectedKeys().size}</span>

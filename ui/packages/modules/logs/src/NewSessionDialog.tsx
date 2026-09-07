@@ -1,6 +1,7 @@
 /**
- * 新建日志窗口：设备 + 划分（包名/PID）+ 可检索进程列表。
- * 进程列表是主内容（唯一滚动区）；检索框同时是过滤和创建值，避免「下拉 + 再输入」叠层。
+ * 新建日志窗口：设备 + 划分（包名/PID）。
+ * 包名列表来自已安装应用（`log.packageSnapshot`）；PID 列表来自当前进程（`ps`）。
+ * 检索框同时是过滤和创建值，避免「下拉 + 再输入」叠层。
  */
 
 import { For, Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
@@ -59,7 +60,11 @@ export function NewSessionDialog(props: {
       return;
     }
     setLoading(true);
-    void logStore.refreshProcesses(serial).finally(() => setLoading(false));
+    const job =
+      untrack(mode) === "pid"
+        ? logStore.refreshProcesses(serial)
+        : logStore.refreshPackages(serial);
+    void job.finally(() => setLoading(false));
   };
 
   createEffect(() => {
@@ -80,17 +85,24 @@ export function NewSessionDialog(props: {
     setMode(next);
     setQuery("");
     setError("");
+    const serial = deviceSerial();
+    if (!serial) return;
+    setLoading(true);
+    const job = next === "pid" ? logStore.refreshProcesses(serial) : logStore.refreshPackages(serial);
+    void job.finally(() => setLoading(false));
   };
 
   const processEntries = createMemo(
     () => logStore.state.devices[deviceSerial()]?.processEntries ?? [],
   );
 
-  const indexDegraded = createMemo(
-    () => logStore.state.devices[deviceSerial()]?.indexDegraded === true,
-  );
+  const packageNames = createMemo(() => logStore.state.devices[deviceSerial()]?.packages ?? []);
 
-  const packageNames = createMemo(() => [...new Set(processEntries().map((e) => e.name))].sort());
+  const listDegraded = createMemo(() => {
+    const slice = logStore.state.devices[deviceSerial()];
+    if (!slice) return false;
+    return mode() === "pid" ? slice.indexDegraded === true : slice.packagesDegraded === true;
+  });
 
   const filteredPackages = createMemo(() => {
     const q = query().trim().toLowerCase();
@@ -224,7 +236,7 @@ export function NewSessionDialog(props: {
             placeholder={
               mode() === "package"
                 ? loading()
-                  ? "正在读取进程…"
+                  ? "正在读取已安装应用…"
                   : "过滤或输入包名"
                 : loading()
                   ? "正在读取进程…"
@@ -244,7 +256,11 @@ export function NewSessionDialog(props: {
               when={filteredPackages().length > 0}
               fallback={
                 <p class="yohu-logs__new-empty">
-                  {loading() ? "正在读取进程…" : query().trim() ? "无匹配进程，将使用上方输入创建" : "进程列表为空，可手动输入包名"}
+                  {loading()
+                    ? "正在读取已安装应用…"
+                    : query().trim()
+                      ? "无匹配应用，将使用上方输入创建"
+                      : "应用列表为空，可手动输入包名"}
                 </p>
               }
             >
@@ -303,8 +319,12 @@ export function NewSessionDialog(props: {
         <Show when={mode() === "package"}>
           <YoCheckbox label="包含子进程（pkg:xxx）" checked={includeChild()} onChange={setIncludeChild} />
         </Show>
-        <Show when={indexDegraded()}>
-          <p class="yohu-logs__new-hint">进程列表读取失败，可直接在上方输入包名或 PID。</p>
+        <Show when={listDegraded()}>
+          <p class="yohu-logs__new-hint">
+            {mode() === "package"
+              ? "已安装应用列表读取失败，可直接在上方输入包名。"
+              : "进程列表读取失败，可直接在上方输入 PID。"}
+          </p>
         </Show>
         <Show when={error()}>
           <p class="yohu-logs__new-error">{error()}</p>

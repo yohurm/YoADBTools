@@ -66,12 +66,15 @@ export type SessionFilterPatch = Partial<
   Pick<LogSessionState, "minLevel" | "tagContains" | "keyword" | "scope" | "paused">
 >;
 
-/** 每设备一份投影：世代 / 溢出 / 进程索引。窗口只引用 serial，不共用全局数组。 */
+/** 每设备一份投影：世代 / 溢出 / 进程索引 / 已安装包名。窗口只引用 serial，不共用全局数组。 */
 export interface DeviceUiState {
   generation: number;
   overflowed: boolean;
   processEntries: ProcessEntry[];
   indexDegraded: boolean;
+  /** 已安装包名（新建窗口包名检索；与 ps 进程索引分离） */
+  packages: string[];
+  packagesDegraded: boolean;
 }
 
 export interface LogUiState {
@@ -109,7 +112,14 @@ export type WorkspaceApi = {
 let nextSessionId = 1;
 
 export function emptyDevice(): DeviceUiState {
-  return { generation: 0, overflowed: false, processEntries: [], indexDegraded: false };
+  return {
+    generation: 0,
+    overflowed: false,
+    processEntries: [],
+    indexDegraded: false,
+    packages: [],
+    packagesDegraded: false,
+  };
 }
 
 export function deviceSlice(state: LogUiState, serial: string | null | undefined): DeviceUiState {

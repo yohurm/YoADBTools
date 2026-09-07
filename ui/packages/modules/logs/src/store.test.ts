@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   logReplay: vi.fn(),
   logExport: vi.fn(),
   logProcessSnapshot: vi.fn(),
+  logPackageSnapshot: vi.fn(),
   logBatchHandlers: [] as ((e: { batch: LogBatch }) => void)[],
   logOverflowHandlers: [] as ((e: { serial: string }) => void)[],
   processIndexHandlers: [] as ((e: unknown) => void)[],
@@ -60,6 +61,7 @@ vi.mock("@yohu/api", () => {
     logReplay: (...a: unknown[]) => mocks.logReplay(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
+    logPackageSnapshot: (...a: unknown[]) => mocks.logPackageSnapshot(...a),
     onDevicesChanged: (h: (e: { devices: unknown[] }) => void): void => {
       mocks.devicesChangedHandlers.push(h);
     },
@@ -158,9 +160,11 @@ beforeEach(() => {
   mocks.logReplay.mockReset();
   mocks.logExport.mockReset();
   mocks.logProcessSnapshot.mockReset();
+  mocks.logPackageSnapshot.mockReset();
   mocks.logReplay.mockResolvedValue({ serial: "S1", from_seq: 0, lines: [], truncated: false });
   mocks.logExport.mockResolvedValue({ path: "x.txt", lines: 0 });
   mocks.logProcessSnapshot.mockResolvedValue([]);
+  mocks.logPackageSnapshot.mockResolvedValue([]);
   mocks.logCaptureStart.mockImplementation(async (serial: unknown) => ({
     serial,
     generation: 1,
@@ -582,6 +586,18 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(order).toEqual(["ps", "start"]);
     expect(store.state.sessions[0]!.fromSeq).toBe(0);
     expect(store.state.sessions[0]!.capturing).toBe(true);
+  });
+
+  it("refreshPackages 写入已安装包名，不覆盖进程索引", async () => {
+    const store = wiredStore();
+    mocks.logProcessSnapshot.mockResolvedValue([{ pid: 10, name: "com.running" }]);
+    mocks.logPackageSnapshot.mockResolvedValue(["com.idle.app", "com.running"]);
+    await store.refreshProcesses("S1");
+    await store.refreshPackages("S1");
+    expect(mocks.logPackageSnapshot).toHaveBeenCalledWith("S1");
+    expect(store.state.devices.S1?.processEntries).toEqual([{ pid: 10, name: "com.running" }]);
+    expect(store.state.devices.S1?.packages).toEqual(["com.idle.app", "com.running"]);
+    expect(store.state.devices.S1?.packagesDegraded).toBe(false);
   });
 
   it("新窗口第一次开始：fromSeq=0，按过滤从当前环补齐，不清空镜像", async () => {

@@ -17,6 +17,7 @@ import {
   logClear,
   logClearDevice,
   logExport,
+  logPackageSnapshot,
   logProcessSnapshot,
   logReplay,
   onCaptureState,
@@ -51,6 +52,7 @@ export type CaptureApi = {
   clearDevice: () => Promise<void>;
   clearShared: () => Promise<void>;
   refreshProcesses: (serial?: string | null) => Promise<void>;
+  refreshPackages: (serial?: string | null) => Promise<void>;
   exportSession: (path?: string) => Promise<string | null>;
   closeSession: (id: number) => void;
   closeOthers: (id: number) => void;
@@ -110,6 +112,11 @@ export function createCapture(
   function setProcessIndex(device: string, entries: ProcessEntry[], degraded: boolean): void {
     ensureDevice(state, setState, device);
     setState("devices", device, { processEntries: entries, indexDegraded: degraded });
+  }
+
+  function setPackages(device: string, packages: string[], degraded: boolean): void {
+    ensureDevice(state, setState, device);
+    setState("devices", device, { packages, packagesDegraded: degraded });
   }
 
   function stopWindowsOn(device: string): void {
@@ -373,6 +380,18 @@ export function createCapture(
     }
   }
 
+  async function refreshPackages(target?: string | null): Promise<void> {
+    const current = target ?? activeSession()?.serial ?? state.serial;
+    if (!current) return;
+    try {
+      const packages = await logPackageSnapshot(current);
+      setPackages(current, packages, false);
+    } catch (e) {
+      console.error("log.packageSnapshot 失败", e);
+      setPackages(current, deviceSlice(state, current).packages, true);
+    }
+  }
+
   async function exportSession(path?: string): Promise<string | null> {
     const session = activeSession();
     if (!session?.serial || session.fromSeq < 0) return null;
@@ -414,6 +433,7 @@ export function createCapture(
     setDeviceGen(device, 0);
     setOverflowed(device, false);
     setProcessIndex(device, [], false);
+    setPackages(device, [], false);
     mirrors.clear(device);
     stopWindowsOn(device);
   }
@@ -455,6 +475,7 @@ export function createCapture(
     clearDevice,
     clearShared,
     refreshProcesses,
+    refreshPackages,
     exportSession,
     closeSession,
     closeOthers,
