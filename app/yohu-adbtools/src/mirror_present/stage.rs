@@ -227,7 +227,7 @@ impl Stage {
     }
 
     pub fn corner_radius(&self) -> u32 {
-        host_corner_radius(self.fullscreen, self.dpr)
+        host_corner_radius(self.fullscreen, self.dpr())
     }
 
     pub fn presentable(&self) -> bool {
@@ -279,14 +279,14 @@ impl Stage {
     }
 
     pub fn letterbox_argb(&self) -> u32 {
-        stage_palette(self.dark).0
+        stage_palette(self.dark()).0
     }
 
     pub fn panel_stroke(&self) -> (f32, u32) {
         if self.fullscreen {
             (0.0, 0)
         } else {
-            (stage_stroke_px(self.dpr), stage_border_argb(self.dark))
+            (stage_stroke_px(self.dpr()), stage_border_argb(self.dark()))
         }
     }
 
@@ -305,13 +305,13 @@ impl Stage {
         }
         let (title, description) = stage_copy(
             self.mode,
-            self.has_device,
-            self.failed,
-            &self.error,
+            self.has_device(),
+            self.failed(),
+            self.error(),
             self.video_w > 0 && self.video_h > 0,
         );
-        let (canvas_argb, title_argb, body_argb) = stage_palette(self.dark);
-        let (icon_px, title_px, body_px) = stage_type_px(self.dpr);
+        let (canvas_argb, title_argb, body_argb) = stage_palette(self.dark());
+        let (icon_px, title_px, body_px) = stage_type_px(self.dpr());
         Some(ChromeDraw {
             mode: self.mode,
             title,

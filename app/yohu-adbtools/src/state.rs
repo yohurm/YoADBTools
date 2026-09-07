@@ -23,6 +23,8 @@ use crate::paths::AppPaths;
 use crate::settings_store::SettingsStore;
 use crate::tasks::TaskCenter;
 
+type CatalogWatch = tokio::sync::watch::Receiver<Option<Result<Vec<DeviceInfo>, String>>>;
+
 /// 应用状态（Tauri managed state）。
 pub struct AppState {
     // ===== core 服务（只读装配，运行期不换） =====
@@ -64,9 +66,7 @@ pub struct AppState {
     /// 进行中的应用更新下载取消令牌
     pub update_download_cancel: Mutex<Option<CancellationToken>>,
     /// 进行中的目录扫描：启动预热与 UI refresh 共用一趟，禁止双开 adb daemon。
-    pub catalog_gate: tokio::sync::Mutex<
-        Option<tokio::sync::watch::Receiver<Option<Result<Vec<DeviceInfo>, String>>>>,
-    >,
+    pub catalog_gate: tokio::sync::Mutex<Option<CatalogWatch>>,
 }
 
 impl AppState {

@@ -7,15 +7,22 @@ mod names;
 mod ole;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
+#[cfg(target_os = "macos")]
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
-use yohu_files::{TransferRunner, TransferSpec, TreeEntry};
-use yohu_protocol::{AppEvent, Direction, DragOutRequest, IpcError, IpcErrorCode};
+use yohu_files::TransferRunner;
+#[cfg(target_os = "macos")]
+use yohu_files::{TransferSpec, TreeEntry};
+#[cfg(target_os = "macos")]
+use yohu_protocol::Direction;
+use yohu_protocol::{AppEvent, DragOutRequest, IpcError, IpcErrorCode};
 
 use crate::commands::{ipc_code, ipc_file};
 use crate::state::AppState;

@@ -35,6 +35,7 @@ pub fn windows_relative_ok(relative: &str) -> bool {
     utf16 < 260 && relative.split('\\').all(windows_file_name_ok)
 }
 
+#[cfg(not(windows))]
 fn unix_file_name_ok(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains('\0') && !name.contains('/')
 }

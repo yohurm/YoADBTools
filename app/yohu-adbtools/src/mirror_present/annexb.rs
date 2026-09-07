@@ -28,6 +28,7 @@ pub fn access_unit(config: Option<&[u8]>, payload: &[u8], keyframe: bool) -> Vec
     payload.to_vec()
 }
 
+#[cfg(any(target_os = "macos", test))]
 pub fn split_nals(data: &[u8]) -> Vec<&[u8]> {
     let mut starts = Vec::new();
     let mut i = 0;
@@ -63,32 +64,17 @@ pub fn split_nals(data: &[u8]) -> Vec<&[u8]> {
     nals
 }
 
-#[allow(dead_code)]
-pub fn annexb_to_avcc(data: &[u8]) -> Vec<u8> {
-    let nals = split_nals(data);
-    if nals.is_empty() {
-        if data.len() >= 4 {
-            return data.to_vec();
-        }
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    for nal in nals {
-        let len = nal.len() as u32;
-        out.extend_from_slice(&len.to_be_bytes());
-        out.extend_from_slice(nal);
-    }
-    out
-}
-
+#[cfg(target_os = "macos")]
 pub fn h264_nal_type(nal: &[u8]) -> u8 {
     nal.first().copied().unwrap_or(0) & 0x1F
 }
 
+#[cfg(target_os = "macos")]
 pub fn hevc_nal_type(nal: &[u8]) -> u8 {
     nal.first().map(|b| (b >> 1) & 0x3F).unwrap_or(0)
 }
 
+#[cfg(target_os = "macos")]
 pub fn h264_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8]>) {
     let mut sps = Vec::new();
     let mut pps = Vec::new();
@@ -102,6 +88,7 @@ pub fn h264_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8
     (sps, pps)
 }
 
+#[cfg(target_os = "macos")]
 #[allow(clippy::type_complexity)]
 pub fn hevc_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8]>, Vec<&'a [u8]>) {
     let mut vps = Vec::new();
@@ -118,6 +105,7 @@ pub fn hevc_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8
     (vps, sps, pps)
 }
 
+#[cfg(target_os = "macos")]
 pub fn vcl_avcc(hevc: bool, data: &[u8]) -> Vec<u8> {
     let nals = split_nals(data);
     let mut out = Vec::new();
@@ -145,6 +133,23 @@ mod tests {
         let mut v = vec![0, 0, 0, 1, kind];
         v.extend_from_slice(rest);
         v
+    }
+
+    fn annexb_to_avcc(data: &[u8]) -> Vec<u8> {
+        let nals = split_nals(data);
+        if nals.is_empty() {
+            if data.len() >= 4 {
+                return data.to_vec();
+            }
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for nal in nals {
+            let len = nal.len() as u32;
+            out.extend_from_slice(&len.to_be_bytes());
+            out.extend_from_slice(nal);
+        }
+        out
     }
 
     #[test]
