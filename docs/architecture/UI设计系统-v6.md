@@ -1,9 +1,14 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.69（2026-09-04，占用 DComp clip）    
+> **状态：** v1.74（2026-09-07，启动数据单源）    
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.74 变更（启动数据单源）**：用户可见品牌只在原生小窗。HTML `#yohu-boot` 只铺画布。主窗居中读小窗锁定的工作区，不再二次 `GetCursorPos`。删除空命令 `boot.reveal` 与 `boot-reveal.js`。揭窗只走 `boot.showMain`。
+> **v1.73 变更（原生启动小窗）**：双击后先出 480×300 原生小窗（GDI，对齐 Android Studio / IntelliJ），主窗隐藏 hydrate 完成后再揭大窗并关掉小窗。禁止用 WebView 当启动小窗。
+> **v1.72 变更（揭窗从可见起算）**：`boot.reveal` 在 `#yohu-boot` 入 DOM 后立刻 show，不等 JS 包 / PageLoad Finished。最短 400ms 从揭窗时刻起算，禁止把隐藏等待算进启动页。工作台 CSS 延后到 `</body>`。
+> **v1.71 变更（同窗启动层）**：`#yohu-boot` 静态品牌页（Logo + 展示名，画布色）盖住 hydrate；PageLoad 揭窗；最短 400ms 后 200ms 加速淡出。禁止第二 WebView splash。禁止启动白/黑空白 >300ms。
+> **v1.70 变更（启动揭窗）**：主窗隐藏到设置/目录首帧再 show，底色对齐 `--yohu-bg-base`。禁止启动白屏；不另开 splash 窗。纯空白仍须 ≤300ms（鸿蒙启动页），揭窗时已是工作台铬层。
 > **v1.69 变更（占用 DComp clip）**：HWND 铺满 avail；可见卡片是 DirectComposition rectangle clip。fill↔contain 由 `IDCompositionAnimation` 在 DWM 刷新率上跑。禁止 `SetWindowPos` 改子窗尺寸冒充占用过渡。
 > **v1.68 变更（占用 spatial-panel）**：HWND fill↔contain 曾走壳内 300ms 标准曲线。v1.69 改为 DComp clip 动画。禁止 CSS 占用过渡。
 >

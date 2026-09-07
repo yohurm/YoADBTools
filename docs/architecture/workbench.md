@@ -38,6 +38,16 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
 
 选择策略在 domain 与 TS 各有一份，testdata JSON 对齐（点击不能等 IPC）。
 
+## 启动链路
+
+同窗启动层已改为 **原生小窗 → 主窗**（Android Studio / IntelliJ SplashManager / keyhop Win32 GDI；禁止第二 WebView splash，见 tauri#1850）：
+
+1. 进程入口立刻画 480×300 无边框原生小窗（GDI，图标 + 展示名，画布色对齐 `--yohu-bg-base`）。Tauri 是 Per-Monitor V2，GDI 不会自动缩放：尺寸用光标所在屏 `GetDpiForMonitor` 做 `MulDiv(logical, dpi, 96)`，再在该屏工作区居中。禁止 `dpi/96` 整数截断，禁止主屏 `SM_CXSCREEN`。**不等** WebView2。
+2. 主窗 `visible: false` 创建并加载工作台；HTML `#yohu-boot` 只铺画布色盖住隐藏中的 hydrate，用户看不见，也不再画 Logo。
+3. `settingsStore.load` + `deviceStore.load` 完成后拆掉 HTML 层，再 `windowShow`（`boot.showMain`）揭主窗：主窗跟小窗用同一块工作区居中，并关掉原生小窗。
+4. `device.refresh` 在揭主窗后发起，与 core 预热单飞。
+5. 2.5s 超时仍兜底揭主窗，避免 JS 失败导致只剩小窗。Media Foundation HEVC 探测后置。
+
 ## Tauri 壳（`app/yohu-adbtools`）
 
 薄命令层：反序列化 → core → 序列化。编排在 `device_catalog` / `library_store` / `group_runs`。设备运行时状态在 `yohu-adb::DeviceStatusHub`（[modules/device.md](modules/device.md)，ADR-v6-025）。`dnd/`：Windows OLE 拖出、macOS Finder 拖出（[文件拖拽-v6.md](文件拖拽-v6.md)）。退出：根 `CancellationToken` → 3s 强杀进程树 → flush 设置。
