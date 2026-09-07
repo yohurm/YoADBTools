@@ -20,7 +20,6 @@ use yohu_runtime::{ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
 /// 各 ADB 短命令超时（ms）——单源，避免业务分支散落魔法数。
 const CLEAR_LOG_TIMEOUT_MS: u64 = 10_000;
 const LIST_PS_TIMEOUT_MS: u64 = 15_000;
-const DUMP_LOG_TIMEOUT_MS: u64 = 30_000;
 const READLINK_TIMEOUT_MS: u64 = 10_000;
 const UI_MODE_TIMEOUT_MS: u64 = 8_000;
 const STATUS_SAMPLE_TIMEOUT_MS: u64 = 8_000;
@@ -196,40 +195,6 @@ impl AdbClient {
             });
         }
         Ok(())
-    }
-
-    /// 一次性转储设备 logcat 缓冲（`logcat -d`），不跟流。
-    /// 供 `yohu-logsrv::CaptureService::dump_into_ring`（拉历史缓冲）使用。
-    pub async fn dump_log(
-        &self,
-        serial: &str,
-        cancel: CancellationToken,
-    ) -> Result<Vec<String>, AdbError> {
-        let out = self
-            .run(
-                serial,
-                &[
-                    "logcat".into(),
-                    "-d".into(),
-                    "-v".into(),
-                    "threadtime,uid".into(),
-                ],
-                Some(DUMP_LOG_TIMEOUT_MS),
-                cancel,
-            )
-            .await?;
-        if out.exit_code != 0 {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
-        Ok(out
-            .stdout
-            .lines()
-            .filter(|line| !line.is_empty())
-            .map(str::to_string)
-            .collect())
     }
 
     /// 浏览设备目录。

@@ -101,33 +101,55 @@ impl DeviceStatusHub {
     }
 
     /// 写设备深浅色后再采一次，更新缓存并推事件。读只信 [`AdbClient::sample_status`]。
+    /// 采样失败时保留上次运行时字段，只覆盖本次写入的 night；槽已撤则视为掉线。
     pub async fn set_night(
         &self,
         serial: &str,
         night: bool,
         cancel: CancellationToken,
     ) -> Result<DeviceStatus, crate::AdbError> {
+        let slot_cancel = self
+            .slots
+            .lock()
+            .expect("status slots lock poisoned")
+            .get(serial)
+            .map(|s| s.cancel.clone());
+        let cancel = slot_cancel.unwrap_or(cancel);
         self.client
             .set_night_mode(serial, night, cancel.clone())
             .await?;
-        let mut fields = match self.client.sample_status(serial, cancel).await {
-            Ok(fields) => fields,
-            Err(_) => DeviceStatusFields {
-                night: Some(night),
-                ..DeviceStatusFields::default()
-            },
+        let previous = self.snapshot(serial);
+        let sampled = match self.client.sample_status(serial, cancel).await {
+            Ok(fields) => Some(fields),
+            Err(e) => {
+                tracing::debug!(serial = %serial, error = %e, "写深浅色后采样失败，保留上次快照");
+                None
+            }
         };
-        if fields.night.is_none() {
-            fields.night = Some(night);
+        let fields = overlay_after_set_night(previous.as_ref(), sampled, night);
+        let (status, _) = self
+            .upsert(serial, fields)
+            .ok_or_else(|| crate::AdbError::DeviceOffline(serial.to_string()))?;
+        // 用户写入是控制面：与 devices/changed 一样 send().await，禁止 try_send。
+        if let Err(e) = self
+            .sink
+            .send(AppEvent::DeviceStatus {
+                status: status.clone(),
+            })
+            .await
+        {
+            tracing::warn!(serial = %serial, error = %e, "device/status 发送失败");
         }
-        Ok(self.publish(serial, fields))
+        Ok(status)
     }
 
-    fn publish(&self, serial: &str, fields: DeviceStatusFields) -> DeviceStatus {
+    /// 槽已不在 Online 集合时不写缓存。返回 (快照, 内容是否变化)。
+    fn upsert(&self, serial: &str, fields: DeviceStatusFields) -> Option<(DeviceStatus, bool)> {
         let mut slots = self.slots.lock().expect("status slots lock poisoned");
-        let generation = slots
-            .get(serial)
-            .and_then(|s| s.status.as_ref())
+        let slot = slots.get_mut(serial)?;
+        let generation = slot
+            .status
+            .as_ref()
             .map(|s| s.generation.saturating_add(1))
             .unwrap_or(1);
         let next = DeviceStatus {
@@ -141,17 +163,46 @@ impl DeviceStatusHub {
             screen_on: fields.screen_on,
             brand: fields.brand,
         };
-        if let Some(slot) = slots.get_mut(serial) {
-            if let Some(prev) = slot.status.as_ref() {
-                if prev.same_runtime(&next) {
-                    return prev.clone();
-                }
+        if let Some(prev) = slot.status.as_ref() {
+            if prev.same_runtime(&next) {
+                return Some((prev.clone(), false));
             }
-            slot.status = Some(next.clone());
         }
-        drop(slots);
-        let _ = self.sink.try_send(AppEvent::DeviceStatus { status: next.clone() });
-        next
+        slot.status = Some(next.clone());
+        Some((next, true))
+    }
+}
+
+fn fields_from_status(status: &DeviceStatus) -> DeviceStatusFields {
+    DeviceStatusFields {
+        night: status.night,
+        battery_pct: status.battery_pct,
+        charging: status.charging,
+        sdk: status.sdk,
+        release: status.release.clone(),
+        screen_on: status.screen_on,
+        brand: status.brand.clone(),
+    }
+}
+
+/// 写深浅色已成功：采样到则用采样（解析不到 night 时才填写入值）；失败则保留上次其它字段并采用本次写入的 night。
+fn overlay_after_set_night(
+    previous: Option<&DeviceStatus>,
+    sampled: Option<DeviceStatusFields>,
+    night: bool,
+) -> DeviceStatusFields {
+    match sampled {
+        Some(mut fields) => {
+            if fields.night.is_none() {
+                fields.night = Some(night);
+            }
+            fields
+        }
+        None => {
+            let mut fields = previous.map(fields_from_status).unwrap_or_default();
+            fields.night = Some(night);
+            fields
+        }
     }
 }
 
@@ -169,11 +220,70 @@ async fn poll_loop(hub: Arc<DeviceStatusHub>, serial: String, cancel: Cancellati
         }
         match hub.client.sample_status(&serial, cancel.clone()).await {
             Ok(fields) => {
-                hub.publish(&serial, fields);
+                if let Some((status, true)) = hub.upsert(&serial, fields) {
+                    let _ = hub.sink.try_send(AppEvent::DeviceStatus { status });
+                }
             }
             Err(e) => {
                 tracing::debug!(serial = %serial, error = %e, "设备状态采样失败，保留上次快照");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn status(night: bool, battery: Option<u8>) -> DeviceStatus {
+        DeviceStatus {
+            serial: "S1".into(),
+            generation: 3,
+            night: Some(night),
+            battery_pct: battery,
+            charging: Some(true),
+            sdk: Some(34),
+            release: Some("15".into()),
+            screen_on: Some(true),
+            brand: Some("motorola".into()),
+        }
+    }
+
+    #[test]
+    fn overlay_keeps_previous_runtime_when_sample_fails() {
+        let prev = status(false, Some(87));
+        let fields = overlay_after_set_night(Some(&prev), None, true);
+        assert_eq!(fields.night, Some(true));
+        assert_eq!(fields.battery_pct, Some(87));
+        assert_eq!(fields.sdk, Some(34));
+        assert_eq!(fields.release.as_deref(), Some("15"));
+    }
+
+    #[test]
+    fn overlay_uses_sample_when_present() {
+        let prev = status(false, Some(10));
+        let sampled = DeviceStatusFields {
+            night: Some(true),
+            battery_pct: Some(40),
+            charging: Some(false),
+            sdk: Some(35),
+            release: Some("16".into()),
+            screen_on: Some(false),
+            brand: Some("google".into()),
+        };
+        let fields = overlay_after_set_night(Some(&prev), Some(sampled.clone()), true);
+        assert_eq!(fields, sampled);
+    }
+
+    #[test]
+    fn overlay_fills_night_only_when_sample_missed_it() {
+        let sampled = DeviceStatusFields {
+            night: None,
+            battery_pct: Some(50),
+            ..DeviceStatusFields::default()
+        };
+        let fields = overlay_after_set_night(None, Some(sampled), true);
+        assert_eq!(fields.night, Some(true));
+        assert_eq!(fields.battery_pct, Some(50));
     }
 }
