@@ -1,6 +1,6 @@
 //! 自愈式设备扫描集成测试（「cmd 有设备、应用没有」类问题的回归防线）。
 //!
-//! 覆盖：adb.path 指向损坏/失效 adb → 自动回退到资源目录候选 → 扫描成功；
+//! 覆盖：adb.path 指向损坏/失效 adb → 自动回退到 DataRoot 解压副本 → 扫描成功；
 //! 全候选失败 → 错误信息含明细。使用 fake-adb（零共享状态：拷贝 exe + 同名 json）。
 
 use std::path::PathBuf;
@@ -40,23 +40,22 @@ fn isolated_fake_adb(script: &str) -> PathBuf {
 }
 
 #[tokio::test]
-async fn fallback_from_broken_user_adb_to_resource() {
-    // 用户设置指向「损坏」的 adb（devices 退出码 1 + 报错）
+async fn fallback_from_broken_user_adb_to_data_dir() {
     let broken = isolated_fake_adb(
         r#"{ "devices_exit_code": 1, "devices_stderr": "adb: failed to connect to daemon" }"#,
     );
-    let resource_dir = std::env::temp_dir().join(format!(
-        "yohu-fallback-res-ok-{}-{:?}",
+    let data_dir = std::env::temp_dir().join(format!(
+        "yohu-fallback-data2-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
-    let healthy = install_fake_adb(
-        &resource_dir,
+    let extracted = install_fake_adb(
+        &data_dir,
         yohu_adb::adb_file_name(),
         r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"] }"#,
     );
-    let data_dir = std::env::temp_dir().join(format!(
-        "yohu-fallback-data2-{}-{:?}",
+    let resource_dir = std::env::temp_dir().join(format!(
+        "yohu-fallback-res-ok-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
@@ -70,32 +69,30 @@ async fn fallback_from_broken_user_adb_to_resource() {
         .expect("自愈扫描应成功");
     assert_eq!(devices.len(), 1, "回退候选应扫到设备");
     assert_eq!(devices[0].serial, "R58M1234A");
-    assert_eq!(used, healthy, "应使用资源目录中的健康 adb");
+    assert_eq!(used, extracted, "应使用数据目录中的健康 adb");
 }
 
 #[tokio::test]
 async fn fallback_skips_missing_user_path() {
-    // 资源目录候选必须命名为当前平台 adb 文件名（ToolResolver 的约定）
-    let dir = std::env::temp_dir().join(format!(
-        "yohu-fallback-res-{}-{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    ));
-    let healthy = install_fake_adb(
-        &dir,
-        yohu_adb::adb_file_name(),
-        r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"] }"#,
-    );
-
-    // 用户路径不存在 → 直接回退
     let data_dir = std::env::temp_dir().join(format!(
         "yohu-fallback-data3-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
+    let extracted = install_fake_adb(
+        &data_dir,
+        yohu_adb::adb_file_name(),
+        r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"] }"#,
+    );
+    let resource_dir = std::env::temp_dir().join(format!(
+        "yohu-fallback-res-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+
     let tool = ToolResolver::new(
         Some(PathBuf::from("Z:\\不存在的目录\\adb.exe")),
-        dir,
+        resource_dir,
         data_dir,
     );
     let client = AdbClient::new(tool, 4);
@@ -104,7 +101,7 @@ async fn fallback_skips_missing_user_path() {
         .await
         .expect("自愈扫描应成功");
     assert_eq!(devices.len(), 1);
-    assert_eq!(used, healthy);
+    assert_eq!(used, extracted);
 }
 
 #[tokio::test]

@@ -16,5 +16,6 @@
   ],
   "logcat_delay_ms": 30,
   "ps": "PID NAME\n1234 com.yohu.app\n5678 com.yohu.app:core\n9999 com.other.app\n",
+  "packages": "package:com.android.systemui\npackage:com.idle.app\npackage:com.yohu.app\n",
   "ls": "drwxr-xr-x 2 root root 4096 2026-01-01 12:00 DCIM\n-rw-rw---- 1 root root 12345 2026-01-02 08:30 report.txt\n"
 }

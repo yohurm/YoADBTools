@@ -147,6 +147,7 @@ impl DeviceStatusHub {
     fn upsert(&self, serial: &str, fields: DeviceStatusFields) -> Option<(DeviceStatus, bool)> {
         let mut slots = self.slots.lock().expect("status slots lock poisoned");
         let slot = slots.get_mut(serial)?;
+        let fields = overlay_fields(slot.status.as_ref(), fields);
         let generation = slot
             .status
             .as_ref()
@@ -185,6 +186,31 @@ fn fields_from_status(status: &DeviceStatus) -> DeviceStatusFields {
     }
 }
 
+/// 本次 `None` 保留上次已有值，让 getprop 首采与 dumpsys 补采可以分开发。
+fn overlay_fields(
+    previous: Option<&DeviceStatus>,
+    sampled: DeviceStatusFields,
+) -> DeviceStatusFields {
+    let prev = previous.map(fields_from_status);
+    DeviceStatusFields {
+        night: sampled.night.or(prev.as_ref().and_then(|p| p.night)),
+        battery_pct: sampled
+            .battery_pct
+            .or(prev.as_ref().and_then(|p| p.battery_pct)),
+        charging: sampled.charging.or(prev.as_ref().and_then(|p| p.charging)),
+        sdk: sampled.sdk.or(prev.as_ref().and_then(|p| p.sdk)),
+        release: sampled
+            .release
+            .or_else(|| prev.as_ref().and_then(|p| p.release.clone())),
+        screen_on: sampled
+            .screen_on
+            .or(prev.as_ref().and_then(|p| p.screen_on)),
+        brand: sampled
+            .brand
+            .or_else(|| prev.as_ref().and_then(|p| p.brand.clone())),
+    }
+}
+
 /// 写深浅色已成功：采样到则用采样（解析不到 night 时才填写入值）；失败则保留上次其它字段并采用本次写入的 night。
 fn overlay_after_set_night(
     previous: Option<&DeviceStatus>,
@@ -206,9 +232,39 @@ fn overlay_after_set_night(
     }
 }
 
+async fn push_sample(
+    hub: &Arc<DeviceStatusHub>,
+    serial: &str,
+    cancel: &CancellationToken,
+    props_only: bool,
+) {
+    let result = if props_only {
+        hub.client.sample_props(serial, cancel.clone()).await
+    } else {
+        hub.client.sample_status(serial, cancel.clone()).await
+    };
+    match result {
+        Ok(fields) => {
+            if let Some((status, true)) = hub.upsert(serial, fields) {
+                let _ = hub.sink.try_send(AppEvent::DeviceStatus { status });
+            }
+        }
+        Err(e) => {
+            tracing::debug!(serial = %serial, error = %e, "设备状态采样失败，保留上次快照");
+        }
+    }
+}
+
 async fn poll_loop(hub: Arc<DeviceStatusHub>, serial: String, cancel: CancellationToken) {
+    // 首采拆段：getprop 先推 Android/API，dumpsys 随后补电量/深浅色，禁止整包结束才出数。
+    push_sample(&hub, &serial, &cancel, true).await;
+    if cancel.is_cancelled() {
+        return;
+    }
+    push_sample(&hub, &serial, &cancel, false).await;
     let mut ticker = tokio::time::interval(SAMPLE_INTERVAL);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    ticker.tick().await;
     loop {
         tokio::select! {
             biased;
@@ -218,16 +274,7 @@ async fn poll_loop(hub: Arc<DeviceStatusHub>, serial: String, cancel: Cancellati
         if cancel.is_cancelled() {
             break;
         }
-        match hub.client.sample_status(&serial, cancel.clone()).await {
-            Ok(fields) => {
-                if let Some((status, true)) = hub.upsert(&serial, fields) {
-                    let _ = hub.sink.try_send(AppEvent::DeviceStatus { status });
-                }
-            }
-            Err(e) => {
-                tracing::debug!(serial = %serial, error = %e, "设备状态采样失败，保留上次快照");
-            }
-        }
+        push_sample(&hub, &serial, &cancel, false).await;
     }
 }
 
@@ -285,5 +332,21 @@ mod tests {
         let fields = overlay_after_set_night(None, Some(sampled), true);
         assert_eq!(fields.night, Some(true));
         assert_eq!(fields.battery_pct, Some(50));
+    }
+
+    #[test]
+    fn overlay_fields_keeps_previous_when_sample_omits() {
+        let prev = status(true, Some(87));
+        let sampled = DeviceStatusFields {
+            sdk: Some(35),
+            release: Some("16".into()),
+            brand: Some("motorola".into()),
+            ..DeviceStatusFields::default()
+        };
+        let fields = overlay_fields(Some(&prev), sampled);
+        assert_eq!(fields.sdk, Some(35));
+        assert_eq!(fields.release.as_deref(), Some("16"));
+        assert_eq!(fields.night, Some(true));
+        assert_eq!(fields.battery_pct, Some(87));
     }
 }

@@ -13,6 +13,7 @@
 //!   "logcat_exit_code": 0,
 //!   "logcat_stderr": "",
 //!   "ps": "PID NAME\n1234 com.test.app\n",
+//!   "packages": "package:com.test.app\npackage:com.idle.app\n",
 //!   "ls": "drwxr-xr-x 2 root root 4096 2026-01-01 12:00 DCIM\n"
 //! }
 //! ```
@@ -41,6 +42,8 @@ struct Script {
     logcat_stderr: String,
     #[serde(default)]
     ps: String,
+    #[serde(default)]
+    packages: String,
     #[serde(default)]
     ls: String,
 }
@@ -97,6 +100,12 @@ fn main() {
 
     if joined.contains("shell ps") {
         write!(out, "{}", script.ps).ok();
+        out.flush().ok();
+        std::process::exit(0);
+    }
+
+    if joined.contains("list packages") {
+        write!(out, "{}", script.packages).ok();
         out.flush().ok();
         std::process::exit(0);
     }

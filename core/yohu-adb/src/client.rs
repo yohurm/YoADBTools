@@ -5,13 +5,15 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 use crate::error::AdbError;
 use crate::parse::{
-    devices as devices_parse, ls as ls_parse, ps as ps_parse, status as status_parse,
+    devices as devices_parse, ls as ls_parse, packages as packages_parse, ps as ps_parse,
+    status as status_parse,
 };
 use crate::tool::ToolResolver;
 use yohu_protocol::{DeviceInfo, ExecOutcome, ProcessEntry, RemoteEntry};
@@ -20,9 +22,13 @@ use yohu_runtime::{ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
 /// 各 ADB 短命令超时（ms）——单源，避免业务分支散落魔法数。
 const CLEAR_LOG_TIMEOUT_MS: u64 = 10_000;
 const LIST_PS_TIMEOUT_MS: u64 = 15_000;
+const LIST_PACKAGES_TIMEOUT_MS: u64 = 15_000;
 const READLINK_TIMEOUT_MS: u64 = 10_000;
 const UI_MODE_TIMEOUT_MS: u64 = 8_000;
 const STATUS_SAMPLE_TIMEOUT_MS: u64 = 8_000;
+const STATUS_PROPS_TIMEOUT_MS: u64 = 5_000;
+const START_SERVER_TIMEOUT_MS: u64 = 20_000;
+const DEVICES_LIST_TIMEOUT_MS: u64 = 10_000;
 
 /// ADB 客户端。
 pub struct AdbClient {
@@ -85,11 +91,7 @@ impl AdbClient {
     }
 
     /// 长驻进程：不占短命令信号量；调用方负责泵输出与 [`ChildHandle::kill_tree`]。
-    pub fn spawn_long_lived(
-        &self,
-        serial: &str,
-        argv: &[String],
-    ) -> Result<ChildHandle, AdbError> {
+    pub fn spawn_long_lived(&self, serial: &str, argv: &[String]) -> Result<ChildHandle, AdbError> {
         let adb = self.resolve_adb()?;
         Ok(self
             .runner
@@ -118,14 +120,53 @@ impl AdbClient {
         }
     }
 
+    /// 对指定 adb 二进制执行 `start-server`。失败不中断，由随后的 `devices -l` 判定该候选。
+    async fn start_server_at(&self, adb: &std::path::Path, cancel: CancellationToken) {
+        let t = Instant::now();
+        tracing::info!(adb = %adb.display(), "adb start-server 开始");
+        let result = self
+            .runner
+            .run_capture(
+                adb,
+                &["start-server".into()],
+                Some(Duration::from_millis(START_SERVER_TIMEOUT_MS)),
+                cancel,
+            )
+            .await;
+        let ms = t.elapsed().as_millis();
+        match result {
+            Ok(out) if out.exit_code == 0 => {
+                tracing::info!(ms, adb = %adb.display(), "adb start-server 完成");
+            }
+            Ok(out) => {
+                tracing::warn!(
+                    ms,
+                    adb = %adb.display(),
+                    exit = out.exit_code,
+                    stderr = %out.stderr.trim(),
+                    "adb start-server 非零退出，仍尝试 devices -l"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    ms,
+                    adb = %adb.display(),
+                    error = %e,
+                    "adb start-server 失败，仍尝试 devices -l"
+                );
+            }
+        }
+    }
+
     /// 扫描设备。
     pub async fn devices(&self, cancel: CancellationToken) -> Result<Vec<DeviceInfo>, AdbError> {
         let (devices, _used) = self.devices_resilient(cancel).await?;
         Ok(devices)
     }
 
-    /// 自愈式设备扫描：按候选顺序尝试不同 adb（用户设置 → 资源目录 → 数据目录）。
+    /// 自愈式设备扫描：按候选顺序尝试不同 adb（用户设置 → DataRoot 解压副本）。
     ///
+    /// 每个候选先 `start-server` 再 `devices -l`，同一二进制，禁止两份 sidecar 抢 5037。
     /// 任一候选「进程可启动且退出码 0」即采信其结果；失败的候选仅记录并尝试下一个。
     /// 全部失败时返回带明细的错误。返回 (设备列表, 实际使用的 adb 路径)。
     pub async fn devices_resilient(
@@ -137,34 +178,49 @@ impl AdbClient {
             return Err(AdbError::ToolUnavailable(self.tool.unavailable_hint()));
         }
         let mut failures: Vec<String> = Vec::new();
+        tracing::info!(
+            candidates = candidates.len(),
+            first = %candidates[0].display(),
+            "adb devices -l 开始"
+        );
         for adb in &candidates {
             if cancel.is_cancelled() {
                 return Err(AdbError::Cancelled);
             }
+            self.start_server_at(adb, cancel.clone()).await;
+            let t = Instant::now();
             let result = self
                 .runner
                 .run_capture(
                     adb,
                     &["devices".into(), "-l".into()],
-                    Some(Duration::from_secs(10)),
+                    Some(Duration::from_millis(DEVICES_LIST_TIMEOUT_MS)),
                     cancel.clone(),
                 )
                 .await;
+            let ms = t.elapsed().as_millis();
             match result {
                 Ok(out) if out.exit_code == 0 => {
+                    tracing::info!(
+                        adb = %adb.display(),
+                        ms,
+                        "adb devices -l 成功"
+                    );
+                    self.tool.set_preferred(adb.clone());
                     return Ok((devices_parse::parse_devices_list(&out.stdout), adb.clone()));
                 }
                 Ok(out) => {
                     failures.push(format!("{} (退出码 {})", out.stderr.trim(), out.exit_code));
                     tracing::warn!(
-                        "adb 候选失败 {}: {}",
-                        adb.display(),
+                        adb = %adb.display(),
+                        ms,
+                        "adb 候选失败 {}",
                         failures.last().unwrap_or(&String::new())
                     );
                 }
                 Err(e) => {
                     failures.push(e.to_string());
-                    tracing::warn!("adb 候选不可用 {}: {e}", adb.display());
+                    tracing::warn!(adb = %adb.display(), ms, "adb 候选不可用 {e}");
                 }
             }
         }
@@ -287,6 +343,55 @@ impl AdbClient {
         Ok(ps_parse::parse_ps(&out.stdout))
     }
 
+    /// 已安装包名（`pm list packages`；失败则 `cmd package list packages`）。
+    pub async fn list_packages(
+        &self,
+        serial: &str,
+        cancel: CancellationToken,
+    ) -> Result<Vec<String>, AdbError> {
+        let pm = self
+            .run(
+                serial,
+                &[
+                    "shell".into(),
+                    "pm".into(),
+                    "list".into(),
+                    "packages".into(),
+                ],
+                Some(LIST_PACKAGES_TIMEOUT_MS),
+                cancel.clone(),
+            )
+            .await?;
+        if pm.exit_code == 0 && !pm.stdout.trim().is_empty() {
+            return Ok(packages_parse::parse_pm_list_packages(&pm.stdout));
+        }
+        let cmd = self
+            .run(
+                serial,
+                &[
+                    "shell".into(),
+                    "cmd".into(),
+                    "package".into(),
+                    "list".into(),
+                    "packages".into(),
+                ],
+                Some(LIST_PACKAGES_TIMEOUT_MS),
+                cancel,
+            )
+            .await?;
+        if cmd.exit_code != 0 {
+            return Err(AdbError::BadExit {
+                exit_code: if pm.exit_code != 0 {
+                    pm.exit_code
+                } else {
+                    cmd.exit_code
+                },
+                stderr: format!("pm: {}; cmd package: {}", pm.stderr, cmd.stderr),
+            });
+        }
+        Ok(packages_parse::parse_pm_list_packages(&cmd.stdout))
+    }
+
     /// 写设备深浅色（`cmd uimode night yes|no`）。读回应走 [`Self::sample_status`]。
     pub async fn set_night_mode(
         &self,
@@ -334,6 +439,34 @@ impl AdbClient {
             }
         }
         Ok(())
+    }
+
+    /// 快路径：只读 SDK / Android 版本 / 品牌，供首采先推。
+    pub async fn sample_props(
+        &self,
+        serial: &str,
+        cancel: CancellationToken,
+    ) -> Result<status_parse::DeviceStatusFields, AdbError> {
+        let out = self
+            .run(
+                serial,
+                &[
+                    "shell".into(),
+                    "sh".into(),
+                    "-c".into(),
+                    status_parse::PROPS_SCRIPT.into(),
+                ],
+                Some(STATUS_PROPS_TIMEOUT_MS),
+                cancel,
+            )
+            .await?;
+        if out.exit_code != 0 && out.stdout.trim().is_empty() {
+            return Err(AdbError::BadExit {
+                exit_code: out.exit_code,
+                stderr: out.stderr,
+            });
+        }
+        Ok(status_parse::parse_props_output(&out.stdout))
     }
 
     /// 一次 shell 采齐夜览/电量/SDK/亮屏等运行时字段。

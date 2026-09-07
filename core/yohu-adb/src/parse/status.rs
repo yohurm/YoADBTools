@@ -8,6 +8,10 @@ pub const MARK_BATTERY: &str = "__YOHU_BATTERY__";
 pub const MARK_POWER: &str = "__YOHU_POWER__";
 pub const MARK_PROPS: &str = "__YOHU_PROPS__";
 
+/// 快路径：只读版本/品牌（毫秒级）。首采先推这一段，不必等 dumpsys。
+pub const PROPS_SCRIPT: &str =
+    "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.brand";
+
 /// 单次采样脚本（常量，无用户输入）。分段标记供 [`parse_status_bundle`] 切开。
 pub const SAMPLE_SCRIPT: &str = concat!(
     "echo __YOHU_UIMODE__; dumpsys uimode; ",
@@ -131,7 +135,9 @@ fn parse_screen_on(output: &str) -> Option<bool> {
                 .next()
                 .unwrap_or("")
                 .trim();
-            return Some(token.eq_ignore_ascii_case("Awake") || token.eq_ignore_ascii_case("Dreaming"));
+            return Some(
+                token.eq_ignore_ascii_case("Awake") || token.eq_ignore_ascii_case("Dreaming"),
+            );
         }
         if line.contains("Display Power") {
             if let Some(rest) = line.split("state=").nth(1) {
@@ -157,6 +163,17 @@ fn parse_props(output: &str) -> (Option<u32>, Option<String>, Option<String>) {
     let release = nonempty(lines.next());
     let brand = nonempty(lines.next());
     (sdk, release, brand)
+}
+
+/// 解析仅 getprop 三行（无分段标记）。
+pub fn parse_props_output(output: &str) -> DeviceStatusFields {
+    let (sdk, release, brand) = parse_props(output);
+    DeviceStatusFields {
+        sdk,
+        release,
+        brand,
+        ..DeviceStatusFields::default()
+    }
 }
 
 fn nonempty(value: Option<&str>) -> Option<String> {
@@ -255,5 +272,14 @@ AC powered: false
     fn noise_without_markers_is_empty() {
         let fields = parse_status_bundle("random dumpsys junk\nlevel: 10\n");
         assert_eq!(fields, DeviceStatusFields::default());
+    }
+
+    #[test]
+    fn props_output_parses_without_markers() {
+        let fields = parse_props_output("35\n16\nmotorola\n");
+        assert_eq!(fields.sdk, Some(35));
+        assert_eq!(fields.release.as_deref(), Some("16"));
+        assert_eq!(fields.brand.as_deref(), Some("motorola"));
+        assert_eq!(fields.battery_pct, None);
     }
 }

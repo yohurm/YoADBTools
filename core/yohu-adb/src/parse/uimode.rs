@@ -83,7 +83,12 @@ fn parse_int_token(raw: &str) -> Option<u32> {
 }
 
 fn parse_bool_token(raw: &str) -> Option<bool> {
-    match raw.trim().trim_end_matches(',').to_ascii_lowercase().as_str() {
+    match raw
+        .trim()
+        .trim_end_matches(',')
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "true" => Some(true),
         "false" => Some(false),
         _ => None,

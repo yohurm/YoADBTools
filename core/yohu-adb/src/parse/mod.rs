@@ -4,6 +4,7 @@
 
 pub mod devices;
 pub mod ls;
+pub mod packages;
 pub mod ps;
 pub mod status;
 pub mod uimode;

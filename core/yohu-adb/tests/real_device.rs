@@ -132,6 +132,30 @@ async fn real_device_ps_parse() {
 }
 
 #[tokio::test]
+async fn real_device_list_packages() {
+    let client = client();
+    let Some(serial) = online_device(&client).await else {
+        eprintln!("跳过：无在线设备");
+        return;
+    };
+    let packages = client
+        .list_packages(&serial, CancellationToken::new())
+        .await
+        .expect("list packages 失败");
+    assert!(
+        packages.len() > 1,
+        "已安装包应多于 1 个，实际 {}",
+        packages.len()
+    );
+    assert!(packages.windows(2).all(|w| w[0] <= w[1]), "包名应已排序");
+    eprintln!(
+        "[真机] 已安装包 = {}，前 5: {:?}",
+        packages.len(),
+        packages.iter().take(5).collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn real_device_stream_lines() {
     let client = client();
     let Some(serial) = online_device(&client).await else {
@@ -234,13 +258,8 @@ async fn real_device_fill_then_evaluate_getprop() {
         .command("c-props")
         .cloned()
         .expect("默认库含 c-props");
-    let filled = cmd
-        .fill(&["ro.product.model".into()])
-        .expect("填充属性名");
-    assert!(
-        !filled.template.contains("{0}"),
-        "填充后模板不应残留占位符"
-    );
+    let filled = cmd.fill(&["ro.product.model".into()]).expect("填充属性名");
+    assert!(!filled.template.contains("{0}"), "填充后模板不应残留占位符");
     let evaluated = run_and_evaluate(&client, &serial, &filled, CancellationToken::new())
         .await
         .expect("eval");
@@ -250,8 +269,5 @@ async fn real_device_fill_then_evaluate_getprop() {
         evaluated.verdict
     );
     assert!(evaluated.verdict.is_pass(), "查询属性应通过");
-    assert!(
-        !evaluated.outcome.stdout.trim().is_empty(),
-        "型号不应为空"
-    );
+    assert!(!evaluated.outcome.stdout.trim().is_empty(), "型号不应为空");
 }
