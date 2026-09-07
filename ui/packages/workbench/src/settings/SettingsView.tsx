@@ -194,7 +194,7 @@ export const SettingsView: Component = () => {
           <YoFormRow
             class="yohu-settings__path-row"
             title="ADB 路径"
-            description="未指定时显示自动解析的绝对路径（用户设置 → 应用旁 → 内置解压）"
+              description="未指定时显示自动解析的绝对路径（用户设置 → DataRoot/tools/adb 解压副本）"
             note={<EffectBadge text="立即生效" />}
           >
             <PathControl

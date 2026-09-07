@@ -48,7 +48,7 @@ export function createSettingsStore() {
       setPaths(info.paths);
       setOs(info.os ?? "");
       setResolved({
-        adb_path: info.adb_in_use ?? info.adb_path ?? "",
+        adb_path: info.adb_path ?? "",
         data_root: info.paths.data_root,
         export_default_path: info.paths.exports_dir,
       });

@@ -77,6 +77,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logReplay: notConfigured,
     logExport: notConfigured,
     logProcessSnapshot: notConfigured,
+    logPackageSnapshot: notConfigured,
     onDevicesChanged: noop,
     onDeviceOffline: noop,
     onDeviceStatus: noop,
@@ -185,7 +186,6 @@ beforeEach(() => {
     identity: { ...DEFAULT_IDENTITY },
     paths: { ...RESOLVED_PATHS },
     adb_path: RESOLVED_ADB,
-    adb_in_use: RESOLVED_ADB,
     settings: { ...DEFAULT_SETTINGS },
     os: "windows",
   });

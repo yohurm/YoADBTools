@@ -46,8 +46,8 @@ export const App: Component = () => {
       setDensity(settingsStore.state.density);
       YoLog.info("shell", "设置已加载", { theme: settingsStore.state.theme });
     });
-    // 启动即扫：只 load() 会先画出「无设备」，预热扫描晚到且事件可能丢。
-    void deviceStore.refresh();
+    // 先读已有目录（启动恢复），再 refresh；与 core 预热扫描单飞，不双开 daemon。
+    void deviceStore.load().then(() => void deviceStore.refresh());
 
     const syncMaximized = (): void => {
       void windowIsMaximized().then(setMaximized);

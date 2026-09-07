@@ -2,6 +2,7 @@
  * 设备 store：UI 投影最近一次目录快照 + 运行时状态（焦点/每模块勾选是选择会话，不是第二份目录）。
  * 写目录只经 `device.refresh`；读目录经 `device.list` 与 `devices/changed`。
  * 运行时状态只经 `device.status` 与 `device/status`（模块禁止自己轮询 adb）。
+ * 卡片先出目录，Android 版本/电量随后经 `device/status` 补上，不必等整包 dumpsys。
  */
 
 import { createStore } from "solid-js/store";
@@ -99,6 +100,9 @@ export function createDeviceStore() {
       const devices = await deviceList();
       setState("lastError", "");
       applyDevices(devices);
+      if (devices.length > 0) {
+        YoLog.info("device", `读目录 ${devices.length} 台`, devices.map((d) => d.serial));
+      }
     } catch (e) {
       const detail = errorText(e);
       setState("lastError", detail);
@@ -110,19 +114,26 @@ export function createDeviceStore() {
 
   async function refresh(): Promise<void> {
     setState("refreshing", true);
-    setState("statusText", "扫描中…");
+    if (state.devices.length === 0) {
+      setState("statusText", "扫描中…");
+    }
+    const t0 = performance.now();
     try {
       const devices = await deviceRefresh();
       setState("lastError", "");
       applyDevices(devices);
       await pullStatuses();
-      YoLog.info("device", `扫描完成 ${devices.length} 台`, devices.map((d) => d.serial));
+      YoLog.info(
+        "device",
+        `扫描完成 ${devices.length} 台 ${Math.round(performance.now() - t0)}ms`,
+        devices.map((d) => d.serial),
+      );
     } catch (e) {
       const detail = errorText(e);
       let adbHint = "";
       try {
         const info = await systemInfo();
-        const used = info.adb_in_use ?? info.adb_path ?? "";
+        const used = info.adb_path ?? "";
         adbHint = used ? `；adb: ${used}` : "；adb 未解析";
       } catch {
         adbHint = "";
