@@ -1,7 +1,6 @@
 //! 设备命令：目录读/写 + 运行时状态快照。选择会话在壳，本层只转发 core。
 
 use tauri::State;
-use tokio_util::sync::CancellationToken;
 
 use crate::commands::{ipc, ipc_adb};
 use crate::state::AppState;
@@ -41,7 +40,7 @@ pub async fn device_set_night_mode(
     state.require_online(&serial)?;
     state
         .status
-        .set_night(&serial, night, CancellationToken::new())
+        .set_night(&serial, night, state.root_cancel.child_token())
         .await
         .map_err(ipc_adb)
 }

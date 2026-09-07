@@ -1,4 +1,4 @@
-//! 日志模块命令：薄转发 CaptureService / SessionLogService。
+//! 日志模块命令：薄转发 CaptureService。
 
 use std::path::PathBuf;
 
@@ -9,8 +9,7 @@ use crate::state::AppState;
 use yohu_logsrv::LogError;
 use yohu_protocol::{
     CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, IpcErrorCode, LogBatch,
-    ProcessEntry, ReplayRequest, SessionFileAppendRequest, SessionFileCloseRequest,
-    SessionFileInfo, SessionFileRequest, SessionLogFile,
+    ProcessEntry, ReplayRequest,
 };
 
 #[tauri::command(rename = "log.capture.start")]
@@ -76,79 +75,26 @@ pub fn log_replay(state: State<'_, AppState>, req: ReplayRequest) -> Result<LogB
     Ok(state.capture.replay(req))
 }
 
-// ===== 实时逐窗口日志文件（日志写入方式） =====
-
-/// `log.sessionFileOpen`：为某窗口新建实时日志文件。
-#[tauri::command(rename = "log.sessionFileOpen")]
-pub fn log_session_file_open(
-    state: State<'_, AppState>,
-    req: SessionFileRequest,
-) -> Result<SessionFileInfo, IpcError> {
-    state
-        .session_log
-        .open(&req.serial, req.window_id, &req.name, req.mode)
-        .map_err(ipc)
-}
-
-/// `log.sessionFileAppend`：追加一批 UI 已过滤行。
-#[tauri::command(rename = "log.sessionFileAppend")]
-pub fn log_session_file_append(
-    state: State<'_, AppState>,
-    req: SessionFileAppendRequest,
-) -> Result<u64, IpcError> {
-    state
-        .session_log
-        .append(&req.serial, req.window_id, &req.lines)
-        .map_err(ipc)
-}
-
-/// `log.sessionFileClose`：结束某窗口日志文件。
-#[tauri::command(rename = "log.sessionFileClose")]
-pub fn log_session_file_close(
-    state: State<'_, AppState>,
-    req: SessionFileCloseRequest,
-) -> Result<String, IpcError> {
-    state
-        .session_log
-        .close(&req.serial, req.window_id)
-        .map(|p| p.to_string_lossy().into_owned())
-        .map_err(ipc)
-}
-
-/// `log.sessionFileLatest`：当前窗口最新日志文件路径（导出「最新」用）。
-#[tauri::command(rename = "log.sessionFileLatest")]
-pub fn log_session_file_latest(
-    state: State<'_, AppState>,
-    serial: String,
-    window_id: u32,
-) -> Result<Option<String>, IpcError> {
-    Ok(state
-        .session_log
-        .latest(&serial, window_id)
-        .map(|p| p.to_string_lossy().into_owned()))
-}
-
-/// `log.sessionFileList`：列出全部窗口日志文件（多选导出对话框用）。
-#[tauri::command(rename = "log.sessionFileList")]
-pub fn log_session_file_list(state: State<'_, AppState>) -> Result<Vec<SessionLogFile>, IpcError> {
-    state.session_log.list().map_err(ipc)
-}
-
-/// `log.export`：把选定实时日志文件合并导出为一份 txt。
+/// `log.export`：当前窗口过滤条件下的环快照。
 #[tauri::command(rename = "log.export")]
 pub fn log_export(
     state: State<'_, AppState>,
     req: ExportRequest,
 ) -> Result<ExportResult, IpcError> {
     let settings = state.settings.snapshot();
-    let default_dir = (!settings.export_default_path.is_empty())
-        .then(|| PathBuf::from(&settings.export_default_path));
+    let default_dir = if !settings.export_default_path.is_empty() {
+        PathBuf::from(&settings.export_default_path)
+    } else {
+        state.paths.exports_dir()
+    };
     let result = state
-        .session_log
+        .capture
         .export(
-            &req.sources,
+            &req.serial,
+            req.from_seq,
+            &req.filter,
             req.path.as_deref().map(std::path::Path::new),
-            default_dir.as_deref(),
+            Some(default_dir.as_path()),
         )
         .map_err(ipc)?;
     state.app_log.info(format!("日志已导出: {}", result.path));

@@ -34,7 +34,7 @@ use tokio_util::sync::CancellationToken;
 use yohu_adb::{AdbClient, DeviceStatusHub, ToolResolver};
 use yohu_domain::AppLog;
 use yohu_files::{FileBrowser, FileMutator, TransferRunner};
-use yohu_logsrv::{CaptureService, SessionLogService};
+use yohu_logsrv::CaptureService;
 use yohu_mirror::MirrorService;
 use yohu_protocol::AppEvent;
 
@@ -128,7 +128,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             browser: FileBrowser::new(client.clone()),
             mutator: FileMutator::new(client.clone()),
             transfers: TransferRunner::new(client.clone()),
-            session_log: SessionLogService::new(paths.session_logs_dir()),
             settings,
             paths: paths.clone(),
             app_log: AppLog::new(500),
@@ -190,12 +189,21 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             let handle = handle.clone();
             let interval_secs = snapshot.devices_auto_refresh as u64;
             tauri::async_runtime::spawn(async move {
+                let cancel = handle.state::<AppState>().root_cancel.clone();
                 let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                // 首 tick 立即触发，会与启动预热扫描叠一次；跳过。
+                ticker.tick().await;
                 loop {
-                    ticker.tick().await;
-                    let state = handle.state::<AppState>();
-                    if let Err(e) = crate::device_catalog::refresh(&state).await {
-                        tracing::warn!("自动刷新失败: {e}");
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => break,
+                        _ = ticker.tick() => {
+                            let state = handle.state::<AppState>();
+                            if let Err(e) = crate::device_catalog::refresh(&state).await {
+                                tracing::warn!("自动刷新失败: {e}");
+                            }
+                        }
                     }
                 }
             });
@@ -233,11 +241,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::log::log_clear_device,
             commands::log::log_replay,
             commands::log::log_export,
-            commands::log::log_session_file_open,
-            commands::log::log_session_file_append,
-            commands::log::log_session_file_close,
-            commands::log::log_session_file_latest,
-            commands::log::log_session_file_list,
             commands::log::log_process_snapshot,
             commands::mirror::mirror_start,
             commands::mirror::mirror_stop,
