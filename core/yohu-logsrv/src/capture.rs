@@ -460,6 +460,14 @@ impl CaptureService {
         Ok(self.adb.ps(serial, CancellationToken::new()).await?)
     }
 
+    /// 已安装包名（新建日志窗口检索；不是当前 `ps` 进程）。
+    pub async fn package_snapshot(&self, serial: &str) -> Result<Vec<String>, LogError> {
+        Ok(self
+            .adb
+            .list_packages(serial, CancellationToken::new())
+            .await?)
+    }
+
     async fn emit_state(&self, serial: &str, generation: u64, state: CaptureState) {
         let _ = self
             .sink
@@ -520,7 +528,10 @@ impl CaptureService {
 mod tests {
     use super::*;
 
-    fn ingest_raw_lines(ring: &RingBuffer, raw_lines: impl IntoIterator<Item = impl AsRef<str>>) -> u64 {
+    fn ingest_raw_lines(
+        ring: &RingBuffer,
+        raw_lines: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> u64 {
         let mut added = 0u64;
         for raw in raw_lines {
             if let Some(line) = parse_logcat_line(raw.as_ref()) {

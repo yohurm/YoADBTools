@@ -50,9 +50,9 @@ fn resolve_dest(
             Ok(p.to_path_buf())
         }
         _ => {
-            let dir = default_dir.filter(|d| !d.as_os_str().is_empty()).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "未指定导出目录")
-            })?;
+            let dir = default_dir
+                .filter(|d| !d.as_os_str().is_empty())
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "未指定导出目录"))?;
             fs::create_dir_all(dir)?;
             let safe: String = serial
                 .chars()

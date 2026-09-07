@@ -175,11 +175,7 @@ async fn real_detach_clears_ring() {
 #[tokio::test]
 async fn real_export_filtered_ring_snapshot() {
     let client = Arc::new(AdbClient::new(
-        ToolResolver::new(
-            Some(real_adb()),
-            scratch("res2"),
-            scratch("data2"),
-        ),
+        ToolResolver::new(Some(real_adb()), scratch("res2"), scratch("data2")),
         4,
     ));
     let Some(serial) = online_device(&client).await else {
@@ -212,7 +208,10 @@ async fn real_export_filtered_ring_snapshot() {
         .expect("导出环快照");
     let content = std::fs::read_to_string(&result.path).expect("读导出文件");
     assert_eq!(content.lines().count() as u64, result.lines);
-    assert!(result.lines >= lines.len() as u64, "导出行数应覆盖已收到的批次");
+    assert!(
+        result.lines >= lines.len() as u64,
+        "导出行数应覆盖已收到的批次"
+    );
 
     let _ = std::fs::remove_dir_all(&root);
 }

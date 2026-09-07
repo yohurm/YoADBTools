@@ -395,6 +395,22 @@ async fn process_snapshot_reads_ps() {
 }
 
 #[tokio::test]
+async fn package_snapshot_reads_pm_list() {
+    let exe = isolated_fake_adb(
+        r#"{ "packages": "package:com.idle.app\npackage:com.yohu.app\npackage:com.android.systemui\n" }"#,
+    );
+    let (service, _rx) = build_service(exe);
+    let names = service
+        .package_snapshot("R58M1234A")
+        .await
+        .expect("packages");
+    assert_eq!(
+        names,
+        vec!["com.android.systemui", "com.idle.app", "com.yohu.app",]
+    );
+}
+
+#[tokio::test]
 async fn adb_client_devices_parse_via_fake() {
     let exe = isolated_fake_adb(
         r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1", "Z9X unauthorized"] }"#,
