@@ -2,6 +2,10 @@
   "name": "yohu-ui-workspace",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=10"
+  },
   "scripts": {
     "dev": "pnpm --filter @yohu/shell dev",
     "build": "pnpm --filter @yohu/shell build",

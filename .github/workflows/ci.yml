@@ -43,7 +43,7 @@ jobs:
       - name: Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
 
@@ -66,6 +66,61 @@ jobs:
       - name: 前端生产构建（PR 也校验可构建；体积断言在 package）
         working-directory: ui
         run: pnpm build
+
+      - name: Rust 构建（含 fake-adb 明文 bin）
+        run: cargo build --workspace
+
+      - name: Rust 测试（含 fake-adb 集成）
+        run: cargo test --workspace
+
+      - name: Clippy（-D warnings）
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  verify-macos:
+    name: 验证 macOS（Rust + 前端）
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+
+      - name: sidecar adb
+        run: bash scripts/setup-adb.sh
+
+      - name: sidecar scrcpy-server
+        run: bash scripts/setup-scrcpy-server.sh
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: 前端依赖
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: 前端类型检查
+        working-directory: ui
+        run: pnpm exec tsc -b
+
+      - name: 前端测试（Vitest）
+        working-directory: ui
+        run: pnpm test
+
+      - name: token 纪律
+        working-directory: ui
+        run: pnpm lint
 
       - name: Rust 构建（含 fake-adb 明文 bin）
         run: cargo build --workspace
@@ -106,7 +161,7 @@ jobs:
       - name: Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
 
