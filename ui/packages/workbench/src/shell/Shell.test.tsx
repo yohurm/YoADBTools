@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   updateDownload: vi.fn(),
   updateInstall: vi.fn(),
   updateCancel: vi.fn(),
+  windowShow: vi.fn(async () => undefined),
   taskHandler: null as null | ((e: unknown) => void),
 }));
 
@@ -96,6 +97,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     windowToggleMaximize: vi.fn(async () => undefined),
     windowClose: vi.fn(async () => undefined),
     windowIsMaximized: vi.fn(async () => false),
+    windowShow: (...a: unknown[]) => mocks.windowShow(...a),
     listenWindowResize: vi.fn(async () => () => undefined),
     EVENT_NAMES: {
       devicesChanged: "devices/changed",
@@ -117,6 +119,8 @@ import { NavList } from "./NavList";
 import { StatusBar } from "./StatusBar";
 import { AppLayout } from "./AppLayout";
 import { SettingsView } from "../settings/SettingsView";
+import { App } from "../App";
+import { resetMainWindowRevealForTests } from "../boot";
 import { registerModule } from "../registry";
 import { deviceStore, settingsStore, updateStore } from "../stores";
 import { APP_IDENTITY, APP_SETTINGS_DEFAULT, ModuleId, type DeviceSession } from "@yohu/api";
@@ -141,14 +145,7 @@ registerModule({
   selectionMode: "singleRequired",
   Component: SessionProbe,
 });
-registerModule({
-  id: ModuleId.Settings,
-  title: "设置",
-  icon: "settings",
-  selectionMode: "none",
-  kind: "system",
-  Component: SettingsView,
-});
+// Settings 由 App.tsx 在 import 时注册，测试不再重复登记。
 registerModule({
   id: ModuleId.Mirror,
   title: "投屏",
@@ -222,6 +219,8 @@ beforeEach(() => {
 
 afterEach(() => {
   updateStore.dismiss();
+  resetMainWindowRevealForTests();
+  mocks.windowShow.mockClear();
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-density");
 });
@@ -721,5 +720,23 @@ describe("settingsStore 外观应用", () => {
     await settingsStore.load();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(document.documentElement.getAttribute("data-density")).toBe("comfortable");
+  });
+});
+
+describe("App 启动编排", () => {
+  it("揭主窗口后加载，再扫描", async () => {
+    mocks.windowShow.mockClear();
+    mocks.deviceRefresh.mockClear();
+    const { unmount } = render(() => <App />);
+    await waitFor(() => {
+      expect(mocks.windowShow).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mocks.deviceRefresh).toHaveBeenCalled();
+    });
+    const showOrder = mocks.windowShow.mock.invocationCallOrder[0]!;
+    const refreshOrder = mocks.deviceRefresh.mock.invocationCallOrder[0]!;
+    expect(showOrder).toBeLessThan(refreshOrder);
+    unmount();
   });
 });

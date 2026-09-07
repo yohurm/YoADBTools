@@ -17,6 +17,7 @@ import {
 } from "@yohu/api";
 import { setDensity, setTheme } from "@yohu/ui";
 
+import { runBootPipeline } from "./boot";
 import { registerModule } from "./registry";
 import { SettingsView } from "./settings/SettingsView";
 import { AppLayout } from "./shell/AppLayout";
@@ -38,23 +39,29 @@ export const App: Component = () => {
   const [maximized, setMaximized] = createSignal(false);
 
   onMount(() => {
+    let disposed = false;
     // 外观跟随设置（加载前先用当前快照兜底）
     setTheme(settingsStore.state.theme);
     setDensity(settingsStore.state.density);
-    void settingsStore.load().then(() => {
-      setTheme(settingsStore.state.theme);
-      setDensity(settingsStore.state.density);
-      YoLog.info("shell", "设置已加载", { theme: settingsStore.state.theme });
+
+    // 原生小窗已显示；此处加载工作台，就绪后揭主窗并关掉小窗。
+    void runBootPipeline({
+      load: async () => {
+        await Promise.all([settingsStore.load(), deviceStore.load()]);
+        YoLog.info("shell", "设置已加载", { theme: settingsStore.state.theme });
+      },
+      refresh: () => {
+        if (!disposed) {
+          void deviceStore.refresh();
+        }
+      },
     });
-    // 先读已有目录（启动恢复），再 refresh；与 core 预热扫描单飞，不双开 daemon。
-    void deviceStore.load().then(() => void deviceStore.refresh());
 
     const syncMaximized = (): void => {
       void windowIsMaximized().then(setMaximized);
     };
     syncMaximized();
     // 退订竞态：监听可能在 cleanup 之后才 resolve，需在 resolve 时检查是否已卸载。
-    let disposed = false;
     let unlistenResize: (() => void) | undefined;
     void listenWindowResize(syncMaximized).then((fn) => {
       if (disposed) {
