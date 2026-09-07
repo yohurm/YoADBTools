@@ -5,7 +5,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LogBatch, LogLine, SessionLogFile } from "@yohu/api";
+import type { LogBatch, LogLine } from "@yohu/api";
 
 const mocks = vi.hoisted(() => ({
   logCaptureStart: vi.fn(),
@@ -15,11 +15,6 @@ const mocks = vi.hoisted(() => ({
   logClearDevice: vi.fn(),
   logReplay: vi.fn(),
   logExport: vi.fn(),
-  logSessionFileOpen: vi.fn(async (..._a: unknown[]) => ({ path: "x.log", name: "System", lines: 0 })),
-  logSessionFileAppend: vi.fn(async (..._a: unknown[]) => 0),
-  logSessionFileClose: vi.fn(async (..._a: unknown[]) => "x.log"),
-  logSessionFileLatest: vi.fn(async (..._a: unknown[]) => "x.log"),
-  logSessionFileList: vi.fn(async (..._a: unknown[]) => [] as SessionLogFile[]),
   logProcessSnapshot: vi.fn(),
   logBatchHandlers: [] as ((e: { batch: LogBatch }) => void)[],
   logOverflowHandlers: [] as ((e: { serial: string }) => void)[],
@@ -64,11 +59,6 @@ vi.mock("@yohu/api", () => {
     logClearDevice: (...a: unknown[]) => mocks.logClearDevice(...a),
     logReplay: (...a: unknown[]) => mocks.logReplay(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
-    logSessionFileOpen: (...a: unknown[]) => mocks.logSessionFileOpen(...a),
-    logSessionFileAppend: (...a: unknown[]) => mocks.logSessionFileAppend(...a),
-    logSessionFileClose: (...a: unknown[]) => mocks.logSessionFileClose(...a),
-    logSessionFileLatest: (...a: unknown[]) => mocks.logSessionFileLatest(...a),
-    logSessionFileList: (...a: unknown[]) => mocks.logSessionFileList(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
     onDevicesChanged: (h: (e: { devices: unknown[] }) => void): void => {
       mocks.devicesChangedHandlers.push(h);
@@ -370,7 +360,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     push("S1", [mk(0), mk(1)]);
     mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
     await vi.waitFor(() => {
-      expect(mocks.logReplay).toHaveBeenCalledWith({ serial: "S1", from_seq: 2, limit: 100_000 });
+      expect(mocks.logReplay).toHaveBeenCalledWith({ serial: "S1", from_seq: 2, limit: 10_000 });
     });
     expect(overflowedOf(store, "S1")).toBe(true);
   });
@@ -424,38 +414,32 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     mocks.logReplay.mockResolvedValue(batch("S1", [mk(3, { msg: "from-replay" })]));
     const store = wiredStore();
     await store.startCapture();
-    expect(mocks.logReplay).toHaveBeenCalledWith({ serial: "S1", from_seq: 0, limit: 100_000 });
+    expect(mocks.logReplay).toHaveBeenCalledWith({ serial: "S1", from_seq: 0, limit: 10_000 });
     expect(store.mirror.size()).toBe(1);
     expect(store.state.sessions[0]!.visible[0]!.line.msg).toBe("from-replay");
     await store.stopCapture();
   });
 
-  it("exportSession 透传源文件路径与目标", async () => {
+  it("exportSession 把当前窗口过滤交给 log.export", async () => {
     const store = wiredStore();
-    await store.exportSession(["C:\\logs\\S1-w1.log"], "D:\\out.txt");
+    await store.startCapture();
+    mocks.logExport.mockResolvedValueOnce({ path: "D:\\out.txt", lines: 1 });
+    await store.exportSession("D:\\out.txt");
     expect(mocks.logExport).toHaveBeenCalledWith(
-      expect.objectContaining({ sources: ["C:\\logs\\S1-w1.log"], path: "D:\\out.txt" }),
+      expect.objectContaining({
+        serial: "S1",
+        from_seq: 0,
+        path: "D:\\out.txt",
+        filter: expect.objectContaining({ scope: { kind: "all" } }),
+      }),
     );
   });
 
-  it("exportSession 空 sources 返回 null 且不发 IPC", async () => {
+  it("exportSession 从未采集的窗口返回 null 且不发 IPC", async () => {
     const store = wiredStore();
-    const result = await store.exportSession([]);
+    const result = await store.exportSession();
     expect(result).toBeNull();
     expect(mocks.logExport).not.toHaveBeenCalled();
-  });
-
-  it("listSessionFiles / latestSessionFile 走 sessionFile IPC", async () => {
-    const store = wiredStore();
-    const listed: SessionLogFile[] = [
-      { path: "a.log", serial: "S1", window_id: 1, name: "System", lines: 1, modified: "" },
-    ];
-    mocks.logSessionFileList.mockResolvedValueOnce(listed);
-    mocks.logSessionFileLatest.mockResolvedValueOnce("b.log");
-    await expect(store.listSessionFiles()).resolves.toEqual(listed);
-    await expect(store.latestSessionFile("S1", 1)).resolves.toBe("b.log");
-    expect(mocks.logSessionFileList).toHaveBeenCalled();
-    expect(mocks.logSessionFileLatest).toHaveBeenCalledWith("S1", 1);
   });
 
   it("重叠 start 闸门串行：首次 IPC，第二次已 capturing 则跳过", async () => {
@@ -501,21 +485,14 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(generationOf(store, "S1")).toBe(7);
   });
 
-  it("start 失败后 pending 清除；若 status 已 Live 则窗口 capturing", async () => {
+  it("start 失败则窗口不订阅", async () => {
     const store = createLogStore();
     await store.bindSerial("S1");
     store.ensureSession();
     mocks.logCaptureStart.mockRejectedValueOnce(new Error("ipc"));
-    mocks.logCaptureStatus.mockResolvedValueOnce({
-      serial: "S1",
-      capturing: true,
-      generation: 3,
-      last_seq: 0,
-    });
     await expect(store.startCapture()).rejects.toThrow("ipc");
     expect(store.state.sessions[0]!.starting).toBe(false);
-    expect(store.state.sessions[0]!.capturing).toBe(true);
-    expect(generationOf(store, "S1")).toBe(3);
+    expect(store.state.sessions[0]!.capturing).toBe(false);
   });
 
   it("start 成功后若 status 世代已结束则纠正窗口 capturing", async () => {

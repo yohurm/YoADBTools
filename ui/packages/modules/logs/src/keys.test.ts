@@ -60,10 +60,12 @@ describe("copyLogText", () => {
     expect(copyLogText(rows, new Set(["2"]), keyOf)).toBe(formatLogLine(rows[1]!.line));
   });
 
-  it("含 UID 名的行按列对齐，解析失败行原样", () => {
-    expect(formatLogLine(line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" }))).toContain(
-      "shell",
+  it("含 UID 名的行按列对齐，无 UID 的行不含 uid 列", () => {
+    expect(formatLogLine(line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" }))).toBe(
+      "01-01 12:00:00.000    shell  1705  1705 W binder: avc",
     );
-    expect(formatLogLine(line({ level: "?", ts: "", pid: 0, msg: "not a logcat line" }))).toBe("not a logcat line");
+    expect(formatLogLine(line({ pid: 100, tid: 200, level: "I", tag: "Yohu", msg: "hello" }))).toBe(
+      "01-01 12:00:00.000   100   200 I Yohu: hello",
+    );
   });
 });

@@ -1,12 +1,12 @@
 /**
  * 采集客户端：窗口订阅 ↔ 每设备一路 logcat。
- * 引用计数、世代、掉线、溢出回补在本文件；批次扇出在 ingest；会话文件在 session-files。
+ * 引用计数、世代、掉线、溢出回补在本文件；批次扇出在 ingest。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
  * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
- * 开始前先打一次 ps，包名窗口带着 pidSet 入镜，不空等下一次触摸或 2.5s 索引。
- * 掉线只停采集、关会话文件、清镜像；已画出的行保留。
- * WebView 从冻结恢复时 replay 补 UI 镜像（JS 暂停时 overflow 事件可能根本没发出）。
+ * 开始前先打一次 ps，包名窗口带着 pidSet 入镜。
+ * 掉线只停采集、清镜像；已画出的行保留。
+ * WebView 从冻结恢复时 replay 补 UI 镜像。
  */
 
 import type { SetStoreFunction } from "solid-js/store";
@@ -19,8 +19,6 @@ import {
   logExport,
   logProcessSnapshot,
   logReplay,
-  logSessionFileLatest,
-  logSessionFileList,
   onCaptureState,
   onDeviceOffline,
   onLogBatch,
@@ -29,11 +27,11 @@ import {
   onSettingsChanged,
   YoLog,
 } from "@yohu/api";
-import type { CaptureStatus, LogWriteMode, ProcessEntry, SessionLogFile } from "@yohu/api";
+import type { CaptureStatus, ProcessEntry } from "@yohu/api";
 
+import { toWireFilter } from "./filter";
 import type { IngestApi } from "./ingest";
-import type { MirrorBank } from "./pipeline";
-import type { SessionFilesApi } from "./session-files";
+import type { MirrorBank } from "./mirror";
 import {
   deviceSlice,
   ensureDevice,
@@ -44,21 +42,16 @@ import {
 
 type CaptureStore = LogUiState;
 
-/** 单次 log.replay 回补/快照的最大行数（与 buffer_capacity 无关；上限兜底）。 */
-const REPLAY_LIMIT = 100_000;
-
 export type CaptureApi = {
   bindSerial: (next: string | null) => Promise<void>;
   setBufferCapacity: (capacity: number) => void;
-  startCapture: (mode?: LogWriteMode) => Promise<void>;
+  startCapture: () => Promise<void>;
   stopCapture: () => Promise<void>;
   clearVisible: (id: number) => Promise<void>;
   clearDevice: () => Promise<void>;
   clearShared: () => Promise<void>;
   refreshProcesses: (serial?: string | null) => Promise<void>;
-  exportSession: (sources: string[], path?: string) => Promise<string | null>;
-  listSessionFiles: () => Promise<SessionLogFile[]>;
-  latestSessionFile: (serial: string, windowId: number) => Promise<string | null>;
+  exportSession: (path?: string) => Promise<string | null>;
   closeSession: (id: number) => void;
   closeOthers: (id: number) => void;
   resumeFollow: (id: number) => void;
@@ -72,7 +65,6 @@ export function createCapture(
   mirrors: MirrorBank,
   workspace: WorkspaceApi,
   ingest: IngestApi,
-  files: SessionFilesApi,
 ): CaptureApi {
   let bindGen = 0;
   const gates = new Map<string, Promise<void>>();
@@ -121,7 +113,6 @@ export function createCapture(
   }
 
   function stopWindowsOn(device: string): void {
-    files.closeDevice(device, state.sessions);
     state.sessions.forEach((session, idx) => {
       if (session.serial !== device || !session.capturing) return;
       setState("sessions", idx, { capturing: false, starting: false });
@@ -209,7 +200,7 @@ export function createCapture(
     }
   }
 
-  async function startCapture(mode?: LogWriteMode): Promise<void> {
+  async function startCapture(): Promise<void> {
     workspace.ensureSession();
     const session = activeSession();
     if (!session) {
@@ -250,25 +241,13 @@ export function createCapture(
             workspace.clearPanel(sessionId);
           }
         }
-        await files.open(state.sessions[idx]!, current, mode);
         subscribeWindow(idx, current, sessionId, resumeWindow);
         await pullSnapshot(current);
         await confirmStart(current, startedGen, sessionId);
       } catch (e) {
-        try {
-          const status = await logCaptureStatus(current);
-          if (status.capturing) {
-            const resumeWindow = state.sessions[idx]!.fromSeq >= 0;
-            await files.open(state.sessions[idx]!, current, mode);
-            subscribeWindow(idx, current, sessionId, resumeWindow);
-            setDeviceGen(current, status.generation);
-            await pullSnapshot(current);
-          } else {
-            setState("sessions", idx, { starting: false });
-          }
-        } catch (statusErr) {
-          setState("sessions", idx, { starting: false });
-          console.error("log.capture.status 失败", statusErr);
+        const done = sessionIndex(sessionId);
+        if (done >= 0) {
+          setState("sessions", done, { starting: false });
         }
         throw e;
       } finally {
@@ -280,7 +259,6 @@ export function createCapture(
     });
   }
 
-  /** 本窗口开始订阅：续采保留 fromSeq；第一次开始 fromSeq=0，立刻从环补齐匹配行。 */
   function subscribeWindow(idx: number, device: string, sessionId: number, resumeWindow: boolean): void {
     if (resumeWindow) {
       setState("sessions", idx, { capturing: true, starting: false, serial: device });
@@ -298,7 +276,7 @@ export function createCapture(
   async function pullSnapshot(device: string): Promise<void> {
     try {
       const from = Math.max(0, mirrors.of(device).lastSeqNumber() + 1);
-      const batch = await logReplay({ serial: device, from_seq: from, limit: REPLAY_LIMIT });
+      const batch = await logReplay({ serial: device, from_seq: from, limit: bufferCapacity() });
       if (batch?.lines && batch.lines.length > 0) ingest.onBatch(batch);
     } catch (e) {
       console.error("log.replay 快照失败", e);
@@ -316,14 +294,9 @@ export function createCapture(
       if (idx >= 0) {
         setState("sessions", idx, { capturing: false, starting: false });
       }
-      files.close(current, session.id);
       if (!lastOnDevice) return;
       YoLog.info("logs", "采集停止", { serial: current });
-      try {
-        await interrupt;
-      } catch (e) {
-        throw e;
-      }
+      await interrupt;
       lastStoppedGen.set(
         current,
         Math.max(lastStoppedGen.get(current) ?? 0, deviceSlice(state, current).generation),
@@ -350,14 +323,12 @@ export function createCapture(
 
   function closeSession(id: number): void {
     const session = state.sessions.find((s) => s.id === id);
-    files.close(session?.serial ?? null, id);
     workspace.closeSession(id);
     releaseDeviceIfIdle(session?.serial ?? null, session?.capturing ?? false);
   }
 
   function closeOthers(id: number): void {
     const closed = state.sessions.filter((s) => s.id !== id);
-    closed.forEach((s) => files.close(s.serial, s.id));
     workspace.closeOthers(id);
     const devices = new Set(closed.filter((s) => s.capturing && s.serial).map((s) => s.serial!));
     for (const device of devices) {
@@ -402,25 +373,23 @@ export function createCapture(
     }
   }
 
-  async function exportSession(sources: string[], path: string | undefined): Promise<string | null> {
-    if (sources.length === 0) return null;
-    const result = await logExport({ sources, path });
+  async function exportSession(path?: string): Promise<string | null> {
+    const session = activeSession();
+    if (!session?.serial || session.fromSeq < 0) return null;
+    const result = await logExport({
+      serial: session.serial,
+      from_seq: session.fromSeq,
+      filter: toWireFilter(session),
+      path,
+    });
     return result.path;
-  }
-
-  function listSessionFiles(): Promise<SessionLogFile[]> {
-    return logSessionFileList();
-  }
-
-  function latestSessionFile(serial: string, windowId: number): Promise<string | null> {
-    return logSessionFileLatest(serial, windowId);
   }
 
   async function onOverflow(device: string): Promise<void> {
     setOverflowed(device, true);
     try {
       const from = mirrors.of(device).lastSeqNumber() + 1;
-      const batch = await logReplay({ serial: device, from_seq: from, limit: REPLAY_LIMIT });
+      const batch = await logReplay({ serial: device, from_seq: from, limit: bufferCapacity() });
       ingest.onBatch(batch);
     } catch (e) {
       console.error("log.replay 回补失败", e);
@@ -449,7 +418,6 @@ export function createCapture(
     stopWindowsOn(device);
   }
 
-  // 采集活过视图：buffer_capacity 不能只靠 DeviceSession 注入。
   void onSettingsChanged((e) => {
     if (e.key === "buffer_capacity") {
       setBufferCapacity(e.settings.buffer_capacity);
@@ -488,8 +456,6 @@ export function createCapture(
     clearShared,
     refreshProcesses,
     exportSession,
-    listSessionFiles,
-    latestSessionFile,
     closeSession,
     closeOthers,
     resumeFollow: (id: number): void => {

@@ -2,10 +2,10 @@
  * 日志页快捷键策略：绑定表 + 复制格式。宿主与选区代数在 @yohu/ui keymap。
  */
 
-import type { LogLine } from "@yohu/api";
 import { whenIdle, whenPanel, whenPanelOrField, type KeyBinding } from "@yohu/ui";
 
-import type { ViewRow } from "./pipeline";
+import { formatLogLine } from "./format";
+import type { ViewRow } from "./stack";
 
 export type LogsKeyAction =
   | "pause"
@@ -31,14 +31,7 @@ export const LOGS_KEY_BINDINGS: readonly KeyBinding<LogsKeyAction>[] = [
   { action: "next-tab", key: "tab", ctrl: true, when: whenPanel },
 ];
 
-export function formatLogLine(line: LogLine): string {
-  if (line.level === "?") return line.msg;
-  const uid = (line.uid ?? "").padStart(8);
-  const pid = String(line.pid).padStart(5);
-  const tid = String(line.tid).padStart(5);
-  const tag = line.tag.padEnd(8);
-  return `${line.ts} ${uid} ${pid} ${tid} ${line.level} ${tag} ${line.msg}`.trimEnd();
-}
+export { formatLogLine };
 
 export function copyLogText(
   rows: readonly ViewRow[],

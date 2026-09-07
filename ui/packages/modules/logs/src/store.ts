@@ -5,15 +5,13 @@
  */
 
 import { createStore } from "solid-js/store";
-import { APP_SETTINGS_DEFAULT, type LogWriteMode } from "@yohu/api";
+import { APP_SETTINGS_DEFAULT } from "@yohu/api";
 
 import { createCapture } from "./capture";
 import { createIngest } from "./ingest";
-import { MirrorBank } from "./pipeline";
-import { createSessionFiles } from "./session-files";
+import { MirrorBank } from "./mirror";
 import { createWorkspace, type LogSessionState, type LogUiState } from "./workspace";
 
-export type { LogWriteMode };
 export type { DeviceUiState, LogSessionState } from "./workspace";
 export { deviceSlice, SYSTEM_SESSION_TITLE } from "./workspace";
 
@@ -27,10 +25,9 @@ export function createLogStore() {
   });
 
   const mirrors = new MirrorBank(APP_SETTINGS_DEFAULT.buffer_capacity);
-  const files = createSessionFiles();
   const workspace = createWorkspace(state, setState, mirrors);
-  const ingest = createIngest(state, setState, mirrors, files);
-  const capture = createCapture(state, setState, mirrors, workspace, ingest, files);
+  const ingest = createIngest(state, setState, mirrors);
+  const capture = createCapture(state, setState, mirrors, workspace, ingest);
 
   return {
     state,
