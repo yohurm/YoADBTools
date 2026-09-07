@@ -24,7 +24,7 @@
 | 018 | 拖拽 | 见 `文件拖拽-v6.md` |
 | 019 | 右键 | 见 `右键菜单-v6.md` |
 | 020 | 事件名 | `/` 分层；invoke 仍点分 |
-| [021](ADR-v6-021.md) | 日志导出真相 | **开放：** 环 vs session-logs |
+| [021](ADR-v6-021.md) | 日志导出真相 | **已采纳：** 导出扫环；采集不落盘 |
 | [022](ADR-v6-022.md) | 更新通道 | GitHub Releases；非 plugin-updater |
 | [023](ADR-v6-023.md) | 投屏画质（旧） | **被 024 取代：** Channel + WebCodecs |
 | [024](ADR-v6-024.md) | 投屏原生呈现 | 进程内系统硬解 + 嵌入表面；Windows = MF + HWND；禁止 ffmpeg.exe |

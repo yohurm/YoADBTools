@@ -18,8 +18,7 @@
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` | 环 / logcat -c / 回补 / ps |
-| `log.sessionFileOpen/Append/Close/Latest/List` | 逐窗口实时文件（见 ADR-v6-021） |
-| `log.export` | **现状：** 合并 session-logs 源文件（不是环快照） |
+| `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
 | `mirror.start/stop/inject/closeControl/layout/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**（舞台透明洞，不是 contain 目标、不是视觉插值盒）。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。禁止 `video_width` / `stroke_px`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。可见则 HWND 独占占用矩形的像素；`visible=false` 才拆表面。Live 状态只信 `mirror/state`，无 `mirror.status` |
 | `settings.set` | 更新单键；推 `settings/changed` 全量快照。读走 `system.info` / 事件注入 |
 | `system.info` / `openPath` / `reportError` / `log` | 关于 / 打开路径 / 上报 |
@@ -48,6 +47,6 @@
 
 RingBuffer seq 单调；Batcher 有界 mpsc 满则丢**推送**不丢环；UI 经 overflow + `log.replay` 补镜像。
 
-**导出：** 文档曾写「导出永远读环」。实现是 UI 过滤行写入 `session-logs`，`log.export` 合并这些文件（ADR-v6-021）。replay 仍读环。
+**导出：** `log.export` 读环（`seq >= from_seq` + domain 过滤），仅用户操作落盘。replay 读环不过滤。
 
 **投屏帧：** 不进 JS。`yohu-mirror::FramePipe` 有界 8 帧，sticky 最后一份 config（先丢 delta，不丢 config）；**呈现线程 `try_recv` 直取**，禁止再泵进无界通道。满则丢待发帧，不影响设备 TCP。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。

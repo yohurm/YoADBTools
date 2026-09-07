@@ -31,7 +31,7 @@
     ├── tools/adb/
     └── modules/
         ├── adb-terminal/config/library.json
-        ├── log-analyzer/exports/ + session-logs/
+        ├── log-analyzer/exports/
         └── file-manager/drag-out/
 
 %TEMP%/<DATA_DIR_NAME>-update/     # NSIS 安装包下载缓存（覆盖安装不进 INSTDIR）
