@@ -111,13 +111,18 @@ pub fn update_install(
             received_bytes: 0,
             total_bytes: 0,
         }));
-    spawn_overlay_install(&installer, pid, &relaunch).map_err(ipc_update)?;
-    state.app_log.info("已启动覆盖安装，即将退出以便写入主程序");
-    state.root_cancel.cancel();
-    if let Err(e) = state.settings.save_atomic() {
-        tracing::warn!("覆盖安装前保存设置失败: {e}");
+    let should_exit = spawn_overlay_install(&installer, pid, &relaunch).map_err(ipc_update)?;
+    if should_exit {
+        state.app_log.info("已启动覆盖安装，即将退出以便写入主程序");
+        state.root_cancel.cancel();
+        if let Err(e) = state.settings.save_atomic() {
+            tracing::warn!("覆盖安装前保存设置失败: {e}");
+        }
+        app.exit(0);
+    } else {
+        let _ = app;
+        state.app_log.info("已打开安装包，请拖入应用程序文件夹");
     }
-    app.exit(0);
     Ok(())
 }
 
@@ -139,20 +144,6 @@ pub fn update_cancel(state: State<'_, AppState>) -> Result<(), IpcError> {
 #[tauri::command(rename = "update.open")]
 pub fn update_open(url: String) -> Result<(), IpcError> {
     let url = assert_http_url(&url).map_err(ipc_update)?;
-    #[cfg(windows)]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .spawn()
-            .map_err(ipc)?;
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = url;
-        return Err(crate::commands::ipc_code(
-            yohu_protocol::IpcErrorCode::Internal,
-            "仅支持 Windows",
-        ));
-    }
+    yohu_runtime::open_url(url).map_err(ipc)?;
     Ok(())
 }

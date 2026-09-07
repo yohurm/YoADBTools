@@ -90,6 +90,13 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
     {
         return None;
     }
+    if (os == "macos" || os == "darwin")
+        && (n.ends_with(".exe")
+            || n.ends_with(".msi")
+            || contains_any(&n, &[".appimage", ".deb", ".rpm", "linux", "win32"]))
+    {
+        return None;
+    }
     if is_x64
         && contains_any(&n, &["arm64", "aarch64", "armv7"])
         && !contains_any(&n, &["x64", "x86_64", "amd64"])
@@ -121,6 +128,19 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
         if n.contains("win") {
             score += 2;
         }
+    } else if os == "macos" || os == "darwin" {
+        if n.ends_with(".dmg") {
+            score += 12;
+        } else if n.contains(".app") {
+            score += 8;
+        } else {
+            return None;
+        }
+        if contains_any(&n, &["darwin", "macos", "osx"]) {
+            score += 3;
+        }
+    } else {
+        return None;
     }
     if is_x64 && contains_any(&n, &["x64", "x86_64", "amd64", "win64"]) {
         score += 8;
@@ -232,6 +252,38 @@ mod tests {
         ];
         let picked = pick_asset(&assets, &win64()).unwrap();
         assert!(picked.name.contains("x64-setup.exe"));
+    }
+
+    fn mac_arm() -> PlatformInfo {
+        PlatformInfo {
+            version: "0.1.0".into(),
+            identifier: "com.yohu.adbtools".into(),
+            os: "macos".into(),
+            arch: "aarch64".into(),
+        }
+    }
+
+    #[test]
+    fn pick_asset_prefers_macos_arm_dmg() {
+        let assets = vec![
+            asset(
+                "YohuAdbTools_1.2.0_x64-setup.exe",
+                "https://example.com/win.exe",
+                20,
+            ),
+            asset(
+                "YohuAdbTools_1.2.0_aarch64.dmg",
+                "https://example.com/mac.dmg",
+                10,
+            ),
+            asset(
+                "YohuAdbTools_1.2.0_x64.dmg",
+                "https://example.com/mac-intel.dmg",
+                12,
+            ),
+        ];
+        let picked = pick_asset(&assets, &mac_arm()).unwrap();
+        assert!(picked.name.contains("aarch64.dmg"));
     }
 
     #[test]

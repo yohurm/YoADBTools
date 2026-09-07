@@ -1,10 +1,15 @@
 //! 覆盖安装：等当前进程退出后静默跑 NSIS `/S`，再拉起新主程序。
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use yohu_protocol::{DATA_DIR_NAME, PRODUCT_NAME};
+#[cfg(windows)]
+use std::io::Write;
+
+#[cfg(not(target_os = "macos"))]
+use yohu_protocol::DATA_DIR_NAME;
+use yohu_protocol::PRODUCT_NAME;
+#[cfg(not(target_os = "macos"))]
 use yohu_runtime::app_data_root;
 
 use crate::download::assert_cached_installer;
@@ -17,6 +22,7 @@ const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 #[cfg(windows)]
 const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
+#[cfg(any(windows, test))]
 const APPLY_PS1: &str = r#"param(
   [Parameter(Mandatory=$true)][int]$WaitPid,
   [Parameter(Mandatory=$true)][string]$Setup,
@@ -40,25 +46,56 @@ if (Test-Path -LiteralPath $App) {
 exit 0
 "#;
 
-/// NSIS per-user 安装后的主程序（`%LOCALAPPDATA%\YohuAdbTools\YohuAdbTools.exe`）。
+/// NSIS per-user 安装后的主程序（Windows：`%LOCALAPPDATA%\YohuAdbTools\YohuAdbTools.exe`）。
+/// macOS：`/Applications/YohuAdbTools.app/Contents/MacOS/YohuAdbTools`。
 pub fn installed_exe_path() -> PathBuf {
-    app_data_root(DATA_DIR_NAME).join(format!("{PRODUCT_NAME}.exe"))
+    #[cfg(windows)]
+    {
+        app_data_root(DATA_DIR_NAME).join(format!("{PRODUCT_NAME}.exe"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        PathBuf::from("/Applications")
+            .join(format!("{PRODUCT_NAME}.app"))
+            .join("Contents")
+            .join("MacOS")
+            .join(PRODUCT_NAME)
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        app_data_root(DATA_DIR_NAME).join(PRODUCT_NAME)
+    }
 }
 
-/// 写脱离作业对象的覆盖安装脚本并拉起：等 `app_pid` 退出 → `setup /S` → 启动新主程序。
+/// 拉起覆盖安装：Windows 等进程退出后静默 `/S`；macOS 打开 DMG（用户拖入 Applications）。
+/// 返回是否应退出当前进程（Windows 必须退出才能覆盖主程序）。
 pub fn spawn_overlay_install(
     installer: &Path,
     app_pid: u32,
     relaunch_exe: &Path,
-) -> Result<(), UpdateError> {
-    #[cfg(not(windows))]
-    {
-        let _ = (installer, app_pid, relaunch_exe);
-        return Err(UpdateError::NotWindows);
-    }
+) -> Result<bool, UpdateError> {
     #[cfg(windows)]
     {
-        spawn_overlay_install_windows(installer, app_pid, relaunch_exe)
+        spawn_overlay_install_windows(installer, app_pid, relaunch_exe)?;
+        Ok(true)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (app_pid, relaunch_exe);
+        let installer = assert_cached_installer(installer)?;
+        std::process::Command::new("open")
+            .arg(installer)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        Ok(false)
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = (installer, app_pid, relaunch_exe);
+        Err(UpdateError::NotWindows)
     }
 }
 
@@ -113,6 +150,7 @@ fn spawn_overlay_install_windows(
     Ok(())
 }
 
+#[cfg(windows)]
 fn path_arg(path: &Path) -> Result<String, UpdateError> {
     path.to_str()
         .map(str::to_string)
@@ -124,13 +162,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn installed_exe_is_under_local_app_data_product() {
+    fn installed_exe_is_under_product_install_root() {
         let p = installed_exe_path();
-        assert!(p.ends_with("YohuAdbTools.exe"));
-        assert!(p
-            .parent()
-            .map(|d| d.ends_with("YohuAdbTools"))
-            .unwrap_or(false));
+        #[cfg(windows)]
+        {
+            assert!(p.ends_with("YohuAdbTools.exe"));
+            assert!(p
+                .parent()
+                .map(|d| d.ends_with("YohuAdbTools"))
+                .unwrap_or(false));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            assert!(p.ends_with("YohuAdbTools"));
+            assert!(p.to_string_lossy().contains("YohuAdbTools.app"));
+        }
     }
 
     #[test]
