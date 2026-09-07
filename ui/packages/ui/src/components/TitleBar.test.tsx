@@ -92,6 +92,13 @@ describe("YoTitleBar", () => {
     expect(trailing?.querySelectorAll(".yohu-titlebar__caption").length).toBe(3);
   });
 
+  it("nativeCaptions 隐藏自定义三键并标记 native", () => {
+    const { container } = render(() => <YoTitleBar title="窗" nativeCaptions />);
+    expect(container.querySelectorAll(".yohu-titlebar__caption").length).toBe(0);
+    expect(container.querySelector(".yohu-titlebar")?.getAttribute("data-captions")).toBe("native");
+    expect(container.querySelector(".yohu-titlebar--native-captions")).toBeTruthy();
+  });
+
   it("中区可承载 children（不再挂模块通栏）", () => {
     const { container } = render(() => (
       <YoTitleBar title="窗">

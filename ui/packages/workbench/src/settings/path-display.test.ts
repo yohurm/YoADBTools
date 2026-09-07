@@ -39,4 +39,13 @@ describe("splitPathEnds", () => {
   it("空路径", () => {
     expect(splitPathEnds("")).toEqual({ head: "", tail: "" });
   });
+
+  it("POSIX 路径按 / 拆末段", () => {
+    expect(
+      splitPathEnds("/Users/me/Library/Application Support/YohuAdbTools/data/tools/adb/adb"),
+    ).toEqual({
+      head: "/Users/me/Library/Application Support/YohuAdbTools/data/tools/adb/",
+      tail: "adb",
+    });
+  });
 });

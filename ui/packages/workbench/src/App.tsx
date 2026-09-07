@@ -86,6 +86,7 @@ export const App: Component = () => {
         void windowToggleMaximize().then(() => void windowIsMaximized().then(setMaximized));
       }}
       onClose={() => void windowClose()}
+      nativeCaptions={settingsStore.os() === "macos"}
     />
   );
 };

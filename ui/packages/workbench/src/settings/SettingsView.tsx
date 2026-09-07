@@ -8,7 +8,6 @@ import { Component, For, Show, onMount, type JSX } from "solid-js";
 
 import { APP_ICON_SRC } from "../app-identity";
 import {
-  DATA_DIR_NAME,
   dialogOpenDirectory,
   dialogOpenFile,
   errorText,
@@ -214,9 +213,11 @@ export const SettingsView: Component = () => {
               onBrowse={() =>
                 void browseFile(
                   "adb_path",
-                  "选择 adb.exe",
+                  settingsStore.os() === "windows" ? "选择 adb.exe" : "选择 adb",
                   "已保存（立即生效）",
-                  [{ name: "adb 可执行文件", extensions: ["exe"] }],
+                  settingsStore.os() === "windows"
+                    ? [{ name: "adb 可执行文件", extensions: ["exe"] }]
+                    : [],
                 )
               }
             />
@@ -225,7 +226,7 @@ export const SettingsView: Component = () => {
           <YoFormRow
             class="yohu-settings__path-row"
             title="数据目录"
-            description={`默认 %LOCALAPPDATA%\\${DATA_DIR_NAME}\\data。其下为 tools/adb 与 modules/（adb-terminal / file-manager / log-analyzer）。设置文件与应用日志固定在 LocalAppData，不随本目录迁移。`}
+            description={`默认 ${settingsStore.paths.local_root || "应用数据目录"}/data。其下为 tools/adb 与 modules/（adb-terminal / file-manager / log-analyzer）。设置文件与应用日志固定在系统应用数据根，不随本目录迁移。`}
             note={<EffectBadge text="重启生效" />}
           >
             <PathControl

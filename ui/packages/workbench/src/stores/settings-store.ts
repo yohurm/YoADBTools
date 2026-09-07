@@ -6,6 +6,7 @@
  * 外观项（theme/density）在加载与变更后同步到 documentElement（data-theme/data-density）。
  */
 
+import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import {
@@ -37,6 +38,7 @@ export function createSettingsStore() {
   const [resolved, setResolved] = createStore({ ...EMPTY_RESOLVED });
   const [identity, setIdentity] = createStore<AppIdentity>({ ...APP_IDENTITY });
   const [paths, setPaths] = createStore<AppPathCatalog>({ ...EMPTY_PATH_CATALOG });
+  const [os, setOs] = createSignal("");
 
   async function load(): Promise<void> {
     try {
@@ -44,6 +46,7 @@ export function createSettingsStore() {
       setState(info.settings);
       setIdentity(info.identity);
       setPaths(info.paths);
+      setOs(info.os ?? "");
       setResolved({
         adb_path: info.adb_in_use ?? info.adb_path ?? "",
         data_root: info.paths.data_root,
@@ -79,7 +82,7 @@ export function createSettingsStore() {
     applyAppearance(e.settings);
   });
 
-  return { state, resolved, identity, paths, load, set };
+  return { state, resolved, identity, paths, os, load, set };
 }
 
 export type SettingsStoreApi = ReturnType<typeof createSettingsStore>;

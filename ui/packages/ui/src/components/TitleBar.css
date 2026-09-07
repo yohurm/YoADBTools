@@ -13,6 +13,10 @@
   user-select: none;
 }
 
+.yohu-titlebar--native-captions {
+  padding-left: var(--yohu-layout-titlebar-traffic);
+}
+
 .yohu-titlebar__brand {
   display: flex;
   align-items: center;

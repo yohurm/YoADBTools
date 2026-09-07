@@ -78,6 +78,7 @@ export const AppLayout: Component<{
   onMinimize?: () => void;
   onToggleMaximize?: () => void;
   onClose?: () => void;
+  nativeCaptions?: boolean;
 }> = (props) => {
   const current = () => modules().find((m) => m.id === props.activeModuleId());
   const [railOpen, setRailOpen] = createSignal(true);
@@ -96,6 +97,7 @@ export const AppLayout: Component<{
         onMinimize={props.onMinimize}
         onToggleMaximize={props.onToggleMaximize}
         onClose={props.onClose}
+        nativeCaptions={props.nativeCaptions}
         actions={
           <YoIconButton
             icon="sidebar"

@@ -79,6 +79,8 @@ export const Layout = {
   TitlebarCaptionGap: 0,
   /** 关闭键贴窗口右缘（电脑去边距）。 */
   TitlebarCloseMargin: 0,
+  /** macOS Overlay 交通灯占位（左内边距，避开系统三键）。 */
+  TitlebarTraffic: 80,
   /** 标题栏渐变模糊下延 32vp（沉浸光感） */
   TitlebarBlur: 32,
   /** 12 列栅格 gutter（≥840vp） */

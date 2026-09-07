@@ -5,6 +5,7 @@
  * 受控 API：title / icon / children / actions / maximized / onMinimize / onToggleMaximize / onClose。
  *
  * 三键从左到右：最小化、最大化（或还原）、关闭。拖动走 data-tauri-drag-region；按钮 no-drag。
+ * macOS Overlay：nativeCaptions 隐藏自定义三键，左侧让出系统交通灯。
  * 沉浸：背板 = --yohu-canvas。窗口操作由 Application 壳接线，本组件只收回调。
  */
 import { Show, type JSX } from "solid-js";
@@ -31,6 +32,8 @@ export interface YoTitleBarProps {
   onToggleMaximize?: () => void;
   /** 关闭 */
   onClose?: () => void;
+  /** true：隐藏自定义三键，左侧让出系统交通灯（macOS Overlay） */
+  nativeCaptions?: boolean;
 }
 
 function isCaptionTarget(target: EventTarget | null): boolean {
@@ -44,6 +47,8 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
   return (
     <header
       class="yohu-titlebar"
+      classList={{ "yohu-titlebar--native-captions": props.nativeCaptions === true }}
+      data-captions={props.nativeCaptions ? "native" : "trailing"}
       onDblClick={(event) => {
         if (isCaptionTarget(event.target)) return;
         props.onToggleMaximize?.();
@@ -82,35 +87,37 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
         <Show when={props.actions}>
           <div class="yohu-titlebar__actions">{props.actions}</div>
         </Show>
-        <div class="yohu-titlebar__captions">
-          <button
-            type="button"
-            class="yohu-titlebar__caption"
-            aria-label="最小化"
-            title="最小化"
-            onClick={() => props.onMinimize?.()}
-          >
-            <Icon name="window-min" size={Layout.IconSm} />
-          </button>
-          <button
-            type="button"
-            class="yohu-titlebar__caption"
-            aria-label={props.maximized ? "还原" : "最大化"}
-            title={props.maximized ? "还原" : "最大化"}
-            onClick={() => props.onToggleMaximize?.()}
-          >
-            <Icon name={props.maximized ? "window-restore" : "window-max"} size={Layout.IconSm} />
-          </button>
-          <button
-            type="button"
-            class="yohu-titlebar__caption yohu-titlebar__caption--close"
-            aria-label="关闭"
-            title="关闭"
-            onClick={() => props.onClose?.()}
-          >
-            <Icon name="close" size={Layout.IconSm} />
-          </button>
-        </div>
+        <Show when={!props.nativeCaptions}>
+          <div class="yohu-titlebar__captions">
+            <button
+              type="button"
+              class="yohu-titlebar__caption"
+              aria-label="最小化"
+              title="最小化"
+              onClick={() => props.onMinimize?.()}
+            >
+              <Icon name="window-min" size={Layout.IconSm} />
+            </button>
+            <button
+              type="button"
+              class="yohu-titlebar__caption"
+              aria-label={props.maximized ? "还原" : "最大化"}
+              title={props.maximized ? "还原" : "最大化"}
+              onClick={() => props.onToggleMaximize?.()}
+            >
+              <Icon name={props.maximized ? "window-restore" : "window-max"} size={Layout.IconSm} />
+            </button>
+            <button
+              type="button"
+              class="yohu-titlebar__caption yohu-titlebar__caption--close"
+              aria-label="关闭"
+              title="关闭"
+              onClick={() => props.onClose?.()}
+            >
+              <Icon name="close" size={Layout.IconSm} />
+            </button>
+          </div>
+        </Show>
       </div>
     </header>
   );

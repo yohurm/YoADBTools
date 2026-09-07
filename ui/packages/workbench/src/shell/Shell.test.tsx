@@ -192,6 +192,7 @@ beforeEach(() => {
     adb_path: RESOLVED_ADB,
     adb_in_use: RESOLVED_ADB,
     settings: { ...DEFAULT_SETTINGS },
+    os: "windows",
   });
   mocks.settingsSet.mockImplementation(async (key: string, value: unknown) => {
     return { ...DEFAULT_SETTINGS, [key]: value };
@@ -443,6 +444,7 @@ describe("StatusBar（§3 状态栏）", () => {
       paths: { ...RESOLVED_PATHS },
       adb_path: RESOLVED_ADB,
       settings: { ...DEFAULT_SETTINGS },
+      os: "windows",
     });
     await settingsStore.load();
     render(() => <StatusBar />);
@@ -453,6 +455,7 @@ describe("StatusBar（§3 状态栏）", () => {
       paths: { ...RESOLVED_PATHS },
       adb_path: RESOLVED_ADB,
       settings: { ...DEFAULT_SETTINGS },
+      os: "windows",
     });
     await settingsStore.load();
   });
@@ -706,6 +709,7 @@ describe("settingsStore 外观应用", () => {
       paths: { ...RESOLVED_PATHS },
       adb_path: "",
       settings: { ...DEFAULT_SETTINGS, theme: "dark", density: "comfortable" },
+      os: "windows",
     });
     await settingsStore.load();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
