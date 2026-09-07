@@ -2,6 +2,37 @@
 
 use std::path::{Path, PathBuf};
 
+/// 当前 OS 上的可执行文件名：Windows 加 `.exe`，其它平台原样。
+pub fn host_bin_name(stem: &str) -> String {
+    #[cfg(windows)]
+    {
+        format!("{stem}.exe")
+    }
+    #[cfg(not(windows))]
+    {
+        stem.to_string()
+    }
+}
+
+/// 确保路径对当前用户可执行（Unix `+x`；Windows 无操作）。
+pub fn ensure_executable(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(path)?.permissions();
+        let mode = perms.mode();
+        if mode & 0o111 == 0 {
+            perms.set_mode(mode | 0o111);
+            std::fs::set_permissions(path, perms)?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    Ok(())
+}
+
 /// 本机应用数据根：`<os_app_data>/<product_dir_name>`。
 ///
 /// Windows：`%LOCALAPPDATA%\<name>`。macOS：`~/Library/Application Support/<name>`。
@@ -72,6 +103,35 @@ pub fn open_path(path: &Path) -> std::io::Result<()> {
     }
 }
 
+/// 用系统默认方式打开 http(s) URL（浏览器兜底）。
+pub fn open_url(url: &str) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .spawn()?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(url).spawn()?;
+        Ok(())
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open").arg(url).spawn()?;
+        Ok(())
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        let _ = url;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "open_url: unsupported OS",
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,5 +140,14 @@ mod tests {
     fn app_data_root_joins_product_name() {
         let p = app_data_root("YohuAdbTools");
         assert!(p.ends_with("YohuAdbTools"));
+    }
+
+    #[test]
+    fn host_bin_name_matches_os() {
+        let name = host_bin_name("adb");
+        #[cfg(windows)]
+        assert_eq!(name, "adb.exe");
+        #[cfg(not(windows))]
+        assert_eq!(name, "adb");
     }
 }
