@@ -1,6 +1,6 @@
 //! 日志过滤匹配（ADR-v6-006）：wire [`LogFilter`] 的领域语义。
 //!
-//! protocol 只持有结构；导出/回补与 UI `matchesWireFilter` 共用本层 + testdata/log_filter.json。
+//! protocol 只持有结构；导出与 UI `matchesWireFilter` 共用本层 + testdata/log_filter.json。回补读环不过滤。
 
 use yohu_protocol::{LogFilter, LogLine, LogScope};
 

@@ -5,9 +5,11 @@
 //! 依赖方向：yohu-domain → yohu-protocol（禁止反向）。
 
 pub mod applog;
+pub mod catalog;
 pub mod command;
 pub mod focus;
 pub mod log_filter;
+pub mod log_format;
 pub mod mirror;
 pub mod safety;
 pub mod settings;
@@ -18,11 +20,12 @@ pub use command::{
     CommandGroup, CommandLibrary, EvaluatedRun, GroupExecutor, GroupRunEvent, InputField,
     LibraryError, RunError, Runner, Verdict,
 };
+pub use catalog::{catalog_after_scan, device_display_name, lookup_selected_devices};
 pub use focus::{
-    assert_device_online, assert_targets_online, catalog_after_scan, device_display_name,
-    lookup_selected_devices, reconcile_focus, DeviceSessionError, SelectionMode,
+    assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,
 };
 pub use log_filter::{level_rank, log_filter_matches};
+pub use log_format::format_log_line;
 pub use mirror::{
     apply_protocol, encoder_limits, is_tcp_connection, params_of, start_encode,
     start_force_forward, EncoderLimits, MirrorEncodeParams, USB_ENCODE, WIFI_ENCODE,

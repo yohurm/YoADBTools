@@ -1,0 +1,39 @@
+[
+  {
+    "line": {
+      "seq": 1,
+      "ts": "01-01 12:00:00.000",
+      "pid": 1705,
+      "tid": 1705,
+      "uid": "shell",
+      "level": "W",
+      "tag": "binder",
+      "msg": "avc"
+    },
+    "expect": "01-01 12:00:00.000    shell  1705  1705 W binder: avc"
+  },
+  {
+    "line": {
+      "seq": 2,
+      "ts": "01-01 12:00:00.000",
+      "pid": 100,
+      "tid": 200,
+      "level": "I",
+      "tag": "Yohu",
+      "msg": "hello"
+    },
+    "expect": "01-01 12:00:00.000   100   200 I Yohu: hello"
+  },
+  {
+    "line": {
+      "seq": 3,
+      "ts": "",
+      "pid": 0,
+      "tid": 0,
+      "level": "?",
+      "tag": "",
+      "msg": "not a logcat line"
+    },
+    "expect": "     0     0 ? : not a logcat line"
+  }
+]

@@ -64,14 +64,6 @@ pub fn apply_setting(
         SettingKey::ExportAskEveryTime => {
             settings.export_ask_every_time = must_bool(key, value)?;
         }
-        SettingKey::ExportMode => {
-            settings.export_mode = serde_json::from_value(value.clone())
-                .map_err(|_| format!("{} 必须是 latest 或 select", key.as_str()))?;
-        }
-        SettingKey::LogWriteMode => {
-            settings.log_write_mode = serde_json::from_value(value.clone())
-                .map_err(|_| format!("{} 必须是 overwrite 或 append", key.as_str()))?;
-        }
         SettingKey::LogDisplayColumns => {
             settings.log_display_columns = serde_json::from_value(value.clone()).map_err(|_| {
                 format!(
