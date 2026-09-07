@@ -10,15 +10,11 @@
 import { Component, For, Show, createSignal } from "solid-js";
 
 import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator } from "@yohu/ui";
-import {
-  deviceDisplayName,
-  formatDeviceStatusHint,
-  formatDeviceStatusMeta,
-  type DeviceInfo,
-} from "@yohu/api";
+import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
 import { deviceStore } from "../stores";
+import { formatDeviceStatusHint, formatDeviceStatusMeta } from "./device-status-format";
 
 /** 设备状态可读文本（title 提示）。 */
 function stateText(state: DeviceInfo["state"]): string {

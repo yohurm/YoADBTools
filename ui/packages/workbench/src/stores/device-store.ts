@@ -80,6 +80,19 @@ export function createDeviceStore() {
     setState("focusSerial", reconcileFocus(state.focusSerial, online));
   }
 
+  /** `device/status` 可丢；对账走缓存快照（ADR-v6-025），不打 dumpsys。 */
+  async function pullStatuses(): Promise<void> {
+    try {
+      const statuses = await deviceStatus();
+      const online = new Set(onlineSerials(state.devices));
+      for (const status of statuses) {
+        if (online.has(status.serial)) applyStatus(status);
+      }
+    } catch (e) {
+      YoLog.warn("device", `读取运行时状态失败 ${errorText(e)}`);
+    }
+  }
+
   /** 读 core 目录快照，不跑 adb。启动扫描走 `refresh()`。 */
   async function load(): Promise<void> {
     try {
@@ -92,12 +105,7 @@ export function createDeviceStore() {
       YoLog.error("device", `读取目录失败 ${detail}`);
       console.error("device.list 失败", e);
     }
-    try {
-      const statuses = await deviceStatus();
-      for (const status of statuses) applyStatus(status);
-    } catch (e) {
-      YoLog.warn("device", `读取运行时状态失败 ${errorText(e)}`);
-    }
+    await pullStatuses();
   }
 
   async function refresh(): Promise<void> {
@@ -107,6 +115,7 @@ export function createDeviceStore() {
       const devices = await deviceRefresh();
       setState("lastError", "");
       applyDevices(devices);
+      await pullStatuses();
       YoLog.info("device", `扫描完成 ${devices.length} 台`, devices.map((d) => d.serial));
     } catch (e) {
       const detail = errorText(e);
@@ -176,6 +185,7 @@ export function createDeviceStore() {
   void onDevicesChanged((e) => {
     setState("lastError", "");
     applyDevices(e.devices);
+    void pullStatuses();
   });
 
   void onDeviceOffline((e) => {

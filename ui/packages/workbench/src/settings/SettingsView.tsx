@@ -54,16 +54,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const WRITE_MODE_OPTIONS = [
-  { value: "overwrite", label: "覆盖（默认）" },
-  { value: "append", label: "续写（每次新开文件）" },
-];
-
-const EXPORT_MODE_OPTIONS = [
-  { value: "latest", label: "最新（默认）" },
-  { value: "select", label: "选择窗口文件" },
-];
-
 const LOG_COLUMN_OPTIONS: { key: keyof LogDisplayColumns; label: string }[] = [
   { key: "ts", label: "时间" },
   { key: "uid", label: "UID" },
@@ -294,28 +284,6 @@ export const SettingsView: Component = () => {
               onBrowse={() =>
                 void browseDir("export_default_path", "选择日志导出目录", "已保存（立即生效）")
               }
-            />
-          </YoFormRow>
-
-          <YoFormRow
-            title="日志写入方式"
-            note={<EffectBadge text="立即生效" />}
-          >
-            <YoSelect
-              options={WRITE_MODE_OPTIONS}
-              value={settingsStore.state.log_write_mode}
-              onChange={(v) => save("log_write_mode", v, "已保存（立即生效）")}
-            />
-          </YoFormRow>
-
-          <YoFormRow
-            title="导出方式"
-            note={<EffectBadge text="立即生效" />}
-          >
-            <YoSelect
-              options={EXPORT_MODE_OPTIONS}
-              value={settingsStore.state.export_mode}
-              onChange={(v) => save("export_mode", v, "已保存（立即生效）")}
             />
           </YoFormRow>
 

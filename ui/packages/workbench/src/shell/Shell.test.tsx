@@ -76,11 +76,6 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logClearDevice: notConfigured,
     logReplay: notConfigured,
     logExport: notConfigured,
-    logSessionFileOpen: notConfigured,
-    logSessionFileAppend: notConfigured,
-    logSessionFileClose: notConfigured,
-    logSessionFileLatest: notConfigured,
-    logSessionFileList: notConfigured,
     logProcessSnapshot: notConfigured,
     onDevicesChanged: noop,
     onDeviceOffline: noop,
@@ -298,6 +293,19 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(container.querySelectorAll('[role="option"]').length).toBe(0);
   });
 
+  it("刷新后用 device.status 对账运行时次行（不依赖可丢的 device/status 事件）", async () => {
+    mocks.deviceRefresh.mockResolvedValue([
+      { serial: "A1", model: "Moto X", state: "online", connection: "usb" },
+    ]);
+    mocks.deviceStatus.mockResolvedValue([
+      { serial: "A1", generation: 1, release: "15", battery_pct: 87, charging: true },
+    ]);
+    await deviceStore.refresh();
+    expect(deviceStore.state.statuses.A1?.battery_pct).toBe(87);
+    render(() => <DeviceRail />);
+    expect(screen.getByText("Android 15 · 87% 充电")).toBeTruthy();
+  });
+
   it("两台在线时执行目标仅为焦点，不广播全部在线设备", async () => {
     mocks.deviceRefresh.mockResolvedValue([]);
     await deviceStore.refresh();
@@ -469,11 +477,10 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.getAllByText("下次采集生效").length).toBeGreaterThan(0);
   });
 
-  it("日志导出设置项可见（路径/导出方式/日志写入方式）", () => {
+  it("日志导出设置项可见（默认路径 / 每次询问保存位置）", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("默认导出路径")).toBeTruthy();
-    expect(screen.getByText("导出方式")).toBeTruthy();
-    expect(screen.getByText("日志写入方式")).toBeTruthy();
+    expect(screen.getByText("每次导出询问保存位置")).toBeTruthy();
   });
 
   it("日志显示列复选框可见且默认全开", () => {
