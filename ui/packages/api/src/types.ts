@@ -193,6 +193,7 @@ export interface SystemInfo {
   adb_path: string;
   adb_in_use?: string;
   settings: AppSettings;
+  os: string;
 }
 
 /** 壳注入到模块视图的会话（模块不得 import 壳 store）。

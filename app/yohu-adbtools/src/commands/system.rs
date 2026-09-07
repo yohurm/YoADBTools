@@ -26,6 +26,7 @@ pub fn system_info(state: State<'_, AppState>) -> Result<SystemInfo, IpcError> {
         adb_path,
         adb_in_use,
         settings: state.settings.snapshot(),
+        os: std::env::consts::OS.to_string(),
     })
 }
 

@@ -118,6 +118,8 @@ pub struct SystemInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adb_in_use: Option<String>,
     pub settings: AppSettings,
+    /// 编译目标 OS：`windows` / `macos` / `linux`（`std::env::consts::OS`）。
+    pub os: String,
 }
 
 #[cfg(test)]
