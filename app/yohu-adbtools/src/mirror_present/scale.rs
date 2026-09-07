@@ -1,6 +1,8 @@
-//! 占用缩放：UI 报稳定可用区；HWND 铺满 avail；可见卡片按画面 contain。
+//! 占用缩放：UI 报稳定可用区；表面铺满 avail；可见卡片按画面 contain。
 //!
-//! 占用盒 fill↔contain 走 DirectComposition clip 动画（300ms）。禁止 CSS 占用过渡。
+//! Windows 占用盒 fill↔contain 走 DirectComposition clip 动画（300ms）。
+//! macOS 走 NSView 卡片 frame + 圆角。禁止 CSS 占用过渡。
+#![cfg_attr(not(windows), allow(dead_code))]
 
 /// 在可用区内按画面宽高比 contain，返回贴合盒相对区原点的偏移与尺寸。
 /// 公式与 UI `fitContain` 相同（先 min 再 round），无画面尺寸时铺满。

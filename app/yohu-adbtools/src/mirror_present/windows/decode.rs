@@ -9,6 +9,7 @@ use windows::Win32::Media::MediaFoundation::IMFDXGIDeviceManager;
 use yohu_mirror::{EncodedFrame, FramePipe};
 
 use super::mf::{DecodedPicture, MfDecoder};
+use crate::mirror_present::annexb::{access_unit, select_live_frames};
 
 pub struct DecodeBind {
     pub pipe: Arc<FramePipe>,
@@ -168,28 +169,4 @@ impl DecodeTick {
             }
         }
     }
-}
-
-fn select_live_frames(
-    last_config: &mut Option<Vec<u8>>,
-    frames: Vec<EncodedFrame>,
-) -> Vec<EncodedFrame> {
-    for frame in &frames {
-        if frame.config {
-            *last_config = Some(frame.payload.clone());
-        }
-    }
-    frames.into_iter().filter(|f| !f.config).collect()
-}
-
-fn access_unit(config: Option<&[u8]>, payload: &[u8], keyframe: bool) -> Vec<u8> {
-    if keyframe {
-        if let Some(cfg) = config {
-            let mut au = Vec::with_capacity(cfg.len() + payload.len());
-            au.extend_from_slice(cfg);
-            au.extend_from_slice(payload);
-            return au;
-        }
-    }
-    payload.to_vec()
 }

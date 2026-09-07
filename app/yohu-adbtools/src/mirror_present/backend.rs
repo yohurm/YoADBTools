@@ -51,6 +51,7 @@ pub trait AnnexBDecoder: Sized {
 }
 
 #[cfg(not(windows))]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn spawn_unimplemented(id: &'static str, serial: &str) -> Sender<Cmd> {
     let (tx, rx) = std::sync::mpsc::channel();
     let label = format!("mirror-present-{id}-{serial}");

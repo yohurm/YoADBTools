@@ -157,6 +157,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(hwnd) => present.set_owner(hwnd.0 as isize),
                 Err(e) => tracing::error!("无法取得主窗口 HWND: {e}"),
             }
+            #[cfg(target_os = "macos")]
+            match win.ns_view() {
+                Ok(view) => present.set_owner(view as isize),
+                Err(e) => tracing::error!("无法取得主窗口 NSView: {e}"),
+            }
         }
 
         let exit_handle = handle.clone();

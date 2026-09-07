@@ -1,6 +1,7 @@
 //! 舞台模型：占用 / 模式 / chrome。与 OS 无关，不进 `MirrorLayout`。
 //!
 //! 解码是否绑定（`bound`）是管道投影，只在 BindPipe/UnbindPipe 时写入，禁止另开 bool 双轨。
+#![cfg_attr(not(windows), allow(dead_code))]
 
 use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
 
@@ -195,6 +196,26 @@ impl Stage {
 
     pub fn video_size(&self) -> (u32, u32) {
         (self.video_w, self.video_h)
+    }
+
+    pub fn dpr(&self) -> f32 {
+        self.dpr
+    }
+
+    pub fn has_device(&self) -> bool {
+        self.has_device
+    }
+
+    pub fn failed(&self) -> bool {
+        self.failed
+    }
+
+    pub fn error(&self) -> &str {
+        &self.error
+    }
+
+    pub fn dark(&self) -> bool {
+        self.dark
     }
 
     pub fn host_size(&self) -> (u32, u32) {

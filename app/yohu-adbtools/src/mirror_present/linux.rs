@@ -1,4 +1,4 @@
-//! 预留：VA-API + DMA-BUF 嵌入式 widget。
+//! 预留：VA-API + DMA-BUF 嵌入式 widget（ADR-v6-030：Linux 本期不交付像素）。
 //!
 //! 禁止用 FFmpeg 或 libavcodec 的 vaapi 封装填这个模块。
 

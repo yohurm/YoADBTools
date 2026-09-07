@@ -1,8 +1,10 @@
-//! 壳内投屏呈现：编译期系统硬解（ADR-v6-024/026/027/028）。
+//! 壳内投屏呈现：编译期系统硬解（ADR-v6-024/026/027/028/030）。
 //!
-//! Windows = Media Foundation → D3D11 YUV → HWND。macOS / Linux 预留，禁止 FFmpeg。
+//! Windows = Media Foundation → D3D11 YUV → HWND。
+//! macOS = VideoToolbox → NSView。Linux 预留，禁止 FFmpeg。
 //! UI 上报稳定可用区；表面独占像素。解码会话跟 `mirror.start`/`stop` 走，表面跟舞台可见性走。
 
+mod annexb;
 mod backend;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -93,10 +95,10 @@ impl PresentHost {
         self.hevc_ok.load(Ordering::SeqCst)
     }
 
-    pub fn set_owner(&self, hwnd: isize) {
-        self.inner.lock().expect("present lock poisoned").owner = hwnd;
+    pub fn set_owner(&self, owner: isize) {
+        self.inner.lock().expect("present lock poisoned").owner = owner;
         #[cfg(windows)]
-        self.geom.set_owner(hwnd);
+        self.geom.set_owner(owner);
     }
 
     /// 绑定解码管道。已有舞台则只换管道，禁止拆表面。
