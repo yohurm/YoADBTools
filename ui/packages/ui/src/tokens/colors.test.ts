@@ -43,6 +43,7 @@ const EXPECTED_LIGHT: Record<string, string> = {
 const EXPECTED_DARK: Record<string, string> = {
   BgBase: "#000000",
   Surface: "#202224",
+  Surface2: "#2E3033",
   Accent: "#317AF7",
   AccentSoft: "#317AF733",
   Success: "#5BA854",
@@ -126,6 +127,11 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     }
   });
 
+  it("深色灰阶随层级抬升明度：page < surface < surface-2", () => {
+    expect(luminance(DarkColors.BgBase)).toBeLessThan(luminance(DarkColors.Surface));
+    expect(luminance(DarkColors.Surface)).toBeLessThan(luminance(DarkColors.Surface2));
+  });
+
   it("深色色板覆盖全部语义键", () => {
     for (const name of Object.keys(Colors)) {
       expect(DarkColors[name], `DarkColors.${name}`).toBeTruthy();
@@ -206,6 +212,8 @@ describe("theme.css 变量", () => {
     const darkBlock = themeCss.slice(themeCss.indexOf('[data-theme="dark"]'));
     expect(darkBlock).toContain("--yohu-accent: #317AF7");
     expect(darkBlock).toContain("--yohu-bg-base: #000000");
+    expect(darkBlock).toContain("--yohu-surface: #202224");
+    expect(darkBlock).toContain("--yohu-surface-2: #2E3033");
     expect(darkBlock).toContain("--yohu-success: #5BA854");
   });
 

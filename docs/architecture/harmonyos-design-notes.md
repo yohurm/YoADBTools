@@ -66,7 +66,7 @@
 | `background_fourth` | `#D1D1D6` | `#2E3033` | 四级背景 |
 | `background_emphasize` | `#0A59F7` | `#317AF7` | 高亮背景 |
 
-> **注（深色模式背景规则）：** 文档文字说明「深色模式下 Primary 与 Secondary 对应背景色默认都为黑色」；灰阶阶梯从 `gray_02` 起按显示层级逐级抬升/降低对比度。界面背景色**不可用透明色**（特殊场景可作组件背景）。文中 token 表 `background_primary` 的 Dark 值（`#E5E5E5`）与文字说明存在出入，工程落地以「深色 primary/secondary = 黑、阶梯 `#191A1C → #202224 → #2E3033`」为准。
+> **注（深色模式背景规则）：** 文档文字说明「深色模式下 Primary 与 Secondary 对应背景色默认都为黑色」；灰阶阶梯从 `gray_02` 起按显示层级逐级抬升/降低对比度。界面背景色**不可用透明色**（特殊场景可作组件背景）。文中 token 表 `background_primary` 的 Dark 值（`#E5E5E5`）与文字说明存在出入，工程落地以「深色页面 = 黑、卡片 `comp_background_primary` `#202224`、次级表面 `background_fourth` `#2E3033`」为准。`#191A1C` 是表内 `background_secondary`，低于卡片明度，不能再当作 `--yohu-surface-2`。
 
 ### 1.5 组件容器色与交互事件色
 

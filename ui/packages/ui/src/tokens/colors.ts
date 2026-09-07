@@ -8,6 +8,8 @@
  * 来源：yovo-harmonyos-docs / 设计指南 / 通用设计基础 / 视觉风格 / 色彩.md
  * 深色 background_primary 表值 #E5E5E5 与正文「深色 Primary/Secondary = 黑」冲突，
  * 落地以正文为准（harmonyos-design-notes.md §1.4）。
+ * 深色次级表面走 gray_02 之后的下一档实色（background_fourth），保证层级随明度抬升，
+ * 禁止再映射成比卡片更暗的 background_secondary。
  */
 
 /** HarmonyOS ARGB `#AARRGGBB` → CSS `#RRGGBB` / `#RRGGBBAA`。 */
@@ -102,7 +104,8 @@ export type SemanticColorName = keyof typeof Colors;
 export const DarkColors: Record<SemanticColorName, string> = {
   BgBase: Harmony.backgroundPrimary.dark,
   Surface: Harmony.compBackgroundPrimary.dark,
-  Surface2: Harmony.backgroundSecondary.dark,
+  /** 深色灰阶随层级抬升：page 黑 → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
+  Surface2: Harmony.backgroundFourth.dark,
   Fg: Harmony.fontPrimary.dark,
   Fg2: Harmony.fontSecondary.dark,
   Fg3: Harmony.fontTertiary.dark,

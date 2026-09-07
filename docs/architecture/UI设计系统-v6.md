@@ -182,7 +182,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 |------------|------------|-------|------|------|
 | `bg-base` | `background_secondary` / 深色 `background_primary` | `#F1F3F5` 雪域灰 | `#000000` | 窗口底色 |
 | `surface` | `comp_background_primary` | `#FFFFFF` | `#202224` | 面板/卡片 |
-| `surface-2` | `background_tertiary` / 深色 `background_secondary` | `#E5E5EA` | `#191A1C` | 次级表面 |
+| `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度） |
 | `fg` / `fg-2` / `fg-3` / `fg-4` | `font_primary`…`fourth` | 黑 90/60/40/20% | 白 90/60/40/20% | 文本四级 |
 | `fg-on` | `font_on_primary` | `#FFFFFF` | `#FFFFFF` | 强调底上的反色字 |
 | `border` | `comp_divider` | 黑 20% | 白 20% | 常规边框/分割 |
