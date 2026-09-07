@@ -1,4 +1,5 @@
 //! Windows 文件名过滤：非法字符、尾空格/点、保留设备名不进 FILEDESCRIPTOR。
+#![cfg_attr(not(windows), allow(dead_code))]
 
 const RESERVED: &[&str] = &[
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
@@ -34,6 +35,22 @@ pub fn windows_relative_ok(relative: &str) -> bool {
     utf16 < 260 && relative.split('\\').all(windows_file_name_ok)
 }
 
+fn unix_file_name_ok(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains('\0') && !name.contains('/')
+}
+
+/// 拖出相对路径（core 用 `\` 分段）在当前 OS 可落盘。
+pub fn relative_ok(relative: &str) -> bool {
+    #[cfg(windows)]
+    {
+        windows_relative_ok(relative)
+    }
+    #[cfg(not(windows))]
+    {
+        !relative.is_empty() && relative.split('\\').all(unix_file_name_ok)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,5 +74,16 @@ mod tests {
         assert!(!windows_relative_ok("DCIM\\con.txt"));
         assert!(!windows_relative_ok(&"a".repeat(260)));
         assert!(windows_relative_ok(&"测".repeat(80)));
+    }
+
+    #[test]
+    fn relative_ok_matches_host() {
+        assert!(relative_ok("DCIM\\a.jpg"));
+        assert!(!relative_ok(""));
+        assert!(!relative_ok("a\\.."));
+        #[cfg(windows)]
+        assert!(!relative_ok("DCIM\\con.txt"));
+        #[cfg(not(windows))]
+        assert!(relative_ok("DCIM\\con.txt"));
     }
 }
