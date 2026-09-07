@@ -181,7 +181,6 @@ export interface SystemInfo {
   identity: AppIdentity;
   paths: AppPathCatalog;
   adb_path: string;
-  adb_in_use?: string;
   settings: AppSettings;
   os: string;
 }

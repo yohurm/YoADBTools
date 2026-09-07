@@ -29,3 +29,12 @@ describe("removed dual-source commands", () => {
     expect("deviceNightMode" in commands).toBe(false);
   });
 });
+
+describe("log snapshots", () => {
+  it("导出进程索引与已安装包名", () => {
+    expect(typeof commands.logProcessSnapshot).toBe("function");
+    expect(typeof commands.logPackageSnapshot).toBe("function");
+    expect(commands.logProcessSnapshot.length).toBe(1);
+    expect(commands.logPackageSnapshot.length).toBe(1);
+  });
+});

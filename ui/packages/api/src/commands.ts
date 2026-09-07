@@ -117,6 +117,9 @@ export const logExport = (req: ExportRequest) => invoke<ExportResult>("log.expor
 export const logProcessSnapshot = (serial: string) =>
   invoke<ProcessEntry[]>("log.processSnapshot", { serial });
 
+export const logPackageSnapshot = (serial: string) =>
+  invoke<string[]>("log.packageSnapshot", { serial });
+
 // ===== mirror =====
 
 export const mirrorStart = (req: MirrorStartRequest) =>
