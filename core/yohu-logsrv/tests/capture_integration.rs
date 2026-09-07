@@ -1,8 +1,8 @@
 //! 采集服务集成测试（fake-adb fixture）：
 //! 单流采集 → 解析 → 环形缓冲 → 批量事件；停止保留缓冲；掉线/取消/切换语义。
 //!
-//! 并行安全：每个测试把 fake-adb.exe 拷贝进独立临时目录，
-//! 脚本写在同目录 `fake-adb.json`（零共享环境变量）。
+//! 并行安全：每个测试把 fake-adb 拷贝进独立临时目录，
+//! 脚本写在同目录同名 `.json`（零共享环境变量）。
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -15,13 +15,13 @@ use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
 use yohu_protocol::AppEvent;
 
-/// 定位 fake-adb.exe：workspace member 的明文 bin 位于
-/// `target/<profile>/fake-adb.exe`（`cargo build --workspace` 产出）。
+/// 定位 fake-adb：workspace member 的明文 bin 位于
+/// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
 fn fake_adb_src() -> PathBuf {
     let mut profile = std::env::current_exe().expect("测试进程路径");
     profile.pop(); // deps/
     profile.pop(); // debug/ | release/
-    let exe = profile.join("fake-adb.exe");
+    let exe = profile.join(yohu_runtime::host_bin_name("fake-adb"));
     assert!(
         exe.is_file(),
         "找不到 {} — 请先执行 cargo build --workspace（集成测试依赖明文 bin）",
@@ -38,8 +38,9 @@ fn isolated_fake_adb(script: &str) -> PathBuf {
         std::thread::current().id()
     ));
     std::fs::create_dir_all(&dir).expect("创建临时目录失败");
-    let exe = dir.join("fake-adb.exe");
+    let exe = dir.join(yohu_runtime::host_bin_name("fake-adb"));
     std::fs::copy(fake_adb_src(), &exe).expect("拷贝 fake-adb 失败");
+    yohu_runtime::ensure_executable(&exe).expect("fake-adb 可执行位");
     std::fs::write(exe.with_extension("json"), script).expect("写脚本失败");
     exe
 }

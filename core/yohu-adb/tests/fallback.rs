@@ -13,11 +13,20 @@ fn fake_adb_src() -> PathBuf {
     let mut p = std::env::current_exe().expect("测试进程路径");
     p.pop(); // deps/
     p.pop(); // debug/ | release/
-    let plain = p.join("fake-adb.exe");
+    let plain = p.join(yohu_runtime::host_bin_name("fake-adb"));
     if plain.is_file() {
         return plain;
     }
     panic!("先执行 cargo build --workspace（fake-adb 明文 bin）");
+}
+
+fn install_fake_adb(dir: &std::path::Path, dest_name: &str, script: &str) -> PathBuf {
+    std::fs::create_dir_all(dir).expect("创建临时目录失败");
+    let exe = dir.join(dest_name);
+    std::fs::copy(fake_adb_src(), &exe).expect("拷贝 fake-adb 失败");
+    yohu_runtime::ensure_executable(&exe).expect("fake-adb 可执行位");
+    std::fs::write(exe.with_extension("json"), script).expect("写脚本失败");
+    exe
 }
 
 /// 建立隔离 fake adb（exe 副本 + 同名 json 脚本），返回 exe 路径。
@@ -27,11 +36,7 @@ fn isolated_fake_adb(script: &str) -> PathBuf {
         std::process::id(),
         std::thread::current().id()
     ));
-    std::fs::create_dir_all(&dir).expect("创建临时目录失败");
-    let exe = dir.join("fake-adb.exe");
-    std::fs::copy(fake_adb_src(), &exe).expect("拷贝 fake-adb 失败");
-    std::fs::write(exe.with_extension("json"), script).expect("写脚本失败");
-    exe
+    install_fake_adb(&dir, &yohu_runtime::host_bin_name("fake-adb"), script)
 }
 
 #[tokio::test]
@@ -40,11 +45,16 @@ async fn fallback_from_broken_user_adb_to_resource() {
     let broken = isolated_fake_adb(
         r#"{ "devices_exit_code": 1, "devices_stderr": "adb: failed to connect to daemon" }"#,
     );
-    // 资源目录放一个「健康」的 adb
-    let healthy = isolated_fake_adb(
+    let resource_dir = std::env::temp_dir().join(format!(
+        "yohu-fallback-res-ok-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let healthy = install_fake_adb(
+        &resource_dir,
+        yohu_adb::adb_file_name(),
         r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"] }"#,
     );
-    let resource_dir = healthy.parent().expect("资源目录").to_path_buf();
     let data_dir = std::env::temp_dir().join(format!(
         "yohu-fallback-data2-{}-{:?}",
         std::process::id(),
@@ -65,20 +75,17 @@ async fn fallback_from_broken_user_adb_to_resource() {
 
 #[tokio::test]
 async fn fallback_skips_missing_user_path() {
-    // 资源目录候选必须命名为 adb.exe（ToolResolver 的约定）
+    // 资源目录候选必须命名为当前平台 adb 文件名（ToolResolver 的约定）
     let dir = std::env::temp_dir().join(format!(
         "yohu-fallback-res-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
-    std::fs::create_dir_all(&dir).expect("创建临时目录失败");
-    let healthy = dir.join("adb.exe");
-    std::fs::copy(fake_adb_src(), &healthy).expect("拷贝 fake-adb 失败");
-    std::fs::write(
-        healthy.with_extension("json"),
+    let healthy = install_fake_adb(
+        &dir,
+        yohu_adb::adb_file_name(),
         r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"] }"#,
-    )
-    .expect("写脚本失败");
+    );
 
     // 用户路径不存在 → 直接回退
     let data_dir = std::env::temp_dir().join(format!(

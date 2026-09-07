@@ -15,7 +15,7 @@ use yohu_logsrv::{CaptureService, SessionLogService};
 use yohu_protocol::{AppEvent, LogWriteMode};
 
 fn real_adb() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/adb.exe")
+    yohu_adb::repo_sidecar_adb()
 }
 
 /// 每个测试独立的临时目录（避免相对路径在 crate CWD 物化残留目录，M4）。

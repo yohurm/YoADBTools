@@ -28,7 +28,7 @@ use yohu_mirror::MirrorSessionRequest;
 use yohu_protocol::{scrcpy, AppEvent, MirrorControlMessage, MirrorSessionState};
 
 fn real_adb() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/adb.exe")
+    yohu_adb::repo_sidecar_adb()
 }
 
 fn server_jar() -> PathBuf {

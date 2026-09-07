@@ -8,15 +8,30 @@ use std::sync::{Arc, RwLock};
 
 use crate::error::AdbError;
 
-/// sidecar 三件套文件名。
-pub const ADB_FILES: [&str; 3] = ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"];
+/// 当前平台需要随包分发的官方 platform-tools 文件。
+#[cfg(windows)]
+pub const ADB_FILES: &[&str] = &["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"];
+#[cfg(not(windows))]
+pub const ADB_FILES: &[&str] = &["adb"];
+
+/// 当前平台的 adb 可执行文件名（Windows `adb.exe`，其它 `adb`）。
+pub fn adb_file_name() -> &'static str {
+    ADB_FILES[0]
+}
+
+/// 仓库 `tools/` 下当前平台的官方 adb（集成测试 / 真机用例）。
+pub fn repo_sidecar_adb() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tools")
+        .join(adb_file_name())
+}
 
 /// adb 工具解析器。
 #[derive(Clone)]
 pub struct ToolResolver {
-    /// 用户自定义 adb.exe 路径（设置 `adb.path`；空 = 自动解析；运行时可变）
+    /// 用户自定义 adb 路径（设置 `adb.path`；空 = 自动解析；运行时可变）
     user_path: Arc<RwLock<Option<PathBuf>>>,
-    /// 应用旁工具目录（安装包 resources / 仓库 tools/），内含 adb.exe + 两个 dll
+    /// 应用旁工具目录（安装包 resources / 仓库 tools/），内含当前平台 sidecar
     resource_dir: PathBuf,
     /// 解压目标：`DataRoot/tools/adb/`
     data_tools_dir: PathBuf,
@@ -36,7 +51,7 @@ impl ToolResolver {
         *self.user_path.write().expect("tool lock poisoned") = path;
     }
 
-    /// 解析可用 adb.exe（首个候选）。
+    /// 解析可用 adb（首个候选）。
     pub fn resolve(&self) -> Result<PathBuf, AdbError> {
         self.candidates()
             .into_iter()
@@ -60,22 +75,23 @@ impl ToolResolver {
                 tracing::warn!("adb.path 指向的文件不存在: {}", p.display());
             }
         }
-        push(self.resource_dir.join("adb.exe"));
+        push(self.resource_dir.join(adb_file_name()));
         if self.ensure_extracted().is_ok() {
-            push(self.data_tools_dir.join("adb.exe"));
+            push(self.data_tools_dir.join(adb_file_name()));
         }
         out
     }
 
     pub fn unavailable_hint(&self) -> String {
         format!(
-            "资源目录与数据目录均无 adb.exe: {} / {}",
+            "资源目录与数据目录均无 {}: {} / {}",
+            adb_file_name(),
             self.resource_dir.display(),
             self.data_tools_dir.display()
         )
     }
 
-    /// 从资源目录复制三件套到数据目录（幂等）。
+    /// 从资源目录复制 sidecar 到数据目录（幂等；Unix 补可执行位）。
     pub fn ensure_extracted(&self) -> Result<(), AdbError> {
         std::fs::create_dir_all(&self.data_tools_dir)?;
         for name in ADB_FILES {
@@ -88,6 +104,7 @@ impl ToolResolver {
                 std::fs::copy(&src, &dst)?;
                 tracing::info!("已解压 adb 工具: {}", dst.display());
             }
+            yohu_runtime::ensure_executable(&dst)?;
         }
         Ok(())
     }
@@ -126,12 +143,12 @@ mod tests {
         let tool = ToolResolver::new(None, resource.clone(), data.clone());
         tool.ensure_extracted().unwrap();
         for name in ADB_FILES {
-            assert_eq!(fs::read_to_string(data.join(name)).unwrap(), name);
+            assert_eq!(fs::read_to_string(data.join(name)).unwrap(), *name);
         }
 
         let candidates = tool.candidates();
-        assert_eq!(candidates.first(), Some(&resource.join("adb.exe")));
-        assert!(candidates.contains(&data.join("adb.exe")));
+        assert_eq!(candidates.first(), Some(&resource.join(adb_file_name())));
+        assert!(candidates.contains(&data.join(adb_file_name())));
         let _ = fs::remove_dir_all(&root);
     }
 }

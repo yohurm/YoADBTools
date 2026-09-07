@@ -13,7 +13,7 @@ use yohu_adb::{AdbClient, ToolResolver};
 use yohu_domain::{default_library, run_and_evaluate, GroupExecutor, Verdict};
 
 fn real_adb() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/adb.exe")
+    yohu_adb::repo_sidecar_adb()
 }
 
 /// 探测在线设备；无设备返回 None（测试自动跳过）。
