@@ -10,7 +10,7 @@
 | 产品 / NSIS `productName` / 主程序 | `YohuAdbTools` |
 | 窗口标题 / 状态栏 / 关于 | `Yohu ADB Tools` |
 | 包标识 | `com.yohu.adbtools` |
-| 数据目录 | `%LOCALAPPDATA%\YohuAdbTools\`（非 Windows 见 `yohu-runtime::os_paths`） |
+| 数据目录 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`；Linux `$XDG_DATA_HOME` 或 `~/.local/share`（`yohu-runtime::os_paths`，产品不交付） |
 | Tauri 壳 crate | **`yohu-adbtools`**（`app/yohu-adbtools`；唯一引用 Tauri） |
 | 前端工作台包 | **`@yohu/workbench`**（`ui/packages/workbench`） |
 | 组件库对外名 | **YoUI**；npm 包仍 `@yohu/ui` |

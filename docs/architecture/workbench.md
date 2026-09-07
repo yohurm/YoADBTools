@@ -40,4 +40,4 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
 
 ## Tauri 壳（`app/yohu-adbtools`）
 
-薄命令层：反序列化 → core → 序列化。编排在 `device_catalog` / `library_store` / `group_runs`。设备运行时状态在 `yohu-adb::DeviceStatusHub`（[modules/device.md](modules/device.md)，ADR-v6-025）。`dnd/` 仅 Windows OLE 拖出（[文件拖拽-v6.md](文件拖拽-v6.md)）。退出：根 `CancellationToken` → 3s 强杀进程树 → flush 设置。
+薄命令层：反序列化 → core → 序列化。编排在 `device_catalog` / `library_store` / `group_runs`。设备运行时状态在 `yohu-adb::DeviceStatusHub`（[modules/device.md](modules/device.md)，ADR-v6-025）。`dnd/`：Windows OLE 拖出、macOS Finder 拖出（[文件拖拽-v6.md](文件拖拽-v6.md)）。退出：根 `CancellationToken` → 3s 强杀进程树 → flush 设置。

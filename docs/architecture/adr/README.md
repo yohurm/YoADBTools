@@ -31,4 +31,6 @@
 | [025](ADR-v6-025.md) | 设备状态 | 目录 ≠ 运行时；Hub 统一采样；禁模块轮询 |
 | [026](ADR-v6-026.md) | 投屏舞台占用 | HWND 独占舞台像素；解码会话 ≠ 表面生命周期 |
 | [027](ADR-v6-027.md) | 投屏占用 | 舞台透明洞；HWND 铺满 avail；可见卡片 DComp clip contain；fill↔contain 走 IDCompositionAnimation；禁止 CSS / SetWindowPos 占用过渡 |
-| [028](ADR-v6-028.md) | 投屏多平台后端 | 编译期 OS 原生硬解；macOS/Linux 预留；禁止 FFmpeg |
+| [028](ADR-v6-028.md) | 投屏多平台后端 | 编译期 OS 原生硬解；Linux 预留；禁止 FFmpeg |
+| [029](ADR-v6-029.md) | 多平台产品 | Windows + macOS 工作台；sidecar/打包/标题栏按 OS |
+| [030](ADR-v6-030.md) | macOS 像素 | VideoToolbox + NSView 出画；Finder 拖出；Linux 仍预留 |
