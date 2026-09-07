@@ -166,11 +166,7 @@ async fn real_safety_root_rejects_dangerous_path() {
 #[tokio::test]
 async fn real_transfer_cancel_midflight() {
     let client = Arc::new(AdbClient::new(
-        ToolResolver::new(
-            Some(real_adb()),
-            scratch("res-c"),
-            scratch("data-c"),
-        ),
+        ToolResolver::new(Some(real_adb()), scratch("res-c"), scratch("data-c")),
         4,
     ));
     let Some(serial) = online_device(&client).await else {

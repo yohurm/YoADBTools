@@ -56,8 +56,15 @@ pub async fn push_server_if_needed(
         Ok(meta) => meta.len(),
         Err(_) => return push_server(adb, serial, local, cancel).await,
     };
-    if jar_already_on_device(local_len, remote_jar_size(adb, serial, cancel.clone()).await) {
-        tracing::info!(serial, size = local_len, "scrcpy-server 已在设备上，跳过 push");
+    if jar_already_on_device(
+        local_len,
+        remote_jar_size(adb, serial, cancel.clone()).await,
+    ) {
+        tracing::info!(
+            serial,
+            size = local_len,
+            "scrcpy-server 已在设备上，跳过 push"
+        );
         return Ok(());
     }
     push_server(adb, serial, local, cancel).await?;

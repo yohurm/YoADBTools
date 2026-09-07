@@ -41,9 +41,7 @@ fn main() {
                     dest_dir.display()
                 );
             } else if let Err(e) = ensure_unix_executable(&dst) {
-                println!(
-                    "cargo:warning=设置 sidecar {name} 可执行位失败: {e}"
-                );
+                println!("cargo:warning=设置 sidecar {name} 可执行位失败: {e}");
             }
             // 旧布局曾平铺到 exe 旁；避免和 tools/ 双份抢解析。
             let _ = std::fs::remove_file(profile_dir.join(name));

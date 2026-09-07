@@ -127,7 +127,10 @@ mod tests {
         let s = AppSettings::default();
         assert_eq!(start_encode(&s, "usb", false), USB_ENCODE);
         assert_eq!(start_encode(&s, "tcp:192.168.1.8:5555", false), WIFI_ENCODE);
-        assert_eq!(start_encode(&s, "tcp:1.1.1.1:5555", true).max_size, s.mirror_max_size);
+        assert_eq!(
+            start_encode(&s, "tcp:1.1.1.1:5555", true).max_size,
+            s.mirror_max_size
+        );
         assert!(start_force_forward(&s, "tcp:1.1.1.1:5555"));
         assert!(!start_force_forward(&s, "usb"));
         assert_eq!(start_encode(&s, "t:19", false), USB_ENCODE);

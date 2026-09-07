@@ -490,9 +490,10 @@ impl MirrorService {
 
     fn slot_still_starting(&self, serial: &str, generation: u64) -> bool {
         let inner = self.inner.lock().expect("mirror lock poisoned");
-        inner.slots.get(serial).is_some_and(|slot| {
-            slot.generation == generation && slot.phase == Phase::Starting
-        })
+        inner
+            .slots
+            .get(serial)
+            .is_some_and(|slot| slot.generation == generation && slot.phase == Phase::Starting)
     }
 
     fn new_control_rx(&self, serial: &str, generation: u64) -> mpsc::Receiver<ControlCmd> {
@@ -587,9 +588,7 @@ impl MirrorService {
                         }
                     }
                     Some(WarmEntry::Busy) => {
-                        inner
-                            .warm
-                            .insert(serial.to_string(), WarmEntry::Busy);
+                        inner.warm.insert(serial.to_string(), WarmEntry::Busy);
                         Step::Wait
                     }
                     None => Step::Miss,

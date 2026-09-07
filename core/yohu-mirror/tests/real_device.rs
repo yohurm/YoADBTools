@@ -23,8 +23,8 @@ fn lock_device() -> std::sync::MutexGuard<'static, ()> {
 }
 
 use yohu_adb::{AdbClient, ToolResolver};
-use yohu_mirror::{FramePipe, MirrorService};
 use yohu_mirror::MirrorSessionRequest;
+use yohu_mirror::{FramePipe, MirrorService};
 use yohu_protocol::{scrcpy, AppEvent, MirrorControlMessage, MirrorSessionState};
 
 fn real_adb() -> PathBuf {

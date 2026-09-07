@@ -13,8 +13,8 @@ pub use transfer::{TransferRunner, TransferSpec};
 
 use tokio_util::sync::CancellationToken;
 
-use yohu_domain::RemotePath;
 use yohu_adb::AdbClient;
+use yohu_domain::RemotePath;
 
 use thiserror::Error;
 
@@ -27,7 +27,10 @@ use thiserror::Error;
 /// 等合法链接通过，`/sdcard/link -> /data` 则逃逸被拒）。
 ///
 /// 纯函数，可单测「接受 / 拒绝」决策。
-pub(crate) fn recheck_resolved(safety: &yohu_domain::SafetyRoot, resolved: &str) -> Result<(), FileError> {
+pub(crate) fn recheck_resolved(
+    safety: &yohu_domain::SafetyRoot,
+    resolved: &str,
+) -> Result<(), FileError> {
     safety
         .check_descendant(resolved)
         .map(|_| ())

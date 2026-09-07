@@ -89,7 +89,9 @@ fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) 
             generation,
             pipe,
         } => {
-            host.lock().expect("present lock poisoned").bind(serial, generation);
+            host.lock()
+                .expect("present lock poisoned")
+                .bind(serial, generation);
             *decode = Some(DecodeBind::new(pipe));
         }
         Cmd::UnbindPipe { serial } => {
@@ -108,7 +110,11 @@ fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) 
     }
 }
 
-fn drain_cmds(rx: &Receiver<Cmd>, host: &Arc<Mutex<Host>>, decode: &mut Option<DecodeBind>) -> bool {
+fn drain_cmds(
+    rx: &Receiver<Cmd>,
+    host: &Arc<Mutex<Host>>,
+    decode: &mut Option<DecodeBind>,
+) -> bool {
     loop {
         match rx.try_recv() {
             Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return false,

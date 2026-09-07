@@ -29,7 +29,8 @@ mod tests {
             expect: String,
         }
         let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../testdata/format_log_line.json")).expect("fixture");
+            serde_json::from_str(include_str!("../testdata/format_log_line.json"))
+                .expect("fixture");
         for (i, case) in cases.iter().enumerate() {
             assert_eq!(format_log_line(&case.line), case.expect, "case {i}");
         }

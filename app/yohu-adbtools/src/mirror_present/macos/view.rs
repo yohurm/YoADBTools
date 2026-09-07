@@ -253,7 +253,9 @@ pub fn apply_snap(snap: LayoutSnap) {
                 layer.setBackgroundColor(Some(&color_argb(snap.canvas).CGColor()));
             }
             let (ox, oy, ow, oh) = snap.occ;
-            views.card.setFrame(pt_rect(ox, oy, ow, oh, snap.host_h, dpr));
+            views
+                .card
+                .setFrame(pt_rect(ox, oy, ow, oh, snap.host_h, dpr));
             if let Some(layer) = views.card.layer() {
                 layer.setCornerRadius(f64::from(snap.radius) / dpr);
                 layer.setMasksToBounds(true);
@@ -300,9 +302,7 @@ pub fn apply_snap(snap: LayoutSnap) {
                     icon_pt,
                 ));
                 y += icon_pt + gap;
-                views
-                    .title
-                    .setStringValue(&NSString::from_str(snap.title));
+                views.title.setStringValue(&NSString::from_str(snap.title));
                 views.title.setTextColor(Some(&color_argb(title_c)));
                 views
                     .title

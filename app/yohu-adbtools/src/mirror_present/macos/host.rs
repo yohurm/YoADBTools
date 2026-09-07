@@ -107,7 +107,10 @@ impl Host {
     }
 
     pub fn screenshot(&self, path: &str) -> Result<(), String> {
-        let pic = self.last_pic.as_ref().ok_or_else(|| "尚无画面".to_string())?;
+        let pic = self
+            .last_pic
+            .as_ref()
+            .ok_or_else(|| "尚无画面".to_string())?;
         let bgra = pic.copy_bgra()?;
         write_bgra_png(path, pic.width, pic.height, &bgra)
     }
@@ -190,7 +193,6 @@ impl Host {
         }
         self.stage.visible() && self.stage.shows_video()
     }
-
 }
 
 pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), String> {

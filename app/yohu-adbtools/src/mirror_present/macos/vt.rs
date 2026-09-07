@@ -3,9 +3,7 @@
 use std::ffi::c_void;
 use std::ptr;
 
-use super::super::annexb::{
-    hevc_parameter_sets, h264_parameter_sets, split_nals, vcl_avcc,
-};
+use super::super::annexb::{h264_parameter_sets, hevc_parameter_sets, split_nals, vcl_avcc};
 use super::super::backend::AnnexBDecoder;
 
 pub type OSStatus = i32;
@@ -437,7 +435,11 @@ fn copy_bgra(image: CVPixelBufferRef) -> Result<Vec<u8>, String> {
     }
 }
 
-unsafe fn copy_packed_bgra(image: CVPixelBufferRef, width: u32, height: u32) -> Result<Vec<u8>, String> {
+unsafe fn copy_packed_bgra(
+    image: CVPixelBufferRef,
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, String> {
     let src = CVPixelBufferGetBaseAddress(image) as *const u8;
     if src.is_null() {
         return Err("BGRA 基址为空".into());

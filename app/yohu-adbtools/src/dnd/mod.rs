@@ -1,15 +1,15 @@
 //! 壳侧拖出：Windows = OLE GetData 才 pull；macOS = pull 后 NSDraggingSession。
 
+#[cfg(target_os = "macos")]
+mod macos;
 mod names;
 #[cfg(windows)]
 mod ole;
-#[cfg(target_os = "macos")]
-mod macos;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::AppHandle;
@@ -104,7 +104,10 @@ pub async fn drag_out(
     {
         let _ = (app, payload);
         let _ = fs::remove_dir_all(&session_dir);
-        Err(ipc_code(IpcErrorCode::Internal, "拖出仅支持 Windows 与 macOS"))
+        Err(ipc_code(
+            IpcErrorCode::Internal,
+            "拖出仅支持 Windows 与 macOS",
+        ))
     }
 }
 
@@ -141,7 +144,8 @@ async fn materialize(payload: &DragPayload) -> Result<(), IpcError> {
             .session_dir
             .join(item.relative.replace('\\', std::path::MAIN_SEPARATOR_STR));
         if item.is_dir {
-            fs::create_dir_all(&local).map_err(|e| ipc_code(IpcErrorCode::Internal, e.to_string()))?;
+            fs::create_dir_all(&local)
+                .map_err(|e| ipc_code(IpcErrorCode::Internal, e.to_string()))?;
             continue;
         }
         if let Some(parent) = local.parent() {

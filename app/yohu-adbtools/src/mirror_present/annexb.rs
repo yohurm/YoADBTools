@@ -46,13 +46,16 @@ pub fn split_nals(data: &[u8]) -> Vec<&[u8]> {
     }
     let mut nals = Vec::with_capacity(starts.len());
     for (idx, start) in starts.iter().copied().enumerate() {
-        let end = starts.get(idx + 1).map(|next| {
-            if *next >= 4 && data[*next - 4..*next].starts_with(&[0, 0, 0, 1]) {
-                *next - 4
-            } else {
-                *next - 3
-            }
-        }).unwrap_or(data.len());
+        let end = starts
+            .get(idx + 1)
+            .map(|next| {
+                if *next >= 4 && data[*next - 4..*next].starts_with(&[0, 0, 0, 1]) {
+                    *next - 4
+                } else {
+                    *next - 3
+                }
+            })
+            .unwrap_or(data.len());
         if start < end {
             nals.push(&data[start..end]);
         }
@@ -100,9 +103,7 @@ pub fn h264_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8
 }
 
 #[allow(clippy::type_complexity)]
-pub fn hevc_parameter_sets<'a>(
-    nals: &[&'a [u8]],
-) -> (Vec<&'a [u8]>, Vec<&'a [u8]>, Vec<&'a [u8]>) {
+pub fn hevc_parameter_sets<'a>(nals: &[&'a [u8]]) -> (Vec<&'a [u8]>, Vec<&'a [u8]>, Vec<&'a [u8]>) {
     let mut vps = Vec::new();
     let mut sps = Vec::new();
     let mut pps = Vec::new();

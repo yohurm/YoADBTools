@@ -6,8 +6,8 @@ use objc2::rc::Retained;
 use objc2::runtime::{NSObject, NSObjectProtocol, ProtocolObject};
 use objc2::{define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSApplication, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource,
-    NSDragOperation,
+    NSApplication, NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession,
+    NSDraggingSource,
 };
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString, NSURL};
 use yohu_protocol::{IpcError, IpcErrorCode};
@@ -42,22 +42,21 @@ impl FileDragSource {
 }
 
 pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), IpcError> {
-    let mtm = MainThreadMarker::new().ok_or_else(|| {
-        ipc_code(IpcErrorCode::Internal, "拖出必须在主线程启动")
-    })?;
+    let mtm = MainThreadMarker::new()
+        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "拖出必须在主线程启动"))?;
     if paths.is_empty() {
         return Err(ipc_code(IpcErrorCode::InvalidArgs, "没有可拖出的项目"));
     }
     let app = NSApplication::sharedApplication(mtm);
-    let event = app.currentEvent().ok_or_else(|| {
-        ipc_code(IpcErrorCode::Internal, "没有可用的拖动手势")
-    })?;
-    let window = app.keyWindow().ok_or_else(|| {
-        ipc_code(IpcErrorCode::Internal, "没有可用的主窗口")
-    })?;
-    let view = window.contentView().ok_or_else(|| {
-        ipc_code(IpcErrorCode::Internal, "主窗口没有 contentView")
-    })?;
+    let event = app
+        .currentEvent()
+        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "没有可用的拖动手势"))?;
+    let window = app
+        .keyWindow()
+        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "没有可用的主窗口"))?;
+    let view = window
+        .contentView()
+        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "主窗口没有 contentView"))?;
     let mut items: Vec<Retained<NSDraggingItem>> = Vec::with_capacity(paths.len());
     for path in paths {
         if !path.exists() {
