@@ -35,29 +35,17 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.png",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/icon.icns"
     ],
     "resources": {
-      "../../tools/adb.exe": "tools/adb.exe",
-      "../../tools/AdbWinApi.dll": "tools/AdbWinApi.dll",
-      "../../tools/AdbWinUsbApi.dll": "tools/AdbWinUsbApi.dll",
       "../../tools/scrcpy-server": "tools/scrcpy-server"
-    },
-    "windows": {
-      "webviewInstallMode": {
-        "type": "embedBootstrapper"
-      },
-      "nsis": {
-        "installMode": "currentUser",
-        "languages": ["SimpChinese"],
-        "installerHooks": "./windows/installer-hooks.nsh"
-      }
     }
   }
 }

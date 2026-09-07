@@ -1,0 +1,31 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Yohu ADB Tools",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "center": true,
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 12
+        }
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "resources": {
+      "../../tools/adb": "tools/adb"
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "entitlements": "./macos/entitlements.plist"
+    }
+  }
+}
