@@ -39,7 +39,7 @@
   font-size: var(--yohu-font-subtitle);
   font-weight: var(--yohu-font-weight-bold);
   color: var(--yohu-fg);
-  line-height: var(--yohu-font-leading-tight);
+  line-height: var(--yohu-font-leading-data);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
