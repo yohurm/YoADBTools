@@ -1,5 +1,5 @@
 //! 主窗口启动：画布色对齐 `--yohu-bg-base`；工作台 hydrate 后再揭窗。
-//! 用户可见的品牌小窗在原生侧；HTML `#yohu-boot` 只盖住隐藏 WebView 的首帧。
+//! Windows 揭窗走原生小窗交接（同屏共享容器 / 异屏出场）；HTML `#yohu-boot` 只盖住隐藏 WebView 的首帧。
 
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -19,8 +19,9 @@ pub const BRAND_TEXT_DARK: Color = Color(0xE5, 0xE5, 0xE5, 255);
 
 /// 前端揭窗超时；超时后由壳显示，避免 JS 失败导致永远无窗口。
 const REVEAL_FALLBACK_MS: u64 = 2500;
-const MAIN_DEFAULT_W: u32 = 1200;
-const MAIN_DEFAULT_H: u32 = 800;
+/// 与 `@yohu/ui` `Layout.WindowDefaultW/H` 同值。
+pub(crate) const MAIN_DEFAULT_W: u32 = 1200;
+pub(crate) const MAIN_DEFAULT_H: u32 = 800;
 
 static BOOT_ORIGIN: OnceLock<Instant> = OnceLock::new();
 
@@ -95,13 +96,35 @@ fn place_on_splash_monitor(win: &WebviewWindow) {
     }
 }
 
-/// 幂等揭窗：已可见则跳过。
+/// 幂等揭窗：已可见则跳过。Windows 上由原生小窗按同屏/异屏配方交接后再揭。
 pub fn show_if_hidden(win: &WebviewWindow, reason: &'static str) {
     if matches!(win.is_visible(), Ok(true)) {
         return;
     }
     #[cfg(windows)]
-    place_on_splash_monitor(win);
+    {
+        match win.hwnd() {
+            Ok(hwnd) => {
+                let sync_tao = crate::native_splash::to_main(windows::Win32::Foundation::HWND(
+                    hwnd.0 as *mut _,
+                ));
+                // 另一路正在播交接：禁止 win.show() 把工作台从 overlay 底下抢出来。
+                if !sync_tao {
+                    return;
+                }
+                // 交接可能已用 ShowWindow 揭 HWND，Tao 的 VISIBLE 仍是 false。
+                // 不补 show：最小化会在 VISIBLE=false 分支再 SW_HIDE，窗口从任务栏消失。
+                if let Err(e) = win.show() {
+                    tracing::warn!(ms = elapsed_ms(), reason, "同步 Tao 可见状态失败: {e}");
+                }
+                let _ = win.set_focus();
+                tracing::info!(ms = elapsed_ms(), reason, "揭主窗口");
+                return;
+            }
+            Err(e) => tracing::warn!(ms = elapsed_ms(), "揭窗时无法取得主窗 HWND: {e}"),
+        }
+        place_on_splash_monitor(win);
+    }
     if let Err(e) = win.show() {
         tracing::warn!(ms = elapsed_ms(), reason, "揭窗失败: {e}");
         return;
@@ -126,15 +149,17 @@ pub fn on_main_page_finished(label: &str, _win: &WebviewWindow) {
     tracing::info!(ms = elapsed_ms(), "页面加载完成（主窗仍由启动编排揭开）");
 }
 
-/// 主窗一旦可见就关掉原生小窗；超时仍未可见则由壳揭主窗。
+/// 主窗一旦可见就结束等待；超时从**壳 setup 完成**起算，不从进程入口起算。
+/// 入口已花在原生小窗 + WebView2 创建上，再用 `elapsed_ms()` 会在 hydrate 前抢跑交接。
 pub fn spawn_reveal_fallback(win: WebviewWindow) {
     tauri::async_runtime::spawn(async move {
+        let start = Instant::now();
         loop {
             tokio::time::sleep(Duration::from_millis(50)).await;
             if matches!(win.is_visible(), Ok(true)) {
                 return;
             }
-            if elapsed_ms() >= REVEAL_FALLBACK_MS {
+            if start.elapsed() >= Duration::from_millis(REVEAL_FALLBACK_MS) {
                 tracing::warn!(ms = elapsed_ms(), "前端未在超时内揭窗，由壳显示主窗口");
                 show_if_hidden(&win, "timeout");
                 return;
@@ -165,5 +190,11 @@ mod tests {
         assert!(!resolve_dark(Theme::Light, true));
         assert!(resolve_dark(Theme::System, true));
         assert!(!resolve_dark(Theme::System, false));
+    }
+
+    #[test]
+    fn window_defaults_match_layout_tokens() {
+        assert_eq!(MAIN_DEFAULT_W, 1200);
+        assert_eq!(MAIN_DEFAULT_H, 800);
     }
 }

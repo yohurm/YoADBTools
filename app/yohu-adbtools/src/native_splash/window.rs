@@ -3,6 +3,7 @@
 use std::sync::Mutex;
 
 use windows::core::{w, PCWSTR};
+use windows::Win32::Foundation::RECT;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     CreateRoundRectRgn, DeleteObject, GetDC, InvalidateRect, ReleaseDC, SetWindowRgn, UpdateWindow,
@@ -10,19 +11,19 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetWindowLongPtrW,
-    LoadCursorW, PeekMessageW, PostMessageW, RegisterClassExW, SetWindowLongPtrW, SetWindowPos,
-    ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HWND_TOPMOST, IDC_ARROW,
-    MSG, PM_REMOVE, SWP_NOZORDER, SW_SHOWNORMAL, WM_CLOSE, WM_DESTROY, WM_ERASEBKGND, WM_PAINT,
-    WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, GetWindowRect, LoadCursorW,
+    PostMessageW, RegisterClassExW, SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW,
+    CS_VREDRAW, GWLP_USERDATA, HWND_TOPMOST, IDC_ARROW, SWP_NOZORDER, SW_HIDE, SW_SHOWNORMAL,
+    WM_CLOSE, WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WNDCLASSEXW, WS_EX_COMPOSITED, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_POPUP,
 };
 use yohu_protocol::DISPLAY_NAME;
 
 use super::geometry::{
-    cursor_monitor, scale_px, store_geometry, SplashPlacement, CORNER_LOGICAL, LOGICAL_H,
-    LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
+    cursor_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, CORNER_LOGICAL,
+    FONT_LOGICAL, ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
 };
-use super::icon::{create_bitmap, load_icon};
+use super::icon::{create_bitmap, load_icon, scale_bitmap};
 use super::paint::{paint, PaintData};
 use crate::window_boot::elapsed_ms;
 
@@ -36,6 +37,15 @@ pub fn show(dark: bool) {
     }
 }
 
+pub fn hide() {
+    let Some(hwnd) = splash_hwnd() else {
+        return;
+    };
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_HIDE);
+    }
+}
+
 pub fn close() {
     let hwnd = SPLASH_HWND.lock().unwrap_or_else(|p| p.into_inner()).take();
     let Some(raw) = hwnd else {
@@ -45,6 +55,22 @@ pub fn close() {
         let _ = PostMessageW(Some(HWND(raw as *mut _)), WM_CLOSE, WPARAM(0), LPARAM(0));
     }
     tracing::info!(ms = elapsed_ms(), "原生启动小窗已关闭");
+}
+
+pub fn splash_hwnd() -> Option<HWND> {
+    SPLASH_HWND
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .map(|raw| HWND(raw as *mut _))
+}
+
+pub fn splash_window_rect() -> Option<RECT> {
+    let hwnd = splash_hwnd()?;
+    unsafe {
+        let mut r = RECT::default();
+        GetWindowRect(hwnd, &mut r).ok()?;
+        Some(r)
+    }
 }
 
 fn show_inner(dark: bool) -> Result<(), String> {
@@ -73,7 +99,7 @@ fn show_inner(dark: bool) -> Result<(), String> {
         );
 
         let hwnd = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_COMPOSITED,
             CLASS,
             PCWSTR(title.as_mut_ptr()),
             WS_POPUP,
@@ -124,36 +150,37 @@ fn show_inner(dark: bool) -> Result<(), String> {
         );
         let _ = SetWindowRgn(hwnd, Some(rgn), true);
 
-        let bitmap = create_bitmap(screen_dc, &icon)?;
+        let full = create_bitmap(screen_dc, &icon)?;
+        let icon_px = scale_px(ICON_LOGICAL, dpi);
+        let bitmap = scale_bitmap(
+            screen_dc,
+            full,
+            icon.width as i32,
+            icon.height as i32,
+            icon_px,
+            icon_px,
+        )?;
+        let _ = DeleteObject(full.into());
         ReleaseDC(None, screen_dc);
 
         let data = Box::new(PaintData {
             bitmap,
-            image_w: icon.width as i32,
-            image_h: icon.height as i32,
+            image_w: icon_px,
+            image_h: icon_px,
             dark,
+            icon_px,
+            gap_px: scale_px(BRAND_GAP_LOGICAL, dpi),
+            font_px: scale_px(FONT_LOGICAL, dpi),
         });
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(data) as isize);
 
         let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
         let _ = InvalidateRect(Some(hwnd), None, true);
         let _ = UpdateWindow(hwnd);
-        pump(hwnd);
+        crate::window_motion::pump(hwnd);
 
         *SPLASH_HWND.lock().unwrap_or_else(|p| p.into_inner()) = Some(hwnd.0 as isize);
         Ok(())
-    }
-}
-
-fn pump(hwnd: HWND) {
-    unsafe {
-        let mut msg = MSG::default();
-        for _ in 0..16 {
-            while PeekMessageW(&mut msg, Some(hwnd), 0, 0, PM_REMOVE).as_bool() {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-        }
     }
 }
 

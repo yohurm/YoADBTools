@@ -2,7 +2,8 @@
 //! 在 WebView2 创建之前用 GDI 画出小窗，主窗就绪后再关掉。
 //! 禁止第二 WebView splash（tauri#1850：WebView 来不及画启动页）。
 
-mod geometry;
+pub(crate) mod geometry;
+mod handover;
 mod icon;
 mod paint;
 mod window;
@@ -20,6 +21,7 @@ use yohu_protocol::Theme;
 use crate::window_boot::resolve_dark;
 
 pub use geometry::{center_on_splash_work, last_geometry};
+pub use handover::to_main;
 
 pub fn system_dark() -> bool {
     unsafe {
@@ -51,4 +53,8 @@ pub fn show(pref: Theme) {
 
 pub fn close() {
     window::close();
+}
+
+pub fn hide() {
+    window::hide();
 }

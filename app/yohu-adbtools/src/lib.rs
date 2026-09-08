@@ -25,6 +25,8 @@ mod state;
 mod tasks;
 mod terminal_eval;
 mod window_boot;
+#[cfg(windows)]
+mod window_motion;
 mod yolog;
 
 use std::path::PathBuf;

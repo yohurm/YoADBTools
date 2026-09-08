@@ -1,7 +1,9 @@
 //! 启动图标：PNG 解码为 RGBA，再做成 GDI DIB。
 
 use windows::Win32::Graphics::Gdi::{
-    CreateDIBSection, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
+    CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject,
+    SelectObject, SetStretchBltMode, StretchBlt, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HALFTONE, HBITMAP, HDC, SRCCOPY,
 };
 
 pub struct IconRgba {
@@ -65,6 +67,50 @@ pub unsafe fn create_bitmap(hdc: HDC, image: &IconRgba) -> Result<HBITMAP, Strin
         }
     }
     Ok(bitmap)
+}
+
+/// 启动时按 DPI 把 Logo 拉到绘制尺寸，动画帧里只 BitBlt，禁止每帧 StretchBlt。
+pub unsafe fn scale_bitmap(
+    hdc: HDC,
+    src: HBITMAP,
+    src_w: i32,
+    src_h: i32,
+    dst_w: i32,
+    dst_h: i32,
+) -> Result<HBITMAP, String> {
+    let dst_w = dst_w.max(1);
+    let dst_h = dst_h.max(1);
+    let dst = CreateCompatibleBitmap(hdc, dst_w, dst_h);
+    if dst.is_invalid() {
+        return Err("CreateCompatibleBitmap 失败".into());
+    }
+    let src_dc = CreateCompatibleDC(Some(hdc));
+    let dst_dc = CreateCompatibleDC(Some(hdc));
+    let old_src = SelectObject(src_dc, src.into());
+    let old_dst = SelectObject(dst_dc, dst.into());
+    let _ = SetStretchBltMode(dst_dc, HALFTONE);
+    let ok = StretchBlt(
+        dst_dc,
+        0,
+        0,
+        dst_w,
+        dst_h,
+        Some(src_dc),
+        0,
+        0,
+        src_w,
+        src_h,
+        SRCCOPY,
+    );
+    SelectObject(src_dc, old_src);
+    SelectObject(dst_dc, old_dst);
+    let _ = DeleteDC(src_dc);
+    let _ = DeleteDC(dst_dc);
+    if !ok.as_bool() {
+        let _ = DeleteObject(dst.into());
+        return Err("StretchBlt 缩放启动图标失败".into());
+    }
+    Ok(dst)
 }
 
 #[cfg(test)]

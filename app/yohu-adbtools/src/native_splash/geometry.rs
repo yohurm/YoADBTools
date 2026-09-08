@@ -9,6 +9,8 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
+pub(crate) use crate::window_motion::{rect_center, rect_height, rect_width, xywh};
+
 pub const LOGICAL_W: i32 = 480;
 pub const LOGICAL_H: i32 = 300;
 pub const ICON_LOGICAL: i32 = 72;
@@ -16,8 +18,9 @@ pub const BRAND_GAP_LOGICAL: i32 = 16;
 pub const FONT_LOGICAL: i32 = 18;
 pub const CORNER_LOGICAL: i32 = 16;
 pub const USER_DEFAULT_SCREEN_DPI: u32 = 96;
-const FALLBACK_WORK_W: i32 = 1200;
-const FALLBACK_WORK_H: i32 = 800;
+/// GetMonitorInfo 失败时的假工作区。不是 `Layout.WindowDefaultW/H`。
+const FALLBACK_WORK_W: i32 = 1920;
+const FALLBACK_WORK_H: i32 = 1080;
 
 /// 小窗物理几何 + 当时锁定的工作区。主窗居中只读这份工作区，不再重新 GetCursorPos。
 #[derive(Clone, Copy, Debug)]
@@ -56,6 +59,43 @@ impl SplashPlacement {
             right: self.work_right,
             bottom: self.work_bottom,
         }
+    }
+
+    pub fn rect(&self) -> RECT {
+        xywh(self.x, self.y, self.width, self.height)
+    }
+}
+
+/// 同屏共享容器 / 异屏出场。分类只看两窗中心是否落在小窗锁定的工作区。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HandoverKind {
+    SameScreen,
+    CrossScreen,
+}
+
+pub fn point_in_rect(x: i32, y: i32, r: RECT) -> bool {
+    x >= r.left && x < r.right && y >= r.top && y < r.bottom
+}
+
+/// 与 `@yohu/ui` `Layout.WindowMinW/H` 同值。
+pub const WINDOW_MIN_W: i32 = 1024;
+pub const WINDOW_MIN_H: i32 = 768;
+
+pub fn clamp_rect_min(r: RECT, min_w: i32, min_h: i32) -> RECT {
+    let (cx, cy) = rect_center(r);
+    let w = rect_width(r).max(min_w);
+    let h = rect_height(r).max(min_h);
+    xywh(cx - w / 2, cy - h / 2, w, h)
+}
+
+/// 两窗中心都在小窗锁定的工作区内 → 同屏共享容器。
+pub fn classify_handover(splash: RECT, main: RECT, splash_work: RECT) -> HandoverKind {
+    if point_in_rect(rect_center(splash).0, rect_center(splash).1, splash_work)
+        && point_in_rect(rect_center(main).0, rect_center(main).1, splash_work)
+    {
+        HandoverKind::SameScreen
+    } else {
+        HandoverKind::CrossScreen
     }
 }
 
@@ -130,8 +170,8 @@ mod tests {
     #[test]
     fn splash_is_smaller_than_main() {
         const {
-            assert!(LOGICAL_W < 1024);
-            assert!(LOGICAL_H < 768);
+            assert!(LOGICAL_W < WINDOW_MIN_W);
+            assert!(LOGICAL_H < WINDOW_MIN_H);
         }
     }
 
@@ -172,5 +212,44 @@ mod tests {
         assert_eq!((x, y), center_in_work_area(work, 1200, 800));
         assert_eq!(x, 1990);
         assert_eq!(y, 193);
+    }
+
+    #[test]
+    fn same_work_area_is_same_screen() {
+        let work = RECT {
+            left: 1493,
+            top: 0,
+            right: 3687,
+            bottom: 1186,
+        };
+        let splash = xywh(2350, 443, 480, 300);
+        let main = xywh(1990, 193, 1200, 800);
+        assert_eq!(
+            classify_handover(splash, main, work),
+            HandoverKind::SameScreen
+        );
+    }
+
+    #[test]
+    fn other_monitor_is_cross_handover() {
+        let splash_work = RECT {
+            left: 1493,
+            top: 0,
+            right: 3687,
+            bottom: 1186,
+        };
+        let splash = xywh(2350, 443, 480, 300);
+        let main_on_primary = xywh(360, 140, 1200, 800);
+        assert_eq!(
+            classify_handover(splash, main_on_primary, splash_work),
+            HandoverKind::CrossScreen
+        );
+    }
+
+    #[test]
+    fn clamp_matches_window_min() {
+        let clamped = clamp_rect_min(xywh(0, 0, 400, 300), WINDOW_MIN_W, WINDOW_MIN_H);
+        assert_eq!(rect_width(clamped), WINDOW_MIN_W);
+        assert_eq!(rect_height(clamped), WINDOW_MIN_H);
     }
 }
