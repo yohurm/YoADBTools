@@ -97,7 +97,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     windowToggleMaximize: vi.fn(async () => undefined),
     windowClose: vi.fn(async () => undefined),
     windowIsMaximized: vi.fn(async () => false),
-    windowShow: (...a: unknown[]) => mocks.windowShow(...a),
+    windowShow: () => mocks.windowShow(),
     listenWindowResize: vi.fn(async () => () => undefined),
     EVENT_NAMES: {
       devicesChanged: "devices/changed",

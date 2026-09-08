@@ -13,7 +13,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@yohu/api")>();
   return {
     ...actual,
-    windowShow: (...a: unknown[]) => mocks.windowShow(...a),
+    windowShow: () => mocks.windowShow(),
   };
 });
 
