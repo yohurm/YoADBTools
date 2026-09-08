@@ -1,9 +1,15 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.75（2026-09-07，模块展示名单源）    
+> **状态：** v1.81（2026-09-08，启动交接时序）    
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.81 变更（启动交接时序）**：主窗 HWND 可先落到最终矩形，但 `ShowWindow` 推迟到 overlay 铺满（同屏）或出场结束（异屏）。禁止 morph 期间工作台从 `NOREDIRECTIONBITMAP` 空洞透出。
+> **v1.80 变更（启动交接单通路）**：overlay 按配方建树（同屏 Shared 才有 fill，异屏 Exit 只有品牌层）。HTML `#yohu-boot` 揭窗前直接卸节点，不做 CSS 淡出。最小化只靠 Tao 可见性同步，不再 `ExitRequested` 拦截。
+> **v1.79 变更（启动交接 DComp）**：L2 改为 `IDCompositionVisual` 的 Offset / Scale / Opacity（`IDCompositionAnimation`）。禁止 `UpdateLayeredWindow` 逐帧画 dest。
+> **v1.78 变更（启动交接重构）**：抛弃 HWND 尺寸插值。主窗一次落到最终矩形；冻结小窗快照做 scale/opacity（同屏共享容器 300ms + 100ms 淡出；异屏出场 200ms）。与鸿蒙 starting surface / Apple zoom 容器同构。禁止再 `SetWindowPos` 补间启动窗。
+> **v1.77 变更（启动展开不抖）**：旧路径曾用 `SWP_NOCOPYBITS` 补丁修抖动；v1.78 删除该布局动画。
+> **v1.76 变更（启动交接）**：工作台 hydrate 之后才交接。同屏共享容器、异屏出场的数值仍用 `spatialPanel` / `spatialExit`。v1.78 起引擎改为分层快照，不再拉 HWND。品牌 Logo 按创建 DPI 冻结。系统关闭窗口动画则瞬时揭窗。禁止 WebView CSS 冒充启动过场。
 > **v1.75 变更（命令终端）**：导航与页眉展示名改为「命令终端」；常量在 `yohu-protocol::module_title` / `@yohu/api` `ModuleTitle`。目录 id 仍是 `adb-terminal`。
 > **v1.74 变更（启动数据单源）**：用户可见品牌只在原生小窗。HTML `#yohu-boot` 只铺画布。主窗居中读小窗锁定的工作区，不再二次 `GetCursorPos`。删除空命令 `boot.reveal` 与 `boot-reveal.js`。揭窗只走 `boot.showMain`。
 > **v1.73 变更（原生启动小窗）**：双击后先出 480×300 原生小窗（GDI，对齐 Android Studio / IntelliJ），主窗隐藏 hydrate 完成后再揭大窗并关掉小窗。禁止用 WebView 当启动小窗。
@@ -343,6 +349,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏展开时与内容区之间画 hairline。模块分区 = `YoPanel`（surface + radius-md + hairline 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行、对话框头尾、输入类控件。路径栏与清单靠 canvas 分层，不另拉线。
 - **状态栏**：左「展示名 v版本」（`system.info.identity`）/ 中留白 / 右「设备 · 任务 · 状态」；任务悬停显示明细。状态槽由模块 `Status` 贡献（投屏出画后显示实测 fps）。透明贴合 canvas。Caption + leading-tight。
 - **对话框**：Title_S Bold；PC 小圆角 `radius-sm`；宽 ≤400、高 ≤90%；**不要**把窗口最小 360×240 套到浮层确认框。
+- **启动交接（Windows）**：用户看见的是原生 GDI 小窗，不是 `#yohu-boot`。hydrate 完成且双 rAF 之后卸掉 HTML 画布层，再 `boot.showMain`。主窗一次落到最终矩形但保持隐藏；同屏 Shared overlay 铺满之后才揭内容并淡出；异屏 Exit overlay 结束后才揭主窗。禁止插值 HWND 宽高、禁止 CSS 缩放主窗、禁止 HTML 启动层淡出、禁止第二 WebView splash。
 - **快捷键统一表（v6.1 目标）**：`Ctrl+K` 命令面板（模块跳转/刷新设备/开始采集…）；模块内快捷键不变。
 
 ---
