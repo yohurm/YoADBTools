@@ -303,12 +303,9 @@ export function TerminalView(props: DeviceSession) {
           variant="pane"
           title="执行结果"
           actions={
-            <>
-              <Show when={busy() !== "idle"}>
-                <YoBadge text="执行中" tone="warn" />
-              </Show>
-              <YoIconButton icon="clear" title="清屏" disabled={!hasResults()} onClick={clearPanel} />
-            </>
+            <Show when={busy() !== "idle"}>
+              <YoBadge text="执行中" tone="warn" />
+            </Show>
           }
         >
           <div
