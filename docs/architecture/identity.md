@@ -1,6 +1,6 @@
 # 产品身份与命名单源
 
-> 常量在 `yohu-protocol`（`PRODUCT_NAME` / `DISPLAY_NAME` / `IDENTIFIER` / `DESCRIPTION` / `COPYRIGHT` / `DATA_DIR_NAME` / `module_id::*` / `dir::*`）。  
+> 常量在 `yohu-protocol`（`PRODUCT_NAME` / `DISPLAY_NAME` / `IDENTIFIER` / `DESCRIPTION` / `COPYRIGHT` / `DATA_DIR_NAME` / `module_id::*` / `module_title::*` / `dir::*`）。  
 > 版本号 = Cargo workspace `version`（`CARGO_PKG_VERSION`）；`tauri.conf.json` 由 `yohu-adbtools/build.rs` 校验一致。UI 禁止再写死版本号或展示名。
 
 ## 命名
@@ -16,6 +16,7 @@
 | 组件库对外名 | **YoUI**；npm 包仍 `@yohu/ui` |
 | IPC 门面 | `@yohu/api` |
 | 模块 | `@yohu/module-{terminal,files,logs,mirror}` |
+| 模块导航 / 页眉 | `module_title::*`（命令终端 / 文件管理 / 日志分析 / 投屏显示 / 设置）；目录 id 仍是 `module_id::*`（`adb-terminal` 等，不随展示名改） |
 | 图标 | `app/yohu-adbtools/icons/`；UI 同源 `/app-icon.png` |
 
 `system.info` 返回 `{ identity, paths, adb_path, settings }`。`adb_path` 是 ToolResolver 当前解析的那一份运行时 sidecar（用户设置或 DataRoot 解压副本）。

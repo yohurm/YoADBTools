@@ -123,7 +123,7 @@ import { App } from "../App";
 import { resetMainWindowRevealForTests } from "../boot";
 import { registerModule } from "../registry";
 import { deviceStore, settingsStore, updateStore } from "../stores";
-import { APP_IDENTITY, APP_SETTINGS_DEFAULT, ModuleId, type DeviceSession } from "@yohu/api";
+import { APP_IDENTITY, APP_SETTINGS_DEFAULT, ModuleId, ModuleTitle, type DeviceSession } from "@yohu/api";
 
 /** 探测壳注入的页眉设备名；用于断言切设备不依赖切模块。 */
 const SessionProbe: Component<DeviceSession> = (props) => (
@@ -133,14 +133,14 @@ const SessionProbe: Component<DeviceSession> = (props) => (
 // 真实应用在 apps/shell 入口注册；测试注册一份子集（含 Planned 模块）。
 registerModule({
   id: ModuleId.Terminal,
-  title: "ADB 终端",
+  title: ModuleTitle.Terminal,
   icon: "terminal",
   selectionMode: "multiOptional",
   Component: SessionProbe,
 });
 registerModule({
   id: ModuleId.Files,
-  title: "文件管理",
+  title: ModuleTitle.Files,
   icon: "folder",
   selectionMode: "singleRequired",
   Component: SessionProbe,
@@ -148,7 +148,7 @@ registerModule({
 // Settings 由 App.tsx 在 import 时注册，测试不再重复登记。
 registerModule({
   id: ModuleId.Mirror,
-  title: "投屏",
+  title: ModuleTitle.Mirror,
   icon: "mirror",
   selectionMode: "singleRequired",
   Component: () => null,
@@ -407,7 +407,7 @@ describe("NavList（§3 模块导航）", () => {
   it("投屏模块不再显示「开发中」徽章", () => {
     render(() => <NavList activeId={ModuleId.Mirror} onNavigate={() => undefined} />);
     expect(screen.queryByText("开发中")).toBeNull();
-    expect(screen.getByText("投屏")).toBeTruthy();
+    expect(screen.getByText(ModuleTitle.Mirror)).toBeTruthy();
   });
 
   it("设置钉在侧栏底部，与模块用横线隔开", () => {
@@ -418,7 +418,7 @@ describe("NavList（§3 模块导航）", () => {
       container.querySelectorAll(".yohu-nav__modules .yohu-nav__item"),
     ).map((el) => el.textContent ?? "");
     expect(moduleTitles.some((t) => t.includes("设置"))).toBe(false);
-    expect(moduleTitles.some((t) => t.includes("ADB 终端"))).toBe(true);
+    expect(moduleTitles.some((t) => t.includes(ModuleTitle.Terminal))).toBe(true);
 
     const footerItems = container.querySelectorAll(".yohu-nav__footer .yohu-nav__item");
     expect(footerItems).toHaveLength(1);

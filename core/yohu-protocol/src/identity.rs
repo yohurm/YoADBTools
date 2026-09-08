@@ -46,6 +46,15 @@ pub mod module_id {
     pub const SETTINGS: &str = "settings";
 }
 
+/// 模块导航 / 页眉展示名（与 `ModuleDescriptor.title` 一致；不是目录名）。
+pub mod module_title {
+    pub const TERMINAL: &str = "命令终端";
+    pub const FILES: &str = "文件管理";
+    pub const LOGS: &str = "日志分析";
+    pub const MIRROR: &str = "投屏显示";
+    pub const SETTINGS: &str = "设置";
+}
+
 /// LocalAppData 根下的固定段（不随 `data_root` 迁移）。
 pub mod dir {
     pub const SETTINGS: &str = "settings";
@@ -143,6 +152,11 @@ mod tests {
         assert_eq!(module_id::LOGS, "log-analyzer");
         assert_eq!(module_id::MIRROR, "screen-mirror");
         assert_eq!(module_id::SETTINGS, "settings");
+        assert_eq!(module_title::TERMINAL, "命令终端");
+        assert_eq!(module_title::FILES, "文件管理");
+        assert_eq!(module_title::LOGS, "日志分析");
+        assert_eq!(module_title::MIRROR, "投屏显示");
+        assert_eq!(module_title::SETTINGS, "设置");
         assert_eq!(scrcpy::SERVER_VERSION, "4.1");
         assert_eq!(dir::SCRCPY_SERVER, "scrcpy-server");
     }

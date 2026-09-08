@@ -3,7 +3,7 @@
  */
 
 import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
-import { errorText, type DeviceSession } from "@yohu/api";
+import { errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
   Layout,
   YoButton,
@@ -271,7 +271,7 @@ export function MirrorView(props: DeviceSession) {
 
   return (
     <YoPage class={`yohu-mirror${mirrorStore.state.fullscreen ? " yohu-mirror--full" : ""}`}>
-      <YoChrome title="投屏显示" deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome title={ModuleTitle.Mirror} deviceLabel={props.selectedLabel ?? undefined}>
         <YoButton
           size="sm"
           variant="primary"

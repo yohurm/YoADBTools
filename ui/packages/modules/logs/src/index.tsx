@@ -3,13 +3,13 @@
  * 只导出 descriptor；注册由 apps/shell 完成（模块不依赖 @yohu/workbench）。
  */
 
-import { ModuleId } from "@yohu/api";
+import { ModuleId, ModuleTitle } from "@yohu/api";
 
 import { LogAnalyzerView } from "./LogAnalyzerView";
 
 export const descriptor = {
   id: ModuleId.Logs,
-  title: "日志分析",
+  title: ModuleTitle.Logs,
   icon: "log" as const,
   selectionMode: "singleRequired" as const,
   Component: LogAnalyzerView,

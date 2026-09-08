@@ -11,6 +11,7 @@ import {
   dialogOpenDirectory,
   dialogOpenFile,
   errorText,
+  ModuleTitle,
   systemOpenPath,
   type Density,
   type LogDisplayColumns,
@@ -187,7 +188,7 @@ export const SettingsView: Component = () => {
 
   return (
     <div class="yohu-settings">
-      <YoChrome title="设置" />
+      <YoChrome title={ModuleTitle.Settings} />
 
       <div class="yohu-settings__body">
         <YoPanel title="工具链">
@@ -241,7 +242,7 @@ export const SettingsView: Component = () => {
           </YoFormRow>
         </YoPanel>
 
-        <YoPanel title="日志分析">
+        <YoPanel title={ModuleTitle.Logs}>
           <YoFormRow
             title="缓冲最大行数"
             note={<EffectBadge text="窗口立即裁剪，采集环下次启动" />}
@@ -322,7 +323,7 @@ export const SettingsView: Component = () => {
           </YoFormRow>
         </YoPanel>
 
-        <YoPanel title="投屏显示">
+        <YoPanel title={ModuleTitle.Mirror}>
           <YoFormRow
             title="强制 ADB forward"
             description="协议、长边、码率、帧率在投屏显示页调节。无线调试默认 forward；USB 上 reverse 失败也会回退。需要跳过 reverse 时打开此开关。"

@@ -9,7 +9,7 @@ Rust 壳是 `yohu-adbtools`。前端工作台包是 **`@yohu/workbench`**（不�
 ```typescript
 interface ModuleDescriptor {
   id: string;              // module_id::*
-  title: string;
+  title: string;           // module_title::*
   icon: IconName;
   selectionMode: "none" | "singleRequired" | "multiOptional";
   kind?: "workspace" | "system";

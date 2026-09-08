@@ -21,6 +21,7 @@ import {
 } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
 import type { CommandDto, CommandGroupDto, DeviceSession } from "@yohu/api";
+import { ModuleTitle } from "@yohu/api";
 
 import { CommandManager } from "./CommandManager";
 import { commandNeedsInput, terminalStore, type ResultEntry } from "./store";
@@ -257,7 +258,7 @@ export function TerminalView(props: DeviceSession) {
 
   return (
     <YoPage class="yohu-terminal">
-      <YoChrome title="ADB 命令终端" deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome title={ModuleTitle.Terminal} deviceLabel={props.selectedLabel ?? undefined}>
         <YoButton
           onClick={run}
           loading={busy() !== "idle"}

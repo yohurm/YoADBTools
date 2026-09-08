@@ -39,6 +39,15 @@ export const ModuleId = {
 
 export type ModuleId = (typeof ModuleId)[keyof typeof ModuleId];
 
+/** 模块导航 / 页眉展示名（与 yohu-protocol::module_title 对齐）。 */
+export const ModuleTitle = {
+  Terminal: "命令终端",
+  Files: "文件管理",
+  Logs: "日志分析",
+  Mirror: "投屏显示",
+  Settings: "设置",
+} as const;
+
 /** 首屏兜底身份（version 等 system.info 回填）。 */
 export const APP_IDENTITY: AppIdentity = {
   name: PRODUCT_NAME,

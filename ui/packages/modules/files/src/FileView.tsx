@@ -4,7 +4,7 @@
 
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
-import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, type DeviceSession } from "@yohu/api";
+import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
   YoButton,
   YoChrome,
@@ -245,7 +245,7 @@ export function FileView(props: DeviceSession) {
 
   return (
     <YoPage class="yohu-files" ref={(el) => { pageEl = el; }}>
-        <YoChrome title="文件管理" deviceLabel={props.selectedLabel ?? undefined} dropIgnore>
+        <YoChrome title={ModuleTitle.Files} deviceLabel={props.selectedLabel ?? undefined} dropIgnore>
           <YoButton onClick={() => void onUpload()}>上传</YoButton>
           <YoButton variant="secondary" disabled={fileStore.singleFile() === undefined} onClick={() => void onDownload()}>
             下载

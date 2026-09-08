@@ -7,6 +7,7 @@ import { Component, createSignal, onCleanup, onMount } from "solid-js";
 
 import {
   ModuleId,
+  ModuleTitle,
   listenWindowResize,
   systemReportError,
   windowClose,
@@ -27,7 +28,7 @@ import { deviceStore, settingsStore } from "./stores";
 
 registerModule({
   id: ModuleId.Settings,
-  title: "设置",
+  title: ModuleTitle.Settings,
   icon: "settings",
   selectionMode: "none",
   kind: "system",

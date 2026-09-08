@@ -3,13 +3,13 @@
  * 只导出 descriptor；注册由 apps/shell 完成（模块不依赖 @yohu/workbench）。
  */
 
-import { ModuleId } from "@yohu/api";
+import { ModuleId, ModuleTitle } from "@yohu/api";
 
 import { FileView } from "./FileView";
 
 export const descriptor = {
   id: ModuleId.Files,
-  title: "文件管理",
+  title: ModuleTitle.Files,
   icon: "folder" as const,
   selectionMode: "singleRequired" as const,
   Component: FileView,

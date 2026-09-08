@@ -83,7 +83,7 @@ try {
     $adbPathField = Find-ByName $appRoot "ADB 路径" $true 4
     Assert "settings ADB path field reachable" ($null -ne $adbPathField)
 
-    $navTerminal = Find-Button $appRoot "ADB 命令终端" 10
+    $navTerminal = Find-Button $appRoot "命令终端" 10
     if ($navTerminal) { Invoke-Click $navTerminal; Start-Sleep -Seconds 1 }
     $treeCmd = Find-ByName $appRoot "型号" $true 10
     Assert "command tree has model" ($null -ne $treeCmd)

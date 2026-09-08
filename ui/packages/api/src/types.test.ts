@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMAND_LIBRARY_SCHEMA_VERSION, DEFAULT_BROWSE_ROOT, MIRROR_MIN_LAYOUT_PX, SAFETY_ROOTS } from "./identity";
+import { COMMAND_LIBRARY_SCHEMA_VERSION, DEFAULT_BROWSE_ROOT, MIRROR_MIN_LAYOUT_PX, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./identity";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
 import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type Theme, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
@@ -289,6 +289,15 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
 
   it("MIRROR_MIN_LAYOUT_PX 与 yohu-protocol 对齐", () => {
     expect(MIRROR_MIN_LAYOUT_PX).toBe(64);
+  });
+
+  it("ModuleId / ModuleTitle 与 yohu-protocol 对齐", () => {
+    expect(ModuleId.Terminal).toBe("adb-terminal");
+    expect(ModuleTitle.Terminal).toBe("命令终端");
+    expect(ModuleTitle.Files).toBe("文件管理");
+    expect(ModuleTitle.Logs).toBe("日志分析");
+    expect(ModuleTitle.Mirror).toBe("投屏显示");
+    expect(ModuleTitle.Settings).toBe("设置");
   });
 
   it("AppIdentity / AppPathCatalog 字段为 snake_case", () => {

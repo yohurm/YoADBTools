@@ -47,8 +47,8 @@ try {
     Assert "设备栏出现假设备（Yohu Phone）" ($null -ne $model)
 
     # ===== 4. 终端：导航 → 树 → 执行「型号」→ 通过判定 =====
-    $navTerminal = Find-Button $appRoot "ADB 命令终端" 10
-    if (-not $navTerminal) { $navTerminal = Find-ByName $appRoot "ADB 命令终端" $false 4 }
+    $navTerminal = Find-Button $appRoot "命令终端" 10
+    if (-not $navTerminal) { $navTerminal = Find-ByName $appRoot "命令终端" $false 4 }
     if ($navTerminal) { Invoke-Click $navTerminal; Start-Sleep -Seconds 1 }
     $treeCmd = Find-ByName $appRoot "型号" $true 10
     Assert "命令库树出现「型号」" ($null -ne $treeCmd)

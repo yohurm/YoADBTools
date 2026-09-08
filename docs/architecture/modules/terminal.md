@@ -1,4 +1,4 @@
-# 模块：ADB 命令终端
+# 模块：命令终端
 
 - 领域：`yohu-domain` 命令库 / `CommandEvaluator`（失败正则 → 成功正则 → 退出码）/ `GroupExecutor`
 - 运输：`yohu-adb` 实现 `Runner`

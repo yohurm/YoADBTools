@@ -6,7 +6,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import type { DeviceSession } from "@yohu/api";
-import { dialogSaveFile, errorText, systemOpenPath } from "@yohu/api";
+import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
 import {
   Icon,
   YoBadge,
@@ -342,7 +342,7 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   return (
     <YoPage class="yohu-logs">
-      <YoChrome title="日志分析" deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome title={ModuleTitle.Logs} deviceLabel={props.selectedLabel ?? undefined}>
         <YoButton
           variant={windowLive() ? "danger" : "primary"}
           disabled={!windowLive() && windowSerial() === null}
