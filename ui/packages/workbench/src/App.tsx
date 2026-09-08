@@ -45,7 +45,7 @@ export const App: Component = () => {
     setTheme(settingsStore.state.theme);
     setDensity(settingsStore.state.density);
 
-    // 原生小窗已显示；此处加载工作台，就绪后揭主窗并关掉小窗。
+    // 原生小窗已显示；此处加载工作台，就绪后由 boot.showMain 交接揭主窗。
     void runBootPipeline({
       load: async () => {
         await Promise.all([settingsStore.load(), deviceStore.load()]);

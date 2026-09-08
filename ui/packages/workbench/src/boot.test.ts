@@ -59,13 +59,8 @@ describe("启动编排", () => {
     vi.unstubAllGlobals();
   });
 
-  it("dismissBootOverlay 淡出后移除节点", async () => {
+  it("dismissBootOverlay 揭窗前移除启动层", async () => {
     document.body.innerHTML = '<div id="yohu-boot" aria-busy="true"></div>';
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      configurable: true,
-      value: () => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }),
-    });
     await dismissBootOverlay();
     expect(document.getElementById("yohu-boot")).toBeNull();
   });
@@ -103,5 +98,6 @@ describe("启动编排", () => {
     expect(html).not.toContain("boot-reveal.js");
     expect(html).not.toContain("yohu-boot__mark");
     expect(html).not.toContain("boot.reveal");
+    expect(html).not.toContain("yohu-boot--leave");
   });
 });
