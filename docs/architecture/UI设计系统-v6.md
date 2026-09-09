@@ -1,9 +1,16 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.87（2026-09-09，命令终端一次输入一条输出块 + 自上而下）    
+> **状态：** v1.94（2026-09-09，发送栏双轴裁切与空态跟随）    
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.94 变更（空态跟随挤位）**：`inline-end` 补 `grid-template-rows` 0fr↔1fr，与宽度同一 `spatialPanel`。闭合不占列高，把手溢出。结果区居中空态靠 `flex:1` 跟随，禁止空态自写位移。`height:auto` / `max-height:none` 视为跳变。侧栏 `rail`、传输 `panel`、按钮 `swap` 同一条「造成挤位的配方插值、被挤兄弟跟随」纪律。
+> **v1.93 变更（发送栏宽度裁切）**：`inline-end` 改为与 `YoSwap`/侧栏同构的 `width` 插值（compact 控制高 ↔ 100%），内容锁祖先 `cqi`、贴 end 裁切；把手绝对叠在裁切盒上，只描露出的上+起边。禁止两列 `0fr auto`↔`minmax 1fr 0fr`（不插值）。
+> **v1.92 变更（发送栏横向开合）**：命令终端输入栏去掉向下 XOR `panel`。收起往右夹成把手（chevron-left），展开往左铺满（`yohu-recipe-inline-end`，宽度 spatial-panel）。
+> **v1.91 变更（动效收口）**：设备插拔走 `YoListPresence`。`yohu-motion` 只导出 `MotionSpec`；`@yohu/ui` 不再导出配方内部时长表（模块只用 `Yo*` / `motionSpecMs` / `DISMISS_HOLD_DURATION`）。
+> **v1.90 变更（进出场观感）**：list 高度与内容同时长（200ms），位移改 xs、改 transition 可打断。Dialog 从下方微移入场、出场原地淡出不回放。Toast/popover/rise 进场改 spatialLocal。发送栏 XOR 走 `yohu-recipe-xor` 同格叠放，避免两段高度相加。
+> **v1.89 变更（MotionSpec 双端）**：`yohu-motion::MotionSpec` 与 `tokens/motion.ts` 同名同值。配方时长从 spec 派生；splash / occupancy 只点规格名。`motionSpecMs()` 公开。弹簧仍只在 CSS 采样。
+> **v1.88 变更（命令终端收发动效）**：IO 块与排队卡片走 `YoListPresence` + 配方 `list`（高度 spatialLocal ∥ rise 进出场）。发送瞬间队列出场、结果区新 `>>>`/`<<<` 升起；清屏直切。发送栏收起条与输入栏 XOR `YoCollapse panel`，禁止 Show 直切。模块不写 `@keyframes`。
 > **v1.87 变更（命令终端 IO 块）**：一次 `>>>` 对应一条多行 `<<<`（`dumpsys` 等整段 stdout 不再按物理行拆成多条输出）。标识与时间钉在首行，后续行只在内容列换行。结果流自上而下（去掉顶栏 spacer），不再把内容顶到视口底部。
 > **v1.86 变更（命令终端排队发送）**：发送栏整栏收缩/展开（YoCollapse panel）。右侧水平纸飞机（Lucide send-horizontal）发送，空内容变灰仍显示。点命令库叶子在输入框上方排队。展示统一 `formatAdbLine`（始终 `adb [-s] 正文`）；exec 是否带 `adb` 仍走设置。
 > **v1.85 变更（命令终端 IO 行）**：抛弃会话卡片。结果区 = 输入/输出标识 + 时间 + 内容；空态在视口正中。发送栏去掉「自定义输入」与 `adb` 文案。库命令与发送栏同一 `terminal.exec`。设置「输入命令默认加上 adb」默认关、无副标题。v1.87 起流改为自上而下，一次输入一条输出块。
@@ -382,8 +389,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
 - 命令库树：组节点加命令数徽章；点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`，不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
-- **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。空态 `YoEmptyState` 铺满视口并居中。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
-- **发送栏**：钉在结果面板底部，整栏收缩/展开（`YoCollapse recipe=panel`）。展开：队列卡片在输入框上方（名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机（Lucide send-horizontal）发送；无内容时按钮仍在，变灰禁用。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
+- **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
+- **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
 ### 4.3 文件管理
 

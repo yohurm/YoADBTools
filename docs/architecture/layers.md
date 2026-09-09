@@ -55,7 +55,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 
 ## `yohu-motion`
 
-与 runtime / protocol 并列，互不依赖。只含 MotionSpec 时长与曲线；Windows 另含 DWM 时钟、消息泵、`IDCompositionAnimation` 采样。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只消费本 crate。
+与 runtime / protocol 并列，互不依赖。公开面是 `MotionSpec`（与 `@yohu/ui` `tokens/motion.ts` 同名同值）：`duration_ms()` + `ease()`。Windows 另含 DWM 时钟、消息泵、`IDCompositionAnimation` 采样。弹簧物理只在 CSS 采样；原生弹簧槽位回退标准贝塞尔。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只点规格名，禁止再写散落毫秒。
 
 ## 仓库布局
 
