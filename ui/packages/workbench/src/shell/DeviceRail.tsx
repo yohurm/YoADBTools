@@ -3,13 +3,14 @@
  * 设备卡片：在线点 + 型号一行 + serial 等宽一行 + 可选运行时次行（Android/电量）+ 未授权徽章；
  * 选中 = `.yohu-interactive--selected`（全表面同一配方）；空态引导 + 错误明细 + 重试。
  * 滑块在 list 宿主内裁切；项滚动走内层 scroller，避免弹簧过冲撑出 Windows 双滚动条。
+ * 插拔走 `YoListPresence`（配方 list）；空态/徽章仍直切。
  * 键盘：roving tabindex（焦点行 0）+ Enter/Space 选择，role=listbox/option。
  * MultiOptional：单击替换勾选；Ctrl/Meta+click 加减选。高亮 = 解析后的执行目标。
  */
 
-import { Component, For, Show, createSignal } from "solid-js";
+import { Component, Show, createSignal } from "solid-js";
 
-import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator } from "@yohu/ui";
+import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence } from "@yohu/ui";
 import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
@@ -94,12 +95,13 @@ export const DeviceRail: Component<{
         >
           <YoIndicator follow={indicatorFollow()} variant="fill" />
           <div class="yohu-device-rail__scroller">
-            <For each={deviceStore.state.devices}>
-              {(device, index) => {
+            <YoListPresence each={deviceStore.state.devices} key={(device) => device.serial}>
+              {(device) => {
                 const focused = () => deviceStore.state.focusSerial === device.serial;
                 const runtime = () => deviceStore.state.statuses[device.serial];
                 const hint = () => formatDeviceStatusHint(runtime());
                 const meta = () => formatDeviceStatusMeta(runtime());
+                const first = () => deviceStore.state.devices[0]?.serial === device.serial;
                 const title = () => {
                   const extra = hint();
                   return extra
@@ -114,7 +116,7 @@ export const DeviceRail: Component<{
                     }}
                     role="option"
                     aria-selected={isSelected(device.serial)}
-                    tabIndex={focused() || (deviceStore.state.focusSerial === null && index() === 0) ? 0 : -1}
+                    tabIndex={focused() || (deviceStore.state.focusSerial === null && first()) ? 0 : -1}
                     title={title()}
                     onClick={(event) => select(device.serial, event)}
                     onKeyDown={(event) => onItemKeyDown(device.serial, event)}
@@ -140,7 +142,7 @@ export const DeviceRail: Component<{
                   </div>
                 );
               }}
-            </For>
+            </YoListPresence>
           </div>
         </div>
         <Show when={deviceStore.state.devices.length === 0}>
