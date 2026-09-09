@@ -50,7 +50,7 @@ use windows::Win32::Media::MediaFoundation::{IMFDXGIDeviceManager, MFCreateDXGID
 use super::chrome::{ChromePainter, ChromeSpec};
 use crate::mirror_present::scale::Letterbox;
 use crate::mirror_present::stage::argb_to_rgba;
-use yohu_motion::{ease_at, ease_standard, eased_anim, SPATIAL_PANEL_MS};
+use yohu_motion::{ease_at, eased_anim, MotionSpec};
 
 const VS: &str = r#"
 struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -884,9 +884,12 @@ fn clip_close(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
         && (a.3 - b.3).abs() < 0.5
 }
 
+/// 占用盒 clip 与侧栏同一 SpatialPanel 规格。
+const OCCUPANCY: MotionSpec = MotionSpec::SpatialPanel;
+
 fn clip_progress(tree: &DcompTree) -> Option<f32> {
     let at = tree.clip_anim_at?;
-    let u = (at.elapsed().as_secs_f32() / (SPATIAL_PANEL_MS as f32 / 1000.0)).clamp(0.0, 1.0);
+    let u = (at.elapsed().as_secs_f32() / (OCCUPANCY.duration_ms() as f32 / 1000.0)).clamp(0.0, 1.0);
     Some(u)
 }
 
@@ -898,7 +901,7 @@ fn clip_now(tree: &DcompTree) -> (f32, f32, f32, f32) {
     let Some(at) = tree.clip_anim_at else {
         return tree.clip_to;
     };
-    let e = ease_at(ease_standard, at.elapsed(), SPATIAL_PANEL_MS);
+    let e = ease_at(OCCUPANCY.ease(), at.elapsed(), OCCUPANCY.duration_ms());
     if e >= 1.0 {
         return tree.clip_to;
     }
@@ -917,7 +920,7 @@ fn animate_scalar(
     from: f32,
     to: f32,
 ) -> WinResult<IDCompositionAnimation> {
-    eased_anim(device, from, to, SPATIAL_PANEL_MS, ease_standard)
+    eased_anim(device, from, to, OCCUPANCY.duration_ms(), OCCUPANCY.ease())
         .ok_or_else(|| windows::core::Error::from(E_FAIL))
 }
 

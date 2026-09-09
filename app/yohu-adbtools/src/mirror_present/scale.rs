@@ -215,6 +215,6 @@ mod tests {
 
     #[test]
     fn occupancy_duration_is_spatial_panel() {
-        assert_eq!(yohu_motion::SPATIAL_PANEL_MS, 300);
+        assert_eq!(yohu_motion::MotionSpec::SpatialPanel.duration_ms(), 300);
     }
 }

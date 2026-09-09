@@ -8,9 +8,7 @@ use std::time::Duration;
 
 use windows::Win32::Foundation::{HWND, RECT};
 
-use yohu_motion::{
-    ease_accel, ease_standard, wait, EFFECTS_FAST_MS, SPATIAL_EXIT_MS, SPATIAL_PANEL_MS,
-};
+use yohu_motion::{wait, MotionSpec};
 
 use super::overlay::{self, OverlayKind, Snapshot};
 use super::overlay_geom::{scale_rect_about_center, screen_to_client};
@@ -36,16 +34,18 @@ pub fn same_screen(
     overlay.pose_shared(from, 1.0);
     overlay.reveal();
     on_covered();
-    overlay.morph_shared(from, to, 1.0, 1.0, SPATIAL_PANEL_MS, ease_standard);
+    let morph = MotionSpec::SpatialPanel;
+    overlay.morph_shared(from, to, 1.0, 1.0, morph.duration_ms(), morph.ease());
     wait(
-        Duration::from_millis(SPATIAL_PANEL_MS),
+        Duration::from_millis(morph.duration_ms()),
         overlay.hwnd(),
         overlay_pump,
     );
     on_present();
-    overlay.morph_shared(to, to, 1.0, 0.0, EFFECTS_FAST_MS, ease_accel);
+    let fade = MotionSpec::EffectsFast;
+    overlay.morph_shared(to, to, 1.0, 0.0, fade.duration_ms(), fade.ease());
     wait(
-        Duration::from_millis(EFFECTS_FAST_MS),
+        Duration::from_millis(fade.duration_ms()),
         overlay.hwnd(),
         overlay_pump,
     );
@@ -68,9 +68,10 @@ pub fn cross_screen(
     overlay.pose_exit(from, 1.0);
     overlay.reveal();
     on_covered();
-    overlay.morph_exit(from, to, 1.0, 0.0, SPATIAL_EXIT_MS, ease_accel);
+    let exit = MotionSpec::SpatialExit;
+    overlay.morph_exit(from, to, 1.0, 0.0, exit.duration_ms(), exit.ease());
     wait(
-        Duration::from_millis(SPATIAL_EXIT_MS),
+        Duration::from_millis(exit.duration_ms()),
         overlay.hwnd(),
         overlay_pump,
     );
