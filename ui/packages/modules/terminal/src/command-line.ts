@@ -26,8 +26,12 @@ export function commandNeedsInput(template: string): boolean {
   return placeholderArity(template) > 0;
 }
 
-/** 按序替换 `{0}` `{1}` …；值本身含 `{n}` 样文本按字面量保留。 */
-export function fillTemplate(template: string, values: string[]): string {
+/** 按序替换 `{0}` `{1}` …；值本身含 `{n}` 样文本按字面量保留。元数必须与 domain `fill` 一致。 */
+export function fillTemplate(template: string, values: readonly string[]): string {
+  const expected = placeholderArity(template);
+  if (values.length !== expected) {
+    throw new Error(`填充值数量不一致：需要 ${expected} 个，实际 ${values.length}`);
+  }
   let out = "";
   let rest = template;
   while (true) {

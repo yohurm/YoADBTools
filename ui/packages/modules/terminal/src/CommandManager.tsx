@@ -190,11 +190,6 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
                       value={group().name}
                       onInput={(v) => setDraft("groups", (g) => g.id === group().id, "name", v)}
                     />
-                    <YoTextField
-                      label="标签（逗号分隔）"
-                      value={group().tagsText}
-                      onInput={(v) => setDraft("groups", (g) => g.id === group().id, "tagsText", v)}
-                    />
                   </YoPanel>
                 )}
               </Show>

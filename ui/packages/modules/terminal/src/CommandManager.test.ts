@@ -10,7 +10,6 @@ const sample: CommandLibraryDto = {
     {
       id: "g1",
       name: "设备信息",
-      tags: ["产线", "调试"],
       commands: [
         {
           id: "c1",
@@ -31,13 +30,6 @@ describe("命令管理 快照编辑（编辑即快照/全量提交/取消零污�
   it("toDraft → fromDraft 无损往返", () => {
     const roundtrip = fromDraft(toDraft(sample));
     expect(roundtrip).toEqual(sample);
-  });
-
-  it("标签逗号拆分", () => {
-    const draft = toDraft(sample);
-    draft.groups[0]!.tagsText = "产线，调试";
-    const out = fromDraft(draft);
-    expect(out.groups[0]!.tags).toEqual(["产线", "调试"]);
   });
 
   it("toDraft 深拷贝：修改草稿不污染原库", () => {

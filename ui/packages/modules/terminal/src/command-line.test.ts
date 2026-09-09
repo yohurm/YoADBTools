@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,10 +26,26 @@ describe("command-line", () => {
     expect(commandNeedsInput("shell ping {0}")).toBe(true);
   });
 
-  it("fillTemplate 按序替换且不二次扫描值", () => {
-    expect(fillTemplate("ping -c 3 {0}", ["8.8.8.8"])).toBe("ping -c 3 8.8.8.8");
-    expect(fillTemplate("{0} {1} {0}", ["a", "b"])).toBe("a b a");
-    expect(fillTemplate("{0}", ["{1} literal"])).toBe("{1} literal");
+  it("fillTemplate 与 domain testdata/command_fill.json 同一套向量", () => {
+    const testdata = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../core/yohu-domain/testdata/command_fill.json",
+    );
+    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
+      template: string;
+      values: string[];
+      arity: number;
+      filled?: string;
+      error?: string;
+    }[];
+    for (const c of fixture) {
+      expect(placeholderArity(c.template)).toBe(c.arity);
+      if (c.error === "arity") {
+        expect(() => fillTemplate(c.template, c.values)).toThrow(/填充值数量不一致/);
+        continue;
+      }
+      expect(fillTemplate(c.template, c.values)).toBe(c.filled);
+    }
   });
 
   it("commandBody 去掉前导 adb", () => {

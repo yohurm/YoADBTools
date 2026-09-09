@@ -14,7 +14,6 @@ export interface DraftCommand {
 export interface DraftGroup {
   id: string;
   name: string;
-  tagsText: string;
   commands: DraftCommand[];
 }
 
@@ -28,7 +27,7 @@ export const emptyCommand = (id: string): DraftCommand => ({
   template: "",
 });
 
-export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", tagsText: "", commands: [] });
+export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", commands: [] });
 
 let draftId = 0;
 export const nextDraftId = (prefix: string): string => `${prefix}-draft-${++draftId}`;
@@ -39,7 +38,6 @@ export function toDraft(library: CommandLibraryDto): DraftState {
     groups: library.groups.map((g) => ({
       id: g.id,
       name: g.name,
-      tagsText: g.tags.join(", "),
       commands: g.commands.map((c) => ({
         id: c.id,
         name: c.name,
@@ -56,7 +54,6 @@ export function fromDraft(draft: DraftState): CommandLibraryDto {
     groups: draft.groups.map((g) => ({
       id: g.id,
       name: g.name,
-      tags: g.tagsText.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
       commands: g.commands.map((c) => ({
         id: c.id,
         name: c.name,

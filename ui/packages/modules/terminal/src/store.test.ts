@@ -32,7 +32,6 @@ const COMMAND: CommandDto = {
 const GROUP: CommandGroupDto = {
   id: "g1",
   name: "demo",
-  tags: [],
   commands: [{ id: "c0", name: "echo", template: "echo hi" }],
 };
 
