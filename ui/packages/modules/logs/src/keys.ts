@@ -1,6 +1,6 @@
 /**
  * 日志页快捷键策略：绑定表。宿主在 @yohu/ui keymap。
- * 复制载荷在 copy.ts（选区 → seq → formatLogLine），本文件不读 Selection.toString。
+ * 复制载荷在 copy.ts（文档选区 + 中间行 formatLogLine），本文件不读 Selection.toString。
  */
 
 import { whenIdle, whenPanel, whenPanelOrField, type KeyBinding } from "@yohu/ui";

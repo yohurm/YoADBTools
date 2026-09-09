@@ -5,7 +5,7 @@
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
-import type { DeviceSession } from "@yohu/api";
+import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
 import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
 import {
   Icon,
@@ -34,14 +34,15 @@ import {
 import {
   applyCopyEvent,
   copyHasPayload,
+  LOG_COPY_ALL,
   LOG_COPY_NONE,
-  pickFromSelection,
   serializeLogCopy,
   type LogCopyScope,
 } from "./copy";
+import { formatLogLinePartsForDisplay } from "./format";
 import { highlightMessage } from "./highlight";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns, type LogColumnSpec } from "./layout";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { LEVELS, levelKey, type ViewRow } from "./pipeline";
@@ -77,43 +78,53 @@ const LEVEL_OPTIONS = [
 
 const rowKey = (row: ViewRow): string => `${row.line.seq}-${row.line.pid}`;
 
-function LogCell(props: { col: LogColumnSpec; row: ViewRow; keyword: string }) {
+function LogLineDoc(props: { row: ViewRow; keyword: string; display: LogDisplayColumns }) {
   const line = (): ViewRow["line"] => props.row.line;
-  switch (props.col.key) {
-    case "ts":
-      return <span class="yohu-logs__row-ts">{line().ts}</span>;
-    case "uid":
-      return <span class="yohu-logs__row-uid">{line().uid ?? ""}</span>;
-    case "pid":
-      return <span class="yohu-logs__row-pid">{line().pid}</span>;
-    case "tid":
-      return <span class="yohu-logs__row-tid">{line().tid}</span>;
-    case "level":
-      return <span class="yohu-logs__row-level yohu-tone">{line().level}</span>;
-    case "tag":
-      return (
-        <span class="yohu-logs__row-tag yohu-tone" title={line().tag}>
-          {line().tag}
-        </span>
-      );
-    case "msg":
-      return (
-        <span class="yohu-logs__row-msg" classList={{ "yohu-tone": levelKey(line().level) === "e" }}>
-          <Show when={props.keyword} keyed fallback={line().msg}>
-            {(keyword) => (
-              <For each={highlightMessage(line().msg, keyword)}>
-                {(part) =>
-                  typeof part === "string" ? part : <mark class="yohu-logs__mark yohu-tone">{part.mark}</mark>
-                }
-              </For>
-            )}
-          </Show>
-          <Show when={props.row.collapsedAfter}>
-            <span class="yohu-logs__row-fold">…{props.row.collapsedAfter} 帧折叠</span>
-          </Show>
-        </span>
-      );
-  }
+  return (
+    <For each={formatLogLinePartsForDisplay(line(), props.display)}>
+      {(part) => {
+        if (part.kind === "sep") {
+          return part.text;
+        }
+        if (part.kind === "msg") {
+          return (
+            <span class="yohu-logs__row-msg" classList={{ "yohu-tone": levelKey(line().level) === "e" }}>
+              <Show when={props.keyword} keyed fallback={part.text}>
+                {(keyword) => (
+                  <For each={highlightMessage(part.text, keyword)}>
+                    {(chunk) =>
+                      typeof chunk === "string" ? chunk : <mark class="yohu-logs__mark yohu-tone">{chunk.mark}</mark>
+                    }
+                  </For>
+                )}
+              </Show>
+              <Show when={props.row.collapsedAfter}>
+                <span class="yohu-logs__row-fold" data-log-chrome>
+                  …{props.row.collapsedAfter} 帧折叠
+                </span>
+              </Show>
+            </span>
+          );
+        }
+        return (
+          <span
+            class={`yohu-logs__row-${part.kind}`}
+            classList={{ "yohu-tone": part.kind === "level" || part.kind === "tag" }}
+            title={part.kind === "tag" ? line().tag : undefined}
+          >
+            {part.text}
+          </span>
+        );
+      }}
+    </For>
+  );
+}
+
+function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumns {
+  return {
+    ...DEFAULT_LOG_DISPLAY_COLUMNS,
+    ...settings.log_display_columns,
+  };
 }
 
 function sessionPending(session: { starting: boolean }): boolean {
@@ -224,15 +235,9 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const windowSerial = (): string | null => active()?.serial ?? props.selectedSerials[0] ?? null;
 
-  const displayColumns = () => ({
-    ...DEFAULT_LOG_DISPLAY_COLUMNS,
-    ...props.settings.log_display_columns,
-  });
+  const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
   const colTemplate = (): string => logColTemplate(displayColumns(), logStore.state.colWidths);
-  const colStyle = (): { "grid-template-columns": string } => ({
-    "grid-template-columns": colTemplate(),
-  });
 
   const togglePause = (): void => {
     const id = logStore.state.activeSessionId;
@@ -244,11 +249,14 @@ export function LogAnalyzerView(props: DeviceSession) {
   const visibleRows = (): ViewRow[] =>
     logStore.state.sessions.find((s) => s.id === logStore.state.activeSessionId)?.visible ?? [];
 
-  const copyText = (scope: LogCopyScope, fallbackLine?: ViewRow["line"] | null): string =>
+  const copyText = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): string =>
     serializeLogCopy({
-      scope,
+      pick: scope,
       rows: visibleRows(),
+      listRoot: listRoot ?? null,
+      selection: window.getSelection(),
       fallbackLine: fallbackLine ?? contextLine(),
+      display: displayColumns(),
     });
 
   const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): void => {
@@ -289,7 +297,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       return;
     }
     if (action === "select-all") {
-      setPick({ kind: "all" });
+      setPick(LOG_COPY_ALL);
       window.getSelection()?.removeAllRanges();
       return;
     }
@@ -304,31 +312,37 @@ export function LogAnalyzerView(props: DeviceSession) {
       onAction: onKeyAction,
     });
     const onSelChange = (): void => {
-      const next = pickFromSelection(listRoot ?? null, window.getSelection());
-      if (next) setPick(next);
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !listRoot || !sel.anchorNode || !listRoot.contains(sel.anchorNode)) {
+        return;
+      }
+      if (pick().kind === "all") {
+        setPick(LOG_COPY_NONE);
+      }
     };
     const onCopy = (event: ClipboardEvent): void => {
       if (isEditableTarget(event.target)) return;
       const target = event.target;
       const inList = Boolean(listRoot && target instanceof Node && listRoot.contains(target));
       if (!inList && pick().kind !== "all") return;
-      applyCopyEvent(event, copyText(pick()));
+      applyCopyEvent(event, copyText());
     };
     const onPointerDown = (event: PointerEvent): void => {
       if (event.button !== 0 || !listRoot) return;
       const target = event.target;
       if (!(target instanceof Element) || !listRoot.contains(target)) return;
-      if (!target.closest(".yohu-logs__row, .yohu-virtual-list__row")) return;
-      setPick(LOG_COPY_NONE);
+      if (pick().kind === "all") {
+        setPick(LOG_COPY_NONE);
+      }
     };
     document.addEventListener("selectionchange", onSelChange);
     document.addEventListener("copy", onCopy);
-    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerdown", onPointerDown);
     onCleanup(() => {
       stop();
       document.removeEventListener("selectionchange", onSelChange);
       document.removeEventListener("copy", onCopy);
-      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("pointerdown", onPointerDown);
       closeContextMenu();
     });
   });
@@ -516,7 +530,6 @@ export function LogAnalyzerView(props: DeviceSession) {
                 </YoColRow>
                 <div
                   class="yohu-logs__list-body"
-                  classList={{ "yohu-logs__list-body--pick-all": pick().kind === "all" }}
                   ref={(el) => { listRoot = el; }}
                 >
                   <Show
@@ -534,11 +547,11 @@ export function LogAnalyzerView(props: DeviceSession) {
                       ariaLabel="日志列表"
                       onRowContextMenu={(row, _key, event) => {
                         setContextLine(row.line);
-                        const fromSel = pickFromSelection(listRoot ?? null, window.getSelection());
-                        const scope = fromSel ?? pick();
+                        const scope = pick();
+                        const selection = window.getSelection();
                         const canCopy = copyHasPayload({
-                          scope,
-                          rows: visibleRows(),
+                          pick: scope,
+                          selection,
                           fallbackLine: row.line,
                         });
                         openContextMenu(logsRowMenu, {
@@ -546,33 +559,22 @@ export function LogAnalyzerView(props: DeviceSession) {
                           y: event.clientY,
                           ctx: {
                             canCopy,
-                            copy: () => copySelected(scope, scope.kind === "none" ? row.line : null),
+                            copy: () => copySelected(scope, row.line),
                           },
                         });
                       }}
                       renderRow={(row) => (
                         <div
-                          class="yohu-logs__cols yohu-logs__row"
+                          class="yohu-logs__row"
                           data-seq={row.line.seq}
                           data-level={levelKey(row.line.level) ?? undefined}
                           classList={{
                             "yohu-logs__row--signal": row.signal !== undefined,
                             "yohu-logs__row--raw": row.line.level === "?",
+                            "yohu-logs__row--picked": pick().kind === "all",
                           }}
-                          style={
-                            row.line.level === "?"
-                              ? { "grid-template-columns": "minmax(0, 1fr)" }
-                              : colStyle()
-                          }
                         >
-                          <Show
-                            when={row.line.level !== "?"}
-                            fallback={<span class="yohu-logs__row-msg">{row.line.msg}</span>}
-                          >
-                            <For each={visibleLogColumns(displayColumns())}>
-                              {(col) => <LogCell col={col} row={row} keyword={session.keyword} />}
-                            </For>
-                          </Show>
+                          <LogLineDoc row={row} keyword={session.keyword} display={displayColumns()} />
                         </div>
                       )}
                     />

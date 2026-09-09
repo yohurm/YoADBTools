@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 import type { LogLine } from "@yohu/api";
 
-import { formatLogLine } from "./format";
+import {
+  formatLogLine,
+  formatLogLineForDisplay,
+  formatLogLineParts,
+  joinLogLineParts,
+} from "./format";
 
 describe("formatLogLine（与 domain testdata/format_log_line.json 同一套向量）", () => {
   const testdata = resolve(
@@ -19,5 +24,21 @@ describe("formatLogLine（与 domain testdata/format_log_line.json 同一套向�
 
   it.each(fixture)("case %#", (c) => {
     expect(formatLogLine(c.line)).toBe(c.expect);
+    expect(joinLogLineParts(formatLogLineParts(c.line))).toBe(c.expect);
+  });
+
+  it("关闭显示列后文档变短，消息仍在", () => {
+    const line = fixture[1]!.line;
+    const hidden = formatLogLineForDisplay(line, {
+      ts: false,
+      uid: false,
+      pid: true,
+      tid: true,
+      level: true,
+      tag: false,
+    });
+    expect(hidden).toBe("  100   200 I hello");
+    expect(hidden.includes(line.msg)).toBe(true);
+    expect(hidden.includes(line.ts)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 /**
- * 日志清单列规格：表头与行共用；显示列由设置 `log_display_columns` 裁剪。
- * 列宽代数走 YoUI col-model；本文件只留业务默认值。
+ * 日志表头铬层列规格。行是文档（formatLogLine），不共用这套 px 轨道。
+ * 显示列由设置 `log_display_columns` 裁剪（表头与文档段同一开关）。
+ * 列宽代数走 YoUI col-model；本文件只留表头默认值。
  */
 
 import type { LogDisplayColumns } from "@yohu/api";

@@ -37,7 +37,9 @@ describe("日志表头布局契约", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:\s*18ch/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
-    expect(logsCss).toContain("yohu-logs__list-body--pick-all");
+    expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
+    expect(logsCss).toContain("yohu-logs__row--picked");
+    expect(logsCss).not.toContain("yohu-logs__list-body--picking");
     expect(logsCss).toContain("yohu-col-header");
   });
 });
