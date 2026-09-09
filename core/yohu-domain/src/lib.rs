@@ -17,9 +17,9 @@ pub mod settings;
 pub use applog::{AppLog, AppLogEntry, LogLevel};
 pub use catalog::{catalog_after_scan, device_display_name, lookup_selected_devices};
 pub use command::{
-    default_library, run_and_evaluate, split_command_line, CommandDefinition, CommandEvaluator,
-    CommandGroup, CommandLibrary, EvaluatedRun, GroupExecutor, GroupRunEvent, InputField,
-    LibraryError, RunError, Runner, Verdict,
+    combine_output, default_library, placeholder_arity, run_command, run_line, split_command_line,
+    strip_leading_adb, CommandDefinition, CommandGroup, CommandLibrary, CommandRun, GroupExecutor,
+    GroupRunEvent, LibraryError, RunError, Runner,
 };
 pub use focus::{
     assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,

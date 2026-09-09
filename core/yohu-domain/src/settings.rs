@@ -95,6 +95,9 @@ pub fn apply_setting(
         SettingKey::MirrorForceForward => {
             settings.mirror_force_forward = must_bool(key, value)?;
         }
+        SettingKey::TerminalPrependAdb => {
+            settings.terminal_prepend_adb = must_bool(key, value)?;
+        }
     }
     Ok(())
 }
@@ -131,5 +134,13 @@ mod tests {
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();
         assert_eq!(s.mirror_max_fps, 15);
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
+    }
+
+    #[test]
+    fn terminal_prepend_adb_applies() {
+        let mut s = AppSettings::default();
+        assert!(!s.terminal_prepend_adb);
+        apply_setting(&mut s, SettingKey::TerminalPrependAdb, &json!(true)).unwrap();
+        assert!(s.terminal_prepend_adb);
     }
 }

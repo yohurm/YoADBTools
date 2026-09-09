@@ -1,4 +1,4 @@
-//! 命令组编排：多设备并行、组内串行、延时、失败中断。
+//! 命令组编排：多设备并行、组内串行。不判定成败、不延时、不因失败中断。
 //!
 //! 执行能力经 [`Runner`] 端口注入（yohu-adb 实现），本层不做进程 IO —— 可单测。
 //! 依赖倒置：端口与其错误类型都定义在 domain，适配层（yohu-adb）负责映射。
@@ -10,7 +10,6 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use super::library::CommandDefinition;
-use super::{CommandEvaluator, Verdict};
 use yohu_protocol::ExecOutcome;
 
 /// 执行端口错误（domain 自有类型；适配层映射）。
@@ -52,47 +51,77 @@ impl<T: Runner + ?Sized> Runner for Arc<T> {
     }
 }
 
-/// 单命令：拆行 → 执行 → 领域判定。`RunError` 原样上抛（IPC 映射由壳完成）。
-pub async fn run_and_evaluate<R: Runner>(
+/// 去掉用户可能手写的前导 `adb` / `adb.exe`，避免拼成 `adb -s X adb shell …`。
+pub fn strip_leading_adb(input: &str) -> &str {
+    let trimmed = input.trim();
+    let bytes = trimmed.as_bytes();
+    if bytes.len() >= 7 && trimmed[..7].eq_ignore_ascii_case("adb.exe") {
+        let rest = &trimmed[7..];
+        return rest.trim_start();
+    }
+    if bytes.len() >= 3 && trimmed[..3].eq_ignore_ascii_case("adb") {
+        let rest = &trimmed[3..];
+        if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+            return rest.trim_start();
+        }
+    }
+    trimmed
+}
+
+/// 单命令：拆行 → 执行。只返回原始输出，不做成败判定。
+pub async fn run_command<R: Runner>(
     runner: &R,
     serial: &str,
     command: &CommandDefinition,
     cancel: CancellationToken,
-) -> Result<EvaluatedRun, RunError> {
-    let argv = split_command_line(&command.template);
+) -> Result<CommandRun, RunError> {
+    run_line(runner, serial, &command.template, cancel).await
+}
+
+/// 自定义输入：规范化命令行后执行。
+pub async fn run_line<R: Runner>(
+    runner: &R,
+    serial: &str,
+    line: &str,
+    cancel: CancellationToken,
+) -> Result<CommandRun, RunError> {
+    let argv = split_command_line(strip_leading_adb(line));
     let started = std::time::Instant::now();
     let outcome = runner.run(serial, argv, None, cancel).await?;
     let duration_ms = started.elapsed().as_millis() as u64;
-    let verdict = CommandEvaluator::evaluate(command, &outcome);
-    Ok(EvaluatedRun {
+    Ok(CommandRun {
         outcome,
-        verdict,
         duration_ms,
     })
 }
 
-/// 单命令执行 + 判定结果。
+/// 单命令执行结果（原始输出）。
 #[derive(Debug, Clone, PartialEq)]
-pub struct EvaluatedRun {
+pub struct CommandRun {
     pub outcome: ExecOutcome,
-    pub verdict: Verdict,
     pub duration_ms: u64,
 }
 
-impl EvaluatedRun {
+impl CommandRun {
     pub fn into_eval_result(self) -> yohu_protocol::EvalResult {
-        let (ok, message) = match self.verdict {
-            Verdict::Pass => (true, String::new()),
-            Verdict::Fail { reason } => (false, reason),
-        };
         yohu_protocol::EvalResult {
-            ok,
-            message,
+            ok: self.outcome.exit_code == 0,
+            message: String::new(),
             exit_code: self.outcome.exit_code,
             stdout: self.outcome.stdout,
             stderr: self.outcome.stderr,
             duration_ms: self.duration_ms,
         }
+    }
+}
+
+/// stdout / stderr 拼成一段展示文本。
+pub fn combine_output(stdout: &str, stderr: &str) -> String {
+    match (stdout.is_empty(), stderr.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => stdout.to_string(),
+        (true, false) => stderr.to_string(),
+        (false, false) => format!("{stdout}\n{stderr}"),
     }
 }
 
@@ -102,11 +131,14 @@ pub struct GroupRunEvent {
     pub serial: String,
     /// 命令名（展示用）
     pub name: String,
+    /// 已填充的具体命令行（不含 adb）
+    pub template: String,
     /// 组内命令序号（0 起）
     pub command_index: usize,
     pub total: usize,
-    pub verdict: Verdict,
+    /// 原始输出（stdout + stderr；执行失败则为错误文案）
     pub message: String,
+    pub exit_code: i32,
     /// 单命令用时（毫秒）
     pub duration_ms: u64,
 }
@@ -123,7 +155,7 @@ impl<R: Runner> GroupExecutor<R> {
         }
     }
 
-    /// 对每个设备并行执行整组命令；组内串行，支持延时与失败中断。
+    /// 对每个设备并行执行整组命令；组内串行，跑完全部命令。
     /// 进度经 `progress_tx` 推送；`cancel` 取消整个运行。
     pub async fn run(
         &self,
@@ -161,50 +193,36 @@ impl<R: Runner> GroupExecutor<R> {
             if cancel.is_cancelled() {
                 return;
             }
-            if command.delay_ms > 0 {
-                tokio::select! {
-                    _ = tokio::time::sleep(std::time::Duration::from_millis(command.delay_ms)) => {}
-                    _ = cancel.cancelled() => return,
-                }
-            }
             let started = std::time::Instant::now();
-            let (verdict, message, duration_ms) =
-                match run_and_evaluate(&*self.runner, serial, command, cancel.clone()).await {
-                    Ok(evaluated) => {
-                        let message = if evaluated.outcome.stderr.is_empty() {
-                            evaluated.outcome.stdout
-                        } else {
-                            evaluated.outcome.stderr
-                        };
-                        (evaluated.verdict, message, evaluated.duration_ms)
-                    }
+            let (message, exit_code, duration_ms) =
+                match run_command(&*self.runner, serial, command, cancel.clone()).await {
+                    Ok(run) => (
+                        combine_output(&run.outcome.stdout, &run.outcome.stderr),
+                        run.outcome.exit_code,
+                        run.duration_ms,
+                    ),
                     Err(e) => (
-                        Verdict::Fail {
-                            reason: e.to_string(),
-                        },
                         e.to_string(),
+                        -1,
                         started.elapsed().as_millis() as u64,
                     ),
                 };
-            let abort = command.abort_on_fail && !verdict.is_pass();
             // 每条命令的组进度是结果区渲染依据（非可丢的背压类推送），必须可靠送达；
             // 若消费方通道已关闭，说明该设备运行被放弃，停止后续命令。
             if progress_tx
                 .send(GroupRunEvent {
                     serial: serial.to_string(),
                     name: command.name.clone(),
+                    template: command.template.clone(),
                     command_index: index,
                     total,
-                    verdict,
                     message,
+                    exit_code,
                     duration_ms,
                 })
                 .await
                 .is_err()
             {
-                return;
-            }
-            if abort {
                 return;
             }
         }
@@ -272,12 +290,17 @@ mod tests {
         assert!(split_command_line("   ").is_empty());
     }
 
-    // ===== 编排逻辑（用假 Runner 单测） =====
+    #[test]
+    fn strip_leading_adb_variants() {
+        assert_eq!(strip_leading_adb("  shell ls  "), "shell ls");
+        assert_eq!(strip_leading_adb("adb shell ls"), "shell ls");
+        assert_eq!(strip_leading_adb("ADB.exe shell ls"), "shell ls");
+        assert_eq!(strip_leading_adb("adb"), "");
+        assert_eq!(strip_leading_adb("adbd"), "adbd");
+    }
 
     struct FakeRunner {
-        /// 记录调用顺序（serial, argv）
         calls: Mutex<Vec<(String, Vec<String>)>>,
-        /// 每个命令的退出码队列
         exit_codes: Mutex<Vec<i32>>,
     }
 
@@ -293,22 +316,17 @@ mod tests {
             self.calls.lock().unwrap().push((serial.to_string(), argv));
             Ok(ExecOutcome {
                 exit_code: code,
-                stdout: String::new(),
+                stdout: format!("out-{code}"),
                 stderr: String::new(),
             })
         }
     }
 
-    fn command(id: &str, template: &str, abort: bool) -> CommandDefinition {
+    fn command(id: &str, template: &str) -> CommandDefinition {
         CommandDefinition {
             id: id.into(),
             name: id.into(),
             template: template.into(),
-            inputs: vec![],
-            failure_regex: String::new(),
-            success_regex: String::new(),
-            delay_ms: 0,
-            abort_on_fail: abort,
         }
     }
 
@@ -319,7 +337,7 @@ mod tests {
             exit_codes: Mutex::new(vec![0, 0, 0, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a", true), command("b", "echo b", true)];
+        let group = vec![command("a", "echo a"), command("b", "echo b")];
         let (tx, mut rx) = mpsc::channel(16);
 
         executor
@@ -337,8 +355,6 @@ mod tests {
         }
         assert_eq!(events.len(), 4);
         let calls = {
-            // 通过事件验证每设备 2 命令均 Pass
-            assert!(events.iter().all(|e| e.verdict.is_pass()));
             let fake = &executor.runner;
             fake.calls.lock().unwrap().clone()
         };
@@ -348,35 +364,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn abort_on_fail_stops_remaining_commands() {
-        let runner = FakeRunner {
-            calls: Mutex::new(vec![]),
-            exit_codes: Mutex::new(vec![1, 0]), // 第一条失败 → 第二条不执行
-        };
-        let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a", true), command("b", "echo b", true)];
-        let (tx, mut rx) = mpsc::channel(16);
-
-        executor
-            .run(&group, &["s1".into()], tx, CancellationToken::new())
-            .await;
-
-        let mut events = Vec::new();
-        while let Ok(e) = rx.try_recv() {
-            events.push(e);
-        }
-        assert_eq!(events.len(), 1);
-        assert!(matches!(events[0].verdict, Verdict::Fail { .. }));
-    }
-
-    #[tokio::test]
-    async fn no_abort_when_abort_on_fail_false() {
+    async fn group_continues_after_nonzero_exit() {
         let runner = FakeRunner {
             calls: Mutex::new(vec![]),
             exit_codes: Mutex::new(vec![1, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a", false), command("b", "echo b", true)];
+        let group = vec![command("a", "echo a"), command("b", "echo b")];
         let (tx, mut rx) = mpsc::channel(16);
 
         executor
@@ -388,6 +382,9 @@ mod tests {
             events.push(e);
         }
         assert_eq!(events.len(), 2);
+        assert_eq!(events[0].exit_code, 1);
+        assert_eq!(events[1].exit_code, 0);
+        assert_eq!(events[0].template, "echo a");
     }
 
     #[tokio::test]
@@ -397,33 +394,54 @@ mod tests {
             exit_codes: Mutex::new(vec![0, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a", true), command("b", "echo b", true)];
+        let group = vec![command("a", "echo a"), command("b", "echo b")];
         let (tx, mut rx) = mpsc::channel(16);
         let cancel = CancellationToken::new();
-        cancel.cancel(); // 一开始就取消 → 无事件
+        cancel.cancel();
 
         executor.run(&group, &["s1".into()], tx, cancel).await;
         assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]
-    async fn run_and_evaluate_maps_exit_code() {
+    async fn run_command_returns_raw_output() {
         let runner = FakeRunner {
             calls: Mutex::new(vec![]),
             exit_codes: Mutex::new(vec![0]),
         };
-        let evaluated = run_and_evaluate(
+        let run = run_command(
             &runner,
             "s1",
-            &command("a", "echo a", true),
+            &command("a", "echo a"),
             CancellationToken::new(),
         )
         .await
         .unwrap();
-        assert!(evaluated.verdict.is_pass());
-        assert_eq!(evaluated.outcome.exit_code, 0);
-        let wire = evaluated.into_eval_result();
+        assert_eq!(run.outcome.exit_code, 0);
+        assert_eq!(run.outcome.stdout, "out-0");
+        let wire = run.into_eval_result();
         assert!(wire.ok);
         assert_eq!(wire.exit_code, 0);
+    }
+
+    #[tokio::test]
+    async fn run_line_strips_leading_adb() {
+        let runner = FakeRunner {
+            calls: Mutex::new(vec![]),
+            exit_codes: Mutex::new(vec![0]),
+        };
+        run_line(&runner, "s1", "adb shell ls", CancellationToken::new())
+            .await
+            .unwrap();
+        let calls = runner.calls.lock().unwrap().clone();
+        assert_eq!(calls[0].1, vec!["shell", "ls"]);
+    }
+
+    #[test]
+    fn combine_output_joins_streams() {
+        assert_eq!(combine_output("out", ""), "out");
+        assert_eq!(combine_output("", "err"), "err");
+        assert_eq!(combine_output("out", "err"), "out\nerr");
+        assert_eq!(combine_output("", ""), "");
     }
 }
