@@ -1,0 +1,56 @@
+[
+  {
+    "template": "shell getprop",
+    "values": [],
+    "arity": 0,
+    "filled": "shell getprop"
+  },
+  {
+    "template": "shell ping {0}",
+    "values": ["8.8.8.8"],
+    "arity": 1,
+    "filled": "shell ping 8.8.8.8"
+  },
+  {
+    "template": "{0} {1}",
+    "values": ["a", "b"],
+    "arity": 2,
+    "filled": "a b"
+  },
+  {
+    "template": "{0} {1} {0}",
+    "values": ["a", "b"],
+    "arity": 2,
+    "filled": "a b a"
+  },
+  {
+    "template": "{2}",
+    "values": ["x", "y", "z"],
+    "arity": 3,
+    "filled": "z"
+  },
+  {
+    "template": "{0}",
+    "values": ["{1} literal"],
+    "arity": 1,
+    "filled": "{1} literal"
+  },
+  {
+    "template": "{0} {1}",
+    "values": ["a{1}b", "c"],
+    "arity": 2,
+    "filled": "a{1}b c"
+  },
+  {
+    "template": "ping {0}",
+    "values": [],
+    "arity": 1,
+    "error": "arity"
+  },
+  {
+    "template": "ping {0}",
+    "values": ["a", "b"],
+    "arity": 1,
+    "error": "arity"
+  }
+]

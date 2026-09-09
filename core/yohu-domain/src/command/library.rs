@@ -20,9 +20,6 @@ pub struct CommandDefinition {
 pub struct CommandGroup {
     pub id: String,
     pub name: String,
-    /// 分类 = 标签（纯派生）
-    #[serde(default)]
-    pub tags: Vec<String>,
     #[serde(default)]
     pub commands: Vec<CommandDefinition>,
 }
@@ -203,7 +200,6 @@ fn group_from_dto(g: &CommandGroupDto) -> CommandGroup {
     CommandGroup {
         id: g.id.clone(),
         name: g.name.clone(),
-        tags: g.tags.clone(),
         commands: g.commands.iter().map(command_from_dto).collect(),
     }
 }
@@ -212,7 +208,6 @@ fn group_to_dto(g: &CommandGroup) -> CommandGroupDto {
     CommandGroupDto {
         id: g.id.clone(),
         name: g.name.clone(),
-        tags: g.tags.clone(),
         commands: g.commands.iter().map(command_to_dto).collect(),
     }
 }
@@ -249,7 +244,6 @@ mod tests {
         CommandGroup {
             id: id.into(),
             name: format!("组{id}"),
-            tags: vec![],
             commands,
         }
     }
@@ -305,44 +299,38 @@ mod tests {
     }
 
     #[test]
-    fn fill_replaces_placeholders_in_order() {
-        let c = cmd("c1", "ping", "ping -c 3 {0}");
-        let filled = c.fill(&["8.8.8.8".into()]).unwrap();
-        assert_eq!(filled.template, "ping -c 3 8.8.8.8");
-
-        let multi = cmd("c2", "x", "{0} {1} {0}");
-        assert_eq!(
-            multi.fill(&["a".into(), "b".into()]).unwrap().template,
-            "a b a"
-        );
-    }
-
-    #[test]
-    fn fill_rejects_arity_mismatch() {
-        let c = cmd("c1", "ping", "ping {0}");
-        assert!(matches!(
-            c.fill(&[]),
-            Err(LibraryError::FillValueMismatch {
-                expected: 1,
-                actual: 0,
-                ..
-            })
-        ));
-    }
-
-    #[test]
-    fn fill_preserves_placeholder_like_text_inside_values() {
-        let c = cmd("c1", "x", "{0}");
-        assert_eq!(
-            c.fill(&["{1} literal".into()]).unwrap().template,
-            "{1} literal"
-        );
-
-        let c = cmd("c2", "y", "{0} {1}");
-        assert_eq!(
-            c.fill(&["a{1}b".into(), "c".into()]).unwrap().template,
-            "a{1}b c"
-        );
+    fn fill_and_arity_match_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            template: String,
+            values: Vec<String>,
+            arity: usize,
+            #[serde(default)]
+            filled: Option<String>,
+            #[serde(default)]
+            error: Option<String>,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../testdata/command_fill.json")).expect("fixture");
+        for (i, case) in cases.iter().enumerate() {
+            let c = cmd("c", "n", &case.template);
+            assert_eq!(placeholder_arity(&case.template), case.arity, "arity case {i}");
+            if case.error.as_deref() == Some("arity") {
+                assert!(
+                    matches!(
+                        c.fill(&case.values),
+                        Err(LibraryError::FillValueMismatch { .. })
+                    ),
+                    "error case {i}"
+                );
+                continue;
+            }
+            assert_eq!(
+                c.fill(&case.values).unwrap().template,
+                case.filled.as_deref().expect("filled"),
+                "fill case {i}"
+            );
+        }
     }
 
     #[test]
@@ -369,10 +357,13 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_arity_counts_max_index() {
-        assert_eq!(placeholder_arity("shell getprop"), 0);
-        assert_eq!(placeholder_arity("shell ping {0}"), 1);
-        assert_eq!(placeholder_arity("{0} {1}"), 2);
-        assert_eq!(placeholder_arity("{2}"), 3);
+    fn legacy_group_tags_are_ignored_on_disk() {
+        let lib: CommandLibrary = serde_json::from_str(
+            r#"{"schema_version":2,"groups":[{"id":"g1","name":"设备信息","tags":["产线"],"commands":[]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(lib.groups[0].name, "设备信息");
+        let json = serde_json::to_value(&lib).unwrap();
+        assert!(json["groups"][0].get("tags").is_none());
     }
 }

@@ -4,10 +4,9 @@ use super::{CommandDefinition, CommandGroup, CommandLibrary};
 
 /// 产线常用默认命令库（schemaVersion 2）。新增命令不做成功/失败正则。
 pub fn default_library() -> CommandLibrary {
-    let g = |id: &str, name: &str, tags: &[&str], commands: Vec<CommandDefinition>| CommandGroup {
+    let g = |id: &str, name: &str, commands: Vec<CommandDefinition>| CommandGroup {
         id: id.into(),
         name: name.into(),
-        tags: tags.iter().map(|t| t.to_string()).collect(),
         commands,
     };
 
@@ -23,7 +22,6 @@ pub fn default_library() -> CommandLibrary {
             g(
                 "g-device",
                 "设备信息",
-                &["产线"],
                 vec![
                     c("c-model", "型号", "shell getprop ro.product.model"),
                     c(
@@ -37,7 +35,6 @@ pub fn default_library() -> CommandLibrary {
             g(
                 "g-power",
                 "电源",
-                &["产线"],
                 vec![
                     c("c-battery", "电池状态", "shell dumpsys battery"),
                     c("c-wake", "点亮屏幕", "shell input keyevent 224"),
@@ -47,7 +44,6 @@ pub fn default_library() -> CommandLibrary {
             g(
                 "g-connect",
                 "连接性",
-                &["调试"],
                 vec![
                     c(
                         "c-wifi",
