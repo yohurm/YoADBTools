@@ -324,7 +324,6 @@ export interface CommandDto {
 export interface CommandGroupDto {
   id: string;
   name: string;
-  tags: string[];
   commands: CommandDto[];
 }
 
