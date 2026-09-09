@@ -128,8 +128,6 @@ pub struct CommandGroupDto {
     pub id: String,
     pub name: String,
     #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
     pub commands: Vec<CommandDto>,
 }
 
@@ -209,5 +207,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(extra.template, "shell getprop");
+    }
+
+    #[test]
+    fn command_group_dto_ignores_legacy_tags() {
+        let parsed: CommandGroupDto = serde_json::from_str(
+            r#"{"id":"g1","name":"设备信息","tags":["产线"],"commands":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.id, "g1");
+        assert!(parsed.commands.is_empty());
+        let json = serde_json::to_value(&parsed).unwrap();
+        assert!(json.get("tags").is_none());
     }
 }
