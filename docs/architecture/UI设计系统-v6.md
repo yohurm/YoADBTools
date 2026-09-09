@@ -1,9 +1,12 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.95（2026-09-09，日志复制按 Logcat 重排）    
-> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
+> **状态：** v1.98（2026-09-09，日志文档行）    
+> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.98 变更（日志文档行）：** 展示面板分两族。Family A（日志/控制台/终端 IO）是一份格式化文档，选区只有字符 Range；Family B（文件清单 / AG Grid）才是单元格/行块，且与选字互斥、不中途换挡。日志行 DOM 文本 === `formatLogLine`（空格是字符，对照 Logcat Formatter）。禁止 Grid 列盒 + 拖选切行块。表头仍是铬层可拖宽，不驱动行几何。
+> **v1.97 变更（日志选区双模式）：** 曾对照 Logcat 做 `text`/`rows` 中途切换；v1.98 撤回。该做法不属于成熟日志面板。
+> **v1.96 变更（日志行块选区）：** 对照 Logcat：拖选是行闭区间，整行 `accent-soft` 补齐列间空白，不再只高亮盒内文字。`user-select: none`；Shift+点延伸；中间行按 seq 补齐。
 > **v1.95 变更（日志复制）：** 对照 Logcat：剪贴板从 `LogLine` 经 `formatLogLine` 重排，禁止 `Selection.toString()`（Grid 列盒会把粘贴拆成乱码）。选区只解析起止 `seq`；跨行取窗口 `visible` 闭区间；Ctrl+A 整表可见区；`copy` 事件只写 `text/plain`。无选区右键仍复制该行。
 > **v1.94 变更（空态跟随挤位）**：`inline-end` 补 `grid-template-rows` 0fr↔1fr，与宽度同一 `spatialPanel`。闭合不占列高，把手溢出。结果区居中空态靠 `flex:1` 跟随，禁止空态自写位移。`height:auto` / `max-height:none` 视为跳变。侧栏 `rail`、传输 `panel`、按钮 `swap` 同一条「造成挤位的配方插值、被挤兄弟跟随」纪律。
 > **v1.93 变更（发送栏宽度裁切）**：`inline-end` 改为与 `YoSwap`/侧栏同构的 `width` 插值（compact 控制高 ↔ 100%），内容锁祖先 `cqi`、贴 end 裁切；把手绝对叠在裁切盒上，只描露出的上+起边。禁止两列 `0fr auto`↔`minmax 1fr 0fr`（不插值）。
@@ -377,12 +380,13 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.1 日志分析（核心打磨对象）
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
-- 行结构（列对齐，等宽，**定宽 grid 轨道**）：默认 `[时间 144px] [UID 80px] [PID 48px] [TID 48px] [级别 48px] [Tag 192px] [消息 →]`（约原 18/10/6/6/4/24 ch）。UID 来自 `logcat -v threadtime,uid`（数字或 `root`/`shell`/`wifi` 名）。禁止 `max-width` / 不定宽 flex 让消息列左右错位。解析失败（level=`?`）整行消息通栏，禁止画 `0 ?` 假列。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`（绑定 `--yohu-level-*`）；左条 / 级别字 / Tag 共用 ink。Error 消息同色（`--yohu-level-e`）。Fatal 级别字母反色块（`radius-2xs`，`--yohu-level-f` on `--yohu-level-f-bg`），Tag 与左条用 f-bg。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class，禁止 Tag 走 `--yohu-accent` 或 `--yohu-tag`。清单关闭行多选，`user-select: text` 只作视觉选区；复制走 `copy.ts`（`data-seq` → `formatLogLine`）。行间 hairline 走 VirtualList 单源。
-- **固定表头**：列名钉在滚动区外，与行共用 `.yohu-logs__cols`；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头走 `YoColRow` + `YoColHeader`（无排序；元数据列 `YoColResizer`；消息列 flex 不拖）。轨道字符串一律 `colTrackTemplate` / `logColTemplate`；模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在）。禁止模块再拉设置命令或把显示列拷进 logStore。
-- 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；选中时信号底让位给选中片，左条保留。
+- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor、VS Code Output / Debug Console、Chrome DevTools Console、lnav）：一行 = `formatLogLine` 文档。文件清单对齐 Family B（AG Grid / MUI Data Grid）：行/单元格选择，复制 TSV，与原生选字互斥。禁止把 Family B 的行块拖选套到日志上，也禁止拖选中途从选字自动切行块（PostHog 等 SaaS 日志是勾选/Shift 点记录 + 消息上拖字，两套手势分开）。
+- 行结构（**文档行**，等宽 `white-space: pre` + `tabular-nums`）：文本 === `formatLogLine` / 显示列裁过的文档（testdata 含解析失败 `?` 行）。UID 来自 `logcat -v threadtime,uid`（数字或 `root`/`shell`/`wifi` 名）。字段只包 span 着色，空格与 `: ` 是文本节点。禁止用独立 Grid 盒当可选项（盒间会变成复制碎片）。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`（绑定 `--yohu-level-*`）；左条 / 级别字 / Tag 共用 ink。Error 消息同色（`--yohu-level-e`）。Fatal 级别字母反色块（`radius-2xs`，`--yohu-level-f` on `--yohu-level-f-bg`），Tag 与左条用 f-bg。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class，禁止 Tag 走 `--yohu-accent` 或 `--yohu-tag`。清单关闭行多选。`user-select: text`；复制走 `copy.ts`（选区重建文档，中间未挂载行补 `formatLogLine`）。行间 hairline 走 VirtualList 单源。
+- **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（无排序；元数据列 `YoColResizer`；消息列 flex 不拖）。轨道字符串一律 `colTrackTemplate` / `logColTemplate`；模块只 `setColWidth(key, px)`，禁止累加 delta。表头 px 轨不驱动文档行几何（对照 Logcat：列是 Formatter 字符宽，不是独立 px 网格）。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
+- 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别含以上 / Tag / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
 - 会话 Tab：标题 + 采集绿点/信号红点 + 关闭 × + 新建 +；Tab 溢出可横向滚动；右键菜单（关闭其他/重命名/复制会话）走 `logs.tab` 场景。
-- 日志行：右键走 `logs.row`（有选区则按 seq 闭区间复制 `formatLogLine`，否则复制该行）。与 Ctrl+C 同一 `serializeLogCopy`。禁止在本页再挂 `YoContextMenu`。禁止把 `Selection.toString()` 写入剪贴板。
+- 日志行：一套字符选区（单行局部与跨行相同）。列间空白可被选中。Ctrl+A 整表 `visible`。右键走 `logs.row`（有选区复制选区文档，否则该行）。与 Ctrl+C 同一 `serializeLogCopy`。折叠徽章 `data-log-chrome` 不进选区。禁止在本页再挂 `YoContextMenu`。禁止把 Grid 碎片 `Selection.toString()` 当载荷。
 - 新建窗口：设备走 `YoSelect block`（触发钮显示选中设备，菜单独立定位层 Portal；禁止芯片/空触发钮）；划分用 `YoSegmentedButton`（包名 / PID，无左侧标题；高度走 `--yohu-segment-single`）。
 - 状态行：`采集指示（绿点/灰点）· 设备 · 缓冲 n · 可见 n · 信号 n · 进程索引 n s 前 · 滞后回补提示`。
 - 空态：未采集 → 插画图标 + 「点击开始采集」主按钮；启动采集 / 采集中空 → `YoLoading`；过滤无命中 → 「无匹配日志，调整过滤条件」。
@@ -391,6 +395,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.2 命令终端
 
+- 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
 - 命令库树：组节点加命令数徽章；点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`，不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
@@ -399,6 +404,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.3 文件管理
 
+- 清单对齐 Family B（数据网格）：行/单元格选择 + 列宽轨道，不是日志那种文档选区。禁止把日志的字符 Range 模型套过来。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 上传/下载/刷新/预览）→ `YoPanel` 资源分区（路径栏 | 四列清单）与独立预览 `YoPanel` 并列 → 有任务时另起传输 `YoPanel`（Presence `rise` 升起；标题栏可点，列表 `YoCollapse recipe=panel`）。
 - 四列清单：`YoVirtualList` 选择模式（含 ripple 与多选邻接圆角）。表头走 `YoColRow` + `YoColHeader`（轨道 + 分割线 + 前三列 `YoColResizer`）；排序钮铺满列格，走 `.yohu-interactive`（宿主 padding 0）。列宽走 YoUI `col-model` / `col-resize`，模块只 `setColWidth(key, px)`，禁止累加 delta。悬浮片铺满列矩形（inset 0 / radius-none）；「名称」左缘由首列 `--yohu-col-header-content-pad`（写在 `.yohu-col-header__label`）与行内 `.yohu-files__name` 左垫对齐，不靠行容器左右 padding，也不靠 button 宿主 padding。行间 hairline 走 VirtualList 单源（`--yohu-border`）；表头与清单背板 `--yohu-canvas`（与面板 surface 分层）；选中宿主保持透明。清单视口与日志相同：`overflow: hidden` 给虚拟列表确定高度。禁止模块再写 `.yohu-virtual-list__row` 分割线。
 - 面包屑：祖先 `--yohu-fg-2`，当前段 `--yohu-fg` + semibold（不是全段 accent，也不是选中实底）；ripple 圆角覆盖为 `radius-xs`。路径栏与清单之间不拉分割线。
