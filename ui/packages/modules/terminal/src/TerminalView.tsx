@@ -3,21 +3,23 @@
  * 点预设命令排队到输入框上方（Cursor 排队发送）；纸飞机发送队列与草稿。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
 import {
   Icon,
   YoBadge,
   YoButton,
   YoChrome,
-  YoCollapse,
   YoDialog,
   YoEmptyState,
   YoIconButton,
+  YoListPresence,
   YoPage,
   YoPanel,
   YoTextField,
   YoTree,
+  motionSpecMs,
+  shouldSkipMotion,
 } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
 import type { CommandDto, CommandGroupDto, DeviceSession } from "@yohu/api";
@@ -136,9 +138,24 @@ export function TerminalView(props: DeviceSession) {
   createEffect(() => {
     const count = terminalStore.lines.length;
     void count;
-    if (resultBox) {
-      resultBox.scrollTop = resultBox.scrollHeight;
-    }
+    const box = resultBox;
+    if (!box) return;
+    const pin = (): void => {
+      box.scrollTop = box.scrollHeight;
+    };
+    pin();
+    if (shouldSkipMotion()) return;
+    const started = performance.now();
+    const hold = motionSpecMs("spatialLocal");
+    let frame = 0;
+    const tick = (now: number): void => {
+      pin();
+      if (now - started < hold) {
+        frame = window.requestAnimationFrame(tick);
+      }
+    };
+    frame = window.requestAnimationFrame(tick);
+    onCleanup(() => window.cancelAnimationFrame(frame));
   });
 
   const treeData = createMemo<TreeNode<CommandDto | CommandGroupDto>[]>(() =>
@@ -269,33 +286,26 @@ export function TerminalView(props: DeviceSession) {
                   />
                 }
               >
-                <For each={terminalStore.lines}>{(line) => <IoRow line={line} />}</For>
+                <YoListPresence each={terminalStore.lines} key={(line) => line.id} exit={false}>
+                  {(line) => <IoRow line={line} />}
+                </YoListPresence>
               </Show>
             </div>
 
-            <div class="yohu-terminal__dock">
-              <Show when={!composerOpen()}>
-                <button
-                  type="button"
-                  class="yohu-terminal__dock-toggle yohu-interactive yohu-focus-ring"
-                  aria-expanded={false}
-                  title="展开输入"
-                  onClick={() => setComposerOpen(true)}
-                >
-                  <Icon name="chevron-up" />
-                  <span class="yohu-terminal__dock-toggle-label">输入命令</span>
-                  <Show when={queue().length > 0}>
-                    <YoBadge text={String(queue().length)} tone="accent" />
-                  </Show>
-                </button>
-              </Show>
-
-              <YoCollapse open={composerOpen()} recipe="panel">
-                <Show when={queue().length > 0}>
-                  <ul class="yohu-terminal__queue">
-                    <For each={queue()}>
+            <div
+              class="yohu-terminal__dock yohu-recipe-inline-end"
+              data-open={composerOpen() ? "true" : "false"}
+            >
+              <div
+                class="yohu-terminal__composer-clip"
+                aria-hidden={!composerOpen() || undefined}
+                inert={!composerOpen() ? true : undefined}
+              >
+                <div class="yohu-terminal__composer-pane">
+                  <div class="yohu-terminal__queue" role="list">
+                    <YoListPresence each={queue()} key={(item) => item.id}>
                       {(item) => (
-                        <li class="yohu-terminal__queue-item">
+                        <div class="yohu-terminal__queue-item" role="listitem">
                           <span class="yohu-terminal__queue-title">{item.title}</span>
                           <span class="yohu-terminal__queue-line" title={formatAdbLine("-", item.line)}>
                             {formatAdbLine("-", item.line)}
@@ -305,38 +315,56 @@ export function TerminalView(props: DeviceSession) {
                             title="移出队列"
                             onClick={() => removeQueued(item.id)}
                           />
-                        </li>
+                        </div>
                       )}
-                    </For>
-                  </ul>
-                </Show>
-                <div class="yohu-terminal__composer">
-                  <YoIconButton
-                    icon="chevron-down"
-                    title="收起输入"
-                    aria-expanded={true}
-                    onClick={() => setComposerOpen(false)}
-                  />
-                  <textarea
-                    class="yohu-terminal__composer-input yohu-focus-ring"
-                    rows={1}
-                    aria-label="命令"
-                    value={draft()}
-                    disabled={running()}
-                    onInput={(event) => setDraft(event.currentTarget.value)}
-                    onKeyDown={onComposerKey}
-                  />
-                  <span class="yohu-terminal__send">
+                    </YoListPresence>
+                  </div>
+                  <div class="yohu-terminal__composer">
                     <YoIconButton
-                      icon="send"
-                      title="发送"
-                      loading={running()}
-                      disabled={!canSend() || running()}
-                      onClick={sendAll}
+                      icon="chevron-right"
+                      title="收起输入"
+                      aria-expanded={true}
+                      onClick={() => setComposerOpen(false)}
                     />
-                  </span>
+                    <textarea
+                      class="yohu-terminal__composer-input yohu-focus-ring"
+                      rows={1}
+                      aria-label="命令"
+                      value={draft()}
+                      disabled={running()}
+                      onInput={(event) => setDraft(event.currentTarget.value)}
+                      onKeyDown={onComposerKey}
+                    />
+                    <span class="yohu-terminal__send">
+                      <YoIconButton
+                        icon="send"
+                        title="发送"
+                        loading={running()}
+                        disabled={!canSend() || running()}
+                        onClick={sendAll}
+                      />
+                    </span>
+                  </div>
                 </div>
-              </YoCollapse>
+              </div>
+              <div
+                class="yohu-terminal__toggle-clip"
+                aria-hidden={composerOpen() || undefined}
+                inert={composerOpen() ? true : undefined}
+              >
+                <button
+                  type="button"
+                  class="yohu-terminal__dock-toggle yohu-interactive yohu-focus-ring"
+                  aria-expanded={false}
+                  title="展开输入"
+                  onClick={() => setComposerOpen(true)}
+                >
+                  <Icon name="chevron-left" />
+                  <Show when={queue().length > 0}>
+                    <YoBadge text={String(queue().length)} tone="accent" />
+                  </Show>
+                </button>
+              </div>
             </div>
           </div>
         </YoPanel>

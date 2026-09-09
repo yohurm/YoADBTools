@@ -16,6 +16,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  container-type: inline-size;
 }
 
 .yohu-terminal__output.yohu-panel--pane .yohu-panel__body {
@@ -49,7 +50,7 @@
   margin-top: var(--yohu-space-sm);
 }
 
-.yohu-terminal__line[data-kind="in"]:first-child {
+.yohu-terminal__stream > .yohu-presence:first-child .yohu-terminal__line[data-kind="in"] {
   margin-top: 0;
 }
 
@@ -81,36 +82,38 @@
 
 .yohu-terminal__dock {
   flex-shrink: 0;
-  border-top: var(--yohu-stroke-hairline) solid var(--yohu-border);
+}
+
+.yohu-terminal__composer-pane {
   background: var(--yohu-surface-2);
+  border-block-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
 .yohu-terminal__dock-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--yohu-space-sm);
+  justify-content: center;
+  gap: var(--yohu-space-xs);
   width: 100%;
   min-height: var(--yohu-control-height);
-  padding: 0 var(--yohu-space-sm);
+  padding: 0;
   border: none;
-  background: transparent;
+  border-block-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border-inline-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border-start-start-radius: var(--yohu-radius-sm);
+  --yohu-ripple-radius: var(--yohu-radius-sm);
+  background: var(--yohu-surface-2);
   color: var(--yohu-fg-2);
   font-family: var(--yohu-font-sans);
   font-size: var(--yohu-font-caption);
   cursor: pointer;
 }
 
-.yohu-terminal__dock-toggle-label {
-  min-width: 0;
-}
-
 .yohu-terminal__queue {
   margin: 0;
-  padding: var(--yohu-space-sm) var(--yohu-space-sm) 0;
-  list-style: none;
+  padding: 0 var(--yohu-space-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--yohu-space-xs);
 }
 
 .yohu-terminal__queue-item {
@@ -119,10 +122,15 @@
   gap: var(--yohu-space-sm);
   min-width: 0;
   min-height: var(--yohu-control-height);
+  margin-top: var(--yohu-space-xs);
   padding: 0 var(--yohu-space-xs) 0 var(--yohu-space-sm);
   border: var(--yohu-stroke-hairline) solid var(--yohu-border);
   border-radius: var(--yohu-radius-sm);
   background: var(--yohu-surface);
+}
+
+.yohu-terminal__queue > .yohu-presence:first-child .yohu-terminal__queue-item {
+  margin-top: var(--yohu-space-sm);
 }
 
 .yohu-terminal__queue-title {
@@ -165,7 +173,10 @@
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
-  transition: border-color var(--yohu-motion-effects-fast);
+  transition:
+    border-color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast),
+    color var(--yohu-motion-effects-fast);
 }
 
 .yohu-terminal__composer-input:focus {
