@@ -25,6 +25,7 @@ time.workspace = true
 yohu-protocol.workspace = true
 yohu-domain.workspace = true
 yohu-runtime.workspace = true
+yohu-motion.workspace = true
 yohu-adb.workspace = true
 yohu-logsrv.workspace = true
 yohu-files.workspace = true

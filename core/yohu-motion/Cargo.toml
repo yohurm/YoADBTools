@@ -1,0 +1,14 @@
+[package]
+name = "yohu-motion"
+description = "Yohu — 原生动效原语：MotionSpec 时长/曲线；Windows DComp 采样（零产品类型、零 Tauri）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_DirectComposition",
+  "Win32_UI_WindowsAndMessaging",
+] }
