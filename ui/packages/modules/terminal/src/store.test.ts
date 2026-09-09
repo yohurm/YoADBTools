@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandDto, CommandGroupDto } from "@yohu/api";
 
 const mocks = vi.hoisted(() => ({
-  terminalEval: vi.fn(),
+  terminalExec: vi.fn(),
   groupRun: vi.fn(),
   groupCancel: vi.fn(),
 }));
@@ -17,7 +17,7 @@ vi.mock("@yohu/api", async () => {
     groupRun: (...a: unknown[]) => mocks.groupRun(...a),
     groupCancel: (...a: unknown[]) => mocks.groupCancel(...a),
     onGroupProgress: vi.fn(() => undefined),
-    terminalEval: (...a: unknown[]) => mocks.terminalEval(...a),
+    terminalExec: (...a: unknown[]) => mocks.terminalExec(...a),
   };
 });
 
@@ -27,44 +27,54 @@ const COMMAND: CommandDto = {
   id: "c1",
   name: "echo",
   template: "echo {0}",
-  inputs: [],
-  failure_regex: "",
-  success_regex: "",
-  delay_ms: 0,
-  abort_on_fail: false,
 };
 
 const GROUP: CommandGroupDto = {
   id: "g1",
   name: "demo",
   tags: [],
-  commands: [COMMAND],
+  commands: [{ id: "c0", name: "echo", template: "echo hi" }],
 };
 
-describe("runCommand / runGroup 目标设备", () => {
-  it("一次 IPC 带全部 serials，由 core 填充", async () => {
-    mocks.terminalEval.mockResolvedValue([
+function texts(store: ReturnType<typeof createTerminalStore>): string[] {
+  return store.lines.map((row) => `${row.kind}:${row.text}`);
+}
+
+describe("send / runCommand / runGroup 目标设备", () => {
+  it("库命令填充后走 terminal.exec", async () => {
+    mocks.terminalExec.mockResolvedValue([
       { serial: "A1", ok: true, message: "", stdout: "ok", duration_ms: 1, exit_code: 0, stderr: "" },
     ]);
     const store = createTerminalStore();
     await store.runCommand(["A1"], COMMAND, ["hi"]);
-    expect(mocks.terminalEval).toHaveBeenCalledTimes(1);
-    expect(mocks.terminalEval).toHaveBeenCalledWith({
-      command_id: "c1",
-      values: ["hi"],
+    expect(mocks.terminalExec).toHaveBeenCalledTimes(1);
+    expect(mocks.terminalExec).toHaveBeenCalledWith({
+      command: "echo hi",
       serials: ["A1"],
     });
+    expect(texts(store)).toEqual(["in:adb -s A1 echo hi", "out:ok"]);
   });
 
-  it("空目标不调用 IPC", async () => {
-    mocks.terminalEval.mockClear();
+  it("开启 prepend 时发送与展示都带 adb", async () => {
+    mocks.terminalExec.mockResolvedValue([
+      { serial: "A1", ok: true, message: "", stdout: "list", duration_ms: 1, exit_code: 0, stderr: "" },
+    ]);
+    const store = createTerminalStore();
+    store.setPrependAdb(true);
+    await store.send(["A1"], "shell ls");
+    expect(mocks.terminalExec).toHaveBeenCalledWith({ command: "adb shell ls", serials: ["A1"] });
+    expect(texts(store)).toEqual(["in:adb -s A1 shell ls", "out:list"]);
+  });
+
+  it("空目标不调用 IPC，仍记输入输出行", async () => {
+    mocks.terminalExec.mockClear();
     mocks.groupRun.mockClear();
     const store = createTerminalStore();
-    await store.runCommand([], COMMAND, []);
+    await store.runCommand([], COMMAND, ["hi"]);
     await store.runGroup([], GROUP);
-    expect(mocks.terminalEval).not.toHaveBeenCalled();
+    expect(mocks.terminalExec).not.toHaveBeenCalled();
     expect(mocks.groupRun).not.toHaveBeenCalled();
-    expect(store.results.some((r) => r.message === "未选择在线设备")).toBe(true);
+    expect(store.lines.some((row) => row.text === "未选择在线设备")).toBe(true);
   });
 
   it("命令组把传入 serials 原样交给 groupRun", async () => {
@@ -79,10 +89,27 @@ describe("runCommand / runGroup 目标设备", () => {
     const store = createTerminalStore();
     await store.runGroup(["B2"], {
       ...GROUP,
-      commands: [{ ...COMMAND, inputs: [{ placeholder: "host" }] }],
+      commands: [{ ...COMMAND }],
     });
     expect(mocks.groupRun).not.toHaveBeenCalled();
-    expect(store.results.some((r) => r.message.includes("请逐条执行"))).toBe(true);
+    expect(store.lines.some((row) => row.text.includes("请逐条执行"))).toBe(true);
+  });
+
+  it("多行输出收成一条 <<<", async () => {
+    mocks.terminalExec.mockResolvedValue([
+      {
+        serial: "A1",
+        ok: true,
+        message: "",
+        stdout: "a\nb\n",
+        duration_ms: 1,
+        exit_code: 0,
+        stderr: "",
+      },
+    ]);
+    const store = createTerminalStore();
+    await store.send(["A1"], "shell ls");
+    expect(texts(store)).toEqual(["in:adb -s A1 shell ls", "out:a\nb"]);
   });
 
   it("cancelGroup 把 run_id 交给 groupCancel", async () => {
@@ -96,9 +123,9 @@ describe("runCommand / runGroup 目标设备", () => {
 
   it("clearResults 清空执行结果面板", async () => {
     const store = createTerminalStore();
-    await store.runCommand([], COMMAND, []);
-    expect(store.results.length).toBeGreaterThan(0);
+    await store.runCommand([], COMMAND, ["hi"]);
+    expect(store.lines.length).toBeGreaterThan(0);
     store.clearResults();
-    expect(store.results).toEqual([]);
+    expect(store.lines).toEqual([]);
   });
 });

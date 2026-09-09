@@ -1,20 +1,14 @@
 /**
  * 命令管理编辑器的草稿模型 + 纯转换（DTO ↔ 草稿）。
- * View 只消费本模块；提交前转换、校验在 core（commands/log 校验库）。
+ * View 只消费本模块；提交前转换、校验在 core。
  */
 
 import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto } from "@yohu/api";
 
-/** 编辑器使用的草稿命令（inputs 以文本行编辑，提交时拆分）。 */
 export interface DraftCommand {
   id: string;
   name: string;
   template: string;
-  inputsText: string;
-  failure_regex: string;
-  success_regex: string;
-  delay_ms: number;
-  abort_on_fail: boolean;
 }
 
 export interface DraftGroup {
@@ -32,11 +26,6 @@ export const emptyCommand = (id: string): DraftCommand => ({
   id,
   name: "",
   template: "",
-  inputsText: "",
-  failure_regex: "",
-  success_regex: "",
-  delay_ms: 0,
-  abort_on_fail: true,
 });
 
 export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", tagsText: "", commands: [] });
@@ -55,11 +44,6 @@ export function toDraft(library: CommandLibraryDto): DraftState {
         id: c.id,
         name: c.name,
         template: c.template,
-        inputsText: c.inputs.map((i) => i.placeholder).join("\n"),
-        failure_regex: c.failure_regex,
-        success_regex: c.success_regex,
-        delay_ms: c.delay_ms,
-        abort_on_fail: c.abort_on_fail,
       })),
     })),
   };
@@ -77,15 +61,6 @@ export function fromDraft(draft: DraftState): CommandLibraryDto {
         id: c.id,
         name: c.name,
         template: c.template,
-        inputs: c.inputsText
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .map((placeholder) => ({ placeholder })),
-        failure_regex: c.failure_regex,
-        success_regex: c.success_regex,
-        delay_ms: c.delay_ms,
-        abort_on_fail: c.abort_on_fail,
       })),
     })),
   };

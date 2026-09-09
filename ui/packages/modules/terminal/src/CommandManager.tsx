@@ -5,8 +5,9 @@
 import { For, Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { createStore } from "solid-js/store";
 
-import { YoBadge, YoButton, YoCheckbox, YoDialog, YoIconButton, YoIndicator, YoPanel, YoTextField, YoToolbar } from "@yohu/ui";
+import { YoBadge, YoButton, YoDialog, YoIconButton, YoIndicator, YoPanel, YoTextField, YoToolbar } from "@yohu/ui";
 
+import { commandBody, formatAdbLine } from "./command-line";
 import { emptyCommand, emptyGroup, fromDraft, nextDraftId, toDraft, type DraftCommand, type DraftGroup, type DraftState } from "./draft";
 import { terminalStore } from "./store";
 import "./command-manager.css";
@@ -203,38 +204,10 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
               <YoPanel title={`命令属性 · ${selectedGroup()?.name || "未命名组"}`}>
                 <YoTextField label="命令名称" value={command.name} onInput={(v) => updateCommand({ name: v })} />
                 <YoTextField
-                  label="命令行（占位符 {0} {1}…）"
-                  value={command.template}
-                  onInput={(v) => updateCommand({ template: v })}
-                />
-                <YoTextField
-                  label="输入框提示（每行一个，与占位符数量一致）"
-                  value={command.inputsText}
-                  onInput={(v) => updateCommand({ inputsText: v })}
-                />
-                <YoTextField
-                  label="失败正则（命中即失败，留空不启用）"
-                  value={command.failure_regex}
-                  onInput={(v) => updateCommand({ failure_regex: v })}
-                />
-                <YoTextField
-                  label="成功正则（命中即成功，留空看退出码）"
-                  value={command.success_regex}
-                  onInput={(v) => updateCommand({ success_regex: v })}
-                />
-                <YoTextField
-                  label="组内延时（毫秒）"
-                  type="number"
-                  value={String(command.delay_ms)}
-                  onInput={(v) => {
-                    const n = Number.parseInt(v, 10);
-                    if (!Number.isNaN(n) && n >= 0) updateCommand({ delay_ms: n });
-                  }}
-                />
-                <YoCheckbox
-                  label="失败中断组执行"
-                  checked={command.abort_on_fail}
-                  onChange={(v) => updateCommand({ abort_on_fail: v })}
+                  label={`具体命令（占位符 {0} {1}…）`}
+                  ariaLabel="具体命令"
+                  value={formatAdbLine("-", command.template)}
+                  onInput={(v) => updateCommand({ template: commandBody(v) })}
                 />
               </YoPanel>
             )}
