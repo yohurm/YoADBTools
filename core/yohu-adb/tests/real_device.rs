@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
-use yohu_domain::{default_library, run_and_evaluate, GroupExecutor, Verdict};
+use yohu_domain::{default_library, run_command, GroupExecutor};
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -200,8 +200,7 @@ async fn real_device_stream_lines() {
     eprintln!("[真机] 取消后流已终止");
 }
 
-/// 命令组编排端到端：默认库「设备信息」组在真机上执行，
-/// 逐命令进度事件回流、判定全部通过（失败正则→成功正则→退出码）。
+/// 命令组编排端到端：默认库「设备信息」组在真机上执行，逐命令进度事件回流。
 #[tokio::test]
 async fn real_device_group_run_end_to_end() {
     let client = std::sync::Arc::new(client());
@@ -231,24 +230,21 @@ async fn real_device_group_run_end_to_end() {
     assert_eq!(events.len(), 3, "组内 3 条命令应各产生一条进度事件");
     for e in &events {
         eprintln!(
-            "[真机] 组命令 {}: verdict={:?} msg={:.60}",
-            e.name, e.verdict, e.message
+            "[真机] 组命令 {} template={} exit={} msg={:.60}",
+            e.name, e.template, e.exit_code, e.message
         );
         assert_eq!(e.serial, serial);
+        assert!(!e.template.is_empty());
     }
     assert!(
-        events.iter().all(|e| e.verdict.is_pass()),
-        "设备信息组在真机上应全部通过"
-    );
-    assert!(
-        events.iter().any(|e| matches!(e.verdict, Verdict::Pass)),
-        "至少一条 Pass"
+        events.iter().all(|e| e.exit_code == 0),
+        "设备信息组在真机上退出码应为 0"
     );
 }
 
-/// 占位符在 domain 填充后再判定：`c-props` 填 `ro.product.model`。
+/// 占位符在 domain 填充后执行：`c-props` 填 `ro.product.model`。
 #[tokio::test]
-async fn real_device_fill_then_evaluate_getprop() {
+async fn real_device_fill_then_run_getprop() {
     let client = client();
     let Some(serial) = online_device(&client).await else {
         eprintln!("跳过：无在线设备");
@@ -260,14 +256,14 @@ async fn real_device_fill_then_evaluate_getprop() {
         .expect("默认库含 c-props");
     let filled = cmd.fill(&["ro.product.model".into()]).expect("填充属性名");
     assert!(!filled.template.contains("{0}"), "填充后模板不应残留占位符");
-    let evaluated = run_and_evaluate(&client, &serial, &filled, CancellationToken::new())
+    let run = run_command(&client, &serial, &filled, CancellationToken::new())
         .await
-        .expect("eval");
+        .expect("run");
     eprintln!(
-        "[真机] fill+eval stdout={} verdict={:?}",
-        evaluated.outcome.stdout.trim(),
-        evaluated.verdict
+        "[真机] fill+run stdout={} exit={}",
+        run.outcome.stdout.trim(),
+        run.outcome.exit_code
     );
-    assert!(evaluated.verdict.is_pass(), "查询属性应通过");
-    assert!(!evaluated.outcome.stdout.trim().is_empty(), "型号不应为空");
+    assert_eq!(run.outcome.exit_code, 0, "查询属性退出码应为 0");
+    assert!(!run.outcome.stdout.trim().is_empty(), "型号不应为空");
 }
