@@ -12,6 +12,7 @@
 | 包标识 | `com.yohu.adbtools` |
 | 数据目录 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`；Linux `$XDG_DATA_HOME` 或 `~/.local/share`（`yohu-runtime::os_paths`，产品不交付） |
 | Tauri 壳 crate | **`yohu-adbtools`**（`app/yohu-adbtools`；唯一引用 Tauri） |
+| 原生动效 crate | **`yohu-motion`**（`core/yohu-motion`；与 runtime / protocol 并列，零 Tauri、零产品 HWND） |
 | 前端工作台包 | **`@yohu/workbench`**（`ui/packages/workbench`） |
 | 组件库对外名 | **YoUI**；npm 包仍 `@yohu/ui` |
 | IPC 门面 | `@yohu/api` |

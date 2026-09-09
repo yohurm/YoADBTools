@@ -49,9 +49,10 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
    - **同屏**：主窗一次落到最终外框（仍隐藏）。Shared overlay 盖住后再藏小窗；fill morph 铺满之后才 `ShowWindow` 主窗，再 100ms 淡出 overlay。禁止在 morph 期间让工作台从透明区透出。禁止 `SetWindowPos` 插值小窗/主窗尺寸。
    - **异屏**：主窗一次落到小窗锁定的工作区（仍隐藏）。Exit overlay 出场结束后才揭主窗。禁止跨屏共享几何、禁止主窗 HWND 放大。视线留在小窗那块屏。
    - 系统 `SPI_GETCLIENTAREAANIMATION` 关闭时瞬时揭窗。
+   - 时长 / 曲线 / 消息泵 / `IDCompositionAnimation` 采样只走 `yohu-motion`。overlay HWND 与配方留在 `native_splash`，禁止引用投屏。
 5. `device.refresh` 在 `boot.showMain` **返回后**（动画已结束）发起，与 core 预热单飞。
 6. 2.5s 超时从壳 setup 完成起算（不是进程入口），避免小窗 + WebView2 创建把预算吃光后抢跑交接。Media Foundation HEVC 探测后置。
 
 ## Tauri 壳（`app/yohu-adbtools`）
 
-薄命令层：反序列化 → core → 序列化。编排在 `device_catalog` / `library_store` / `group_runs`。设备运行时状态在 `yohu-adb::DeviceStatusHub`（[modules/device.md](modules/device.md)，ADR-v6-025）。`dnd/`：Windows OLE 拖出、macOS Finder 拖出（[文件拖拽-v6.md](文件拖拽-v6.md)）。退出：根 `CancellationToken` → 3s 强杀进程树 → flush 设置。
+薄命令层：反序列化 → core → 序列化。编排在 `device_catalog` / `library_store` / `group_runs`。设备运行时状态在 `yohu-adb::DeviceStatusHub`（[modules/device.md](modules/device.md)，ADR-v6-025）。Windows 启动 overlay 在 `native_splash`；时长与 DComp 采样只消费 `yohu-motion`。`dnd/`：Windows OLE 拖出、macOS Finder 拖出（[文件拖拽-v6.md](文件拖拽-v6.md)）。退出：根 `CancellationToken` → 3s 强杀进程树 → flush 设置。

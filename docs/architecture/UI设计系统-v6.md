@@ -1,9 +1,11 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.81（2026-09-08，启动交接时序）    
+> **状态：** v1.83（2026-09-08，原生动效进 `core/yohu-motion`）    
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.83 变更（原生动效 crate）**：时钟 / 曲线 / 时长 / `IDCompositionAnimation` 采样进 `core/yohu-motion`。禁止再把公共层放在 `app/yohu-adbtools`。启动 overlay 仍在 `native_splash`，投屏 clip 仍在 `mirror_present`。二者不互引，也不进 `yohu-motion`。
+> **v1.82 变更（原生动效解耦）**：壳内曾有 `native_motion`；v1.83 已迁出为独立 crate。启动 overlay 留在 `native_splash`，投屏 clip 留在 `mirror_present`。二者不互引。禁止壳内第三套贝塞尔。
 > **v1.81 变更（启动交接时序）**：主窗 HWND 可先落到最终矩形，但 `ShowWindow` 推迟到 overlay 铺满（同屏）或出场结束（异屏）。禁止 morph 期间工作台从 `NOREDIRECTIONBITMAP` 空洞透出。
 > **v1.80 变更（启动交接单通路）**：overlay 按配方建树（同屏 Shared 才有 fill，异屏 Exit 只有品牌层）。HTML `#yohu-boot` 揭窗前直接卸节点，不做 CSS 淡出。最小化只靠 Tao 可见性同步，不再 `ExitRequested` 拦截。
 > **v1.79 变更（启动交接 DComp）**：L2 改为 `IDCompositionVisual` 的 Offset / Scale / Opacity（`IDCompositionAnimation`）。禁止 `UpdateLayeredWindow` 逐帧画 dest。

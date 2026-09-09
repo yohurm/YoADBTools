@@ -7,7 +7,7 @@
 - 架构：`docs/architecture/README.md`（分层/IPC/模块/ADR-v6-001～029）；右键菜单见 `docs/architecture/右键菜单-v6.md`
 
 ## 技术栈
-- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）← `yohu-domain`（判定/安全根/过滤）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）
+- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）∥ `yohu-motion`（时长/曲线；Windows DComp 采样，仅壳消费）← `yohu-domain`（判定/安全根/过滤）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）。`yohu-motion` 禁止进 runtime，禁止含启动 overlay / 投屏 clip
 - **桌面壳**：Tauri 2（窗口/sidecar/升级；IPC = invoke 命令 + 批量事件）；`app/yohu-adbtools` 是唯一引用 Tauri 的 crate；`commands/` 只转发，编排在 `device_catalog` / `library_store` / `group_runs`；设备运行时状态在 `yohu-adb::DeviceStatusHub`
 - **UI**：TypeScript + SolidJS + Vite，pnpm workspace（`--filter`，含 `ui/turbo.json` 任务声明）：`@yohu/api`（类型化 IPC）→ `@yohu/ui`（YoUI）→ `@yohu/workbench`（壳）+ `@yohu/modules/*`
 - **组件库**：YoUI / `@yohu/ui` 第一公民（公开组件 `Yo*` 标注；token 单源；lint 禁硬编码色值/字号/动效时长/圆角）；见 `docs/architecture/youi.md`
@@ -24,7 +24,7 @@
 6. **设置面板** — `adb_path`（立即）/`data_root`（重启）/`devices_auto_refresh`（重启）/`buffer_capacity`（窗口立即、采集环下次启动）/`clear_device_on_start`（下次采集）/`theme`（立即，默认 system）/`density`（立即，默认 comfortable＝鸿蒙 PC）/`mirror_force_forward`（下次启动；协议/长边/码率/帧率只在投屏页）；设置根固定 OS 应用数据目录下 `YohuAdbTools/settings/`（Windows `%LOCALAPPDATA%`，macOS `~/Library/Application Support`）；关于页身份与路径来自 `system.info`；检查更新后 Windows 可应用内下载 NSIS 并 `/S` 覆盖安装，macOS 打开 DMG（`update.download` / `update.install`）
 
 ## 架构约定（v6，ADR 全量见 `docs/architecture/adr/`）
-- **依赖方向**：`UI → @yohu/api → IPC ← commands ← core crates`；`yohu-runtime ∥ yohu-protocol`；`yohu-adb → runtime+protocol+domain`；设备 capability → adb；`yohu-update` 禁止 adb。`apps/shell` 是唯一组合点（`registerModule`）；模块只依赖 `@yohu/api` + `@yohu/ui`。禁止 core 引用 Tauri、UI 模块互 import / 依赖 `@yohu/workbench`（`scripts/check-ui-deps.mjs`）、跨层绕过 IPC
+- **依赖方向**：`UI → @yohu/api → IPC ← commands ← core crates`；`yohu-runtime ∥ yohu-protocol ∥ yohu-motion`；`yohu-adb → runtime+protocol+domain`；设备 capability → adb；`yohu-update` 禁止 adb。`apps/shell` 是唯一组合点（`registerModule`）；模块只依赖 `@yohu/api` + `@yohu/ui`。禁止 core 引用 Tauri、UI 模块互 import / 依赖 `@yohu/workbench`（`scripts/check-ui-deps.mjs`）、跨层绕过 IPC
 - **批量 IPC（ADR-v6-007）**：logcat 行/传输进度 100–200ms 聚合（单批 ≤1000 行 / 512KB，先到先发），**禁逐行**；背压：下游事件队列有界，溢出**丢推送不丢环**（RingBuffer seq 单调），UI 经 `log/overflow` 提示后 `log.replay(fromSeq)` 补齐。**导出现状**见 ADR-v6-021（环快照，仅用户导出时落盘）。**投屏帧**不进 JS（ADR-v6-024），壳内 Present；`mirror/painted` 报首帧与 fps。**Tauri 2.9 事件名禁止点号**（ADR-v6-020），事件用 `/`（`log/lines`），invoke 命令名仍点分（`log.export`）
 - **采集模型（ADR-v6-006/016）**：每设备至多一路 logcat 流（多设备可并行）；槽位 Empty/Starting/Live/Stopping；`start` **仅 Live adopt**，Starting/Stopping 等待；`CaptureState` 带 generation 且必达；窗口=会话订阅（serial/capturing/fromSeq），过滤/可见列表仍在 UI；设备流按窗口引用计数；切焦点不停其他设备；`start` 失败与成功均以 `log.capture.status` 快照对账；启动中可并发 `stop` 取消 Starting
 - **会话与过滤**：Scope（All=System / Package / Pid）；包名匹配 = PidSet ∪ HistoryPidSet；PID 精确相等；级别最低含以上；Tag/关键字包含（OrdinalIgnoreCase）；过滤变更仅当前窗口重建可见区（且只重放 seq≥fromSeq）
@@ -45,6 +45,7 @@ docs/
 core/
 ├── yohu-runtime/                       # 宿主：process / persist / os_paths（零产品类型）
 ├── yohu-protocol/                      # wire 类型（serde，无 IO）：DeviceInfo/LogLine/LogBatch/AppEvent…
+├── yohu-motion/                        # 动效原语：时长/曲线；Windows 时钟与 DComp 采样（零产品 HWND、零 Tauri）
 ├── yohu-domain/                        # 纯领域：命令库/CommandEvaluator/GroupExecutor/RemotePath/SafetyRoot/设置模型
 ├── yohu-adb/                           # ADB 客户端：tool(sidecar)/client/parse/DeviceStatusHub（进程在 runtime）
 ├── yohu-logsrv/                        # 采集服务：CaptureService/RingBuffer/Batcher/ProcessIndexService
