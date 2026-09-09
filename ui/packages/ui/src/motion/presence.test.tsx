@@ -30,6 +30,18 @@ describe("YoPresence", () => {
     expect(screen.queryByText("内容")).toBeNull();
     expect(onExitComplete).toHaveBeenCalledTimes(1);
   });
+
+  it("recipe=list 用 clip 包一层，skip motion 时直接 open", () => {
+    render(() => (
+      <YoPresence when recipe="list">
+        <div>行</div>
+      </YoPresence>
+    ));
+    const host = document.querySelector(".yohu-presence");
+    expect(host?.getAttribute("data-recipe")).toBe("list");
+    expect(host?.getAttribute("data-state")).toBe("open");
+    expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("行");
+  });
 });
 
 describe("YoCollapse", () => {

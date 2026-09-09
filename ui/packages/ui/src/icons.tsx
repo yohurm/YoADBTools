@@ -19,6 +19,7 @@ export type IconName =
   | "close"
   | "plus"
   | "chevron-down"
+  | "chevron-left"
   | "chevron-right"
   | "chevron-up"
   | "search"
@@ -95,6 +96,7 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
     </>
   ),
   "chevron-down": () => <polyline points="6 9 12 15 18 9" />,
+  "chevron-left": () => <polyline points="15 18 9 12 15 6" />,
   "chevron-right": () => <polyline points="9 18 15 12 9 6" />,
   "chevron-up": () => <polyline points="18 15 12 9 6 15" />,
   search: () => (

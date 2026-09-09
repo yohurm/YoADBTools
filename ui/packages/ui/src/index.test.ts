@@ -33,6 +33,7 @@ const YO_PUBLIC = [
   "YoToast",
   "YoToaster",
   "YoPresence",
+  "YoListPresence",
   "YoCollapse",
   "YoSwap",
   "YoIndicator",

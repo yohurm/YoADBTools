@@ -1,3 +1,4 @@
+/* 出现/消失直切。被 rail / collapse / inline-end 挤位时靠父级 1fr 插值跟随，禁止本组件写 transition。 */
 .yohu-empty-state {
   display: flex;
   flex-direction: column;

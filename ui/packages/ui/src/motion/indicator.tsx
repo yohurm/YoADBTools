@@ -7,7 +7,7 @@
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 
-import { motionDurationMs, type MotionDurationName } from "../tokens/motion";
+import { motionDurationMs, motionSpecMs, type MotionDurationName } from "../tokens/motion";
 import {
   EMPTY_INDICATOR,
   indicatorDurationName,
@@ -87,7 +87,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
   const armMoving = (durationName: MotionDurationName): void => {
     const gen = ++moveGen;
     setMoving(true);
-    const ms = Math.max(motionDurationMs(durationName), motionDurationMs("local"));
+    const ms = Math.max(motionDurationMs(durationName), motionSpecMs("spatialLocal"));
     window.setTimeout(() => {
       if (gen === moveGen) {
         setMoving(false);

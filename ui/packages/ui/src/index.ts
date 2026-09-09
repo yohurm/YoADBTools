@@ -4,7 +4,7 @@
  */
 
 // —— tokens ——
-// 公开面只表达契约：`MotionDuration` / `MotionEasing` / `MotionSpec`（动效配方名）、`motionDurationMs`（外部模块消费）。
+// 公开面只表达契约：`MotionDuration` / `MotionEasing` / `MotionSpec`、`motionDurationMs` / `motionSpecMs`。
 // `MotionSpring` / `springCssEasing` 是采样实现（把欠阻尼弹簧采成 `linear()`），只被 motion 模块内部消费，
 // 不进入对外导出面；消费弹簧请用 `MotionEasing.spring` / `MotionEasing.springSoft`。
 export {
@@ -30,6 +30,7 @@ export {
   MotionEasing,
   MotionSpec,
   motionDurationMs,
+  motionSpecMs,
   StateFill,
   setTheme,
   getTheme,
@@ -187,18 +188,17 @@ export type { ToastItem, ToastTone, Toaster, YoToastProps, YoToasterProps } from
 
 export {
   YoPresence,
+  YoListPresence,
   YoCollapse,
   YoSwap,
   YoIndicator,
   prefersReducedMotion,
   shouldSkipMotion,
-  PRESENCE_EXIT_DURATION,
-  SWAP_DURATION,
-  INDICATOR_DURATION,
   DISMISS_HOLD_DURATION,
 } from "./motion";
 export type {
   YoPresenceProps,
+  YoListPresenceProps,
   YoCollapseProps,
   CollapseRecipe,
   YoSwapProps,

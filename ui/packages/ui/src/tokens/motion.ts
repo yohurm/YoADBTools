@@ -133,3 +133,8 @@ export function motionDurationMs(name: MotionDurationName): number {
   }
   return Number.parseFloat(token);
 }
+
+/** 把 MotionSpec 的时长解析为毫秒（Presence / 原生 wait 与 CSS 对齐）。 */
+export function motionSpecMs(name: MotionSpecName): number {
+  return motionDurationMs(MotionSpec[name].duration);
+}

@@ -7,6 +7,7 @@ import {
   MotionSpec,
   MotionSpring,
   motionDurationMs,
+  motionSpecMs,
 } from "./motion";
 
 /**
@@ -130,5 +131,15 @@ describe("动效 token 单一事实源契约", () => {
     expect(motionDurationMs("fast")).toBe(100);
     expect(motionDurationMs("toast")).toBe(3000);
     expect(motionDurationMs("loopSlow")).toBe(1200);
+  });
+
+  it("motionSpecMs 与 MotionSpec.duration 对齐", () => {
+    expect(motionSpecMs("effectsFast")).toBe(100);
+    expect(motionSpecMs("spatialSmall")).toBe(150);
+    expect(motionSpecMs("effectsEnter")).toBe(160);
+    expect(motionSpecMs("spatialLocal")).toBe(200);
+    expect(motionSpecMs("spatialPanel")).toBe(300);
+    expect(motionSpecMs("spatialEnter")).toBe(350);
+    expect(motionSpecMs("spatialExit")).toBe(200);
   });
 });

@@ -92,7 +92,7 @@
 @keyframes yohu-scale-in {
   from {
     opacity: 0;
-    transform: translateY(calc(var(--yohu-space-lg) * -1)) scale(0.98);
+    transform: translateY(var(--yohu-space-xs)) scale(0.96);
   }
   to {
     opacity: 1;
@@ -103,11 +103,11 @@
 @keyframes yohu-scale-out {
   from {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: translateY(calc(var(--yohu-space-lg) * -1)) scale(0.98);
+    transform: scale(0.98);
   }
 }
 
@@ -151,7 +151,7 @@
 }
 
 .yohu-presence[data-recipe="toast"][data-state="open"] .yohu-toast {
-  animation: yohu-slide-end-in var(--yohu-motion-effects-enter) both;
+  animation: yohu-slide-end-in var(--yohu-motion-spatial-local) both;
 }
 
 .yohu-presence[data-recipe="toast"][data-state="closed"] .yohu-toast {
@@ -160,7 +160,7 @@
 
 .yohu-presence[data-recipe="popover"][data-state="open"] .yohu-select__menu,
 .yohu-presence[data-recipe="popover"][data-state="open"] .yohu-context-menu {
-  animation: yohu-rise-in var(--yohu-motion-effects-enter) both;
+  animation: yohu-rise-in var(--yohu-motion-spatial-local) both;
 }
 
 .yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-select__menu,
@@ -206,11 +206,134 @@
 }
 
 .yohu-presence[data-recipe="rise"][data-state="open"] {
-  animation: yohu-rise-in var(--yohu-motion-effects-enter) both;
+  animation: yohu-rise-in var(--yohu-motion-spatial-local) both;
 }
 
 .yohu-presence[data-recipe="rise"][data-state="closed"] {
   animation: yohu-rise-out var(--yohu-motion-effects-exit) both;
+}
+
+/*
+ * 配方 list：非虚拟短列表 insert/remove。
+ * 双轨同时长：高度 spatial-local；内容位移 xs（局部范围，不是面板级 sm）。
+ * 进场强调减速、出场加速；transition 可打断。进场先 closed 再 open。
+ */
+.yohu-presence[data-recipe="list"] {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--yohu-motion-spatial-local);
+}
+
+.yohu-presence[data-recipe="list"][data-state="open"] {
+  grid-template-rows: 1fr;
+}
+
+.yohu-presence[data-recipe="list"] .yohu-presence__clip {
+  overflow: hidden;
+  min-height: 0;
+  contain: layout;
+  opacity: 0;
+  transform: translateY(var(--yohu-space-xs));
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-presence[data-recipe="list"] .yohu-presence__clip > * {
+  min-height: min-content;
+}
+
+.yohu-presence[data-recipe="list"][data-state="open"] .yohu-presence__clip {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--yohu-motion-spatial-local),
+    transform var(--yohu-motion-spatial-local);
+}
+
+/*
+ * 配方 inline-end：贴 inline-end 的双轴裁切（与 YoSwap / collapse 同构）。
+ * 宽 compact↔100%；高 0fr↔1fr。闭合不占列高，把手溢出到上一行。
+ * 1fr 兄弟（居中空态、结果流）被挤位时靠布局插值跟随。
+ * 禁止 max-height:none / height:auto 离散跳变；禁止给空态写 keyframes。
+ * 禁止 0fr auto ↔ minmax 1fr 0fr。禁止 container-type 写在本宿主上。
+ */
+.yohu-recipe-inline-end {
+  position: relative;
+  align-self: end;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 0fr;
+  width: var(--yohu-control-height);
+  max-width: 100%;
+  overflow: visible;
+  isolation: isolate;
+  z-index: 1;
+  transition:
+    width var(--yohu-motion-spatial-panel),
+    grid-template-rows var(--yohu-motion-spatial-panel);
+}
+
+.yohu-recipe-inline-end[data-open="true"] {
+  width: 100%;
+  grid-template-rows: 1fr;
+}
+
+.yohu-recipe-inline-end > :first-child {
+  display: flex;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.yohu-recipe-inline-end > :first-child > * {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100cqi;
+  min-width: 100cqi;
+  max-width: 100cqi;
+  min-height: min-content;
+  opacity: 0;
+  transform: translateX(var(--yohu-space-xs));
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-recipe-inline-end[data-open="true"] > :first-child > * {
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--yohu-motion-effects-enter),
+    transform var(--yohu-motion-effects-enter);
+}
+
+.yohu-recipe-inline-end > :last-child {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: var(--yohu-control-height);
+  height: var(--yohu-control-height);
+  display: flex;
+  opacity: 1;
+  transition: opacity var(--yohu-motion-effects-exit);
+}
+
+.yohu-recipe-inline-end[data-open="true"] > :last-child {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--yohu-motion-effects-enter);
+}
+
+.yohu-recipe-inline-end > :last-child > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* —— 配方：折叠 / 侧栏 / 指示 —— */
@@ -400,8 +523,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .yohu-recipe-rail,
+  .yohu-recipe-inline-end,
+  .yohu-recipe-inline-end > :first-child > *,
+  .yohu-recipe-inline-end > :last-child,
   .yohu-collapse,
   .yohu-collapse[data-recipe="panel"] .yohu-collapse__inner,
+  .yohu-presence[data-recipe="list"],
+  .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-switch,
   .yohu-switch__thumb,
   .yohu-recipe-indicator[data-ready],
@@ -425,6 +553,7 @@
   .yohu-context-menu,
   .yohu-presence[data-recipe="fade"],
   .yohu-presence[data-recipe="rise"],
+  .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-recipe-dismiss-fade {
     animation: none !important;
   }
