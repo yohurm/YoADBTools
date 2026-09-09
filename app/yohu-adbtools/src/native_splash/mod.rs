@@ -1,11 +1,15 @@
 //! 原生启动小窗（Android Studio / IntelliJ / keyhop 同构）：
 //! 在 WebView2 创建之前用 GDI 画出小窗，主窗就绪后再关掉。
 //! 禁止第二 WebView splash（tauri#1850：WebView 来不及画启动页）。
+//! 交接 overlay / 配方在本模块；时钟与曲线走 `yohu-motion`。禁止引用投屏。
 
 pub(crate) mod geometry;
 mod handover;
 mod icon;
+mod overlay;
+mod overlay_geom;
 mod paint;
+mod recipe;
 mod window;
 
 use windows::core::w;

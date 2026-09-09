@@ -1,6 +1,6 @@
 //! 占用缩放：UI 报稳定可用区；表面铺满 avail；可见卡片按画面 contain。
 //!
-//! Windows 占用盒 fill↔contain 走 DirectComposition clip 动画（300ms）。
+//! Windows 占用盒 fill↔contain 走 DirectComposition clip（时长/曲线用 `yohu-motion`）。
 //! macOS 走 NSView 卡片 frame + 圆角。禁止 CSS 占用过渡。
 #![cfg_attr(not(windows), allow(dead_code))]
 
@@ -124,41 +124,9 @@ pub fn map_client_to_video(
     ))
 }
 
-/// 与 `--yohu-motion-spatial-panel` 同值：300ms。
-pub const SPATIAL_PANEL_MS: u64 = 300;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// HarmonyOS 标准曲线 `cubic-bezier(0.4, 0, 0.2, 1)`，与 `--yohu-ease-standard` 同值。
-    fn ease_standard(t: f64) -> f64 {
-        let x = t.clamp(0.0, 1.0);
-        cubic_bezier(0.4, 0.0, 0.2, 1.0, x)
-    }
-
-    fn cubic_bezier(x1: f64, y1: f64, x2: f64, y2: f64, x: f64) -> f64 {
-        let mut t = x;
-        for _ in 0..8 {
-            let x_est = sample_curve(t, x1, x2);
-            let dx = sample_curve_d(t, x1, x2);
-            if dx.abs() < 1e-6 {
-                break;
-            }
-            t = (t - (x_est - x) / dx).clamp(0.0, 1.0);
-        }
-        sample_curve(t, y1, y2)
-    }
-
-    fn sample_curve(t: f64, a: f64, b: f64) -> f64 {
-        let u = 1.0 - t;
-        3.0 * u * u * t * a + 3.0 * u * t * t * b + t * t * t
-    }
-
-    fn sample_curve_d(t: f64, a: f64, b: f64) -> f64 {
-        let u = 1.0 - t;
-        3.0 * u * u * a + 6.0 * u * t * (b - a) + 3.0 * t * t * (1.0 - b)
-    }
 
     #[test]
     fn integer_scale_snaps() {
@@ -246,11 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn ease_standard_is_bounded_and_eases() {
-        assert_eq!(ease_standard(0.0), 0.0);
-        assert!((ease_standard(1.0) - 1.0).abs() < 1e-6);
-        let mid = ease_standard(0.5);
-        assert!(mid > 0.2 && mid < 0.8);
-        assert!(ease_standard(0.2) < ease_standard(0.8));
+    fn occupancy_duration_is_spatial_panel() {
+        assert_eq!(yohu_motion::SPATIAL_PANEL_MS, 300);
     }
 }

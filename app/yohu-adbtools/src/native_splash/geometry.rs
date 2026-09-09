@@ -9,7 +9,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
-pub(crate) use crate::window_motion::{rect_center, rect_height, rect_width, xywh};
+pub(crate) use yohu_motion::{rect_center, rect_height, rect_width, xywh};
 
 pub const LOGICAL_W: i32 = 480;
 pub const LOGICAL_H: i32 = 300;

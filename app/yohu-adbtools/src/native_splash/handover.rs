@@ -1,4 +1,4 @@
-//! L4：hydrate 之后消费 window_motion 配方。
+//! L4：hydrate 之后消费本模块交接配方。
 //! 主窗 HWND 一次落到最终矩形。禁止插值 HWND 宽高。
 //! 主窗内容只在 overlay 铺满（同屏）或出场结束（异屏）之后才变为可见。
 
@@ -11,12 +11,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::window_boot::{elapsed_ms, MAIN_DEFAULT_H, MAIN_DEFAULT_W};
-use crate::window_motion;
 
 use super::geometry::{
     center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height, rect_width,
     xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
 };
+use super::overlay;
+use super::recipe;
 use super::window::{splash_hwnd, splash_window_rect};
 
 const IDLE: u8 = 0;
@@ -57,7 +58,7 @@ pub fn to_main(main: HWND) -> bool {
     let kind = classify_handover(splash_rect, main_rect, work);
     let target = target_on_splash_work(main_rect);
 
-    if !window_motion::motion_allowed() {
+    if !yohu_motion::motion_allowed() {
         tracing::info!(ms = elapsed_ms(), ?kind, "系统关闭窗口动画，瞬时交接");
         show_main_at_target(main, target);
         finish();
@@ -75,7 +76,7 @@ pub fn to_main(main: HWND) -> bool {
     );
 
     place_main_at_target(main, target);
-    let snap = window_motion::capture(splash, splash_rect);
+    let snap = overlay::capture(splash, splash_rect);
     let cover = || {
         tracing::info!(ms = elapsed_ms(), "启动交接：overlay 已盖住，藏小窗");
         super::hide();
@@ -88,11 +89,11 @@ pub fn to_main(main: HWND) -> bool {
     match (kind, snap) {
         (HandoverKind::SameScreen, Some(snap)) => {
             tracing::info!(ms = elapsed_ms(), "启动交接：同屏共享容器");
-            window_motion::same_screen(snap, splash_rect, target, main, cover, present);
+            recipe::same_screen(snap, splash_rect, target, main, cover, present);
         }
         (HandoverKind::CrossScreen, Some(snap)) => {
             tracing::info!(ms = elapsed_ms(), "启动交接：异屏出场");
-            window_motion::cross_screen(snap, splash_rect, main, cover, present);
+            recipe::cross_screen(snap, splash_rect, main, cover, present);
         }
         _ => {
             tracing::info!(ms = elapsed_ms(), "启动交接：无快照，瞬时");

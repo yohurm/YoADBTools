@@ -6,7 +6,7 @@ use std::mem::ManuallyDrop;
 use std::time::Instant;
 
 use windows::core::{s, Interface, Result as WinResult};
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Foundation::{E_FAIL, HWND, RECT};
 use windows::Win32::Graphics::Direct3D::Fxc::D3DCompile;
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
@@ -48,8 +48,9 @@ use windows::Win32::Graphics::Dxgi::{
 use windows::Win32::Media::MediaFoundation::{IMFDXGIDeviceManager, MFCreateDXGIDeviceManager};
 
 use super::chrome::{ChromePainter, ChromeSpec};
-use crate::mirror_present::scale::{Letterbox, SPATIAL_PANEL_MS};
+use crate::mirror_present::scale::Letterbox;
 use crate::mirror_present::stage::argb_to_rgba;
+use yohu_motion::{ease_at, ease_standard, eased_anim, SPATIAL_PANEL_MS};
 
 const VS: &str = r#"
 struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -883,12 +884,6 @@ fn clip_close(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
         && (a.3 - b.3).abs() < 0.5
 }
 
-/// 与 `AddCubic` 的 3t²−2t³ 同式，打断时才能采样到 composition 正在跑的值。
-fn clip_smoothstep(u: f32) -> f32 {
-    let s = u.clamp(0.0, 1.0);
-    s * s * (3.0 - 2.0 * s)
-}
-
 fn clip_progress(tree: &DcompTree) -> Option<f32> {
     let at = tree.clip_anim_at?;
     let u = (at.elapsed().as_secs_f32() / (SPATIAL_PANEL_MS as f32 / 1000.0)).clamp(0.0, 1.0);
@@ -900,13 +895,13 @@ fn clip_animating(tree: &DcompTree) -> bool {
 }
 
 fn clip_now(tree: &DcompTree) -> (f32, f32, f32, f32) {
-    let Some(u) = clip_progress(tree) else {
+    let Some(at) = tree.clip_anim_at else {
         return tree.clip_to;
     };
-    if u >= 1.0 {
+    let e = ease_at(ease_standard, at.elapsed(), SPATIAL_PANEL_MS);
+    if e >= 1.0 {
         return tree.clip_to;
     }
-    let e = clip_smoothstep(u);
     let (fl, ft, fr, fb) = tree.clip_from;
     let (tl, tt, tr, tb) = tree.clip_to;
     (
@@ -922,17 +917,8 @@ fn animate_scalar(
     from: f32,
     to: f32,
 ) -> WinResult<IDCompositionAnimation> {
-    let dur = SPATIAL_PANEL_MS as f32 / 1000.0;
-    let delta = to - from;
-    let t2 = dur * dur;
-    let t3 = t2 * dur;
-    let anim = unsafe { device.CreateAnimation()? };
-    unsafe {
-        // x(t) = a t³ + b t² + c t + d，t 为秒。零端点斜率 = smoothstep。
-        anim.AddCubic(0.0, from, 0.0, 3.0 * delta / t2, -2.0 * delta / t3)?;
-        anim.End(dur as f64, to)?;
-    }
-    Ok(anim)
+    eased_anim(device, from, to, SPATIAL_PANEL_MS, ease_standard)
+        .ok_or_else(|| windows::core::Error::from(E_FAIL))
 }
 
 fn apply_clip_radius(clip: &IDCompositionRectangleClip, r: f32) -> WinResult<()> {

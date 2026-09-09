@@ -177,7 +177,7 @@ fn show_inner(dark: bool) -> Result<(), String> {
         let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
         let _ = InvalidateRect(Some(hwnd), None, true);
         let _ = UpdateWindow(hwnd);
-        crate::window_motion::pump(hwnd);
+        yohu_motion::pump(hwnd);
 
         *SPLASH_HWND.lock().unwrap_or_else(|p| p.into_inner()) = Some(hwnd.0 as isize);
         Ok(())

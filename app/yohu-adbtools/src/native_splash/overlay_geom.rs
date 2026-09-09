@@ -1,27 +1,8 @@
-//! L2 视觉几何：overlay 客户区里的 dest 矩形。不是 HWND 布局。
+//! 启动 overlay 客户区里的 dest。不是 HWND 布局，不是投屏占用盒。
 
 use windows::Win32::Foundation::RECT;
 
-pub fn xywh(x: i32, y: i32, w: i32, h: i32) -> RECT {
-    RECT {
-        left: x,
-        top: y,
-        right: x + w,
-        bottom: y + h,
-    }
-}
-
-pub fn rect_width(r: RECT) -> i32 {
-    r.right - r.left
-}
-
-pub fn rect_height(r: RECT) -> i32 {
-    r.bottom - r.top
-}
-
-pub fn rect_center(r: RECT) -> (i32, i32) {
-    (r.left + rect_width(r) / 2, r.top + rect_height(r) / 2)
-}
+use yohu_motion::{rect_center, rect_height, rect_width, xywh};
 
 pub fn scale_rect_about_center(r: RECT, scale: f64) -> RECT {
     let (cx, cy) = rect_center(r);
