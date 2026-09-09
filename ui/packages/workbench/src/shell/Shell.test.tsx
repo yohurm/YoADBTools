@@ -581,6 +581,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("启用项为 YoSwitch，无「启用」字样", () => {
     render(() => <SettingsView />);
     expect(screen.getByRole("switch", { name: "开始采集前清空设备缓冲（logcat -c）" })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "输入命令默认加上 adb" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "强制 ADB forward（跳过 reverse）" })).toBeTruthy();
     expect(screen.queryByText("启用")).toBeNull();
   });

@@ -1,5 +1,5 @@
 /**
- * 设置面板（UI设计系统-v6.md §4.5）：分组卡片（工具链/日志/外观/关于）。
+ * 设置面板（UI设计系统-v6.md §4.5）：分组卡片（工具链/命令终端/日志/投屏/外观/关于）。
  * 每项走 YoFormRow（左标题信息、右控件，两列垂直居中）；启用类走 YoSwitch（无「启用」二字）。
  * 文件位置项：只读展示框显示绝对路径 + 统一「浏览」；超长折叠中间。
  */
@@ -238,6 +238,16 @@ export const SettingsView: Component = () => {
                   save("devices_auto_refresh", n, "已保存（重启生效）");
                 }
               }}
+            />
+          </YoFormRow>
+        </YoPanel>
+
+        <YoPanel title={ModuleTitle.Terminal}>
+          <YoFormRow title="输入命令默认加上 adb" note={<EffectBadge text="立即生效" />}>
+            <YoSwitch
+              ariaLabel="输入命令默认加上 adb"
+              checked={settingsStore.state.terminal_prepend_adb}
+              onChange={(v) => save("terminal_prepend_adb", v, "已保存（立即生效）")}
             />
           </YoFormRow>
         </YoPanel>
