@@ -1,4 +1,4 @@
-//! 命令组运行生命周期：任务中心登记、进度转发、取消。判定仍在 domain GroupExecutor。
+//! 命令组运行生命周期：任务中心登记、进度转发、取消。编排在 domain GroupExecutor。
 
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::commands::{ipc_code, ipc_library};
 use crate::state::AppState;
-use yohu_domain::{CommandGroup, GroupExecutor, LibraryError, Verdict};
+use yohu_domain::{CommandGroup, GroupExecutor, LibraryError};
 use yohu_protocol::{AppEvent, GroupProgress, GroupRunRequest, IpcError, IpcErrorCode};
 
 /// 查库、校验占位符、登记并异步跑一组命令；立即返回 run_id。
@@ -52,19 +52,16 @@ fn spawn(app: AppHandle, state: &AppState, group: CommandGroup, serials: Vec<Str
     tokio::spawn(async move {
         let forward = tokio::spawn(async move {
             while let Some(e) = rx.recv().await {
-                let message = match &e.verdict {
-                    Verdict::Pass => e.message,
-                    Verdict::Fail { reason } => reason.clone(),
-                };
                 let _ = sink.try_send(AppEvent::GroupProgress(GroupProgress {
                     run_id,
                     serial: e.serial,
                     name: Some(e.name),
-                    ok: e.verdict.is_pass(),
-                    message: if message.is_empty() {
+                    template: e.template,
+                    ok: e.exit_code == 0,
+                    message: if e.message.is_empty() {
                         None
                     } else {
-                        Some(message)
+                        Some(e.message)
                     },
                     duration_ms: e.duration_ms,
                 }));

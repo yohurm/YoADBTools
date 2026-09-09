@@ -7,7 +7,7 @@ use crate::commands::ipc_adb;
 use crate::state::AppState;
 use yohu_protocol::{AdbExecRequest, ExecOutcome, IpcError};
 
-/// `adb.exec`：短命令，返回原始结果（不判定成败，ADR-v6-009）。
+/// `adb.exec`：短命令，返回原始结果。
 #[tauri::command(rename = "adb.exec")]
 pub async fn adb_exec(
     state: State<'_, AppState>,

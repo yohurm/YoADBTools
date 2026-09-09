@@ -1,11 +1,13 @@
-//! 终端域命令：单命令判定 / 命令组编排（薄转发）。
+//! 终端域命令：单命令执行 / 自定义命令行 / 命令组编排（薄转发）。
 
 use tauri::{AppHandle, State};
 
 use crate::state::AppState;
-use yohu_protocol::{GroupRunRequest, IpcError, SerialEvalResult, TerminalEvalRequest};
+use yohu_protocol::{
+    GroupRunRequest, IpcError, SerialEvalResult, TerminalEvalRequest, TerminalExecRequest,
+};
 
-/// `terminal.eval`：按命令库 id 填充占位符，对 serials 并行执行并判定。
+/// `terminal.eval`：按命令库 id 填充占位符，对 serials 并行执行。
 #[tauri::command(rename = "terminal.eval")]
 pub async fn terminal_eval(
     state: State<'_, AppState>,
@@ -15,7 +17,17 @@ pub async fn terminal_eval(
     crate::terminal_eval::eval(&state, req).await
 }
 
-/// `group.run`：命令组编排（多设备并行/组内串行/延时/失败中断）。
+/// `terminal.exec`：自定义命令行，对 serials 并行执行。
+#[tauri::command(rename = "terminal.exec")]
+pub async fn terminal_exec(
+    state: State<'_, AppState>,
+    req: TerminalExecRequest,
+) -> Result<Vec<SerialEvalResult>, IpcError> {
+    state.require_online_many(&req.serials)?;
+    crate::terminal_eval::exec(&state, req).await
+}
+
+/// `group.run`：命令组编排（多设备并行 / 组内串行，跑完全部命令）。
 #[tauri::command(rename = "group.run")]
 pub fn group_run(
     state: State<'_, AppState>,
