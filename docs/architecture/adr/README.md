@@ -12,7 +12,7 @@
 | 006 | 采集 | 每设备一路；过滤在消费端；replay 读环 |
 | 007 | 批量 IPC | 100–200ms；丢推送不丢环；投屏帧见 024 |
 | 008 | ADB | sidecar 官方 adb.exe |
-| 009 | 判定 | CommandEvaluator 在 domain |
+| 009 | 终端结果 | 只展示输入/输出；不配置成功/失败正则；wire `ok` 仅反映退出码 |
 | 010 | 日志分离 | AppLog 内存环 vs logcat |
 | 011 | 组件库 | YoUI / `@yohu/ui` token 单源 |
 | 012 | 模块 | 静态组合；`apps/shell` 组合点 |

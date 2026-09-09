@@ -7,7 +7,7 @@
 - 架构：`docs/architecture/README.md`（分层/IPC/模块/ADR-v6-001～029）；右键菜单见 `docs/architecture/右键菜单-v6.md`
 
 ## 技术栈
-- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）∥ `yohu-motion`（时长/曲线；Windows DComp 采样，仅壳消费）← `yohu-domain`（判定/安全根/过滤）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）。`yohu-motion` 禁止进 runtime，禁止含启动 overlay / 投屏 clip
+- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）∥ `yohu-motion`（时长/曲线；Windows DComp 采样，仅壳消费）← `yohu-domain`（命令库/安全根/过滤）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）。`yohu-motion` 禁止进 runtime，禁止含启动 overlay / 投屏 clip
 - **桌面壳**：Tauri 2（窗口/sidecar/升级；IPC = invoke 命令 + 批量事件）；`app/yohu-adbtools` 是唯一引用 Tauri 的 crate；`commands/` 只转发，编排在 `device_catalog` / `library_store` / `group_runs`；设备运行时状态在 `yohu-adb::DeviceStatusHub`
 - **UI**：TypeScript + SolidJS + Vite，pnpm workspace（`--filter`，含 `ui/turbo.json` 任务声明）：`@yohu/api`（类型化 IPC）→ `@yohu/ui`（YoUI）→ `@yohu/workbench`（壳）+ `@yohu/modules/*`
 - **组件库**：YoUI / `@yohu/ui` 第一公民（公开组件 `Yo*` 标注；token 单源；lint 禁硬编码色值/字号/动效时长/圆角）；见 `docs/architecture/youi.md`
@@ -17,18 +17,18 @@
 
 ## 核心功能
 1. **设备管理** — `yohu-adb` 的 `devices -l` 扫描（device/unauthorized/offline + 型号）是**目录**唯一源（空列表即无设备）；在线设备运行时状态（夜览/电量/SDK/亮屏等）由 `DeviceStatusHub` 统一采样，经 `device/status` 投影到设备栏与 `DeviceSession.deviceStatuses`（ADR-v6-025，禁止模块自轮询）；全局焦点 + 每模块选择作用域（终端 MultiOptional，文件/日志 SingleRequired）；手动刷新 + 启动预热 + 可选自动刷新（`devices_auto_refresh`）
-2. **命令终端** — 命令库/命令组（占位符 `{0}{1}`）/多设备并行/组编排（顺序、延时、失败中断）；成败判定在 core 领域层 `CommandEvaluator`（**失败正则 → 成功正则 → 退出码**，ADR-v6-009）；命令管理窗口（深拷贝编辑、全量提交、取消零污染）
+2. **命令终端** — 命令库/命令组（占位符 `{0}{1}`）/多设备并行/组内串行（无组内延时、不因失败中断）；结果为统一输入/输出块（`>>>` / `<<<` + 时间 + 内容，一次输入对应整段输出）；流自上而下；发送栏整栏收缩；预设命令排队后纸飞机发送；设置 `terminal_prepend_adb`（默认关）；命令管理窗口（深拷贝编辑、全量提交、取消零污染；新增命令不配置成功/失败正则）
 3. **文件管理** — `ls` 浏览、push/pull（`transfer/progress` 事件 200ms 节流 + 可取消）、删除/新建目录；**core 侧 SafetyRoot 强制校验**（`/sdcard`、`/storage` 子路径，拒绝 `..`，不信任 UI，ADR-v6-013）
 4. **日志分析** — core **每设备一路** logcat（`adb logcat -v threadtime,uid`）+ 设备级共享环形缓冲（`buffer_capacity` 默认 10000，与 UI 镜像/可见区同一上限）；**窗口/过滤在 UI 消费端**（ADR-v6-006）：多窗口 Tab（默认 System，Scope=all；可按包名/PID 再开）；每窗口绑定 serial + capturing/fromSeq；启停只打当前窗口，设备流按窗口引用计数 0↔1 / 1↔0；切焦点不停其他设备；进程索引（`ps` 2.5s 周期）+ 包名 PID 自动重绑（历史 PID 集上限 8）；窗口第一次点开始先 `processSnapshot` 再 `fromSeq=0` 按过滤从当前环补齐；AS 风格过滤栏（级别含以上/包名含子进程开关/精确 PID/Tag/关键字，无正则）；每窗口独立暂停（Space）与滚动挂起（离开底部只计数不跟滚）；清设备缓冲 = `logcat -c` + 清共享缓冲；导出 txt 走 core（`log.export`，当前窗口过滤后的环快照）；快捷键 Space/Ctrl+L/Ctrl+F/Ctrl+T/Ctrl+W/Ctrl+Tab；掉线只停该 serial 的采集，已画出的行保留
 5. **投屏显示** — 官方 `scrcpy-server` 4.1 sidecar + `yohu-mirror` 自写客户端（USB reverse 优先，`tcp:` 默认 forward）；投屏协议 usb/wifi；帧在壳内 **系统硬解** 呈现（Windows = Media Foundation → D3D11 YUV HWND；macOS = VideoToolbox → NSView，ADR-v6-024/028/030；禁止 FFmpeg）；**舞台像素由嵌入表面独占**（空态/加载/暂停也在同一表面，ADR-v6-026）；**UI 只报 avail**（Windows：HWND 铺满 avail，占用卡片 DComp clip contain；macOS：NSView 铺满 avail，占用卡片圆角层 contain；fill↔contain 禁止 CSS / 运行时 `containInZone`）；默认可操作，页眉可切仅显示；设备深浅色读统一状态 Hub，不是工作台 theme；每设备一路 + generation
-6. **设置面板** — `adb_path`（立即）/`data_root`（重启）/`devices_auto_refresh`（重启）/`buffer_capacity`（窗口立即、采集环下次启动）/`clear_device_on_start`（下次采集）/`theme`（立即，默认 system）/`density`（立即，默认 comfortable＝鸿蒙 PC）/`mirror_force_forward`（下次启动；协议/长边/码率/帧率只在投屏页）；设置根固定 OS 应用数据目录下 `YohuAdbTools/settings/`（Windows `%LOCALAPPDATA%`，macOS `~/Library/Application Support`）；关于页身份与路径来自 `system.info`；检查更新后 Windows 可应用内下载 NSIS 并 `/S` 覆盖安装，macOS 打开 DMG（`update.download` / `update.install`）
+6. **设置面板** — `adb_path`（立即）/`data_root`（重启）/`devices_auto_refresh`（重启）/`buffer_capacity`（窗口立即、采集环下次启动）/`clear_device_on_start`（下次采集）/`theme`（立即，默认 system）/`density`（立即，默认 comfortable＝鸿蒙 PC）/`terminal_prepend_adb`（立即，默认关）/`mirror_force_forward`（下次启动；协议/长边/码率/帧率只在投屏页）；设置根固定 OS 应用数据目录下 `YohuAdbTools/settings/`（Windows `%LOCALAPPDATA%`，macOS `~/Library/Application Support`）；关于页身份与路径来自 `system.info`；检查更新后 Windows 可应用内下载 NSIS 并 `/S` 覆盖安装，macOS 打开 DMG（`update.download` / `update.install`）
 
 ## 架构约定（v6，ADR 全量见 `docs/architecture/adr/`）
 - **依赖方向**：`UI → @yohu/api → IPC ← commands ← core crates`；`yohu-runtime ∥ yohu-protocol ∥ yohu-motion`；`yohu-adb → runtime+protocol+domain`；设备 capability → adb；`yohu-update` 禁止 adb。`apps/shell` 是唯一组合点（`registerModule`）；模块只依赖 `@yohu/api` + `@yohu/ui`。禁止 core 引用 Tauri、UI 模块互 import / 依赖 `@yohu/workbench`（`scripts/check-ui-deps.mjs`）、跨层绕过 IPC
 - **批量 IPC（ADR-v6-007）**：logcat 行/传输进度 100–200ms 聚合（单批 ≤1000 行 / 512KB，先到先发），**禁逐行**；背压：下游事件队列有界，溢出**丢推送不丢环**（RingBuffer seq 单调），UI 经 `log/overflow` 提示后 `log.replay(fromSeq)` 补齐。**导出现状**见 ADR-v6-021（环快照，仅用户导出时落盘）。**投屏帧**不进 JS（ADR-v6-024），壳内 Present；`mirror/painted` 报首帧与 fps。**Tauri 2.9 事件名禁止点号**（ADR-v6-020），事件用 `/`（`log/lines`），invoke 命令名仍点分（`log.export`）
 - **采集模型（ADR-v6-006/016）**：每设备至多一路 logcat 流（多设备可并行）；槽位 Empty/Starting/Live/Stopping；`start` **仅 Live adopt**，Starting/Stopping 等待；`CaptureState` 带 generation 且必达；窗口=会话订阅（serial/capturing/fromSeq），过滤/可见列表仍在 UI；设备流按窗口引用计数；切焦点不停其他设备；`start` 失败与成功均以 `log.capture.status` 快照对账；启动中可并发 `stop` 取消 Starting
 - **会话与过滤**：Scope（All=System / Package / Pid）；包名匹配 = PidSet ∪ HistoryPidSet；PID 精确相等；级别最低含以上；Tag/关键字包含（OrdinalIgnoreCase）；过滤变更仅当前窗口重建可见区（且只重放 seq≥fromSeq）
-- **成败判定分离**：ADB 客户端不判定；判定在 `yohu-domain`（CommandEvaluator）
+- **终端结果（ADR-v6-009）**：只展示输入与输出行；不配置成功/失败正则；wire `ok` 仅反映退出码；库命令与发送栏同一 `terminal.exec`
 - **应用日志 vs 设备日志严格分离（ADR-v6-010）**：设备 logcat 自持；应用操作日志内存环形（不落盘）；崩溃经 Rust panic hook 写 `logs/panic-*.log`
 - **模块静态组合（ADR-v6-012）**：无插件热加载；模块 descriptor（id/title/icon/selectionMode/Component）注册进 `@yohu/workbench` 注册表
 - **右键菜单（ADR-v6-019）**：场景表在各模块 `menu.ts`；`openContextMenu` 打开；壳唯一 Host。禁止 View 自挂 `YoContextMenu`
@@ -46,7 +46,7 @@ core/
 ├── yohu-runtime/                       # 宿主：process / persist / os_paths（零产品类型）
 ├── yohu-protocol/                      # wire 类型（serde，无 IO）：DeviceInfo/LogLine/LogBatch/AppEvent…
 ├── yohu-motion/                        # 动效原语：时长/曲线；Windows 时钟与 DComp 采样（零产品 HWND、零 Tauri）
-├── yohu-domain/                        # 纯领域：命令库/CommandEvaluator/GroupExecutor/RemotePath/SafetyRoot/设置模型
+├── yohu-domain/                        # 纯领域：命令库/GroupExecutor/RemotePath/SafetyRoot/设置模型
 ├── yohu-adb/                           # ADB 客户端：tool(sidecar)/client/parse/DeviceStatusHub（进程在 runtime）
 ├── yohu-logsrv/                        # 采集服务：CaptureService/RingBuffer/Batcher/ProcessIndexService
 ├── yohu-files/                         # 文件：browse/transfer/mutate
@@ -101,7 +101,7 @@ cargo tauri build
 ## 实施状态
 - 架构设计定稿（2026-08-14）；实现按 **S1–S5 strangler-fig**（架构文档 §15）推进，总工期约 9–12 周（2 人）
 - **S1 骨架已落地**：Cargo workspace + Tauri 壳（`app/yohu-adbtools`，含 `log.capture.status`）+ YoUI + `@yohu/api` + `@yohu/workbench` + sidecar adb
-- **S2 终端模块已落地**：命令库（默认库 3 组 9 命令，首次启动写入）/ 命令组 / 多设备并行 / 成败判定（core 领域层）/ 命令管理窗口（快照编辑、全量提交、取消零污染）/ 占位符填值对话框 / 结果日志流；GroupProgress 携带命令名；@yohu/ui 新增 YoDialog/YoToast(createToaster)
+- **S2 终端模块已落地**：命令库（默认库 3 组 9 命令，首次启动写入）/ 命令组 / 多设备并行 / 组内串行（无延时、不因失败中断）/ 命令管理窗口（快照编辑、全量提交、取消零污染）/ 占位符填值对话框 / 统一输入输出行（`>>>` / `<<<` + 时间 + 内容）/ 可收缩发送栏与排队发送；GroupProgress 回流为 IO 行
 - **S3 文件模块已落地**：设备目录浏览（YoVirtualList 虚拟化）/ 上传（tauri-plugin-dialog 选文件）/ 下载（save 对话框）/ 删除（确认框 + core 侧 SafetyRoot）/ 新建目录 / 传输面板（进度条/取消/状态徽章）
 - **S4 日志模块已落地**：多窗口 Tab（默认 System；按包名/PID 再开，每窗口绑定设备）/ 每设备一路 logcat + 窗口引用计数启停 / 切焦点不停其他设备 / AS 风格过滤栏（级别含以上/Tag/关键字，无正则）/ 进程索引重绑（历史 PID 集上限 8）/ 信号扫描（崩溃/ANR 徽章）/ 堆叠折叠 / 溢出回补（log.replay）/ 导出 / 快捷键（Space/Ctrl+L/F/T/W/Tab）/ 批量 IPC 消费端过滤（pipeline.ts 纯函数 + 14 单测）
 - **体积优化**：release profile 启用 lto + codegen-units=1 + strip + panic=abort → exe 6.4 MB
@@ -110,7 +110,7 @@ cargo tauri build
 - **真机测试已落地**（motorola edge 60 pro，自动跳过无设备环境）：yohu-adb 6 用例（扫描/型号/进程/组命令端到端）、yohu-logsrv 4 用例（采集 1000 行/导出/清缓冲/导出过滤）、yohu-files 3 用例（浏览/push-pull/传输中途取消）；yohu-adb 另含 3 用例自愈式扫描（fallback.rs）
 - **Phase A/B UI 打磨已落地**：三层 token + 双主题语义板 + 密度变量 + 级别板 + 动效 token（HarmonyOS 100/160/300/350ms + 标准/减速曲线，motion.ts ↔ theme.css 契约测试，lint 扩展动效时长纪律）；YoDialog/YoSelect/YoTabs/YoTree 键盘/ARIA 补全；YoVirtualList 选择模式（roving tabindex + ↑/↓/Home/End/Enter/Space + listbox/option 语义）；Dialog/Toast 入场动画（prefers-reduced-motion 降级）
 - **Phase C 壳重绘已落地**：设备卡片化（surface 卡片 + 选中 accent-soft 底 + 2px accent 左边条 + listbox/option 键盘选择）；导航键盘可达（aria-current + Enter/Space）；状态栏任务悬停明细（TaskInfo.detail，core 任务中心扩展）；设置页分组卡片 + 生效徽章（立即/重启/下次采集）+ 保存 toast + adb_path 浏览按钮 + density 设置（core 全链路：protocol → settings.set / settings/changed → settingsStore → UI 应用 data-density）；壳组件测试 11 用例（vi.mock @yohu/api + plugin-dialog）
-- **Phase D 三模块重绘已落地**：① 日志——列对齐行（时间 18ch/PID/级别/Tag≤24ch/消息，等宽 tabular-nums）、级别 3px 左条、Fatal 反色块、信号行底色+Error 左条、行选中（VirtualList 选择模式）、检索框放大镜+accent 边框、三态空态（未采集引导/等待/过滤无命中）、状态行采集指示+设备+滞后回补提示、会话右键菜单（关闭其他/重命名/复制会话，YoTabs onContextMenu）；修复溢出回补提示被回补批次立即清除的缺陷；② 终端——结构化结果卡片（设备维度分组、组头汇总徽章、折叠输出区失败默认展开、用时经 core duration_ms 全链路）、命令库树命令数徽章+模板 title（YoTree badge/title）；③ 文件——面包屑路径栏（逐级可点）、双栏（目录下钻 | 文件列表含 ls 修改时间列，core RemoteEntry.mtime 全链路）、扩展名分类色图标、传输卡片（方向图标/速度采样/终态 3s 淡出自动移除）
+- **Phase D 三模块重绘已落地**：① 日志——列对齐行（时间 18ch/PID/级别/Tag≤24ch/消息，等宽 tabular-nums）、级别 3px 左条、Fatal 反色块、信号行底色+Error 左条、行选中（VirtualList 选择模式）、检索框放大镜+accent 边框、三态空态（未采集引导/等待/过滤无命中）、状态行采集指示+设备+滞后回补提示、会话右键菜单（关闭其他/重命名/复制会话，YoTabs onContextMenu）；修复溢出回补提示被回补批次立即清除的缺陷；② 终端——统一 IO 块（一次输入一整段输出，自上而下）、发送栏整栏收缩、纸飞机发送、预设命令排队预览、设置 `terminal_prepend_adb`、命令库树命令数徽章+`adb` 模板 title（YoTree badge/title）；③ 文件——面包屑路径栏（逐级可点）、双栏（目录下钻 | 文件列表含 ls 修改时间列，core RemoteEntry.mtime 全链路）、扩展名分类色图标、传输卡片（方向图标/速度采样/终态 3s 淡出自动移除）
 - **模块级测试扩展**：logs store 34 用例（窗口生命周期/System 默认/同设备引用计数/多设备并行/切焦点不停流/消费端过滤/溢出回补/掉线按 serial）+ pipeline 15 用例（新增行级信号标记）；files 纯函数 13 用例（新增 splitPath/fileCategory）；Vitest 累计 **248** 用例；Rust 侧 ls 解析新增 mtime 断言、settings 契约 4 用例
 - **验收现状**：`cargo build --workspace && cargo test --workspace` 全绿（含 7 集成 + 4 设置契约 + 13 真机）、clippy -D warnings 通过、Vitest **248** 用例全绿、tsc -b 0 错误、`pnpm lint`（ADR-v6-011 token 纪律：色值/字号/动效时长/圆角，scripts/check-ui-tokens.mjs）通过、**verify-v6-smoke.ps1 已实际跑通**（进程存活/无 panic/sidecar 解压/默认命令库写入；期间修复 events.rs 必须在 tauri 异步运行时 spawn 的启动崩溃）
 - 待续（S5，需设备，脚本已备）：安装包安装冒烟、全功能联调、日志性能验收、产线镜像预置 WebView2

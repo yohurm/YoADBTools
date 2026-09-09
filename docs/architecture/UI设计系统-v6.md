@@ -1,9 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.83（2026-09-08，原生动效进 `core/yohu-motion`）    
+> **状态：** v1.87（2026-09-09，命令终端一次输入一条输出块 + 自上而下）    
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志查看器实践。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v1.87 变更（命令终端 IO 块）**：一次 `>>>` 对应一条多行 `<<<`（`dumpsys` 等整段 stdout 不再按物理行拆成多条输出）。标识与时间钉在首行，后续行只在内容列换行。结果流自上而下（去掉顶栏 spacer），不再把内容顶到视口底部。
+> **v1.86 变更（命令终端排队发送）**：发送栏整栏收缩/展开（YoCollapse panel）。右侧水平纸飞机（Lucide send-horizontal）发送，空内容变灰仍显示。点命令库叶子在输入框上方排队。展示统一 `formatAdbLine`（始终 `adb [-s] 正文`）；exec 是否带 `adb` 仍走设置。
+> **v1.85 变更（命令终端 IO 行）**：抛弃会话卡片。结果区 = 输入/输出标识 + 时间 + 内容；空态在视口正中。发送栏去掉「自定义输入」与 `adb` 文案。库命令与发送栏同一 `terminal.exec`。设置「输入命令默认加上 adb」默认关、无副标题。v1.87 起流改为自上而下，一次输入一条输出块。
+> **v1.84 变更（命令终端会话块）**：执行结果曾改为终端会话块 + 自定义输入栏；v1.85 已替换为统一 IO 行。命令管理只留名称与具体命令；去掉成功/失败正则、输入提示、组内延时、失败中断。
 > **v1.83 变更（原生动效 crate）**：时钟 / 曲线 / 时长 / `IDCompositionAnimation` 采样进 `core/yohu-motion`。禁止再把公共层放在 `app/yohu-adbtools`。启动 overlay 仍在 `native_splash`，投屏 clip 仍在 `mirror_present`。二者不互引，也不进 `yohu-motion`。
 > **v1.82 变更（原生动效解耦）**：壳内曾有 `native_motion`；v1.83 已迁出为独立 crate。启动 overlay 留在 `native_splash`，投屏 clip 留在 `mirror_present`。二者不互引。禁止壳内第三套贝塞尔。
 > **v1.81 变更（启动交接时序）**：主窗 HWND 可先落到最终矩形，但 `ShowWindow` 推迟到 overlay 铺满（同屏）或出场结束（异屏）。禁止 morph 期间工作台从 `NOREDIRECTIONBITMAP` 空洞透出。
@@ -375,10 +379,11 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.2 命令终端
 
-- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 执行/清屏/命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。
-- 命令库树：组节点加命令数徽章；点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。
-- **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。
-- 结果区为结构化卡片列表；设备维度分组；模块功能栏统一提供「清屏」按钮（只清 UI 结果，不影响命令库）。
+- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
+- 命令库树：组节点加命令数徽章；点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`，不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
+- **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
+- **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。空态 `YoEmptyState` 铺满视口并居中。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
+- **发送栏**：钉在结果面板底部，整栏收缩/展开（`YoCollapse recipe=panel`）。展开：队列卡片在输入框上方（名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机（Lucide send-horizontal）发送；无内容时按钮仍在，变灰禁用。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
 ### 4.3 文件管理
 
@@ -403,6 +408,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug；两列 `align-items: center`。开关 / 数字 / 下拉 / 多选复选进右侧槽。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex。
 - 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：只读展示框显示绝对路径 + 「浏览」；展示框宽 ≤ `--yohu-layout-settings-control-max`，超长折叠中间（目录头 ellipsis、末段完整）。空值显示 `system.info` 解析路径。数字/下拉仍走 `YoTextField`/`YoSelect`。
 - 投屏协议 / 长边 / 码率 / 帧率只在投屏显示页。设置页「投屏显示」仅保留强制 ADB forward。
+- 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、设置目录、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
 - `YoDialog`：中性 10% 遮罩 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400、高 90%；标题 Title_S Bold；电脑小圆角 `radius-sm`。最小 360×240 仅适用于独立子窗口，不套浮层。

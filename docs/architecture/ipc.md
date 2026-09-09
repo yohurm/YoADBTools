@@ -13,7 +13,7 @@
 | `device.status` | 读运行时状态缓存（可选 `serial`）；不触发扫描 |
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
-| `terminal.eval` / `group.run` / `group.cancel` | 领域判定 + 组编排 |
+| `terminal.eval` / `terminal.exec` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；组编排 |
 | `commandlib.load` / `save` | 命令库；损坏备份后默认库 |
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |

@@ -37,7 +37,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 | `yohu-runtime` | `process` / `persist` / `os_paths` | 产品类型、设备路径、HTTP、Tauri |
 | `yohu-motion` | MotionSpec 时长/曲线；Windows 合成器时钟与 `IDCompositionAnimation` 采样 | 产品 HWND 树、Tauri、wire、设备 |
 | `yohu-protocol` | serde DTO、身份、事件名 | IO、判定、正则 |
-| `yohu-domain` | 判定、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri |
+| `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri |
 | `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、实现 `Runner` | 日志会话、文件浏览用例、投屏 demux |
 | `yohu-files` / `logsrv` / `mirror` | 各自用例 | capability 互引；绕过 SafetyRoot |
 | `yohu-update` | 更新检查 / 下载 / 覆盖安装（GitHub Releases） | 依赖 adb |
