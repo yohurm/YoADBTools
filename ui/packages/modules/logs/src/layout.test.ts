@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_LOG_DISPLAY_COLUMNS,
+  defaultLogColWidths,
   logColTemplate,
+  applyLogColWidth,
   visibleLogColumns,
 } from "./layout";
 
@@ -34,13 +36,16 @@ describe("日志表头布局契约", () => {
   it("列轨道不在 CSS 写死七列，由显示列内联写入", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:\s*18ch/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
+    expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
+    expect(logsCss).toContain("yohu-logs__list-body--pick-all");
+    expect(logsCss).toContain("yohu-col-header");
   });
 });
 
 describe("日志显示列", () => {
   it("默认全开含消息列", () => {
     expect(logColTemplate(DEFAULT_LOG_DISPLAY_COLUMNS)).toBe(
-      "18ch 10ch 6ch 6ch 4ch 24ch minmax(0, 1fr)",
+      "144px 80px 48px 48px 48px 192px minmax(96px, 1fr)",
     );
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
@@ -56,12 +61,19 @@ describe("日志显示列", () => {
   it("关闭元数据列后消息仍在，轨道只留可见列", () => {
     const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
     expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "tid", "level", "msg"]);
-    expect(logColTemplate(display)).toBe("6ch 6ch 4ch minmax(0, 1fr)");
+    expect(logColTemplate(display)).toBe("48px 48px 48px minmax(96px, 1fr)");
   });
 
   it("全部元数据关闭只剩消息", () => {
     const display = { ts: false, uid: false, pid: false, tid: false, level: false, tag: false };
-    expect(logColTemplate(display)).toBe("minmax(0, 1fr)");
+    expect(logColTemplate(display)).toBe("minmax(96px, 1fr)");
+  });
+
+  it("写绝对宽度，不低于 min，消息列不拖", () => {
+    const start = defaultLogColWidths();
+    expect(applyLogColWidth(start, "tag", 212).tag).toBe(212);
+    expect(applyLogColWidth(start, "pid", 10).pid).toBe(36);
+    expect(applyLogColWidth(start, "msg", 200)).toBe(start);
   });
 });
 

@@ -1,10 +1,11 @@
 /* ============================================================================
  * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 行结构列对齐等宽：[时间 18ch] [UID 10ch] [PID 6ch] [TID 6ch] [级别 4ch] [Tag 24ch] [消息]；
- * 表头钉在虚拟列表外（flex-shrink: 0），与行共用 .yohu-logs__cols；轨道由显示列内联写入；
+ * 行结构列对齐等宽（默认 px 约 18/10/6/6/4/24 ch）；表头 YoColHeader 可拖宽；
+ * 表头钉在虚拟列表外（flex-shrink: 0），与行共用 .yohu-logs__cols；轨道由显示列 + 列宽内联写入；
  * 行 data-level 绑定 --yohu-log-ink（token 板 --yohu-level-* 单源）：
  * 左条 / 级别字 / Tag 共用 ink；Error 消息同色；Fatal 级别字母反色块，Tag 用 f-bg；
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
+ * 选区是视觉层；复制走 copy.ts（seq → formatLogLine），禁止 Selection.toString。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -73,6 +74,11 @@
   overflow: hidden;
 }
 
+/* Ctrl+A：整表可见区入选；虚拟列表只给视口洗一层 accent-soft，不改级别色。 */
+.yohu-logs__list-body--pick-all .yohu-logs__row {
+  background-color: var(--yohu-accent-soft);
+}
+
 /* 离开底部：只计数不跟滚（Entangle jump-to-bottom / Qovery new-logs） */
 .yohu-logs__pending {
   position: absolute;
@@ -81,12 +87,11 @@
   z-index: 1;
 }
 
-/* 表头与行共用定宽 grid；ch 跟等宽字体走，禁止表头另起一套轨道 */
+/* 表头与行共用定宽 grid；列宽 px 由 layout 写入，禁止表头另起一套轨道 */
 .yohu-logs__cols {
   display: grid;
   align-items: center;
-  column-gap: var(--yohu-space-sm);
-  padding: 0 var(--yohu-space-sm) 0 var(--yohu-space-xs);
+  padding: 0;
   border-left: var(--yohu-stroke-emphasis) solid transparent;
   box-sizing: border-box;
   min-width: 0;
@@ -98,6 +103,7 @@
 .yohu-logs__cols--head {
   flex-shrink: 0;
   height: var(--yohu-row-height-header);
+  align-items: stretch;
   background: var(--yohu-canvas);
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
   color: var(--yohu-fg-2);
@@ -105,27 +111,22 @@
   user-select: none;
 }
 
-.yohu-logs__head-cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.yohu-logs__head-cell--end {
-  text-align: right;
-}
-
-.yohu-logs__head-cell--center {
-  text-align: center;
+.yohu-logs__cols--head .yohu-col-header:first-child {
+  --yohu-col-header-content-pad: 0 var(--yohu-space-sm) 0 var(--yohu-space-sm);
 }
 
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
   height: 100%;
   white-space: nowrap;
-  user-select: none;
+  user-select: text;
+  cursor: text;
   border-left-color: var(--yohu-log-ink);
+}
+
+.yohu-logs__list .yohu-virtual-list__row {
+  user-select: text;
+  cursor: text;
 }
 
 .yohu-logs__row[data-level="v"] { --yohu-log-ink: var(--yohu-level-v); }
@@ -140,15 +141,18 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* 信号行（崩溃/ANR）：信号底色 + Error 左条；行 hover/选中由 YoVirtualList.yohu-interactive 承担。
-   选中时让位给选中片，只留 Error 左条。 */
+/* 信号行（崩溃/ANR）：信号底色 + Error 左条。复制按 seq 重排，不用行多选片。 */
 .yohu-logs__row--signal {
   background-color: var(--yohu-signal-bg);
   border-left-color: var(--yohu-error);
 }
 
-.yohu-interactive--selected .yohu-logs__row--signal {
-  background-color: transparent;
+.yohu-logs__row > :first-child {
+  padding-left: var(--yohu-space-sm);
+}
+
+.yohu-logs__row > * {
+  padding-right: var(--yohu-space-sm);
 }
 
 /* 列对齐：每行独立 grid，轨道必须定宽（禁止 max-width / minmax 让消息列错位） */

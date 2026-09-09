@@ -1,5 +1,6 @@
 /**
  * 日志页右键场景表。Tab 与列表分行，动作经 ctx 注入。
+ * 行复制与 Ctrl+C 同一 serializeLogCopy（seq → formatLogLine）。
  */
 
 import { defineContextMenu } from "@yohu/ui";

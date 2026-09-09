@@ -975,4 +975,12 @@ describe("logStore 设置联动", () => {
     await Promise.resolve();
     expect(store.state.bufferCapacity).toBe(10_000);
   });
+
+  it("setColWidth 写绝对宽度，消息列不动", () => {
+    const store = wiredStore();
+    store.setColWidth("tag", 220);
+    expect(store.state.colWidths.tag).toBe(220);
+    store.setColWidth("msg", 200);
+    expect(store.state.colWidths.msg).toBe(96);
+  });
 });

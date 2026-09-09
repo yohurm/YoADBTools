@@ -11,6 +11,7 @@ import { APP_SETTINGS_DEFAULT } from "@yohu/api";
 import { createCapture } from "./capture";
 import { createIngest } from "./ingest";
 import { MirrorBank } from "./mirror";
+import { applyLogColWidth, defaultLogColWidths, type LogColKey } from "./layout";
 import { createWorkspace, type LogSessionState, type LogUiState } from "./workspace";
 
 export type { DeviceUiState, LogSessionState } from "./workspace";
@@ -23,6 +24,7 @@ export function createLogStore() {
     sessions: [] as LogSessionState[],
     activeSessionId: null,
     bufferCapacity: APP_SETTINGS_DEFAULT.buffer_capacity,
+    colWidths: defaultLogColWidths(),
   });
 
   const mirrors = new MirrorBank(APP_SETTINGS_DEFAULT.buffer_capacity);
@@ -48,6 +50,9 @@ export function createLogStore() {
     clearDevicePanels: workspace.clearDevicePanels,
     setFollowing: workspace.setFollowing,
     detachFollow: workspace.detachFollow,
+    setColWidth: (key: LogColKey, width: number) => {
+      setState("colWidths", applyLogColWidth(state.colWidths, key, width));
+    },
     ...capture,
   };
 }

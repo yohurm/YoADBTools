@@ -12,6 +12,8 @@ import {
   YoBadge,
   YoButton,
   YoChrome,
+  YoColHeader,
+  YoColRow,
   YoDialog,
   YoEmptyState,
   YoLoading,
@@ -22,17 +24,23 @@ import {
   YoTextField,
   YoToaster,
   YoVirtualList,
-  allKeys,
   attachPanelKeys,
   closeContextMenu,
   createToaster,
-  nextKeys,
+  isEditableTarget,
   openContextMenu,
-  pointerSelectMode,
 } from "@yohu/ui";
 
+import {
+  applyCopyEvent,
+  copyHasPayload,
+  LOG_COPY_NONE,
+  pickFromSelection,
+  serializeLogCopy,
+  type LogCopyScope,
+} from "./copy";
 import { highlightMessage } from "./highlight";
-import { copyLogText, LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
+import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
 import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns, type LogColumnSpec } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -164,12 +172,13 @@ function scopeLabel(session: { scope: { kind: string; pkg?: string; pid?: number
 
 export function LogAnalyzerView(props: DeviceSession) {
   const [newOpen, setNewOpen] = createSignal(false);
-  const [selectedKeys, setSelectedKeys] = createSignal<Set<string>>(new Set());
-  const [pivotKey, setPivotKey] = createSignal<string | null>(null);
+  const [contextLine, setContextLine] = createSignal<ViewRow["line"] | null>(null);
   const [renameTarget, setRenameTarget] = createSignal<number | null>(null);
   const [renameText, setRenameText] = createSignal("");
+  const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
 
   let keywordRef: HTMLInputElement | undefined;
+  let listRoot: HTMLDivElement | undefined;
 
   createEffect(() => {
     const serial = props.selectedSerials[0] ?? null;
@@ -183,8 +192,8 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   createEffect(() => {
     void logStore.state.activeSessionId;
-    setSelectedKeys(new Set<string>());
-    setPivotKey(null);
+    setContextLine(null);
+    setPick(LOG_COPY_NONE);
     closeContextMenu();
   });
 
@@ -215,15 +224,14 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const windowSerial = (): string | null => active()?.serial ?? props.selectedSerials[0] ?? null;
 
-  const visibleKeys = (): string[] => (active()?.visible ?? []).map(rowKey);
-
   const displayColumns = () => ({
     ...DEFAULT_LOG_DISPLAY_COLUMNS,
     ...props.settings.log_display_columns,
   });
 
+  const colTemplate = (): string => logColTemplate(displayColumns(), logStore.state.colWidths);
   const colStyle = (): { "grid-template-columns": string } => ({
-    "grid-template-columns": logColTemplate(displayColumns()),
+    "grid-template-columns": colTemplate(),
   });
 
   const togglePause = (): void => {
@@ -233,10 +241,18 @@ export function LogAnalyzerView(props: DeviceSession) {
     if (session?.capturing) logStore.setPaused(id, !session.paused);
   };
 
-  const copySelected = (): void => {
-    const session = active();
-    if (!session) return;
-    const text = copyLogText(session.visible, selectedKeys(), rowKey);
+  const visibleRows = (): ViewRow[] =>
+    logStore.state.sessions.find((s) => s.id === logStore.state.activeSessionId)?.visible ?? [];
+
+  const copyText = (scope: LogCopyScope, fallbackLine?: ViewRow["line"] | null): string =>
+    serializeLogCopy({
+      scope,
+      rows: visibleRows(),
+      fallbackLine: fallbackLine ?? contextLine(),
+    });
+
+  const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): void => {
+    const text = copyText(scope, fallbackLine);
     if (!text) return;
     void navigator.clipboard.writeText(text).catch((e) => toaster.show(`复制失败: ${errorMessage(e)}`, "error"));
   };
@@ -273,7 +289,8 @@ export function LogAnalyzerView(props: DeviceSession) {
       return;
     }
     if (action === "select-all") {
-      setSelectedKeys(allKeys(visibleKeys()));
+      setPick({ kind: "all" });
+      window.getSelection()?.removeAllRanges();
       return;
     }
     if (action === "copy") copySelected();
@@ -286,8 +303,32 @@ export function LogAnalyzerView(props: DeviceSession) {
       bindings: LOGS_KEY_BINDINGS,
       onAction: onKeyAction,
     });
+    const onSelChange = (): void => {
+      const next = pickFromSelection(listRoot ?? null, window.getSelection());
+      if (next) setPick(next);
+    };
+    const onCopy = (event: ClipboardEvent): void => {
+      if (isEditableTarget(event.target)) return;
+      const target = event.target;
+      const inList = Boolean(listRoot && target instanceof Node && listRoot.contains(target));
+      if (!inList && pick().kind !== "all") return;
+      applyCopyEvent(event, copyText(pick()));
+    };
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.button !== 0 || !listRoot) return;
+      const target = event.target;
+      if (!(target instanceof Element) || !listRoot.contains(target)) return;
+      if (!target.closest(".yohu-logs__row, .yohu-virtual-list__row")) return;
+      setPick(LOG_COPY_NONE);
+    };
+    document.addEventListener("selectionchange", onSelChange);
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("pointerdown", onPointerDown, true);
     onCleanup(() => {
       stop();
+      document.removeEventListener("selectionchange", onSelChange);
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       closeContextMenu();
     });
   });
@@ -457,23 +498,27 @@ export function LogAnalyzerView(props: DeviceSession) {
               </div>
 
               <div class="yohu-logs__list">
-                <div class="yohu-logs__cols yohu-logs__cols--head" role="row" style={colStyle()}>
+                <YoColRow class="yohu-logs__cols yohu-logs__cols--head" template={colTemplate()}>
                   <For each={visibleLogColumns(displayColumns())}>
                     {(col) => (
-                      <span
-                        class="yohu-logs__head-cell"
-                        classList={{
-                          "yohu-logs__head-cell--end": col.align === "end",
-                          "yohu-logs__head-cell--center": col.align === "center",
-                        }}
-                        role="columnheader"
+                      <YoColHeader
+                        align={col.align}
+                        resizable={!col.flex}
+                        resizeLabel={col.resizeLabel}
+                        width={logStore.state.colWidths[col.key] ?? col.defaultWidth}
+                        minWidth={col.minWidth}
+                        onWidthChange={(width) => logStore.setColWidth(col.key, width)}
                       >
-                        {col.header}
-                      </span>
+                        <span class="yohu-col-header__label">{col.header}</span>
+                      </YoColHeader>
                     )}
                   </For>
-                </div>
-                <div class="yohu-logs__list-body">
+                </YoColRow>
+                <div
+                  class="yohu-logs__list-body"
+                  classList={{ "yohu-logs__list-body--pick-all": pick().kind === "all" }}
+                  ref={(el) => { listRoot = el; }}
+                >
                   <Show
                     when={(logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) > 0}
                     fallback={<SessionEmpty session={session} />}
@@ -487,29 +532,28 @@ export function LogAnalyzerView(props: DeviceSession) {
                         else logStore.detachFollow(session.id);
                       }}
                       ariaLabel="日志列表"
-                      selectedKeys={selectedKeys}
-                      selectedKey={pivotKey}
-                      onSelectRow={(row, _key, event) => {
-                        const key = rowKey(row);
-                        const next = nextKeys(visibleKeys(), selectedKeys(), pivotKey(), key, pointerSelectMode(event));
-                        setSelectedKeys(next.keys);
-                        setPivotKey(next.pivot);
-                      }}
                       onRowContextMenu={(row, _key, event) => {
-                        const key = rowKey(row);
-                        if (!selectedKeys().has(key)) {
-                          setSelectedKeys(new Set([key]));
-                          setPivotKey(key);
-                        }
+                        setContextLine(row.line);
+                        const fromSel = pickFromSelection(listRoot ?? null, window.getSelection());
+                        const scope = fromSel ?? pick();
+                        const canCopy = copyHasPayload({
+                          scope,
+                          rows: visibleRows(),
+                          fallbackLine: row.line,
+                        });
                         openContextMenu(logsRowMenu, {
                           x: event.clientX,
                           y: event.clientY,
-                          ctx: { canCopy: selectedKeys().size > 0, copy: copySelected },
+                          ctx: {
+                            canCopy,
+                            copy: () => copySelected(scope, scope.kind === "none" ? row.line : null),
+                          },
                         });
                       }}
                       renderRow={(row) => (
                         <div
                           class="yohu-logs__cols yohu-logs__row"
+                          data-seq={row.line.seq}
                           data-level={levelKey(row.line.level) ?? undefined}
                           classList={{
                             "yohu-logs__row--signal": row.signal !== undefined,
@@ -559,9 +603,6 @@ export function LogAnalyzerView(props: DeviceSession) {
                   {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}
                 </span>
                 <span>行数 {session.visible.length}</span>
-                <Show when={selectedKeys().size > 0}>
-                  <span>已选 {selectedKeys().size}</span>
-                </Show>
                 <span classList={{ "yohu-logs__status-signal": session.signalCount > 0 }}>
                   信号 {session.signalCount}
                 </span>

@@ -1,11 +1,9 @@
 /**
- * 日志页快捷键策略：绑定表 + 复制格式。宿主与选区代数在 @yohu/ui keymap。
+ * 日志页快捷键策略：绑定表。宿主在 @yohu/ui keymap。
+ * 复制载荷在 copy.ts（选区 → seq → formatLogLine），本文件不读 Selection.toString。
  */
 
 import { whenIdle, whenPanel, whenPanelOrField, type KeyBinding } from "@yohu/ui";
-
-import { formatLogLine } from "./format";
-import type { ViewRow } from "./stack";
 
 export type LogsKeyAction =
   | "pause"
@@ -30,16 +28,3 @@ export const LOGS_KEY_BINDINGS: readonly KeyBinding<LogsKeyAction>[] = [
   { action: "close-tab", key: "w", ctrl: true, when: whenPanel },
   { action: "next-tab", key: "tab", ctrl: true, when: whenPanel },
 ];
-
-export { formatLogLine };
-
-export function copyLogText(
-  rows: readonly ViewRow[],
-  selected: ReadonlySet<string>,
-  keyOf: (row: ViewRow) => string,
-): string {
-  return rows
-    .filter((row) => selected.has(keyOf(row)))
-    .map((row) => formatLogLine(row.line))
-    .join("\n");
-}

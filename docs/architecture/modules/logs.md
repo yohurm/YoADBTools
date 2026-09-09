@@ -8,6 +8,8 @@
 - **显示面板：** 窗口私有。入镜 / 跟滚 / PID 重绑只按末行 seq 追加（`isFreshLine`）。用户改级别/Tag/关键字走 `rebuildFiltered`（已画出仍匹配 ∪ 镜像命中，按 seq 合并；镜像为空时只可能变少，禁止整表替换成空）。**冻结与过滤解耦：** 离开底部记下 `frozenThroughSeq`；跟滚中过滤从 `fromSeq` 全量合并、pending=0；未跟滚只合并 `seq ≤ frozenThroughSeq`，其后计 pending。暂停只挡入镜/catchUp，不进 `patchFilter`。点开始才订阅：先 `log.processSnapshot` 绑 PID，`fromSeq=0`，按本窗口过滤从当前环补齐
 - 环：`buffer_capacity` 默认 10000；掉线清该 serial 的 core 环与 UI 镜像，**不清面板**
 - **导出（ADR-v6-021）：** `log.export` 扫该设备环：`seq >= fromSeq` 且 domain `log_filter_matches`。仅用户点导出时落盘。行文本与 UI 复制共用 `format_log_line` testdata
+- **清单列：** 表头走 `YoColRow` + `YoColHeader`（元数据列可拖宽；消息列 `1fr`）。宽度代数在 YoUI `col-model` / `col-resize`；模块 store 只存 `colWidths` 并 `setColWidth`，不进设置。显示列仍读 `log_display_columns`
+- **选区与复制（对照 Logcat）：** 清单是文本选区，不是行多选。剪贴板**禁止** `Selection.toString()`（CSS Grid 各列是独立盒，原生选区会拆成碎片/换行，粘贴即乱码）。选区只解析相交行的 `data-seq`；Ctrl+C / 右键 / `copy` 事件一律 `format_log_line`。跨行按 seq 闭区间取当前窗口 `visible`（补上虚拟列表未挂载的中间行）。Ctrl+A 标记整表可见区（不只视口）。无选区时右键复制该行。`copy` 事件只写 `text/plain` 并拦截浏览器默认。
 - UI：`@yohu/module-logs`；轨 `singleRequired`；多窗口可绑不同设备
 - 状态行设备：型号 + Android 版本 + API（`DeviceSession.devices` + `deviceStatuses`），不拼 serial
 - 快捷键：Space / Ctrl+L / F / T / W / Tab

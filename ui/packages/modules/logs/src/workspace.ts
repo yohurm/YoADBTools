@@ -33,6 +33,7 @@ import {
   type SessionScope,
   type ViewRow,
 } from "./pipeline";
+import type { LogColWidths } from "./layout";
 import type { MirrorBank } from "./mirror";
 
 /** 从未开始采集：入镜/补洞均跳过共享环。 */
@@ -91,6 +92,8 @@ export interface LogUiState {
   activeSessionId: number | null;
   /** 与 core `buffer_capacity` 对齐：镜像与可见区同一上限 */
   bufferCapacity: number;
+  /** 清单列宽（px）；不进设置，模块单例内有效 */
+  colWidths: LogColWidths;
 }
 
 export type WorkspaceApi = {

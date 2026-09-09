@@ -1,26 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { LogLine } from "@yohu/api";
 import { matchBindings, type PanelKeyContext } from "@yohu/ui";
 
-import { copyLogText, formatLogLine, LOGS_KEY_BINDINGS } from "./keys";
-import type { ViewRow } from "./pipeline";
+import { LOGS_KEY_BINDINGS } from "./keys";
 
 function keyEvent(init: Pick<KeyboardEventInit, "key" | "ctrlKey">): KeyboardEvent {
   return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
-}
-
-function line(over: Partial<LogLine> = {}): LogLine {
-  return {
-    seq: 1,
-    ts: "01-01 12:00:00.000",
-    pid: 100,
-    tid: 200,
-    level: "I",
-    tag: "Yohu",
-    msg: "hello",
-    ...over,
-  };
 }
 
 describe("LOGS_KEY_BINDINGS", () => {
@@ -50,22 +35,5 @@ describe("LOGS_KEY_BINDINGS", () => {
     expect(matchBindings(keyEvent({ key: "f", ctrlKey: true }), field, LOGS_KEY_BINDINGS)).toBe("find");
     expect(matchBindings(keyEvent({ key: "l", ctrlKey: true }), chrome, LOGS_KEY_BINDINGS)).toBe("clear");
     expect(matchBindings(keyEvent({ key: "a", ctrlKey: true }), rail, LOGS_KEY_BINDINGS)).toBe("select-all");
-  });
-});
-
-describe("copyLogText", () => {
-  it("只拼选中行的列对齐文本", () => {
-    const rows: ViewRow[] = [{ line: line({ seq: 1, msg: "one" }) }, { line: line({ seq: 2, pid: 101, msg: "two" }) }];
-    const keyOf = (row: ViewRow): string => `${row.line.seq}`;
-    expect(copyLogText(rows, new Set(["2"]), keyOf)).toBe(formatLogLine(rows[1]!.line));
-  });
-
-  it("含 UID 名的行按列对齐，无 UID 的行不含 uid 列", () => {
-    expect(formatLogLine(line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" }))).toBe(
-      "01-01 12:00:00.000    shell  1705  1705 W binder: avc",
-    );
-    expect(formatLogLine(line({ pid: 100, tid: 200, level: "I", tag: "Yohu", msg: "hello" }))).toBe(
-      "01-01 12:00:00.000   100   200 I Yohu: hello",
-    );
   });
 });
