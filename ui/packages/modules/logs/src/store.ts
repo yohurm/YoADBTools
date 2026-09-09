@@ -2,6 +2,7 @@
  * 日志模块门面：工作区 + 窗口扇出 + 采集客户端。只依赖 @yohu/api。
  * 焦点由 View 经 bindSerial 注入默认设备；窗口/过滤/可见区在消费端（ADR-v6-006）。
  * 显示面板由 workspace 持有，ingest 只按 seq 追加。
+ * close / resumeFollow 以 capture 为准（先停采 / 再补快照），不从 workspace 展开覆盖。
  */
 
 import { createStore } from "solid-js/store";
@@ -32,10 +33,21 @@ export function createLogStore() {
   return {
     state,
     mirrors,
-    get mirror() {
-      return mirrors.of(state.serial ?? "");
-    },
-    ...workspace,
+    ensureSession: workspace.ensureSession,
+    createSession: workspace.createSession,
+    renameSession: workspace.renameSession,
+    duplicateSession: workspace.duplicateSession,
+    setActive: workspace.setActive,
+    patchFilter: workspace.patchFilter,
+    setPaused: workspace.setPaused,
+    trimPanels: workspace.trimPanels,
+    catchUpSession: workspace.catchUpSession,
+    bindPackageSessions: workspace.bindPackageSessions,
+    assignDefaultSerial: workspace.assignDefaultSerial,
+    clearPanel: workspace.clearPanel,
+    clearDevicePanels: workspace.clearDevicePanels,
+    setFollowing: workspace.setFollowing,
+    detachFollow: workspace.detachFollow,
     ...capture,
   };
 }

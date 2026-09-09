@@ -9,7 +9,7 @@ import type { LogBatch } from "@yohu/api";
 
 import { matchesLine, toSessionFilter } from "./filter";
 import type { MirrorBank } from "./mirror";
-import { appendLines, countSignals, lastSeqOf } from "./panel";
+import { appendLines, countSignals, isFreshLine, lastSeqOf } from "./panel";
 import type { LogUiState } from "./workspace";
 
 export type IngestApi = {
@@ -33,7 +33,7 @@ export function createIngest(
       const filter = toSessionFilter(session);
       const after = lastSeqOf(session.visible, session.fromSeq);
       const matched = batch.lines.filter(
-        (line) => line.seq > after && line.seq >= session.fromSeq && matchesLine(line, filter),
+        (line) => isFreshLine(line.seq, after, session.fromSeq) && matchesLine(line, filter),
       );
       if (matched.length === 0) return;
       const idx = sessionIndex(session.id);

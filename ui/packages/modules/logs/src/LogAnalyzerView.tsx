@@ -31,11 +31,12 @@ import {
   pointerSelectMode,
 } from "@yohu/ui";
 
-import { LEVELS, levelKey, type ViewRow } from "./pipeline";
-import { NewSessionDialog } from "./NewSessionDialog";
+import { highlightMessage } from "./highlight";
 import { copyLogText, LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
 import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns, type LogColumnSpec } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
+import { NewSessionDialog } from "./NewSessionDialog";
+import { LEVELS, levelKey, type ViewRow } from "./pipeline";
 import { formatSessionDevice } from "./session-device";
 import { deviceSlice, logStore } from "./store";
 import type { LogSessionState } from "./workspace";
@@ -68,23 +69,6 @@ const LEVEL_OPTIONS = [
 
 const rowKey = (row: ViewRow): string => `${row.line.seq}-${row.line.pid}`;
 
-function highlight(msg: string, keyword: string): (string | { mark: string })[] {
-  if (!keyword) return [msg];
-  const lower = msg.toLowerCase();
-  const needle = keyword.toLowerCase();
-  const parts: (string | { mark: string })[] = [];
-  let cursor = 0;
-  let index = lower.indexOf(needle, cursor);
-  while (index >= 0) {
-    if (index > cursor) parts.push(msg.slice(cursor, index));
-    parts.push({ mark: msg.slice(index, index + needle.length) });
-    cursor = index + needle.length;
-    index = lower.indexOf(needle, cursor);
-  }
-  if (cursor < msg.length) parts.push(msg.slice(cursor));
-  return parts;
-}
-
 function LogCell(props: { col: LogColumnSpec; row: ViewRow; keyword: string }) {
   const line = (): ViewRow["line"] => props.row.line;
   switch (props.col.key) {
@@ -107,9 +91,15 @@ function LogCell(props: { col: LogColumnSpec; row: ViewRow; keyword: string }) {
     case "msg":
       return (
         <span class="yohu-logs__row-msg" classList={{ "yohu-tone": levelKey(line().level) === "e" }}>
-          <For each={highlight(line().msg, props.keyword)}>
-            {(part) => (typeof part === "string" ? part : <mark class="yohu-logs__mark yohu-tone">{part.mark}</mark>)}
-          </For>
+          <Show when={props.keyword} keyed fallback={line().msg}>
+            {(keyword) => (
+              <For each={highlightMessage(line().msg, keyword)}>
+                {(part) =>
+                  typeof part === "string" ? part : <mark class="yohu-logs__mark yohu-tone">{part.mark}</mark>
+                }
+              </For>
+            )}
+          </Show>
           <Show when={props.row.collapsedAfter}>
             <span class="yohu-logs__row-fold">…{props.row.collapsedAfter} 帧折叠</span>
           </Show>

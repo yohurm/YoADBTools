@@ -200,7 +200,7 @@ describe("logStore 窗口生命周期", () => {
     expect(created.capturing).toBe(false);
     expect(created.visible).toHaveLength(0);
     expect(created.fromSeq).toBeLessThan(0);
-    expect(store.mirror.size()).toBe(2);
+    expect(store.mirrors.of("S1").size()).toBe(2);
   });
 
   it("renameSession：修剪标题、拒绝空标题", () => {
@@ -264,7 +264,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(session.visible[1]!.collapsedAfter).toBe(1);
     expect(session.visible[2]!.signal).toBe("crash");
     expect(session.signalCount).toBe(1);
-    expect(store.mirror.size()).toBe(5);
+    expect(store.mirrors.of("S1").size()).toBe(5);
   });
 
   it("关键字/Tag 过滤与信号行标记", async () => {
@@ -280,13 +280,72 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     const session = store.state.sessions[0]!;
     expect(session.visible.map((r) => r.line.seq)).toEqual([0]);
     expect(session.visible[0]!.signal).toBeUndefined();
-    expect(store.mirror.size()).toBe(4);
+    expect(store.mirrors.of("S1").size()).toBe(4);
+  });
+
+  it("清除检索从镜像补回中间被筛掉的行", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [
+      mk(0, { msg: "alpha" }),
+      mk(1, { msg: "beta hello" }),
+      mk(2, { msg: "gamma" }),
+    ]);
+    store.patchFilter(id, { keyword: "hello" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["beta hello"]);
+    store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["alpha", "beta hello", "gamma"]);
+  });
+
+  it("离开底部后清除检索只补冻结窗口内的洞，尾部仍计 pending", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [
+      mk(0, { msg: "alpha" }),
+      mk(1, { msg: "beta hello" }),
+      mk(2, { msg: "gamma" }),
+    ]);
+    store.detachFollow(id);
+    store.patchFilter(id, { keyword: "hello" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["beta hello"]);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBe(2);
+    push("S1", [mk(3, { msg: "hello tail" })]);
+    expect(store.state.sessions[0]!.pendingCount).toBe(1);
+    store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["alpha", "beta hello", "gamma"]);
+    expect(store.state.sessions[0]!.pendingCount).toBe(1);
+    expect(store.state.sessions[0]!.following).toBe(false);
+  });
+
+  it("空面板离开底部：冻结上限为 fromSeq 之前，改过滤不把尾部画进面板", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    expect(store.state.sessions[0]!.fromSeq).toBe(0);
+    store.detachFollow(id);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBe(-1);
+    push("S1", [mk(0), mk(1)]);
+    expect(store.state.sessions[0]!.visible).toHaveLength(0);
+    expect(store.state.sessions[0]!.pendingCount).toBe(2);
+    store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.visible).toHaveLength(0);
+    expect(store.state.sessions[0]!.pendingCount).toBe(2);
+    expect(store.state.sessions[0]!.following).toBe(false);
+  });
+
+  it("清除级别过滤从镜像补回被筛掉的行", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0, { level: "I", msg: "info" }), mk(1, { level: "E", msg: "err" })]);
+    store.patchFilter(id, { minLevel: "E" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
+    store.patchFilter(id, { minLevel: null });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["info", "err"]);
   });
 
   it("其他设备批次入该机镜像，不进入本窗口", async () => {
     const store = await liveStore();
     push("OTHER", [mk(0)]);
-    expect(store.mirror.size()).toBe(0);
+    expect(store.mirrors.of("S1").size()).toBe(0);
     expect(store.mirrors.of("OTHER").size()).toBe(1);
     expect(store.state.sessions[0]!.visible).toHaveLength(0);
   });
@@ -301,9 +360,10 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     push("S1", [mk(2), mk(3)]);
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1]);
     expect(store.state.sessions[0]!.pendingCount).toBe(2);
-    expect(store.mirror.size()).toBe(4);
+    expect(store.mirrors.of("S1").size()).toBe(4);
     store.resumeFollow(id);
     expect(store.state.sessions[0]!.following).toBe(true);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBeNull();
     expect(store.state.sessions[0]!.pendingCount).toBe(0);
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3]);
   });
@@ -327,15 +387,14 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1]);
   });
 
-  it("paused 不增加 pending；恢复后从镜像按 seq 补洞", async () => {
+  it("paused 不增加 pending；跟滚中改过滤从镜像重建命中", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
-    store.detachFollow(id);
     store.setPaused(id, true);
     push("S1", [mk(0, { level: "E", msg: "e0" })]);
     expect(store.state.sessions[0]!.pendingCount).toBe(0);
     expect(store.state.sessions[0]!.visible).toHaveLength(0);
-    store.patchFilter(id, { paused: false, minLevel: "E" });
+    store.patchFilter(id, { minLevel: "E" });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0]);
   });
 
@@ -372,12 +431,12 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   it("掉线：停采集、清镜像，已画出的行保留", async () => {
     const store = await liveStore();
     push("S1", [mk(0, { msg: "kept" })]);
-    expect(store.mirror.size()).toBe(1);
+    expect(store.mirrors.of("S1").size()).toBe(1);
     expect(store.state.sessions[0]!.capturing).toBe(true);
     mocks.deviceOfflineHandlers.at(-1)?.({ serial: "S1" });
     expect(store.state.sessions[0]!.capturing).toBe(false);
     expect(anyCapturing(store)).toBe(false);
-    expect(store.mirror.size()).toBe(0);
+    expect(store.mirrors.of("S1").size()).toBe(0);
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["kept"]);
   });
 
@@ -404,9 +463,9 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   it("startCapture 清空镜像，只保留启动后的行", async () => {
     const store = wiredStore();
     push("S1", [mk(0)]);
-    expect(store.mirror.size()).toBe(1);
+    expect(store.mirrors.of("S1").size()).toBe(1);
     await store.startCapture();
-    expect(store.mirror.size()).toBe(0);
+    expect(store.mirrors.of("S1").size()).toBe(0);
     expect(store.state.sessions[0]!.visible).toHaveLength(0);
     push("S1", [mk(1, { msg: "after-start" })]);
     expect(store.state.sessions[0]!.visible).toHaveLength(1);
@@ -419,7 +478,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     const store = wiredStore();
     await store.startCapture();
     expect(mocks.logReplay).toHaveBeenCalledWith({ serial: "S1", from_seq: 0, limit: 10_000 });
-    expect(store.mirror.size()).toBe(1);
+    expect(store.mirrors.of("S1").size()).toBe(1);
     expect(store.state.sessions[0]!.visible[0]!.line.msg).toBe("from-replay");
     await store.stopCapture();
   });
@@ -605,7 +664,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     push("S1", [mk(0, { msg: "kept" })]);
     mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S1", generation: 4, adopted: true });
     await store.startCapture();
-    expect(store.mirror.size()).toBe(1);
+    expect(store.mirrors.of("S1").size()).toBe(1);
     expect(store.state.sessions[0]!.fromSeq).toBe(0);
     expect(store.state.sessions[0]!.capturing).toBe(true);
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["kept"]);
