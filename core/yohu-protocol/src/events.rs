@@ -30,10 +30,12 @@ pub struct GroupProgress {
     /// 命令名（展示用）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// 已填充的具体命令行（不含 adb）
+    pub template: String,
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
-    /// 单命令用时（毫秒；结果卡片头部展示）
+    /// 单命令用时（毫秒）
     pub duration_ms: u64,
 }
 

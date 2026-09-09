@@ -73,12 +73,19 @@ pub struct GroupRunRequest {
     pub serials: Vec<String>,
 }
 
-/// `terminal.eval` 请求：按库 id 查找、领域填充占位符、多设备并行判定。
+/// `terminal.eval` 请求：按库 id 查找、领域填充占位符、多设备并行执行。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TerminalEvalRequest {
     pub command_id: String,
     #[serde(default)]
     pub values: Vec<String>,
+    pub serials: Vec<String>,
+}
+
+/// `terminal.exec` 请求：自定义命令行，多设备并行执行（不查命令库）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TerminalExecRequest {
+    pub command: String,
     pub serials: Vec<String>,
 }
 
@@ -94,7 +101,7 @@ pub struct SerialEvalResult {
     pub duration_ms: u64,
 }
 
-/// `terminal.eval` 响应：原始执行结果 + 领域判定。
+/// `terminal.eval` / `terminal.exec` 单台原始输出（`ok` 仅反映退出码，UI 不展示成败）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvalResult {
     pub ok: bool,
@@ -109,26 +116,11 @@ pub struct EvalResult {
 // ===== 命令库 wire 结构（schemaVersion 2） =====
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct InputFieldDto {
-    pub placeholder: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandDto {
     pub id: String,
     pub name: String,
-    /// 命令库模板，可含 `{0}` `{1}`；执行前由 domain `fill`，不信任 UI 改写后的行
+    /// 具体命令行，可含 `{0}` `{1}`；执行前由 domain `fill`，不信任 UI 改写后的行
     pub template: String,
-    #[serde(default)]
-    pub inputs: Vec<InputFieldDto>,
-    #[serde(default)]
-    pub failure_regex: String,
-    #[serde(default)]
-    pub success_regex: String,
-    #[serde(default)]
-    pub delay_ms: u64,
-    #[serde(default = "crate::default_true")]
-    pub abort_on_fail: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -196,5 +188,26 @@ mod tests {
         assert_eq!(parsed.values, vec!["8.8.8.8"]);
         assert_eq!(parsed.serials.len(), 2);
         assert_eq!(COMMAND_LIBRARY_SCHEMA_VERSION, 2);
+    }
+
+    #[test]
+    fn terminal_exec_request_is_command_serials() {
+        let parsed: TerminalExecRequest =
+            serde_json::from_str(r#"{"command":"shell ls","serials":["S1"]}"#).unwrap();
+        assert_eq!(parsed.command, "shell ls");
+        assert_eq!(parsed.serials, vec!["S1"]);
+    }
+
+    #[test]
+    fn command_dto_is_id_name_template() {
+        let parsed: CommandDto =
+            serde_json::from_str(r#"{"id":"c1","name":"型号","template":"shell getprop"}"#)
+                .unwrap();
+        assert_eq!(parsed.template, "shell getprop");
+        let extra: CommandDto = serde_json::from_str(
+            r#"{"id":"c1","name":"型号","template":"shell getprop","failure_regex":"x","inputs":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(extra.template, "shell getprop");
     }
 }

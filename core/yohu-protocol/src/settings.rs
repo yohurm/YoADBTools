@@ -98,6 +98,9 @@ pub struct AppSettings {
     /// 强制 ADB forward（跳过 reverse）。下次启动生效。
     #[serde(default)]
     pub mirror_force_forward: bool,
+    /// 终端输入默认在命令前加上 `adb`。立即生效；默认关。
+    #[serde(default)]
+    pub terminal_prepend_adb: bool,
 }
 
 /// 投屏链路协议。USB 与无线各套一套编码参数；改长边/码率/帧率不另立协议。
@@ -152,6 +155,7 @@ impl Default for AppSettings {
             mirror_max_fps: default_mirror_max_fps(),
             mirror_protocol: MirrorProtocol::Usb,
             mirror_force_forward: false,
+            terminal_prepend_adb: false,
         }
     }
 }
@@ -175,6 +179,7 @@ pub enum SettingKey {
     MirrorMaxFps,
     MirrorProtocol,
     MirrorForceForward,
+    TerminalPrependAdb,
 }
 
 impl SettingKey {
@@ -196,6 +201,7 @@ impl SettingKey {
             SettingKey::MirrorMaxFps => "mirror_max_fps",
             SettingKey::MirrorProtocol => "mirror_protocol",
             SettingKey::MirrorForceForward => "mirror_force_forward",
+            SettingKey::TerminalPrependAdb => "terminal_prepend_adb",
         }
     }
 }
@@ -219,6 +225,7 @@ mod tests {
         assert_eq!(s.mirror_max_fps, 0);
         assert_eq!(s.mirror_protocol, MirrorProtocol::Usb);
         assert!(!s.mirror_force_forward);
+        assert!(!s.terminal_prepend_adb);
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/app_settings_default.json"))
                 .expect("fixture");
@@ -303,6 +310,7 @@ mod tests {
             SettingKey::MirrorMaxFps,
             SettingKey::MirrorProtocol,
             SettingKey::MirrorForceForward,
+            SettingKey::TerminalPrependAdb,
         ];
         for key in all {
             let wire = serde_json::to_value(key).unwrap();

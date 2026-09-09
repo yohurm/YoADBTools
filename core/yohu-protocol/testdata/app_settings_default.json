@@ -20,5 +20,6 @@
   "mirror_video_bit_rate": 16000000,
   "mirror_max_fps": 0,
   "mirror_protocol": "usb",
-  "mirror_force_forward": false
+  "mirror_force_forward": false,
+  "terminal_prepend_adb": false
 }
