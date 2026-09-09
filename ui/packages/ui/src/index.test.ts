@@ -21,6 +21,7 @@ const YO_PUBLIC = [
   "YoVirtualList",
   "YoColResizer",
   "YoColHeader",
+  "YoColRow",
   "YoPanel",
   "YoPage",
   "YoFormRow",

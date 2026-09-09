@@ -12,5 +12,8 @@
 |------|------|------|-----|
 | 快捷键 | `keymap/` | 绑定表 + `onAction` | `attachPanelKeys` |
 | 右键 | `context-menu/` | 模块 `menu.ts` + `openContextMenu` | 唯一 `YoContextMenuHost` |
+| 列宽 | `col-model.ts` / `col-resize.ts` + `YoColRow` / `YoColHeader` / `YoColResizer` | 模块只存 `colWidths`，接绝对 px | — |
 
 禁止模块自挂 `YoContextMenu`。YoUI **零 IPC、零产品业务**。
+
+列拖拽不是 `YoTable`。清单体仍是 `YoVirtualList`。YoUI 只提供轨道铬与宽度代数：`col-model`（`YoColSpec` / clamp / `colTrackTemplate`）→ `col-resize`（从 `startX` 重算绝对宽，禁止每帧累加 `dx`）→ `YoColResizer`（`separator` + valuemin/now/max + 键盘）/ `YoColHeader` / `YoColRow`。模块只存 `colWidths` 并 `setColWidth(key, px)`。拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。

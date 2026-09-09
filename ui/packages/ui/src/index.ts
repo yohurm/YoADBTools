@@ -110,6 +110,22 @@ export type { YoColResizerProps } from "./components/ColResizer";
 export { YoColHeader } from "./components/ColHeader";
 export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./components/ColHeader";
 
+export { YoColRow } from "./components/ColRow";
+export type { YoColRowProps } from "./components/ColRow";
+
+export {
+  COL_RESIZE_STEP,
+  clampColWidth,
+  colTrackTemplate,
+  colWidthOf,
+  defaultColWidths,
+  nudgeColWidth,
+  setColWidth,
+} from "./components/col-model";
+export type { YoColSpec, YoColWidths } from "./components/col-model";
+export { beginColResize, moveColResize } from "./components/col-resize";
+export type { ColResizePhase, ColResizeSession } from "./components/col-resize";
+
 export { YoPanel } from "./components/Panel";
 export type { YoPanelProps, YoPanelPadding, YoPanelVariant } from "./components/Panel";
 

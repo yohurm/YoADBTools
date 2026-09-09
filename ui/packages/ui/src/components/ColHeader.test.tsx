@@ -23,7 +23,14 @@ describe("YoColHeader", () => {
   it("轨道承担 columnheader，内容区与拖拽条是兄弟", () => {
     const onResize = vi.fn();
     const { container } = render(() => (
-      <YoColHeader ariaSort="ascending" resizable resizeLabel="调节名称列宽" onResize={onResize}>
+      <YoColHeader
+        ariaSort="ascending"
+        resizable
+        resizeLabel="调节名称列宽"
+        width={240}
+        minWidth={140}
+        onWidthChange={onResize}
+      >
         <button type="button">名称</button>
       </YoColHeader>
     ));
@@ -54,6 +61,15 @@ describe("YoColHeader", () => {
       </YoColHeader>
     ));
     expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--end")).toBe(true);
+  });
+
+  it("center 对齐加在轨道 class 上", () => {
+    const { container } = render(() => (
+      <YoColHeader align="center">
+        <span>级别</span>
+      </YoColHeader>
+    ));
+    expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--center")).toBe(true);
   });
 
   it("悬浮片铺满交互宿主，文案边距只写在内容槽", () => {

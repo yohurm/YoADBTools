@@ -1,0 +1,6 @@
+.yohu-col-row {
+  display: grid;
+  align-items: stretch;
+  min-width: 0;
+  box-sizing: border-box;
+}

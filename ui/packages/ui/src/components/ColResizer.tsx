@@ -1,49 +1,143 @@
 /**
- * YoColResizer —— 表头列宽拖拽。
- * HarmonyOS 对照：分栏拖拽条；按下后 pointer capture。
- * 受控 API：onResize / label。
+ * YoColResizer —— 表头列宽边界。
+ * 对照：Spectrum separator + valuemin/now/max；AG Grid start/move/end；VS Code sash capture。
+ * 受控：width / minWidth / onWidthChange(width, phase)。YoUI 不算单元格自适应。
  */
-import type { JSX } from "solid-js";
+import { createSignal, onCleanup, type JSX } from "solid-js";
+
+import { nudgeColWidth, type YoColSpec } from "./col-model";
+import { beginColResize, moveColResize, type ColResizePhase, type ColResizeSession } from "./col-resize";
 import "./ColResizer.css";
 
+export type { ColResizePhase } from "./col-resize";
+
 export interface YoColResizerProps {
-  /** 列宽增量（px，可负） */
-  onResize: (deltaX: number) => void;
+  width: number;
+  minWidth: number;
+  maxWidth?: number;
   /** 无障碍名称 */
   label?: string;
+  onWidthChange: (width: number, phase: ColResizePhase) => void;
+  /** 双击；调用方决定是否按内容回默认宽 */
+  onFit?: () => void;
+}
+
+const RESIZE_LOCK = "yohuColResizing";
+
+function lockPageResize(on: boolean): void {
+  if (typeof document === "undefined") return;
+  if (on) document.documentElement.dataset[RESIZE_LOCK] = "";
+  else delete document.documentElement.dataset[RESIZE_LOCK];
 }
 
 /**
- * 渲染一个位于列右缘的拖拽条。
+ * 渲染列右缘可聚焦拖条。
  */
 export function YoColResizer(props: YoColResizerProps): JSX.Element {
-  let originX = 0;
+  const [active, setActive] = createSignal(false);
+  let session: ColResizeSession | null = null;
+
+  const spec = (): YoColSpec => ({
+    key: "col",
+    defaultWidth: props.width,
+    minWidth: props.minWidth,
+    maxWidth: props.maxWidth,
+  });
+
+  const finish = (clientX: number | null): void => {
+    if (!session) return;
+    const width = clientX === null ? props.width : moveColResize(session, clientX, spec());
+    session = null;
+    setActive(false);
+    lockPageResize(false);
+    props.onWidthChange(width, "end");
+  };
 
   const onPointerDown = (event: PointerEvent): void => {
+    if (event.button > 0) return;
     event.preventDefault();
     event.stopPropagation();
-    originX = event.clientX;
     const target = event.currentTarget as HTMLElement;
-    target.setPointerCapture(event.pointerId);
+    session = beginColResize("col", event.clientX, props.width);
+    setActive(true);
+    lockPageResize(true);
+    props.onWidthChange(props.width, "start");
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch {
+      /* jsdom / 指针未激活时 capture 会抛，会话仍跟元素上的 move/up */
+    }
   };
 
   const onPointerMove = (event: PointerEvent): void => {
-    if (!((event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId))) return;
-    const x = event.clientX;
-    if (!Number.isFinite(x)) return;
-    const dx = x - originX;
-    if (dx === 0) return;
-    originX = event.clientX;
-    props.onResize(dx);
+    if (!session) return;
+    const width = moveColResize(session, event.clientX, spec());
+    if (width === props.width) return;
+    props.onWidthChange(width, "move");
   };
 
+  const onPointerUp = (event: PointerEvent): void => {
+    if (!session) return;
+    const target = event.currentTarget as HTMLElement;
+    try {
+      target.releasePointerCapture?.(event.pointerId);
+    } catch {
+      /* 与 setPointerCapture 对称：无捕获时忽略 */
+    }
+    finish(event.clientX);
+  };
+
+  const onLostCapture = (): void => {
+    finish(null);
+  };
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    const current = spec();
+    let next: number | null = null;
+    switch (event.key) {
+      case "ArrowLeft":
+        next = nudgeColWidth(props.width, current, -1);
+        break;
+      case "ArrowRight":
+        next = nudgeColWidth(props.width, current, 1);
+        break;
+      case "Home":
+        next = current.minWidth;
+        break;
+      case "End":
+        if (current.maxWidth === undefined) return;
+        next = current.maxWidth;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    if (next === props.width) return;
+    props.onWidthChange(next, "end");
+  };
+
+  onCleanup(() => {
+    if (session) lockPageResize(false);
+  });
+
   return (
-    <button
-      type="button"
-      class="yohu-col-resizer"
+    <div
+      role="separator"
+      aria-orientation="vertical"
       aria-label={props.label ?? "调节列宽"}
+      aria-valuemin={props.minWidth}
+      aria-valuenow={Math.round(props.width)}
+      aria-valuemax={props.maxWidth ?? undefined}
+      tabindex="0"
+      class="yohu-col-resizer"
+      classList={{ "yohu-col-resizer--active": active() }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onLostPointerCapture={onLostCapture}
+      onKeyDown={onKeyDown}
+      onDblClick={() => props.onFit?.()}
     />
   );
 }

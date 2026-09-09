@@ -53,6 +53,10 @@
   justify-content: flex-end;
 }
 
+.yohu-col-header--center .yohu-col-header__label {
+  justify-content: center;
+}
+
 .yohu-col-header:not(:last-child)::after {
   content: "";
   position: absolute;

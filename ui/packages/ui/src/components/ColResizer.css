@@ -12,10 +12,20 @@
 }
 
 .yohu-col-resizer:hover,
-.yohu-col-resizer:focus-visible {
+.yohu-col-resizer:focus-visible,
+.yohu-col-resizer--active {
   background-color: var(--yohu-accent);
 }
 
 .yohu-col-resizer:focus-visible {
   outline: none;
+}
+
+html[data-yohu-col-resizing] {
+  cursor: col-resize;
+}
+
+html[data-yohu-col-resizing],
+html[data-yohu-col-resizing] * {
+  user-select: none !important;
 }
