@@ -28,4 +28,5 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   mirror_max_fps: 0,
   mirror_protocol: "usb",
   mirror_force_forward: false,
+  terminal_prepend_adb: false,
 };

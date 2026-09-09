@@ -278,6 +278,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         mirror_max_fps: 0,
         mirror_protocol: "usb",
         mirror_force_forward: false,
+        terminal_prepend_adb: false,
       },
     };
     expect(JSON.parse(JSON.stringify(event)).settings.buffer_capacity).toBe(50);

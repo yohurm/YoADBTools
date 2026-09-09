@@ -118,6 +118,7 @@ export interface AppSettings {
   mirror_max_fps: number;
   mirror_protocol: MirrorProtocol;
   mirror_force_forward: boolean;
+  terminal_prepend_adb: boolean;
 }
 
 /** 日志清单元数据列开关；消息列始终显示。 */
@@ -145,7 +146,8 @@ export type SettingKey =
   | "mirror_video_bit_rate"
   | "mirror_max_fps"
   | "mirror_protocol"
-  | "mirror_force_forward";
+  | "mirror_force_forward"
+  | "terminal_prepend_adb";
 
 /** `settings.set` 单键值类型：按键映射到 `AppSettings` 对应字段类型。
  * `SettingKey` 成员与 `AppSettings` 字段一一同名，故索引映射即精确值类型。
@@ -285,7 +287,13 @@ export interface TerminalEvalRequest {
   serials: string[];
 }
 
-/** 单台设备的 `terminal.eval` 结果。 */
+/** `terminal.exec`：自定义命令行，多设备并行。 */
+export interface TerminalExecRequest {
+  command: string;
+  serials: string[];
+}
+
+/** 单台设备的 `terminal.eval` / `terminal.exec` 结果。 */
 export interface SerialEvalResult {
   serial: string;
   ok: boolean;
@@ -296,7 +304,7 @@ export interface SerialEvalResult {
   duration_ms: number;
 }
 
-/** `terminal.eval` 单台判定字段（不含 serial）。 */
+/** `terminal.eval` 单台原始输出（不含 serial）。`ok` 仅反映退出码。 */
 export interface EvalResult {
   ok: boolean;
   message: string;
@@ -307,19 +315,10 @@ export interface EvalResult {
   duration_ms: number;
 }
 
-export interface InputFieldDto {
-  placeholder: string;
-}
-
 export interface CommandDto {
   id: string;
   name: string;
   template: string;
-  inputs: InputFieldDto[];
-  failure_regex: string;
-  success_regex: string;
-  delay_ms: number;
-  abort_on_fail: boolean;
 }
 
 export interface CommandGroupDto {
@@ -453,6 +452,7 @@ export interface GroupProgress {
   run_id: number;
   serial: string;
   name?: string;
+  template: string;
   ok: boolean;
   message?: string;
   /** 单命令用时（毫秒） */

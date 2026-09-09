@@ -30,6 +30,7 @@ import type {
   SettingValue,
   SystemInfo,
   TerminalEvalRequest,
+  TerminalExecRequest,
   TransferRequest,
   DragOutRequest,
   RemoteUpdate,
@@ -63,6 +64,9 @@ export const adbExec = (req: AdbExecRequest) => invoke<ExecOutcome>("adb.exec", 
 
 export const terminalEval = (req: TerminalEvalRequest) =>
   invoke<SerialEvalResult[]>("terminal.eval", { req });
+
+export const terminalExec = (req: TerminalExecRequest) =>
+  invoke<SerialEvalResult[]>("terminal.exec", { req });
 
 export const groupRun = (req: GroupRunRequest) => invoke<number>("group.run", { req });
 
