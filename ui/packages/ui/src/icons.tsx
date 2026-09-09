@@ -31,6 +31,7 @@ export type IconName =
   | "sidebar"
   | "arrow-up"
   | "arrow-down"
+  | "send"
   | "window-max"
   | "window-min"
   | "window-restore"
@@ -154,6 +155,14 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
     <>
       <line x1="12" y1="5" x2="12" y2="19" />
       <polyline points="19 12 12 19 5 12" />
+    </>
+  ),
+  send: () => (
+    // Lucide send-horizontal（ISC）：水平纸飞机，避免对角 send 在方钮里显歪。
+    // https://github.com/lucide-icons/lucide/blob/main/icons/send-horizontal.svg
+    <>
+      <path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" />
+      <path d="M6 12h16" />
     </>
   ),
   "window-max": () => <rect x="5" y="5" width="14" height="14" rx="1" />,

@@ -68,8 +68,8 @@ describe("Icon", () => {
     expect(d("display-off")).not.toContain("463.384");
   });
 
-  it("含窗口三键图标", () => {
-    expect(ICON_NAMES).toEqual(expect.arrayContaining(["window-max", "window-min", "window-restore"]));
+  it("含窗口三键与水平发送图标", () => {
+    expect(ICON_NAMES).toEqual(expect.arrayContaining(["window-max", "window-min", "window-restore", "send"]));
     expect(ICON_NAMES).toEqual(
       expect.arrayContaining([
         "nav-back",
@@ -82,5 +82,7 @@ describe("Icon", () => {
         "brightness-up",
       ]),
     );
+    const { container } = render(() => <Icon name="send" />);
+    expect(container.querySelector('svg[data-icon="send"] path')?.getAttribute("d") ?? "").toContain("M3.714");
   });
 });
