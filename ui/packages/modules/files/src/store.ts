@@ -20,12 +20,19 @@ import {
   YoLog,
 } from "@yohu/api";
 import type { RemoteEntry, TransferProgress, TransferState } from "@yohu/api";
-import { DISMISS_HOLD_DURATION, motionDurationMs, nextKeys, type SelectMode } from "@yohu/ui";
+import {
+  DISMISS_HOLD_DURATION,
+  motionDurationMs,
+  nextKeys,
+  setColWidth as applyColWidth,
+  type SelectMode,
+} from "@yohu/ui";
 
 import { localBaseName, namesForDrag } from "./drop";
 import {
   DEFAULT_SORT_DIR,
   FILE_COLUMNS,
+  defaultFileColWidths,
   childPath,
   errorText,
   isCancelledError,
@@ -63,8 +70,6 @@ export interface UiTransfer {
 }
 
 const TERMINAL_KEEP_MS = motionDurationMs(DISMISS_HOLD_DURATION);
-const COL_DEFAULT = FILE_COLUMNS.map((col) => col.defaultWidth);
-const COL_MIN = FILE_COLUMNS.map((col) => col.minWidth);
 
 export function createFileStore() {
   const [entries, setEntries] = createStore<RemoteEntry[]>([]);
@@ -88,7 +93,7 @@ export function createFileStore() {
     previewOpen: false,
     /** 传输列表展开；新任务会强制打开。 */
     transfersOpen: true,
-    colWidths: [...COL_DEFAULT],
+    colWidths: defaultFileColWidths(),
   });
 
   let listGen = 0;
@@ -389,12 +394,10 @@ export function createFileStore() {
     setSelection({ names, pivot: selection.pivot ?? names[0] ?? null });
   }
 
-  function resizeCol(index: number, delta: number): void {
-    setUi("colWidths", (prev) => {
-      const next = [...prev];
-      next[index] = Math.max(COL_MIN[index] ?? 0, (next[index] ?? 0) + delta);
-      return next;
-    });
+  function setColWidth(key: SortKey, width: number): void {
+    const spec = FILE_COLUMNS.find((col) => col.key === key);
+    if (!spec) return;
+    setUi("colWidths", applyColWidth(ui.colWidths, spec, width));
   }
 
   function togglePreview(): void {
@@ -443,7 +446,7 @@ export function createFileStore() {
     select,
     selectAll,
     clearSelection,
-    resizeCol,
+    setColWidth,
     togglePreview,
     toggleTransfers,
     selectedSet,

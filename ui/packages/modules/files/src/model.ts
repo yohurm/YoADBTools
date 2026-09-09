@@ -4,6 +4,7 @@
 
 import type { RemoteEntry } from "@yohu/api";
 import { errorText, SAFETY_ROOTS } from "@yohu/api";
+import { colTrackTemplate, defaultColWidths, type YoColWidths } from "@yohu/ui";
 
 export { errorText, SAFETY_ROOTS };
 
@@ -106,11 +107,12 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
   },
 ];
 
-export function fileColTemplate(widths: readonly number[]): string {
-  return FILE_COLUMNS.map((col, index) => {
-    const width = widths[index] ?? col.defaultWidth;
-    return col.flex ? `minmax(${Math.max(width, col.minWidth)}px, 1fr)` : `${width}px`;
-  }).join(" ");
+export function defaultFileColWidths(): YoColWidths {
+  return defaultColWidths(FILE_COLUMNS);
+}
+
+export function fileColTemplate(widths: YoColWidths): string {
+  return colTrackTemplate(FILE_COLUMNS, widths);
 }
 
 export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {

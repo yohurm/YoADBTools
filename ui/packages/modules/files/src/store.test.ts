@@ -4,7 +4,7 @@ import type { RemoteEntry } from "@yohu/api";
 
 import {
   childPath,
-  FILE_COLUMNS,
+  defaultFileColWidths,
   fileCategory,
   fileColTemplate,
   fileTypeLabel,
@@ -191,8 +191,7 @@ describe("formatMtime", () => {
 
 describe("fileColTemplate", () => {
   it("前三列定宽，日期列吃剩余", () => {
-    const widths = FILE_COLUMNS.map((col) => col.defaultWidth);
-    expect(fileColTemplate(widths)).toBe("240px 72px 80px minmax(108px, 1fr)");
+    expect(fileColTemplate(defaultFileColWidths())).toBe("240px 72px 80px minmax(108px, 1fr)");
   });
 });
 

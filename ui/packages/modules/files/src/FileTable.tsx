@@ -5,7 +5,16 @@
 
 import { For, Show } from "solid-js";
 
-import { Icon, YoColHeader, YoEmptyState, YoFileIcon, YoLoading, YoVirtualList, pointerSelectMode } from "@yohu/ui";
+import {
+  Icon,
+  YoColHeader,
+  YoColRow,
+  YoEmptyState,
+  YoFileIcon,
+  YoLoading,
+  YoVirtualList,
+  pointerSelectMode,
+} from "@yohu/ui";
 import type { RemoteEntry } from "@yohu/api";
 
 import {
@@ -21,7 +30,7 @@ import {
 const FILE_ROW_HEIGHT = 28;
 import { fileStore } from "./store";
 
-function ColHead(props: { col: FileColumnSpec; index: number }) {
+function ColHead(props: { col: FileColumnSpec }) {
   const ariaSort = (): "ascending" | "descending" | "none" => {
     if (fileStore.sort.key !== props.col.key) return "none";
     return fileStore.sort.dir === "asc" ? "ascending" : "descending";
@@ -32,7 +41,9 @@ function ColHead(props: { col: FileColumnSpec; index: number }) {
       ariaSort={ariaSort()}
       resizable={!props.col.flex}
       resizeLabel={props.col.resizeLabel}
-      onResize={(dx) => fileStore.resizeCol(props.index, dx)}
+      width={fileStore.ui.colWidths[props.col.key] ?? props.col.defaultWidth}
+      minWidth={props.col.minWidth}
+      onWidthChange={(width) => fileStore.setColWidth(props.col.key, width)}
     >
       <button
         type="button"
@@ -89,16 +100,17 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
 }
 
 export function FileTable(props: { onContextMenu: (x: number, y: number) => void; dropDirName?: string | null }) {
+  const colTemplate = (): string => fileColTemplate(fileStore.ui.colWidths);
   const colStyle = (): { "grid-template-columns": string } => ({
-    "grid-template-columns": fileColTemplate(fileStore.ui.colWidths),
+    "grid-template-columns": colTemplate(),
   });
   const entries = (): RemoteEntry[] => fileStore.entries;
 
   return (
     <section class="yohu-files__table">
-      <div class="yohu-files__cols yohu-files__cols--head" style={colStyle()} role="row">
-        <For each={[...FILE_COLUMNS]}>{(col, index) => <ColHead col={col} index={index()} />}</For>
-      </div>
+      <YoColRow class="yohu-files__cols yohu-files__cols--head" template={colTemplate()}>
+        <For each={[...FILE_COLUMNS]}>{(col) => <ColHead col={col} />}</For>
+      </YoColRow>
       <div
         class="yohu-files__table-list"
         onContextMenu={(event) => {
