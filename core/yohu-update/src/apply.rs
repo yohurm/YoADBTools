@@ -10,7 +10,7 @@ use std::io::Write;
 use yohu_protocol::DATA_DIR_NAME;
 use yohu_protocol::PRODUCT_NAME;
 #[cfg(not(target_os = "macos"))]
-use yohu_runtime::app_data_root;
+use yohu_runtime::app_install_root;
 
 use crate::download::assert_cached_installer;
 use crate::error::UpdateError;
@@ -39,6 +39,7 @@ if (-not (Test-Path -LiteralPath $Setup)) { exit 2 }
 $p = Start-Process -FilePath $Setup -ArgumentList '/S' -Wait -PassThru
 if ($null -eq $p) { exit 3 }
 if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+Remove-Item -LiteralPath $Setup -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 if (Test-Path -LiteralPath $App) {
   Start-Process -FilePath $App
@@ -46,12 +47,12 @@ if (Test-Path -LiteralPath $App) {
 exit 0
 "#;
 
-/// NSIS per-user 安装后的主程序（Windows：`%LOCALAPPDATA%\YohuAdbTools\YohuAdbTools.exe`）。
+/// NSIS per-user 安装后的主程序（Windows：`%LOCALAPPDATA%\Programs\YohuAdbTools\YohuAdbTools.exe`）。
 /// macOS：`/Applications/YohuAdbTools.app/Contents/MacOS/YohuAdbTools`。
 pub fn installed_exe_path() -> PathBuf {
     #[cfg(windows)]
     {
-        app_data_root(DATA_DIR_NAME).join(format!("{PRODUCT_NAME}.exe"))
+        app_install_root(DATA_DIR_NAME).join(format!("{PRODUCT_NAME}.exe"))
     }
     #[cfg(target_os = "macos")]
     {
@@ -63,7 +64,7 @@ pub fn installed_exe_path() -> PathBuf {
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
-        app_data_root(DATA_DIR_NAME).join(PRODUCT_NAME)
+        app_install_root(DATA_DIR_NAME).join(PRODUCT_NAME)
     }
 }
 
@@ -167,9 +168,11 @@ mod tests {
         #[cfg(windows)]
         {
             assert!(p.ends_with("YohuAdbTools.exe"));
-            assert!(p
+            let parent = p.parent().expect("exe parent");
+            assert!(parent.ends_with("YohuAdbTools"));
+            assert!(parent
                 .parent()
-                .map(|d| d.ends_with("YohuAdbTools"))
+                .map(|d| d.ends_with("Programs"))
                 .unwrap_or(false));
         }
         #[cfg(target_os = "macos")]

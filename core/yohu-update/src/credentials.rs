@@ -1,4 +1,4 @@
-//! GitHub Releases 通道：环境变量与 settings/update.json 可覆盖仓库；token 可选。
+﻿//! GitHub Releases 通道：环境变量与 config/update.json 可覆盖仓库；token 可选。
 
 use std::path::Path;
 
@@ -32,13 +32,13 @@ struct GitHubFile {
 }
 
 /// 解析 GitHub 仓库坐标。
-pub fn load_github_source(settings_dir: &Path) -> Result<GitHubReleaseSource, UpdateError> {
-    load_github_source_from(&read_update_file(settings_dir))
+pub fn load_github_source(config_dir: &Path) -> Result<GitHubReleaseSource, UpdateError> {
+    load_github_source_from(&read_update_file(config_dir))
 }
 
 /// 给设置页展示的通道摘要（不含密钥）。
-pub fn describe_channel(settings_dir: &Path) -> Result<UpdateChannelInfo, UpdateError> {
-    let source = load_github_source(settings_dir)?;
+pub fn describe_channel(config_dir: &Path) -> Result<UpdateChannelInfo, UpdateError> {
+    let source = load_github_source(config_dir)?;
     Ok(UpdateChannelInfo {
         remote: format!("{}/{}", source.owner, source.repo),
         page_url: format!("https://github.com/{}/{}", source.owner, source.repo),
@@ -57,8 +57,8 @@ fn load_github_source_from(file: &UpdateFile) -> Result<GitHubReleaseSource, Upd
     Ok(GitHubReleaseSource::new(owner, repo)?.with_token(token))
 }
 
-fn read_update_file(settings_dir: &Path) -> UpdateFile {
-    let path = settings_dir.join(UPDATE_FILE);
+fn read_update_file(config_dir: &Path) -> UpdateFile {
+    let path = config_dir.join(UPDATE_FILE);
     let Ok(text) = std::fs::read_to_string(&path) else {
         return UpdateFile::default();
     };

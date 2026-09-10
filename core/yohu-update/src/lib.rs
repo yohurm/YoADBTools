@@ -26,12 +26,12 @@ use std::path::Path;
 
 use yohu_protocol::RemoteUpdate;
 
-/// 用 `settings/update.json` / 环境变量补全仓库后检查 GitHub Releases。
+/// 用 `config/update.json` / 环境变量补全仓库后检查 GitHub Releases。
 pub async fn check_configured(
-    settings_dir: &Path,
+    config_dir: &Path,
     platform: PlatformInfo,
 ) -> Result<RemoteUpdate, UpdateError> {
-    check_with_github(load_github_source(settings_dir)?, platform).await
+    check_with_github(load_github_source(config_dir)?, platform).await
 }
 
 /// 用 GitHub Releases Provider 按平台信息检查更新。

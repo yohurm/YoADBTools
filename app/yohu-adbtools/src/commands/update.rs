@@ -20,7 +20,7 @@ use yohu_update::{
 pub async fn update_check(state: State<'_, AppState>) -> Result<RemoteUpdate, IpcError> {
     let platform =
         PlatformInfo::from_identity(&AppIdentity::with_version(env!("CARGO_PKG_VERSION")));
-    check_configured(&state.paths.settings_dir, platform)
+    check_configured(&state.paths.config_dir, platform)
         .await
         .map_err(ipc_update)
 }
@@ -28,7 +28,7 @@ pub async fn update_check(state: State<'_, AppState>) -> Result<RemoteUpdate, Ip
 /// `update.info`：当前通道（不含密钥），供设置页展示。
 #[tauri::command(rename = "update.info")]
 pub fn update_info(state: State<'_, AppState>) -> Result<UpdateChannelInfo, IpcError> {
-    describe_channel(&state.paths.settings_dir).map_err(ipc_update)
+    describe_channel(&state.paths.config_dir).map_err(ipc_update)
 }
 
 /// `update.download`：把检查结果中的安装包下到临时目录并校验。
@@ -40,7 +40,7 @@ pub async fn update_download(
     let url = assert_http_url(&request.url)
         .map_err(ipc_update)?
         .to_string();
-    let token = load_github_source(&state.paths.settings_dir)
+    let token = load_github_source(&state.paths.config_dir)
         .map(|s| s.token)
         .unwrap_or_default();
     let cancel = CancellationToken::new();

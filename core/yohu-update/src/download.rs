@@ -7,7 +7,10 @@ use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
-use yohu_protocol::{UpdateDownloadResult, UpdateProgress, UpdateStage, PRODUCT_NAME};
+use yohu_protocol::{
+    dir, UpdateDownloadResult, UpdateProgress, UpdateStage, DATA_DIR_NAME,
+};
+use yohu_runtime::app_data_root;
 
 use crate::error::UpdateError;
 
@@ -16,9 +19,11 @@ pub const MAX_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
-/// `%TEMP%\YohuAdbTools-update\`：不进 NSIS INSTDIR，覆盖安装时不会自删。
+/// 产品家园 `cache/update/`：不进 NSIS INSTDIR，覆盖安装时不会自删。
 pub fn update_cache_dir() -> PathBuf {
-    std::env::temp_dir().join(format!("{PRODUCT_NAME}-update"))
+    app_data_root(DATA_DIR_NAME)
+        .join(dir::CACHE)
+        .join(dir::UPDATE)
 }
 
 /// 从下载 URL 取出合法的 `.exe` 文件名。
