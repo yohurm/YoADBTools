@@ -108,7 +108,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
           <Show when={error()}>
             <span class="yohu-cm__error">{error()}</span>
           </Show>
-          <YoButton variant="ghost" onClick={props.onClose} disabled={saving()}>
+          <YoButton variant="ghost" tone="neutral" onClick={props.onClose} disabled={saving()}>
             取消
           </YoButton>
           <YoButton onClick={() => void save()} loading={saving()}>

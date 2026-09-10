@@ -18,6 +18,7 @@ import {
   YoPanel,
   YoTextField,
   YoTree,
+  YoTooltip,
   motionSpecMs,
   shouldSkipMotion,
 } from "@yohu/ui";
@@ -71,7 +72,7 @@ function ParameterDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <YoButton variant="ghost" onClick={props.onClose}>
+          <YoButton variant="ghost" tone="neutral" onClick={props.onClose}>
             取消
           </YoButton>
           <YoButton onClick={submit}>加入队列</YoButton>
@@ -233,10 +234,10 @@ export function TerminalView(props: DeviceSession) {
   return (
     <YoPage class="yohu-terminal">
       <YoChrome title={ModuleTitle.Terminal} deviceLabel={props.selectedLabel ?? undefined}>
-        <YoButton variant="secondary" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
+        <YoButton variant="outlined" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
           清屏
         </YoButton>
-        <YoButton variant="secondary" onClick={() => setManagerOpen(true)}>
+        <YoButton variant="outlined" tone="neutral" onClick={() => setManagerOpen(true)}>
           命令管理
         </YoButton>
       </YoChrome>
@@ -264,7 +265,7 @@ export function TerminalView(props: DeviceSession) {
           title="执行结果"
           actions={
             <Show when={running()}>
-              <YoBadge text="执行中" tone="warn" />
+              <YoBadge text="执行中" tone="warning" />
             </Show>
           }
         >
@@ -307,9 +308,9 @@ export function TerminalView(props: DeviceSession) {
                       {(item) => (
                         <div class="yohu-terminal__queue-item" role="listitem">
                           <span class="yohu-terminal__queue-title">{item.title}</span>
-                          <span class="yohu-terminal__queue-line" title={formatAdbLine("-", item.line)}>
-                            {formatAdbLine("-", item.line)}
-                          </span>
+                          <YoTooltip content={formatAdbLine("-", item.line)} block>
+                            <span class="yohu-terminal__queue-line">{formatAdbLine("-", item.line)}</span>
+                          </YoTooltip>
                           <YoIconButton
                             icon="close"
                             title="移出队列"
@@ -352,11 +353,12 @@ export function TerminalView(props: DeviceSession) {
                 aria-hidden={composerOpen() || undefined}
                 inert={composerOpen() ? true : undefined}
               >
+                <YoTooltip content="展开输入">
                 <button
                   type="button"
                   class="yohu-terminal__dock-toggle yohu-interactive yohu-focus-ring"
                   aria-expanded={false}
-                  title="展开输入"
+                  aria-label="展开输入"
                   onClick={() => setComposerOpen(true)}
                 >
                   <Icon name="chevron-left" />
@@ -364,6 +366,7 @@ export function TerminalView(props: DeviceSession) {
                     <YoBadge text={String(queue().length)} tone="accent" />
                   </Show>
                 </button>
+                </YoTooltip>
               </div>
             </div>
           </div>

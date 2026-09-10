@@ -19,7 +19,7 @@
   container-type: inline-size;
 }
 
-.yohu-terminal__output.yohu-panel--pane .yohu-panel__body {
+.yohu-terminal__output.yohu-panel[data-variant="pane"] .yohu-panel__body {
   overflow: hidden;
 }
 
