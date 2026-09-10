@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use crate::error::AdbError;
+use yohu_protocol::dir;
 
 /// 当前平台需要随包分发的官方 platform-tools 文件。
 #[cfg(windows)]
@@ -106,20 +107,27 @@ impl ToolResolver {
         )
     }
 
-    /// 从资源目录复制 sidecar 到数据目录（幂等；Unix 补可执行位）。
+    /// 从资源目录复制 sidecar 到数据目录。源 size+mtime 与 stamp 不一致则覆盖。
     pub fn ensure_extracted(&self) -> Result<(), AdbError> {
         std::fs::create_dir_all(&self.data_tools_dir)?;
+        let stamp_path = self.data_tools_dir.join(dir::SIDECAR_STAMP);
+        let wanted = sidecar_stamp(&self.resource_dir);
+        let current = std::fs::read_to_string(&stamp_path).unwrap_or_default();
+        let refresh = !wanted.is_empty() && wanted != current;
         for name in ADB_FILES {
             let src = self.resource_dir.join(name);
             if !src.is_file() {
                 continue;
             }
             let dst = self.data_tools_dir.join(name);
-            if !dst.is_file() {
+            if refresh || !dst.is_file() {
                 std::fs::copy(&src, &dst)?;
                 tracing::info!("已解压 adb 工具: {}", dst.display());
             }
             yohu_runtime::ensure_executable(&dst)?;
+        }
+        if !wanted.is_empty() {
+            std::fs::write(&stamp_path, wanted)?;
         }
         Ok(())
     }
@@ -133,6 +141,24 @@ impl ToolResolver {
             Err(e) => tracing::warn!("adb 预热解压失败: {e}"),
         }
     }
+}
+
+fn sidecar_stamp(resource_dir: &std::path::Path) -> String {
+    let mut out = String::new();
+    for name in ADB_FILES {
+        let src = resource_dir.join(name);
+        let Ok(meta) = src.metadata() else {
+            continue;
+        };
+        let mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        out.push_str(&format!("{}:{}:{mtime}\n", name, meta.len()));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -178,6 +204,36 @@ mod tests {
         let after_user = tool.candidates();
         assert_eq!(after_user.first(), Some(&resource.join(adb_file_name())));
         assert_eq!(after_user.len(), 2, "用户路径 + 解压副本");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn extract_overwrites_when_source_stamp_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "yohu-tool-stamp-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let resource = root.join("res");
+        let data = root.join("data");
+        fs::create_dir_all(&resource).unwrap();
+        for name in ADB_FILES {
+            fs::write(resource.join(name), b"v1").unwrap();
+        }
+        let tool = ToolResolver::new(None, resource.clone(), data.clone());
+        tool.ensure_extracted().unwrap();
+        assert_eq!(fs::read_to_string(data.join(adb_file_name())).unwrap(), "v1");
+
+        for name in ADB_FILES {
+            fs::write(resource.join(name), b"v2-longer").unwrap();
+        }
+        tool.ensure_extracted().unwrap();
+        assert_eq!(
+            fs::read_to_string(data.join(adb_file_name())).unwrap(),
+            "v2-longer"
+        );
+        assert!(data.join(yohu_protocol::dir::SIDECAR_STAMP).is_file());
         let _ = fs::remove_dir_all(&root);
     }
 }
