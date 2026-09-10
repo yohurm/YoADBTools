@@ -1,18 +1,28 @@
 [
   {
     "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "W", "tag": "T", "msg": "m" },
-    "filter": { "min_level": "W", "scope": { "kind": "all" } },
+    "filter": { "levels": ["W"], "scope": { "kind": "all" } },
     "expect": true
   },
   {
     "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "E", "tag": "T", "msg": "m" },
-    "filter": { "min_level": "W", "scope": { "kind": "all" } },
-    "expect": true
+    "filter": { "levels": ["W"], "scope": { "kind": "all" } },
+    "expect": false
   },
   {
     "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "T", "msg": "m" },
-    "filter": { "min_level": "W", "scope": { "kind": "all" } },
+    "filter": { "levels": ["W"], "scope": { "kind": "all" } },
     "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "E", "tag": "T", "msg": "m" },
+    "filter": { "levels": ["W", "E"], "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "W", "tag": "T", "msg": "m" },
+    "filter": { "levels": ["w"], "scope": { "kind": "all" } },
+    "expect": true
   },
   {
     "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "OkHttp-Async", "msg": "request Timeout" },
@@ -56,7 +66,12 @@
   },
   {
     "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "?", "tag": "T", "msg": "m" },
-    "filter": { "min_level": "V", "scope": { "kind": "all" } },
+    "filter": { "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "?", "tag": "T", "msg": "m" },
+    "filter": { "levels": ["V"], "scope": { "kind": "all" } },
     "expect": false
   }
 ]

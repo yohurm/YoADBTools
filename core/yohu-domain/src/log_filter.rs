@@ -32,12 +32,19 @@ fn contains_ascii_ignore_case(haystack: &str, needle: &str) -> bool {
         .any(|w| w.iter().zip(n).all(|(a, b)| a.eq_ignore_ascii_case(b)))
 }
 
+fn level_in_set(levels: &[char], line: char) -> bool {
+    if levels.is_empty() {
+        return true;
+    }
+    let needle = line.to_ascii_uppercase();
+    levels.iter().any(|item| item.to_ascii_uppercase() == needle)
+}
+
 /// 单行匹配。`Package { pids: [] }` 不命中任何行。
+/// 级别：`levels` 空则不限；非空则精确属于该集合（不是最低含以上）。
 pub fn log_filter_matches(filter: &LogFilter, line: &LogLine) -> bool {
-    if let Some(min) = filter.min_level {
-        if level_rank(line.level) < level_rank(min) {
-            return false;
-        }
+    if !level_in_set(&filter.levels, line.level) {
+        return false;
     }
     if let Some(tag) = &filter.tag_contains {
         if !contains_ascii_ignore_case(&line.tag, tag) {
@@ -101,6 +108,16 @@ mod tests {
             serde_json::from_str(include_str!("../testdata/level_rank.json")).expect("fixture");
         for (i, case) in cases.iter().enumerate() {
             assert_eq!(level_rank(case.level), case.rank, "case {i}");
+        }
+    }
+
+    #[test]
+    fn known_levels_shared_fixture() {
+        let letters: Vec<char> =
+            serde_json::from_str(include_str!("../testdata/log_levels.json")).expect("fixture");
+        assert_eq!(letters, vec!['V', 'D', 'I', 'W', 'E', 'F']);
+        for (i, letter) in letters.iter().enumerate() {
+            assert_eq!(level_rank(*letter), (i + 1) as u8, "letter {letter}");
         }
     }
 }
