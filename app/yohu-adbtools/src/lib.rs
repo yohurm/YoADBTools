@@ -65,6 +65,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--force-renderer-accessibility",
         );
     }
+    #[cfg(windows)]
+    if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_none() {
+        let webview = AppPaths::default_webview_dir();
+        let _ = std::fs::create_dir_all(&webview);
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview);
+    }
     // 诊断日志：release（windows_subsystem）无控制台 → 落盘 logs/app.log（滚动 1MB×3）
     // 与设备日志严格分离（ADR-v6-010）；AppLog 内存环仍不落盘。
     let logs_dir = AppPaths::default_logs_dir();
@@ -145,6 +151,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 crate::window_boot::spawn_reveal_fallback(win);
             }
             let paths = AppPaths::resolve(&snapshot.data_root);
+            if let Err(e) = paths.ensure_home() {
+                tracing::warn!("创建产品家园失败: {e}");
+            }
             crate::dnd::cleanup_stale(&paths.drag_out_dir());
 
             // 2) 崩溃 hook（先于一切业务）
