@@ -1,6 +1,7 @@
 /**
  * 采集客户端：窗口订阅 ↔ 每设备一路 logcat。
  * 引用计数、世代、掉线、溢出回补在本文件；批次扇出在 ingest。
+ * 设备流停靠 captureState 事件；confirmStart 只退订本窗口。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
  * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
@@ -28,7 +29,7 @@ import {
   onSettingsChanged,
   YoLog,
 } from "@yohu/api";
-import type { CaptureStatus, ProcessEntry } from "@yohu/api";
+import type { ProcessEntry } from "@yohu/api";
 
 import { toWireFilter } from "./filter";
 import type { IngestApi } from "./ingest";
@@ -141,24 +142,6 @@ export function createCapture(
     stopWindowsOn(device);
   }
 
-  function applyStatus(status: CaptureStatus): void {
-    if (status.capturing) {
-      if (status.generation > 0 && (lastStoppedGen.get(status.serial) ?? 0) >= status.generation) {
-        lastStoppedGen.set(status.serial, status.generation - 1);
-      }
-      setDeviceGen(status.serial, status.generation);
-      return;
-    }
-    const prev = Math.max(
-      lastStoppedGen.get(status.serial) ?? 0,
-      status.generation,
-      deviceSlice(state, status.serial).generation,
-    );
-    lastStoppedGen.set(status.serial, prev);
-    setDeviceGen(status.serial, status.generation);
-    stopWindowsOn(status.serial);
-  }
-
   function setBufferCapacity(capacity: number): void {
     const next = Math.max(1, capacity);
     mirrors.setCapacity(next);
@@ -170,20 +153,18 @@ export function createCapture(
   async function confirmStart(device: string, startedGen: number, sessionId: number): Promise<void> {
     try {
       const status = await logCaptureStatus(device);
-      if (status.capturing || status.generation >= startedGen) {
-        if (status.capturing) {
-          if (status.generation > 0 && (lastStoppedGen.get(device) ?? 0) >= status.generation) {
-            lastStoppedGen.set(device, status.generation - 1);
-          }
-          setDeviceGen(device, status.generation);
-          await pullSnapshot(device);
-          return;
+      if (status.capturing) {
+        if (status.generation > 0 && (lastStoppedGen.get(device) ?? 0) >= status.generation) {
+          lastStoppedGen.set(device, status.generation - 1);
         }
-        applyStatus(status);
-        const idx = sessionIndex(sessionId);
-        if (idx >= 0 && state.sessions[idx]!.serial === device) {
-          setState("sessions", idx, { capturing: false, starting: false });
-        }
+        setDeviceGen(device, status.generation);
+        await pullSnapshot(device);
+        return;
+      }
+      if (status.generation < startedGen) return;
+      const idx = sessionIndex(sessionId);
+      if (idx >= 0 && state.sessions[idx]!.serial === device) {
+        setState("sessions", idx, { capturing: false, starting: false });
       }
     } catch (e) {
       console.error("log.capture.status 失败", e);

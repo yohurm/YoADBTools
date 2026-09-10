@@ -189,7 +189,11 @@ describe("scanSignal", () => {
   it("崩溃与 ANR", () => {
     expect(scanSignal(line({ tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }))?.kind).toBe("crash");
     expect(scanSignal(line({ msg: "ANR in com.foo" }))?.kind).toBe("anr");
+    expect(scanSignal(line({ msg: "am_anr: com.foo" }))?.kind).toBe("anr");
     expect(scanSignal(line({ msg: "normal" }))).toBeNull();
+    expect(scanSignal(line({ tag: "AndroidRuntime", msg: "Process: com.foo" }))).toBeNull();
+    expect(scanSignal(line({ tag: "ActivityManager", msg: "Process com.foo (pid 12) has died" }))).toBeNull();
+    expect(scanSignal(line({ msg: "socket is not responding yet" }))).toBeNull();
   });
 });
 

@@ -15,11 +15,11 @@ import type { LogLine, ProcessEntry } from "@yohu/api";
 
 import {
   appendLines,
-  countSignals,
   isFreshLine,
   lastSeqOf,
   rebuildFiltered,
   seqBefore,
+  signalCountOf,
   splitHitsForFreeze,
   trimRows,
 } from "./panel";
@@ -62,6 +62,7 @@ export interface LogSessionState {
   /** 离开底部时可见区末 seq；跟滚中为 null。过滤重建用它当冻结上限，不跟当前（可能已筛窄的）末行走。 */
   frozenThroughSeq: number | null;
   pendingCount: number;
+  /** 当前可见面板上的信号行，由 visible 派生，禁止累计已裁掉的行 */
   signalCount: number;
   visible: ViewRow[];
   binding: PidBinding;
@@ -184,10 +185,11 @@ export function createWorkspace(
     return session;
   }
 
-  function writePanel(idx: number, rows: ViewRow[], signalCount: number, pendingCount: number): void {
+  function writePanel(idx: number, rows: ViewRow[], pendingCount: number): void {
+    const visible = trimRows(rows, bufferCapacity());
     setState("sessions", idx, {
-      visible: trimRows(rows, bufferCapacity()),
-      signalCount,
+      visible,
+      signalCount: signalCountOf(visible),
       pendingCount,
     });
   }
@@ -195,7 +197,7 @@ export function createWorkspace(
   function clearPanel(id: number): void {
     const idx = sessionIndex(id);
     if (idx < 0) return;
-    writePanel(idx, [], 0, 0);
+    writePanel(idx, [], 0);
   }
 
   function clearDevicePanels(serial: string): void {
@@ -226,15 +228,13 @@ export function createWorkspace(
       if (session.following) setState("sessions", idx, { pendingCount: 0 });
       return;
     }
-    const signals = session.signalCount + countSignals(lines);
     if (!session.following) {
       setState("sessions", idx, {
         pendingCount: session.pendingCount + lines.length,
-        signalCount: signals,
       });
       return;
     }
-    writePanel(idx, appendLines(session.visible, lines, bufferCapacity()), signals, 0);
+    writePanel(idx, appendLines(session.visible, lines, bufferCapacity()), 0);
   }
 
   /**
@@ -250,7 +250,7 @@ export function createWorkspace(
     const ceiling = session.following ? null : session.frozenThroughSeq;
     const { forPanel, pending } = splitHitsForFreeze(allHits, ceiling);
     const next = rebuildFiltered(session.visible, forPanel, filter, bufferCapacity());
-    writePanel(idx, next.visible, next.signalCount, pending);
+    writePanel(idx, next.visible, pending);
   }
 
   function trimPanels(): void {
@@ -258,7 +258,7 @@ export function createWorkspace(
     state.sessions.forEach((session, idx) => {
       const trimmed = trimRows(session.visible, cap);
       if (trimmed.length === session.visible.length) return;
-      setState("sessions", idx, { visible: trimmed });
+      writePanel(idx, trimmed, session.pendingCount);
     });
   }
 

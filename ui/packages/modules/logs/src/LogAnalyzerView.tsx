@@ -53,6 +53,13 @@ import {
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { LEVELS, levelKey, type ViewRow } from "./pipeline";
+import {
+  sessionCaptureLabel,
+  sessionCapturePhase,
+  sessionEmptyWait,
+  sessionIsLive,
+  sessionTabDot,
+} from "./session-chrome";
 import { formatSessionDevice } from "./session-device";
 import { deviceSlice, logStore } from "./store";
 import type { LogSessionState } from "./workspace";
@@ -142,10 +149,6 @@ function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumn
   };
 }
 
-function sessionPending(session: { starting: boolean }): boolean {
-  return session.starting;
-}
-
 function shortSerial(serial: string | null): string {
   if (!serial) return "";
   return serial.length > 6 ? serial.slice(-4) : serial;
@@ -159,8 +162,8 @@ function tabTitle(session: LogSessionState): string {
 function SessionEmpty(props: { session: LogSessionState }) {
   const filterActive = (): boolean =>
     props.session.minLevel !== null || props.session.tagContains.length > 0 || props.session.keyword.length > 0;
-  const idle = (): boolean =>
-    !props.session.capturing && !sessionPending(props.session) && !filterActive();
+  const phase = (): ReturnType<typeof sessionCapturePhase> => sessionCapturePhase(props.session);
+  const idle = (): boolean => phase() === "stopped" && !filterActive();
   return (
     <div class="yohu-logs__empty">
       <Show
@@ -173,14 +176,11 @@ function SessionEmpty(props: { session: LogSessionState }) {
         }
       >
         <Show
-          when={filterActive() && !sessionPending(props.session)}
+          when={filterActive() && phase() !== "starting"}
           fallback={
-            <YoLoading
-              title={sessionPending(props.session) ? "正在启动采集…" : "等待设备输出…"}
-              description={
-                sessionPending(props.session) ? "正在连接设备 logcat" : "logcat 采集中，暂未收到行"
-              }
-            />
+            <Show when={sessionEmptyWait(phase())} keyed>
+              {(wait) => <YoLoading title={wait.title} description={wait.description} />}
+            </Show>
           }
         >
           <YoEmptyState icon="log" title="无匹配日志" description="调整过滤条件（级别/Tag/关键字）后重试" />
@@ -232,18 +232,13 @@ export function LogAnalyzerView(props: DeviceSession) {
     logStore.state.sessions.map((s) => ({
       id: String(s.id),
       title: tabTitle(s),
-      dot:
-        s.signalCount > 0
-          ? ({ tone: "error" as const })
-          : s.capturing
-            ? ({ tone: "success" as const })
-            : undefined,
+      dot: sessionTabDot(sessionCapturePhase(s)),
     })),
   );
 
   const windowLive = (): boolean => {
     const session = active();
-    return Boolean(session && (session.capturing || session.starting));
+    return Boolean(session && sessionIsLive(session));
   };
 
   const overflowed = createMemo(() => deviceSlice(logStore.state, active()?.serial).overflowed);
@@ -413,7 +408,7 @@ export function LogAnalyzerView(props: DeviceSession) {
           }}
         >
           {windowLive()
-            ? active()?.starting && !active()?.capturing
+            ? sessionCapturePhase(active()!) === "starting"
               ? "取消启动"
               : "停止"
             : "开始"}
@@ -608,13 +603,9 @@ export function LogAnalyzerView(props: DeviceSession) {
                 <span class="yohu-logs__status-capture">
                   <span
                     class="yohu-logs__status-dot"
-                    classList={{ "yohu-logs__status-dot--on": session.capturing }}
+                    classList={{ "yohu-logs__status-dot--on": sessionCapturePhase(session) === "live" }}
                   />
-                  {session.capturing
-                    ? "采集中"
-                    : sessionPending(session)
-                      ? "启动中"
-                      : "已停止"}
+                  {sessionCaptureLabel(sessionCapturePhase(session))}
                 </span>
                 <span>
                   {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}

@@ -11,7 +11,6 @@ import type { LogLine } from "@yohu/api";
 import {
   collapseStack,
   matchesLine,
-  scanSignal,
   type SessionFilter,
   type ViewRow,
 } from "./pipeline";
@@ -37,8 +36,9 @@ export function trimRows(rows: readonly ViewRow[], cap: number): ViewRow[] {
   return rows.length > n ? rows.slice(rows.length - n) : [...rows];
 }
 
-export function countSignals(lines: readonly LogLine[]): number {
-  return lines.reduce((acc, l) => acc + (scanSignal(l) ? 1 : 0), 0);
+/** 当前可见面板上的信号行；裁剪后必须重算，禁止累计已滚出的行。 */
+export function signalCountOf(rows: readonly ViewRow[]): number {
+  return rows.reduce((acc, row) => acc + (row.signal ? 1 : 0), 0);
 }
 
 export function keepMatching(rows: readonly ViewRow[], filter: SessionFilter): LogLine[] {
@@ -109,7 +109,8 @@ export function panelFromLines(
   lines: readonly LogLine[],
   cap: number,
 ): { visible: ViewRow[]; signalCount: number } {
-  return { visible: trimRows(collapseStack(lines), cap), signalCount: countSignals(lines) };
+  const visible = trimRows(collapseStack(lines), cap);
+  return { visible, signalCount: signalCountOf(visible) };
 }
 
 /**

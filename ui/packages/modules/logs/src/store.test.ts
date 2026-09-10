@@ -267,6 +267,20 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.mirrors.of("S1").size()).toBe(5);
   });
 
+  it("信号计数跟可见面板；采集订阅不因信号变红/停", async () => {
+    const store = await liveStore();
+    store.setBufferCapacity(2);
+    push("S1", [
+      mk(0, { level: "E", tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }),
+      mk(1, { msg: "recovered" }),
+      mk(2, { msg: "still live" }),
+    ]);
+    const session = store.state.sessions[0]!;
+    expect(session.visible.map((r) => r.line.seq)).toEqual([1, 2]);
+    expect(session.signalCount).toBe(0);
+    expect(session.capturing).toBe(true);
+  });
+
   it("关键字/Tag 过滤与信号行标记", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
@@ -572,6 +586,25 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.capturing).toBe(false);
     expect(generationOf(store, "S1")).toBe(1);
     expect(store.state.sessions[0]!.starting).toBe(false);
+  });
+
+  it("后开窗口 status 已结束只退订自己，不误伤同设备兄弟窗口", async () => {
+    const store = await liveStore();
+    const system = store.state.sessions[0]!;
+    const other = store.createSession({ kind: "all" }, "A");
+    store.setActive(other);
+    mocks.logCaptureStatus.mockResolvedValueOnce({
+      serial: "S1",
+      capturing: false,
+      generation: 1,
+      last_seq: 0,
+    });
+    await store.startCapture();
+    expect(store.state.sessions.find((s) => s.id === other)!.capturing).toBe(false);
+    expect(store.state.sessions.find((s) => s.id === system.id)!.capturing).toBe(true);
+    push("S1", [mk(0, { msg: "sibling-still-live" })]);
+    expect(store.state.sessions.find((s) => s.id === system.id)!.visible[0]!.line.msg).toBe("sibling-still-live");
+    expect(store.state.sessions.find((s) => s.id === other)!.visible).toHaveLength(0);
   });
 
   it("starting 期间 stop 立即发 stop IPC，不等待 start 返回", async () => {

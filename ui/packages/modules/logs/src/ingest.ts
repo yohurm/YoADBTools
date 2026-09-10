@@ -9,7 +9,7 @@ import type { LogBatch } from "@yohu/api";
 
 import { matchesLine, toSessionFilter } from "./filter";
 import type { MirrorBank } from "./mirror";
-import { appendLines, countSignals, isFreshLine, lastSeqOf } from "./panel";
+import { appendLines, isFreshLine, lastSeqOf, signalCountOf } from "./panel";
 import type { LogUiState } from "./workspace";
 
 export type IngestApi = {
@@ -40,17 +40,16 @@ export function createIngest(
       if (idx < 0) return;
 
       if (session.paused) return;
-      const signals = countSignals(matched);
       if (!session.following) {
         setState("sessions", idx, {
           pendingCount: session.pendingCount + matched.length,
-          signalCount: session.signalCount + signals,
         });
         return;
       }
+      const visible = appendLines(state.sessions[idx]!.visible, matched, bufferCapacity());
       setState("sessions", idx, {
-        visible: appendLines(state.sessions[idx]!.visible, matched, bufferCapacity()),
-        signalCount: session.signalCount + signals,
+        visible,
+        signalCount: signalCountOf(visible),
       });
     });
   }

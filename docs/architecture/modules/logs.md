@@ -12,5 +12,6 @@
 - **复制仍是文档（Family A）：** 载荷是 `formatLogLine`。选区偏移从单元格文案映射回文档（补列间空格）。禁止把 Grid 碎片 `Selection.toString()` 当跨列载荷。解析失败（`level=?`）整行通栏
 - **选区与复制：** 只有一套字符选区。单行局部与跨行同一机制；列间空白可被选中。复制按选区重建：单行切片；跨行 = 首行切片 + 中间 `format_log_line`（含虚拟列表未挂载行）+ 末行切片。Ctrl+A = 整表 visible。无选区右键复制该行。铬层（表头、折叠钮）`user-select: none`。禁止把 Grid 碎片 `Selection.toString()` 当载荷；文档行上的选区文本与 `format_log_line` 对齐
 - UI：`@yohu/module-logs`；轨 `singleRequired`；多窗口可绑不同设备
+- **采集相只有一源：** Tab 圆点、状态行、空态只认窗口订阅 `capturing` / `starting`（`session-chrome`）。设备流停靠 `log/captureState`（`applyEvent`）停该 serial 全部窗口。`confirmStart` 只退订本窗口，禁止 `stopWindowsOn`。崩溃只要 `FATAL EXCEPTION`，ANR 只要 `ANR in` / `am_anr`；信号计数由可见面板 `ViewRow.signal` 派生，禁止改 Tab 色、禁止累计已裁掉的行
 - 状态行设备：型号 + Android 版本 + API（`DeviceSession.devices` + `deviceStatuses`），不拼 serial
 - 快捷键：Space / Ctrl+L / F / T / W / Tab

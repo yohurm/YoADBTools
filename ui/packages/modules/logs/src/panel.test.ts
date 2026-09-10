@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { appendLines, isFreshLine, keepMatching, lastSeqOf, mergeLinesBySeq, panelFromLines, rebuildFiltered, seqBefore, splitHitsForFreeze, trimRows } from "./panel";
+import { appendLines, isFreshLine, keepMatching, lastSeqOf, mergeLinesBySeq, panelFromLines, rebuildFiltered, seqBefore, signalCountOf, splitHitsForFreeze, trimRows } from "./panel";
 import { collapseStack, type SessionFilter } from "./pipeline";
 
 const line = (seq: number, over: Partial<LogLine> = {}): LogLine => ({
@@ -91,5 +91,19 @@ describe("panel", () => {
     );
     expect(visible).toHaveLength(1);
     expect(signalCount).toBe(1);
+  });
+
+  it("信号计数跟裁剪后的可见行，不累计已滚出的崩溃", () => {
+    const { visible, signalCount } = panelFromLines(
+      [
+        line(0, { level: "E", tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }),
+        line(1, { msg: "ok" }),
+        line(2, { msg: "still ok" }),
+      ],
+      2,
+    );
+    expect(visible.map((r) => r.line.seq)).toEqual([1, 2]);
+    expect(signalCount).toBe(0);
+    expect(signalCountOf(visible)).toBe(0);
   });
 });
