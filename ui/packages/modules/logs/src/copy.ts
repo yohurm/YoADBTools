@@ -1,14 +1,16 @@
 /**
  * 日志复制：一份文档，一套选区（对照 Logcat Editor / VS Code Output / DevTools Console）。
  *
- * 行 DOM 文本 === `formatLogLine`（或显示列裁过的文档）。
- * 选区是字符 Range，不中途切成「行块」。虚拟列表未挂载的中间行用文档全文补齐。
+ * 行视觉是与表头同轨的单元格；复制载荷仍是 `formatLogLine`。
+ * 选区偏移：DOM 只计单元格文案，再映射回文档（补上列间空格 / pad）。
+ * 虚拟列表未挂载的中间行用文档全文补齐。
  * 铬层（表头、折叠钮）`user-select: none` / `data-log-chrome`，不进选区。
  */
 
 import type { LogDisplayColumns, LogLine } from "@yohu/api";
 
-import { formatLogLine, formatLogLineForDisplay } from "./format";
+import { formatLogLine, formatLogLineForDisplay, formatLogLinePartsForDisplay } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, logLineCellText, visibleLogColumns, type LogColKey } from "./layout";
 
 export type LogCopyScope = { kind: "none" } | { kind: "all" };
 
@@ -158,7 +160,74 @@ function textLengthBefore(root: Element, target: Node): number {
   return n;
 }
 
-/** 行内文本偏移：只计文档节点，跳过折叠钮等铬层。 */
+/**
+ * 把某单元格内的局部偏移映射到 formatLogLine 文档偏移。
+ * padStart 字段：显示「100」对应文档「  100」，映射时补上前导空格。
+ */
+export function mapLogCellOffsetToDoc(
+  line: LogLine,
+  display: LogDisplayColumns,
+  key: LogColKey,
+  local: number,
+): number {
+  const parts = formatLogLinePartsForDisplay(line, display);
+  let partIdx = 0;
+  let doc = 0;
+
+  const consumeSeps = (): void => {
+    while (parts[partIdx]?.kind === "sep") {
+      doc += parts[partIdx]!.text.length;
+      partIdx += 1;
+    }
+  };
+
+  for (const col of visibleLogColumns(display)) {
+    consumeSeps();
+    const shown = logLineCellText(line, col.key);
+    const part = parts[partIdx];
+    if (col.key === key) {
+      if (part && part.kind === key) {
+        const lead = Math.max(0, part.text.length - shown.length);
+        return doc + lead + Math.min(Math.max(local, 0), shown.length);
+      }
+      return doc;
+    }
+    if (part && part.kind === col.key) {
+      doc += part.text.length;
+      partIdx += 1;
+    }
+  }
+  consumeSeps();
+  return doc;
+}
+
+function cellKeyOf(el: Element): LogColKey | null {
+  for (const col of ["ts", "uid", "pid", "tid", "level", "tag", "msg"] as const) {
+    if (el.classList.contains(`yohu-logs__row-${col}`)) {
+      return col;
+    }
+  }
+  return null;
+}
+
+/** 选区锚在哪个单元格，就按那一列映射，避免列缝在 DOM 与文档上错位。 */
+export function docOffsetInRow(
+  line: LogLine,
+  display: LogDisplayColumns,
+  rowEl: Element,
+  node: Node,
+  offset: number,
+): number {
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  const cell = el?.closest<HTMLElement>(".yohu-col-cell");
+  const key = cell ? cellKeyOf(cell) : null;
+  if (!cell || !key || !rowEl.contains(cell)) {
+    return mapLogCellOffsetToDoc(line, display, "msg", textOffsetInRow(rowEl, node, offset));
+  }
+  return mapLogCellOffsetToDoc(line, display, key, textOffsetInRow(cell, node, offset));
+}
+
+/** 行内文本偏移：只计单元格节点，跳过折叠钮等铬层。 */
 export function textOffsetInRow(rowEl: Element, node: Node, offset: number): number {
   if (!rowEl.contains(node) && rowEl !== node) {
     return 0;
@@ -208,13 +277,14 @@ export function documentCopyText(
   const lastDoc = lineText(lastLine, display);
   const startRow = rowContaining(range.startContainer);
   const endRow = rowContaining(range.endContainer);
+  const columns = display ?? DEFAULT_LOG_DISPLAY_COLUMNS;
   const fromOff =
     startRow && Number(startRow.dataset.seq) === first.seq
-      ? textOffsetInRow(first.el, range.startContainer, range.startOffset)
+      ? docOffsetInRow(firstLine, columns, first.el, range.startContainer, range.startOffset)
       : 0;
   const toOff =
     endRow && Number(endRow.dataset.seq) === last.seq
-      ? textOffsetInRow(last.el, range.endContainer, range.endOffset)
+      ? docOffsetInRow(lastLine, columns, last.el, range.endContainer, range.endOffset)
       : lastDoc.length;
 
   if (first.seq === last.seq) {

@@ -1,7 +1,7 @@
 /* ============================================================================
  * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 行是文档（formatLogLine / Logcat Formatter）：字段着色，列对齐空格是文本节点。
- * 表头是铬层（YoColHeader 可拖宽），不驱动行几何。表头钉在虚拟列表外。
+ * 轨道走 YoColFrame / YoColRow / YoColTrack / YoColCell。复制载荷仍是 formatLogLine。
+ * 表头是铬层（YoColHeader 可拖宽）。表头钉在虚拟列表外。
  * 行 data-level 绑定 --yohu-log-ink（token 板 --yohu-level-* 单源）：
  * 左条 / 级别字 / Tag 共用 ink；Error 消息同色；Fatal 级别字母反色块，Tag 用 f-bg；
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
@@ -88,14 +88,10 @@
   z-index: 1;
 }
 
-/* 表头铬层：定宽 grid，列宽 px 由 layout 写入。行不走这套轨道。 */
+/* 模块铬：等宽、左条。轨道与列垫由 YoColFrame / Track / Cell 承担。 */
 .yohu-logs__cols {
-  display: grid;
-  align-items: center;
   padding: 0;
   border-left: var(--yohu-stroke-emphasis) solid transparent;
-  box-sizing: border-box;
-  min-width: 0;
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
@@ -112,25 +108,13 @@
   user-select: none;
 }
 
-.yohu-logs__cols--head .yohu-col-header:first-child {
-  --yohu-col-header-content-pad: 0 var(--yohu-space-sm) 0 var(--yohu-space-sm);
-}
-
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
-  display: block;
   height: 100%;
-  padding: 0 var(--yohu-space-sm);
-  box-sizing: border-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: pre;
   user-select: text;
   cursor: text;
-  border-left: var(--yohu-stroke-emphasis) solid var(--yohu-log-ink);
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-caption);
-  font-variant-numeric: tabular-nums;
+  border-left-color: var(--yohu-log-ink);
 }
 
 .yohu-logs__list .yohu-virtual-list__row {
@@ -156,15 +140,6 @@
   background-color: var(--yohu-accent-soft);
 }
 
-/* 字段只着色，不另开盒宽；对齐空格在文档里。 */
-.yohu-logs__row-ts,
-.yohu-logs__row-uid,
-.yohu-logs__row-pid,
-.yohu-logs__row-tid,
-.yohu-logs__row-tag {
-  min-width: 0;
-}
-
 .yohu-logs__row-ts {
   color: var(--yohu-fg-3);
 }
@@ -185,7 +160,6 @@
 
 .yohu-logs__row-level {
   font-weight: var(--yohu-font-weight-semibold);
-  text-align: center;
   box-sizing: border-box;
 }
 

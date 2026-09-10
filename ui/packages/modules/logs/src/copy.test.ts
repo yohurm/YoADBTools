@@ -6,6 +6,7 @@ import {
   applyCopyEvent,
   copyHasPayload,
   documentCopyText,
+  mapLogCellOffsetToDoc,
   LOG_COPY_ALL,
   LOG_COPY_NONE,
   seqFromTarget,
@@ -13,6 +14,7 @@ import {
   textOffsetInRow,
 } from "./copy";
 import { formatLogLine } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, logLineCellText, visibleLogColumns } from "./layout";
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -37,9 +39,14 @@ function mountDocRows(lines: readonly LogLine[], wrapVirtual = false): HTMLEleme
     const host = document.createElement("div");
     if (wrapVirtual) host.className = "yohu-virtual-list__row";
     const rowEl = document.createElement("div");
-    rowEl.className = "yohu-logs__row";
+    rowEl.className = "yohu-logs__cols yohu-logs__row";
     rowEl.setAttribute("data-seq", String(item.seq));
-    rowEl.textContent = formatLogLine(item);
+    for (const col of visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS)) {
+      const cell = document.createElement("span");
+      cell.className = `yohu-col-cell yohu-logs__row-${col.key}`;
+      cell.textContent = logLineCellText(item, col.key);
+      rowEl.append(cell);
+    }
     host.append(rowEl);
     root.append(wrapVirtual ? host : rowEl);
   }
@@ -85,11 +92,10 @@ describe("documentCopyText", () => {
     const item = line({ seq: 9, msg: "hello" });
     const root = mountDocRows([item]);
     const rowEl = root.querySelector(`[data-seq="9"]`);
-    const text = rowEl?.firstChild;
+    const text = rowEl?.querySelector(".yohu-logs__row-tag")?.firstChild;
     if (!rowEl || !text) throw new Error("row");
     const doc = formatLogLine(item);
-    const from = doc.indexOf("Yohu");
-    const sel = selectRange(text, from, text, from + 4);
+    const sel = selectRange(text, 0, text, 4);
     expect(documentCopyText(root, sel, [{ line: item }])).toBe("Yohu");
     expect(doc.includes("   100   200")).toBe(true);
     root.remove();
@@ -110,14 +116,14 @@ describe("documentCopyText", () => {
   it("跨行首行从字符偏移切，末行切到偏移", () => {
     const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
     const root = mountDocRows([rows[0]!.line, rows[2]!.line]);
-    const firstText = root.querySelector(`[data-seq="1"]`)?.firstChild;
-    const lastText = root.querySelector(`[data-seq="3"]`)?.firstChild;
+    const firstText = root.querySelector(`[data-seq="1"] .yohu-logs__row-msg`)?.firstChild;
+    const lastText = root.querySelector(`[data-seq="3"] .yohu-logs__row-msg`)?.firstChild;
     if (!firstText || !lastText) throw new Error("text");
     const firstDoc = formatLogLine(rows[0]!.line);
     const lastDoc = formatLogLine(rows[2]!.line);
     const from = firstDoc.indexOf("one");
     const to = lastDoc.indexOf("three") + 3;
-    const text = documentCopyText(root, selectRange(firstText, from, lastText, to), rows);
+    const text = documentCopyText(root, selectRange(firstText, 0, lastText, 3), rows);
     expect(text).toBe([firstDoc.slice(from), formatLogLine(rows[1]!.line), lastDoc.slice(0, to)].join("\n"));
     root.remove();
   });
@@ -132,6 +138,16 @@ describe("documentCopyText", () => {
       rows.map((r) => formatLogLine(r.line)).join("\n"),
     );
     root.remove();
+  });
+});
+
+describe("mapLogCellOffsetToDoc", () => {
+  it("单元格「100」映射到文档 padStart 后的 PID", () => {
+    const item = line();
+    const doc = formatLogLine(item);
+    const from = mapLogCellOffsetToDoc(item, DEFAULT_LOG_DISPLAY_COLUMNS, "pid", 0);
+    const to = mapLogCellOffsetToDoc(item, DEFAULT_LOG_DISPLAY_COLUMNS, "pid", 3);
+    expect(doc.slice(from, to)).toBe("100");
   });
 });
 

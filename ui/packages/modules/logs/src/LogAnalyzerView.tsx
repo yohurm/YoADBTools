@@ -12,8 +12,11 @@ import {
   YoBadge,
   YoButton,
   YoChrome,
+  YoColCell,
+  YoColFrame,
   YoColHeader,
   YoColRow,
+  YoColTrack,
   YoDialog,
   YoEmptyState,
   YoLoading,
@@ -39,10 +42,14 @@ import {
   serializeLogCopy,
   type LogCopyScope,
 } from "./copy";
-import { formatLogLinePartsForDisplay } from "./format";
 import { highlightMessage } from "./highlight";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, logColTemplate, visibleLogColumns } from "./layout";
+import {
+  DEFAULT_LOG_DISPLAY_COLUMNS,
+  logColTemplate,
+  logLineCellText,
+  visibleLogColumns,
+} from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { LEVELS, levelKey, type ViewRow } from "./pipeline";
@@ -78,45 +85,53 @@ const LEVEL_OPTIONS = [
 
 const rowKey = (row: ViewRow): string => `${row.line.seq}-${row.line.pid}`;
 
-function LogLineDoc(props: { row: ViewRow; keyword: string; display: LogDisplayColumns }) {
+function LogLineCells(props: { row: ViewRow; keyword: string; display: LogDisplayColumns }) {
   const line = (): ViewRow["line"] => props.row.line;
+  const raw = (): boolean => line().level === "?";
   return (
-    <For each={formatLogLinePartsForDisplay(line(), props.display)}>
-      {(part) => {
-        if (part.kind === "sep") {
-          return part.text;
-        }
-        if (part.kind === "msg") {
+    <Show
+      when={!raw()}
+      fallback={
+        <YoColCell class="yohu-logs__row-msg" span>
+          {line().msg}
+        </YoColCell>
+      }
+    >
+      <For each={visibleLogColumns(props.display)}>
+        {(col) => {
+          const text = (): string => logLineCellText(line(), col.key);
+          if (col.key === "msg") {
+            return (
+              <YoColCell class="yohu-logs__row-msg" classList={{ "yohu-tone": levelKey(line().level) === "e" }}>
+                <Show when={props.keyword} keyed fallback={text()}>
+                  {(keyword) => (
+                    <For each={highlightMessage(text(), keyword)}>
+                      {(chunk) =>
+                        typeof chunk === "string" ? chunk : <mark class="yohu-logs__mark yohu-tone">{chunk.mark}</mark>
+                      }
+                    </For>
+                  )}
+                </Show>
+                <Show when={props.row.collapsedAfter}>
+                  <span class="yohu-logs__row-fold" data-log-chrome>
+                    …{props.row.collapsedAfter} 帧折叠
+                  </span>
+                </Show>
+              </YoColCell>
+            );
+          }
           return (
-            <span class="yohu-logs__row-msg" classList={{ "yohu-tone": levelKey(line().level) === "e" }}>
-              <Show when={props.keyword} keyed fallback={part.text}>
-                {(keyword) => (
-                  <For each={highlightMessage(part.text, keyword)}>
-                    {(chunk) =>
-                      typeof chunk === "string" ? chunk : <mark class="yohu-logs__mark yohu-tone">{chunk.mark}</mark>
-                    }
-                  </For>
-                )}
-              </Show>
-              <Show when={props.row.collapsedAfter}>
-                <span class="yohu-logs__row-fold" data-log-chrome>
-                  …{props.row.collapsedAfter} 帧折叠
-                </span>
-              </Show>
-            </span>
+            <YoColCell
+              class={`yohu-logs__row-${col.key}`}
+              classList={{ "yohu-tone": col.key === "level" || col.key === "tag" }}
+              title={col.key === "tag" ? line().tag : undefined}
+            >
+              {text()}
+            </YoColCell>
           );
-        }
-        return (
-          <span
-            class={`yohu-logs__row-${part.kind}`}
-            classList={{ "yohu-tone": part.kind === "level" || part.kind === "tag" }}
-            title={part.kind === "tag" ? line().tag : undefined}
-          >
-            {part.text}
-          </span>
-        );
-      }}
-    </For>
+        }}
+      </For>
+    </Show>
   );
 }
 
@@ -236,8 +251,6 @@ export function LogAnalyzerView(props: DeviceSession) {
   const windowSerial = (): string | null => active()?.serial ?? props.selectedSerials[0] ?? null;
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
-
-  const colTemplate = (): string => logColTemplate(displayColumns(), logStore.state.colWidths);
 
   const togglePause = (): void => {
     const id = logStore.state.activeSessionId;
@@ -511,12 +524,14 @@ export function LogAnalyzerView(props: DeviceSession) {
                 </span>
               </div>
 
-              <div class="yohu-logs__list">
-                <YoColRow class="yohu-logs__cols yohu-logs__cols--head" template={colTemplate()}>
+              <YoColFrame
+                class="yohu-logs__list"
+                template={logColTemplate(displayColumns(), logStore.state.colWidths)}
+              >
+                <YoColRow class="yohu-logs__cols yohu-logs__cols--head">
                   <For each={visibleLogColumns(displayColumns())}>
                     {(col) => (
                       <YoColHeader
-                        align={col.align}
                         resizable={!col.flex}
                         resizeLabel={col.resizeLabel}
                         width={logStore.state.colWidths[col.key] ?? col.defaultWidth}
@@ -564,9 +579,9 @@ export function LogAnalyzerView(props: DeviceSession) {
                         });
                       }}
                       renderRow={(row) => (
-                        <div
-                          class="yohu-logs__row"
-                          data-seq={row.line.seq}
+                        <YoColTrack
+                          class="yohu-logs__cols yohu-logs__row"
+                          data-seq={String(row.line.seq)}
                           data-level={levelKey(row.line.level) ?? undefined}
                           classList={{
                             "yohu-logs__row--signal": row.signal !== undefined,
@@ -574,8 +589,8 @@ export function LogAnalyzerView(props: DeviceSession) {
                             "yohu-logs__row--picked": pick().kind === "all",
                           }}
                         >
-                          <LogLineDoc row={row} keyword={session.keyword} display={displayColumns()} />
-                        </div>
+                          <LogLineCells row={row} keyword={session.keyword} display={displayColumns()} />
+                        </YoColTrack>
                       )}
                     />
                   </Show>
@@ -587,7 +602,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     </YoButton>
                   </div>
                 </Show>
-              </div>
+              </YoColFrame>
 
               <div class="yohu-logs__status">
                 <span class="yohu-logs__status-capture">

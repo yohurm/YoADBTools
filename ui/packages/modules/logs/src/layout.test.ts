@@ -6,6 +6,7 @@ import {
   DEFAULT_LOG_DISPLAY_COLUMNS,
   defaultLogColWidths,
   logColTemplate,
+  logLineCellText,
   applyLogColWidth,
   visibleLogColumns,
 } from "./layout";
@@ -33,21 +34,23 @@ describe("日志表头布局契约", () => {
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
   });
 
-  it("列轨道不在 CSS 写死七列，由显示列内联写入", () => {
-    expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:\s*18ch/);
+  it("列轨道不在模块 CSS 写死，交给 YoColFrame", () => {
+    expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
-    expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
+    expect(logsCss).not.toContain(".yohu-logs__cell");
     expect(logsCss).toContain("yohu-logs__row--picked");
     expect(logsCss).not.toContain("yohu-logs__list-body--picking");
-    expect(logsCss).toContain("yohu-col-header");
+    expect(logsCss).not.toContain("yohu-col-header");
+    expect(logsCss).not.toContain("--yohu-col-tracks");
+    expect(logsCss).not.toContain("--yohu-col-cell-pad");
   });
 });
 
 describe("日志显示列", () => {
   it("默认全开含消息列", () => {
     expect(logColTemplate(DEFAULT_LOG_DISPLAY_COLUMNS)).toBe(
-      "144px 80px 48px 48px 48px 192px minmax(96px, 1fr)",
+      "144px 80px 80px 80px 64px 192px minmax(96px, 1fr)",
     );
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
@@ -63,7 +66,7 @@ describe("日志显示列", () => {
   it("关闭元数据列后消息仍在，轨道只留可见列", () => {
     const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
     expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "tid", "level", "msg"]);
-    expect(logColTemplate(display)).toBe("48px 48px 48px minmax(96px, 1fr)");
+    expect(logColTemplate(display)).toBe("80px 80px 64px minmax(96px, 1fr)");
   });
 
   it("全部元数据关闭只剩消息", () => {
@@ -71,10 +74,32 @@ describe("日志显示列", () => {
     expect(logColTemplate(display)).toBe("minmax(96px, 1fr)");
   });
 
+  it("单元格文案与表头同序，不含列间空格", () => {
+    const line = {
+      seq: 1,
+      ts: "01-01 12:00:00.000",
+      uid: "shell",
+      pid: 100,
+      tid: 200,
+      level: "I",
+      tag: "Yohu",
+      msg: "hello",
+    };
+    expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((col) => logLineCellText(line, col.key))).toEqual([
+      "01-01 12:00:00.000",
+      "shell",
+      "100",
+      "200",
+      "I",
+      "Yohu",
+      "hello",
+    ]);
+  });
+
   it("写绝对宽度，不低于 min，消息列不拖", () => {
     const start = defaultLogColWidths();
     expect(applyLogColWidth(start, "tag", 212).tag).toBe(212);
-    expect(applyLogColWidth(start, "pid", 10).pid).toBe(36);
+    expect(applyLogColWidth(start, "pid", 10).pid).toBe(56);
     expect(applyLogColWidth(start, "msg", 200)).toBe(start);
   });
 });
@@ -86,6 +111,7 @@ describe("日志级别色单源", () => {
     expect(logsCss).toContain('[data-level="f"] { --yohu-log-ink: var(--yohu-level-f-bg); }');
     expect(logsCss).toContain(".yohu-logs__row-tag {");
     expect(logsCss).toContain("color: var(--yohu-log-ink)");
+    expect(logsCss).not.toMatch(/\.yohu-logs__row-level\s*\{[^}]*text-align:\s*center/);
     expect(logsCss).toContain('[data-level="e"] .yohu-logs__row-msg');
     expect(logsCss).not.toContain(".yohu-logs__level--");
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
