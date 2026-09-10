@@ -1,0 +1,14 @@
+/* 清单体单元格：与表头同一 --yohu-col-cell-pad，禁止模块再写一份列垫。 */
+
+.yohu-col-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+  padding: var(--yohu-col-cell-pad, var(--yohu-col-header-content-pad));
+}
+
+.yohu-col-cell--span {
+  grid-column: 1 / -1;
+}

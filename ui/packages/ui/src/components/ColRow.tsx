@@ -1,12 +1,13 @@
 /**
- * YoColRow —— 表头行列轨道宿主。
- * 统一 grid-template-columns；清单行仍用同一 template 字符串，不套本组件。
+ * YoColRow —— 表头行列轨道。
+ * 缺省继承父级 YoColFrame 的 `--yohu-col-tracks`；传入 template 则覆盖。
  */
 import type { JSX } from "solid-js";
 import "./ColRow.css";
 
 export interface YoColRowProps {
-  template: string;
+  /** 缺省吃 `--yohu-col-tracks`。仅在没有 YoColFrame 时传入。 */
+  template?: string;
   resizing?: boolean;
   class?: string;
   children: JSX.Element;
@@ -21,7 +22,7 @@ export function YoColRow(props: YoColRowProps): JSX.Element {
       class={`yohu-col-row${props.class ? ` ${props.class}` : ""}`}
       classList={{ "yohu-col-row--resizing": props.resizing === true }}
       role="row"
-      style={{ "grid-template-columns": props.template }}
+      style={props.template ? { "grid-template-columns": props.template } : undefined}
     >
       {props.children}
     </div>

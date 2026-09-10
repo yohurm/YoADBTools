@@ -1,5 +1,6 @@
 /**
- * 清单列宽代数（L2）。视图只接线拖条与网格轨道。
+ * 清单列宽代数（L1）。只出规格、clamp、轨道字符串。
+ * 宿主是 YoColFrame（L2，写 --yohu-col-tracks）；表头/拖条是 YoColRow / Header / Resizer。
  * 对照：TanStack columnSizing；AG Grid actualWidth + min/max。
  */
 

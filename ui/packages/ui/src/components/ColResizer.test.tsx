@@ -1,7 +1,24 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 import { YoColResizer } from "./ColResizer";
+
+function loadColResizerCss(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/components/ColResizer.css"),
+    resolve(process.cwd(), "packages/ui/src/components/ColResizer.css"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const colResizerCss = loadColResizerCss();
 
 /** jsdom 的 PointerEvent 常丢 clientX；直接写到事件上。 */
 function firePointer(el: HTMLElement, type: "pointerdown" | "pointermove" | "pointerup", clientX: number): void {
@@ -51,5 +68,18 @@ describe("YoColResizer", () => {
     expect(onWidthChange).toHaveBeenCalledWith(200, "end");
     fireEvent.keyDown(handle, { key: "Home" });
     expect(onWidthChange).toHaveBeenCalledWith(48, "end");
+  });
+
+  it("热区透明，可见铬是居中短柄而不是整块 accent", () => {
+    expect(colResizerCss).toMatch(/\.yohu-col-resizer\s*\{[^}]*background:\s*transparent/);
+    expect(colResizerCss).not.toMatch(
+      /\.yohu-col-resizer:hover\s*,\s*\.yohu-col-resizer:focus-visible\s*,\s*\.yohu-col-resizer--active\s*\{[^}]*background-color:\s*var\(--yohu-accent\)/,
+    );
+    expect(colResizerCss).toContain(".yohu-col-resizer::before");
+    expect(colResizerCss).not.toContain(".yohu-col-resizer::after");
+    expect(colResizerCss).toContain("height: 30%");
+    expect(colResizerCss).toContain("var(--yohu-stroke-accent)");
+    expect(colResizerCss).toContain("var(--yohu-border)");
+    expect(colResizerCss).toContain("var(--yohu-radius-pill)");
   });
 });

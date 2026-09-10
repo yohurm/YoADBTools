@@ -1,6 +1,17 @@
+/* 表头行：只定轨道，不画列分割线。分割铬在 YoColResizer。
+ * 轨道默认吃父级 YoColFrame 的 --yohu-col-tracks。 */
+
 .yohu-col-row {
   display: grid;
+  grid-template-columns: var(--yohu-col-tracks);
   align-items: stretch;
+  flex-shrink: 0;
+  height: var(--yohu-row-height-header);
   min-width: 0;
   box-sizing: border-box;
+  user-select: none;
+}
+
+.yohu-col-row--resizing {
+  cursor: col-resize;
 }

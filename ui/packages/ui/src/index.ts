@@ -110,8 +110,17 @@ export type { YoColResizerProps } from "./components/ColResizer";
 export { YoColHeader } from "./components/ColHeader";
 export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./components/ColHeader";
 
+export { YoColFrame } from "./components/ColFrame";
+export type { YoColFrameProps } from "./components/ColFrame";
+
 export { YoColRow } from "./components/ColRow";
 export type { YoColRowProps } from "./components/ColRow";
+
+export { YoColTrack } from "./components/ColTrack";
+export type { YoColTrackProps } from "./components/ColTrack";
+
+export { YoColCell } from "./components/ColCell";
+export type { YoColCellProps } from "./components/ColCell";
 
 export {
   COL_RESIZE_STEP,

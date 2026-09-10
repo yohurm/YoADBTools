@@ -54,6 +54,15 @@ describe("YoColHeader", () => {
     expect(container.querySelector(".yohu-col-header")?.getAttribute("aria-sort")).toBe("none");
   });
 
+  it("center 对齐加在轨道 class 上", () => {
+    const { container } = render(() => (
+      <YoColHeader align="center">
+        <span>级别</span>
+      </YoColHeader>
+    ));
+    expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--center")).toBe(true);
+  });
+
   it("end 对齐加在轨道 class 上", () => {
     const { container } = render(() => (
       <YoColHeader align="end">
@@ -63,13 +72,14 @@ describe("YoColHeader", () => {
     expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--end")).toBe(true);
   });
 
-  it("center 对齐加在轨道 class 上", () => {
+  it("默认靠左，未传 align 也带 --start", () => {
     const { container } = render(() => (
-      <YoColHeader align="center">
+      <YoColHeader>
         <span>级别</span>
       </YoColHeader>
     ));
-    expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--center")).toBe(true);
+    expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--start")).toBe(true);
+    expect(container.querySelector(".yohu-col-header")?.classList.contains("yohu-col-header--center")).toBe(false);
   });
 
   it("悬浮片铺满交互宿主，文案边距只写在内容槽", () => {
@@ -86,5 +96,16 @@ describe("YoColHeader", () => {
     expect(colHeaderCss).not.toMatch(
       /\.yohu-col-header__content\s*>\s*\.yohu-interactive\s*\{[^}]*padding:\s*var\(--yohu-col-header-content-pad\)/,
     );
+  });
+
+  it("标题默认靠左，列内边距左 md 右 sm，不画列分割线", () => {
+    expect(colHeaderCss).toContain(
+      "--yohu-col-header-content-pad: var(--yohu-col-cell-pad, 0 var(--yohu-space-sm) 0 var(--yohu-space-md))",
+    );
+    expect(colHeaderCss).toMatch(
+      /\.yohu-col-header__label\s*\{[^}]*justify-content:\s*flex-start/,
+    );
+    expect(colHeaderCss).not.toContain(".yohu-col-header:not(:last-child)::after");
+    expect(colHeaderCss).not.toContain(":has(.yohu-col-resizer)");
   });
 });

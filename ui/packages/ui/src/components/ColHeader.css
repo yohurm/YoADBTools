@@ -1,18 +1,20 @@
-/* 表头列轨道：铬（分割线 / 拖拽条）与内容区分离。
- * 悬浮片几何 ≠ 文案边距：overlay-inset 只调 ::before；content-pad 只写在 __label。
- * 禁止把 content-pad 写在 .yohu-interactive 宿主上——<button> 的绝对定位 ::before
- * 按内容盒算 inset，宿主 padding 会把悬浮片缩成文案胶囊。 */
+/* 表头列格。
+ * 对照 HarmonyOS PC / macOS Finder 列表：标题靠左，列内有默认垫，不贴格边、不贴拖条。
+ * 左 Padding_level6（space-md）= 文件名列与行内图标后文案同一起笔；
+ * 右 Padding_level4（space-sm）让开 YoColResizer 短柄。
+ * 列间铬只由 YoColResizer 承担。悬浮片几何 ≠ 文案边距。 */
 
 .yohu-col-header {
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   min-width: 0;
   height: 100%;
   overflow: visible;
   --yohu-col-header-overlay-inset: 0;
   --yohu-col-header-overlay-radius: var(--yohu-radius-none);
-  --yohu-col-header-content-pad: 0 var(--yohu-space-sm) 0 0;
+  --yohu-col-header-content-pad: var(--yohu-col-cell-pad, 0 var(--yohu-space-sm) 0 var(--yohu-space-md));
 }
 
 .yohu-col-header__content {
@@ -21,6 +23,7 @@
   height: 100%;
   display: flex;
   align-items: stretch;
+  justify-content: flex-start;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -41,30 +44,24 @@
 .yohu-col-header__label {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--yohu-space-2xs);
   width: 100%;
   height: 100%;
   min-width: 0;
+  overflow: hidden;
   box-sizing: border-box;
   padding: var(--yohu-col-header-content-pad);
-}
-
-.yohu-col-header--end .yohu-col-header__label {
-  justify-content: flex-end;
+  text-align: start;
+  white-space: nowrap;
 }
 
 .yohu-col-header--center .yohu-col-header__label {
   justify-content: center;
+  text-align: center;
 }
 
-.yohu-col-header:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: var(--yohu-space-sm);
-  right: 0;
-  bottom: var(--yohu-space-sm);
-  width: var(--yohu-stroke-hairline);
-  background: var(--yohu-border);
-  pointer-events: none;
-  z-index: 1;
+.yohu-col-header--end .yohu-col-header__label {
+  justify-content: flex-end;
+  text-align: end;
 }

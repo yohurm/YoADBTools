@@ -1,20 +1,50 @@
+/* 列宽边界铬（重写）。
+ * 对照：
+ * - AG Grid Quartz：`--ag-header-column-resize-handle-*`（宽 2、高约 30%、色=border）
+ *   热区与绘制区分权；禁止命中区整块上色
+ * - TanStack column-sizing：右缘绝对定位条 + isResizing 才亮指示
+ * - VS Code Modern UI sash：热区透明，握柄低对比；悬停/拖动再强调
+ * 可见铬只有一条居中短柄（::before）。空闲 border，悬停 accent 加长，拖中铺满表头高。 */
+
 .yohu-col-resizer {
   position: absolute;
-  top: 0;
-  right: calc(var(--yohu-layout-hit-nudge) * -1);
+  inset-block: 0;
+  inset-inline-end: calc(var(--yohu-layout-hit-nudge) * -1);
   width: var(--yohu-layout-hit-splitter);
-  height: 100%;
   padding: 0;
   border: none;
   background: transparent;
   cursor: col-resize;
+  touch-action: none;
   z-index: 2;
 }
 
-.yohu-col-resizer:hover,
-.yohu-col-resizer:focus-visible,
-.yohu-col-resizer--active {
-  background-color: var(--yohu-accent);
+.yohu-col-resizer::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--yohu-stroke-accent);
+  height: 30%;
+  transform: translate(-50%, -50%);
+  background: var(--yohu-border);
+  border-radius: var(--yohu-radius-pill);
+  pointer-events: none;
+  transition: var(--yohu-motion-effects-fast);
+}
+
+.yohu-col-resizer:hover::before,
+.yohu-col-resizer:focus-visible::before {
+  height: 50%;
+  background: var(--yohu-accent);
+}
+
+.yohu-col-resizer--active::before,
+.yohu-col-resizer--active:hover::before,
+.yohu-col-resizer--active:focus-visible::before {
+  height: 100%;
+  background: var(--yohu-accent);
+  border-radius: var(--yohu-radius-none);
 }
 
 .yohu-col-resizer:focus-visible {
@@ -28,4 +58,10 @@ html[data-yohu-col-resizing] {
 html[data-yohu-col-resizing],
 html[data-yohu-col-resizing] * {
   user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yohu-col-resizer::before {
+    transition: none;
+  }
 }

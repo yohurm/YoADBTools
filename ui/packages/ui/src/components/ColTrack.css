@@ -1,0 +1,9 @@
+/* 清单体行：与 YoColRow 同一条 --yohu-col-tracks。 */
+
+.yohu-col-track {
+  display: grid;
+  grid-template-columns: var(--yohu-col-tracks);
+  align-items: center;
+  min-width: 0;
+  box-sizing: border-box;
+}

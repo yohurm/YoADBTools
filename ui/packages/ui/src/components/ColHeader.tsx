@@ -1,9 +1,8 @@
 /**
- * YoColHeader —— 表头列轨道。
- * 轨道铺满列格：悬浮片 inset 0、圆角 none（矩形列，不是列表圆角片）。
- * 排序钮（.yohu-interactive）铺满内容区且 padding 为 0；文案边距只写在 .yohu-col-header__label。
- * 禁止用行 padding 把轨道往里推，也禁止把 content-pad 写在 button 宿主上。
- * 对照：AG Grid ag-header-cell；Spectrum headCell / columnResizer；VS Code sash vs th。
+ * YoColHeader —— 表头列格。
+ * 标题默认靠左并带列内边距（HarmonyOS PC / Finder 列表）。align 只覆盖 center/end。
+ * 排序钮铺满内容区且 padding 0；文案边距只写在 .yohu-col-header__label。
+ * 列缝铬只走 YoColResizer，本组件不画分割线。
  */
 import { createSignal, type JSX } from "solid-js";
 import { Show } from "solid-js";
@@ -16,7 +15,7 @@ export type YoColHeaderAlign = "start" | "end" | "center";
 export type YoColHeaderSort = "ascending" | "descending" | "none";
 
 export interface YoColHeaderProps {
-  /** 内容对齐 */
+  /** 标题对齐；默认 start。单元格对齐由模块自己管。 */
   align?: YoColHeaderAlign;
   /** 当前列排序态 */
   ariaSort?: YoColHeaderSort;
@@ -38,6 +37,7 @@ export interface YoColHeaderProps {
  */
 export function YoColHeader(props: YoColHeaderProps): JSX.Element {
   const [resizing, setResizing] = createSignal(false);
+  const align = (): YoColHeaderAlign => props.align ?? "start";
 
   const onWidthChange = (width: number, phase: ColResizePhase): void => {
     setResizing(phase === "start" || phase === "move");
@@ -48,8 +48,9 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
     <div
       class="yohu-col-header"
       classList={{
-        "yohu-col-header--end": props.align === "end",
-        "yohu-col-header--center": props.align === "center",
+        "yohu-col-header--start": align() === "start",
+        "yohu-col-header--end": align() === "end",
+        "yohu-col-header--center": align() === "center",
       }}
       role="columnheader"
       aria-sort={props.ariaSort ?? "none"}

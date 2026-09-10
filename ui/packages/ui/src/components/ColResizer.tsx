@@ -2,6 +2,7 @@
  * YoColResizer —— 表头列宽边界。
  * 对照：Spectrum separator + valuemin/now/max；AG Grid start/move/end；VS Code sash capture。
  * 受控：width / minWidth / onWidthChange(width, phase)。YoUI 不算单元格自适应。
+ * 热区透明；可见铬是 AG Grid 式居中短柄（::before）。
  */
 import { createSignal, onCleanup, type JSX } from "solid-js";
 
