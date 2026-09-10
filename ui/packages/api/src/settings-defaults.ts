@@ -17,9 +17,9 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   export_ask_every_time: true,
   log_display_columns: {
     ts: true,
-    uid: true,
+    uid: false,
     pid: true,
-    tid: true,
+    tid: false,
     level: true,
     tag: true,
   },

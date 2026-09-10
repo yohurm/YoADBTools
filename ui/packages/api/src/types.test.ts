@@ -75,11 +75,11 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
 
   it("LogFilter.scope 内部 tag 为 camelCase kind", () => {
     const filter: LogFilter = {
-      min_level: "W",
+      levels: ["W", "E"],
       scope: { kind: "package", pids: [1, 2] },
     };
     expect(JSON.parse(JSON.stringify(filter))).toEqual({
-      min_level: "W",
+      levels: ["W", "E"],
       scope: { kind: "package", pids: [1, 2] },
     });
   });

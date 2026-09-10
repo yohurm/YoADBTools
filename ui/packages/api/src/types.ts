@@ -80,7 +80,8 @@ export type LogScope =
   | { kind: "package"; pids: number[] };
 
 export interface LogFilter {
-  min_level?: string;
+  /** 精确级别字母；缺省/空 = 不限（含 `?`）。不是最低含以上。 */
+  levels?: string[];
   tag_contains?: string;
   message_contains?: string;
   scope: LogScope;
