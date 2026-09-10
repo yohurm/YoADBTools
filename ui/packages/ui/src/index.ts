@@ -72,6 +72,8 @@ export { YO_SEGMENTED_MAX_ITEMS } from "./components/segmented-model";
 
 export { YoIconButton } from "./components/IconButton";
 export type { YoIconButtonProps } from "./components/IconButton";
+export { YoThemeToggle } from "./components/ThemeToggle";
+export type { YoThemeToggleProps } from "./components/ThemeToggle";
 
 export { YoTextField } from "./components/TextField";
 export type { YoTextFieldProps } from "./components/TextField";
@@ -219,6 +221,12 @@ export {
   YoIndicator,
   prefersReducedMotion,
   shouldSkipMotion,
+  nextResolvedTheme,
+  runThemeViewTransition,
+  themeTransitionOriginFromElement,
+  themeWipeFrames,
+  themeWipeRadius,
+  THEME_WIPE_COVERAGE,
   DISMISS_HOLD_DURATION,
 } from "./motion";
 export type {
@@ -230,6 +238,7 @@ export type {
   YoIndicatorProps,
   IndicatorVariant,
   PresenceRecipe,
+  ThemeTransitionOrigin,
 } from "./motion";
 
 // —— 窗口铬 ——

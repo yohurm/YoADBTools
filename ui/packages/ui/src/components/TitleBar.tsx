@@ -1,7 +1,7 @@
 /**
  * YoTitleBar —— HarmonyOS 电脑窗口容器层（自定义标题栏）。
  * HarmonyOS 对照：窗口框架容器层。页眉回内容区后走 Compact 40vp。
- * 右侧铬条（侧栏钮 + 三键）等宽 48vp 贴合铺满栏高，无内边距；关闭悬停铺满该键。
+ * 右侧铬条（主题钮 + 侧栏钮 + 三键，操作区最多 3 个图标）等宽 48vp 贴合铺满栏高，无内边距；关闭悬停铺满该键。
  * 受控 API：title / icon / children / actions / maximized / onMinimize / onToggleMaximize / onClose。
  *
  * 三键从左到右：最小化、最大化（或还原）、关闭。拖动走 data-tauri-drag-region；按钮 no-drag。

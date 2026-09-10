@@ -519,6 +519,51 @@
   line-height: inherit;
 }
 
+/* —— 配方：主题切换（MDN：关默认淡出 + image-pair isolation，避免叠化闪底） —— */
+
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(root) {
+  animation-duration: var(--yohu-dur-enter);
+  animation-timing-function: linear;
+}
+
+::view-transition-image-pair(root) {
+  isolation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  display: block;
+}
+
+/* 叠层跟切换后的 data-theme（Ant Design），不跟会中途摘掉的 data-theme-transition。 */
+[data-theme="light"]::view-transition-old(root) {
+  z-index: 2;
+}
+
+[data-theme="light"]::view-transition-new(root) {
+  z-index: 1;
+}
+
+[data-theme="dark"]::view-transition-old(root) {
+  z-index: 1;
+}
+
+[data-theme="dark"]::view-transition-new(root) {
+  z-index: 2;
+}
+
+html[data-theme-transition] *,
+html[data-theme-transition] *::before,
+html[data-theme-transition] *::after {
+  transition: none !important;
+}
+
 /* —— reduced-motion：配方统一降级；循环指示改为静止 —— */
 
 @media (prefers-reduced-motion: reduce) {
@@ -540,6 +585,8 @@
   .yohu-progress__bar,
   .yohu-button,
   .yohu-icon-button,
+  .yohu-theme-toggle__sun,
+  .yohu-theme-toggle__moon,
   .yohu-checkbox__box,
   .yohu-text-field__control,
   .yohu-swap[data-resizing] .yohu-swap__clip {

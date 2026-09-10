@@ -8,6 +8,7 @@ const YO_PUBLIC = [
   "YoButton",
   "YoSegmentedButton",
   "YoIconButton",
+  "YoThemeToggle",
   "YoTextField",
   "YoSelect",
   "YoCheckbox",

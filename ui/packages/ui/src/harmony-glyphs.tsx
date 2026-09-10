@@ -6,7 +6,7 @@
  * - nav-power: power-off（电源）
  * - volume-down: public-volume-down-filled（喇叭无声波＝音量减）
  * - volume-up: public-sound-filled（喇叭加声波＝音量加）
- * - display-off / display-on: 月亮 / 实心太阳（连接设备当前深浅色同一操作位）
+ * - display-off / display-on: 月亮 / 实心太阳（工作台 YoThemeToggle 与设备深浅色同一对字形）
  * - brightness-down: controlcenter-brightness-reduce
  * - brightness-up: controlcenter-brightness-plus
  */

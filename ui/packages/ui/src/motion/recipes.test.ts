@@ -44,6 +44,19 @@ describe("motion recipes", () => {
     expect(untilFold).toContain("--yohu-motion-spatial-local");
   });
 
+  it("主题切换配方关闭默认淡出并按方向叠层", () => {
+    const css = loadMotionCss();
+    expect(css).toContain("::view-transition-image-pair(root)");
+    expect(css).toContain("isolation: auto");
+    expect(css).toContain("::view-transition-old(root)");
+    expect(css).toContain("::view-transition-new(root)");
+    expect(css).toContain("mix-blend-mode: normal");
+    expect(css).toContain('[data-theme="light"]::view-transition-old(root)');
+    expect(css).toContain('[data-theme="dark"]::view-transition-new(root)');
+    expect(css).not.toContain("view-transition-name: yohu-theme-toggle");
+    expect(css).not.toContain("@keyframes yohu-theme-keep");
+  });
+
   it("inline-end 双轴插值，禁止高度离散跳变", () => {
     const css = loadMotionCss();
     expect(css).toContain("yohu-recipe-inline-end");

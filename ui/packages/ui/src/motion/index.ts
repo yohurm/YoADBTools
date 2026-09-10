@@ -9,5 +9,14 @@ export type { YoSwapProps } from "./swap";
 export { YoIndicator } from "./indicator";
 export type { YoIndicatorProps, IndicatorVariant } from "./indicator";
 export { prefersReducedMotion, shouldSkipMotion } from "./reduced";
+export {
+  nextResolvedTheme,
+  runThemeViewTransition,
+  themeTransitionOriginFromElement,
+  themeWipeFrames,
+  themeWipeRadius,
+  THEME_WIPE_COVERAGE,
+} from "./theme-transition";
+export type { ThemeTransitionOrigin } from "./theme-transition";
 export { DISMISS_HOLD_DURATION } from "./recipes";
 export type { PresenceRecipe } from "./recipes";

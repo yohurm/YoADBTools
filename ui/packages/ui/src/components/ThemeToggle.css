@@ -1,0 +1,39 @@
+/* 标题栏主题钮：太阳/月亮叠在同一热区，弹簧交叉（比线性 rotate 更跟手）。 */
+.yohu-theme-toggle__glyphs {
+  position: relative;
+  display: block;
+  width: var(--yohu-layout-icon-sm);
+  height: var(--yohu-layout-icon-sm);
+}
+
+.yohu-theme-toggle__sun,
+.yohu-theme-toggle__moon {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform var(--yohu-motion-spatial-small),
+    opacity var(--yohu-motion-effects-enter);
+}
+
+.yohu-theme-toggle__sun {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
+
+.yohu-theme-toggle__moon {
+  transform: rotate(72deg) scale(0);
+  opacity: 0;
+}
+
+[data-theme="dark"] .yohu-theme-toggle__sun {
+  transform: rotate(-72deg) scale(0);
+  opacity: 0;
+}
+
+[data-theme="dark"] .yohu-theme-toggle__moon {
+  transform: rotate(0deg) scale(1);
+  opacity: 1;
+}
