@@ -21,16 +21,17 @@ pub enum Density {
     Comfortable,
 }
 
-/// 日志清单显示哪些元数据列（消息列始终显示）。缺字段视为开启。
+/// 日志清单显示哪些元数据列（消息列始终显示）。
+/// 缺字段回落 Default：UID / TID 默认关，其余默认开。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogDisplayColumns {
     #[serde(default = "crate::default_true")]
     pub ts: bool,
-    #[serde(default = "crate::default_true")]
+    #[serde(default)]
     pub uid: bool,
     #[serde(default = "crate::default_true")]
     pub pid: bool,
-    #[serde(default = "crate::default_true")]
+    #[serde(default)]
     pub tid: bool,
     #[serde(default = "crate::default_true")]
     pub level: bool,
@@ -42,9 +43,9 @@ impl Default for LogDisplayColumns {
     fn default() -> Self {
         Self {
             ts: true,
-            uid: true,
+            uid: false,
             pid: true,
-            tid: true,
+            tid: false,
             level: true,
             tag: true,
         }
@@ -366,10 +367,10 @@ mod tests {
     }
 
     #[test]
-    fn partial_log_display_columns_defaults_missing_flags_true() {
+    fn partial_log_display_columns_defaults_missing_uid_tid_off() {
         let s: LogDisplayColumns =
             serde_json::from_str(r#"{"uid":false,"tag":false}"#).expect("部分列开关");
-        assert!(s.ts && s.pid && s.tid && s.level);
-        assert!(!s.uid && !s.tag);
+        assert!(s.ts && s.pid && s.level);
+        assert!(!s.uid && !s.tid && !s.tag);
     }
 }

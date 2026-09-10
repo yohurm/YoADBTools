@@ -91,10 +91,12 @@ pub enum LogScope {
 }
 
 /// 日志过滤条件（会话过滤 / 导出共用；回补读环不过滤）。
+///
+/// `levels` 空 = 不限级别（含解析失败的 `?`）；非空 = 精确字母集合，不是最低含以上。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LogFilter {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_level: Option<char>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub levels: Vec<char>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag_contains: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -135,5 +137,19 @@ mod tests {
         let s = serde_json::to_value(&status).unwrap();
         assert_eq!(s["last_seq"], 9);
         assert_eq!(s["capturing"], true);
+    }
+
+    #[test]
+    fn log_filter_levels_exact_set_omits_empty() {
+        let filtered = LogFilter {
+            levels: vec!['W', 'E'],
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&filtered).unwrap();
+        assert_eq!(v["levels"], serde_json::json!(["W", "E"]));
+        assert!(v.get("min_level").is_none());
+
+        let empty = serde_json::to_value(&LogFilter::default()).unwrap();
+        assert!(empty.get("levels").is_none());
     }
 }
