@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::{resolve_and_recheck, FileError};
+use crate::{file_error_from_adb, resolve_and_recheck, FileError};
 const DELETE_TIMEOUT_MS: u64 = 30_000;
 const MUTATE_TIMEOUT_MS: u64 = 15_000;
 use yohu_adb::shell_quote;
@@ -57,12 +57,16 @@ impl FileMutator {
                 Some(DELETE_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
+            .await
+            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
         if out.exit_code != 0 {
-            return Err(FileError::Adb(yohu_adb::AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            }));
+            return Err(file_error_from_adb(
+                normalized.as_str(),
+                yohu_adb::AdbError::BadExit {
+                    exit_code: out.exit_code,
+                    stderr: out.stderr,
+                },
+            ));
         }
         Ok(())
     }
@@ -90,12 +94,16 @@ impl FileMutator {
                 Some(MUTATE_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
+            .await
+            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
         if out.exit_code != 0 {
-            return Err(FileError::Adb(yohu_adb::AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            }));
+            return Err(file_error_from_adb(
+                normalized.as_str(),
+                yohu_adb::AdbError::BadExit {
+                    exit_code: out.exit_code,
+                    stderr: out.stderr,
+                },
+            ));
         }
         Ok(())
     }
@@ -122,12 +130,16 @@ impl FileMutator {
                 Some(MUTATE_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
+            .await
+            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
         if out.exit_code != 0 {
-            return Err(FileError::Adb(yohu_adb::AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            }));
+            return Err(file_error_from_adb(
+                normalized.as_str(),
+                yohu_adb::AdbError::BadExit {
+                    exit_code: out.exit_code,
+                    stderr: out.stderr,
+                },
+            ));
         }
         Ok(())
     }

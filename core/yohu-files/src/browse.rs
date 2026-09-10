@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::FileError;
+use crate::{file_error_from_adb, FileError};
 use yohu_adb::AdbClient;
 use yohu_domain::{validate_entry_name, RemotePath, SafetyRoot};
 use yohu_protocol::{EntryKind, RemoteEntry};
@@ -52,7 +52,10 @@ impl FileBrowser {
             .check(path)
             .map_err(|e| FileError::OutsideRoot(e.to_string()))?;
         let listing = format!("{}/", normalized.as_str());
-        Ok(self.adb.ls(serial, &listing, cancel).await?)
+        self.adb
+            .ls(serial, &listing, cancel)
+            .await
+            .map_err(|e| file_error_from_adb(normalized.as_str(), e))
     }
 
     /// 把一组远端路径展开成 FILEDESCRIPTOR 树（目录递归；文件一条）。
@@ -106,7 +109,7 @@ impl FileBrowser {
         let entry = entries
             .iter()
             .find(|e| e.name == name)
-            .ok_or_else(|| FileError::Path(format!("条目不存在: {}", path.as_str())))?;
+            .ok_or_else(|| FileError::RemoteNotFound(path.as_str().to_string()))?;
         Ok(match entry.kind {
             EntryKind::Dir => (true, 0),
             EntryKind::File | EntryKind::Other => (false, entry.size),

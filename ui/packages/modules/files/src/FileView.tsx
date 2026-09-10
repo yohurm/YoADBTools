@@ -2,7 +2,7 @@
  * 文件管理 View：绑定壳注入的 DeviceSession，对话框与本机选路留在视图层。
  */
 
-import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
@@ -14,8 +14,10 @@ import {
   YoPage,
   YoPanel,
   YoTextField,
+  YoToaster,
   attachPanelKeys,
   closeContextMenu,
+  createToaster,
   openContextMenu,
 } from "@yohu/ui";
 
@@ -25,42 +27,15 @@ import { TransferPanel } from "./TransferPanel";
 import { type DropHit, localBaseName, resolveDropHit } from "./drop";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
 import { filesListMenu } from "./menu";
-import { childPath, splitPath, parentWithinSafety, validateEntryName, errorText } from "./model";
+import { filesFaultText } from "./fault";
+import { childPath, validateEntryName } from "./model";
+import { AddressSlot, type AddressSlotApi } from "./AddressSlot";
 import { fileStore } from "./store";
 import "./files.css";
 
-function Breadcrumb() {
-  const segments = () => splitPath(fileStore.session.path);
-  return (
-    <div class="yohu-files__crumbs">
-      <For each={segments()}>
-        {(segment, index) => {
-          const target = (): string => `/${segments().slice(0, index() + 1).join("/")}`;
-          return (
-            <>
-              <Show when={index() > 0}>
-                <span class="yohu-files__crumb-sep" aria-hidden="true">
-                  ▸
-                </span>
-              </Show>
-              <button
-                type="button"
-                class="yohu-files__crumb yohu-interactive yohu-focus-ring"
-                classList={{ "yohu-files__crumb--current": index() === segments().length - 1 }}
-                title={target()}
-                onClick={() => void fileStore.goTo(target())}
-              >
-                {segment}
-              </button>
-            </>
-          );
-        }}
-      </For>
-    </div>
-  );
-}
-
 type CreateKind = "file" | "dir";
+
+const toaster = createToaster();
 
 export function FileView(props: DeviceSession) {
   const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
@@ -68,11 +43,17 @@ export function FileView(props: DeviceSession) {
   const [createName, setCreateName] = createSignal("");
   const [createError, setCreateError] = createSignal("");
   const [dropHit, setDropHit] = createSignal<DropHit>({ accept: false });
-
   let pageEl: HTMLDivElement | undefined;
+  let addressSlot: AddressSlotApi | undefined;
 
   createEffect(() => {
     fileStore.bindSerial(props.selectedSerials[0] ?? null);
+  });
+
+  createEffect(() => {
+    const tick = fileStore.session.errorTick;
+    const text = untrack(() => fileStore.session.error);
+    if (tick > 0 && text) toaster.show(text, "error");
   });
 
   const dropCurrent = (): boolean => {
@@ -96,7 +77,7 @@ export function FileView(props: DeviceSession) {
       const dest = hit.dirName ? childPath(fileStore.session.path, hit.dirName) : fileStore.session.path;
       void fileStore.pushLocals(paths, dest);
     } catch (e) {
-      fileStore.notifyError(errorText(e));
+      fileStore.notifyError(filesFaultText(e));
     }
   };
 
@@ -152,7 +133,7 @@ export function FileView(props: DeviceSession) {
     const names = fileStore.selection.names;
     if (names.length === 0) return;
     const text = copyRemotePaths(fileStore.session.path, names);
-    void navigator.clipboard.writeText(text).catch((e) => fileStore.notifyError(errorText(e)));
+    void navigator.clipboard.writeText(text).catch((e) => fileStore.notifyError(filesFaultText(e)));
   };
 
   const openSelected = (event: KeyboardEvent): void => {
@@ -186,6 +167,10 @@ export function FileView(props: DeviceSession) {
     }
     if (action === "go-up") {
       void fileStore.goUp();
+      return;
+    }
+    if (action === "edit-path") {
+      addressSlot?.open();
       return;
     }
     if (action === "open") openSelected(event);
@@ -265,12 +250,6 @@ export function FileView(props: DeviceSession) {
           </YoButton>
         </YoChrome>
 
-      <Show when={fileStore.session.error}>
-        <div class="yohu-files__error" role="alert">
-          {fileStore.session.error}
-        </div>
-      </Show>
-
       <div
         class="yohu-files__stage yohu-recipe-rail"
         classList={{ "yohu-files__stage--preview-collapsed": !fileStore.ui.previewOpen }}
@@ -282,17 +261,7 @@ export function FileView(props: DeviceSession) {
         >
           <YoPanel
             variant="pane"
-            header={
-              <div class="yohu-files__path">
-                <YoIconButton
-                  icon="chevron-up"
-                  title="上级目录"
-                  disabled={parentWithinSafety(fileStore.session.path) === null}
-                  onClick={() => void fileStore.goUp()}
-                />
-                <Breadcrumb />
-              </div>
-            }
+            header={<AddressSlot api={(slot) => { addressSlot = slot; }} />}
           >
             <Show
               when={props.selectedSerials[0]}
@@ -360,6 +329,7 @@ export function FileView(props: DeviceSession) {
           </Show>
         </YoDialog>
       </div>
+      <YoToaster toaster={toaster} />
     </YoPage>
   );
 }

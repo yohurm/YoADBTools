@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{resolve_and_recheck, FileError};
+use crate::{file_error_from_adb, resolve_and_recheck, FileError};
 use yohu_adb::AdbClient;
 use yohu_domain::SafetyRoot;
 use yohu_protocol::{AppEvent, Direction, TransferProgress, TransferState};
@@ -130,13 +130,17 @@ impl TransferRunner {
                     Ok(total_bytes)
                 } else {
                     cleanup_pull(direction, &local_path);
+                    let err = file_error_from_adb(
+                        remote_norm.as_str(),
+                        yohu_adb::AdbError::BadExit {
+                            exit_code: code,
+                            stderr: last_summary,
+                        },
+                    );
                     progress.state = TransferState::Failed;
-                    progress.message = Some(format!("退出码 {code}: {last_summary}"));
+                    progress.message = Some(err.to_string());
                     emit(&sink, progress, true).await;
-                    Err(FileError::Adb(yohu_adb::AdbError::BadExit {
-                        exit_code: code,
-                        stderr: last_summary,
-                    }))
+                    Err(err)
                 }
             }
             Err(yohu_adb::AdbError::Cancelled) => {
@@ -147,10 +151,11 @@ impl TransferRunner {
             }
             Err(e) => {
                 cleanup_pull(direction, &local_path);
+                let err = file_error_from_adb(remote_norm.as_str(), e);
                 progress.state = TransferState::Failed;
-                progress.message = Some(e.to_string());
+                progress.message = Some(err.to_string());
                 emit(&sink, progress, true).await;
-                Err(FileError::Adb(e))
+                Err(err)
             }
         }
     }

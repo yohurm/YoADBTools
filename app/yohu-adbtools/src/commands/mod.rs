@@ -72,13 +72,18 @@ pub fn ipc_library(error: LibraryError) -> IpcError {
     ipc_code(IpcErrorCode::InvalidArgs, error.to_string())
 }
 
-/// 文件模块错误 → IPC（路径/安全根走 InvalidArgs，取消保留语义）。
+/// 文件模块错误 → IPC（前端按 code 处理；文案已是分类后的中文）。
 pub fn ipc_file(e: FileError) -> IpcError {
     match e {
-        FileError::Path(message) | FileError::OutsideRoot(message) => {
-            ipc_code(IpcErrorCode::InvalidArgs, message)
+        FileError::Path(message)
+        | FileError::OutsideRoot(message)
+        | FileError::NotADirectory(message)
+        | FileError::AlreadyExists(message)
+        | FileError::ReadOnly(message)
+        | FileError::PermissionDenied(message) => ipc_code(IpcErrorCode::InvalidArgs, message),
+        FileError::RemoteNotFound(message) | FileError::LocalNotFound(message) => {
+            ipc_code(IpcErrorCode::NotFound, message)
         }
-        FileError::LocalNotFound(message) => ipc_code(IpcErrorCode::NotFound, message),
         FileError::Adb(adb) => ipc_adb(adb),
     }
 }

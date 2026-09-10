@@ -23,12 +23,36 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toMatch(/\.yohu-files__cols\s*\{[^}]*padding:[^;}]*space-/);
   });
 
-  it("首列文案缩进走 content-pad，排序钮宿主 padding 为 0", () => {
-    expect(filesCss).toContain(
-      "--yohu-col-header-content-pad: 0 var(--yohu-space-sm) 0 var(--yohu-space-md)",
-    );
+  it("表头与名称列垫交给 YoColCell，排序钮宿主 padding 为 0", () => {
+    expect(filesCss).not.toContain("--yohu-col-header-content-pad:");
+    expect(filesCss).not.toContain("--yohu-col-cell-pad");
     expect(filesCss).toMatch(/\.yohu-files__sort\s*\{[^}]*padding:\s*0/);
-    expect(filesCss).toContain("padding-left: var(--yohu-space-md)");
+    expect(filesCss).not.toMatch(/\.yohu-files__name\s*\{[^}]*padding-left/);
+  });
+
+  it("路径行只有一条地址槽：展开与收回共用 clip-path", () => {
+    expect(filesCss).toContain(".yohu-files__slot");
+    expect(filesCss).toContain(".yohu-files__slot-hit");
+    expect(filesCss).toContain(".yohu-files__field");
+    expect(filesCss).toContain("grid-area: 1 / 1");
+    expect(filesCss).toContain("clip-path: inset(0 100% 0 0)");
+    expect(filesCss).toContain("clip-path var(--yohu-motion-spatial-local)");
+    expect(filesCss).not.toContain("width var(--yohu-motion-spatial-local)");
+    const fieldInput = filesCss.match(/\.yohu-files__field-input\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(fieldInput).toContain("field-sizing: content");
+    expect(fieldInput).toContain("width: auto");
+    expect(fieldInput).toContain("min-width: 100%");
+    expect(fieldInput).not.toMatch(/(?<![-])width:\s*100%/);
+    expect(fieldInput).not.toMatch(/min-width:\s*0/);
+    expect(fieldInput).not.toMatch(/flex:\s*1/);
+    expect(filesCss).not.toContain("[data-leave");
+    expect(filesCss).not.toContain("effects-exit");
+    expect(filesCss).not.toContain(".yohu-files__address");
+    expect(filesCss).not.toContain(".yohu-files__editor-clip");
+    expect(filesCss).not.toContain(".yohu-files__vacant");
+    expect(filesCss).not.toContain(".yohu-presence");
+    expect(filesCss).not.toContain("100cqi");
+    expect(filesCss).not.toContain("container-type");
   });
 
   it("拖入高亮走 accent token", () => {

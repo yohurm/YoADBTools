@@ -29,12 +29,12 @@ import {
 } from "@yohu/ui";
 
 import { localBaseName, namesForDrag } from "./drop";
+import { filesFaultText } from "./fault";
 import {
   DEFAULT_SORT_DIR,
   FILE_COLUMNS,
   defaultFileColWidths,
   childPath,
-  errorText,
   isCancelledError,
   isNotFoundError,
   parentWithinSafety,
@@ -43,6 +43,7 @@ import {
   type SortDir,
   type SortKey,
 } from "./model";
+import { resolveRemotePath } from "./path-resolve";
 import { shouldAcceptProgress } from "./progress";
 
 export type { SortDir, SortKey } from "./model";
@@ -80,6 +81,7 @@ export function createFileStore() {
     loading: false,
     mutating: false,
     error: "",
+    errorTick: 0,
   });
   const [sort, setSortState] = createStore<{ key: SortKey; dir: SortDir }>({
     key: "name",
@@ -108,6 +110,7 @@ export function createFileStore() {
 
   function setError(message: string): void {
     setSession("error", message);
+    if (message) setSession("errorTick", session.errorTick + 1);
   }
 
   function upsertTransfer(progress: TransferProgress, name?: string): void {
@@ -164,27 +167,43 @@ export function createFileStore() {
     if (index >= 0) setTransfers(index, { name });
   }
 
-  async function refresh(): Promise<void> {
+  async function refresh(): Promise<boolean> {
+    return loadListing(session.path, true);
+  }
+
+  /** stay=true：已在该路径，失败清空列表。stay=false：先 list，成功才改 path，失败原地不动。 */
+  async function loadListing(target: string, stay: boolean): Promise<boolean> {
     const current = serial();
     if (!current) {
-      setEntries([]);
-      return;
+      if (stay) setEntries([]);
+      else setError("未选择设备");
+      return false;
     }
     const gen = ++listGen;
     setSession("loading", true);
     try {
-      const list = await filesList(current, session.path);
-      if (gen !== listGen) return;
+      const list = await filesList(current, target);
+      if (gen !== listGen) return false;
+      const moved = target !== session.path;
+      if (moved) {
+        setSession("path", target);
+        clearSelection();
+      }
       setEntries(sortEntries(list, sort.key, sort.dir));
       setError("");
-      YoLog.info("files", "浏览", { serial: current, path: session.path, count: list.length });
-      const alive = new Set(list.map((e) => e.name));
-      setSelection("names", selection.names.filter((n) => alive.has(n)));
+      YoLog.info("files", "浏览", { serial: current, path: target, count: list.length });
+      if (!moved) {
+        const alive = new Set(list.map((e) => e.name));
+        setSelection("names", selection.names.filter((n) => alive.has(n)));
+      }
+      return true;
     } catch (e) {
-      if (gen !== listGen || isCancelledError(e)) return;
-      setEntries([]);
-      setError(errorText(e));
-      YoLog.error("files", "浏览失败", { path: session.path, error: errorText(e) });
+      if (gen !== listGen || isCancelledError(e)) return false;
+      const message = filesFaultText(e);
+      setError(message);
+      YoLog.error("files", "浏览失败", { path: target, error: message });
+      if (stay) setEntries([]);
+      return false;
     } finally {
       if (gen === listGen) setSession("loading", false);
     }
@@ -209,17 +228,15 @@ export function createFileStore() {
     void refresh();
   }
 
-  async function navigate(target: string): Promise<void> {
-    setSession("path", target || "/");
-    clearSelection();
-    await refresh();
+  async function navigate(target: string): Promise<boolean> {
+    return loadListing(target || "/", false);
   }
 
   async function enterDirectory(name: string): Promise<void> {
     try {
       await navigate(childPath(session.path, name));
     } catch (e) {
-      setError(errorText(e));
+      setError(filesFaultText(e));
     }
   }
 
@@ -228,8 +245,13 @@ export function createFileStore() {
     if (parent !== null) await navigate(parent);
   }
 
-  async function goTo(target: string): Promise<void> {
-    await navigate(target.startsWith("/") ? target : `/${target}`);
+  async function goTo(target: string): Promise<boolean> {
+    const resolved = resolveRemotePath(target, session.path);
+    if (!resolved.ok) {
+      setError(resolved.reason);
+      return false;
+    }
+    return navigate(resolved.path);
   }
 
   async function withSerial(op: (serial: string) => Promise<void>): Promise<void> {
@@ -244,7 +266,7 @@ export function createFileStore() {
       setError("");
       await refresh();
     } catch (e) {
-      setError(errorText(e));
+      setError(filesFaultText(e));
     } finally {
       setSession("mutating", false);
     }
@@ -259,7 +281,7 @@ export function createFileStore() {
         try {
           await filesDelete({ serial: current, path: childPath(session.path, name) });
         } catch (e) {
-          failures.push(`${name}: ${errorText(e)}`);
+          failures.push(`${name}: ${filesFaultText(e)}`);
         }
       }
       if (failures.length > 0) throw new Error(failures.join("；"));
@@ -292,7 +314,7 @@ export function createFileStore() {
       await enqueuePush(local, remoteName, destDir ?? session.path);
       setError("");
     } catch (e) {
-      setError(errorText(e));
+      setError(filesFaultText(e));
     }
   }
 
@@ -314,7 +336,7 @@ export function createFileStore() {
       try {
         await enqueuePush(local, name, dest);
       } catch (e) {
-        failures.push(`${name}: ${errorText(e)}`);
+        failures.push(`${name}: ${filesFaultText(e)}`);
       }
     }
     setError(failures.length > 0 ? failures.join("；") : "");
@@ -332,7 +354,7 @@ export function createFileStore() {
       setTransferName(id, remoteName);
       setError("");
     } catch (e) {
-      setError(errorText(e));
+      setError(filesFaultText(e));
     }
   }
 
@@ -341,7 +363,7 @@ export function createFileStore() {
       await filesCancel(id);
     } catch (e) {
       if (!isNotFoundError(e)) {
-        setError(errorText(e));
+        setError(filesFaultText(e));
         return;
       }
     }
@@ -371,7 +393,7 @@ export function createFileStore() {
       await filesDragOut({ serial: current, remotes });
       setError("");
     } catch (e) {
-      setError(errorText(e));
+      setError(filesFaultText(e));
     } finally {
       dragging = false;
     }

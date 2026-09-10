@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RemoteEntry } from "@yohu/api";
+
+const mocks = vi.hoisted(() => ({
+  filesList: vi.fn(async (_serial: string, _path: string): Promise<RemoteEntry[]> => []),
+}));
+
+vi.mock("@yohu/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@yohu/api")>();
+  return { ...actual, filesList: mocks.filesList };
+});
 
 import {
   childPath,
@@ -19,6 +28,11 @@ import {
   isNotFoundError,
 } from "./model";
 import { createFileStore } from "./store";
+
+beforeEach(() => {
+  mocks.filesList.mockReset();
+  mocks.filesList.mockResolvedValue([]);
+});
 
 describe("joinPath", () => {
   it("根目录拼接", () => {
@@ -200,6 +214,43 @@ describe("isNotFoundError", () => {
     expect(isNotFoundError({ code: "not_found", message: "传输不存在: 3" })).toBe(true);
     expect(isNotFoundError("not found")).toBe(true);
     expect(isNotFoundError(new Error("其它错误"))).toBe(false);
+  });
+});
+
+describe("goTo（自定义路径）", () => {
+  it("安全根外不发起浏览", async () => {
+    const store = createFileStore();
+    await expect(store.goTo("/data/local/tmp")).resolves.toBe(false);
+    expect(store.session.error).toBe("路径不在安全根内");
+    expect(store.session.path).toBe("/sdcard");
+  });
+});
+
+describe("goTo 走路径解析", () => {
+  it("安全根外只报错，不改当前路径", async () => {
+    const store = createFileStore();
+    expect(store.session.path).toBe("/sdcard");
+    await expect(store.goTo("/data/local/tmp")).resolves.toBe(false);
+    expect(store.session.path).toBe("/sdcard");
+    expect(store.session.error).toBe("路径不在安全根内");
+  });
+
+  it("设备上不存在的路径不跳转，文案不含 ls 退出码", async () => {
+    mocks.filesList.mockImplementation(async (_serial, path) => {
+      if (path.includes("com.ggec")) {
+        throw {
+          code: "not_found",
+          message: "没有这个目录，请重新输入",
+        };
+      }
+      return [];
+    });
+    const store = createFileStore();
+    store.bindSerial("S1");
+    await expect(store.goTo("/sdcard/Android/data/com.ggec")).resolves.toBe(false);
+    expect(store.session.path).toBe("/sdcard");
+    expect(store.session.error).toBe("没有这个目录，请重新输入");
+    expect(store.session.error).not.toContain("退出码");
   });
 });
 

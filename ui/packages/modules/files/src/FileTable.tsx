@@ -1,14 +1,17 @@
 /**
  * 文件表（View）：列规格来自 model.FILE_COLUMNS，状态全在 fileStore。
- * 表头轨道走 YoColHeader（悬浮片铺满列宽；文案边距在 .yohu-col-header__label）；本文件只提供排序文案与单元格。
+ * 轨道走 YoColFrame；表头 YoColRow / YoColHeader；行 YoColTrack / YoColCell。
  */
 
 import { For, Show } from "solid-js";
 
 import {
   Icon,
+  YoColCell,
+  YoColFrame,
   YoColHeader,
   YoColRow,
+  YoColTrack,
   YoEmptyState,
   YoFileIcon,
   YoLoading,
@@ -37,7 +40,6 @@ function ColHead(props: { col: FileColumnSpec }) {
   };
   return (
     <YoColHeader
-      align={props.col.align}
       ariaSort={ariaSort()}
       resizable={!props.col.flex}
       resizeLabel={props.col.resizeLabel}
@@ -71,44 +73,41 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
   switch (props.col.key) {
     case "name":
       return (
-        <span class="yohu-files__name">
+        <YoColCell class="yohu-files__name">
           <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={16} />
           <span class="yohu-files__name-text" title={props.entry.name}>
             {props.entry.name}
           </span>
-        </span>
+        </YoColCell>
       );
     case "type":
       return (
-        <span class="yohu-files__cell" title={type()}>
+        <YoColCell class="yohu-files__cell" title={type()}>
           {type()}
-        </span>
+        </YoColCell>
       );
     case "size":
       return (
-        <span class="yohu-files__cell yohu-files__num" title={size()}>
+        <YoColCell class="yohu-files__num" title={size()}>
           {size()}
-        </span>
+        </YoColCell>
       );
     case "mtime":
       return (
-        <span class="yohu-files__cell yohu-files__mtime" title={props.entry.mtime ?? ""}>
+        <YoColCell class="yohu-files__mtime" title={props.entry.mtime ?? ""}>
           {mtime()}
-        </span>
+        </YoColCell>
       );
   }
 }
 
 export function FileTable(props: { onContextMenu: (x: number, y: number) => void; dropDirName?: string | null }) {
   const colTemplate = (): string => fileColTemplate(fileStore.ui.colWidths);
-  const colStyle = (): { "grid-template-columns": string } => ({
-    "grid-template-columns": colTemplate(),
-  });
   const entries = (): RemoteEntry[] => fileStore.entries;
 
   return (
-    <section class="yohu-files__table">
-      <YoColRow class="yohu-files__cols yohu-files__cols--head" template={colTemplate()}>
+    <YoColFrame class="yohu-files__table" template={colTemplate()}>
+      <YoColRow class="yohu-files__cols yohu-files__cols--head">
         <For each={[...FILE_COLUMNS]}>{(col) => <ColHead col={col} />}</For>
       </YoColRow>
       <div
@@ -145,12 +144,11 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
               props.onContextMenu(event.clientX, event.clientY);
             }}
             renderRow={(entry) => (
-              <div
+              <YoColTrack
                 class="yohu-files__cols yohu-files__row"
                 classList={{ "yohu-files__row--drop": props.dropDirName === entry.name }}
                 data-kind={entry.kind}
                 draggable="true"
-                style={colStyle()}
                 onDragStart={(event) => {
                   event.preventDefault();
                   if (!fileStore.selectedSet().has(entry.name)) fileStore.select(entry.name, "replace");
@@ -161,11 +159,11 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
                 }}
               >
                 <For each={[...FILE_COLUMNS]}>{(col) => <FileCell entry={entry} col={col} />}</For>
-              </div>
+              </YoColTrack>
             )}
           />
         </Show>
       </div>
-    </section>
+    </YoColFrame>
   );
 }

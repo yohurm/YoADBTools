@@ -6,7 +6,7 @@ import { whenList, whenPanel, type KeyBinding } from "@yohu/ui";
 
 import { joinPath } from "./model";
 
-export type FilesKeyAction = "select-all" | "copy" | "delete" | "refresh" | "go-up" | "open";
+export type FilesKeyAction = "select-all" | "copy" | "delete" | "refresh" | "go-up" | "open" | "edit-path";
 
 export const FILES_LIST_SELECTOR = ".yohu-files__table-list";
 
@@ -17,6 +17,7 @@ export const FILES_KEY_BINDINGS: readonly KeyBinding<FilesKeyAction>[] = [
   { action: "open", key: "enter", when: whenList },
   { action: "go-up", key: "backspace", when: whenList },
   { action: "refresh", key: "f5", when: whenPanel },
+  { action: "edit-path", key: "l", ctrl: true, when: whenPanel },
 ];
 
 export function copyRemotePaths(dir: string, names: readonly string[]): string {

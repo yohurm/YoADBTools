@@ -4,10 +4,12 @@
 //! 不信任 UI 传来的路径。
 
 pub mod browse;
+pub mod fault;
 pub mod mutate;
 pub mod transfer;
 
 pub use browse::{join_win_relative, FileBrowser, TreeEntry, MAX_TREE_ENTRIES};
+pub use fault::{classify_remote_stderr, file_error_from_adb, RemoteFault};
 pub use mutate::FileMutator;
 pub use transfer::{TransferRunner, TransferSpec};
 
@@ -58,13 +60,23 @@ pub(crate) async fn resolve_and_recheck(
     }
 }
 
-/// 文件服务错误。
+/// 文件服务错误。能分类的设备侧失败走具名变体，禁止把 `ls` stderr 原文交给 UI。
 #[derive(Debug, Error)]
 pub enum FileError {
     #[error("路径非法: {0}")]
     Path(String),
     #[error("路径不在安全根内: {0}")]
     OutsideRoot(String),
+    #[error("没有这个目录，请重新输入")]
+    RemoteNotFound(String),
+    #[error("没有这个目录，请重新输入")]
+    NotADirectory(String),
+    #[error("没有权限访问该路径: {0}")]
+    PermissionDenied(String),
+    #[error("文件系统只读: {0}")]
+    ReadOnly(String),
+    #[error("路径已存在: {0}")]
+    AlreadyExists(String),
     #[error("本地路径不存在: {0}")]
     LocalNotFound(String),
     #[error("ADB 错误: {0}")]

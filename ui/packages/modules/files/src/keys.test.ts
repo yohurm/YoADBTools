@@ -23,13 +23,16 @@ describe("FILES_KEY_BINDINGS", () => {
   const chrome = ctx();
   const rail = ctx({ inPanel: false });
 
-  it("列表 Ctrl+A/C、Delete、Enter、Backspace；F5 在面板铬；输入框与侧栏不生效", () => {
+  it("列表 Ctrl+A/C、Delete、Enter、Backspace；F5 / Ctrl+L 在面板铬；输入框与侧栏不生效", () => {
     expect(matchBindings(keyEvent({ key: "a", ctrlKey: true }), list, FILES_KEY_BINDINGS)).toBe("select-all");
     expect(matchBindings(keyEvent({ key: "c", ctrlKey: true }), list, FILES_KEY_BINDINGS)).toBe("copy");
     expect(matchBindings(keyEvent({ key: "Delete" }), list, FILES_KEY_BINDINGS)).toBe("delete");
     expect(matchBindings(keyEvent({ key: "Enter" }), list, FILES_KEY_BINDINGS)).toBe("open");
     expect(matchBindings(keyEvent({ key: "Backspace" }), list, FILES_KEY_BINDINGS)).toBe("go-up");
     expect(matchBindings(keyEvent({ key: "F5" }), chrome, FILES_KEY_BINDINGS)).toBe("refresh");
+    expect(matchBindings(keyEvent({ key: "l", ctrlKey: true }), chrome, FILES_KEY_BINDINGS)).toBe("edit-path");
+    expect(matchBindings(keyEvent({ key: "l", ctrlKey: true }), list, FILES_KEY_BINDINGS)).toBe("edit-path");
+    expect(matchBindings(keyEvent({ key: "l", ctrlKey: true }), field, FILES_KEY_BINDINGS)).toBeNull();
     expect(matchBindings(keyEvent({ key: "a", ctrlKey: true }), field, FILES_KEY_BINDINGS)).toBeNull();
     expect(matchBindings(keyEvent({ key: "Delete" }), field, FILES_KEY_BINDINGS)).toBeNull();
     expect(matchBindings(keyEvent({ key: "a", ctrlKey: true }), rail, FILES_KEY_BINDINGS)).toBeNull();
