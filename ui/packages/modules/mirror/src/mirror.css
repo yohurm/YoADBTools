@@ -33,7 +33,7 @@
   min-height: 0;
 }
 
-.yohu-mirror__ops.yohu-panel--pane {
+.yohu-mirror__ops.yohu-panel[data-variant="pane"] {
   flex: 0 0 var(--yohu-layout-mirror-ops);
   width: var(--yohu-layout-mirror-ops);
   max-width: var(--yohu-layout-mirror-ops);
@@ -49,7 +49,7 @@
   overflow-y: auto;
 }
 
-.yohu-mirror__func.yohu-panel--pane {
+.yohu-mirror__func.yohu-panel[data-variant="pane"] {
   flex: 0 0 var(--yohu-layout-preview);
   width: var(--yohu-layout-preview);
   max-width: var(--yohu-layout-preview);

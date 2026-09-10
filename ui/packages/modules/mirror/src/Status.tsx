@@ -3,6 +3,7 @@
  */
 
 import { Show } from "solid-js";
+import { YoTooltip } from "@yohu/ui";
 
 import { mirrorStore } from "./store";
 
@@ -10,11 +11,9 @@ export function MirrorStatus() {
   const live = () => mirrorStore.state.phase === "live" && mirrorStore.state.hasFrame;
   return (
     <Show when={live()}>
-      <span
-        title={`${mirrorStore.state.width}×${mirrorStore.state.height}`}
-      >
-        {mirrorStore.state.paintedFps} fps
-      </span>
+      <YoTooltip content={`${mirrorStore.state.width}×${mirrorStore.state.height}`}>
+        <span>{mirrorStore.state.paintedFps} fps</span>
+      </YoTooltip>
     </Show>
   );
 }

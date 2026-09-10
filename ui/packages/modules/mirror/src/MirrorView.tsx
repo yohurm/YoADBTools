@@ -5,7 +5,6 @@
 import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
-  Layout,
   YoButton,
   YoChrome,
   YoIconButton,
@@ -13,6 +12,7 @@ import {
   YoPanel,
   YoSelect,
   YoToaster,
+  YoTooltip,
   createToaster,
   type IconName,
 } from "@yohu/ui";
@@ -274,7 +274,7 @@ export function MirrorView(props: DeviceSession) {
       <YoChrome title={ModuleTitle.Mirror} deviceLabel={props.selectedLabel ?? undefined}>
         <YoButton
           size="sm"
-          variant="primary"
+          variant="solid"
           disabled={!props.selectedSerials[0] || mirrorStore.state.phase === "starting"}
           loading={mirrorStore.state.phase === "starting"}
           onClick={() => {
@@ -304,7 +304,8 @@ export function MirrorView(props: DeviceSession) {
         />
         <YoButton
           size="sm"
-          variant={mirrorStore.state.readOnly ? "primary" : "secondary"}
+          variant={mirrorStore.state.readOnly ? "solid" : "outlined"}
+          tone={mirrorStore.state.readOnly ? "accent" : "neutral"}
           aria-pressed={mirrorStore.state.readOnly}
           disabled={!props.selectedSerials[0] || mirrorStore.state.phase === "starting"}
           onClick={() => void mirrorStore.setReadOnly(!mirrorStore.state.readOnly)}
@@ -331,7 +332,7 @@ export function MirrorView(props: DeviceSession) {
               <YoIconButton
                 icon={op.icon}
                 title={op.title}
-                size={Layout.IconMd}
+                size="md"
                 disabled={!canControl()}
                 onClick={() => void runOp(op)}
               />
@@ -342,7 +343,7 @@ export function MirrorView(props: DeviceSession) {
             title={
               deviceNight() === null ? "设备深浅色" : deviceNight() === true ? "设备深色" : "设备浅色"
             }
-            size={Layout.IconMd}
+            size="md"
             pressed={deviceNight() === true}
             disabled={!props.selectedSerials[0] || deviceNight() === null}
             onClick={() => void toggleDeviceNight()}
@@ -352,7 +353,7 @@ export function MirrorView(props: DeviceSession) {
               <YoIconButton
                 icon={op.icon}
                 title={op.title}
-                size={Layout.IconMd}
+                size="md"
                 disabled={!canControl()}
                 onClick={() => void runOp(op)}
               />
@@ -361,7 +362,8 @@ export function MirrorView(props: DeviceSession) {
         </YoPanel>
 
         <YoPanel class="yohu-mirror__func" variant="pane" padding="md" aria-label="投屏功能栏">
-          <div class="yohu-mirror__group" title="下次开始生效">
+          <YoTooltip content="下次开始生效" block>
+          <div class="yohu-mirror__group">
             <div class="yohu-mirror__group-label">质量</div>
             <label class="yohu-mirror__field">
               <span class="yohu-mirror__field-name">投屏协议</span>
@@ -410,6 +412,7 @@ export function MirrorView(props: DeviceSession) {
               />
             </label>
           </div>
+          </YoTooltip>
         </YoPanel>
       </div>
       <YoToaster toaster={toaster} />
