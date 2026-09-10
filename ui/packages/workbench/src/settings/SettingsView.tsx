@@ -217,7 +217,7 @@ export const SettingsView: Component = () => {
           <YoFormRow
             class="yohu-settings__path-row"
             title="数据目录"
-            description={`默认 ${settingsStore.paths.local_root || "应用数据目录"}/data。其下为 tools/adb 与 modules/（adb-terminal / file-manager / log-analyzer）。设置文件与应用日志固定在系统应用数据根，不随本目录迁移。`}
+            description={`默认 ${settingsStore.paths.local_root || "应用数据目录"}/data。其下为 tools/adb 与 modules/（adb-terminal / log-analyzer）。配置、日志与缓存固定在产品家园，不随本目录迁移，也不搬家。`}
             note={<EffectBadge text="重启生效" />}
           >
             <PathControl
@@ -398,7 +398,9 @@ export const SettingsView: Component = () => {
             <span class="yohu-settings__value">{settingsStore.identity.copyright}</span>
           </YoFormRow>
           <PathOpenRow title="数据根" path={settingsStore.paths.data_root} />
-          <PathOpenRow title="设置目录" path={settingsStore.paths.settings_dir} />
+          <PathOpenRow title="安装目录" path={settingsStore.paths.install_dir} />
+          <PathOpenRow title="配置目录" path={settingsStore.paths.config_dir} />
+          <PathOpenRow title="缓存" path={settingsStore.paths.cache_dir} />
           <PathOpenRow title="应用日志" path={settingsStore.paths.logs_dir} />
         </YoPanel>
       </div>

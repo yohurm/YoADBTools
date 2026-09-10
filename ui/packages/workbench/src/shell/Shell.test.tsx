@@ -163,14 +163,18 @@ const RESOLVED_DATA = "C:\\Users\\me\\AppData\\Local\\YohuAdbTools\\data";
 const RESOLVED_EXPORT = "C:\\Users\\me\\AppData\\Local\\YohuAdbTools\\data\\modules\\log-analyzer\\exports";
 const RESOLVED_PATHS = {
   local_root: RESOLVED_LOCAL,
-  settings_dir: `${RESOLVED_LOCAL}\\settings`,
-  settings_file: `${RESOLVED_LOCAL}\\settings\\settings.json`,
+  install_dir: "C:\\Users\\me\\AppData\\Local\\Programs\\YohuAdbTools",
+  config_dir: `${RESOLVED_LOCAL}\\config`,
+  settings_file: `${RESOLVED_LOCAL}\\config\\settings.json`,
   logs_dir: `${RESOLVED_LOCAL}\\logs`,
   data_root: RESOLVED_DATA,
+  cache_dir: `${RESOLVED_LOCAL}\\cache`,
+  webview_dir: `${RESOLVED_LOCAL}\\cache\\webview`,
+  update_cache_dir: `${RESOLVED_LOCAL}\\cache\\update`,
   adb_tools_dir: `${RESOLVED_DATA}\\tools\\adb`,
   library_file: `${RESOLVED_DATA}\\modules\\adb-terminal\\config\\library.json`,
   exports_dir: RESOLVED_EXPORT,
-  drag_out_dir: `${RESOLVED_DATA}\\modules\\file-manager\\drag-out`,
+  drag_out_dir: `${RESOLVED_LOCAL}\\cache\\drag-out`,
 };
 
 const DEFAULT_IDENTITY = {
@@ -536,15 +540,17 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       );
     });
     const boxes = container.querySelectorAll(".yohu-settings__path");
-    expect(boxes).toHaveLength(6);
+    expect(boxes).toHaveLength(8);
     expect(boxes[0]?.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
     expect(boxes[1]?.getAttribute("title")).toBe(RESOLVED_DATA);
     expect(boxes[2]?.getAttribute("title")).toBe(RESOLVED_EXPORT);
     expect(boxes[3]?.getAttribute("title")).toBe(RESOLVED_DATA);
-    expect(boxes[4]?.getAttribute("title")).toBe(RESOLVED_PATHS.settings_dir);
-    expect(boxes[5]?.getAttribute("title")).toBe(RESOLVED_PATHS.logs_dir);
+    expect(boxes[4]?.getAttribute("title")).toBe(RESOLVED_PATHS.install_dir);
+    expect(boxes[5]?.getAttribute("title")).toBe(RESOLVED_PATHS.config_dir);
+    expect(boxes[6]?.getAttribute("title")).toBe(RESOLVED_PATHS.cache_dir);
+    expect(boxes[7]?.getAttribute("title")).toBe(RESOLVED_PATHS.logs_dir);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
-    expect(screen.getAllByText("打开")).toHaveLength(3);
+    expect(screen.getAllByText("打开")).toHaveLength(5);
 
     mocks.dialogOpenDirectory.mockResolvedValue("D:\\YohuData");
     fireEvent.click(screen.getAllByText("浏览")[1] as HTMLElement);
@@ -604,11 +610,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
     expect(screen.getByText("com.yohu.adbtools")).toBeTruthy();
     expect(screen.getByText("数据根")).toBeTruthy();
-    expect(screen.getByText("设置目录")).toBeTruthy();
+    expect(screen.getByText("安装目录")).toBeTruthy();
+    expect(screen.getByText("配置目录")).toBeTruthy();
+    expect(screen.getByText("缓存")).toBeTruthy();
     expect(screen.getByText("应用日志")).toBeTruthy();
     const openButtons = screen.getAllByRole("button", { name: "打开" });
-    expect(openButtons.length).toBe(3);
-    fireEvent.click(openButtons[2] as HTMLButtonElement);
+    expect(openButtons.length).toBe(5);
+    fireEvent.click(openButtons[4] as HTMLButtonElement);
     await waitFor(() => {
       expect(mocks.systemOpenPath).toHaveBeenCalledWith(RESOLVED_PATHS.logs_dir);
     });
