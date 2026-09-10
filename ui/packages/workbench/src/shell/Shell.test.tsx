@@ -435,7 +435,7 @@ describe("NavList（§3 模块导航）", () => {
 });
 
 describe("StatusBar（§3 状态栏）", () => {
-  it("任务项悬停明细（title = TaskInfo.detail）", async () => {
+  it("任务项悬停明细走 YoTooltip（aria-label = TaskInfo.detail）", async () => {
     expect(mocks.taskHandler).not.toBeNull();
     mocks.taskHandler?.({
       tasks: [
@@ -446,7 +446,9 @@ describe("StatusBar（§3 状态栏）", () => {
     const { container } = render(() => <StatusBar />);
     const task = container.querySelector(".yohu-status__task");
     expect(task?.textContent).toBe("上传: x.apk");
-    expect(task?.getAttribute("title")).toBe("C:\\x.apk → /sdcard/x.apk");
+    expect(task?.getAttribute("title")).toBeNull();
+    expect(task?.getAttribute("aria-label")).toBe("C:\\x.apk → /sdcard/x.apk");
+    expect(task?.closest(".yohu-tooltip__anchor")).toBeTruthy();
   });
 
   it("版本文案来自 system.info 身份", async () => {
@@ -486,11 +488,14 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.getByText("每次导出询问保存位置")).toBeTruthy();
   });
 
-  it("日志显示列复选框可见且默认全开", () => {
+  it("日志显示列复选框可见且默认不含 UID/TID", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("日志显示列")).toBeTruthy();
-    for (const name of ["时间", "UID", "PID", "TID", "级别", "Tag"]) {
+    for (const name of ["时间", "PID", "级别", "Tag"]) {
       expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(true);
+    }
+    for (const name of ["UID", "TID"]) {
+      expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(false);
     }
   });
 
@@ -509,13 +514,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(control?.querySelector(".yohu-settings__checks")).toBeTruthy();
   });
 
-  it("关闭 UID 列立即写入 log_display_columns", async () => {
+  it("关闭 PID 列立即写入 log_display_columns", async () => {
     render(() => <SettingsView />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "UID" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PID" }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith(
         "log_display_columns",
-        expect.objectContaining({ uid: false, ts: true, pid: true, tag: true }),
+        expect.objectContaining({ pid: false, ts: true, uid: false, tid: false, tag: true }),
       );
     });
   });
@@ -535,16 +540,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("三项文件位置统一：绝对路径展示框 + 浏览；数据目录走选文件夹", async () => {
     const { container } = render(() => <SettingsView />);
     await waitFor(() => {
-      expect(container.querySelector(".yohu-settings__path")?.getAttribute("title")).toBe(
-        RESOLVED_ADB,
-      );
+      expect(container.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
     });
     const boxes = container.querySelectorAll(".yohu-settings__path");
     expect(boxes).toHaveLength(4);
+    expect(boxes[0]?.getAttribute("title")).toBeNull();
+    expect(boxes[0]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
     expect(boxes[0]?.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
-    expect(boxes[1]?.getAttribute("title")).toBe(RESOLVED_DATA);
-    expect(boxes[2]?.getAttribute("title")).toBe(RESOLVED_EXPORT);
-    expect(boxes[3]?.getAttribute("title")).toBe(RESOLVED_PATHS.logs_dir);
+    expect(boxes[1]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
+    expect(boxes[2]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
+    expect(boxes[3]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
 

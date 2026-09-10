@@ -10,6 +10,7 @@ import { APP_ICON_SRC } from "../app-identity";
 import { selectedDeviceLabel } from "./device-label";
 import {
   YoContextMenuHost,
+  YoTooltipHost,
   YoIconButton,
   YoPresence,
   YoThemeToggle,
@@ -138,6 +139,7 @@ export const AppLayout: Component<{
         <StatusBar />
       </div>
       <YoContextMenuHost />
+      <YoTooltipHost />
     </div>
   );
 };

@@ -31,6 +31,7 @@ import {
   YoSwitch,
   YoTextField,
   YoToaster,
+  YoTooltip,
   createToaster,
 } from "@yohu/ui";
 
@@ -77,11 +78,13 @@ function PathControl(props: { label: string; path: string; onBrowse: () => void 
   const parts = () => splitPathEnds(props.path);
   return (
     <>
-      <div class="yohu-settings__path" title={props.path || undefined} aria-label={props.label}>
-        <span class="yohu-settings__path-head">{parts().head}</span>
-        <span class="yohu-settings__path-tail">{parts().tail}</span>
-      </div>
-      <YoButton variant="secondary" onClick={() => props.onBrowse()}>
+      <YoTooltip content={props.path} disabled={!props.path} block>
+        <div class="yohu-settings__path" aria-label={props.label}>
+          <span class="yohu-settings__path-head">{parts().head}</span>
+          <span class="yohu-settings__path-tail">{parts().tail}</span>
+        </div>
+      </YoTooltip>
+      <YoButton variant="outlined" tone="neutral" onClick={() => props.onBrowse()}>
         浏览
       </YoButton>
     </>
@@ -93,12 +96,14 @@ function PathOpenRow(props: { title: string; path: string }): JSX.Element {
   const parts = () => splitPathEnds(props.path);
   return (
     <YoFormRow class="yohu-settings__path-row" title={props.title}>
-      <div class="yohu-settings__path" title={props.path || undefined} aria-label={props.title}>
-        <span class="yohu-settings__path-head">{parts().head}</span>
-        <span class="yohu-settings__path-tail">{parts().tail}</span>
-      </div>
+      <YoTooltip content={props.path} disabled={!props.path} block>
+        <div class="yohu-settings__path" aria-label={props.title}>
+          <span class="yohu-settings__path-head">{parts().head}</span>
+          <span class="yohu-settings__path-tail">{parts().tail}</span>
+        </div>
+      </YoTooltip>
       <YoButton
-        variant="secondary"
+        variant="outlined" tone="neutral"
         disabled={!props.path}
         onClick={() => void systemOpenPath(props.path)}
       >
@@ -383,7 +388,7 @@ export const SettingsView: Component = () => {
             <span class="yohu-settings__value">{settingsStore.identity.version}</span>
             <YoButton
               size="sm"
-              variant="secondary"
+              variant="outlined" tone="neutral"
               loading={updateStore.checking()}
               disabled={updateStore.checking()}
               onClick={() => void checkAppUpdate()}
@@ -409,15 +414,15 @@ export const SettingsView: Component = () => {
           <Show
             when={!downloading()}
             fallback={
-              <YoButton variant="ghost" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
                 取消
               </YoButton>
             }
           >
-            <YoButton variant="ghost" onClick={() => updateStore.dismiss()}>
+            <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
               稍后
             </YoButton>
-            <YoButton variant="ghost" onClick={() => void openDownload()}>
+            <YoButton variant="ghost" tone="neutral" onClick={() => void openDownload()}>
               浏览器下载
             </YoButton>
             <Show when={updateStore.canApply()}>
@@ -455,7 +460,7 @@ export const SettingsView: Component = () => {
         footer={
           <>
             <Show when={!applying()}>
-              <YoButton variant="ghost" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
                 取消
               </YoButton>
             </Show>

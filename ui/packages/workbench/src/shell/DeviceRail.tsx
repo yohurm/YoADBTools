@@ -10,14 +10,14 @@
 
 import { Component, Show, createSignal } from "solid-js";
 
-import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence } from "@yohu/ui";
+import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence, YoTooltip } from "@yohu/ui";
 import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
 import { deviceStore } from "../stores";
 import { formatDeviceStatusHint, formatDeviceStatusMeta } from "./device-status-format";
 
-/** 设备状态可读文本（title 提示）。 */
+/** 设备状态可读文本（YoTooltip）。 */
 function stateText(state: DeviceInfo["state"]): string {
   switch (state) {
     case "online":
@@ -109,6 +109,7 @@ export const DeviceRail: Component<{
                     : `${deviceDisplayName(device)} · ${device.serial} · ${stateText(device.state)}`;
                 };
                 return (
+                  <YoTooltip content={title()} block>
                   <div
                     class="yohu-device-rail__item yohu-interactive yohu-focus-ring"
                     classList={{
@@ -117,7 +118,6 @@ export const DeviceRail: Component<{
                     role="option"
                     aria-selected={isSelected(device.serial)}
                     tabIndex={focused() || (deviceStore.state.focusSerial === null && first()) ? 0 : -1}
-                    title={title()}
                     onClick={(event) => select(device.serial, event)}
                     onKeyDown={(event) => onItemKeyDown(device.serial, event)}
                   >
@@ -137,9 +137,10 @@ export const DeviceRail: Component<{
                       </Show>
                     </span>
                     <Show when={device.state === "unauthorized"}>
-                      <YoBadge text="未授权" tone="warn" />
+                      <YoBadge text="未授权" tone="warning" />
                     </Show>
                   </div>
+                  </YoTooltip>
                 );
               }}
             </YoListPresence>
@@ -149,7 +150,7 @@ export const DeviceRail: Component<{
           <div class="yohu-device-rail__empty">
             <div class="yohu-device-rail__empty-title">无设备</div>
             <Show when={deviceStore.state.lastError}>
-              <div class="yohu-device-rail__empty-error" role="status" title={deviceStore.state.lastError}>
+              <div class="yohu-device-rail__empty-error" role="status">
                 {deviceStore.state.lastError}
               </div>
             </Show>
@@ -158,7 +159,7 @@ export const DeviceRail: Component<{
                 请用 USB 连接设备并确认已授权（adb devices 可见）
               </div>
             </Show>
-            <YoButton size="sm" variant="secondary" onClick={() => void deviceStore.refresh()}>
+            <YoButton size="sm" variant="outlined" tone="neutral" onClick={() => void deviceStore.refresh()}>
               重试扫描
             </YoButton>
           </div>

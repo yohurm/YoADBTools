@@ -5,7 +5,7 @@
 
 import { Component, For, Show } from "solid-js";
 
-import { YoStatusBar } from "@yohu/ui";
+import { YoStatusBar, YoTooltip } from "@yohu/ui";
 
 import { modules } from "../registry";
 import { deviceStore, settingsStore, taskStore } from "../stores";
@@ -30,9 +30,11 @@ export const StatusBar: Component = () => {
               任务:
               <For each={activeTasks()}>
                 {(t) => (
-                  <span class="yohu-status__task" title={t.detail ?? t.name}>
-                    {t.name}
-                  </span>
+                  <YoTooltip content={t.detail ?? t.name}>
+                    <span class="yohu-status__task" aria-label={t.detail ?? t.name}>
+                      {t.name}
+                    </span>
+                  </YoTooltip>
                 )}
               </For>
             </span>
