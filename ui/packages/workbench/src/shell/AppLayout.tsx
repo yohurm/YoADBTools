@@ -1,5 +1,5 @@
 /**
- * 工作台主布局：窗口铬（应用标题 + 侧栏钮 + 三键）+ 左侧抽屉（设备栏 + 模块导航）
+ * 工作台主布局：窗口铬（应用标题 + 主题钮 + 侧栏钮 + 三键）+ 左侧抽屉（设备栏 + 模块导航）
  * / 右侧内容区（模块自带标题区与功能栏）/ 底部状态栏。
  * 单一 canvas 铺满窗口；标题栏/侧栏/状态栏不刷互打架的实底。
  */
@@ -8,7 +8,15 @@ import { type Component, Show, createEffect, createMemo, createSignal } from "so
 
 import { APP_ICON_SRC } from "../app-identity";
 import { selectedDeviceLabel } from "./device-label";
-import { YoContextMenuHost, YoIconButton, YoPresence, YoTitleBar, closeContextMenu, shouldSkipMotion } from "@yohu/ui";
+import {
+  YoContextMenuHost,
+  YoIconButton,
+  YoPresence,
+  YoThemeToggle,
+  YoTitleBar,
+  closeContextMenu,
+  shouldSkipMotion,
+} from "@yohu/ui";
 
 import { modules, type ModuleDescriptor } from "../registry";
 import { deviceStore, settingsStore } from "../stores";
@@ -99,12 +107,19 @@ export const AppLayout: Component<{
         onClose={props.onClose}
         nativeCaptions={props.nativeCaptions}
         actions={
-          <YoIconButton
-            icon="sidebar"
-            title={railOpen() ? "收起侧栏" : "展开侧栏"}
-            aria-expanded={railOpen()}
-            onClick={() => setRailOpen((open) => !open)}
-          />
+          <>
+            <YoThemeToggle
+              onThemeChange={(theme) => {
+                void settingsStore.set("theme", theme);
+              }}
+            />
+            <YoIconButton
+              icon="sidebar"
+              title={railOpen() ? "收起侧栏" : "展开侧栏"}
+              aria-expanded={railOpen()}
+              onClick={() => setRailOpen((open) => !open)}
+            />
+          </>
         }
       />
       <div

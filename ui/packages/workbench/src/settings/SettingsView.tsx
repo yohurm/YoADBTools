@@ -397,10 +397,6 @@ export const SettingsView: Component = () => {
           <YoFormRow title="版权">
             <span class="yohu-settings__value">{settingsStore.identity.copyright}</span>
           </YoFormRow>
-          <PathOpenRow title="数据根" path={settingsStore.paths.data_root} />
-          <PathOpenRow title="安装目录" path={settingsStore.paths.install_dir} />
-          <PathOpenRow title="配置目录" path={settingsStore.paths.config_dir} />
-          <PathOpenRow title="缓存" path={settingsStore.paths.cache_dir} />
           <PathOpenRow title="应用日志" path={settingsStore.paths.logs_dir} />
         </YoPanel>
       </div>
@@ -464,13 +460,21 @@ export const SettingsView: Component = () => {
               </YoButton>
             </Show>
             <YoButton loading={applying()} disabled={applying()} onClick={() => void installUpdate()}>
-              {applying() ? "正在安装…" : "安装并重启"}
+              {applying()
+                ? settingsStore.os() === "macos"
+                  ? "正在打开…"
+                  : "正在安装…"
+                : settingsStore.os() === "macos"
+                  ? "打开安装包"
+                  : "安装并重启"}
             </YoButton>
           </>
         }
       >
         <p class="yohu-settings__update-copy">
-          已下载 {updateStore.pending()?.version}。安装将关闭应用并覆盖当前版本，完成后自动启动。
+          {settingsStore.os() === "macos"
+            ? `已下载 ${updateStore.pending()?.version}。将打开 DMG，请拖入应用程序文件夹。`
+            : `已下载 ${updateStore.pending()?.version}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
         </p>
         <Show when={applying()}>
           <p class="yohu-settings__update-progress-text">正在覆盖安装，应用即将重启…</p>

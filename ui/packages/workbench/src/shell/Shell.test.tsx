@@ -540,17 +540,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       );
     });
     const boxes = container.querySelectorAll(".yohu-settings__path");
-    expect(boxes).toHaveLength(8);
+    expect(boxes).toHaveLength(4);
     expect(boxes[0]?.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
     expect(boxes[1]?.getAttribute("title")).toBe(RESOLVED_DATA);
     expect(boxes[2]?.getAttribute("title")).toBe(RESOLVED_EXPORT);
-    expect(boxes[3]?.getAttribute("title")).toBe(RESOLVED_DATA);
-    expect(boxes[4]?.getAttribute("title")).toBe(RESOLVED_PATHS.install_dir);
-    expect(boxes[5]?.getAttribute("title")).toBe(RESOLVED_PATHS.config_dir);
-    expect(boxes[6]?.getAttribute("title")).toBe(RESOLVED_PATHS.cache_dir);
-    expect(boxes[7]?.getAttribute("title")).toBe(RESOLVED_PATHS.logs_dir);
+    expect(boxes[3]?.getAttribute("title")).toBe(RESOLVED_PATHS.logs_dir);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
-    expect(screen.getAllByText("打开")).toHaveLength(5);
+    expect(screen.getAllByText("打开")).toHaveLength(1);
 
     mocks.dialogOpenDirectory.mockResolvedValue("D:\\YohuData");
     fireEvent.click(screen.getAllByText("浏览")[1] as HTMLElement);
@@ -609,14 +605,14 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       expect(screen.getByText("0.1.0")).toBeTruthy();
     });
     expect(screen.getByText("com.yohu.adbtools")).toBeTruthy();
-    expect(screen.getByText("数据根")).toBeTruthy();
-    expect(screen.getByText("安装目录")).toBeTruthy();
-    expect(screen.getByText("配置目录")).toBeTruthy();
-    expect(screen.getByText("缓存")).toBeTruthy();
+    expect(screen.queryByText("数据根")).toBeNull();
+    expect(screen.queryByText("安装目录")).toBeNull();
+    expect(screen.queryByText("配置目录")).toBeNull();
+    expect(screen.queryByText("缓存")).toBeNull();
     expect(screen.getByText("应用日志")).toBeTruthy();
     const openButtons = screen.getAllByRole("button", { name: "打开" });
-    expect(openButtons.length).toBe(5);
-    fireEvent.click(openButtons[4] as HTMLButtonElement);
+    expect(openButtons.length).toBe(1);
+    fireEvent.click(openButtons[0] as HTMLButtonElement);
     await waitFor(() => {
       expect(mocks.systemOpenPath).toHaveBeenCalledWith(RESOLVED_PATHS.logs_dir);
     });
@@ -687,6 +683,18 @@ describe("AppLayout 窗口铬", () => {
     const titlebar = document.querySelector(".yohu-titlebar");
     expect(titlebar?.textContent).not.toContain("设置");
     expect(document.querySelector(".yohu-layout__content .yohu-chrome__title")?.textContent).toContain("设置");
+  });
+
+  it("主题钮在展开侧栏按钮左侧，点击即切深浅并落盘", async () => {
+    render(() => <AppLayout activeModuleId={() => ModuleId.Terminal} onNavigate={() => undefined} />);
+    const actions = document.querySelectorAll(".yohu-titlebar__actions .yohu-icon-button");
+    expect(actions[0]?.getAttribute("aria-label")).toBe("切换到深色模式");
+    expect(actions[1]?.getAttribute("aria-label")).toBe("收起侧栏");
+    fireEvent.click(screen.getByRole("button", { name: "切换到深色模式" }));
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      expect(mocks.settingsSet).toHaveBeenCalledWith("theme", "dark");
+    });
   });
 
   it("侧栏可收起为抽屉", () => {
