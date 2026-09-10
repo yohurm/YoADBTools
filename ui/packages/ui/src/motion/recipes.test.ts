@@ -83,4 +83,16 @@ describe("motion recipes", () => {
     expect(untilCollapse).not.toContain("max-height: none");
     expect(untilCollapse).toContain("grid-template-rows var(--yohu-motion-spatial-panel)");
   });
+
+  it("send-aim 有内容朝上，时长走 spatialSmall", () => {
+    const css = loadMotionCss();
+    expect(css).toContain("yohu-recipe-send-aim");
+    expect(css).toContain('.yohu-recipe-send-aim[data-armed="true"] .yohu-icon');
+    expect(css).toContain("rotate(-90deg)");
+    const sendBlock = css.slice(css.indexOf("配方 send-aim"));
+    const untilIndicator = sendBlock.slice(0, sendBlock.indexOf("配方 indicator"));
+    expect(untilIndicator).toContain("--yohu-motion-spatial-small");
+    expect(untilIndicator).toContain("rotate(0deg)");
+    expect(untilIndicator).not.toMatch(/\b\d+ms\b/);
+  });
 });

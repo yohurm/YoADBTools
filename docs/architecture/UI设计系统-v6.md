@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.35（2026-09-10，日志级别按下改填充）    
+> **状态：** v2.36（2026-09-10，发送图标有内容朝上）    
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.36 变更（发送图标朝上）：** 命令终端纸飞机空内容水平向右；草稿或队列有内容时挂 `yohu-recipe-send-aim`，`spatialSmall` 转到朝上。清空转回。模块禁止自写 rotate。见 [动画系统-v6.md](动画系统-v6.md)。
 > **v2.35 变更（日志级别按下填充）：** 选中格用 `--yohu-log-ink` 叠到 surface 的软底（透明度对齐 `--yohu-accent-soft` 的 20%），字母仍走 ink。禁止底条 / inset shadow 冒充选中。
 > **v2.34 变更（日志级别筛选铬）：** 级别 V–F 与 Tag / 检索同一条控件铬（`--yohu-surface` + hairline + `radius-sm` + `--yohu-control-height`），内部格线分隔，不是六颗独立描边按钮。字母始终走 `--yohu-log-ink`；按下用级别 ink 软底。悬停名走 `YoTooltip`（Verbose…Fatal）。禁止再拆成 outlined 按钮带 gap。
 > **v2.33 变更（日志级别独立筛选）：** 过滤栏不再用「最低含以上」下拉。`LEVELS`（`log_levels.json`）是选项与匹配的唯一字母表。按下的级别是精确集合：选 W 只留 W，可再按下 E 同时留 W+E；全部弹起 = 不限（含 `?`）。wire `LogFilter.levels` 空则不限。禁止再写 `min_level` / 按 `levelRank` 筛选。
@@ -479,7 +480,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 命令库树：组节点加命令数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`，不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
-- **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
+- **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
 ### 4.3 文件管理
 

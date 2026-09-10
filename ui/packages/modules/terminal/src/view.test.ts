@@ -44,4 +44,11 @@ describe("命令终端动效接线", () => {
     expect(css).not.toMatch(/animation\s*:/);
     expect(css).not.toMatch(/@keyframes/);
   });
+
+  it("有内容时发送图标挂 send-aim，空内容不朝上", () => {
+    expect(view).toContain("yohu-recipe-send-aim");
+    expect(view).toContain('data-armed={canSend() ? "true" : "false"}');
+    expect(view).toContain('icon="send"');
+    expect(css).not.toContain("rotate(");
+  });
 });

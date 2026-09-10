@@ -389,6 +389,19 @@
   transform: rotate(-90deg);
 }
 
+/*
+ * 配方 send-aim：水平纸飞机有内容时转到朝上。
+ * 持续元素，spatialSmall，可打断。模块只挂 class，禁止自写 rotate。
+ */
+.yohu-recipe-send-aim .yohu-icon {
+  transition: transform var(--yohu-motion-spatial-small);
+  transform: rotate(0deg);
+}
+
+.yohu-recipe-send-aim[data-armed="true"] .yohu-icon {
+  transform: rotate(-90deg);
+}
+
 /* 配方 indicator：一块滑块在选中项之间移动（持续元素，可打断）。 */
 .yohu-indicator-host {
   isolation: isolate;
@@ -576,6 +589,7 @@ html[data-theme-transition] *::after {
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,
   .yohu-recipe-tree-chevron,
+  .yohu-recipe-send-aim .yohu-icon,
   .yohu-progress__bar,
   .yohu-button,
   .yohu-icon-button,

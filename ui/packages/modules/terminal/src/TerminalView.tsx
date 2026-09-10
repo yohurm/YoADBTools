@@ -336,7 +336,10 @@ export function TerminalView(props: DeviceSession) {
                       onInput={(event) => setDraft(event.currentTarget.value)}
                       onKeyDown={onComposerKey}
                     />
-                    <span class="yohu-terminal__send">
+                    <span
+                      class="yohu-terminal__send yohu-recipe-send-aim"
+                      data-armed={canSend() ? "true" : "false"}
+                    >
                       <YoIconButton
                         icon="send"
                         title="发送"
