@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
@@ -6,15 +6,17 @@ import {
   applyCopyEvent,
   copyHasPayload,
   documentCopyText,
-  mapLogCellOffsetToDoc,
   LOG_COPY_ALL,
   LOG_COPY_NONE,
+  logSelectionInList,
   seqFromTarget,
   serializeLogCopy,
-  textOffsetInRow,
+  textOffsetInDoc,
 } from "./copy";
-import { formatLogLine } from "./format";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, logLineCellText, visibleLogColumns } from "./layout";
+import { defaultLogDocLayout, formatLogDoc, formatLogDocParts } from "./doc";
+import { ALL_LOG_DISPLAY_COLUMNS } from "./format";
+
+const layout = defaultLogDocLayout(ALL_LOG_DISPLAY_COLUMNS);
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -33,155 +35,73 @@ function row(over: Partial<LogLine> = {}): { line: LogLine } {
   return { line: line(over) };
 }
 
-function mountDocRows(lines: readonly LogLine[], wrapVirtual = false): HTMLElement {
-  const root = document.createElement("div");
-  for (const item of lines) {
-    const host = document.createElement("div");
-    if (wrapVirtual) host.className = "yohu-virtual-list__row";
-    const rowEl = document.createElement("div");
-    rowEl.className = "yohu-logs__cols yohu-logs__row";
-    rowEl.setAttribute("data-seq", String(item.seq));
-    for (const col of visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS)) {
-      const cell = document.createElement("span");
-      cell.className = `yohu-col-cell yohu-logs__row-${col.key}`;
-      cell.textContent = logLineCellText(item, col.key);
-      rowEl.append(cell);
-    }
-    host.append(rowEl);
-    root.append(wrapVirtual ? host : rowEl);
+function mountRow(item: LogLine): HTMLElement {
+  const el = document.createElement("div");
+  el.dataset.seq = String(item.seq);
+  for (const part of formatLogDocParts(item, layout)) {
+    const span = document.createElement("span");
+    span.dataset.kind = part.kind;
+    span.textContent = part.text;
+    el.append(span);
   }
-  document.body.append(root);
-  return root;
+  return el;
 }
 
-function selectRange(start: Node, startOff: number, end: Node, endOff: number): Selection {
+function pointAt(rowEl: HTMLElement, offset: number): { node: Node; offset: number } {
+  let left = offset;
+  const walk = (node: Node): { node: Node; offset: number } | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const len = node.textContent?.length ?? 0;
+      if (left <= len) {
+        return { node, offset: left };
+      }
+      left -= len;
+      return null;
+    }
+    for (const child of node.childNodes) {
+      const hit = walk(child);
+      if (hit) {
+        return hit;
+      }
+    }
+    return null;
+  };
+  return walk(rowEl) ?? { node: rowEl, offset: rowEl.childNodes.length };
+}
+
+function selectDoc(startRow: HTMLElement, start: number, endRow: HTMLElement, end: number): Selection {
+  const from = pointAt(startRow, start);
+  const to = pointAt(endRow, end);
   const range = document.createRange();
-  range.setStart(start, startOff);
-  range.setEnd(end, endOff);
-  const sel = window.getSelection();
-  if (!sel) throw new Error("no selection");
-  sel.removeAllRanges();
-  sel.addRange(range);
-  return sel;
+  range.setStart(from.node, from.offset);
+  range.setEnd(to.node, to.offset);
+  const selection = window.getSelection();
+  if (!selection) {
+    throw new Error("no Selection");
+  }
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return selection;
 }
 
-function selectBetween(a: Node, b: Node): Selection {
-  const range = document.createRange();
-  range.setStartBefore(a);
-  range.setEndAfter(b);
-  const sel = window.getSelection();
-  if (!sel) throw new Error("no selection");
-  sel.removeAllRanges();
-  sel.addRange(range);
-  return sel;
-}
-
-describe("documentCopyText", () => {
-  it("折叠或清单外选区不收行", () => {
-    const root = mountDocRows([line({ seq: 1 })]);
-    const collapsed = {
-      isCollapsed: true,
-      rangeCount: 0,
-    } as unknown as Selection;
-    expect(documentCopyText(root, collapsed, [row({ seq: 1 })])).toBe("");
-    expect(documentCopyText(root, null, [row({ seq: 1 })])).toBe("");
-    root.remove();
-  });
-
-  it("单行局部切片等于文档字符，列间空格在文档里", () => {
-    const item = line({ seq: 9, msg: "hello" });
-    const root = mountDocRows([item]);
-    const rowEl = root.querySelector(`[data-seq="9"]`);
-    const text = rowEl?.querySelector(".yohu-logs__row-tag")?.firstChild;
-    if (!rowEl || !text) throw new Error("row");
-    const doc = formatLogLine(item);
-    const sel = selectRange(text, 0, text, 4);
-    expect(documentCopyText(root, sel, [{ line: item }])).toBe("Yohu");
-    expect(doc.includes("   100   200")).toBe(true);
-    root.remove();
-  });
-
-  it("跨行选整行时中间未挂载行按文档补齐", () => {
-    const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
-    const root = mountDocRows([rows[0]!.line, rows[2]!.line]);
-    const first = root.querySelector(`[data-seq="1"]`);
-    const last = root.querySelector(`[data-seq="3"]`);
-    if (!first || !last) throw new Error("rows");
-    const text = documentCopyText(root, selectBetween(first, last), rows);
-    expect(text).toBe(rows.map((r) => formatLogLine(r.line)).join("\n"));
-    expect(window.getSelection()?.toString()).not.toBe(text);
-    root.remove();
-  });
-
-  it("跨行首行从字符偏移切，末行切到偏移", () => {
-    const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
-    const root = mountDocRows([rows[0]!.line, rows[2]!.line]);
-    const firstText = root.querySelector(`[data-seq="1"] .yohu-logs__row-msg`)?.firstChild;
-    const lastText = root.querySelector(`[data-seq="3"] .yohu-logs__row-msg`)?.firstChild;
-    if (!firstText || !lastText) throw new Error("text");
-    const firstDoc = formatLogLine(rows[0]!.line);
-    const lastDoc = formatLogLine(rows[2]!.line);
-    const from = firstDoc.indexOf("one");
-    const to = lastDoc.indexOf("three") + 3;
-    const text = documentCopyText(root, selectRange(firstText, 0, lastText, 3), rows);
-    expect(text).toBe([firstDoc.slice(from), formatLogLine(rows[1]!.line), lastDoc.slice(0, to)].join("\n"));
-    root.remove();
-  });
-
-  it("虚拟列表行包装也能命中 data-seq", () => {
-    const rows = [row({ seq: 4, msg: "a" }), row({ seq: 5, msg: "b" })];
-    const root = mountDocRows(rows.map((r) => r.line), true);
-    const first = root.querySelector(`[data-seq="4"]`);
-    const last = root.querySelector(`[data-seq="5"]`);
-    if (!first || !last) throw new Error("rows");
-    expect(documentCopyText(root, selectBetween(first, last), rows)).toBe(
-      rows.map((r) => formatLogLine(r.line)).join("\n"),
-    );
-    root.remove();
-  });
-});
-
-describe("mapLogCellOffsetToDoc", () => {
-  it("单元格「100」映射到文档 padStart 后的 PID", () => {
-    const item = line();
-    const doc = formatLogLine(item);
-    const from = mapLogCellOffsetToDoc(item, DEFAULT_LOG_DISPLAY_COLUMNS, "pid", 0);
-    const to = mapLogCellOffsetToDoc(item, DEFAULT_LOG_DISPLAY_COLUMNS, "pid", 3);
-    expect(doc.slice(from, to)).toBe("100");
-  });
-});
-
-describe("textOffsetInRow / seqFromTarget", () => {
-  it("跳过 data-log-chrome，偏移只计文档", () => {
-    const root = document.createElement("div");
-    const rowEl = document.createElement("div");
-    rowEl.setAttribute("data-seq", "7");
-    rowEl.append("hello");
-    const chrome = document.createElement("span");
-    chrome.setAttribute("data-log-chrome", "");
-    chrome.textContent = "折叠";
-    rowEl.append(chrome);
-    root.append(rowEl);
-    document.body.append(root);
-    expect(textOffsetInRow(rowEl, chrome, chrome.childNodes.length)).toBe(5);
-    expect(seqFromTarget(rowEl.firstChild)).toBe(7);
-    expect(seqFromTarget(root)).toBeNull();
-    root.remove();
-  });
+afterEach(() => {
+  window.getSelection()?.removeAllRanges();
+  document.body.replaceChildren();
 });
 
 describe("serializeLogCopy", () => {
   const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
 
-  it("all 复制当前窗口全部可见行，不只视口", () => {
+  it("all 复制当前窗口全部可见行的清单文档", () => {
     expect(
       serializeLogCopy({
         pick: LOG_COPY_ALL,
         rows,
         listRoot: null,
         selection: null,
+        layout,
       }),
-    ).toBe(rows.map((r) => formatLogLine(r.line)).join("\n"));
+    ).toBe(rows.map((item) => formatLogDoc(item.line, layout)).join("\n"));
   });
 
   it("无选区时回退一行；空则空串", () => {
@@ -192,50 +112,120 @@ describe("serializeLogCopy", () => {
         listRoot: null,
         selection: null,
         fallbackLine: rows[1]!.line,
+        layout,
       }),
-    ).toBe(formatLogLine(rows[1]!.line));
-    expect(serializeLogCopy({ pick: LOG_COPY_NONE, rows, listRoot: null, selection: null })).toBe("");
-    expect(copyHasPayload({ pick: LOG_COPY_NONE, selection: null })).toBe(false);
-    expect(copyHasPayload({ pick: LOG_COPY_ALL, selection: null })).toBe(true);
+    ).toBe(formatLogDoc(rows[1]!.line, layout));
+    expect(serializeLogCopy({ pick: LOG_COPY_NONE, rows, listRoot: null, selection: null, layout })).toBe("");
+    expect(copyHasPayload({ pick: LOG_COPY_NONE, listRoot: null, selection: null })).toBe(false);
+    expect(copyHasPayload({ pick: LOG_COPY_ALL, listRoot: null, selection: null })).toBe(true);
   });
 
-  it("含 UID / 无 UID 与 formatLogLine 一致", () => {
+  it("回退行含 UID 的清单文档带 pad 空格，不是 formatLogLine 紧贴格式", () => {
     const withUid = line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" });
-    expect(
-      serializeLogCopy({
-        pick: LOG_COPY_NONE,
-        rows: [],
-        listRoot: null,
-        selection: null,
-        fallbackLine: withUid,
-      }),
-    ).toBe("01-01 12:00:00.000    shell  1705  1705 W binder: avc");
-    expect(
-      serializeLogCopy({
-        pick: LOG_COPY_NONE,
-        rows: [],
-        listRoot: null,
-        selection: null,
-        fallbackLine: line(),
-      }),
-    ).toBe("01-01 12:00:00.000   100   200 I Yohu: hello");
+    const text = serializeLogCopy({
+      pick: LOG_COPY_NONE,
+      rows: [],
+      listRoot: null,
+      selection: null,
+      fallbackLine: withUid,
+      layout,
+    });
+    expect(text).toBe(formatLogDoc(withUid, layout));
+    expect(text.includes("binder")).toBe(true);
+    expect(text.includes("avc")).toBe(true);
+    const tag = formatLogDocParts(withUid, layout).find((part) => part.kind === "tag");
+    expect(tag?.text.endsWith(" ")).toBe(true);
   });
+});
 
-  it("选区优先于 fallback", () => {
-    const item = line({ seq: 1, msg: "one" });
-    const root = mountDocRows([item]);
-    const rowEl = root.querySelector(`[data-seq="1"]`);
-    if (!rowEl) throw new Error("row");
+describe("documentCopyText", () => {
+  it("只选 Tag 字段时复制不含前面的时间/PID", () => {
+    const item = line({ seq: 8, tag: "ActivityManager", msg: "hello" });
+    const list = document.createElement("div");
+    const rowEl = mountRow(item);
+    list.append(rowEl);
+    document.body.append(list);
+    const parts = formatLogDocParts(item, layout);
+    const before = parts.filter((part) => part.kind !== "tag" && part.kind !== "msg").reduce((n, part) => n + part.text.length, 0);
+    const tag = parts.find((part) => part.kind === "tag")!;
+    const lead = tag.text.length - tag.text.trimStart().length;
+    const selection = selectDoc(rowEl, before + lead, rowEl, before + tag.text.trimEnd().length);
+    expect(documentCopyText(list, selection, [{ line: item }], layout)).toBe("ActivityManager");
     expect(
       serializeLogCopy({
         pick: LOG_COPY_NONE,
         rows: [{ line: item }],
-        listRoot: root,
-        selection: selectBetween(rowEl, rowEl),
+        listRoot: list,
+        selection,
         fallbackLine: line({ seq: 9, msg: "other" }),
+        layout,
       }),
-    ).toBe(formatLogLine(item));
-    root.remove();
+    ).toBe("ActivityManager");
+  });
+
+  it("从 Tag 拖过 pad 空格，复制含字段后的空白", () => {
+    const item = line({ seq: 1, tag: "Yohu", msg: "hello" });
+    const list = document.createElement("div");
+    const rowEl = mountRow(item);
+    list.append(rowEl);
+    document.body.append(list);
+    const parts = formatLogDocParts(item, layout);
+    const before = parts.filter((part) => part.kind !== "tag" && part.kind !== "msg").reduce((n, part) => n + part.text.length, 0);
+    const tag = parts.find((part) => part.kind === "tag")!;
+    expect(tag.text.trimStart().startsWith("Yohu")).toBe(true);
+    expect(tag.text.length).toBeGreaterThan(4);
+    const selection = selectDoc(rowEl, before, rowEl, before + tag.text.length);
+    expect(documentCopyText(list, selection, [{ line: item }], layout)).toBe(tag.text);
+    expect(documentCopyText(list, selection, [{ line: item }], layout).endsWith(" ")).toBe(true);
+  });
+
+  it("跨行中间未挂载行用同一文档补齐", () => {
+    const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
+    const list = document.createElement("div");
+    const first = mountRow(rows[0]!.line);
+    const last = mountRow(rows[2]!.line);
+    list.append(first, last);
+    document.body.append(list);
+    const firstDoc = formatLogDoc(rows[0]!.line, layout);
+    const lastDoc = formatLogDoc(rows[2]!.line, layout);
+    const selection = selectDoc(first, 2, last, 4);
+    expect(documentCopyText(list, selection, rows, layout)).toBe(
+      [firstDoc.slice(2), formatLogDoc(rows[1]!.line, layout), lastDoc.slice(0, 4)].join("\n"),
+    );
+  });
+});
+
+describe("textOffsetInDoc / logSelectionInList", () => {
+  it("文本节点偏移累加等于文档偏移；铬层不计长", () => {
+    const item = line();
+    const rowEl = mountRow(item);
+    const fold = document.createElement("span");
+    fold.dataset.logChrome = "";
+    fold.textContent = "…3 帧折叠";
+    rowEl.append(fold);
+    document.body.append(rowEl);
+    const firstText = rowEl.querySelector("span")?.firstChild;
+    expect(firstText).toBeTruthy();
+    expect(textOffsetInDoc(rowEl, firstText!, 3)).toBe(3);
+    expect(textOffsetInDoc(rowEl, fold.firstChild!, 2)).toBe(formatLogDoc(item, layout).length);
+  });
+
+  it("折叠选区不算在清单里", () => {
+    const list = document.createElement("div");
+    document.body.append(list);
+    expect(logSelectionInList(list, window.getSelection())).toBe(false);
+  });
+});
+
+describe("seqFromTarget", () => {
+  it("从 data-seq 读行号", () => {
+    const root = document.createElement("div");
+    const rowEl = document.createElement("div");
+    rowEl.setAttribute("data-seq", "7");
+    rowEl.append("hello");
+    root.append(rowEl);
+    expect(seqFromTarget(rowEl.firstChild)).toBe(7);
+    expect(seqFromTarget(root)).toBeNull();
   });
 });
 
@@ -255,8 +245,8 @@ describe("applyCopyEvent", () => {
     } as unknown as ClipboardEvent;
     expect(applyCopyEvent(event, "")).toBe(false);
     expect(prevented).toBe(false);
-    expect(applyCopyEvent(event, "01-01 12:00:00.000   100   200 I Yohu: hello")).toBe(true);
+    expect(applyCopyEvent(event, "Yohu      ")).toBe(true);
     expect(prevented).toBe(true);
-    expect(written).toEqual({ "text/plain": "01-01 12:00:00.000   100   200 I Yohu: hello" });
+    expect(written).toEqual({ "text/plain": "Yohu      " });
   });
 });

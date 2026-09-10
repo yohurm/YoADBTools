@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { RingMirror, collapseStack, matchesLine } from "./pipeline";
+import { LEVELS, RingMirror, collapseStack, matchesLine } from "./pipeline";
 import type { SessionFilter } from "./pipeline";
 
 const line = (seq: number): LogLine => ({
@@ -16,7 +16,7 @@ const line = (seq: number): LogLine => ({
   ts: "08-17 10:00:00.000",
   pid: 100 + (seq % 500),
   tid: 1,
-  level: ["V", "D", "I", "W", "E", "F"][seq % 6]!,
+  level: LEVELS[seq % LEVELS.length]!,
   tag: ["ActivityManager", "SystemServer", "BatteryService", "OkHttp"][seq % 4]!,
   msg:
     seq % 13 === 0
@@ -35,7 +35,7 @@ function fillMirror(capacity: number): RingMirror {
 }
 
 const sessionFilter = (over: Partial<SessionFilter>): SessionFilter => ({
-  minLevel: "W",
+  levels: ["W"],
   tagContains: "",
   keyword: "",
   scope: { kind: "all" },
@@ -55,9 +55,9 @@ describe("日志管线性能回归（50k 缓冲 · 3 会话）", () => {
   it("单批 1000 行过滤 + 折叠 < 16ms（ADR-v6-007 批量预算，含 10x 余量）", () => {
     const mirror = fillMirror(50_000);
     const filters = [
-      sessionFilter({ minLevel: "W", keyword: "payload" }),
-      sessionFilter({ minLevel: "E" }),
-      sessionFilter({ minLevel: "V", tagContains: "activity", scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [100] }),
+      sessionFilter({ levels: ["W"], keyword: "payload" }),
+      sessionFilter({ levels: ["E"] }),
+      sessionFilter({ levels: ["V"], tagContains: "activity", scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [100] }),
     ];
     // 预热（JIT）
     for (const f of filters) mirror.replay((l) => matchesLine(l, f), 2000);
@@ -78,9 +78,9 @@ describe("日志管线性能回归（50k 缓冲 · 3 会话）", () => {
   it("3 会话过滤管线端到端（批处理 + 可见区裁剪）在预算内", () => {
     const mirror = fillMirror(50_000);
     const filters = [
-      sessionFilter({ minLevel: "I" }),
-      sessionFilter({ minLevel: "W", tagContains: "battery" }),
-      sessionFilter({ scope: { kind: "pid", pid: 123 }, minLevel: null }),
+      sessionFilter({ levels: ["I"] }),
+      sessionFilter({ levels: ["W"], tagContains: "battery" }),
+      sessionFilter({ scope: { kind: "pid", pid: 123 }, levels: [] }),
     ];
     const start = performance.now();
     for (const f of filters) {

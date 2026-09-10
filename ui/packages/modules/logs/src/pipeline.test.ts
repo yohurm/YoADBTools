@@ -10,13 +10,17 @@ import {
   SessionFilter,
   collapseStack,
   emptyBinding,
+  LEVELS,
   levelKey,
+  levelLabel,
   levelRank,
   matchesLine,
   matchesWireFilter,
+  normalizeLevels,
   pidSetOf,
   rebindPids,
   scanSignal,
+  toggleLevel,
   toWireFilter,
 } from "./pipeline";
 
@@ -32,7 +36,7 @@ const line = (over: Partial<LogLine>): LogLine => ({
 });
 
 const filter = (over: Partial<SessionFilter>): SessionFilter => ({
-  minLevel: null,
+  levels: [],
   tagContains: "",
   keyword: "",
   scope: { kind: "all" },
@@ -78,12 +82,54 @@ describe("levelRank（与 domain testdata/level_rank.json 同一套向量）", (
   });
 });
 
+describe("LEVELS（与 domain testdata/log_levels.json 同一张字母表）", () => {
+  const testdata = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../../../core/yohu-domain/testdata/log_levels.json",
+  );
+  const fixture: string[] = JSON.parse(readFileSync(testdata, "utf8")) as string[];
+
+  it("筛选选项与 testdata 同一向量", () => {
+    expect([...LEVELS]).toEqual(fixture);
+  });
+
+  it("字母说明文案跟 LEVELS 对齐", () => {
+    expect(LEVELS.map(levelLabel)).toEqual(["Verbose", "Debug", "Info", "Warn", "Error", "Fatal"]);
+  });
+});
+
+describe("normalizeLevels / toggleLevel", () => {
+  it("只收 LEVELS 字母，按 V→F 去重排序", () => {
+    expect(normalizeLevels(["e", "W", "W", "X", "?"])).toEqual(["W", "E"]);
+    expect(normalizeLevels([])).toEqual([]);
+  });
+
+  it("独立切换：按下只加入自己，再按弹起", () => {
+    expect(toggleLevel([], "W")).toEqual(["W"]);
+    expect(toggleLevel(["W"], "E")).toEqual(["W", "E"]);
+    expect(toggleLevel(["W", "E"], "W")).toEqual(["E"]);
+    expect(toggleLevel(["E"], "E")).toEqual([]);
+  });
+});
+
 describe("matchesLine", () => {
-  it("级别最低含以上", () => {
-    const f = filter({ minLevel: "W" });
+  it("级别精确集合：选 W 不含 E/I", () => {
+    const f = filter({ levels: ["W"] });
+    expect(matchesLine(line({ level: "W" }), f)).toBe(true);
+    expect(matchesLine(line({ level: "E" }), f)).toBe(false);
+    expect(matchesLine(line({ level: "I" }), f)).toBe(false);
+  });
+
+  it("级别可多选：W+E 不含 I", () => {
+    const f = filter({ levels: ["W", "E"] });
     expect(matchesLine(line({ level: "W" }), f)).toBe(true);
     expect(matchesLine(line({ level: "E" }), f)).toBe(true);
     expect(matchesLine(line({ level: "I" }), f)).toBe(false);
+  });
+
+  it("空集合不限级别，含解析失败", () => {
+    expect(matchesLine(line({ level: "?" }), filter({ levels: [] }))).toBe(true);
+    expect(matchesLine(line({ level: "?" }), filter({ levels: ["V"] }))).toBe(false);
   });
 
   it("Tag/关键字包含（忽略大小写）", () => {
@@ -161,21 +207,21 @@ describe("PidBinding 包名重绑（含历史集）", () => {
   it("toWireFilter：空 package pids 与 pid 作用域", () => {
     expect(
       toWireFilter({
-        minLevel: "W",
+        levels: ["W"],
         tagContains: "",
         keyword: "",
         scope: { kind: "package", pkg: "com.none", includeChild: false },
         binding: emptyBinding(),
       }),
     ).toEqual({
-      min_level: "W",
+      levels: ["W"],
       tag_contains: undefined,
       message_contains: undefined,
       scope: { kind: "package", pids: [] },
     });
     expect(
       toWireFilter({
-        minLevel: null,
+        levels: [],
         tagContains: "",
         keyword: "",
         scope: { kind: "pid", pid: 42 },
@@ -252,13 +298,14 @@ describe("RingMirror 共享缓冲镜像", () => {
     expect(out.map((l) => l.seq)).toEqual([2, 4]);
   });
 
-  it("clear 重置 lastSeq，允许再次接收", () => {
+  it("clear 丢行但 lastSeq 不回退，拒绝过期批次", () => {
     const m = new RingMirror(10);
     m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 9 })] });
     m.clear();
     expect(m.size()).toBe(0);
-    expect(m.lastSeqNumber()).toBe(-1);
-    expect(m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 })] })).toBe(1);
+    expect(m.lastSeqNumber()).toBe(9);
+    expect(m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 })] })).toBe(0);
+    expect(m.pushBatch({ serial: "s", from_seq: 10, truncated: false, lines: [line({ seq: 10 })] })).toBe(1);
   });
 
   it("setCapacity 裁剪过长缓冲", () => {

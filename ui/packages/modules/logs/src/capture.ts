@@ -5,9 +5,8 @@
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
  * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
- * 开始前先打一次 ps，包名窗口带着 pidSet 入镜。
+ * 清空可见区走 discardView（推进 fromSeq）。清设备缓冲清环与镜像并 flush 面板。
  * 掉线只停采集、清镜像；已画出的行保留。
- * WebView 从冻结恢复时 replay 补 UI 镜像。
  */
 
 import type { SetStoreFunction } from "solid-js/store";
@@ -226,7 +225,7 @@ export function createCapture(
           if (!result.adopted) {
             mirrors.clear(current);
             setOverflowed(current, false);
-            workspace.clearPanel(sessionId);
+            workspace.flushPanel(sessionId);
           }
         }
         subscribeWindow(idx, current, sessionId, resumeWindow);
@@ -249,13 +248,21 @@ export function createCapture(
 
   function subscribeWindow(idx: number, device: string, sessionId: number, resumeWindow: boolean): void {
     if (resumeWindow) {
-      setState("sessions", idx, { capturing: true, starting: false, serial: device });
+      setState("sessions", idx, {
+        capturing: true,
+        starting: false,
+        serial: device,
+        following: true,
+        frozenThroughSeq: null,
+      });
     } else {
       setState("sessions", idx, {
         capturing: true,
         starting: false,
         fromSeq: 0,
         serial: device,
+        following: true,
+        frozenThroughSeq: null,
       });
     }
     workspace.catchUpSession(sessionId);
@@ -325,7 +332,7 @@ export function createCapture(
   }
 
   async function clearVisible(id: number): Promise<void> {
-    workspace.clearPanel(id);
+    workspace.discardView(id);
   }
 
   async function clearDevice(): Promise<void> {
@@ -333,10 +340,13 @@ export function createCapture(
     if (!current) return;
     await logClearDevice(current);
     mirrors.clear(current);
-    workspace.clearDevicePanels(current);
+    workspace.flushDevicePanels(current);
     state.sessions.forEach((session, i) => {
       if (session.serial !== current) return;
-      if (session.capturing) setState("sessions", i, { fromSeq: 0 });
+      if (session.capturing) {
+        const fromSeq = Math.max(0, mirrors.of(current).lastSeqNumber() + 1);
+        setState("sessions", i, { fromSeq, following: true, frozenThroughSeq: null });
+      }
     });
   }
 
@@ -345,7 +355,14 @@ export function createCapture(
     if (!current) return;
     await logClear(current);
     mirrors.clear(current);
-    workspace.clearDevicePanels(current);
+    workspace.flushDevicePanels(current);
+    state.sessions.forEach((session, i) => {
+      if (session.serial !== current) return;
+      if (session.capturing) {
+        const fromSeq = Math.max(0, mirrors.of(current).lastSeqNumber() + 1);
+        setState("sessions", i, { fromSeq, following: true, frozenThroughSeq: null });
+      }
+    });
   }
 
   async function refreshProcesses(target?: string | null): Promise<void> {

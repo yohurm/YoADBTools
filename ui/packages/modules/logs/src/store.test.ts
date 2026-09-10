@@ -215,12 +215,12 @@ describe("logStore 窗口生命周期", () => {
   it("duplicateSession：拷贝 scope/过滤，副本空且停", () => {
     const store = wiredStore();
     const src = store.createSession({ kind: "pid", pid: 42 }, "PID 42");
-    store.patchFilter(src, { minLevel: "W", keyword: "x" });
+    store.patchFilter(src, { levels: ["W"], keyword: "x" });
     const copy = store.duplicateSession(src);
     expect(copy).not.toBeNull();
     const dup = store.state.sessions.find((s) => s.id === copy);
     expect(dup?.scope).toEqual({ kind: "pid", pid: 42 });
-    expect(dup?.minLevel).toBe("W");
+    expect(dup?.levels).toEqual(["W"]);
     expect(dup?.keyword).toBe("x");
     expect(dup?.title).toContain("副本");
     expect(dup?.capturing).toBe(false);
@@ -248,10 +248,10 @@ describe("logStore 窗口生命周期", () => {
 });
 
 describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => {
-  it("级别含以上 + 堆叠折叠 + 信号计数 + 镜像行数", async () => {
+  it("级别精确筛选 + 堆叠折叠 + 信号计数 + 镜像行数", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
-    store.patchFilter(id, { minLevel: "W" });
+    store.patchFilter(id, { levels: ["E"] });
     push("S1", [
       mk(0, { level: "I", msg: "info" }),
       mk(1, { level: "E", msg: "error one" }),
@@ -265,6 +265,19 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(session.visible[2]!.signal).toBe("crash");
     expect(session.signalCount).toBe(1);
     expect(store.mirrors.of("S1").size()).toBe(5);
+  });
+
+  it("选 W 只留 W，不带出 E/F", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    store.patchFilter(id, { levels: ["W"] });
+    push("S1", [
+      mk(0, { level: "I", msg: "info" }),
+      mk(1, { level: "W", msg: "warn" }),
+      mk(2, { level: "E", msg: "err" }),
+      mk(3, { level: "F", msg: "fatal" }),
+    ]);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["warn"]);
   });
 
   it("信号计数跟可见面板；采集订阅不因信号变红/停", async () => {
@@ -331,28 +344,48 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.following).toBe(false);
   });
 
-  it("空面板离开底部：冻结上限为 fromSeq 之前，改过滤不把尾部画进面板", async () => {
+  it("空面板不能离开底部：detach 空操作，入镜仍跟滚", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
     expect(store.state.sessions[0]!.fromSeq).toBe(0);
     store.detachFollow(id);
-    expect(store.state.sessions[0]!.frozenThroughSeq).toBe(-1);
+    expect(store.state.sessions[0]!.following).toBe(true);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBeNull();
     push("S1", [mk(0), mk(1)]);
-    expect(store.state.sessions[0]!.visible).toHaveLength(0);
-    expect(store.state.sessions[0]!.pendingCount).toBe(2);
-    store.patchFilter(id, { keyword: "" });
-    expect(store.state.sessions[0]!.visible).toHaveLength(0);
-    expect(store.state.sessions[0]!.pendingCount).toBe(2);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1]);
+    expect(store.state.sessions[0]!.pendingCount).toBe(0);
+    expect(store.state.sessions[0]!.following).toBe(true);
+  });
+
+  it("新流 flush 后强制跟滚：停跟滚再开采集，快照进可见区而不是 pending", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1)]);
+    store.detachFollow(id);
     expect(store.state.sessions[0]!.following).toBe(false);
+    await store.stopCapture();
+    mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S1", generation: 3, adopted: false });
+    mocks.logReplay.mockResolvedValueOnce({
+      serial: "S1",
+      from_seq: 0,
+      lines: [mk(0), mk(1), mk(2)],
+      truncated: false,
+    });
+    await store.startCapture();
+    expect(store.state.sessions[0]!.id).toBe(id);
+    expect(store.state.sessions[0]!.following).toBe(true);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBeNull();
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2]);
+    expect(store.state.sessions[0]!.pendingCount).toBe(0);
   });
 
   it("清除级别过滤从镜像补回被筛掉的行", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
     push("S1", [mk(0, { level: "I", msg: "info" }), mk(1, { level: "E", msg: "err" })]);
-    store.patchFilter(id, { minLevel: "E" });
+    store.patchFilter(id, { levels: ["E"] });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
-    store.patchFilter(id, { minLevel: null });
+    store.patchFilter(id, { levels: [] });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["info", "err"]);
   });
 
@@ -408,7 +441,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     push("S1", [mk(0, { level: "E", msg: "e0" })]);
     expect(store.state.sessions[0]!.pendingCount).toBe(0);
     expect(store.state.sessions[0]!.visible).toHaveLength(0);
-    store.patchFilter(id, { minLevel: "E" });
+    store.patchFilter(id, { levels: ["E"] });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0]);
   });
 
@@ -428,7 +461,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     const id = store.state.sessions[0]!.id;
     push("S1", [mk(0, { level: "I", msg: "info" }), mk(1, { level: "E", msg: "err" })]);
     store.mirrors.clear("S1");
-    store.patchFilter(id, { minLevel: "E" });
+    store.patchFilter(id, { levels: ["E"] });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
   });
 
@@ -678,6 +711,9 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(order).toEqual(["ps", "start"]);
     expect(store.state.sessions[0]!.fromSeq).toBe(0);
     expect(store.state.sessions[0]!.capturing).toBe(true);
+    expect(store.state.sessions[0]!.following).toBe(true);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBeNull();
+    expect(store.state.sessions[0]!.pendingCount).toBe(0);
   });
 
   it("refreshPackages 写入已安装包名，不覆盖进程索引", async () => {
@@ -987,6 +1023,46 @@ describe("logStore 多窗口 × 多设备", () => {
 });
 
 describe("logStore 设置联动", () => {
+  it("清空可见区后 PID 重绑与改过滤不得把旧行投影回来", async () => {
+    const store = wiredStore();
+    const id = store.createSession({ kind: "package", pkg: "com.foo", includeChild: false }, "com.foo");
+    store.setActive(id);
+    mocks.processIndexHandlers.at(-1)?.({
+      serial: "S1",
+      entries: [{ pid: 10, name: "com.foo" }],
+      degraded: false,
+    });
+    await store.startCapture();
+    push("S1", [mk(0, { pid: 10, msg: "old" }), mk(1, { pid: 10, msg: "also-old" })]);
+    expect(store.state.sessions.find((s) => s.id === id)!.visible).toHaveLength(2);
+    await store.clearVisible(id);
+    const cleared = store.state.sessions.find((s) => s.id === id)!;
+    expect(cleared.visible).toHaveLength(0);
+    expect(cleared.fromSeq).toBeGreaterThan(1);
+    mocks.processIndexHandlers.at(-1)?.({
+      serial: "S1",
+      entries: [{ pid: 10, name: "com.foo" }],
+      degraded: false,
+    });
+    store.patchFilter(id, { keyword: "" });
+    store.resumeFollow(id);
+    expect(store.state.sessions.find((s) => s.id === id)!.visible).toHaveLength(0);
+    push("S1", [mk(2, { pid: 10, msg: "fresh" })]);
+    expect(store.state.sessions.find((s) => s.id === id)!.visible.map((r) => r.line.msg)).toEqual(["fresh"]);
+  });
+
+  it("System 窗口清空后跟滚只收清空之后的新行", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0, { msg: "a" }), mk(1, { msg: "b" })]);
+    await store.clearVisible(id);
+    store.patchFilter(id, { keyword: "" });
+    store.resumeFollow(id);
+    expect(store.state.sessions[0]!.visible).toHaveLength(0);
+    push("S1", [mk(2, { msg: "c" })]);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["c"]);
+  });
+
   it("settings/changed buffer_capacity 立即裁剪镜像容量", async () => {
     const store = wiredStore();
     expect(store.state.bufferCapacity).toBe(10_000);

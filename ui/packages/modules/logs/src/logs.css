@@ -1,11 +1,14 @@
 /* ============================================================================
  * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 轨道走 YoColFrame / YoColRow / YoColTrack / YoColCell。复制载荷仍是 formatLogLine。
- * 表头是铬层（YoColHeader 可拖宽）。表头钉在虚拟列表外。
+ * 表头是铬层：YoColFrame cellPad=list + ch 轨道（logDocTrackTemplate）。
+ * 列垫在尺里（padLeftChars = space-md），标题与文档同一起笔，禁止 cellPad=none 贴边。
+ * 行是一份 white-space:pre 文档。表头与行共用 logDocColumns 一把尺。
+ * 列间空白是 formatLogDoc 的 pad 空格。选区走原生 ::selection（--yohu-text-sel）。
+ * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 data-level 绑定 --yohu-log-ink（token 板 --yohu-level-* 单源）：
  * 左条 / 级别字 / Tag 共用 ink；Error 消息同色；Fatal 级别字母反色块，Tag 用 f-bg；
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
- * 选区只有一套：user-select: text。Ctrl+A 整表铺底。复制走 copy.ts。
+ * Ctrl+A 同色铺底。禁止 accent-soft / 列表选中片冒充选字。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -25,6 +28,60 @@
 
 .yohu-logs__filter .yohu-text-field {
   width: calc(var(--yohu-space-xl) * 7);
+}
+
+.yohu-logs__levels {
+  display: inline-flex;
+  align-items: stretch;
+  height: var(--yohu-control-height);
+  box-sizing: border-box;
+  overflow: hidden;
+  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border-radius: var(--yohu-radius-sm);
+  background-color: var(--yohu-surface);
+  flex-shrink: 0;
+}
+
+.yohu-logs__level-slot {
+  display: inline-flex;
+  height: 100%;
+  --yohu-log-fill: color-mix(in srgb, var(--yohu-log-ink) 20%, var(--yohu-surface));
+}
+
+.yohu-logs__level-slot .yohu-tooltip__anchor {
+  display: inline-flex;
+  height: 100%;
+}
+
+.yohu-logs__level-slot:not(:last-child) {
+  border-inline-end: var(--yohu-stroke-hairline) solid var(--yohu-border);
+}
+
+.yohu-logs__level-slot .yohu-button {
+  height: 100%;
+  min-width: var(--yohu-control-height-sm);
+  padding-inline: var(--yohu-space-sm);
+  border: 0;
+  border-radius: var(--yohu-radius-none);
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--yohu-log-ink);
+}
+
+.yohu-logs__level-slot .yohu-button:not(:disabled):hover,
+.yohu-logs__level-slot .yohu-button:not(:disabled):active,
+.yohu-logs__level-slot .yohu-button[aria-pressed="true"] {
+  color: var(--yohu-log-ink);
+}
+
+.yohu-logs__level-slot .yohu-button[aria-pressed="true"] {
+  background-color: var(--yohu-log-fill);
+}
+
+.yohu-logs__level-slot .yohu-button[aria-pressed="true"]:not(:disabled):hover,
+.yohu-logs__level-slot .yohu-button[aria-pressed="true"]:not(:disabled):active {
+  background-color: var(--yohu-log-fill);
 }
 
 /* 检索框：放大镜图标 + 过滤生效 accent 边框 */
@@ -48,7 +105,7 @@
   padding-left: calc(var(--yohu-space-md) + var(--yohu-space-sm));
 }
 
-.yohu-logs__search--active .yohu-text-field__control {
+.yohu-logs__search[data-active] .yohu-text-field__control {
   border-color: var(--yohu-accent);
 }
 
@@ -66,18 +123,22 @@
   min-height: 0;
   overflow: hidden;
   background-color: var(--yohu-canvas);
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .yohu-logs__list-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Ctrl+A 整表：未挂载行也要看得见范围；拖选本身走浏览器 ::selection。 */
+/* Ctrl+A 未挂载行：与拖选同一 --yohu-text-sel，不是徽章软底。 */
 .yohu-logs__row--picked,
 .yohu-virtual-list__row:has(.yohu-logs__row--picked) {
-  background-color: var(--yohu-accent-soft);
+  background-color: var(--yohu-text-sel);
 }
 
 /* 离开底部：只计数不跟滚（Entangle jump-to-bottom / Qovery new-logs） */
@@ -88,7 +149,24 @@
   z-index: 1;
 }
 
-/* 模块铬：等宽、左条。轨道与列垫由 YoColFrame / Track / Cell 承担。 */
+/* 量 ch 只用行内探针，禁止套 .yohu-logs__row（那是通栏 block）。 */
+.yohu-logs__ch-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: inline;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  white-space: pre;
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 模块铬：等宽、左条。表头轨道由 YoColFrame 承担；行是文档。 */
 .yohu-logs__cols {
   padding: 0;
   border-left: var(--yohu-stroke-emphasis) solid transparent;
@@ -110,25 +188,38 @@
 
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
+  display: block;
   height: 100%;
   overflow: hidden;
+  white-space: pre;
   user-select: text;
   cursor: text;
   border-left-color: var(--yohu-log-ink);
 }
 
+.yohu-logs__list .yohu-virtual-list,
 .yohu-logs__list .yohu-virtual-list__row {
   user-select: text;
   cursor: text;
 }
 
-.yohu-logs__row[data-level="v"] { --yohu-log-ink: var(--yohu-level-v); }
-.yohu-logs__row[data-level="d"] { --yohu-log-ink: var(--yohu-level-d); }
-.yohu-logs__row[data-level="i"] { --yohu-log-ink: var(--yohu-level-i); }
-.yohu-logs__row[data-level="w"] { --yohu-log-ink: var(--yohu-level-w); }
-.yohu-logs__row[data-level="e"] { --yohu-log-ink: var(--yohu-level-e); }
-/* Fatal 字母是反色块（--yohu-level-f = font_on）；Tag / 左条用 warning 底色才可读。 */
-.yohu-logs__row[data-level="f"] { --yohu-log-ink: var(--yohu-level-f-bg); }
+.yohu-logs__list ::selection {
+  background-color: var(--yohu-text-sel);
+}
+
+.yohu-logs__row[data-level="v"],
+.yohu-logs__level-slot[data-level="v"] { --yohu-log-ink: var(--yohu-level-v); }
+.yohu-logs__row[data-level="d"],
+.yohu-logs__level-slot[data-level="d"] { --yohu-log-ink: var(--yohu-level-d); }
+.yohu-logs__row[data-level="i"],
+.yohu-logs__level-slot[data-level="i"] { --yohu-log-ink: var(--yohu-level-i); }
+.yohu-logs__row[data-level="w"],
+.yohu-logs__level-slot[data-level="w"] { --yohu-log-ink: var(--yohu-level-w); }
+.yohu-logs__row[data-level="e"],
+.yohu-logs__level-slot[data-level="e"] { --yohu-log-ink: var(--yohu-level-e); }
+/* Fatal 字母是反色块（--yohu-level-f = font_on）；Tag / 左条 / 筛选按下用 warning 底色才可读。 */
+.yohu-logs__row[data-level="f"],
+.yohu-logs__level-slot[data-level="f"] { --yohu-log-ink: var(--yohu-level-f-bg); }
 
 /* 信号行（崩溃/ANR）：信号底色 + Error 左条。Ctrl+A 铺底时让位。 */
 .yohu-logs__row--signal {
@@ -137,7 +228,7 @@
 }
 
 .yohu-logs__row--signal.yohu-logs__row--picked {
-  background-color: var(--yohu-accent-soft);
+  background-color: var(--yohu-text-sel);
 }
 
 .yohu-logs__row-ts {
@@ -168,7 +259,6 @@
   color: var(--yohu-level-f);
   background-color: var(--yohu-level-f-bg);
   border-radius: var(--yohu-radius-2xs);
-  padding: 0 var(--yohu-space-2xs);
 }
 
 .yohu-logs__row-msg {
@@ -184,7 +274,6 @@
   background: var(--yohu-warn-bg);
   color: var(--yohu-fg);
   border-radius: var(--yohu-radius-2xs);
-  padding: 0 var(--yohu-space-2xs);
 }
 
 .yohu-logs__row-fold {
@@ -234,12 +323,15 @@
 /* ===== 空态 / 新建窗口 ===== */
 
 .yohu-logs__empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--yohu-space-md);
-  height: 100%;
+  background-color: var(--yohu-canvas);
 }
 
 /* 对话框自行管理滚动：仅进程列表滚动，避免下拉菜单撑出双滚动条 */

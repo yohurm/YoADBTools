@@ -1,9 +1,9 @@
 /**
- * 窗口显示面板（纯函数）。
+ * 窗口可见区代数。环 / 镜像 / 面板共用同一套游标，禁止第二套「保护旧行」策略。
  *
- * 入镜路径 append-only：只允许调用方显式 flush（重新开始采集、清空、清设备缓冲）。
- * 过滤路径走 rebuildFiltered：已画出仍匹配 ∪ 镜像命中按 seq 合并；镜像为空时只可能变少。
- * 未跟滚时由调用方把镜像命中裁到冻结末 seq，尾部计 pending；不得把过滤重建当成 resumeFollow。
+ * 一行能进面板 ⟺ 已订阅 && seq >= fromSeq && (跟滚 || seq <= frozenThroughSeq) && 过滤命中。
+ * 入镜、过滤、PID 重绑、跟滚、清空只通过本文件选择行。
+ * 清空把 fromSeq 推过已见与镜像末 seq，旧行不能再投影回来。
  */
 
 import type { LogLine } from "@yohu/api";
@@ -26,9 +26,37 @@ export function lastSeqOf(rows: readonly ViewRow[], fromSeq: number): number {
   return seqBefore(fromSeq);
 }
 
+/**
+ * 没有已画行就没有「底部」。空面板冻结会把 ceiling 落到 fromSeq 之前，
+ * 后续行全进 pending，空态却仍显示「等待设备输出」。
+ */
+export function canFreezeFollow(visible: readonly ViewRow[]): boolean {
+  return visible.length > 0;
+}
+
 /** 入镜 / 回放共用：seq 在窗口起点之后、且晚于已画末行。 */
 export function isFreshLine(seq: number, after: number, fromSeq: number): boolean {
   return seq > after && seq >= fromSeq;
+}
+
+export function viewCeiling(following: boolean, frozenThroughSeq: number | null): number | null {
+  return following ? null : frozenThroughSeq;
+}
+
+/** 镜像里是否还有本窗口游标范围内的行。空镜像不得当权威源去冲面板。 */
+export function mirrorCoversRange(size: number, lastSeq: number, fromSeq: number): boolean {
+  return fromSeq >= 0 && size > 0 && lastSeq >= fromSeq;
+}
+
+/** 清空可见区：游标推到已见与镜像之后，旧 seq 全部失效。 */
+export function nextDiscardFromSeq(
+  fromSeq: number,
+  lastVisibleSeq: number | undefined,
+  mirrorLast: number,
+): number {
+  if (fromSeq < 0) return fromSeq;
+  const visible = lastVisibleSeq ?? seqBefore(fromSeq);
+  return Math.max(fromSeq, visible + 1, mirrorLast + 1);
 }
 
 export function trimRows(rows: readonly ViewRow[], cap: number): ViewRow[] {
@@ -43,39 +71,6 @@ export function signalCountOf(rows: readonly ViewRow[]): number {
 
 export function keepMatching(rows: readonly ViewRow[], filter: SessionFilter): LogLine[] {
   return rows.filter((row) => matchesLine(row.line, filter)).map((row) => row.line);
-}
-
-/** 两条已按 seq 升序的行集合按 seq 合并去重；同 seq 取右侧（镜像）。 */
-export function mergeLinesBySeq(left: readonly LogLine[], right: readonly LogLine[]): LogLine[] {
-  if (right.length === 0) return [...left];
-  if (left.length === 0) return [...right];
-  const out: LogLine[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < left.length && j < right.length) {
-    const a = left[i]!.seq;
-    const b = right[j]!.seq;
-    if (a < b) {
-      out.push(left[i]!);
-      i++;
-    } else if (b < a) {
-      out.push(right[j]!);
-      j++;
-    } else {
-      out.push(right[j]!);
-      i++;
-      j++;
-    }
-  }
-  while (i < left.length) {
-    out.push(left[i]!);
-    i++;
-  }
-  while (j < right.length) {
-    out.push(right[j]!);
-    j++;
-  }
-  return out;
 }
 
 /**
@@ -96,6 +91,17 @@ export function splitHitsForFreeze(
   return { forPanel, pending };
 }
 
+export function selectHits(
+  lines: readonly LogLine[],
+  fromSeq: number,
+  ceiling: number | null,
+  filter: SessionFilter,
+): { forPanel: LogLine[]; pending: number } {
+  if (fromSeq < 0) return { forPanel: [], pending: 0 };
+  const hits = lines.filter((line) => line.seq >= fromSeq && matchesLine(line, filter));
+  return splitHitsForFreeze(hits, ceiling);
+}
+
 export function appendLines(
   current: readonly ViewRow[],
   lines: readonly LogLine[],
@@ -113,15 +119,72 @@ export function panelFromLines(
   return { visible, signalCount: signalCountOf(visible) };
 }
 
+export interface ViewApply {
+  visible: ViewRow[];
+  signalCount: number;
+  pendingCount: number;
+}
+
 /**
- * 显示过滤变更：已画出仍匹配的行 ∪ 镜像命中（调用方已按新过滤筛过），按 seq 合并重建。
- * 与入镜「只在末行之后追加」解耦；镜像为空时只可能变少，不会冲成空。
+ * 过滤投影。镜像覆盖游标范围时镜像是唯一权威；否则只收窄已画行，不冲成空、不把旧行补回来。
  */
-export function rebuildFiltered(
-  drawn: readonly ViewRow[],
-  mirrorHits: readonly LogLine[],
-  filter: SessionFilter,
-  cap: number,
-): { visible: ViewRow[]; signalCount: number } {
-  return panelFromLines(mergeLinesBySeq(keepMatching(drawn, filter), mirrorHits), cap);
+export function projectWindow(opts: {
+  drawn: readonly ViewRow[];
+  source: readonly LogLine[];
+  sourceCoversRange: boolean;
+  fromSeq: number;
+  following: boolean;
+  frozenThroughSeq: number | null;
+  filter: SessionFilter;
+  cap: number;
+  pendingCount: number;
+}): ViewApply {
+  const ceiling = viewCeiling(opts.following, opts.frozenThroughSeq);
+  if (!opts.sourceCoversRange) {
+    const kept = keepMatching(opts.drawn, opts.filter);
+    const { forPanel } = splitHitsForFreeze(kept, ceiling);
+    const next = panelFromLines(forPanel, opts.cap);
+    return { ...next, pendingCount: opts.pendingCount };
+  }
+  const { forPanel, pending } = selectHits(opts.source, opts.fromSeq, ceiling, opts.filter);
+  return { ...panelFromLines(forPanel, opts.cap), pendingCount: pending };
+}
+
+/**
+ * 入镜 / 补洞。暂停丢弃；未跟滚只加 pending；跟滚按 seq 追加。
+ * 无新行且跟滚中：把 pending 清零（尾部已对齐）。
+ */
+export function applyAppend(opts: {
+  visible: readonly ViewRow[];
+  lines: readonly LogLine[];
+  fromSeq: number;
+  following: boolean;
+  paused: boolean;
+  filter: SessionFilter;
+  cap: number;
+  pendingCount: number;
+}): ViewApply | null {
+  if (opts.paused || opts.fromSeq < 0) return null;
+  const following = opts.following || !canFreezeFollow(opts.visible);
+  const after = lastSeqOf(opts.visible, opts.fromSeq);
+  const fresh = opts.lines.filter(
+    (line) => isFreshLine(line.seq, after, opts.fromSeq) && matchesLine(line, opts.filter),
+  );
+  if (fresh.length === 0) {
+    if (!following) return null;
+    return {
+      visible: trimRows(opts.visible, opts.cap),
+      signalCount: signalCountOf(opts.visible),
+      pendingCount: 0,
+    };
+  }
+  if (!following) {
+    return {
+      visible: trimRows(opts.visible, opts.cap),
+      signalCount: signalCountOf(opts.visible),
+      pendingCount: opts.pendingCount + fresh.length,
+    };
+  }
+  const visible = appendLines(opts.visible, fresh, opts.cap);
+  return { visible, signalCount: signalCountOf(visible), pendingCount: 0 };
 }

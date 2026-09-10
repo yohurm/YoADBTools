@@ -1,34 +1,36 @@
 /**
- * 日志会话工作区：窗口（Tab）生命周期、显示过滤、包名 PID 重绑。
- * 不碰采集 IPC。每个窗口绑定一台设备；新建/复制空且停，不从共享环重放。
+ * 日志会话工作区：窗口生命周期与可见区写入。不碰采集 IPC。
  * 点开始才订阅：fromSeq=0，按窗口过滤从当前环补齐。
- * 进程索引按 serial 分桶，禁止用焦点设备的 ps 去重绑其他窗口。
+ * 进程索引按 serial 分桶。
  *
- * 显示面板是窗口私有。入镜 / 跟滚只按末行 seq 追加（append-only）。
- * 改级别 / Tag / 关键字走 rebuild：已画出仍匹配 ∪ 镜像命中。跟滚时从 fromSeq 全量合并；
- * 未跟滚时只合并到离开底部时记下的 frozenThroughSeq，尾部计 pending。暂停只挡入镜/catchUp。
- * 只在重新开始采集或清空时 flush。掉线 / 停采 / 无输出 / PID 重绑 / 跟滚 / 镜像落后都不得冲掉已画出的行。
+ * 面板写入只有两条：applyAppend（入镜 / 补洞 / 重绑）与 projectWindow（改过滤）。
+ * 清空走 discardView：推进 fromSeq，旧行不能再投影回来。
+ * 空面板不能 detachFollow：没有已画行就没有底部。
  */
 
 import type { SetStoreFunction } from "solid-js/store";
 import type { LogLine, ProcessEntry } from "@yohu/api";
 
 import {
-  appendLines,
+  applyAppend,
+  canFreezeFollow,
   isFreshLine,
   lastSeqOf,
-  rebuildFiltered,
+  mirrorCoversRange,
+  nextDiscardFromSeq,
+  projectWindow,
   seqBefore,
   signalCountOf,
-  splitHitsForFreeze,
   trimRows,
 } from "./panel";
 import {
   copyBinding,
   emptyBinding,
   matchesLine,
+  normalizeLevels,
   rebindPids,
   toSessionFilter,
+  type LevelLetter,
   type PidBinding,
   type SessionScope,
   type ViewRow,
@@ -53,7 +55,8 @@ export interface LogSessionState {
   /** 本窗口起始序号；<0 表示从未开始，禁止从镜像补洞 */
   fromSeq: number;
   scope: SessionScope;
-  minLevel: string | null;
+  /** 精确级别集合；空 = 不限。不是最低含以上。 */
+  levels: LevelLetter[];
   tagContains: string;
   keyword: string;
   paused: boolean;
@@ -70,7 +73,7 @@ export interface LogSessionState {
 
 /** 显示过滤补丁。暂停只走 setPaused。 */
 export type SessionFilterPatch = Partial<
-  Pick<LogSessionState, "minLevel" | "tagContains" | "keyword" | "scope">
+  Pick<LogSessionState, "levels" | "tagContains" | "keyword" | "scope">
 >;
 
 /** 每设备一份投影：世代 / 溢出 / 进程索引 / 已安装包名。窗口只引用 serial，不共用全局数组。 */
@@ -111,8 +114,10 @@ export type WorkspaceApi = {
   catchUpSession: (id: number) => void;
   bindPackageSessions: (serial: string, entries?: readonly ProcessEntry[]) => void;
   assignDefaultSerial: (serial: string | null) => void;
-  clearPanel: (id: number) => void;
-  clearDevicePanels: (serial: string) => void;
+  onDeviceLines: (serial: string, lines: readonly LogLine[]) => void;
+  discardView: (id: number) => void;
+  flushPanel: (id: number) => void;
+  flushDevicePanels: (serial: string) => void;
   setFollowing: (id: number, following: boolean) => void;
   resumeFollow: (id: number) => void;
   detachFollow: (id: number) => void;
@@ -145,7 +150,7 @@ export function ensureDevice(
   setState("devices", serial, emptyDevice());
 }
 
-const DISPLAY_KEYS: readonly (keyof SessionFilterPatch)[] = ["minLevel", "tagContains", "keyword", "scope"];
+const DISPLAY_KEYS: readonly (keyof SessionFilterPatch)[] = ["levels", "tagContains", "keyword", "scope"];
 
 export function createWorkspace(
   state: LogUiState,
@@ -168,7 +173,7 @@ export function createWorkspace(
       starting: false,
       fromSeq: SESSION_NEVER_STARTED,
       scope,
-      minLevel: null,
+      levels: [],
       tagContains: "",
       keyword: "",
       paused: false,
@@ -194,17 +199,9 @@ export function createWorkspace(
     });
   }
 
-  function clearPanel(id: number): void {
-    const idx = sessionIndex(id);
-    if (idx < 0) return;
-    writePanel(idx, [], 0);
-  }
-
-  function clearDevicePanels(serial: string): void {
-    state.sessions.forEach((session) => {
-      if (session.serial !== serial) return;
-      clearPanel(session.id);
-    });
+  function commitApply(idx: number, applied: { visible: ViewRow[]; pendingCount: number } | null): void {
+    if (!applied) return;
+    writePanel(idx, applied.visible, applied.pendingCount);
   }
 
   function extraFromMirror(session: LogSessionState, after: number): LogLine[] {
@@ -216,41 +213,92 @@ export function createWorkspace(
     }, bufferCapacity());
   }
 
-  /** 按 seq 追加镜像里尚未画出的匹配行。空面板可以首次填入，但不得整表替换。 */
+  function appendToSession(id: number, lines: readonly LogLine[]): void {
+    const idx = sessionIndex(id);
+    if (idx < 0) return;
+    const session = state.sessions[idx]!;
+    const following = session.following || !canFreezeFollow(session.visible);
+    if (following && !session.following) {
+      setState("sessions", idx, { following: true, frozenThroughSeq: null, pendingCount: 0 });
+    }
+    commitApply(
+      idx,
+      applyAppend({
+        visible: session.visible,
+        lines,
+        fromSeq: session.fromSeq,
+        following,
+        paused: session.paused,
+        filter: toSessionFilter(session),
+        cap: bufferCapacity(),
+        pendingCount: following && !session.following ? 0 : session.pendingCount,
+      }),
+    );
+  }
+
   function catchUpSession(id: number): void {
     const idx = sessionIndex(id);
     if (idx < 0) return;
     const session = state.sessions[idx]!;
-    if (session.paused) return;
     const after = lastSeqOf(session.visible, session.fromSeq);
-    const lines = extraFromMirror(session, after);
-    if (lines.length === 0) {
-      if (session.following) setState("sessions", idx, { pendingCount: 0 });
-      return;
-    }
-    if (!session.following) {
-      setState("sessions", idx, {
-        pendingCount: session.pendingCount + lines.length,
-      });
-      return;
-    }
-    writePanel(idx, appendLines(session.visible, lines, bufferCapacity()), 0);
+    appendToSession(id, extraFromMirror(session, after));
   }
 
-  /**
-   * 显示过滤变更。跟滚：从 fromSeq 合并全部命中。
-   * 未跟滚：只合并到 frozenThroughSeq，其后计 pending。
-   */
-  function refilterSession(id: number): void {
+  function projectSession(id: number): void {
     const idx = sessionIndex(id);
     if (idx < 0) return;
     const session = state.sessions[idx]!;
-    const filter = toSessionFilter(session);
-    const allHits = extraFromMirror(session, seqBefore(session.fromSeq));
-    const ceiling = session.following ? null : session.frozenThroughSeq;
-    const { forPanel, pending } = splitHitsForFreeze(allHits, ceiling);
-    const next = rebuildFiltered(session.visible, forPanel, filter, bufferCapacity());
-    writePanel(idx, next.visible, pending);
+    const mirror = session.serial ? mirrors.of(session.serial) : null;
+    const covers = mirror
+      ? mirrorCoversRange(mirror.size(), mirror.lastSeqNumber(), session.fromSeq)
+      : false;
+    const source = covers ? extraFromMirror(session, seqBefore(session.fromSeq)) : [];
+    const next = projectWindow({
+      drawn: session.visible,
+      source,
+      sourceCoversRange: covers,
+      fromSeq: session.fromSeq,
+      following: session.following,
+      frozenThroughSeq: session.frozenThroughSeq,
+      filter: toSessionFilter(session),
+      cap: bufferCapacity(),
+      pendingCount: session.pendingCount,
+    });
+    writePanel(idx, next.visible, next.pendingCount);
+  }
+
+  function onDeviceLines(serial: string, lines: readonly LogLine[]): void {
+    state.sessions.forEach((session) => {
+      if (session.serial !== serial || !session.capturing) return;
+      appendToSession(session.id, lines);
+    });
+  }
+
+  function flushPanel(id: number): void {
+    const idx = sessionIndex(id);
+    if (idx < 0) return;
+    writePanel(idx, [], 0);
+  }
+
+  function flushDevicePanels(serial: string): void {
+    state.sessions.forEach((session) => {
+      if (session.serial !== serial) return;
+      flushPanel(session.id);
+    });
+  }
+
+  function discardView(id: number): void {
+    const idx = sessionIndex(id);
+    if (idx < 0) return;
+    const session = state.sessions[idx]!;
+    const mirrorLast = session.serial ? mirrors.of(session.serial).lastSeqNumber() : -1;
+    const fromSeq = nextDiscardFromSeq(session.fromSeq, session.visible.at(-1)?.line.seq, mirrorLast);
+    setState("sessions", idx, {
+      fromSeq,
+      following: true,
+      frozenThroughSeq: null,
+    });
+    writePanel(idx, [], 0);
   }
 
   function trimPanels(): void {
@@ -335,7 +383,7 @@ export function createWorkspace(
     const src = state.sessions.find((s) => s.id === id);
     if (!src) return null;
     const copy = makeSession({ ...src.scope }, `${src.title} 副本`, src.serial);
-    copy.minLevel = src.minLevel;
+    copy.levels = [...src.levels];
     copy.tagContains = src.tagContains;
     copy.keyword = src.keyword;
     copy.paused = false;
@@ -373,10 +421,12 @@ export function createWorkspace(
     const idx = sessionIndex(id);
     if (idx < 0) return;
     if (Object.keys(patch).length === 0) return;
-    setState("sessions", idx, patch);
+    const next =
+      patch.levels !== undefined ? { ...patch, levels: normalizeLevels(patch.levels) } : patch;
+    setState("sessions", idx, next);
     rebindIfPackage(idx);
     if (DISPLAY_KEYS.some((key) => key in patch)) {
-      refilterSession(id);
+      projectSession(id);
     }
   }
 
@@ -398,6 +448,7 @@ export function createWorkspace(
       catchUpSession(id);
       return;
     }
+    if (!canFreezeFollow(session.visible)) return;
     setState("sessions", idx, {
       following: false,
       frozenThroughSeq: lastSeqOf(session.visible, session.fromSeq),
@@ -418,8 +469,10 @@ export function createWorkspace(
     catchUpSession,
     bindPackageSessions,
     assignDefaultSerial,
-    clearPanel,
-    clearDevicePanels,
+    onDeviceLines,
+    discardView,
+    flushPanel,
+    flushDevicePanels,
     setFollowing,
     resumeFollow: (id) => setFollowing(id, true),
     detachFollow: (id) => setFollowing(id, false),

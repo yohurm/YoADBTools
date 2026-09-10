@@ -1,6 +1,7 @@
 /**
- * 日志过滤（纯函数，ADR-v6-006 消费端）：级别含以上 / Tag·关键字包含 / Scope。
+ * 日志过滤（纯函数，ADR-v6-006 消费端）：级别精确集合 / Tag·关键字包含 / Scope。
  * 与 yohu-domain::log_filter_matches 同一套 testdata/log_filter.json。
+ * 级别字母单源：testdata/log_levels.json ↔ LEVELS；着色键仍走同一张表。
  */
 
 import type { LogFilter, LogLine } from "@yohu/api";
@@ -16,15 +17,58 @@ function levelIndex(level: string): number {
   return (LEVELS as readonly string[]).indexOf(level.toUpperCase());
 }
 
-export function levelKey(level: string): LevelKey | null {
+export function parseLevelLetter(level: string): LevelLetter | null {
   const idx = levelIndex(level);
-  return idx < 0 ? null : (LEVELS[idx]!.toLowerCase() as LevelKey);
+  return idx < 0 ? null : LEVELS[idx]!;
 }
 
-/** 级别序：未知=0，V=1 … F=6（与 yohu-domain::level_rank 对齐）。 */
+const LEVEL_CAPTION: Record<LevelLetter, string> = {
+  V: "Verbose",
+  D: "Debug",
+  I: "Info",
+  W: "Warn",
+  E: "Error",
+  F: "Fatal",
+};
+
+export function levelLabel(letter: LevelLetter): string {
+  return LEVEL_CAPTION[letter];
+}
+
+export function levelKey(level: string): LevelKey | null {
+  const letter = parseLevelLetter(level);
+  return letter ? (letter.toLowerCase() as LevelKey) : null;
+}
+
+/** 级别序：未知=0，V=1 … F=6（与 yohu-domain::level_rank 对齐；只给着色/契约，不参与筛选）。 */
 export function levelRank(level: string): number {
   const idx = levelIndex(level);
   return idx < 0 ? 0 : idx + 1;
+}
+
+/** 只保留 LEVELS 中的字母，去重并按 V→F 排序。空 = 不限级别。 */
+export function normalizeLevels(input: readonly string[]): LevelLetter[] {
+  const seen = new Set<LevelLetter>();
+  for (const raw of input) {
+    const letter = parseLevelLetter(raw);
+    if (letter) seen.add(letter);
+  }
+  return LEVELS.filter((letter) => seen.has(letter));
+}
+
+export function toggleLevel(selected: readonly string[], letter: LevelLetter): LevelLetter[] {
+  const current = normalizeLevels(selected);
+  return normalizeLevels(current.includes(letter) ? current.filter((item) => item !== letter) : [...current, letter]);
+}
+
+export function levelAllowed(lineLevel: string, selected: readonly string[]): boolean {
+  if (selected.length === 0) return true;
+  const letter = parseLevelLetter(lineLevel);
+  if (!letter) return false;
+  for (const item of selected) {
+    if (parseLevelLetter(item) === letter) return true;
+  }
+  return false;
 }
 
 export type SessionScope =
@@ -33,7 +77,7 @@ export type SessionScope =
   | { kind: "pid"; pid: number };
 
 export interface SessionFilter {
-  minLevel: string | null;
+  levels: LevelLetter[];
   tagContains: string;
   keyword: string;
   scope: SessionScope;
@@ -59,50 +103,71 @@ export function containsAsciiIgnoreCase(haystack: string, needle: string): boole
   return false;
 }
 
+const SCOPE_ALL: LogFilter["scope"] = { kind: "all" };
+
 export function matchesWireFilter(line: LogLine, f: LogFilter): boolean {
-  if (f.min_level) {
-    const min = f.min_level[0];
-    if (min && levelRank(line.level) < levelRank(min)) return false;
-  }
-  if (f.tag_contains && !containsAsciiIgnoreCase(line.tag, f.tag_contains)) return false;
-  if (f.message_contains && !containsAsciiIgnoreCase(line.msg, f.message_contains)) return false;
-  switch (f.scope.kind) {
-    case "all":
-      return true;
-    case "pid":
-      return line.pid === f.scope.pid;
-    case "package":
-      return f.scope.pids.includes(line.pid);
-  }
+  return matchCore(line, f.levels ?? [], f.tag_contains ?? "", f.message_contains ?? "", f.scope);
 }
 
 export function matchesLine(line: LogLine, f: SessionFilter): boolean {
-  return matchesWireFilter(line, sessionFilterToWire(f));
+  switch (f.scope.kind) {
+    case "all":
+      return matchCore(line, f.levels, f.tagContains, f.keyword, SCOPE_ALL);
+    case "pid":
+      return matchCore(line, f.levels, f.tagContains, f.keyword, { kind: "pid", pid: f.scope.pid });
+    case "package":
+      return matchCore(line, f.levels, f.tagContains, f.keyword, { kind: "package", pids: f.pidSet });
+  }
+}
+
+function matchCore(
+  line: LogLine,
+  levels: readonly string[],
+  tag: string,
+  message: string,
+  scope: LogFilter["scope"],
+): boolean {
+  if (!levelAllowed(line.level, levels)) return false;
+  if (tag && !containsAsciiIgnoreCase(line.tag, tag)) return false;
+  if (message && !containsAsciiIgnoreCase(line.msg, message)) return false;
+  switch (scope.kind) {
+    case "all":
+      return true;
+    case "pid":
+      return line.pid === scope.pid;
+    case "package":
+      return scope.pids.includes(line.pid);
+  }
 }
 
 function sessionFilterToWire(f: SessionFilter): LogFilter {
-  const min_level = f.minLevel ?? undefined;
+  const levels = normalizeLevels(f.levels);
   const tag_contains = f.tagContains || undefined;
   const message_contains = f.keyword || undefined;
+  const base = {
+    ...(levels.length > 0 ? { levels } : {}),
+    tag_contains,
+    message_contains,
+  };
   switch (f.scope.kind) {
     case "all":
-      return { min_level, tag_contains, message_contains, scope: { kind: "all" } };
+      return { ...base, scope: { kind: "all" } };
     case "pid":
-      return { min_level, tag_contains, message_contains, scope: { kind: "pid", pid: f.scope.pid } };
+      return { ...base, scope: { kind: "pid", pid: f.scope.pid } };
     case "package":
-      return { min_level, tag_contains, message_contains, scope: { kind: "package", pids: f.pidSet } };
+      return { ...base, scope: { kind: "package", pids: f.pidSet } };
   }
 }
 
 export function toSessionFilter(input: {
-  minLevel: string | null;
+  levels: readonly string[];
   tagContains: string;
   keyword: string;
   scope: SessionScope;
   binding: PidBinding;
 }): SessionFilter {
   return {
-    minLevel: input.minLevel,
+    levels: normalizeLevels(input.levels),
     tagContains: input.tagContains,
     keyword: input.keyword,
     scope: input.scope,
@@ -111,7 +176,7 @@ export function toSessionFilter(input: {
 }
 
 export function toWireFilter(input: {
-  minLevel: string | null;
+  levels: readonly string[];
   tagContains: string;
   keyword: string;
   scope: SessionScope;

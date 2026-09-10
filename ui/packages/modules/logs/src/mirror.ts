@@ -33,9 +33,9 @@ export class RingMirror {
     return out.reverse();
   }
 
+  /** 只丢行，不回退 lastSeq：过期批次不得再入镜（与 core RingBuffer::clear 一致）。 */
   clear(): void {
     this.buf = [];
-    this.lastSeq = -1;
   }
 
   size(): number {
