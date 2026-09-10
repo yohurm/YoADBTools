@@ -17,7 +17,7 @@ pub const IDENTIFIER: &str = "com.yohu.adbtools";
 pub const DESCRIPTION: &str = "设备工具工作台";
 /// 版权行。
 pub const COPYRIGHT: &str = "© 2026 Yohu";
-/// `%LOCALAPPDATA%\<DATA_DIR_NAME>\`
+/// 产品家园目录名：`%LOCALAPPDATA%\<DATA_DIR_NAME>\`
 pub const DATA_DIR_NAME: &str = PRODUCT_NAME;
 
 /// 设备路径安全根（ADR-v6-013）。UI 面包屑夹紧与 domain `SafetyRoot::default` 共用。
@@ -55,14 +55,19 @@ pub mod module_title {
     pub const SETTINGS: &str = "设置";
 }
 
-/// LocalAppData 根下的固定段（不随 `data_root` 迁移）。
+/// 产品家园下的固定段（不随 `data_root` 迁移，除非另注）。
 pub mod dir {
-    pub const SETTINGS: &str = "settings";
+    pub const CONFIG: &str = "config";
     pub const SETTINGS_FILE: &str = "settings.json";
+    pub const DEVICES_CATALOG: &str = "devices-catalog.json";
     pub const LOGS: &str = "logs";
     pub const DATA: &str = "data";
+    pub const CACHE: &str = "cache";
+    pub const WEBVIEW: &str = "webview";
+    pub const UPDATE: &str = "update";
     pub const TOOLS: &str = "tools";
     pub const ADB: &str = "adb";
+    pub const SIDECAR_STAMP: &str = ".sidecar-stamp";
     /// 官方 scrcpy-server 文件名（与 `tools/scrcpy-server`、bundle resources 一致）。
     pub const SCRCPY_SERVER: &str = "scrcpy-server";
     pub const MODULES: &str = "modules";
@@ -100,13 +105,18 @@ impl AppIdentity {
 /// 解析后的绝对路径目录（`system.info.paths`）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppPathCatalog {
-    /// `%LOCALAPPDATA%\YohuAdbTools`
+    /// 产品家园（Windows `%LOCALAPPDATA%\YohuAdbTools`）
     pub local_root: String,
-    pub settings_dir: String,
+    /// 安装根（Windows `%LOCALAPPDATA%\Programs\YohuAdbTools`）
+    pub install_dir: String,
+    pub config_dir: String,
     pub settings_file: String,
     pub logs_dir: String,
     /// 数据根（可配置；默认 `local_root/data`）
     pub data_root: String,
+    pub cache_dir: String,
+    pub webview_dir: String,
+    pub update_cache_dir: String,
     pub adb_tools_dir: String,
     pub library_file: String,
     pub exports_dir: String,
@@ -159,6 +169,12 @@ mod tests {
         assert_eq!(module_title::SETTINGS, "设置");
         assert_eq!(scrcpy::SERVER_VERSION, "4.1");
         assert_eq!(dir::SCRCPY_SERVER, "scrcpy-server");
+        assert_eq!(dir::CONFIG, "config");
+        assert_eq!(dir::CACHE, "cache");
+        assert_eq!(dir::WEBVIEW, "webview");
+        assert_eq!(dir::UPDATE, "update");
+        assert_eq!(dir::SIDECAR_STAMP, ".sidecar-stamp");
+        assert_eq!(dir::DEVICES_CATALOG, "devices-catalog.json");
     }
 
     #[test]
