@@ -26,7 +26,7 @@ pub fn update_cache_dir() -> PathBuf {
         .join(dir::UPDATE)
 }
 
-/// 从下载 URL 取出合法的 `.exe` 文件名。
+/// 从下载 URL 取出合法的安装包文件名（`.exe` / `.dmg`）。
 pub fn installer_file_name(url: &str) -> Result<String, UpdateError> {
     let trimmed = url.trim();
     let without_query = trimmed.split(['?', '#']).next().unwrap_or(trimmed);
@@ -35,8 +35,7 @@ pub fn installer_file_name(url: &str) -> Result<String, UpdateError> {
         return Err(UpdateError::InvalidInstaller);
     }
     let decoded = raw.replace("%20", " ");
-    let lower = decoded.to_ascii_lowercase();
-    if !lower.ends_with(".exe") {
+    if crate::artifact::InstallerKind::from_name(&decoded).is_none() {
         return Err(UpdateError::InvalidInstaller);
     }
     if decoded
@@ -149,7 +148,12 @@ pub async fn download_installer(
         return Err(UpdateError::TooLarge);
     }
 
-    let part = dest.with_extension("exe.part");
+    let part = dest.with_file_name(format!(
+        "{}.part",
+        dest.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "installer.part".into())
+    ));
     if part.exists() {
         let _ = tokio::fs::remove_file(&part).await;
     }
@@ -236,17 +240,16 @@ pub async fn download_installer(
     })
 }
 
-/// 安装包必须落在更新缓存目录内的 `.exe`。
+/// 安装包必须落在更新缓存目录内，且为 `.exe` / `.dmg`。
 pub fn assert_cached_installer(path: &Path) -> Result<PathBuf, UpdateError> {
     if !path.is_absolute() {
         return Err(UpdateError::InvalidInstaller);
     }
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .eq_ignore_ascii_case("exe");
-    if !ext {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or(UpdateError::InvalidInstaller)?;
+    if crate::artifact::InstallerKind::from_name(name).is_none() {
         return Err(UpdateError::InvalidInstaller);
     }
     if !path.is_file() {
@@ -275,6 +278,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(name, "YohuAdbTools_0.1.2_x64-setup.exe");
+        let dmg = installer_file_name(
+            "https://github.com/yohurm/Windows-YoADBTools/releases/download/v0.1.2/YohuAdbTools_0.1.2_aarch64.dmg",
+        )
+        .unwrap();
+        assert_eq!(dmg, "YohuAdbTools_0.1.2_aarch64.dmg");
     }
 
     #[test]

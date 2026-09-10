@@ -12,9 +12,9 @@
 
 ## 覆盖安装
 
-1. `update.download` 把当前平台安装包下到产品家园 `cache/update/`（Windows NSIS `*-setup.exe`，macOS `*.dmg`），流式 SHA-256（GitHub `digest` 有则校验）；安装成功后删除 setup
-2. Windows：`update.install` 拉起脱离作业对象的助手：等当前 PID 退出 → `setup.exe /S` 写入 `%LOCALAPPDATA%\Programs\YohuAdbTools` → 启动新主程序；壳随后退出
-3. macOS：`update.install` 打开 DMG，用户拖入 `/Applications`；进程不退出
+1. `update.download` 把当前平台安装包下到产品家园 `cache/update/`（Windows NSIS `*-setup.exe`，macOS `*.dmg`），流式 SHA-256（GitHub `digest` 有则校验）；Windows 安装成功后删除 setup
+2. Windows：`update.install` 拉起脱离作业对象的助手：等当前 PID 退出并 settle → `setup.exe /S /UPDATE /NS`（失败退避最多 4 次）写入 `%LOCALAPPDATA%\Programs\YohuAdbTools` → 启动新主程序；过程写 `cache/update/apply.log`；壳随后退出
+3. macOS：`update.install` 打开已缓存的 DMG，用户拖入 `/Applications`；进程不退出
 4. 产品家园 `config/` `logs/` `data/` `cache/` 不在安装包文件列表里，覆盖安装会保留
 5. `update.open` 仅作浏览器兜底（无匹配附件时）
 

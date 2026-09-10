@@ -31,8 +31,8 @@ pub enum UpdateError {
     InstallerNotFound,
     #[error("更新已取消")]
     Cancelled,
-    #[error("覆盖安装仅支持 Windows")]
-    NotWindows,
+    #[error("当前平台不支持该安装包")]
+    UnsupportedOs,
     #[error("写入安装包失败: {0}")]
     Io(String),
 }

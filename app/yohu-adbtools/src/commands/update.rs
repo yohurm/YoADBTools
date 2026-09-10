@@ -31,7 +31,7 @@ pub fn update_info(state: State<'_, AppState>) -> Result<UpdateChannelInfo, IpcE
     describe_channel(&state.paths.config_dir).map_err(ipc_update)
 }
 
-/// `update.download`：把检查结果中的安装包下到临时目录并校验。
+/// `update.download`：把检查结果中的安装包下到家园 `cache/update/` 并校验。
 #[tauri::command(rename = "update.download")]
 pub async fn update_download(
     state: State<'_, AppState>,

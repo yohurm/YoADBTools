@@ -1,8 +1,11 @@
 //! yohu-update — 应用更新检查 / 下载 / 覆盖安装。
 //!
-//! 固定 GitHub Releases（`yohurm/Windows-YoADBTools`）。下载 NSIS 安装包后静默 `/S` 覆盖，不引入 tauri-plugin-updater。
+//! 固定 GitHub Releases（`yohurm/Windows-YoADBTools`）。
+//! Windows：家园缓存 NSIS 后 `/S /UPDATE /NS` 覆盖；macOS：打开 DMG。
+//! 不引入 tauri-plugin-updater。
 
 pub mod apply;
+pub mod artifact;
 pub mod check;
 pub mod contract;
 pub mod credentials;
@@ -13,7 +16,8 @@ pub mod mapper;
 pub mod platform;
 pub mod release;
 
-pub use apply::{installed_exe_path, spawn_overlay_install};
+pub use apply::{installed_exe_path, spawn_overlay_install, NSIS_OVERLAY_ARGS};
+pub use artifact::InstallerKind;
 pub use check::{assert_http_url, check_update};
 pub use contract::UpdateCheckProvider;
 pub use credentials::{describe_channel, load_github_source};

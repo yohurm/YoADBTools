@@ -104,7 +104,7 @@ pub fn ipc_update(e: UpdateError) -> IpcError {
         | UpdateError::Network(_)
         | UpdateError::Parse(_)
         | UpdateError::Io(_)
-        | UpdateError::NotWindows => IpcErrorCode::Internal,
+        | UpdateError::UnsupportedOs => IpcErrorCode::Internal,
     };
     IpcError {
         code,

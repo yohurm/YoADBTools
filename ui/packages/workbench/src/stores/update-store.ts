@@ -20,7 +20,7 @@ export type UpdateApplyPhase = "idle" | "downloading" | "ready" | "applying";
 
 function isInstallerUrl(url: string): boolean {
   const path = url.trim().split(/[?#]/, 1)[0] ?? "";
-  return /\.exe$/i.test(path);
+  return /\.(exe|dmg)$/i.test(path);
 }
 
 export function createUpdateStore() {
