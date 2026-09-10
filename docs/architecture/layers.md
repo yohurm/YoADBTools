@@ -49,7 +49,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 
 - **process**：`ProcessRunner`（`run_capture` / `run_streaming` / `spawn_child`）/ `kill_tree` / `ChildHandle` / `ProcessOutput` / `ProcessError`。不返回 `ExecOutcome` 或 `AdbError`。掉线文案判定留在 adb。`run_streaming` 即计划稿的流式入口（曾写 `spawn_streaming`）。
 - **persist**：`atomic_write` + `backup_corrupt`（`.tmp` rename；`.corrupt-<ts>`）。不解析 settings/library schema。
-- **os_paths**：`app_data_root(product_dir_name)` + `open_path`。产品子目录仍由壳拼。
+- **os_paths**：`app_data_root` / `app_install_root` + `open_path`。产品子目录仍由壳拼。
 
 不抽：Capture/Mirror 槽位状态机、`RingBuffer<LogLine>`、`RemotePath`、Fs trait、统一 `YohuError`。动效不进 runtime：否则每个 adb 消费者都会链上 DirectComposition。
 

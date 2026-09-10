@@ -10,7 +10,8 @@
 | 产品 / NSIS `productName` / 主程序 | `YohuAdbTools` |
 | 窗口标题 / 状态栏 / 关于 | `Yohu ADB Tools` |
 | 包标识 | `com.yohu.adbtools` |
-| 数据目录 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`；Linux `$XDG_DATA_HOME` 或 `~/.local/share`（`yohu-runtime::os_paths`，产品不交付） |
+| 产品家园 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`（`yohu-runtime::app_data_root`） |
+| 安装根 | Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；macOS `/Applications/YohuAdbTools.app`（`yohu-runtime::app_install_root`） |
 | Tauri 壳 crate | **`yohu-adbtools`**（`app/yohu-adbtools`；唯一引用 Tauri） |
 | 原生动效 crate | **`yohu-motion`**（`core/yohu-motion`；与 runtime / protocol 并列，零 Tauri、零产品 HWND） |
 | 前端工作台包 | **`@yohu/workbench`**（`ui/packages/workbench`） |
@@ -24,20 +25,23 @@
 
 ## 路径规划
 
+安装根与产品家园分离（ADR-v6-031）。Windows per-user 载荷在 `Programs\`，可变文件在家园。改 `data_root` 不搬家。
+
 ```text
-<os_app_data>/<DATA_DIR_NAME>/     # local_root（不随 data_root 迁移）
-├── settings/settings.json
-├── settings/devices-catalog.json  # 上次成功 `devices -l`（启动先画卡片，扫描再对账）
-├── settings/update.json           # 更新通道密钥/仓库覆盖（ADR-v6-022）
-├── logs/                          # app-*.log + panic-*.log
-└── data/                          # DataRoot（可配，重启生效）
-    ├── tools/adb/
+<os_app_data>/Programs/<DATA_DIR_NAME>/   # 安装根（Windows）；macOS = /Applications/<name>.app
+<os_app_data>/<DATA_DIR_NAME>/            # 产品家园（不随 data_root 迁移）
+├── config/settings.json
+├── config/devices-catalog.json           # 上次成功 `devices -l`
+├── config/update.json                    # 更新通道覆盖（ADR-v6-022）
+├── logs/                                 # app-*.log + panic-*.log
+├── cache/webview/                        # WebView2 用户数据
+├── cache/update/                         # NSIS / DMG 下载缓存
+├── cache/drag-out/                       # 拖出临时区（启动/退出整清）
+└── data/                                 # DataRoot（可配，重启生效）
+    ├── tools/adb/                        # 解压 sidecar + .sidecar-stamp
     └── modules/
         ├── adb-terminal/config/library.json
-        ├── log-analyzer/exports/
-        └── file-manager/drag-out/
-
-%TEMP%/<DATA_DIR_NAME>-update/     # NSIS 安装包下载缓存（覆盖安装不进 INSTDIR）
+        └── log-analyzer/exports/         # 懒创建
 ```
 
-产品子路径由壳 `AppPaths` 用 `dir::*` 拼装；OS 根只经 `yohu_runtime::app_data_root`。
+产品子路径由壳 `AppPaths` 用 `dir::*` 拼装；OS 根只经 `app_data_root` / `app_install_root`。

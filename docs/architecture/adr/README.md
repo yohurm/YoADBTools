@@ -17,7 +17,7 @@
 | 011 | 组件库 | YoUI / `@yohu/ui` token 单源 |
 | 012 | 模块 | 静态组合；`apps/shell` 组合点 |
 | 013 | 安全根 | check / check_descendant |
-| 014 | 部署 | NSIS per-user + WebView2 bootstrapper |
+| 014 | 部署 | NSIS per-user + WebView2 bootstrapper；安装根见 [031](ADR-v6-031.md) |
 | 015 | 投屏 | scrcpy-server 4.1 + 自写客户端 + 壳内呈现 |
 | 016 | 采集控制面 | 槽位 + generation；仅 Live adopt |
 | 017 | 动效 | 见 `动画系统-v6.md` |
@@ -34,3 +34,4 @@
 | [028](ADR-v6-028.md) | 投屏多平台后端 | 编译期 OS 原生硬解；Linux 预留；禁止 FFmpeg |
 | [029](ADR-v6-029.md) | 多平台产品 | Windows + macOS 工作台；sidecar/打包/标题栏按 OS |
 | [030](ADR-v6-030.md) | macOS 像素 | VideoToolbox + NSView 出画；Finder 拖出；Linux 仍预留 |
+| [031](ADR-v6-031.md) | 路径家园 | 安装根 ≠ 产品家园；config / data / cache / logs |

@@ -21,7 +21,7 @@
 3. **文件管理** — `ls` 浏览、push/pull（`transfer/progress` 事件 200ms 节流 + 可取消）、删除/新建目录；**core 侧 SafetyRoot 强制校验**（`/sdcard`、`/storage` 子路径，拒绝 `..`，不信任 UI，ADR-v6-013）
 4. **日志分析** — core **每设备一路** logcat（`adb logcat -v threadtime,uid`）+ 设备级共享环形缓冲（`buffer_capacity` 默认 10000，与 UI 镜像/可见区同一上限）；**窗口/过滤在 UI 消费端**（ADR-v6-006）：多窗口 Tab（默认 System，Scope=all；可按包名/PID 再开）；每窗口绑定 serial + capturing/fromSeq；启停只打当前窗口，设备流按窗口引用计数 0↔1 / 1↔0；切焦点不停其他设备；进程索引（`ps` 2.5s 周期）+ 包名 PID 自动重绑（历史 PID 集上限 8）；窗口第一次点开始先 `processSnapshot` 再 `fromSeq=0` 按过滤从当前环补齐；AS 风格过滤栏（级别含以上/包名含子进程开关/精确 PID/Tag/关键字，无正则）；每窗口独立暂停（Space）与滚动挂起（离开底部只计数不跟滚）；清设备缓冲 = `logcat -c` + 清共享缓冲；导出 txt 走 core（`log.export`，当前窗口过滤后的环快照）；快捷键 Space/Ctrl+L/Ctrl+F/Ctrl+T/Ctrl+W/Ctrl+Tab；掉线只停该 serial 的采集，已画出的行保留
 5. **投屏显示** — 官方 `scrcpy-server` 4.1 sidecar + `yohu-mirror` 自写客户端（USB reverse 优先，`tcp:` 默认 forward）；投屏协议 usb/wifi；帧在壳内 **系统硬解** 呈现（Windows = Media Foundation → D3D11 YUV HWND；macOS = VideoToolbox → NSView，ADR-v6-024/028/030；禁止 FFmpeg）；**舞台像素由嵌入表面独占**（空态/加载/暂停也在同一表面，ADR-v6-026）；**UI 只报 avail**（Windows：HWND 铺满 avail，占用卡片 DComp clip contain；macOS：NSView 铺满 avail，占用卡片圆角层 contain；fill↔contain 禁止 CSS / 运行时 `containInZone`）；默认可操作，页眉可切仅显示；设备深浅色读统一状态 Hub，不是工作台 theme；每设备一路 + generation
-6. **设置面板** — `adb_path`（立即）/`data_root`（重启）/`devices_auto_refresh`（重启）/`buffer_capacity`（窗口立即、采集环下次启动）/`clear_device_on_start`（下次采集）/`theme`（立即，默认 system）/`density`（立即，默认 comfortable＝鸿蒙 PC）/`terminal_prepend_adb`（立即，默认关）/`mirror_force_forward`（下次启动；协议/长边/码率/帧率只在投屏页）；设置根固定 OS 应用数据目录下 `YohuAdbTools/settings/`（Windows `%LOCALAPPDATA%`，macOS `~/Library/Application Support`）；关于页身份与路径来自 `system.info`；检查更新后 Windows 可应用内下载 NSIS 并 `/S` 覆盖安装，macOS 打开 DMG（`update.download` / `update.install`）
+6. **设置面板** — `adb_path`（立即）/`data_root`（重启）/`devices_auto_refresh`（重启）/`buffer_capacity`（窗口立即、采集环下次启动）/`clear_device_on_start`（下次采集）/`theme`（立即，默认 system）/`density`（立即，默认 comfortable＝鸿蒙 PC）/`terminal_prepend_adb`（立即，默认关）/`mirror_force_forward`（下次启动；协议/长边/码率/帧率只在投屏页）；设置根固定产品家园 `YohuAdbTools/config/`（Windows `%LOCALAPPDATA%`，macOS `~/Library/Application Support`）；安装根 Windows `%LOCALAPPDATA%\Programs\YohuAdbTools`；关于页身份与路径来自 `system.info`；检查更新后 Windows 可应用内下载 NSIS 并 `/S` 覆盖安装，macOS 打开 DMG（`update.download` / `update.install`）
 
 ## 架构约定（v6，ADR 全量见 `docs/architecture/adr/`）
 - **依赖方向**：`UI → @yohu/api → IPC ← commands ← core crates`；`yohu-runtime ∥ yohu-protocol ∥ yohu-motion`；`yohu-adb → runtime+protocol+domain`；设备 capability → adb；`yohu-update` 禁止 adb。`apps/shell` 是唯一组合点（`registerModule`）；模块只依赖 `@yohu/api` + `@yohu/ui`。禁止 core 引用 Tauri、UI 模块互 import / 依赖 `@yohu/workbench`（`scripts/check-ui-deps.mjs`）、跨层绕过 IPC
@@ -35,7 +35,7 @@
 - **编辑即快照**：命令管理深拷贝编辑、保存全量提交（原子写：临时文件 + rename，损坏备份 `.corrupt-<ts>`）
 - **后台任务**：长任务（采集/传输/命令组/投屏）登记任务中心，状态栏展示；退出序列 = 根 CancellationToken cancel → 任务收敛（超时 3s 强杀 adb 进程树）→ 设置 flush
 - **新增模块**：实现 `ModuleDescriptor`（见 `docs/architecture/workbench.md`）→ 在 `apps/shell` 静态 `registerModule`
-- **数据与路径**：全部在 `%LOCALAPPDATA%\YohuAdbTools\`（无管理员权限）；命令库 `data/modules/adb-terminal/config/library.json`（schemaVersion 2；损坏或 schema 不匹配则备份后写默认库）
+- **数据与路径（ADR-v6-031）**：安装根 Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；产品家园 `%LOCALAPPDATA%\YohuAdbTools\`（`config/` `data/` `cache/` `logs/`，无管理员权限）。命令库 `data/modules/adb-terminal/config/library.json`（schemaVersion 2；损坏或 schema 不匹配则备份后写默认库）
 
 ## 目录结构（v6 目标，见架构文档 §4.1）
 ```

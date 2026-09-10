@@ -21,7 +21,7 @@
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
 | `mirror.start/stop/inject/closeControl/layout/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**（舞台透明洞，不是 contain 目标、不是视觉插值盒）。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。禁止 `video_width` / `stroke_px`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。可见则 HWND 独占占用矩形的像素；`visible=false` 才拆表面。Live 状态只信 `mirror/state`，无 `mirror.status` |
 | `settings.set` | 更新单键；推 `settings/changed` 全量快照。读走 `system.info` / 事件注入 |
-| `system.info` / `openPath` / `reportError` / `log` | 关于 / 打开路径 / 上报 |
+| `system.info` / `openPath` / `reportError` / `log` | 关于 / 打开路径 / 上报。`paths` 含 `install_dir` / `config_dir` / `cache_dir` / `webview_dir` / `update_cache_dir`（ADR-v6-031；无 `settings_dir`） |
 | `boot.showMain` | 工作台已 hydrate：Windows 上同屏铺满后再揭主窗内容 / 异屏出场后再揭；其它平台直接揭窗。幂等。 |
 | `update.check` / `info` / `download` / `install` / `cancel` / `open` | ADR-v6-022 |
 

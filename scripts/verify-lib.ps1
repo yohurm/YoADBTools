@@ -5,7 +5,7 @@
 # 契约来源（改动时同步更新，避免失真）：
 #   - 数据目录名  ：core/yohu-protocol/src/identity.rs 的 `PRODUCT_NAME` / `DATA_DIR_NAME`（= "YohuAdbTools"）
 #   - settings 键 ：core/yohu-protocol/src/settings.rs 的 `AppSettings` 字段与 `SettingKey::as_str()`
-#   - settings 根 ：`%LOCALAPPDATA%\<DATA_DIR_NAME>\settings\`（app/yohu-adbtools/src/paths.rs；不随 data_root 迁移）
+#   - config 根 ：`%LOCALAPPDATA%\<DATA_DIR_NAME>\config\`（app/yohu-adbtools/src/paths.rs；不随 data_root 迁移）
 
 # 产品数据目录名（= PRODUCT_NAME = DATA_DIR_NAME）。身份/目录变更时只改这里。
 $ProductDataDir = "YohuAdbTools"
@@ -15,13 +15,13 @@ $FakeDeviceDataDir = "YohuFakeDevice"
 
 # 统一写法：`Join-Path $env:LOCALAPPDATA $ProductDataDir` 得到产品数据根目录。
 # 各脚本以它为基础再拼子路径，例如：
-#   设置目录   -> Join-Path (Join-Path $env:LOCALAPPDATA $ProductDataDir) "settings"
+#   配置目录   -> Join-Path (Join-Path $env:LOCALAPPDATA $ProductDataDir) "config"
 #   日志目录   -> Join-Path (Join-Path $env:LOCALAPPDATA $ProductDataDir) "logs"
 
 function Write-AppSettings {
     <#
     .SYNOPSIS
-        单一来源生成 %LOCALAPPDATA%\<ProductDataDir>\settings\settings.json。
+        单一来源生成 %LOCALAPPDATA%\<ProductDataDir>\config\settings.json。
     .DESCRIPTION
         契约：core/yohu-protocol/src/settings.rs 的 AppSettings（字段名与 SettingKey::as_str 一致）。
         这里只写验证脚本关心的键；其余字段（export_*、log_display_columns、mirror_* 等）由 AppSettings 的字段级 serde(default) 回落，
@@ -39,7 +39,7 @@ function Write-AppSettings {
         [string]$Density = "compact"
     )
 
-    $settingsDir = Join-Path (Join-Path $env:LOCALAPPDATA $ProductDataDir) "settings"
+    $settingsDir = Join-Path (Join-Path $env:LOCALAPPDATA $ProductDataDir) "config"
     New-Item -ItemType Directory -Force $settingsDir | Out-Null
 
     $options = @{

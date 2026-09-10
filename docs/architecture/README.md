@@ -9,7 +9,7 @@
 
 | 文档 | 内容 |
 |------|------|
-| [identity.md](identity.md) | 产品名 / crate / 前端包 / 路径目录单源 |
+| [identity.md](identity.md) | 产品名 / crate / 前端包 / 路径目录单源（[ADR-v6-031](adr/ADR-v6-031.md)） |
 | [layers.md](layers.md) | runtime ∥ protocol ∥ motion → domain → adb → capability → 壳 |
 | [ipc.md](ipc.md) | invoke 命令、事件、背压 |
 | [youi.md](youi.md) | `@yohu/ui`（对外名 YoUI） |
