@@ -7,6 +7,7 @@ import { For, Show } from "solid-js";
 
 import {
   Icon,
+  Layout,
   YoColCell,
   YoColFrame,
   YoColHeader,
@@ -16,6 +17,7 @@ import {
   YoFileIcon,
   YoLoading,
   YoVirtualList,
+  YoTooltip,
   pointerSelectMode,
 } from "@yohu/ui";
 import type { RemoteEntry } from "@yohu/api";
@@ -47,21 +49,22 @@ function ColHead(props: { col: FileColumnSpec }) {
       minWidth={props.col.minWidth}
       onWidthChange={(width) => fileStore.setColWidth(props.col.key, width)}
     >
+      <YoTooltip content={props.col.sortTitle}>
       <button
         type="button"
         class="yohu-files__sort yohu-interactive yohu-focus-ring--inset"
         onClick={() => fileStore.setSort(props.col.key)}
-        title={props.col.sortTitle}
       >
         <span class="yohu-col-header__label">
           <span class="yohu-files__sort-label">{props.col.header}</span>
           <Show when={ariaSort() !== "none"}>
             <span class="yohu-files__sort-icon" aria-hidden="true">
-              <Icon name={ariaSort() === "ascending" ? "chevron-up" : "chevron-down"} size={12} />
+              <Icon name={ariaSort() === "ascending" ? "chevron-up" : "chevron-down"} size={Layout.IconTiny} />
             </span>
           </Show>
         </span>
       </button>
+      </YoTooltip>
     </YoColHeader>
   );
 }
@@ -75,28 +78,28 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
       return (
         <YoColCell class="yohu-files__name">
           <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={16} />
-          <span class="yohu-files__name-text" title={props.entry.name}>
-            {props.entry.name}
-          </span>
+          <YoTooltip content={props.entry.name}>
+            <span class="yohu-files__name-text">{props.entry.name}</span>
+          </YoTooltip>
         </YoColCell>
       );
     case "type":
       return (
-        <YoColCell class="yohu-files__cell" title={type()}>
-          {type()}
-        </YoColCell>
+        <YoTooltip content={type()}>
+          <YoColCell class="yohu-files__cell">{type()}</YoColCell>
+        </YoTooltip>
       );
     case "size":
       return (
-        <YoColCell class="yohu-files__num" title={size()}>
-          {size()}
-        </YoColCell>
+        <YoTooltip content={size()} disabled={!size()}>
+          <YoColCell class="yohu-files__num">{size()}</YoColCell>
+        </YoTooltip>
       );
     case "mtime":
       return (
-        <YoColCell class="yohu-files__mtime" title={props.entry.mtime ?? ""}>
-          {mtime()}
-        </YoColCell>
+        <YoTooltip content={props.entry.mtime ?? ""} disabled={!props.entry.mtime}>
+          <YoColCell class="yohu-files__mtime">{mtime()}</YoColCell>
+        </YoTooltip>
       );
   }
 }
@@ -133,6 +136,7 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
           <YoVirtualList<RemoteEntry>
             items={entries}
             itemHeight={FILE_ROW_HEIGHT}
+            tone="list"
             getItemKey={(entry) => entry.name}
             ariaLabel="文件列表"
             selectedKeys={fileStore.selectedSet}

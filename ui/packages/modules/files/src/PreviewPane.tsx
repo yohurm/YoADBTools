@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 
-import { YoFileIcon, YoIconButton, YoPanel } from "@yohu/ui";
+import { YoFileIcon, YoIconButton, YoPanel, YoTooltip } from "@yohu/ui";
 
 import { fileTypeLabel, formatSize } from "./model";
 import { fileStore } from "./store";
@@ -24,9 +24,9 @@ export function PreviewPane() {
         {(entry) => (
           <div class="yohu-files__preview-body">
             <YoFileIcon name={entry().name} kind={entry().kind} size={48} />
-            <div class="yohu-files__preview-name" title={entry().name}>
-              {entry().name}
-            </div>
+            <YoTooltip content={entry().name} block>
+              <div class="yohu-files__preview-name">{entry().name}</div>
+            </YoTooltip>
             <dl class="yohu-files__preview-meta">
               <dt>类型</dt>
               <dd>{fileTypeLabel(entry())}</dd>

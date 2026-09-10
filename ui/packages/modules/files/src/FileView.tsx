@@ -232,7 +232,7 @@ export function FileView(props: DeviceSession) {
     <YoPage class="yohu-files" ref={(el) => { pageEl = el; }}>
         <YoChrome title={ModuleTitle.Files} deviceLabel={props.selectedLabel ?? undefined} dropIgnore>
           <YoButton onClick={() => void onUpload()}>上传</YoButton>
-          <YoButton variant="secondary" disabled={fileStore.singleFile() === undefined} onClick={() => void onDownload()}>
+          <YoButton variant="outlined" tone="neutral" disabled={fileStore.singleFile() === undefined} onClick={() => void onDownload()}>
             下载
           </YoButton>
           <YoIconButton
@@ -242,7 +242,7 @@ export function FileView(props: DeviceSession) {
             onClick={() => void fileStore.refresh()}
           />
           <YoButton
-            variant="ghost"
+            variant="ghost" tone="neutral"
             aria-expanded={fileStore.ui.previewOpen}
             onClick={() => fileStore.togglePreview()}
           >
@@ -286,10 +286,10 @@ export function FileView(props: DeviceSession) {
           onClose={() => setDeleteNames([])}
           footer={
             <>
-              <YoButton variant="ghost" onClick={() => setDeleteNames([])}>
+              <YoButton variant="ghost" tone="neutral" onClick={() => setDeleteNames([])}>
                 取消
               </YoButton>
-              <YoButton variant="danger" onClick={confirmDelete}>
+              <YoButton tone="danger" onClick={confirmDelete}>
                 删除
               </YoButton>
             </>
@@ -306,7 +306,7 @@ export function FileView(props: DeviceSession) {
           onClose={() => setCreateKind(null)}
           footer={
             <>
-              <YoButton variant="ghost" onClick={() => setCreateKind(null)}>
+              <YoButton variant="ghost" tone="neutral" onClick={() => setCreateKind(null)}>
                 取消
               </YoButton>
               <YoButton onClick={confirmCreate} disabled={fileStore.session.mutating}>

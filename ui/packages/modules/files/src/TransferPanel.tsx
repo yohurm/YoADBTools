@@ -14,6 +14,7 @@ import {
   YoPanel,
   YoPresence,
   YoProgressBar,
+  YoTooltip,
 } from "@yohu/ui";
 
 import { formatSize } from "./model";
@@ -28,9 +29,9 @@ function collapsedSummary(): string {
   return running?.name ?? fileStore.transfers[0]?.name ?? "";
 }
 
-function transferTone(transfer: UiTransfer): "success" | "error" | "accent" | "neutral" {
+function transferTone(transfer: UiTransfer): "success" | "danger" | "accent" | "neutral" {
   if (transfer.state === "done") return "success";
-  if (transfer.state === "failed") return "error";
+  if (transfer.state === "failed") return "danger";
   if (transfer.state === "running") return "accent";
   return "neutral";
 }
@@ -52,12 +53,12 @@ export function TransferPanel() {
         class="yohu-files__transfers"
         padding="none"
         header={
+          <YoTooltip content={listOpen() ? "收起传输" : "展开传输"} block>
           <button
             type="button"
             class="yohu-files__transfer-bar yohu-interactive yohu-focus-ring"
             aria-expanded={listOpen()}
             aria-controls="yohu-files-transfer-list"
-            title={listOpen() ? "收起传输" : "展开传输"}
             onClick={() => fileStore.toggleTransfers()}
           >
             <span
@@ -74,11 +75,12 @@ export function TransferPanel() {
               tone={runningCount() > 0 ? "accent" : "neutral"}
             />
             <Show when={!listOpen() && collapsedSummary()}>
-              <span class="yohu-files__transfer-summary" title={collapsedSummary()}>
-                {collapsedSummary()}
-              </span>
+              <YoTooltip content={collapsedSummary()}>
+                <span class="yohu-files__transfer-summary">{collapsedSummary()}</span>
+              </YoTooltip>
             </Show>
           </button>
+          </YoTooltip>
         }
       >
         <YoCollapse open={listOpen()} recipe="panel">
@@ -92,14 +94,16 @@ export function TransferPanel() {
                     "yohu-files__transfer--failed": transfer.state === "failed",
                   }}
                 >
-                  <span class="yohu-files__transfer-dir" title={transfer.direction === "push" ? "上传" : "下载"}>
-                    <Icon name={transfer.direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
-                  </span>
+                  <YoTooltip content={transfer.direction === "push" ? "上传" : "下载"}>
+                    <span class="yohu-files__transfer-dir">
+                      <Icon name={transfer.direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
+                    </span>
+                  </YoTooltip>
                   <div class="yohu-files__transfer-body">
                     <div class="yohu-files__transfer-head">
-                      <span class="yohu-files__transfer-name" title={transfer.name}>
-                        {transfer.name}
-                      </span>
+                      <YoTooltip content={transfer.name}>
+                        <span class="yohu-files__transfer-name">{transfer.name}</span>
+                      </YoTooltip>
                       <YoBadge text={transferLabel(transfer)} tone={transferTone(transfer)} />
                       <Show when={transfer.state === "running"}>
                         <YoIconButton

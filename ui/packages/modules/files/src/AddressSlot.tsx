@@ -7,7 +7,7 @@
 
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
-import { YoIconButton, motionSpecMs } from "@yohu/ui";
+import { YoIconButton, YoTooltip, motionSpecMs } from "@yohu/ui";
 
 import { parentWithinSafety, splitPath } from "./model";
 import { resolveRemotePath } from "./path-resolve";
@@ -136,13 +136,15 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
           <For each={splitPath(fileStore.session.path)}>
             {(segment, index) => <Crumb segment={segment} index={index()} />}
           </For>
-          <button
-            type="button"
-            class="yohu-files__slot-hit"
-            aria-label="输入路径"
-            onPointerDown={(event) => event.preventDefault()}
-            onClick={startEdit}
-          />
+          <YoTooltip content="输入路径" block>
+            <button
+              type="button"
+              class="yohu-files__slot-hit"
+              aria-label="输入路径"
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={startEdit}
+            />
+          </YoTooltip>
         </nav>
         <Show when={held()}>
           <div
@@ -201,15 +203,16 @@ function Crumb(props: { segment: string; index: number }) {
           ▸
         </span>
       </Show>
-      <button
-        type="button"
-        class="yohu-files__crumb yohu-interactive yohu-focus-ring"
-        classList={{ "yohu-files__crumb--current": props.index === segments().length - 1 }}
-        title={target()}
-        onClick={() => void fileStore.goTo(target())}
-      >
-        {props.segment}
-      </button>
+      <YoTooltip content={target()}>
+        <button
+          type="button"
+          class="yohu-files__crumb yohu-interactive yohu-focus-ring"
+          classList={{ "yohu-files__crumb--current": props.index === segments().length - 1 }}
+          onClick={() => void fileStore.goTo(target())}
+        >
+          {props.segment}
+        </button>
+      </YoTooltip>
     </>
   );
 }
