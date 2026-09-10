@@ -1,30 +1,19 @@
 /**
- * YoSegmentedButton —— 单选分段按钮。
- * HarmonyOS 对照：SegmentButtonV2；tab 白选择块 / capsule 强调块。
- * 受控 API：items / value / onChange / type / size。
+ * YoSegmentedButton —— 单选分段按钮（L4 视图）。
+ * 类型 / 涂装 / 提交由 segmented-model + segmented-policy 决定；本文件只绑属性与内容区。
+ * 选择块走 YoIndicator（配方 thumb），禁止自写第二套滑动。
  *
- * 架构：
- * - 选中/键盘算法在 segmented-model.ts
- * - 选择块走 YoIndicator（配方 indicator），几何按 item 实测盒
- * - 类型 tab / capsule 只换色板，不换交互
- *
- * 默认 tab：白选择块 + 32vp 圆角 + OUTER_DEFAULT_XS 阴影 + 主色字。
- * 页签栏（多会话关闭/新建）仍走 YoTabs；本组件不作一级导航，不承载删除/添加。
- *
- * 键盘：radiogroup + ←/→/↑/↓ 循环；Home/End 首尾；焦点跟随选中。
+ * 默认 tab：白选择块。capsule 才强调色块。
+ * 页签栏仍走 YoTabs；本组件不作一级导航，不承载删除/添加。
  */
-import { For } from "solid-js";
+import { For, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 
 import { Icon, type IconName } from "../icons";
-import { Layout } from "../tokens/layout";
 import { YoIndicator } from "../motion/indicator";
-import {
-  isHybridItems,
-  resolveKeyIndex,
-  type YoSegmentedButtonSize,
-  type YoSegmentedType,
-} from "./segmented-model";
+import type { YoSegmentedButtonSize, YoSegmentedType } from "./segmented-model";
+import { resolveKeyIndex } from "./segmented-model";
+import { resolveSegmentedCommit, segmentedHostAttrs, segmentedItemAttrs } from "./segmented-policy";
 import "./SegmentedButton.css";
 
 export type { YoSegmentedButtonSize, YoSegmentedType };
@@ -54,7 +43,7 @@ export interface YoSegmentedButtonProps {
    * capsule：强调色选择块（V2 Capsule 默认）。
    */
   type?: YoSegmentedType;
-  /** 字号：sm=caption / md=body（14fp，鸿蒙默认）。高度由密度与是否图文决定。 */
+  /** 字号：sm=caption / md=body。高度由密度与是否图文决定。 */
   size?: YoSegmentedButtonSize;
   /** 整组禁用 */
   disabled?: boolean;
@@ -62,32 +51,31 @@ export interface YoSegmentedButtonProps {
   ariaLabel?: string;
 }
 
-/**
- * 渲染单选分段按钮。
- */
+/** 渲染单选分段按钮。内容区 = 图标 + 标签，选择块在铬层。 */
 export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
   const itemRefs: Array<HTMLButtonElement | undefined> = [];
-
-  const kind = (): YoSegmentedType => props.type ?? "tab";
-  const size = (): YoSegmentedButtonSize => props.size ?? "md";
-  const hybrid = (): boolean => isHybridItems(props.items);
-  const iconPx = (): number => (hybrid() || size() === "md" ? Layout.IconMd : Layout.IconSm);
+  const host = createMemo(() =>
+    segmentedHostAttrs({
+      type: props.type,
+      size: props.size,
+      disabled: props.disabled,
+      items: props.items,
+    }),
+  );
 
   const commitIndex = (index: number, focus: boolean): void => {
-    if (props.disabled) return;
-    const item = props.items[index];
-    if (!item || item.disabled) return;
-    props.onItemClick?.(index);
-    if (item.value !== props.value) {
-      props.onChange?.(item.value);
+    const next = resolveSegmentedCommit(props.items, props.value, index, props.disabled);
+    if (!next) return;
+    props.onItemClick?.(next.index);
+    if (next.changed) {
+      props.onChange?.(next.value);
     }
     if (focus) {
-      queueMicrotask(() => itemRefs[index]?.focus());
+      queueMicrotask(() => itemRefs[next.index]?.focus());
     }
   };
 
   const onGroupKeyDown = (event: KeyboardEvent): void => {
-    if (props.disabled) return;
     const next = resolveKeyIndex(props.items, props.value, event.key);
     if (next === undefined) return;
     event.preventDefault();
@@ -97,22 +85,20 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
   return (
     <div
       class="yohu-segmented"
-      classList={{
-        [`yohu-segmented--${kind()}`]: true,
-        [`yohu-segmented--${size()}`]: true,
-        "yohu-segmented--hybrid": hybrid(),
-        "yohu-segmented--disabled": !!props.disabled,
-      }}
+      data-type={host()["data-type"]}
+      data-size={host()["data-size"]}
+      data-paint={host()["data-paint"]}
+      data-hybrid={host()["data-hybrid"]}
+      data-icon-size={host()["data-icon-size"]}
       role="radiogroup"
       aria-label={props.ariaLabel}
-      aria-disabled={props.disabled || undefined}
+      aria-disabled={host()["aria-disabled"]}
       onKeyDown={onGroupKeyDown}
     >
-      <YoIndicator follow={props.value} variant="thumb" selector=".yohu-segmented__item--selected" />
+      <YoIndicator follow={props.value} variant="thumb" selector=".yohu-segmented__item[data-selected]" />
       <For each={props.items}>
         {(item, index) => {
-          const selected = () => item.value === props.value;
-          const itemDisabled = () => !!props.disabled || !!item.disabled;
+          const attrs = () => segmentedItemAttrs(item, props.value, props.disabled);
           return (
             <button
               ref={(el) => {
@@ -120,15 +106,15 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
               }}
               type="button"
               class="yohu-segmented__item yohu-focus-ring--inset"
-              classList={{ "yohu-segmented__item--selected": selected() }}
+              data-selected={attrs().selected ? "" : undefined}
               role="radio"
-              aria-checked={selected()}
+              aria-checked={attrs()["aria-checked"]}
               aria-label={item.label}
-              disabled={itemDisabled()}
-              tabIndex={selected() ? 0 : -1}
+              disabled={attrs().disabled}
+              tabIndex={attrs().tabIndex}
               onClick={() => commitIndex(index(), false)}
             >
-              {item.icon ? <Icon name={item.icon} size={iconPx()} /> : null}
+              {item.icon ? <Icon name={item.icon} /> : null}
               {item.label ? <span class="yohu-segmented__label">{item.label}</span> : null}
             </button>
           );

@@ -1,11 +1,19 @@
 /**
- * YoContextMenu —— 右键菜单呈现（L0）。
- * HarmonyOS 对照：Menu；电脑默认最小宽 224vp；Esc / 点击外侧关闭。
- * 页面不要直接挂本组件：走 defineContextMenu + openContextMenu + 壳上的 YoContextMenuHost。
+ * YoContextMenu —— 右键菜单 List 呈现（L4）。
+ * HarmonyOS 对照：Menu；电脑默认最小宽 224vp。
+ * Host 管开合与落点；本组件管槽位与键盘。页面不要直接挂：走 defineContextMenu + openContextMenu。
  */
-import { createEffect, For, onCleanup, onMount } from "solid-js";
+import { For, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import type { JSX } from "solid-js";
 import type { YoMenuItem } from "../context-menu/types";
+import { typeaheadMatchIndex } from "../context-menu/menu-list-model";
+import {
+  MENU_TYPEAHEAD_WINDOW_MS,
+  firstEnabledIndex,
+  menuItemHostAttrs,
+  menuKeyIntent,
+  nextTypeaheadQuery,
+} from "../context-menu/menu-key-policy";
 import { YoPresence } from "../motion/presence";
 import "./ContextMenu.css";
 
@@ -24,27 +32,88 @@ export interface YoContextMenuProps {
 
 export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
   let root: HTMLDivElement | undefined;
+  const [focusIndex, setFocusIndex] = createSignal(0);
+  let typeaheadQuery = "";
+  let typeaheadAt = 0;
+  let typeaheadTimer: number | undefined;
 
-  const onDoc = (event: MouseEvent): void => {
+  const clearTypeahead = (): void => {
+    typeaheadQuery = "";
+    if (typeaheadTimer !== undefined) {
+      window.clearTimeout(typeaheadTimer);
+      typeaheadTimer = undefined;
+    }
+  };
+
+  const focusItem = (index: number): void => {
+    const el = root?.querySelectorAll<HTMLElement>('[role="menuitem"]')[index];
+    el?.focus();
+  };
+
+  const selectIndex = (index: number): void => {
+    const item = props.items[index];
+    if (!item || item.disabled) return;
+    props.onSelect(item.id);
+    props.onClose();
+  };
+
+  const onDocMouse = (event: MouseEvent): void => {
     if (!root) return;
     if (!root.contains(event.target as Node)) props.onClose();
   };
 
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key === "Escape") props.onClose();
+  const onDocKey = (event: KeyboardEvent): void => {
+    const intent = menuKeyIntent(event.key, {
+      focusIndex: focusIndex(),
+      items: props.items,
+      altKey: event.altKey,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+    });
+    if (!intent) return;
+    event.preventDefault();
+    if (intent.type === "close") {
+      clearTypeahead();
+      props.onClose();
+      return;
+    }
+    if (intent.type === "move") {
+      setFocusIndex(intent.index);
+      focusItem(intent.index);
+      return;
+    }
+    if (intent.type === "select") {
+      selectIndex(focusIndex());
+      return;
+    }
+    const now = Date.now();
+    typeaheadQuery = nextTypeaheadQuery(typeaheadQuery, intent.char, now - typeaheadAt);
+    typeaheadAt = now;
+    if (typeaheadTimer !== undefined) window.clearTimeout(typeaheadTimer);
+    typeaheadTimer = window.setTimeout(clearTypeahead, MENU_TYPEAHEAD_WINDOW_MS);
+    const matched = typeaheadMatchIndex(props.items, typeaheadQuery, focusIndex());
+    if (matched === null) return;
+    setFocusIndex(matched);
+    focusItem(matched);
   };
 
-  onMount(() => {
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
+  createEffect(() => {
+    if (!props.open) {
+      clearTypeahead();
+      return;
+    }
+    const first = untrack(() => firstEnabledIndex(props.items));
+    setFocusIndex(first);
+    document.addEventListener("mousedown", onDocMouse);
+    document.addEventListener("keydown", onDocKey);
+    queueMicrotask(() => focusItem(first));
     onCleanup(() => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDocMouse);
+      document.removeEventListener("keydown", onDocKey);
+      clearTypeahead();
     });
   });
 
-  // 打开后等一帧测量真实尺寸上报：估算宽（Layout.MenuMin）对更宽条目偏小，
-  // 实测后由控制器按 clampToRect 二次夹紧，避免贴右/下边溢出。
   createEffect(() => {
     if (!props.open || !props.onPlace) return;
     queueMicrotask(() => {
@@ -64,22 +133,29 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
         style={{ left: `${props.x}px`, top: `${props.y}px` }}
       >
         <For each={props.items}>
-          {(item) => (
-            <button
-              type="button"
-              role="menuitem"
-              class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
-              classList={{ "yohu-context-menu__item--danger": !!item.danger }}
-              disabled={item.disabled}
-              onClick={() => {
-                if (item.disabled) return;
-                props.onSelect(item.id);
-                props.onClose();
-              }}
-            >
-              <span>{item.label}</span>
-            </button>
-          )}
+          {(item, index) => {
+            const attrs = () => menuItemHostAttrs(item, index() === focusIndex());
+            return (
+              <button
+                type="button"
+                role={attrs().role}
+                class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
+                data-tone={attrs()["data-tone"]}
+                data-slot={attrs()["data-slot"]}
+                disabled={attrs().disabled}
+                tabindex={attrs().tabindex}
+                onClick={() => {
+                  if (item.disabled) return;
+                  props.onSelect(item.id);
+                  props.onClose();
+                }}
+              >
+                <span class="yohu-context-menu__slot" data-slot="label">
+                  {item.label}
+                </span>
+              </button>
+            );
+          }}
         </For>
       </div>
     </YoPresence>

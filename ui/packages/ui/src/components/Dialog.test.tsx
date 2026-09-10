@@ -84,7 +84,7 @@ describe("YoDialog", () => {
     ));
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.style.width).toBe("");
-    expect(panel.classList.contains("yohu-dialog__panel--sized")).toBe(false);
+    expect(panel.hasAttribute("data-sized")).toBe(false);
   });
 
   it("显式宽度写入 inline 并覆盖弹出框上限", () => {
@@ -95,7 +95,8 @@ describe("YoDialog", () => {
     ));
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.style.width).toBe("960px");
-    expect(panel.classList.contains("yohu-dialog__panel--sized")).toBe(true);
+    expect(panel.hasAttribute("data-sized")).toBe(true);
+    expect(panel.classList.contains("yohu-dialog__panel--sized")).toBe(false);
   });
 
   it("open 支持 Accessor 形式（响应式开关）", () => {

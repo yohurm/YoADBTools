@@ -1,8 +1,14 @@
 .yohu-button {
+  --yohu-button-fill: var(--yohu-accent);
+  --yohu-button-fill-hover: var(--yohu-accent-hover);
+  --yohu-button-fill-pressed: var(--yohu-accent-pressed);
+  --yohu-button-ink: var(--yohu-accent);
+  --yohu-button-soft: var(--yohu-accent-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--yohu-space-xs);
+  overflow: hidden;
   border: var(--yohu-stroke-hairline) solid transparent;
   border-radius: var(--yohu-radius-sm);
   font-family: var(--yohu-font-sans);
@@ -20,76 +26,156 @@
     color var(--yohu-motion-effects-fast);
 }
 
-.yohu-button:disabled {
-  cursor: not-allowed;
-  background-color: var(--yohu-disabled);
-  border-color: transparent;
-  color: var(--yohu-fg-3);
+.yohu-button[data-tone="accent"] {
+  --yohu-button-fill: var(--yohu-accent);
+  --yohu-button-fill-hover: var(--yohu-accent-hover);
+  --yohu-button-fill-pressed: var(--yohu-accent-pressed);
+  --yohu-button-ink: var(--yohu-accent);
+  --yohu-button-soft: var(--yohu-accent-soft);
 }
 
-.yohu-button--sm {
+.yohu-button[data-tone="neutral"] {
+  --yohu-button-fill: var(--yohu-surface-2);
+  --yohu-button-fill-hover: var(--yohu-state-hover);
+  --yohu-button-fill-pressed: var(--yohu-state-pressed);
+  --yohu-button-ink: var(--yohu-fg);
+  --yohu-button-soft: var(--yohu-state-hover);
+}
+
+.yohu-button[data-tone="danger"] {
+  --yohu-button-fill: var(--yohu-error);
+  --yohu-button-fill-hover: var(--yohu-error-hover);
+  --yohu-button-fill-pressed: var(--yohu-error-pressed);
+  --yohu-button-ink: var(--yohu-error);
+  --yohu-button-soft: var(--yohu-signal-bg);
+}
+
+.yohu-button[data-tone="success"] {
+  --yohu-button-fill: var(--yohu-success);
+  --yohu-button-fill-hover: var(--yohu-success-hover);
+  --yohu-button-fill-pressed: var(--yohu-success-pressed);
+  --yohu-button-ink: var(--yohu-success);
+  --yohu-button-soft: var(--yohu-success-bg);
+}
+
+.yohu-button[data-tone="warning"] {
+  --yohu-button-fill: var(--yohu-warn);
+  --yohu-button-fill-hover: var(--yohu-warn-hover);
+  --yohu-button-fill-pressed: var(--yohu-warn-pressed);
+  --yohu-button-ink: var(--yohu-warn);
+  --yohu-button-soft: var(--yohu-warn-bg);
+}
+
+.yohu-button[data-size="sm"] {
   height: var(--yohu-control-height-sm);
   padding: 0 var(--yohu-space-sm);
   font-size: var(--yohu-font-caption);
 }
 
-.yohu-button--md {
+.yohu-button[data-size="md"] {
   height: var(--yohu-control-height);
   padding: 0 var(--yohu-space-md);
 }
 
-.yohu-button--primary {
-  background-color: var(--yohu-accent);
+.yohu-button[data-paint="solid-on"] {
+  background-color: var(--yohu-button-fill);
   color: var(--yohu-fg-on);
 }
 
-.yohu-button--primary:not(:disabled):hover {
-  background-color: var(--yohu-accent-hover);
+.yohu-button[data-paint="solid-on"]:not(:disabled):hover {
+  background-color: var(--yohu-button-fill-hover);
 }
 
-.yohu-button--primary:not(:disabled):active {
-  background-color: var(--yohu-accent-pressed);
+.yohu-button[data-paint="solid-on"]:not(:disabled):active {
+  background-color: var(--yohu-button-fill-pressed);
 }
 
-.yohu-button--secondary {
+.yohu-button[data-paint="solid-tone"] {
+  background-color: var(--yohu-button-soft);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="solid-tone"]:not(:disabled):hover {
+  border-color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="solid-tone"]:not(:disabled):active {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="solid-neutral"] {
+  background-color: var(--yohu-surface-2);
+  color: var(--yohu-fg);
+}
+
+.yohu-button[data-paint="solid-neutral"]:not(:disabled):hover {
+  background-color: var(--yohu-state-hover);
+}
+
+.yohu-button[data-paint="solid-neutral"]:not(:disabled):active {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="outlined-neutral"] {
   background-color: var(--yohu-surface);
   color: var(--yohu-fg);
   border-color: var(--yohu-border);
 }
 
-.yohu-button--secondary:not(:disabled):hover {
+.yohu-button[data-paint="outlined-neutral"]:not(:disabled):hover {
   background-color: var(--yohu-state-hover);
 }
 
-.yohu-button--secondary:not(:disabled):active {
+.yohu-button[data-paint="outlined-neutral"]:not(:disabled):active {
   background-color: var(--yohu-state-pressed);
 }
 
-.yohu-button--ghost {
+.yohu-button[data-paint="outlined-tone"] {
+  background-color: var(--yohu-surface);
+  color: var(--yohu-button-ink);
+  border-color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="outlined-tone"]:not(:disabled):hover {
+  background-color: var(--yohu-button-soft);
+}
+
+.yohu-button[data-paint="outlined-tone"]:not(:disabled):active {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="ghost-neutral"] {
   background-color: transparent;
   color: var(--yohu-fg-2);
 }
 
-.yohu-button--ghost:not(:disabled):hover {
+.yohu-button[data-paint="ghost-neutral"]:not(:disabled):hover {
   background-color: var(--yohu-state-hover);
   color: var(--yohu-fg);
 }
 
-.yohu-button--ghost:not(:disabled):active {
+.yohu-button[data-paint="ghost-neutral"]:not(:disabled):active {
   background-color: var(--yohu-state-pressed);
 }
 
-.yohu-button--danger {
-  background-color: var(--yohu-error);
-  color: var(--yohu-fg-on);
+.yohu-button[data-paint="ghost-tone"] {
+  background-color: transparent;
+  color: var(--yohu-button-ink);
 }
 
-.yohu-button--danger:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--yohu-error) 88%, var(--yohu-fg));
+.yohu-button[data-paint="ghost-tone"]:not(:disabled):hover {
+  background-color: var(--yohu-button-soft);
 }
 
-.yohu-button--danger:not(:disabled):active {
-  background-color: color-mix(in srgb, var(--yohu-error) 76%, var(--yohu-fg));
+.yohu-button[data-paint="ghost-tone"]:not(:disabled):active {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-button:disabled {
+  cursor: not-allowed;
+  background-color: var(--yohu-disabled);
+  border-color: transparent;
+  color: var(--yohu-fg-3);
 }
 
 .yohu-button__spinner {

@@ -1,9 +1,10 @@
 /**
- * 右键菜单（L1 共享能力）。
+ * 右键菜单引擎。
  * 页面只提供场景表（defineContextMenu）与 open 时的 ctx。
  * 壳挂载唯一 YoContextMenuHost；禁止模块再渲染 YoContextMenu。
  *
- * L0 呈现 → L1 条目 → L2 场景 → L3 会话 → L4 宿主
+ * L0 token → L1 Presence/interactive → L2 types + list-model
+ * → L3 controller / place / menu-key-policy → L4 Host + YoContextMenu List
  */
 
 export type {

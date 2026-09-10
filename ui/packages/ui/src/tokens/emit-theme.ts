@@ -2,9 +2,10 @@
  * theme.css 唯一生成器：全部变量从 TS token 排出。
  * 契约测试强制磁盘上的 theme.css 与本函数输出逐字节一致。
  */
-import { Colors, DarkColors, LogLevelDark, LogLevelLight } from "./colors";
+import { Colors, DarkColors, FileIconDark, FileIconLight, LogLevelDark, LogLevelLight } from "./colors";
 import { Density } from "./density";
 import { DarkElevation, Elevation } from "./elevation";
+import { ZIndex } from "./z-index";
 import { FocusRing, Layout, Stroke } from "./layout";
 import { MotionDuration, MotionEasing, MotionSpec } from "./motion";
 import { Radius, RadiusShape } from "./radius";
@@ -47,6 +48,15 @@ function levelVars(board: { v: string; d: string; i: string; w: string; e: strin
   ];
 }
 
+function fileIconVars(board: typeof FileIconLight): Array<[string, string]> {
+  return (Object.entries(board) as Array<[string, { body: string; mark: string }]>).flatMap(
+    ([glyph, swatch]) => [
+      [`--yohu-file-icon-${glyph}`, swatch.body],
+      [`--yohu-file-icon-${glyph}-mark`, swatch.mark],
+    ],
+  );
+}
+
 function densityVars(pack: Record<string, number>): Array<[string, string]> {
   return Object.entries(pack).map(([name, value]) => [`--yohu-${kebab(name)}`, `${value}px`]);
 }
@@ -70,6 +80,10 @@ export function emitThemeCss(): string {
   const layout: Array<[string, string]> = (Object.entries(Layout) as Array<[string, number]>).map(
     ([name, value]) => [`--yohu-layout-${kebab(name)}`, `${value}px`],
   );
+  const zIndex: Array<[string, string]> = Object.entries(ZIndex).map(([name, value]) => [
+    `--yohu-z-${kebab(name)}`,
+    String(value),
+  ]);
   const durs: Array<[string, string]> = Object.entries(MotionDuration).map(([name, value]) => [
     `--yohu-dur-${kebab(name)}`,
     value,
@@ -91,6 +105,7 @@ export function emitThemeCss(): string {
     ["--yohu-shadow-dialog", Elevation.Dialog],
     ["--yohu-shadow-dialog-unfocused", Elevation.DialogUnfocused],
     ...levelVars(LogLevelLight),
+    ...fileIconVars(FileIconLight),
     ["--yohu-canvas", "var(--yohu-bg-base)"],
     ["--yohu-splitter", "var(--yohu-border-strong)"],
     ["--yohu-state-hover", StateFill.Hover],
@@ -121,6 +136,7 @@ export function emitThemeCss(): string {
     ["--yohu-density", "comfortable"],
     ...densityVars(Density.Comfortable),
     ...layout,
+    ...zIndex,
     ...durs,
     ...eases,
     ...specs,
@@ -134,6 +150,7 @@ export function emitThemeCss(): string {
     ["--yohu-shadow-dialog", DarkElevation.Dialog],
     ["--yohu-shadow-dialog-unfocused", DarkElevation.DialogUnfocused],
     ...levelVars(LogLevelDark),
+    ...fileIconVars(FileIconDark),
     ["--yohu-canvas", "var(--yohu-bg-base)"],
     ["--yohu-state-hover", DarkStateFill.Hover],
     ["--yohu-state-pressed", DarkStateFill.Pressed],

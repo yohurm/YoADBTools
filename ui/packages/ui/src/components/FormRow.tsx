@@ -1,10 +1,12 @@
 /**
- * YoFormRow —— 表单/设置行默认排布。
- * 左侧标题信息（标题 / 副标题 / 备注），右侧控件；两列垂直居中。
+ * YoFormRow —— 表单/设置行默认排布（L4 视图）。
+ * 槽位由 formrow-model + formrow-policy 决定；本文件只绑属性与两列内容区。
  * HarmonyOS 对照：列表项「内容左、操作右」，右侧与内容间距 12vp。
+ * 不是 YoForm 引擎：不收集值、不校验、不提交。
  */
 import type { JSX } from "solid-js";
-import { Show } from "solid-js";
+import { Show, createMemo } from "solid-js";
+import { formRowHostAttrs, shouldRenderFormRowSlot } from "./formrow-policy";
 import "./FormRow.css";
 
 export interface YoFormRowProps {
@@ -21,23 +23,25 @@ export interface YoFormRowProps {
   children: JSX.Element;
 }
 
-/**
- * 渲染一行「左信息、右控件」的表单项。页面不要再自写这套 flex。
- */
+/** 渲染一行「左信息、右控件」。页面不要再自写这套 flex。 */
 export function YoFormRow(props: YoFormRowProps): JSX.Element {
+  const host = createMemo(() => formRowHostAttrs(props));
+
   return (
     <div
       class={`yohu-form-row${props.class ? ` ${props.class}` : ""}`}
       classList={props.classList}
+      data-has-description={host()["data-has-description"]}
+      data-has-note={host()["data-has-note"]}
     >
       <div class="yohu-form-row__info">
         <div class="yohu-form-row__heading">
           <div class="yohu-form-row__title">{props.title}</div>
-          <Show when={props.note}>
+          <Show when={shouldRenderFormRowSlot(props.note)}>
             <div class="yohu-form-row__note">{props.note}</div>
           </Show>
         </div>
-        <Show when={props.description}>
+        <Show when={shouldRenderFormRowSlot(props.description)}>
           <div class="yohu-form-row__description">{props.description}</div>
         </Show>
       </div>

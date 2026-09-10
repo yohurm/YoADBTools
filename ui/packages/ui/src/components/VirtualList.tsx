@@ -1,33 +1,58 @@
 /**
- * YoVirtualList —— 定高行虚拟列表。
+ * YoVirtualList —— 定高行虚拟列表（L4 视图）。
  * HarmonyOS 对照：长列表虚拟化；背板透明贴合 canvas，行选中走 --yohu-state-*。
  * 受控 API：items / selectedKey / onSelectRow / itemHeight / overscan。
  *
  * 泛型组件：外层滚动容器占满父高，内部以总高度撑起滚动区，
  * 仅绝对定位渲染可见行（含 overscan 缓冲），底部自动跟随滚动。
+ * For 按 getItemKey 的原始值做身份（对照 Solid 文档：For 按 value identity）。
+ * 禁止把每次新建的 {index,item,key} 包装对象交给 For，否则行重挂、原生 Selection 被清掉。
  *
  * 选择模式：传入 `selectedKey` + `onSelectRow` 时开启单选——
- * roving tabindex（选中行 0 / 其余 -1 / 未选中时首可视行 0）、
- * ↑/↓/Home/End 移动、Enter/Space 选中、目标行自动滚入视野并聚焦、
+ * roving tabindex、↑/↓/Home/End 移动、Enter/Space 选中、目标行滚入视野并聚焦、
  * `role=listbox/option` + `aria-selected`（对齐 UI设计系统-v6.md §5）。
  * 多选（`selectedKeys`）时按邻接关系挂 `--sel-start/mid/end`，连续选中合成一块圆角。
  * 单选高亮由 YoIndicator 按下标滑动（行本身无 transition）；多选 ≥2 退回每项 ::before。
  * 未开启选择模式时行不参与焦点序列（日志列表性能优先）。
+ * 行铬 `tone` 默认 document（无分割线）；文件清单显式 list。
  *
  * 注意：`itemHeight` / `overscan` / `rowHeight` 为功能性配置项（非主题 token），
  * 由调用方指定，仅用于定位计算；所有配色/字号/间距仍走 tokens。
  */
-import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
-import { adjacentJoin } from "../keymap/selection";
 import { YoIndicator } from "../motion/indicator";
 import type { IndicatorBox } from "../motion/indicator-layout";
 import {
+  VIRTUAL_DEFAULT_ITEM_HEIGHT,
+  VIRTUAL_DEFAULT_OVERSCAN,
+  VIRTUAL_FOCUS_RETRY_LIMIT,
   isStuckToBottom,
+  isVirtualMulti,
+  isVirtualRowSelected,
+  isVirtualSelectable,
+  isVirtualSelectionEmpty,
+  virtualAdjacentSelected,
+  virtualIndicatorAnchor,
+  virtualIndicatorFollow,
+  virtualIndexOfKey,
   virtualRange,
+  virtualRowKey,
+  virtualRowTop,
   virtualTotalHeight,
+  virtualVisibleKeys,
+  virtualVisibleRows,
 } from "./virtuallist-model";
+import {
+  isPendingFocusAdopted,
+  resolveVirtualListKeyAction,
+  shouldEmitAtBottom,
+  virtualHostAttrs,
+  virtualRowAttrs,
+} from "./virtuallist-policy";
 import "./VirtualList.css";
+
+export type YoVirtualListTone = "document" | "list";
 
 export interface YoVirtualListProps<T> {
   /** 数据源（响应式访问器） */
@@ -58,28 +83,42 @@ export interface YoVirtualListProps<T> {
   onRowContextMenu?: (item: T, key: string | number, event: MouseEvent) => void;
   /** 选择模式下 listbox 的无障碍名称 */
   ariaLabel?: string;
+  /**
+   * 行铬。默认 document：虚拟化只负责视口，不画格子线。
+   * Family B 文件清单显式 tone="list" 才有行间 hairline。
+   * 禁止默认画线再让文档列表去关。
+   */
+  tone?: YoVirtualListTone;
 }
 
 /**
  * 渲染一个定高行虚拟列表。
  */
 export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
-  const itemHeight = (): number => props.itemHeight ?? 22;
-  const overscan = (): number => props.overscan ?? 10;
+  const itemHeight = (): number => props.itemHeight ?? VIRTUAL_DEFAULT_ITEM_HEIGHT;
+  const overscan = (): number => props.overscan ?? VIRTUAL_DEFAULT_OVERSCAN;
 
   const [scrollTop, setScrollTop] = createSignal(0);
   const [viewportHeight, setViewportHeight] = createSignal(0);
-  /** 聚焦请求重试计数（目标行尚未渲染时滚动后重跑 effect） */
   const [focusTick, setFocusTick] = createSignal(0);
   let container: HTMLDivElement | undefined;
-  /** 键盘导航目标 key（非响应式，防点击误触发聚焦） */
   let pendingFocusKey: string | number | null = null;
   let focusAttempts = 0;
-  /** 与 Entangle useFollowTail 一致：程序化滚底不视为手势离开 */
   let isAutoScrolling = false;
   let autoScrollReset = 0;
-  /** 默认视为贴底，避免挂载瞬间误报 detach */
   let lastAtBottom = true;
+
+  const selectable = (): boolean =>
+    isVirtualSelectable(
+      props.selectedKey !== undefined,
+      props.selectedKeys !== undefined,
+      props.onSelectRow !== undefined,
+    );
+
+  const multi = (): boolean => isVirtualMulti(props.selectedKeys !== undefined);
+
+  const selectedKeys = (): ReadonlySet<string | number> | undefined => props.selectedKeys?.();
+  const selectedKey = (): string | number | null | undefined => props.selectedKey?.();
 
   const measureAtBottom = (): boolean => {
     if (!container) return true;
@@ -89,7 +128,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   const emitAtBottom = (): void => {
     if (!props.onAtBottomChange) return;
     const atBottom = measureAtBottom();
-    if (atBottom === lastAtBottom) return;
+    if (!shouldEmitAtBottom(isAutoScrolling, atBottom, lastAtBottom)) return;
     lastAtBottom = atBottom;
     props.onAtBottomChange(atBottom);
   };
@@ -112,119 +151,62 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const totalHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
 
-  const startIndex = (): number =>
-    virtualRange(scrollTop(), viewportHeight(), itemHeight(), props.items().length, overscan()).start;
-
-  const endIndex = (): number =>
-    virtualRange(scrollTop(), viewportHeight(), itemHeight(), props.items().length, overscan()).end;
-
-  const keyOf = (item: T, index: number): string | number =>
-    props.getItemKey ? props.getItemKey(item, index) : index;
-
-  const selectable = (): boolean =>
-    (props.selectedKey !== undefined || props.selectedKeys !== undefined) && props.onSelectRow !== undefined;
-
-  const isMulti = (): boolean => props.selectedKeys !== undefined;
-
-  const visibleRows = (): { index: number; item: T; key: string | number }[] => {
+  const visibleRows = () => {
     const items = props.items();
-    const start = startIndex();
-    const end = endIndex();
-    const rows: { index: number; item: T; key: string | number }[] = [];
-    for (let i = start; i < end; i++) {
-      const item = items[i];
-      if (item === undefined) {
-        break;
-      }
-      rows.push({ index: i, item, key: keyOf(item, i) });
-    }
-    return rows;
+    const range = virtualRange(scrollTop(), viewportHeight(), itemHeight(), items.length, overscan());
+    return virtualVisibleRows(items, range.start, range.end, props.getItemKey);
   };
 
-  const indexOfKey = (key: string | number): number => {
-    const items = props.items();
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item === undefined) {
-        break;
-      }
-      if (keyOf(item, i) === key) {
-        return i;
-      }
+  const visibleKeys = createMemo(() => virtualVisibleKeys(visibleRows()));
+  const rowByKey = createMemo(() => {
+    const map = new Map<string | number, ReturnType<typeof visibleRows>[number]>();
+    for (const row of visibleRows()) {
+      map.set(row.key, row);
     }
-    return -1;
-  };
+    return map;
+  });
 
   const findRowElement = (key: string | number): HTMLElement | null => {
     if (!container) return null;
     for (const el of container.querySelectorAll<HTMLElement>(".yohu-virtual-list__row")) {
-      if (el.dataset.key === String(key)) {
-        return el;
-      }
+      if (el.dataset.key === String(key)) return el;
     }
     return null;
-  };
-
-  const isSelected = (key: string | number): boolean => {
-    if (!selectable()) return false;
-    if (props.selectedKeys) return props.selectedKeys().has(key);
-    return props.selectedKey?.() === key;
-  };
-
-  const neighborSelected = (index: number): boolean => {
-    const item = props.items()[index];
-    if (item === undefined) return false;
-    return isSelected(keyOf(item, index));
-  };
-
-  const rowJoin = (index: number, key: string | number) =>
-    adjacentJoin(isSelected(key), neighborSelected(index - 1), neighborSelected(index + 1));
-
-  const rowTabIndex = (row: { index: number; key: string | number }): number | undefined => {
-    if (!selectable()) return undefined;
-    if (isSelected(row.key)) return 0;
-    const selected = props.selectedKeys ? props.selectedKeys().size : props.selectedKey?.() ?? null;
-    const empty = props.selectedKeys ? props.selectedKeys().size === 0 : selected === null || selected === undefined;
-    if (empty) {
-      const first = visibleRows()[0];
-      if (first && first.key === row.key) return 0;
-    }
-    return -1;
   };
 
   const selectAt = (index: number, event?: MouseEvent | KeyboardEvent): void => {
     const item = props.items()[index];
     if (item === undefined || !props.onSelectRow) return;
-    props.onSelectRow(item, keyOf(item, index), event);
+    props.onSelectRow(item, virtualRowKey(item, index, props.getItemKey), event);
   };
 
-  const indicatorFollow = (): string | undefined => {
-    if (!selectable()) return undefined;
-    if (props.selectedKeys) {
-      const keys = [...props.selectedKeys()];
-      return keys.length === 1 ? String(keys[0]) : undefined;
-    }
-    const key = props.selectedKey?.();
-    return key == null ? undefined : String(key);
-  };
+  const followKey = (): string | undefined =>
+    virtualIndicatorFollow(selectable(), selectedKeys(), selectedKey());
 
-  const indicatorAnchor = (): IndicatorBox | null => {
-    const follow = indicatorFollow();
-    if (follow == null) return null;
+  const indicatorAnchor = (): IndicatorBox | null =>
+    virtualIndicatorAnchor(props.items(), followKey(), itemHeight(), container?.clientWidth ?? 0, props.getItemKey);
+
+  const rowSnapshot = (row: { index: number; key: string | number }) => {
     const items = props.items();
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item === undefined) break;
-      if (String(keyOf(item, i)) === follow) {
-        return {
-          x: 0,
-          y: i * itemHeight(),
-          width: container?.clientWidth ?? 0,
-          height: itemHeight(),
-        };
-      }
-    }
-    return null;
+    const selected = isVirtualRowSelected(row.key, selectable(), selectedKeys(), selectedKey());
+    const adjacent = virtualAdjacentSelected(
+      items,
+      row.index,
+      selectable(),
+      selectedKeys(),
+      selectedKey(),
+      props.getItemKey,
+    );
+    const first = visibleRows()[0];
+    return virtualRowAttrs({
+      key: row.key,
+      selectable: selectable(),
+      selected,
+      prevSelected: adjacent.prev,
+      nextSelected: adjacent.next,
+      selectionEmpty: isVirtualSelectionEmpty(selectedKeys(), selectedKey()),
+      isFirstVisible: first?.key === row.key,
+    });
   };
 
   const handleRowClick = (index: number, event: MouseEvent): void => {
@@ -235,68 +217,43 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const handleRowKeyDown = (index: number, event: KeyboardEvent): void => {
     if (!selectable()) return;
-    let target: number | null = null;
-    switch (event.key) {
-      case "ArrowDown":
-        target = index + 1;
-        break;
-      case "ArrowUp":
-        target = index - 1;
-        break;
-      case "Home":
-        target = 0;
-        break;
-      case "End":
-        target = props.items().length - 1;
-        break;
-      case "Enter":
-      case " ": {
-        event.preventDefault();
-        selectAt(index);
-        return;
-      }
-      default:
-        return;
-    }
-    if (target === null) return;
+    const action = resolveVirtualListKeyAction(event.key, index, props.items().length);
+    if (!action) return;
     event.preventDefault();
-    const clamped = Math.max(0, Math.min(props.items().length - 1, target));
-    if (clamped === index) return;
-    const item = props.items()[clamped];
-    if (item === undefined) return;
-    pendingFocusKey = keyOf(item, clamped);
-    focusAttempts = 0;
-    selectAt(clamped);
-  };
-
-  // 键盘导航后：将新选中行滚入视野并聚焦（行未渲染时先滚动触发渲染再聚焦）。
-  createEffect(() => {
-    if (!selectable()) return;
-    const singleKey = props.selectedKey?.() ?? null;
-    const multiKeys = props.selectedKeys?.() ?? null;
-    void focusTick(); // 依赖：滚动重试
-    if (pendingFocusKey === null) return;
-    // 确认本次交互目标已被选中：单选看 `selectedKey`；多选 `selectedKey` 恒 null，
-    // 需改看 `selectedKeys` 是否含目标 key（否则多选下聚焦被立即清空）。
-    const confirmed = isMulti()
-      ? multiKeys !== null && multiKeys.has(pendingFocusKey)
-      : singleKey === pendingFocusKey;
-    if (!confirmed) {
-      pendingFocusKey = null; // 回调未采纳本次选中，放弃聚焦
+    if (action.type === "commit") {
+      selectAt(index);
       return;
     }
-    const el = findRowElement(pendingFocusKey);
+    if (action.index === index) return;
+    const item = props.items()[action.index];
+    if (item === undefined) return;
+    pendingFocusKey = virtualRowKey(item, action.index, props.getItemKey);
+    focusAttempts = 0;
+    selectAt(action.index);
+  };
+
+  createEffect(() => {
+    if (!selectable()) return;
+    void focusTick();
+    const single = selectedKey() ?? null;
+    const keys = selectedKeys() ?? null;
+    const pending = pendingFocusKey;
+    if (pending === null || !isPendingFocusAdopted(pending, multi(), single, keys)) {
+      pendingFocusKey = null;
+      return;
+    }
+    const el = findRowElement(pending);
     if (!el) {
-      const index = indexOfKey(pendingFocusKey);
-      if (!container || index < 0 || focusAttempts >= 3) {
+      const index = virtualIndexOfKey(props.items(), pending, props.getItemKey);
+      if (!container || index < 0 || focusAttempts >= VIRTUAL_FOCUS_RETRY_LIMIT) {
         pendingFocusKey = null;
         return;
       }
       focusAttempts += 1;
-      const top = Math.max(0, index * itemHeight());
+      const top = Math.max(0, virtualRowTop(index, itemHeight()));
       container.scrollTop = top;
       setScrollTop(top);
-      setFocusTick((tick) => tick + 1); // 重渲染后再聚焦
+      setFocusTick((tick) => tick + 1);
       return;
     }
     el.scrollIntoView({ block: "nearest" });
@@ -308,7 +265,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     if (!container) return;
     setScrollTop(container.scrollTop);
     setViewportHeight(container.clientHeight);
-    if (isAutoScrolling) return;
     emitAtBottom();
   };
 
@@ -336,7 +292,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     });
   });
 
-  // 数据追加时若处于「跟随底部」模式，自动滚底（Entangle：entryCount 变化才 snap）。
   createEffect(() => {
     const length = props.items().length;
     if (container && props.autoScrollToBottom?.() && length >= 0) {
@@ -344,53 +299,78 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     }
   });
 
+  const host = () =>
+    virtualHostAttrs({
+      selectable: selectable(),
+      multi: multi(),
+      tone: props.tone,
+      ariaLabel: props.ariaLabel,
+    });
+
   return (
     <div
       ref={(el) => (container = el)}
       class="yohu-virtual-list"
-      role={selectable() ? "listbox" : undefined}
-      aria-label={selectable() ? props.ariaLabel : undefined}
-      aria-multiselectable={isMulti() ? true : undefined}
+      data-tone={host()["data-tone"]}
+      role={host().role}
+      aria-label={host()["aria-label"]}
+      aria-multiselectable={host()["aria-multiselectable"]}
       onScroll={handleScroll}
     >
       <div class="yohu-virtual-list__inner" style={{ height: `${totalHeight()}px` }}>
         <Show when={selectable()}>
-          <YoIndicator follow={indicatorFollow()} variant="fill" anchor={indicatorAnchor} />
+          <YoIndicator follow={followKey()} variant="fill" anchor={indicatorAnchor} />
         </Show>
-        <For each={visibleRows()}>
-          {(row) => (
-            <div
-              class="yohu-virtual-list__row"
-              classList={{
-                "yohu-interactive": selectable(),
-                "yohu-interactive--selected": selectable() && isSelected(row.key),
-                "yohu-interactive--sel-start": rowJoin(row.index, row.key) === "start",
-                "yohu-interactive--sel-mid": rowJoin(row.index, row.key) === "middle",
-                "yohu-interactive--sel-end": rowJoin(row.index, row.key) === "end",
-                "yohu-focus-ring--inset": selectable(),
-              }}
-              style={{
-                position: "absolute",
-                top: `${row.index * itemHeight()}px`,
-                left: "0",
-                right: "0",
-                height: `${itemHeight()}px`,
-              }}
-              data-key={row.key}
-              role={selectable() ? "option" : undefined}
-              aria-selected={selectable() ? isSelected(row.key) : undefined}
-              tabIndex={rowTabIndex(row)}
-              onClick={(event) => handleRowClick(row.index, event)}
-              onContextMenu={(event) => {
-                if (!props.onRowContextMenu) return;
-                event.preventDefault();
-                props.onRowContextMenu(row.item, row.key, event);
-              }}
-              onKeyDown={(event) => handleRowKeyDown(row.index, event)}
-            >
-              {props.renderRow(row.item, row.index)}
-            </div>
-          )}
+        <For each={visibleKeys()}>
+          {(key) => {
+            const row = createMemo(() => rowByKey().get(key));
+            const attrs = () => {
+              const current = row();
+              return current ? rowSnapshot(current) : rowSnapshot({ index: 0, item: undefined as never, key });
+            };
+            return (
+              <div
+                class="yohu-virtual-list__row"
+                classList={{
+                  "yohu-interactive": attrs().interactive,
+                  "yohu-interactive--selected": attrs().selected,
+                  "yohu-interactive--sel-start": attrs().selStart,
+                  "yohu-interactive--sel-mid": attrs().selMid,
+                  "yohu-interactive--sel-end": attrs().selEnd,
+                  "yohu-focus-ring--inset": attrs().interactive,
+                }}
+                style={{
+                  position: "absolute",
+                  top: `${virtualRowTop(row()?.index ?? 0, itemHeight())}px`,
+                  left: "0",
+                  right: "0",
+                  height: `${itemHeight()}px`,
+                }}
+                data-key={attrs()["data-key"]}
+                role={attrs().role}
+                aria-selected={attrs()["aria-selected"]}
+                tabIndex={attrs().tabIndex}
+                onClick={(event) => {
+                  const current = row();
+                  if (current) handleRowClick(current.index, event);
+                }}
+                onContextMenu={(event) => {
+                  const current = row();
+                  if (!current || !props.onRowContextMenu) return;
+                  event.preventDefault();
+                  props.onRowContextMenu(current.item, current.key, event);
+                }}
+                onKeyDown={(event) => {
+                  const current = row();
+                  if (current) handleRowKeyDown(current.index, event);
+                }}
+              >
+                <Show when={row()?.item} keyed>
+                  {(item) => props.renderRow(item, row()!.index)}
+                </Show>
+              </div>
+            );
+          }}
         </For>
       </div>
     </div>

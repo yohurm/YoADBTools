@@ -4,28 +4,61 @@ import { createSignal } from "solid-js";
 import { YoButton } from "./Button";
 
 describe("YoButton", () => {
-  it("渲染文本并应用默认 primary/md 类", () => {
+  it("无 props 是 solid+accent 主按钮，没有旧变体 class", () => {
     render(() => <YoButton>保存</YoButton>);
     const btn = screen.getByRole("button", { name: "保存" });
-    expect(btn.className).toContain("yohu-button--primary");
-    expect(btn.className).toContain("yohu-button--md");
+    expect(btn.getAttribute("data-variant")).toBe("solid");
+    expect(btn.getAttribute("data-tone")).toBe("accent");
+    expect(btn.getAttribute("data-size")).toBe("md");
+    expect(btn.getAttribute("data-paint")).toBe("solid-on");
+    expect(btn.className).not.toContain("yohu-button--primary");
+    expect(btn.className).not.toContain("yohu-button--md");
   });
 
-  it("应用指定 variant 与 size", () => {
+  it("tone=danger 走 solid-on，不用旧 danger class", () => {
     render(() => (
-      <YoButton variant="danger" size="sm">
+      <YoButton tone="danger" size="sm">
         删除
       </YoButton>
     ));
     const btn = screen.getByRole("button", { name: "删除" });
-    expect(btn.className).toContain("yohu-button--danger");
-    expect(btn.className).toContain("yohu-button--sm");
+    expect(btn.getAttribute("data-paint")).toBe("solid-on");
+    expect(btn.getAttribute("data-tone")).toBe("danger");
+    expect(btn.getAttribute("data-size")).toBe("sm");
+    expect(btn.className).not.toContain("yohu-button--danger");
+  });
+
+  it("outlined+neutral 等同旧 secondary", () => {
+    render(() => (
+      <YoButton variant="outlined" tone="neutral">
+        取消
+      </YoButton>
+    ));
+    expect(screen.getByRole("button").getAttribute("data-paint")).toBe("outlined-neutral");
+  });
+
+  it("ghost+neutral 等同旧 ghost", () => {
+    render(() => (
+      <YoButton variant="ghost" tone="neutral">
+        稍后
+      </YoButton>
+    ));
+    expect(screen.getByRole("button").getAttribute("data-paint")).toBe("ghost-neutral");
+  });
+
+  it("solid+success 走软底语义字，不走 solid-on", () => {
+    render(() => (
+      <YoButton tone="success">
+        通过
+      </YoButton>
+    ));
+    expect(screen.getByRole("button").getAttribute("data-paint")).toBe("solid-tone");
   });
 
   it("点击触发 onClick", () => {
     const onClick = vi.fn();
     render(() => (
-      <YoButton variant="secondary" onClick={onClick}>
+      <YoButton variant="outlined" tone="neutral" onClick={onClick}>
         取消
       </YoButton>
     ));
@@ -43,6 +76,7 @@ describe("YoButton", () => {
     render(() => <YoButton loading>加载中</YoButton>);
     const btn = screen.getByRole("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-busy")).toBe("true");
     expect(btn.querySelector(".yohu-button__spinner")).toBeTruthy();
   });
 
@@ -58,7 +92,7 @@ describe("YoButton", () => {
 
   it("aria-pressed 透传到按钮", () => {
     render(() => (
-      <YoButton size="sm" variant="secondary" aria-pressed>
+      <YoButton size="sm" variant="outlined" tone="neutral" aria-pressed>
         仅显示
       </YoButton>
     ));

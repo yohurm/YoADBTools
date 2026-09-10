@@ -7,6 +7,7 @@ describe("YoSwitch", () => {
     render(() => <YoSwitch ariaLabel="自动刷新" checked={false} />);
     const sw = screen.getByRole("switch", { name: "自动刷新" });
     expect(sw.getAttribute("aria-checked")).toBe("false");
+    expect(sw.getAttribute("data-paint")).toBe("off");
     expect(sw.className).not.toContain("yohu-switch--on");
   });
 
@@ -17,10 +18,13 @@ describe("YoSwitch", () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
-  it("开启态带 --on 类", () => {
+  it("开启态走 data-paint=on", () => {
     render(() => <YoSwitch ariaLabel="启用" checked />);
-    expect(screen.getByRole("switch").className).toContain("yohu-switch--on");
-    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true");
+    const sw = screen.getByRole("switch");
+    expect(sw.getAttribute("data-paint")).toBe("on");
+    expect(sw.getAttribute("data-checked")).toBe("true");
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    expect(sw.className).not.toContain("yohu-switch--on");
   });
 
   it("disabled 不触发 onChange", () => {
@@ -28,6 +32,7 @@ describe("YoSwitch", () => {
     render(() => <YoSwitch ariaLabel="禁用" checked={false} disabled onChange={onChange} />);
     const sw = screen.getByRole("switch") as HTMLButtonElement;
     expect(sw.disabled).toBe(true);
+    expect(sw.getAttribute("data-disabled")).toBe("true");
     fireEvent.click(sw);
     expect(onChange).not.toHaveBeenCalled();
   });

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
@@ -46,6 +49,48 @@ describe("YoVirtualList", () => {
     expect(rows.length).toBeLessThan(100);
     expect(screen.getByText("row-0")).toBeTruthy();
     expect(screen.queryByText("row-50")).toBeNull();
+    expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-tone")).toBe("document");
+  });
+
+  it("文件清单显式 tone=list 才画行间线", () => {
+    const items = makeItems(8);
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => items}
+        itemHeight={22}
+        tone="list"
+        renderRow={(item) => <span>{item}</span>}
+      />
+    ));
+    expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-tone")).toBe("list");
+  });
+
+  it("默认 CSS 不画行线，只有 tone=list 才画", () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.css"), "utf-8");
+    expect(css).toMatch(
+      /\.yohu-virtual-list__row \{\s*box-sizing: border-box;\s*overflow: hidden;\s*\}/,
+    );
+    expect(css).toMatch(/\[data-tone="list"\] \.yohu-virtual-list__row \{\s*border-bottom:/);
+  });
+
+  it("items 换新数组时相同 key 的行节点保持同一引用", async () => {
+    const [items, setItems] = createSignal(["a", "b", "c"]);
+    const { container } = render(() => (
+      <YoVirtualList
+        items={items}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        renderRow={(item) => <span data-text={item}>{item}</span>}
+      />
+    ));
+    const before = container.querySelector('[data-key="b"]');
+    const textNode = before?.querySelector("span")?.firstChild;
+    expect(before).toBeTruthy();
+    setItems(["a", "b", "c", "d"]);
+    await Promise.resolve();
+    const after = container.querySelector('[data-key="b"]');
+    expect(after).toBe(before);
+    expect(after?.querySelector("span")?.firstChild).toBe(textNode);
   });
 
   it("getItemKey 写入 data-key", () => {

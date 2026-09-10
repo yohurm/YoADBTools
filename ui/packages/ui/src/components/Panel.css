@@ -14,7 +14,7 @@
   overflow: visible;
 }
 
-.yohu-panel--pane {
+.yohu-panel[data-variant="pane"] {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -29,7 +29,7 @@
   min-height: 0;
 }
 
-.yohu-panel--pane .yohu-panel__clip {
+.yohu-panel[data-variant="pane"] .yohu-panel__clip {
   overflow: hidden;
   border-radius: inherit;
 }
@@ -53,7 +53,7 @@
   box-sizing: border-box;
 }
 
-.yohu-panel__header--custom {
+.yohu-panel[data-header="custom"] .yohu-panel__header {
   min-height: 0;
   padding: 0;
 }
@@ -81,33 +81,33 @@
   min-width: 0;
 }
 
-.yohu-panel--pane .yohu-panel__body {
+.yohu-panel[data-variant="pane"] .yohu-panel__body {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: auto;
 }
 
-.yohu-panel--padding-none .yohu-panel__body {
+.yohu-panel[data-padding="none"] .yohu-panel__body {
   padding: 0;
 }
 
-.yohu-panel--padding-xs .yohu-panel__body {
+.yohu-panel[data-padding="xs"] .yohu-panel__body {
   padding: var(--yohu-space-xs);
 }
 
-.yohu-panel--padding-sm .yohu-panel__body {
+.yohu-panel[data-padding="sm"] .yohu-panel__body {
   padding: var(--yohu-space-sm);
 }
 
-.yohu-panel--padding-md .yohu-panel__body {
+.yohu-panel[data-padding="md"] .yohu-panel__body {
   padding: var(--yohu-space-md);
 }
 
-.yohu-panel--padding-lg .yohu-panel__body {
+.yohu-panel[data-padding="lg"] .yohu-panel__body {
   padding: var(--yohu-space-lg);
 }
 
-.yohu-panel--padding-xl .yohu-panel__body {
+.yohu-panel[data-padding="xl"] .yohu-panel__body {
   padding: var(--yohu-space-xl);
 }

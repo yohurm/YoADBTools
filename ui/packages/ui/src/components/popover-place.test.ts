@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyPopoverBox, placePopover, popoverLayerStyle } from "./popover-place";
+import { applyPopoverBox, overlayLayerStyle, placePopover, popoverLayerStyle } from "./popover-place";
 
 const VIEW = { width: 800, height: 600 };
 const GAP = 8;
@@ -108,5 +108,38 @@ describe("placePopover", () => {
     applyPopoverBox(el, box);
     expect(el.style.width).toBe("");
     expect(el.hasAttribute("data-overflow-y")).toBe(false);
+    expect(el.style.zIndex).toBe("var(--yohu-z-overlay)");
+  });
+
+  it("prefer=top 且上方够用时向上", () => {
+    const box = placePopover({
+      trigger: { top: 200, left: 40, bottom: 232, width: 80 },
+      menuHeight: 40,
+      viewport: VIEW,
+      gap: GAP,
+      maxHeightCap: CAP,
+      prefer: "top",
+    });
+    expect(box.placement).toBe("top");
+    expect(box.top).toBeNull();
+  });
+
+  it("Tooltip hug 内容：minWidth=0 且水平居中", () => {
+    const box = placePopover({
+      trigger: { top: 40, left: 200, bottom: 72, width: 40 },
+      menuHeight: 24,
+      viewport: VIEW,
+      gap: GAP,
+      maxHeightCap: CAP,
+      minWidth: 80,
+      align: "center",
+    });
+    expect(box.minWidth).toBe(80);
+    expect(box.left).toBe(200 + 20 - 40);
+  });
+
+  it("叠层配方走 overlay token，不写 9999", () => {
+    expect(overlayLayerStyle("dialog").zIndex).toBe("var(--yohu-z-dialog)");
+    expect(overlayLayerStyle("popover").zIndex).toBe("var(--yohu-z-overlay)");
   });
 });

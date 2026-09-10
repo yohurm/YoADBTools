@@ -14,7 +14,7 @@
   transition: width var(--yohu-dur-progress) var(--yohu-ease-standard);
 }
 
-.yohu-progress--indeterminate .yohu-progress__bar {
+.yohu-progress[data-mode="indeterminate"] .yohu-progress__bar {
   width: 40%;
   animation: yohu-progress-indeterminate var(--yohu-dur-loop-slow) var(--yohu-ease-loop) infinite;
 }

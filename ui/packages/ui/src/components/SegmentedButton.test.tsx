@@ -12,11 +12,18 @@ describe("YoSegmentedButton", () => {
     const { container } = render(() => (
       <YoSegmentedButton items={ITEMS} value="package" ariaLabel="划分方式" />
     ));
-    expect(screen.getByRole("radiogroup", { name: "划分方式" })).toBeTruthy();
-    expect(container.querySelector(".yohu-segmented--tab")).toBeTruthy();
+    const group = screen.getByRole("radiogroup", { name: "划分方式" });
+    expect(group).toBeTruthy();
+    expect(group.getAttribute("data-type")).toBe("tab");
+    expect(group.getAttribute("data-paint")).toBe("tab-surface");
+    expect(group.getAttribute("data-size")).toBe("md");
+    expect(group.className).not.toContain("yohu-segmented--tab");
     expect(container.querySelector(".yohu-recipe-indicator--thumb")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "包名" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "包名" }).hasAttribute("data-selected")).toBe(true);
     expect(screen.getByRole("radio", { name: "PID" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "PID" }).hasAttribute("data-selected")).toBe(false);
+    expect(screen.getByRole("radio", { name: "包名" }).classList.contains("yohu-segmented__item--selected")).toBe(false);
   });
 
   it("点击未选项触发 onChange 与 onItemClick", () => {
@@ -75,14 +82,19 @@ describe("YoSegmentedButton", () => {
         value="package"
       />
     ));
-    expect(container.querySelector(".yohu-segmented--hybrid")).toBeTruthy();
+    const group = container.querySelector(".yohu-segmented");
+    expect(group?.getAttribute("data-hybrid")).toBe("");
+    expect(group?.className).not.toContain("yohu-segmented--hybrid");
   });
 
-  it("capsule 类型挂强调色选择块 class", () => {
+  it("capsule 类型挂强调色选择块", () => {
     const { container } = render(() => (
       <YoSegmentedButton items={ITEMS} value="package" type="capsule" />
     ));
-    expect(container.querySelector(".yohu-segmented--capsule")).toBeTruthy();
+    const group = container.querySelector(".yohu-segmented");
+    expect(group?.getAttribute("data-paint")).toBe("capsule-accent");
+    expect(group?.getAttribute("data-type")).toBe("capsule");
+    expect(group?.className).not.toContain("yohu-segmented--capsule");
   });
 
   it("disabled 时不触发 onChange", () => {

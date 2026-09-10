@@ -1,9 +1,11 @@
 /**
- * YoLoading —— 区域/页面加载占位。
- * HarmonyOS 对照：Loading；环 + 标题/描述，居中说明。
- * 控件内加载仍走 YoButton / YoIconButton 的 loading，禁止模块自写 spinner。
+ * YoLoading（L4 视图）。
+ * 区域/页面等待；控件内加载仍走 YoButton / YoIconButton.loading。
+ * 环走 tokens/motion.css 的 yohu-spin。
  */
+import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { loadingHostAttrs } from "./loading-policy";
 import "./Loading.css";
 
 export interface YoLoadingProps {
@@ -15,21 +17,22 @@ export interface YoLoadingProps {
   cover?: boolean;
 }
 
-/**
- * 渲染一个居中的加载占位。
- */
+/** 渲染一个居中的加载占位。内容区 = 环 + 文案。 */
 export function YoLoading(props: YoLoadingProps): JSX.Element {
+  const host = createMemo(() => loadingHostAttrs(props));
   return (
     <div
       class="yohu-loading"
-      classList={{ "yohu-loading--cover": !!props.cover }}
-      role="status"
-      aria-busy="true"
-      aria-live="polite"
+      data-cover={host()["data-cover"]}
+      role={host().role}
+      aria-busy={host()["aria-busy"]}
+      aria-live={host()["aria-live"]}
     >
       <span class="yohu-loading__spinner" aria-hidden="true" />
       <div class="yohu-loading__title">{props.title}</div>
-      {props.description ? <div class="yohu-loading__description">{props.description}</div> : null}
+      <Show when={props.description}>
+        {(description) => <div class="yohu-loading__description">{description()}</div>}
+      </Show>
     </div>
   );
 }

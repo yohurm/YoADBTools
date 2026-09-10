@@ -11,6 +11,10 @@
   min-height: 0;
 }
 
+.yohu-col-frame[data-cell-pad="none"] {
+  --yohu-col-cell-pad: 0;
+}
+
 .yohu-col-frame > .yohu-col-row {
   overflow: hidden;
   scrollbar-gutter: stable;

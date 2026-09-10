@@ -1,9 +1,9 @@
 /**
- * YoThemeToggle —— 标题栏深浅色图标钮。
- * 图标：鸿蒙控制中心太阳/月亮叠层交叉（shadcn ModeToggle 的 rotate+scale）。
- * 整页：`runThemeViewTransition` 圆形揭示。偏好持久化由壳 `onThemeChange` 负责。
+ * YoThemeToggle —— 标题栏深浅色图标钮（L4 视图）。
+ * 只组合 YoIconButton + 主题能力；不复制按钮铬。
+ * 整页圆形揭示走 `runThemeViewTransition`；偏好持久化由壳 `onThemeChange` 负责。
  */
-import { createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import { createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { Icon } from "../icons";
 import {
   nextResolvedTheme,
@@ -11,8 +11,9 @@ import {
   themeTransitionOriginFromElement,
 } from "../motion/theme-transition";
 import { getTheme, onResolvedThemeChange, setTheme, type ThemeName } from "../tokens";
-import { Layout } from "../tokens/layout";
-import "./IconButton.css";
+import { YoIconButton } from "./IconButton";
+import { THEME_TOGGLE_MOON, THEME_TOGGLE_SUN } from "./theme-toggle-model";
+import { themeToggleHostAttrs } from "./theme-toggle-policy";
 import "./ThemeToggle.css";
 
 export interface YoThemeToggleProps {
@@ -20,13 +21,7 @@ export interface YoThemeToggleProps {
   onThemeChange?: (theme: ThemeName) => void | Promise<void>;
 }
 
-function toggleTitle(theme: ThemeName): string {
-  return theme === "dark" ? "切换到浅色模式" : "切换到深色模式";
-}
-
-/**
- * 渲染标题栏深浅色切换钮（当前浅色显示太阳，深色显示月亮）。
- */
+/** 渲染标题栏深浅色切换钮（当前浅色显示太阳，深色显示月亮）。 */
 export function YoThemeToggle(props: YoThemeToggleProps): JSX.Element {
   const [resolved, setResolved] = createSignal<ThemeName>(getTheme());
   const [busy, setBusy] = createSignal(false);
@@ -36,19 +31,18 @@ export function YoThemeToggle(props: YoThemeToggleProps): JSX.Element {
     onCleanup(onResolvedThemeChange(setResolved));
   });
 
-  const title = () => toggleTitle(resolved());
+  const host = createMemo(() => themeToggleHostAttrs(resolved(), busy()));
 
   return (
-    <button
-      type="button"
-      class="yohu-icon-button yohu-theme-toggle yohu-focus-ring"
-      title={title()}
-      aria-label={title()}
-      aria-pressed={resolved() === "dark"}
-      disabled={busy()}
+    <YoIconButton
+      title={host().title}
+      aria-pressed={host()["aria-pressed"]}
+      disabled={host().disabled}
       onClick={(event) => {
         const next = nextResolvedTheme();
-        const origin = themeTransitionOriginFromElement(event.currentTarget);
+        const target = event.currentTarget;
+        if (!(target instanceof Element)) return;
+        const origin = themeTransitionOriginFromElement(target);
         setBusy(true);
         void (async () => {
           try {
@@ -62,12 +56,12 @@ export function YoThemeToggle(props: YoThemeToggleProps): JSX.Element {
     >
       <span class="yohu-theme-toggle__glyphs" aria-hidden="true">
         <span class="yohu-theme-toggle__sun">
-          <Icon name="display-on" size={Layout.IconSm} />
+          <Icon name={THEME_TOGGLE_SUN} />
         </span>
         <span class="yohu-theme-toggle__moon">
-          <Icon name="display-off" size={Layout.IconSm} />
+          <Icon name={THEME_TOGGLE_MOON} />
         </span>
       </span>
-    </button>
+    </YoIconButton>
   );
 }

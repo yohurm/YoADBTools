@@ -1,10 +1,11 @@
 /**
- * YoCheckbox —— 复选框（多选/条件，不是启用开关）。
+ * YoCheckbox —— 复选框（L4 视图）。
+ * 勾选 / 禁用由 checkbox-model + checkbox-policy 决定；本文件只绑属性与内容区。
  * HarmonyOS 对照：Checkbox；启用类场景改走 YoSwitch。
- * 受控 API：checked / onChange / label / disabled。
  */
-import { Show } from "solid-js";
+import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { canCommitCheckboxChange, checkboxHostAttrs } from "./checkbox-policy";
 import "./Checkbox.css";
 
 export interface YoCheckboxProps {
@@ -18,27 +19,32 @@ export interface YoCheckboxProps {
   disabled?: boolean;
 }
 
-/**
- * 渲染一个受控复选框。
- */
+/** 渲染复选框。内容区 = 勾选符 + 标签，圆角盒内裁剪。 */
 export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
+  const host = createMemo(() => checkboxHostAttrs(props));
+
+  const handleChange = (event: Event): void => {
+    if (!canCommitCheckboxChange(host().disabled)) return;
+    const target = event.currentTarget as HTMLInputElement;
+    props.onChange?.(target.checked);
+  };
+
   return (
-    <label class="yohu-checkbox" classList={{ "yohu-checkbox--disabled": !!props.disabled }}>
-      <span
-        class="yohu-checkbox__box yohu-focus-host"
-        classList={{ "yohu-checkbox__box--checked": !!props.checked }}
-      >
+    <label
+      class="yohu-checkbox"
+      data-checked={host()["data-checked"]}
+      data-paint={host()["data-paint"]}
+      data-disabled={host()["data-disabled"]}
+    >
+      <span class="yohu-checkbox__box yohu-focus-host" data-paint={host()["data-paint"]}>
         <input
           type="checkbox"
           class="yohu-checkbox__input"
-          checked={!!props.checked}
-          disabled={props.disabled}
-          onChange={(event) => {
-            if (props.disabled) return;
-            props.onChange?.(event.currentTarget.checked);
-          }}
+          checked={host()["data-checked"] === "true"}
+          disabled={host().disabled}
+          onChange={handleChange}
         />
-        <Show when={props.checked}>
+        <Show when={host()["data-checked"] === "true"}>
           <svg
             class="yohu-checkbox__check"
             viewBox="0 0 24 24"
@@ -53,7 +59,9 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
           </svg>
         </Show>
       </span>
-      {props.label ? <span class="yohu-checkbox__label">{props.label}</span> : null}
+      <Show when={props.label}>
+        <span class="yohu-checkbox__label">{props.label}</span>
+      </Show>
     </label>
   );
 }

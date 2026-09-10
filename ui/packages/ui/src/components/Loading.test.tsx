@@ -16,7 +16,8 @@ describe("YoLoading", () => {
   it("可选描述；cover 铺满父级", () => {
     const { container } = render(() => <YoLoading title="加载中" cover />);
     expect(screen.getByText("加载中")).toBeTruthy();
-    expect(container.querySelector(".yohu-loading--cover")).toBeTruthy();
+    expect(container.querySelector(".yohu-loading")?.getAttribute("data-cover")).toBe("true");
+    expect(container.querySelector(".yohu-loading--cover")).toBeNull();
     expect(container.querySelector(".yohu-loading__description")).toBeNull();
   });
 });

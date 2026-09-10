@@ -6,7 +6,7 @@
   font-family: var(--yohu-font-sans);
 }
 
-.yohu-select--block {
+.yohu-select[data-block] {
   display: flex;
   width: 100%;
 }
@@ -32,7 +32,7 @@
   cursor: pointer;
 }
 
-.yohu-select--block .yohu-select__trigger {
+.yohu-select[data-block] .yohu-select__trigger {
   display: flex;
   width: 100%;
 }
@@ -50,7 +50,7 @@
   white-space: nowrap;
 }
 
-.yohu-select__value--placeholder {
+.yohu-select__value[data-placeholder] {
   color: var(--yohu-fg-3);
 }
 
@@ -58,10 +58,10 @@
   flex: 0 0 auto;
 }
 
-/* 铬：落点与夹紧。内容 hug，禁止写死 width。高于对话框 1000、低于 Toast 1100。 */
+/* 铬：落点与夹紧。内容 hug，禁止写死 width。叠层走 popover-place overlay token。 */
 .yohu-select__layer {
   position: fixed;
-  z-index: 1050;
+  z-index: var(--yohu-z-overlay);
   box-sizing: border-box;
   width: max-content;
 }
@@ -115,7 +115,7 @@
   text-overflow: ellipsis;
 }
 
-.yohu-select--disabled .yohu-select__trigger {
+.yohu-select[data-disabled] .yohu-select__trigger {
   background-color: var(--yohu-surface-2);
   color: var(--yohu-disabled);
   cursor: not-allowed;

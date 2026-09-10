@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { closeFocusIndex, tabsKeyIntent } from "./tabs-model";
+import { closeFocusIndex, tabAt, tabsActiveIndex, tabsKeyIntent } from "./tabs-model";
 
 describe("tabs-model", () => {
   it("左右循环、Home/End", () => {
@@ -24,5 +24,14 @@ describe("tabs-model", () => {
     expect(closeFocusIndex(0, 3)).toBe(0);
     expect(closeFocusIndex(2, 3)).toBe(1);
     expect(closeFocusIndex(1, 2)).toBe(0);
+  });
+
+  it("按稳定 id 解析激活下标", () => {
+    const tabs = [{ id: "a" }, { id: "b" }];
+    expect(tabsActiveIndex(tabs, "b")).toBe(1);
+    expect(tabsActiveIndex(tabs, null)).toBe(-1);
+    expect(tabsActiveIndex(tabs, "missing")).toBe(-1);
+    expect(tabAt(tabs, 0)?.id).toBe("a");
+    expect(tabAt(tabs, 9)).toBeUndefined();
   });
 });

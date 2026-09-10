@@ -1,6 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoTitleBar } from "./TitleBar";
+
+function loadTitleBarCss(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/components/TitleBar.css"),
+    resolve(process.cwd(), "packages/ui/src/components/TitleBar.css"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
 
 describe("YoTitleBar", () => {
   it("渲染标题并带拖动区", () => {
@@ -22,6 +37,8 @@ describe("YoTitleBar", () => {
     render(() => <YoTitleBar title="窗" />);
     const buttons = screen.getAllByRole("button");
     expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual(["最小化", "最大化", "关闭"]);
+    expect(buttons.map((b) => b.getAttribute("data-caption"))).toEqual(["min", "max", "close"]);
+    expect(buttons.map((b) => b.getAttribute("data-paint"))).toEqual(["window", "window", "close"]);
   });
 
   it("最大化时最大化键变为还原", () => {
@@ -96,7 +113,7 @@ describe("YoTitleBar", () => {
     const { container } = render(() => <YoTitleBar title="窗" nativeCaptions />);
     expect(container.querySelectorAll(".yohu-titlebar__caption").length).toBe(0);
     expect(container.querySelector(".yohu-titlebar")?.getAttribute("data-captions")).toBe("native");
-    expect(container.querySelector(".yohu-titlebar--native-captions")).toBeTruthy();
+    expect(container.querySelector(".yohu-titlebar--native-captions")).toBeNull();
   });
 
   it("中区可承载 children（不再挂模块通栏）", () => {
@@ -106,5 +123,24 @@ describe("YoTitleBar", () => {
       </YoTitleBar>
     ));
     expect(container.querySelector(".yohu-titlebar__center")?.textContent).toContain("通栏");
+  });
+
+  it("三键贴边满高，关闭例外色走 error token", () => {
+    const css = loadTitleBarCss();
+    expect(css.length).toBeGreaterThan(0);
+    const bar = css.match(/\.yohu-titlebar\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(bar).not.toMatch(/padding-right/);
+    const caption = css.match(/\.yohu-titlebar__caption\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(caption).toMatch(/height:\s*100%/);
+    expect(caption).toMatch(/padding:\s*0/);
+    expect(caption).toMatch(/border-radius:\s*var\(--yohu-radius-none\)/);
+    expect(css).toMatch(
+      /\[data-paint="close"\]:hover\s*\{[^}]*background-color:\s*var\(--yohu-error\)/,
+    );
+    expect(css).toMatch(
+      /\[data-paint="close"\]:active\s*\{[^}]*background-color:\s*var\(--yohu-error-pressed\)/,
+    );
+    expect(css.toLowerCase()).not.toContain(["#", "c42b1c"].join(""));
+    expect(css).not.toMatch(/color-mix/);
   });
 });

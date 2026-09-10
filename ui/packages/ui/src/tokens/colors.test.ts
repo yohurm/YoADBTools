@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Colors, DarkColors, Harmony, LogLevelDark, LogLevelLight } from "./colors";
+import { Colors, DarkColors, FileIconDark, FileIconLight, Harmony, LogLevelDark, LogLevelLight } from "./colors";
+import type { FileGlyph } from "../file-glyph";
 
 /**
  * 读取 theme.css 内容。
@@ -38,6 +39,7 @@ const EXPECTED_LIGHT: Record<string, string> = {
   Error: "#E84026",
   Offline: "#00000066",
   SwitchOff: "#00000019",
+  TextSel: "#0A59F773",
 };
 
 const EXPECTED_DARK: Record<string, string> = {
@@ -50,6 +52,7 @@ const EXPECTED_DARK: Record<string, string> = {
   Warn: "#DB6B42",
   Error: "#D94838",
   SwitchOff: "#FFFFFF19",
+  TextSel: "#317AF773",
 };
 
 function kebab(name: string): string {
@@ -195,6 +198,47 @@ describe("logcat 级别板（复用官方语义色）", () => {
   });
 });
 
+const FILE_GLYPHS: FileGlyph[] = [
+  "folder",
+  "file",
+  "apk",
+  "image",
+  "video",
+  "audio",
+  "archive",
+  "xml",
+  "json",
+  "text",
+  "pdf",
+];
+
+describe("YoFileIcon 组件板（复用官方语义色）", () => {
+  it("浅/深板覆盖全部字形且键一致", () => {
+    expect(Object.keys(FileIconLight).sort()).toEqual([...FILE_GLYPHS].sort());
+    expect(Object.keys(FileIconDark).sort()).toEqual(Object.keys(FileIconLight).sort());
+  });
+
+  it("色值只取 Harmony primitive，无散落 hex", () => {
+    expect(FileIconLight.folder.body).toBe(Harmony.brand.light);
+    expect(FileIconLight.folder.mark).toBe(Harmony.iconSubEmphasize.light);
+    expect(FileIconLight.file.body).toBe(Harmony.fontTertiary.light);
+    expect(FileIconLight.file.mark).toBe(Harmony.backgroundFourth.light);
+    expect(FileIconLight.text.mark).toBe(Harmony.fontFourth.light);
+    expect(FileIconLight.apk.body).toBe(Harmony.confirm.light);
+    expect(FileIconLight.apk.mark).toBe(Harmony.fontOnPrimary.light);
+    expect(FileIconLight.image.body).toBe(Harmony.brand.light);
+    expect(FileIconLight.video.mark).toBe(Harmony.fontOnPrimary.light);
+    expect(FileIconLight.audio.body).toBe(Harmony.alert.light);
+    expect(FileIconLight.archive.mark).toBe(Harmony.fontOnPrimary.light);
+    expect(FileIconLight.xml.body).toBe(Harmony.warning.light);
+    expect(FileIconLight.pdf.mark).toBe(Harmony.fontOnPrimary.light);
+    expect(FileIconLight.json.body).toBe(Harmony.alert.light);
+    expect(FileIconLight.json.mark).toBe(Harmony.fontPrimary.light);
+    expect(FileIconDark.folder.body).toBe(Harmony.brand.dark);
+    expect(FileIconDark.json.mark).toBe(Harmony.fontPrimary.dark);
+  });
+});
+
 describe("theme.css 变量", () => {
   it("定义浅色与深色两个主题块", () => {
     expect(themeCss).toContain(":root");
@@ -223,6 +267,16 @@ describe("theme.css 变量", () => {
     }
   });
 
+  it("文件图标板变量齐备（浅色+深色，body/mark）", () => {
+    for (const glyph of Object.keys(FileIconLight)) {
+      expect(themeCss).toContain(`--yohu-file-icon-${glyph}:`);
+      expect(themeCss).toContain(`--yohu-file-icon-${glyph}-mark:`);
+    }
+    const darkBlock = themeCss.slice(themeCss.indexOf('[data-theme="dark"]'));
+    expect(darkBlock).toContain(`--yohu-file-icon-folder: ${FileIconDark.folder.body}`);
+    expect(darkBlock).toContain(`--yohu-file-icon-json-mark: ${FileIconDark.json.mark}`);
+  });
+
   it("密度与动效 token 已定义", () => {
     expect(themeCss).toContain("--yohu-density:");
     expect(themeCss).toContain("--yohu-control-height:");
@@ -243,12 +297,16 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-layout-rail-inset: 8px");
     expect(themeCss).toContain("--yohu-layout-settings-control-max: 360px");
     expect(themeCss).toContain("--yohu-layout-switch-w: 36px");
+    expect(themeCss).toContain("--yohu-z-dialog: 1000");
+    expect(themeCss).toContain("--yohu-z-overlay: 1050");
+    expect(themeCss).toContain("--yohu-z-toast: 1100");
     expect(themeCss).toContain("--yohu-title-bar-height: 40px");
     expect(themeCss).toContain("--yohu-canvas: var(--yohu-bg-base)");
     expect(themeCss).toContain("color-scheme: light");
     expect(themeCss).toContain("color-scheme: dark");
     expect(themeCss).toContain("--yohu-state-selected: var(--yohu-accent)");
     expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg-on)");
+    expect(themeCss).toContain("--yohu-text-sel:");
     expect(themeCss).toContain("--yohu-ripple-inset: 0");
     expect(themeCss).toContain("--yohu-space-3xl: 40px");
   });

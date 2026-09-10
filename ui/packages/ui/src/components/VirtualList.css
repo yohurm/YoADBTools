@@ -13,22 +13,26 @@
   width: 100%;
 }
 
+/* 默认 document：无行铬。list 才画 Family B 行间线。 */
 .yohu-virtual-list__row {
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row {
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
-.yohu-virtual-list__row.yohu-interactive--selected {
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected {
   border-bottom-color: transparent;
 }
 
-.yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start,
-.yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid {
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start,
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid {
   border-bottom-color: var(--yohu-state-selected);
 }
 
-.yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start:hover,
-.yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid:hover {
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start:hover,
+.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid:hover {
   border-bottom-color: var(--yohu-accent-hover);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flattenVisible, parentIndex, treeKeyIntent } from "./tree-model";
+import { flattenVisible, parentIndex, treeHasChildren, treeKeyIntent, treeKeySelector } from "./tree-model";
 
 const TREE = [
   {
@@ -32,5 +32,11 @@ describe("tree-model", () => {
     expect(treeKeyIntent("ArrowLeft", 1, 3, false, false)).toEqual({ type: "parent" });
     expect(treeKeyIntent("Enter", 1, 3, false, false)).toEqual({ type: "select" });
     expect(treeKeyIntent("ArrowDown", 2, 3, false, false)).toEqual({ type: "focus", index: 2 });
+  });
+
+  it("选择器转义引号，并判断是否有子节点", () => {
+    expect(treeKeySelector('a"b')).toBe('[data-tree-key="a\\"b"]');
+    expect(treeHasChildren({ children: [{ key: "x" }] })).toBe(true);
+    expect(treeHasChildren({ children: [] })).toBe(false);
   });
 });

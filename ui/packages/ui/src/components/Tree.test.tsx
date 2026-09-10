@@ -1,6 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoTree } from "./Tree";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const treeCss = readFileSync(resolve(here, "Tree.css"), "utf-8");
+const motionCss = readFileSync(resolve(here, "../tokens/motion.css"), "utf-8");
 
 const DATA = [
   {
@@ -76,6 +83,20 @@ describe("YoTree", () => {
     expect(row?.classList.contains("yohu-tree__row--selected")).toBe(false);
     expect(row?.getAttribute("aria-selected")).toBe("true");
     expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeTruthy();
+  });
+
+  it("行高走导航尺，不套数据行，不被 collapse 盖成 min-content", () => {
+    expect(treeCss).toContain("min-height: var(--yohu-tree-row-height, var(--yohu-row-height-nav))");
+    expect(treeCss).not.toMatch(/min-height:\s*var\(--yohu-row-height\)/);
+    expect(treeCss).toContain("gap: var(--yohu-space-sm)");
+    expect(motionCss).not.toMatch(/\.yohu-collapse__inner\s*>\s*\*[^{]*\{[^}]*min-height:\s*min-content/);
+  });
+
+  it("rowHeight 只写覆盖变量，不锁行 height", () => {
+    render(() => <YoTree data={DATA} rowHeight={40} />);
+    const tree = screen.getByRole("tree");
+    expect(tree.style.getPropertyValue("--yohu-tree-row-height")).toBe("40px");
+    expect(document.querySelector(".yohu-tree__row")?.getAttribute("style") ?? "").not.toMatch(/height:\s*40px/);
   });
 
   it("键盘 ← 未展开时跳到父节点", () => {

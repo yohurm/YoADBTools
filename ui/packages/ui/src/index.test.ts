@@ -34,6 +34,8 @@ const YO_PUBLIC = [
   "YoEmptyState",
   "YoLoading",
   "YoDialog",
+  "YoTooltip",
+  "YoTooltipHost",
   "YoContextMenuHost",
   "YoToast",
   "YoToaster",
@@ -58,5 +60,10 @@ describe("@yohu/ui 公开组件清单", () => {
   it("含 YoSwitch 与 YoTitleBar", () => {
     expect(ui.YoSwitch).toBeTypeOf("function");
     expect(ui.YoTitleBar).toBeTypeOf("function");
+  });
+
+  it("不公开 fileGlyphFor / FileGlyph", () => {
+    expect((ui as Record<string, unknown>).fileGlyphFor).toBeUndefined();
+    expect(Object.keys(ui)).not.toContain("fileGlyphFor");
   });
 });

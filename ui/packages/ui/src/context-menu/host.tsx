@@ -1,5 +1,7 @@
 /**
- * L4 宿主：应用根只挂一份。Portal 到 body，避免祖先 transform 打断 fixed。
+ * 右键宿主（L4）。
+ * 应用根只挂一份；只管开合与把会话交给 List。Portal 到 body，避免祖先 transform 打断 fixed。
+ * 键盘与槽位在 YoContextMenu，不堆在本文件。
  */
 
 import type { JSX } from "solid-js";

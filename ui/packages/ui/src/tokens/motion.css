@@ -353,12 +353,6 @@
   min-height: 0;
 }
 
-/* 高度动画只裁切，不把子项压扁。 */
-.yohu-collapse__inner > * {
-  min-height: min-content;
-  flex-shrink: 0;
-}
-
 /*
  * 配方 panel：Fluent Collapse 双轨（高度空间运动 ∥ 内容淡入上移）。
  * 高度走 spatial-panel（300ms 标准，大行程无弹簧过冲）；内容走 effects 进出场。
@@ -597,6 +591,7 @@ html[data-theme-transition] *::after {
   .yohu-dialog__panel,
   .yohu-toast,
   .yohu-select__menu,
+  .yohu-tooltip,
   .yohu-context-menu,
   .yohu-presence[data-recipe="fade"],
   .yohu-presence[data-recipe="rise"],
@@ -607,8 +602,8 @@ html[data-theme-transition] *::after {
 
   .yohu-button__spinner,
   .yohu-loading__spinner,
-  .yohu-icon-button--loading .yohu-icon,
-  .yohu-progress--indeterminate .yohu-progress__bar {
+  .yohu-icon-button[data-busy] > .yohu-icon,
+  .yohu-progress[data-mode="indeterminate"] .yohu-progress__bar {
     animation: none !important;
   }
 }

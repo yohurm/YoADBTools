@@ -1,6 +1,6 @@
 /**
- * YoTabs —— 多会话标签页。
- * HarmonyOS 对照：Tabs；激活项 Accent 下划线。
+ * YoTabs —— 多会话标签页（L4 视图）。
+ * HarmonyOS 对照：Tabs；激活项 Accent 下划线由 YoIndicator 滑动。
  * 受控 API：tabs / activeId / onActivate / onClose / onNew / onContextMenu。
  *
  * 可达性：
@@ -8,18 +8,18 @@
  * - ←/→ 循环切换（自动激活）；Home/End 首尾；Delete 关闭（提供 onClose 时，自动聚焦相邻）
  * - 关闭按钮 `aria-label=close`；`+` 新建按钮 `aria-label=new tab`
  *
- * 视觉：激活项 Accent 下划线由 YoIndicator 在项之间滑动；hover 仍走 ripple。
+ * 视觉：激活是 underline，不是选中实底；hover 只走 yohu-interactive / ripple。
  */
-import { For, createSignal, onMount } from "solid-js";
+import { For } from "solid-js";
 import type { JSX } from "solid-js";
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoIndicator } from "../motion/indicator";
-import { closeFocusIndex, tabsKeyIntent } from "./tabs-model";
+import { resolveTabsChrome, resolveTabsKeyAction, tabsTabAttrs } from "./tabs-policy";
 import "./Tabs.css";
 
 /** 圆点色调 */
-export type YoTabDotTone = "neutral" | "accent" | "success" | "warn" | "error";
+export type YoTabDotTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 export interface YoTabDot {
   /** 圆点语义色调 */
@@ -54,81 +54,68 @@ export interface YoTabsProps {
  * 渲染一条多会话标签页栏。
  */
 export function YoTabs(props: YoTabsProps): JSX.Element {
-  const [focusedId, setFocusedId] = createSignal<string | null>(null);
   let tablistRef: HTMLDivElement | undefined;
 
-  const handleClose = (id: string, event: MouseEvent): void => {
-    event.stopPropagation();
-    props.onClose?.(id);
-  };
-
-  const activeIndex = (): number => props.tabs.findIndex((t) => t.id === props.activeId);
+  const chrome = () => resolveTabsChrome(props);
 
   const focusIndex = (index: number): void => {
     const tab = props.tabs[index];
     if (!tab) return;
-    setFocusedId(tab.id);
     const el = tablistRef?.querySelector<HTMLElement>(`[data-tab-id="${tab.id}"]`);
     el?.focus();
   };
 
   const onTablistKeyDown = (event: KeyboardEvent): void => {
-    const index = activeIndex();
-    const count = props.tabs.length;
-    const intent = tabsKeyIntent(event.key, index, count, Boolean(props.onClose));
-    if (!intent) return;
+    const action = resolveTabsKeyAction(event.key, props.tabs, props.activeId, chrome().canClose);
+    if (!action) return;
     event.preventDefault();
-    if (intent.type === "activate") {
-      const tab = props.tabs[intent.index];
-      if (!tab) return;
-      props.onActivate?.(tab.id);
-      focusIndex(intent.index);
+    if (action.type === "activate") {
+      props.onActivate?.(action.id);
+      focusIndex(action.focusIndex);
       return;
     }
-    props.onClose?.(props.tabs[intent.index]!.id);
-    focusIndex(closeFocusIndex(intent.index, count));
+    props.onClose?.(action.id);
+    focusIndex(action.focusIndex);
   };
-
-  onMount(() => {
-    setFocusedId(props.activeId ?? null);
-  });
 
   return (
     <div
-      ref={(el) => (tablistRef = el)}
+      ref={(el) => {
+        tablistRef = el;
+      }}
       class="yohu-tabs"
       role="tablist"
       aria-label="会话"
       onKeyDown={onTablistKeyDown}
     >
-      <YoIndicator follow={props.activeId} variant="underline" selector=".yohu-tabs__tab--active" />
+      <YoIndicator follow={props.activeId} variant="underline" selector=".yohu-tabs__tab[data-active]" />
       <For each={props.tabs}>
         {(tab) => {
-          const active = (): boolean => tab.id === props.activeId;
+          const attrs = () => tabsTabAttrs(tab.id, props.activeId);
           return (
             <div
               data-tab-id={tab.id}
+              data-active={attrs().active ? "" : undefined}
               class="yohu-tabs__tab yohu-interactive yohu-focus-ring--inset"
-              classList={{ "yohu-tabs__tab--active": active() }}
               role="tab"
-              aria-selected={active()}
-              tabindex={active() ? 0 : -1}
-              onClick={() => {
-                props.onActivate?.(tab.id);
-                setFocusedId(tab.id);
-              }}
+              aria-selected={attrs()["aria-selected"]}
+              tabindex={attrs().tabindex}
+              onClick={() => props.onActivate?.(tab.id)}
               onContextMenu={(event) => props.onContextMenu?.(tab.id, event)}
             >
               {tab.dot ? (
-                <span class="yohu-tabs__dot" classList={{ [`yohu-tabs__dot--${tab.dot.tone}`]: true }} />
+                <span class="yohu-tabs__dot" data-tone={tab.dot.tone} />
               ) : null}
               <span class="yohu-tabs__title">{tab.title}</span>
-              {props.onClose ? (
+              {chrome().canClose ? (
                 <button
                   type="button"
                   class="yohu-tabs__close yohu-interactive yohu-focus-ring"
                   aria-label="关闭页签"
-                  onClick={(event) => handleClose(tab.id, event)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onClose?.(tab.id);
+                  }}
                 >
                   <Icon name="close" size={Layout.IconTiny} />
                 </button>
@@ -137,7 +124,7 @@ export function YoTabs(props: YoTabsProps): JSX.Element {
           );
         }}
       </For>
-      {props.onNew ? (
+      {chrome().canNew ? (
         <button type="button" class="yohu-tabs__new yohu-interactive yohu-focus-ring" aria-label="新建页签" onClick={props.onNew}>
           <Icon name="plus" size={Layout.IconInline} />
         </button>

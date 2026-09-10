@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SEGMENTED_SIZE,
+  DEFAULT_SEGMENTED_TYPE,
   YO_SEGMENTED_MAX_ITEMS,
   edgeEnabledIndex,
   enabledItemIndexes,
   isHybridItems,
   resolveKeyIndex,
+  resolveSegmentedSpec,
   resolveSelectedIndex,
   segmentKeyIntent,
+  segmentedIconSize,
+  segmentedPaintKind,
   stepEnabledIndex,
 } from "./segmented-model";
 
@@ -63,5 +68,20 @@ describe("segmented-model", () => {
     expect(resolveKeyIndex(ITEMS, "pid", "ArrowRight")).toBe(3);
     expect(resolveKeyIndex(ITEMS, "tag", "Home")).toBe(0);
     expect(resolveKeyIndex(ITEMS, "package", "Enter")).toBeUndefined();
+  });
+
+  it("缺省是 tab + md，capsule 才是强调涂装", () => {
+    expect(resolveSegmentedSpec({})).toEqual({
+      type: DEFAULT_SEGMENTED_TYPE,
+      size: DEFAULT_SEGMENTED_SIZE,
+    });
+    expect(segmentedPaintKind("tab")).toBe("tab-surface");
+    expect(segmentedPaintKind("capsule")).toBe("capsule-accent");
+  });
+
+  it("图标档：md 或 hybrid 走 md，仅 sm 非混合走 sm", () => {
+    expect(segmentedIconSize({ type: "tab", size: "md" }, false)).toBe("md");
+    expect(segmentedIconSize({ type: "tab", size: "sm" }, true)).toBe("md");
+    expect(segmentedIconSize({ type: "tab", size: "sm" }, false)).toBe("sm");
   });
 });

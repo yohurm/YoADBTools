@@ -1,16 +1,19 @@
 /**
- * YoTitleBar —— HarmonyOS 电脑窗口容器层（自定义标题栏）。
- * HarmonyOS 对照：窗口框架容器层。页眉回内容区后走 Compact 40vp。
- * 右侧铬条（主题钮 + 侧栏钮 + 三键，操作区最多 3 个图标）等宽 48vp 贴合铺满栏高，无内边距；关闭悬停铺满该键。
- * 受控 API：title / icon / children / actions / maximized / onMinimize / onToggleMaximize / onClose。
- *
- * 三键从左到右：最小化、最大化（或还原）、关闭。拖动走 data-tauri-drag-region；按钮 no-drag。
- * macOS Overlay：nativeCaptions 隐藏自定义三键，左侧让出系统交通灯。
- * 沉浸：背板 = --yohu-canvas。窗口操作由 Application 壳接线，本组件只收回调。
+ * YoTitleBar —— HarmonyOS 电脑窗口容器层（L4 视图）。
+ * 品牌 / 三键涂装由 titlebar-model + titlebar-policy 决定；本文件只绑属性与内容区。
+ * 三键贴边满高，禁止 padding 缩进关闭钮；色/圆角锁鸿蒙 token。
  */
-import { Show, type JSX } from "solid-js";
+import { For, Show, createMemo, type JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
+import { resolveTitleBarSpec } from "./titlebar-model";
+import {
+  isCaptionTarget,
+  titlebarCaptionButtons,
+  titlebarHostAttrs,
+  type TitleBarCaptionButton,
+} from "./titlebar-policy";
+import { YoTooltip } from "./Tooltip";
 import "./TitleBar.css";
 
 export interface YoTitleBarProps {
@@ -36,47 +39,43 @@ export interface YoTitleBarProps {
   nativeCaptions?: boolean;
 }
 
-function isCaptionTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest("button, a, input") !== null;
+function onCaption(kind: TitleBarCaptionButton["kind"], props: YoTitleBarProps): void {
+  if (kind === "min") props.onMinimize?.();
+  else if (kind === "max") props.onToggleMaximize?.();
+  else props.onClose?.();
 }
 
-/**
- * 渲染 HarmonyOS 风格窗口标题栏（无系统边框时由 Application 接线拖动/三键）。
- */
+/** 渲染 HarmonyOS 风格窗口标题栏（无系统边框时由 Application 接线拖动/三键）。 */
 export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
+  const spec = createMemo(() => resolveTitleBarSpec(props));
+  const host = createMemo(() => titlebarHostAttrs(props));
+  const captions = createMemo(() => titlebarCaptionButtons(spec()));
+
   return (
     <header
       class="yohu-titlebar"
-      classList={{ "yohu-titlebar--native-captions": props.nativeCaptions === true }}
-      data-captions={props.nativeCaptions ? "native" : "trailing"}
+      data-captions={host()["data-captions"]}
+      data-brand={host()["data-brand"]}
       onDblClick={(event) => {
         if (isCaptionTarget(event.target)) return;
         props.onToggleMaximize?.();
       }}
     >
       <div class="yohu-titlebar__brand" data-tauri-drag-region>
-        <Show
-          when={props.logoSrc}
-          fallback={
-            <Show when={props.icon}>
-              {(name) => (
-                <span class="yohu-titlebar__icon" aria-hidden="true">
-                  <Icon name={name()} size={Layout.IconSm} />
-                </span>
-              )}
-            </Show>
-          }
-        >
-          {(src) => (
-            <img
-              class="yohu-titlebar__logo"
-              src={src()}
-              alt=""
-              width={Layout.IconSm}
-              height={Layout.IconSm}
-              draggable={false}
-            />
-          )}
+        <Show when={spec().brand === "logo"}>
+          <img
+            class="yohu-titlebar__logo"
+            src={props.logoSrc}
+            alt=""
+            width={Layout.IconSm}
+            height={Layout.IconSm}
+            draggable={false}
+          />
+        </Show>
+        <Show when={spec().brand === "icon"}>
+          <span class="yohu-titlebar__icon" aria-hidden="true">
+            <Icon name={props.icon as IconName} size={Layout.IconSm} />
+          </span>
         </Show>
         <span class="yohu-titlebar__title">{props.title}</span>
       </div>
@@ -87,35 +86,24 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
         <Show when={props.actions}>
           <div class="yohu-titlebar__actions">{props.actions}</div>
         </Show>
-        <Show when={!props.nativeCaptions}>
+        <Show when={spec().showCaptions}>
           <div class="yohu-titlebar__captions">
-            <button
-              type="button"
-              class="yohu-titlebar__caption"
-              aria-label="最小化"
-              title="最小化"
-              onClick={() => props.onMinimize?.()}
-            >
-              <Icon name="window-min" size={Layout.IconSm} />
-            </button>
-            <button
-              type="button"
-              class="yohu-titlebar__caption"
-              aria-label={props.maximized ? "还原" : "最大化"}
-              title={props.maximized ? "还原" : "最大化"}
-              onClick={() => props.onToggleMaximize?.()}
-            >
-              <Icon name={props.maximized ? "window-restore" : "window-max"} size={Layout.IconSm} />
-            </button>
-            <button
-              type="button"
-              class="yohu-titlebar__caption yohu-titlebar__caption--close"
-              aria-label="关闭"
-              title="关闭"
-              onClick={() => props.onClose?.()}
-            >
-              <Icon name="close" size={Layout.IconSm} />
-            </button>
+            <For each={captions()}>
+              {(btn) => (
+                <YoTooltip content={btn.label}>
+                  <button
+                    type="button"
+                    class="yohu-titlebar__caption"
+                    data-caption={btn.kind}
+                    data-paint={btn.paint}
+                    aria-label={btn.label}
+                    onClick={() => onCaption(btn.kind, props)}
+                  >
+                    <Icon name={btn.icon} size={Layout.IconSm} />
+                  </button>
+                </YoTooltip>
+              )}
+            </For>
           </div>
         </Show>
       </div>

@@ -25,4 +25,34 @@ describe("YoFileIcon", () => {
     ));
     expect(container.querySelectorAll("svg[data-file-icon=folder]")).toHaveLength(2);
   });
+
+  it("path/rect/circle 只标 data-fill，禁止 fill hex", () => {
+    const samples: Array<{ name: string; kind: "dir" | "file" }> = [
+      { name: "DCIM", kind: "dir" },
+      { name: "a.bin", kind: "file" },
+      { name: "app.apk", kind: "file" },
+      { name: "p.png", kind: "file" },
+      { name: "v.mp4", kind: "file" },
+      { name: "s.mp3", kind: "file" },
+      { name: "z.zip", kind: "file" },
+      { name: "m.xml", kind: "file" },
+      { name: "d.json", kind: "file" },
+      { name: "n.txt", kind: "file" },
+      { name: "r.pdf", kind: "file" },
+    ];
+    const { container } = render(() => (
+      <>
+        {samples.map((item) => (
+          <YoFileIcon name={item.name} kind={item.kind} />
+        ))}
+      </>
+    ));
+    const painted = container.querySelectorAll("[data-fill]");
+    expect(painted.length).toBeGreaterThan(0);
+    for (const node of painted) {
+      expect(node.getAttribute("data-fill")).toMatch(/^(body|mark)$/);
+      expect(node.getAttribute("fill")).toBeNull();
+    }
+    expect(container.innerHTML).not.toMatch(/fill="#/);
+  });
 });

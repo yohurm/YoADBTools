@@ -21,6 +21,7 @@ export {
   RadiusShape,
   Layout,
   LayoutLimits,
+  ZIndex,
   Stroke,
   FocusRing,
   Elevation,
@@ -54,12 +55,10 @@ export { Icon, ICON_NAMES } from "./icons";
 export type { IconName, IconProps } from "./icons";
 export { YoFileIcon } from "./file-icons";
 export type { YoFileIconProps } from "./file-icons";
-export { fileGlyphFor } from "./file-glyph";
-export type { FileGlyph, FileIconKind } from "./file-glyph";
 
 // —— 基础 ——
 export { YoButton } from "./components/Button";
-export type { YoButtonProps, YoButtonVariant, YoButtonSize } from "./components/Button";
+export type { YoButtonProps, YoButtonVariant, YoButtonTone, YoButtonSize } from "./components/Button";
 
 export { YoSegmentedButton } from "./components/SegmentedButton";
 export type {
@@ -68,7 +67,6 @@ export type {
   YoSegmentedItem,
   YoSegmentedType,
 } from "./components/SegmentedButton";
-export { YO_SEGMENTED_MAX_ITEMS } from "./components/segmented-model";
 
 export { YoIconButton } from "./components/IconButton";
 export type { YoIconButtonProps } from "./components/IconButton";
@@ -76,7 +74,7 @@ export { YoThemeToggle } from "./components/ThemeToggle";
 export type { YoThemeToggleProps } from "./components/ThemeToggle";
 
 export { YoTextField } from "./components/TextField";
-export type { YoTextFieldProps } from "./components/TextField";
+export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix } from "./components/TextField";
 
 export { YoSelect } from "./components/Select";
 export type { YoSelectProps, YoSelectOption } from "./components/Select";
@@ -104,7 +102,7 @@ export { YoTree } from "./components/Tree";
 export type { YoTreeProps, TreeNode } from "./components/Tree";
 
 export { YoVirtualList } from "./components/VirtualList";
-export type { YoVirtualListProps } from "./components/VirtualList";
+export type { YoVirtualListProps, YoVirtualListTone } from "./components/VirtualList";
 
 export { YoColResizer } from "./components/ColResizer";
 export type { YoColResizerProps } from "./components/ColResizer";
@@ -113,7 +111,7 @@ export { YoColHeader } from "./components/ColHeader";
 export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./components/ColHeader";
 
 export { YoColFrame } from "./components/ColFrame";
-export type { YoColFrameProps } from "./components/ColFrame";
+export type { YoColFrameProps, YoColCellPad } from "./components/ColFrame";
 
 export { YoColRow } from "./components/ColRow";
 export type { YoColRowProps } from "./components/ColRow";
@@ -125,17 +123,12 @@ export { YoColCell } from "./components/ColCell";
 export type { YoColCellProps } from "./components/ColCell";
 
 export {
-  COL_RESIZE_STEP,
-  clampColWidth,
   colTrackTemplate,
-  colWidthOf,
   defaultColWidths,
-  nudgeColWidth,
   setColWidth,
 } from "./components/col-model";
 export type { YoColSpec, YoColWidths } from "./components/col-model";
-export { beginColResize, moveColResize } from "./components/col-resize";
-export type { ColResizePhase, ColResizeSession } from "./components/col-resize";
+export type { ColResizePhase } from "./components/col-resize";
 
 export { YoPanel } from "./components/Panel";
 export type { YoPanelProps, YoPanelPadding, YoPanelVariant } from "./components/Panel";
@@ -190,6 +183,9 @@ export type { YoLoadingProps } from "./components/Loading";
 export { YoDialog } from "./components/Dialog";
 export type { YoDialogProps } from "./components/Dialog";
 
+export { YoTooltip, YoTooltipHost } from "./components/Tooltip";
+export type { YoTooltipProps, YoTooltipHostProps } from "./components/Tooltip";
+
 // —— 右键菜单（L1；页面提供场景表，壳挂唯一 Host；YoContextMenu 仅 Host 内部使用） ——
 // 注意：默认单例 `contextMenu` 只被 YoContextMenuHost 内部读取；公开导出可变全局本体没有意义，
 // 故不从此处导出。页面/模块统一走 `openContextMenu` / `closeContextMenu` 薄转发；
@@ -221,12 +217,6 @@ export {
   YoIndicator,
   prefersReducedMotion,
   shouldSkipMotion,
-  nextResolvedTheme,
-  runThemeViewTransition,
-  themeTransitionOriginFromElement,
-  themeWipeFrames,
-  themeWipeRadius,
-  THEME_WIPE_COVERAGE,
   DISMISS_HOLD_DURATION,
 } from "./motion";
 export type {
@@ -238,7 +228,6 @@ export type {
   YoIndicatorProps,
   IndicatorVariant,
   PresenceRecipe,
-  ThemeTransitionOrigin,
 } from "./motion";
 
 // —— 窗口铬 ——

@@ -16,8 +16,11 @@ describe("YoThemeToggle", () => {
 
   it("浅色时显示太阳并提示切到深色", () => {
     const { container } = render(() => <YoThemeToggle />);
-    expect(screen.getByRole("button", { name: "切换到深色模式" })).toBeTruthy();
-    expect(screen.getByRole("button").getAttribute("aria-pressed")).toBe("false");
+    const btn = screen.getByRole("button", { name: "切换到深色模式" });
+    expect(btn).toBeTruthy();
+    expect(btn.className).toContain("yohu-icon-button");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(btn.getAttribute("data-pressed")).toBeNull();
     expect(container.querySelector('svg[data-icon="display-on"]')).toBeTruthy();
     expect(container.querySelector('svg[data-icon="display-off"]')).toBeTruthy();
   });

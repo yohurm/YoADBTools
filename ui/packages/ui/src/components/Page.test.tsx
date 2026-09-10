@@ -13,6 +13,7 @@ describe("YoPage", () => {
     ));
     const page = container.querySelector(".yohu-page");
     expect(page).toBeTruthy();
+    expect(page?.getAttribute("data-role")).toBe("module");
     expect(page?.classList.contains("yohu-mirror")).toBe(true);
     expect(page?.querySelector(":scope > .yohu-chrome")).toBeTruthy();
     expect(page?.querySelector(".yohu-chrome__title")?.textContent).toBe("投屏显示");

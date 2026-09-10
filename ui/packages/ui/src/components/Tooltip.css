@@ -1,0 +1,57 @@
+.yohu-tooltip__anchor {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.yohu-tooltip__anchor[data-block] {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.yohu-tooltip__layer {
+  position: fixed;
+  z-index: var(--yohu-z-overlay);
+  box-sizing: border-box;
+  width: max-content;
+  pointer-events: none;
+}
+
+
+/* 内容区：文案在圆角内裁剪。铬（阴影/描边）在层上。 */
+.yohu-tooltip {
+  box-sizing: border-box;
+  max-width: var(--yohu-layout-dialog-max);
+  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border-radius: var(--yohu-radius-sm);
+  background-color: var(--yohu-surface);
+  color: var(--yohu-fg);
+  box-shadow: var(--yohu-shadow-overlay);
+  font-family: var(--yohu-font-sans);
+  overflow: hidden;
+}
+
+.yohu-tooltip__content {
+  padding: var(--yohu-space-xs) var(--yohu-space-sm);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-tooltip {
+  animation: yohu-rise-in var(--yohu-motion-spatial-local) both;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip {
+  animation: yohu-rise-out var(--yohu-motion-effects-exit) both;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-tooltip[data-placement="top"] {
+  animation-name: yohu-drop-in;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip[data-placement="top"] {
+  animation-name: yohu-drop-out;
+}

@@ -1,8 +1,23 @@
 /**
- * 标签页键盘意图（L2）。视图只消费这些纯函数。
+ * 标签页领域模型（L2）。
+ * 激活身份与键盘意图是不变式；不碰 DOM / 不组装 aria。
  */
 
+export interface TabsIdentity {
+  id: string;
+}
+
 export type TabsKeyIntent = { type: "activate"; index: number } | { type: "close"; index: number };
+
+/** 按稳定 id 解析激活下标；未命中为 -1。 */
+export function tabsActiveIndex(tabs: readonly TabsIdentity[], activeId?: string | null): number {
+  if (activeId == null || activeId === "") return -1;
+  return tabs.findIndex((tab) => tab.id === activeId);
+}
+
+export function tabAt(tabs: readonly TabsIdentity[], index: number): TabsIdentity | undefined {
+  return tabs[index];
+}
 
 /** 未识别返回 null（视图不 preventDefault）。activeIndex < 0 时箭头从 0 起算，Delete 不关闭。 */
 export function tabsKeyIntent(

@@ -6,7 +6,7 @@ import { YoTabs } from "./Tabs";
 const TABS = [
   { id: "a", title: "会话A", dot: { tone: "success" as const } },
   { id: "b", title: "会话B" },
-  { id: "c", title: "会话C", dot: { tone: "error" as const } },
+  { id: "c", title: "会话C", dot: { tone: "danger" as const } },
 ];
 
 describe("YoTabs", () => {
@@ -53,6 +53,10 @@ describe("YoTabs", () => {
     expect(tabs[1]!.getAttribute("tabindex")).toBe("-1");
     expect(tabs[2]!.getAttribute("tabindex")).toBe("-1");
     expect(container.querySelector(".yohu-recipe-indicator--underline")).toBeTruthy();
+    expect(tabs[0]!.classList.contains("yohu-interactive--selected")).toBe(false);
+    expect(tabs[0]!.classList.contains("yohu-tabs__tab--active")).toBe(false);
+    expect(tabs[0]!.hasAttribute("data-active")).toBe(true);
+    expect(tabs[0]!.classList.contains("yohu-interactive")).toBe(true);
   });
 
   it("键盘 →/← 循环切换并激活", () => {

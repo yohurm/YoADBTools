@@ -5,22 +5,28 @@ import { YoPanel } from "./Panel";
 describe("YoPanel", () => {
   it("渲染标题与内容，默认 md 内边距", () => {
     const { container } = render(() => <YoPanel title="面板标题">内容</YoPanel>);
+    const panel = container.querySelector(".yohu-panel");
     expect(screen.getByText("面板标题")).toBeTruthy();
     expect(screen.getByText("内容")).toBeTruthy();
-    expect(container.querySelector(".yohu-panel--padding-md")).toBeTruthy();
-    expect(container.querySelector(".yohu-panel--pane")).toBeNull();
+    expect(panel?.getAttribute("data-variant")).toBe("card");
+    expect(panel?.getAttribute("data-padding")).toBe("md");
+    expect(panel?.getAttribute("data-header")).toBe("card-title");
+    expect(container.querySelector(".yohu-panel")?.getAttribute("data-padding")).toBe("md");
+    expect(container.querySelector(".yohu-panel")?.getAttribute("data-variant")).toBe("card");
   });
 
   it("支持自定义 padding", () => {
     const { container } = render(() => <YoPanel padding="lg">内容</YoPanel>);
-    expect(container.querySelector(".yohu-panel--padding-lg")).toBeTruthy();
+    expect(container.querySelector(".yohu-panel")?.getAttribute("data-padding")).toBe("lg");
   });
 
   it("pane 变体撑满分区，默认 none 内边距", () => {
     const { container } = render(() => <YoPanel variant="pane">分栏</YoPanel>);
-    expect(container.querySelector(".yohu-panel--pane")).toBeTruthy();
-    expect(container.querySelector(".yohu-panel--padding-none")).toBeTruthy();
-    expect(container.querySelector(".yohu-panel--pane")?.classList.contains("yohu-panel")).toBe(true);
+    const panel = container.querySelector(".yohu-panel");
+    expect(panel?.getAttribute("data-variant")).toBe("pane");
+    expect(panel?.getAttribute("data-padding")).toBe("none");
+    expect(panel?.getAttribute("data-header")).toBe("none");
+    expect(container.querySelector(".yohu-panel--pane")).toBeNull();
   });
 
   it("pane 支持 title 与 actions", () => {
@@ -41,6 +47,7 @@ describe("YoPanel", () => {
       </YoPanel>
     ));
     expect(screen.getByText("路径")).toBeTruthy();
+    expect(container.querySelector(".yohu-panel")?.getAttribute("data-header")).toBe("custom");
     expect(container.querySelector(".yohu-panel__heading")).toBeNull();
   });
 });

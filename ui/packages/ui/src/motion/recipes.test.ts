@@ -57,6 +57,16 @@ describe("motion recipes", () => {
     expect(css).not.toContain("@keyframes yohu-theme-keep");
   });
 
+  it("collapse 只裁切，不给子项写 min-height", () => {
+    const css = loadMotionCss();
+    const collapse = css.slice(css.indexOf("配方：折叠"));
+    const inner = collapse.slice(0, collapse.indexOf(".yohu-collapse[data-recipe=\"panel\"]"));
+    expect(inner).toContain(".yohu-collapse__inner");
+    expect(inner).toContain("overflow: hidden");
+    expect(inner).not.toMatch(/\.yohu-collapse__inner\s*>\s*\*/);
+    expect(inner).not.toContain("min-height: min-content");
+  });
+
   it("inline-end 双轴插值，禁止高度离散跳变", () => {
     const css = loadMotionCss();
     expect(css).toContain("yohu-recipe-inline-end");

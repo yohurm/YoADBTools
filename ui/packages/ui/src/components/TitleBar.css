@@ -13,7 +13,7 @@
   user-select: none;
 }
 
-.yohu-titlebar--native-captions {
+.yohu-titlebar[data-captions="native"] {
   padding-left: var(--yohu-layout-titlebar-traffic);
 }
 
@@ -78,6 +78,10 @@
   gap: var(--yohu-layout-titlebar-caption-gap);
 }
 
+.yohu-titlebar__captions {
+  margin-inline-end: var(--yohu-layout-titlebar-close-margin);
+}
+
 .yohu-titlebar__actions {
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -102,23 +106,23 @@
 }
 
 .yohu-titlebar__actions .yohu-icon-button:not(:disabled):hover,
-.yohu-titlebar__caption:hover {
+.yohu-titlebar__caption[data-paint="window"]:hover {
   background-color: var(--yohu-state-hover);
   color: var(--yohu-fg);
 }
 
 .yohu-titlebar__actions .yohu-icon-button:not(:disabled):active,
-.yohu-titlebar__caption:active {
+.yohu-titlebar__caption[data-paint="window"]:active {
   background-color: var(--yohu-state-pressed);
   color: var(--yohu-fg);
 }
 
-.yohu-titlebar__caption--close:hover {
+.yohu-titlebar__caption[data-paint="close"]:hover {
   background-color: var(--yohu-error);
   color: var(--yohu-fg-on);
 }
 
-.yohu-titlebar__caption--close:active {
-  background-color: color-mix(in srgb, var(--yohu-fg) 10%, var(--yohu-error));
+.yohu-titlebar__caption[data-paint="close"]:active {
+  background-color: var(--yohu-error-pressed);
   color: var(--yohu-fg-on);
 }

@@ -6,6 +6,11 @@
   height: var(--yohu-layout-icon-sm);
 }
 
+.yohu-theme-toggle__glyphs .yohu-icon {
+  width: var(--yohu-layout-icon-sm);
+  height: var(--yohu-layout-icon-sm);
+}
+
 .yohu-theme-toggle__sun,
 .yohu-theme-toggle__moon {
   position: absolute;

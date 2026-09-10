@@ -1,23 +1,26 @@
 /**
- * YoButton —— 通用按钮。
- * HarmonyOS 对照：Button；最大宽 448vp；primary = brand + font_on。
- * 文案切换交给 motion/YoSwap（沿轴裁切展开/收起），本文件只负责铬、变体、加载。
+ * YoButton —— 通用按钮（L4 视图）。
+ * 外形 / 语义色 / 禁用由 button-model + button-policy 决定；本文件只绑属性与内容区。
+ * 纯文案走 YoSwap；加载环走 tokens/motion.css 的 yohu-spin。
  */
 import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { resolveText } from "../dom/text";
 import { YoSwap } from "../motion/swap";
+import type { YoButtonSize, YoButtonTone, YoButtonVariant } from "./button-model";
+import { buttonHostAttrs } from "./button-policy";
 import "./Button.css";
 
-export type YoButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type YoButtonSize = "sm" | "md";
+export type { YoButtonSize, YoButtonTone, YoButtonVariant };
 
 export interface YoButtonProps {
-  /** 语义变体 */
+  /** 外形：实心 / 描边 / 幽灵。默认 solid */
   variant?: YoButtonVariant;
+  /** 语义色。默认 accent。outlined/ghost 不写则是彩色，不是旧 secondary/ghost */
+  tone?: YoButtonTone;
   /** 尺寸 */
   size?: YoButtonSize;
-  /** 加载态（显示 spinner 并禁用） */
+  /** 加载态（spinner + 禁用 + aria-busy） */
   loading?: boolean;
   /** 禁用 */
   disabled?: boolean;
@@ -32,22 +35,22 @@ export interface YoButtonProps {
   children: JSX.Element;
 }
 
-/** 只对纯文案走 Swap；复合 children 原样渲染。 */
-/** 渲染一个带语义变体与尺寸的按钮。 */
+/** 渲染按钮。内容区 = spinner + 文案/复合 children，圆角内裁剪。 */
 export function YoButton(props: YoButtonProps): JSX.Element {
   const resolved = children(() => props.children);
   const text = createMemo(() => resolveText(resolved()));
+  const host = createMemo(() => buttonHostAttrs(props));
 
   return (
     <button
       type={props.type ?? "button"}
       class="yohu-button yohu-focus-ring"
-      classList={{
-        [`yohu-button--${props.variant ?? "primary"}`]: true,
-        [`yohu-button--${props.size ?? "md"}`]: true,
-      }}
-      disabled={props.disabled || props.loading}
-      aria-busy={props.loading}
+      data-variant={host()["data-variant"]}
+      data-tone={host()["data-tone"]}
+      data-size={host()["data-size"]}
+      data-paint={host()["data-paint"]}
+      disabled={host().disabled}
+      aria-busy={host()["aria-busy"]}
       aria-expanded={props["aria-expanded"]}
       aria-pressed={props["aria-pressed"]}
       onClick={props.onClick}

@@ -14,6 +14,7 @@ export * from "./radius";
 export * from "./density";
 export * from "./layout";
 export * from "./elevation";
+export * from "./z-index";
 export * from "./motion";
 export * from "./state";
 export { emitThemeCss } from "./emit-theme";

@@ -14,6 +14,7 @@
   justify-content: center;
   width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
   height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  overflow: hidden;
   border: var(--yohu-stroke-hairline) solid var(--yohu-border);
   border-radius: var(--yohu-radius-sm);
   background-color: var(--yohu-surface);
@@ -32,17 +33,31 @@
   cursor: pointer;
 }
 
-.yohu-checkbox--disabled .yohu-checkbox__input {
+.yohu-checkbox[data-disabled] .yohu-checkbox__input {
   cursor: not-allowed;
 }
 
-.yohu-checkbox__box:hover {
+.yohu-checkbox:not([data-disabled]) .yohu-checkbox__box[data-paint="idle"]:hover {
   border-color: var(--yohu-splitter-hover);
 }
 
-.yohu-checkbox__box--checked {
+.yohu-checkbox:not([data-disabled]) .yohu-checkbox__box[data-paint="idle"]:has(input:active) {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-checkbox__box[data-paint="checked"] {
   background-color: var(--yohu-accent);
   border-color: var(--yohu-accent);
+}
+
+.yohu-checkbox:not([data-disabled]) .yohu-checkbox__box[data-paint="checked"]:hover {
+  background-color: var(--yohu-accent-hover);
+  border-color: var(--yohu-accent-hover);
+}
+
+.yohu-checkbox:not([data-disabled]) .yohu-checkbox__box[data-paint="checked"]:has(input:active) {
+  background-color: var(--yohu-accent-pressed);
+  border-color: var(--yohu-accent-pressed);
 }
 
 .yohu-checkbox__check {
@@ -56,20 +71,20 @@
   color: var(--yohu-fg);
 }
 
-.yohu-checkbox--disabled {
+.yohu-checkbox[data-disabled] {
   cursor: not-allowed;
 }
 
-.yohu-checkbox--disabled .yohu-checkbox__box {
+.yohu-checkbox[data-disabled] .yohu-checkbox__box[data-paint="idle"] {
   background-color: var(--yohu-surface-2);
   border-color: var(--yohu-border);
 }
 
-.yohu-checkbox--disabled .yohu-checkbox__box--checked {
+.yohu-checkbox[data-disabled] .yohu-checkbox__box[data-paint="checked"] {
   background-color: var(--yohu-disabled);
   border-color: var(--yohu-disabled);
 }
 
-.yohu-checkbox--disabled .yohu-checkbox__label {
+.yohu-checkbox[data-disabled] .yohu-checkbox__label {
   color: var(--yohu-disabled);
 }

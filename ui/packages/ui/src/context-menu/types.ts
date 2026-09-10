@@ -1,6 +1,6 @@
 /**
- * 右键菜单引擎类型（L1–L3）。
- * 呈现层仍是 YoContextMenu；页面禁止自挂一份，只 define + open。
+ * 右键菜单领域类型（L2）。
+ * 场景 / 会话 / 条目是契约；呈现层仍是 YoContextMenu；页面禁止自挂一份，只 define + open。
  */
 
 export interface YoMenuItem<Action extends string = string> {

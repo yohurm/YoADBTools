@@ -218,7 +218,7 @@ describe("YoSelect", () => {
 
   it("block 拉满父级", () => {
     const { container } = render(() => <YoSelect block options={OPTIONS} value="a" />);
-    expect(container.querySelector(".yohu-select")?.classList.contains("yohu-select--block")).toBe(true);
+    expect(container.querySelector(".yohu-select")?.hasAttribute("data-block")).toBe(true);
   });
 });
 

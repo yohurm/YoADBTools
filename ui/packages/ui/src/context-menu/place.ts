@@ -1,8 +1,9 @@
 /**
- * 右键菜单落点：按视口夹紧，避免贴边时整块溢出。
+ * 右键菜单落点策略（L3）。按视口夹紧，避免贴边时整块溢出。
  * 打开时先按条目估算宽高夹紧（`clampContextMenuPoint`）；菜单挂载后应再以
  * **实测** `offsetWidth/offsetHeight` 二次夹紧（`clampToRect`），
  * 因为 `Layout.MenuMin` 只是最小宽，更宽条目会让估算偏小，贴右/下边时会溢出。
+ * 定位只用本文件，不走 Select 的 popover-place。
  */
 
 import { getDensity } from "../tokens";

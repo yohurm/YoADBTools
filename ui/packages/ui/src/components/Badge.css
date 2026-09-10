@@ -1,6 +1,7 @@
 .yohu-badge {
   display: inline-flex;
   align-items: center;
+  overflow: hidden;
   padding: 0 var(--yohu-space-sm);
   height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
   border-radius: var(--yohu-radius-pill);
@@ -13,28 +14,28 @@
   box-sizing: border-box;
 }
 
-.yohu-badge--neutral {
+.yohu-badge[data-tone="neutral"] {
   background-color: var(--yohu-surface-2);
   border-color: var(--yohu-border);
   color: var(--yohu-fg-2);
 }
 
-.yohu-badge--accent {
+.yohu-badge[data-tone="accent"] {
   background-color: var(--yohu-accent-soft);
   color: var(--yohu-accent);
 }
 
-.yohu-badge--success {
+.yohu-badge[data-tone="success"] {
   background-color: var(--yohu-success-bg);
   color: var(--yohu-success);
 }
 
-.yohu-badge--warn {
+.yohu-badge[data-tone="warning"] {
   background-color: var(--yohu-warn-bg);
-  color: var(--yohu-tag);
+  color: var(--yohu-warn);
 }
 
-.yohu-badge--error {
+.yohu-badge[data-tone="danger"] {
   background-color: var(--yohu-signal-bg);
   color: var(--yohu-error);
 }

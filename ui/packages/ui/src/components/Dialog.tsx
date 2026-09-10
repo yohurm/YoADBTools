@@ -1,6 +1,7 @@
 /**
- * YoDialog —— 模态对话框。
+ * YoDialog —— 模态对话框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：弹出框；最大宽 400vp；遮罩 10% 中性，不点遮罩关闭。
+ * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
  * 受控 API：open / title / width / height / onClose / footer / children。
  *
  * 可达性：
@@ -9,16 +10,20 @@
  * - Esc 触发 onClose；关闭后焦点还原到打开前的元素
  * - 遮罩点击不关闭（防误触；仅由显式取消/确认按钮关闭）
  *
- * 多实例叠加：Esc/Tab 由模块级**单栈焦点管理器**统一裁决，只作用于最上层，
- * 消除两个 Dialog 各自挂 keydown 时的焦点竞争。视图只 push / pop，不挂监听。
+ * 多实例叠加：Esc/Tab 由 dialog-stack 单栈裁决。视图只 attach / detach。
  *
  * `open` 支持 `boolean` 或响应式 `Accessor<boolean>`。
  */
 import { createEffect, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
 import { YoPresence } from "../motion/presence";
-import { dialogFocusables } from "./dialog-focus";
-import { popDialog, pushDialog, type DialogStackEntry } from "./dialog-stack";
+import {
+  attachDialog,
+  dialogLayerStyle,
+  dialogPanelPaint,
+  resolveDialogOpen,
+  type DialogStackEntry,
+} from "./dialog-policy";
 import "./Dialog.css";
 
 export interface YoDialogProps {
@@ -41,39 +46,28 @@ export interface YoDialogProps {
  * 渲染一个带遮罩的模态对话框。
  */
 export function YoDialog(props: YoDialogProps): JSX.Element {
-  const isOpen = (): boolean => (typeof props.open === "function" ? props.open() : props.open);
+  const isOpen = (): boolean => resolveDialogOpen(props.open);
 
   let panel: HTMLDivElement | undefined;
 
   createEffect(() => {
     if (!isOpen()) return;
 
-    // 记录打开前焦点（关闭时交给单栈焦点管理器还原）
     const restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
     const entry: DialogStackEntry = {
       getPanel: () => panel,
       onClose: props.onClose,
       restoreFocus,
     };
-    pushDialog(entry);
-
-    // 打开后聚焦面板内首个可聚焦元素
-    queueMicrotask(() => {
-      if (panel) {
-        const items = dialogFocusables(panel);
-        (items[0] ?? panel).focus();
-      }
-    });
-
-    onCleanup(() => {
-      popDialog(entry);
-    });
+    const detach = attachDialog(entry);
+    onCleanup(detach);
   });
+
+  const paint = (): ReturnType<typeof dialogPanelPaint> => dialogPanelPaint(props.width, props.height);
 
   return (
     <YoPresence when={isOpen()} recipe="dialog">
-      <div class="yohu-dialog">
+      <div class="yohu-dialog" style={dialogLayerStyle() as JSX.CSSProperties}>
         <div class="yohu-dialog__backdrop" aria-hidden="true" />
         <div
           class="yohu-dialog__panel"
@@ -84,11 +78,8 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
           ref={(el) => {
             panel = el;
           }}
-          classList={{ "yohu-dialog__panel--sized": props.width !== undefined }}
-          style={{
-            ...(props.width !== undefined ? { width: `${props.width}px` } : {}),
-            height: props.height !== undefined ? `${props.height}px` : undefined,
-          }}
+          data-sized={paint().sized ? "" : undefined}
+          style={paint().style}
         >
           {props.title ? <h3 class="yohu-dialog__title">{props.title}</h3> : null}
           <div class="yohu-dialog__body">{props.children}</div>

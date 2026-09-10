@@ -2,7 +2,7 @@
   position: fixed;
   top: var(--yohu-space-md);
   right: var(--yohu-space-md);
-  z-index: 1100;
+  z-index: var(--yohu-z-toast);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -13,6 +13,7 @@
 
 .yohu-toast {
   pointer-events: auto;
+  overflow: hidden;
   max-width: var(--yohu-layout-dialog-max);
   padding: var(--yohu-space-sm) var(--yohu-space-md);
   border: var(--yohu-stroke-hairline) solid var(--yohu-border);
@@ -25,14 +26,14 @@
   box-sizing: border-box;
 }
 
-.yohu-toast--success {
+.yohu-toast[data-tone="success"] {
   border-left-color: var(--yohu-success);
 }
 
-.yohu-toast--error {
+.yohu-toast[data-tone="danger"] {
   border-left-color: var(--yohu-error);
 }
 
-.yohu-toast--info {
+.yohu-toast[data-tone="accent"] {
   border-left-color: var(--yohu-accent);
 }

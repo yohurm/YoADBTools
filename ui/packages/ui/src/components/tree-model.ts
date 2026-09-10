@@ -1,5 +1,6 @@
 /**
- * 树可见行扁平化与键盘意图（L2）。
+ * 树领域模型（L2）。
+ * 可见行扁平化、父子关系与键盘意图是不变式；不碰 DOM / 不组装 aria。
  */
 
 export type TreeKeyIntent =
@@ -66,4 +67,13 @@ export function treeKeyIntent(
     default:
       return null;
   }
+}
+
+/** 属性值选择器转义（引号/反斜杠），避免依赖 CSS.escape（jsdom 缺失）。 */
+export function treeKeySelector(key: string): string {
+  return `[data-tree-key="${String(key).replace(/[\\"]/g, (c) => (c === '"' ? '\\"' : "\\\\"))}"]`;
+}
+
+export function treeHasChildren(node: { children?: readonly unknown[] } | undefined): boolean {
+  return Boolean(node?.children && node.children.length > 0);
 }

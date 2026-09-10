@@ -27,7 +27,7 @@
   transition: color var(--yohu-motion-effects-fast);
 }
 
-.yohu-tabs__tab--active {
+.yohu-tabs__tab[data-active] {
   color: var(--yohu-accent);
 }
 
@@ -44,23 +44,23 @@
   border-radius: var(--yohu-radius-full);
 }
 
-.yohu-tabs__dot--neutral {
+.yohu-tabs__dot[data-tone="neutral"] {
   background-color: var(--yohu-offline);
 }
 
-.yohu-tabs__dot--accent {
+.yohu-tabs__dot[data-tone="accent"] {
   background-color: var(--yohu-accent);
 }
 
-.yohu-tabs__dot--success {
+.yohu-tabs__dot[data-tone="success"] {
   background-color: var(--yohu-success);
 }
 
-.yohu-tabs__dot--warn {
+.yohu-tabs__dot[data-tone="warning"] {
   background-color: var(--yohu-warn);
 }
 
-.yohu-tabs__dot--error {
+.yohu-tabs__dot[data-tone="danger"] {
   background-color: var(--yohu-error);
 }
 

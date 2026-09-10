@@ -1,5 +1,5 @@
 /**
- * 对话框焦点陷阱（L2）。视图只接线。
+ * 对话框焦点陷阱（L3）。视图只接线，算法由 dialog-policy 装配。
  */
 
 export const DIALOG_FOCUSABLE =

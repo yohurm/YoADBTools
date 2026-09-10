@@ -27,5 +27,19 @@ describe("YoColFrame", () => {
       "grid-template-columns",
     );
     expect(container.querySelector(".yohu-col-cell")).not.toBeNull();
+    expect(frame.getAttribute("data-cell-pad")).toBe("list");
+  });
+
+  it("文档列表 cellPad=none 关掉列垫", () => {
+    const { container } = render(() => (
+      <YoColFrame template="20ch minmax(12ch, 1fr)" cellPad="none">
+        <YoColRow>
+          <span>时间</span>
+        </YoColRow>
+      </YoColFrame>
+    ));
+    const frame = container.querySelector(".yohu-col-frame") as HTMLElement;
+    expect(frame.getAttribute("data-cell-pad")).toBe("none");
+    expect(frame.style.getPropertyValue("--yohu-col-tracks")).toBe("20ch minmax(12ch, 1fr)");
   });
 });

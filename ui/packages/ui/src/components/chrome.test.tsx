@@ -18,6 +18,11 @@ function loadChromeCss(): string {
 }
 
 describe("YoChrome", () => {
+  it("dropIgnore 标记页眉不当投放目标", () => {
+    const { container } = render(() => <YoChrome title="文件管理" dropIgnore />);
+    expect(container.querySelector(".yohu-chrome")?.getAttribute("data-drop")).toBe("ignore");
+  });
+
   it("在原地渲染标题区与功能栏，不传送", () => {
     const { container } = render(() => (
       <div data-testid="body">
@@ -45,8 +50,10 @@ describe("YoChrome", () => {
 
   it("无操作时只显示标题区", () => {
     const { container } = render(() => <YoChrome title="投屏显示" />);
+    expect(container.querySelector(".yohu-chrome")?.getAttribute("data-layout")).toBe("title");
     expect(container.querySelector(".yohu-chrome__title")?.textContent).toBe("投屏显示");
     expect(container.querySelector(".yohu-chrome__bar")).toBeNull();
+    expect(container.querySelector(".yohu-chrome__row")).toBeTruthy();
   });
 
   it("标题行占位走 control-height，底垫走 chrome-pad（外壳不加 min-height）", () => {
@@ -66,6 +73,9 @@ describe("YoChrome", () => {
         <button type="button">开始</button>
       </YoChrome>
     ));
+    expect(container.querySelector(".yohu-chrome")?.getAttribute("data-layout")).toBe(
+      "title-bar-extra",
+    );
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).toContain("开始");
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).not.toContain("质量");
     expect(container.querySelector(".yohu-chrome__extra")?.textContent).toContain("质量");

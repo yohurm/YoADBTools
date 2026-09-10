@@ -24,9 +24,19 @@ describe("YoEmptyState", () => {
     expect(screen.getByText("请选择设备开始采集")).toBeTruthy();
   });
 
-  it("可选图标", () => {
+  it("可选插画", () => {
     const { container } = render(() => <YoEmptyState icon="log" title="空" />);
     expect(container.querySelector("svg")).toBeTruthy();
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-icon")).toBe("true");
+    expect(container.querySelector(".yohu-empty-state__illustration")).toBeTruthy();
+  });
+
+  it("可选 action 槽，不是 Dialog", () => {
+    const { container } = render(() => <YoEmptyState title="空" action={<button type="button">开始采集</button>} />);
+    expect(screen.getByRole("button", { name: "开始采集" })).toBeTruthy();
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-action")).toBe("true");
+    expect(container.querySelector("[role=dialog]")).toBeNull();
+    expect(container.querySelector(".yohu-dialog")).toBeNull();
   });
 
   it("挤位跟随布局，自身不写 transition", () => {

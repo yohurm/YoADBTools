@@ -14,6 +14,13 @@
   box-sizing: border-box;
 }
 
+.yohu-empty-state__illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--yohu-fg-3);
+}
+
 .yohu-empty-state__title {
   font-size: var(--yohu-font-subtitle);
   font-weight: var(--yohu-font-weight-medium);
@@ -25,4 +32,11 @@
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   color: var(--yohu-fg-3);
+}
+
+.yohu-empty-state__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yohu-space-sm);
 }

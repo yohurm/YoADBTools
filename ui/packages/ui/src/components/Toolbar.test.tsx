@@ -8,11 +8,13 @@ describe("YoToolbar", () => {
     render(() => (
       <YoToolbar>
         <YoButton>刷新</YoButton>
-        <YoButton variant="secondary">导出</YoButton>
+        <YoButton variant="outlined" tone="neutral">导出</YoButton>
       </YoToolbar>
     ));
-    const toolbar = screen.getByRole("button", { name: "刷新" }).parentElement;
-    expect(toolbar?.className).toContain("yohu-toolbar");
+    const toolbar = screen.getByRole("toolbar");
+    expect(toolbar.className).toContain("yohu-toolbar");
+    expect(toolbar.getAttribute("data-chrome")).toBe("band");
+    expect(toolbar.getAttribute("data-overflow")).toBe("scroll");
     expect(screen.getByRole("button", { name: "导出" })).toBeTruthy();
   });
 });

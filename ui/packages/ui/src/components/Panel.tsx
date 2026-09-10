@@ -1,17 +1,15 @@
 /**
- * YoPanel —— 画布上的卡片/分区唯一容器。
- * HarmonyOS：surface + radius-md + hairline 描边 + XS 阴影。card / pane 同一套铬，禁止模块再手写卡片。
- * pane：撑满剩余空间，内部裁切；阴影画在外壳，不被 overflow 吃掉。
+ * YoPanel —— 画布上的卡片/分区唯一容器（L4 视图）。
+ * 变体 / 内边距 / 顶栏形态由 panel-model + panel-policy 决定；本文件只绑属性与内容区。
+ * 铬（surface + radius-md + hairline + XS 阴影）只写在 Panel.css。
  */
+import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
-import { Show } from "solid-js";
+import type { YoPanelPadding, YoPanelVariant } from "./panel-model";
+import { panelHostAttrs } from "./panel-policy";
 import "./Panel.css";
 
-/** 内边距取值（映射到间距 token） */
-export type YoPanelPadding = "none" | "xs" | "sm" | "md" | "lg" | "xl";
-
-/** card = 内容卡片（hug）；pane = 撑满的模块分区。铬相同。 */
-export type YoPanelVariant = "card" | "pane";
+export type { YoPanelPadding, YoPanelVariant };
 
 export interface YoPanelProps {
   /** 面板标题 */
@@ -30,28 +28,32 @@ export interface YoPanelProps {
   children: JSX.Element;
 }
 
-/**
- * 渲染圆角卡片分区。模块分区一律走本组件，不要再铺 surface + radius-md。
- */
+/** 渲染圆角卡片分区。模块分区一律走本组件，不要再铺 surface + radius-md。 */
 export function YoPanel(props: YoPanelProps): JSX.Element {
-  const padding = () => props.padding ?? (props.variant === "pane" ? "none" : "md");
-  const pane = () => props.variant === "pane";
+  const host = createMemo(() =>
+    panelHostAttrs({
+      variant: props.variant,
+      padding: props.padding,
+      header: Boolean(props.header),
+      title: Boolean(props.title),
+      actions: Boolean(props.actions),
+    }),
+  );
 
   return (
     <section
       class={`yohu-panel${props.class ? ` ${props.class}` : ""}`}
-      classList={{
-        "yohu-panel--pane": pane(),
-        [`yohu-panel--padding-${padding()}`]: true,
-        ...props.classList,
-      }}
+      classList={props.classList}
+      data-variant={host()["data-variant"]}
+      data-padding={host()["data-padding"]}
+      data-header={host()["data-header"]}
       aria-label={props["aria-label"]}
     >
       <div class="yohu-panel__clip">
-        <Show when={props.header}>
-          <div class="yohu-panel__header yohu-panel__header--custom">{props.header}</div>
+        <Show when={host()["data-header"] === "custom"}>
+          <div class="yohu-panel__header">{props.header}</div>
         </Show>
-        <Show when={!props.header && pane() && (props.title || props.actions)}>
+        <Show when={host()["data-header"] === "pane"}>
           <header class="yohu-panel__header">
             <Show when={props.title}>
               <h3 class="yohu-panel__heading">{props.title}</h3>
@@ -61,7 +63,7 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
             </Show>
           </header>
         </Show>
-        <Show when={!props.header && !pane() && props.title}>
+        <Show when={host()["data-header"] === "card-title"}>
           <h3 class="yohu-panel__title">{props.title}</h3>
         </Show>
         <div class="yohu-panel__body">{props.children}</div>

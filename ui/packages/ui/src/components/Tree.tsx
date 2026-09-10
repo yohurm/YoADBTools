@@ -1,5 +1,5 @@
 /**
- * YoTree —— 泛型树。
+ * YoTree —— 泛型树（L4 视图）。
  * HarmonyOS 对照：Tree；命令库等层级导航。
  * 受控 API：data / onSelect / expandedKeys / defaultExpandedKeys。
  *
@@ -9,7 +9,8 @@
  *
  * ARIA：`role=tree/treeitem` + `aria-expanded` + roving tabindex（仅焦点节点 tabindex=0）。
  * 受控展开（expandedKeys）或默认展开（defaultExpandedKeys）。
- * 子树用 YoCollapse，关闭后仍挂载（aria-hidden），高度 200ms 过渡。
+ * 子树用 YoCollapse，关闭后仍挂载（aria-hidden），高度走 MotionSpec。
+ * 选中只挂 yohu-interactive--selected；单选滑块走 YoIndicator fill，不自绘第二套选中底。
  */
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
@@ -18,7 +19,15 @@ import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/collapse";
 import { YoIndicator } from "../motion/indicator";
 import { YoBadge } from "./Badge";
-import { flattenVisible, parentIndex, treeKeyIntent } from "./tree-model";
+import { YoTooltip } from "./Tooltip";
+import { flattenVisible, treeHasChildren, treeKeySelector } from "./tree-model";
+import {
+  isTreeControlled,
+  isTreeExpanded,
+  resolveTreeKeyAction,
+  toggleExpandedSet,
+  treeRowAttrs,
+} from "./tree-policy";
 import "./Tree.css";
 
 export interface TreeNode<T = unknown> {
@@ -47,7 +56,7 @@ export interface YoTreeProps<T = unknown> {
   defaultExpandedKeys?: string[];
   /** 选中回调 */
   onSelect?: (key: string, node: TreeNode<T>) => void;
-  /** 行高（px），默认 30 */
+  /** 行高（px）；缺省走 --yohu-row-height-nav，禁止套数据行 --yohu-row-height */
   rowHeight?: number;
 }
 
@@ -55,36 +64,16 @@ export interface YoTreeProps<T = unknown> {
  * 渲染一棵可展开/选中的树。
  */
 export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
-  const rowHeight = (): number => props.rowHeight ?? 30;
-  const controlled = (): boolean => props.expandedKeys !== undefined;
-
   const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set(props.defaultExpandedKeys ?? []));
   const [selected, setSelected] = createSignal<string | null>(null);
   const [focusedKey, setFocusedKey] = createSignal<string | null>(null);
   let root: HTMLDivElement | undefined;
-  // 属性值选择器转义（引号/反斜杠），避免依赖 CSS.escape（jsdom 测试环境缺失）。
-  const keySelector = (key: string): string =>
-    `[data-tree-key="${String(key).replace(/[\\"]/g, (c) => (c === '"' ? '\\"' : '\\\\'))}"]`;
 
-  const isExpanded = (key: string): boolean => {
-    const ek = props.expandedKeys;
-    if (ek === undefined) {
-      return expanded().has(key);
-    }
-    return ek instanceof Set ? ek.has(key) : ek.includes(key);
-  };
+  const isExpanded = (key: string): boolean => isTreeExpanded(key, props.expandedKeys, expanded());
 
   const toggle = (key: string): void => {
-    if (controlled()) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
+    if (isTreeControlled(props.expandedKeys)) return;
+    setExpanded((prev) => toggleExpandedSet(prev, key));
   };
 
   const select = (node: TreeNode<T>): void => {
@@ -96,66 +85,53 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
 
   const focusKey = (key: string): void => {
     setFocusedKey(key);
-    // 限定在自身树内查找（避免多 YoTree 命中错误节点），并对 key 做 CSS 转义。
-    const el = root?.querySelector<HTMLElement>(keySelector(key));
+    const el = root?.querySelector<HTMLElement>(treeKeySelector(key));
     el?.focus();
   };
 
   const onTreeKeyDown = (event: KeyboardEvent): void => {
-    const visible = rows();
-    if (visible.length === 0) return;
-    const focused = focusedKey() ?? selected() ?? visible[0]!.node.key;
-    const index = visible.findIndex((r) => r.node.key === focused);
-    const current = index >= 0 ? visible[index]! : visible[0]!;
-    const hasChildren = !!current.node.children && current.node.children.length > 0;
-    const intent = treeKeyIntent(
-      event.key,
-      index,
-      visible.length,
-      hasChildren,
-      isExpanded(current.node.key),
-    );
-    if (!intent) return;
+    const action = resolveTreeKeyAction(event.key, rows(), focusedKey(), selected(), isExpanded);
+    if (!action) return;
     event.preventDefault();
-    switch (intent.type) {
-      case "focus": {
-        const next = visible[intent.index];
-        if (next) focusKey(next.node.key);
-        break;
-      }
-      case "toggle":
-        toggle(current.node.key);
-        break;
-      case "parent": {
-        const parent = parentIndex(visible, index);
-        if (parent !== null) focusKey(visible[parent]!.node.key);
-        break;
-      }
-      case "select":
-        select(current.node);
-        break;
+    if (action.type === "focus") {
+      focusKey(action.key);
+      return;
     }
+    const current = rows().find((row) => row.node.key === action.key)?.node;
+    if (!current) return;
+    if (action.type === "toggle") {
+      toggle(current.key);
+      return;
+    }
+    select(current);
   };
 
   const renderNodes = (nodes: TreeNode<T>[], depth: number): JSX.Element => (
     <For each={nodes}>
       {(node) => {
-        const hasChildren = !!node.children && node.children.length > 0;
+        const hasChildren = treeHasChildren(node);
         const expandedNow = (): boolean => hasChildren && isExpanded(node.key);
+        const attrs = () =>
+          treeRowAttrs({
+            key: node.key,
+            selectedKey: selected(),
+            focusedKey: focusedKey(),
+            hasChildren,
+            expanded: expandedNow(),
+          });
         return (
           <>
             <div
               data-tree-key={node.key}
               class="yohu-tree__row yohu-interactive yohu-focus-ring--inset"
               classList={{
-                "yohu-interactive--selected": selected() === node.key,
+                "yohu-interactive--selected": attrs().selected,
               }}
               role="treeitem"
-              aria-expanded={hasChildren ? expandedNow() : undefined}
-              aria-selected={selected() === node.key}
-              tabindex={focusedKey() === node.key ? 0 : -1}
+              aria-expanded={attrs()["aria-expanded"]}
+              aria-selected={attrs()["aria-selected"]}
+              tabindex={attrs().tabindex}
               style={{
-                height: `${rowHeight()}px`,
                 "padding-left": `calc(${depth} * var(--yohu-space-lg))`,
               }}
               onClick={() => {
@@ -181,12 +157,12 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                   </span>
                 </button>
               ) : (
-                <span class="yohu-tree__chevron yohu-tree__chevron--leaf" />
+                <span class="yohu-tree__chevron" data-leaf="" />
               )}
               {node.icon ? <Icon name={node.icon} size={Layout.IconSm} /> : null}
-              <span class="yohu-tree__label" title={node.title}>
-                {node.label}
-              </span>
+              <YoTooltip content={node.title ?? node.label} disabled={!node.title}>
+                <span class="yohu-tree__label">{node.label}</span>
+              </YoTooltip>
               {node.badge ? <YoBadge text={node.badge} /> : null}
             </div>
             <Show when={hasChildren}>
@@ -199,7 +175,17 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
   );
 
   return (
-    <div ref={root} class="yohu-tree" role="tree" aria-label="树" tabindex={0} onKeyDown={onTreeKeyDown}>
+    <div
+      ref={root}
+      class="yohu-tree"
+      role="tree"
+      aria-label="树"
+      tabindex={0}
+      onKeyDown={onTreeKeyDown}
+      style={
+        props.rowHeight !== undefined ? { "--yohu-tree-row-height": `${props.rowHeight}px` } : undefined
+      }
+    >
       <YoIndicator follow={selected()} variant="fill" />
       {renderNodes(props.data, 0)}
     </div>

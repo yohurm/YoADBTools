@@ -2,3 +2,80 @@
   display: block;
   flex-shrink: 0;
 }
+
+.yohu-file-icon[data-file-icon="folder"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-folder);
+}
+.yohu-file-icon[data-file-icon="folder"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-folder-mark);
+}
+
+.yohu-file-icon[data-file-icon="file"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-file);
+}
+.yohu-file-icon[data-file-icon="file"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-file-mark);
+}
+
+.yohu-file-icon[data-file-icon="text"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-text);
+}
+.yohu-file-icon[data-file-icon="text"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-text-mark);
+}
+
+.yohu-file-icon[data-file-icon="apk"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-apk);
+}
+.yohu-file-icon[data-file-icon="apk"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-apk-mark);
+}
+
+.yohu-file-icon[data-file-icon="image"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-image);
+}
+.yohu-file-icon[data-file-icon="image"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-image-mark);
+}
+
+.yohu-file-icon[data-file-icon="video"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-video);
+}
+.yohu-file-icon[data-file-icon="video"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-video-mark);
+}
+
+.yohu-file-icon[data-file-icon="audio"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-audio);
+}
+.yohu-file-icon[data-file-icon="audio"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-audio-mark);
+}
+
+.yohu-file-icon[data-file-icon="archive"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-archive);
+}
+.yohu-file-icon[data-file-icon="archive"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-archive-mark);
+}
+
+.yohu-file-icon[data-file-icon="xml"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-xml);
+}
+.yohu-file-icon[data-file-icon="xml"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-xml-mark);
+}
+
+.yohu-file-icon[data-file-icon="json"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-json);
+}
+.yohu-file-icon[data-file-icon="json"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-json-mark);
+}
+
+.yohu-file-icon[data-file-icon="pdf"] [data-fill="body"] {
+  fill: var(--yohu-file-icon-pdf);
+}
+.yohu-file-icon[data-file-icon="pdf"] [data-fill="mark"] {
+  fill: var(--yohu-file-icon-pdf-mark);
+}

@@ -7,7 +7,9 @@ describe("YoProgressBar", () => {
     const { container } = render(() => <YoProgressBar value={50} />);
     const bar = container.querySelector(".yohu-progress__bar") as HTMLElement;
     expect(bar.style.width).toBe("50%");
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50");
+    const host = screen.getByRole("progressbar");
+    expect(host.getAttribute("aria-valuenow")).toBe("50");
+    expect(host.getAttribute("data-mode")).toBe("determinate");
   });
 
   it("value 夹取到 0-100", () => {
@@ -15,8 +17,12 @@ describe("YoProgressBar", () => {
     expect((container.querySelector(".yohu-progress__bar") as HTMLElement).style.width).toBe("100%");
   });
 
-  it("不定态应用 indeterminate 类", () => {
+  it("不定态应用 class 与 data-mode，不写宽度", () => {
     const { container } = render(() => <YoProgressBar indeterminate />);
-    expect(container.querySelector(".yohu-progress--indeterminate")).toBeTruthy();
+    const host = container.querySelector(".yohu-progress") as HTMLElement;
+    expect(host.getAttribute("data-mode")).toBe("indeterminate");
+    expect(host.getAttribute("data-mode")).toBe("indeterminate");
+    expect(host.getAttribute("aria-valuenow")).toBeNull();
+    expect((container.querySelector(".yohu-progress__bar") as HTMLElement).style.width).toBe("");
   });
 });

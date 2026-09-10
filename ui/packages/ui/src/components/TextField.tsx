@@ -1,13 +1,20 @@
 /**
- * YoTextField —— 单行输入框。
- * HarmonyOS 对照：TextInput；focus 边框 Accent；IME 走受控 value。
- * 受控 API：value / onInput / label / placeholder / ariaLabel / clearable / type / disabled。
+ * YoTextField —— 单行输入框（L4 视图）。
+ * 盒内缀 / 盒外缀 / status / 禁用由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
+ * HarmonyOS 对照：TextInput；status 边走语义 token，不引进 antd Input。
  */
-import { createUniqueId } from "solid-js";
+import { Show, createMemo, createUniqueId } from "solid-js";
 import type { JSX } from "solid-js";
-import { Icon } from "../icons";
+import { ICON_NAMES, Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
+import type { YoTextFieldStatus } from "./textfield-model";
+import { resolveTextFieldInteractive, textFieldHostAttrs } from "./textfield-policy";
 import "./TextField.css";
+
+export type { YoTextFieldStatus };
+
+/** 盒内缀：图标名或自定义节点。 */
+export type YoTextFieldAffix = IconName | JSX.Element;
 
 export interface YoTextFieldProps {
   /** 标签 */
@@ -22,18 +29,42 @@ export interface YoTextFieldProps {
   ariaLabel?: string;
   /** 禁用 */
   disabled?: boolean;
-  /** 是否显示清除按钮 */
+  /** 有值时显示清除按钮 */
   clearable?: boolean;
   /** 输入类型，默认 text */
   type?: string;
+  /** 盒内前缀（图标名或节点） */
+  prefix?: YoTextFieldAffix;
+  /** 盒内后缀（图标名或节点） */
+  suffix?: YoTextFieldAffix;
+  /** 盒外前附加 */
+  addonBefore?: JSX.Element;
+  /** 盒外后附加 */
+  addonAfter?: JSX.Element;
+  /** 校验态。默认 none */
+  status?: YoTextFieldStatus;
 }
 
-/**
- * 渲染一个带标签与可选清除按钮的受控输入框。
- */
+function isIconName(value: unknown): value is IconName {
+  return typeof value === "string" && (ICON_NAMES as readonly string[]).includes(value);
+}
+
+/** 渲染盒内缀。图标名走 Icon；其余当内容节点。 */
+function TextFieldAffix(props: { value: YoTextFieldAffix | undefined }): JSX.Element {
+  const icon = createMemo(() => (isIconName(props.value) ? props.value : undefined));
+  return (
+    <Show when={icon()} fallback={props.value}>
+      {(name) => <Icon name={name()} size={Layout.IconInline} />}
+    </Show>
+  );
+}
+
+/** 渲染输入。内容区 = 盒内缀 + input + 清除，圆角内裁剪。 */
 export function YoTextField(props: YoTextFieldProps): JSX.Element {
   const id = createUniqueId();
   let inputRef: HTMLInputElement | undefined;
+  const host = createMemo(() => textFieldHostAttrs(props));
+  const interactive = createMemo(() => resolveTextFieldInteractive(props));
 
   const handleInput = (event: InputEvent): void => {
     const target = event.currentTarget as HTMLInputElement;
@@ -47,6 +78,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
   };
 
   const handleClear = (): void => {
+    if (interactive().disabled) return;
     if (inputRef) {
       inputRef.value = "";
       inputRef.focus();
@@ -54,38 +86,69 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
     props.onInput?.("", new InputEvent("input"));
   };
 
-  const showClear = (): boolean => !!props.clearable && (props.value ?? "").length > 0;
-
   return (
-    <div class="yohu-text-field" classList={{ "yohu-text-field--disabled": !!props.disabled }}>
-      {props.label ? (
+    <div
+      class="yohu-text-field"
+      data-status={host()["data-status"]}
+      data-paint={host()["data-paint"]}
+      data-prefix={host()["data-prefix"]}
+      data-suffix={host()["data-suffix"]}
+      data-addon-before={host()["data-addon-before"]}
+      data-addon-after={host()["data-addon-after"]}
+      data-clearable={host()["data-clearable"]}
+      data-disabled={host()["data-disabled"]}
+    >
+      <Show when={props.label}>
         <label class="yohu-text-field__label" for={id}>
           {props.label}
         </label>
-      ) : null}
-      <div class="yohu-text-field__control yohu-focus-host">
-        <input
-          ref={(el) => (inputRef = el)}
-          id={id}
-          class="yohu-text-field__input"
-          type={props.type ?? "text"}
-          value={props.value ?? ""}
-          placeholder={props.placeholder ?? ""}
-          aria-label={props.ariaLabel ?? props.label}
-          disabled={props.disabled}
-          onInput={handleInput}
-          onChange={handleChange}
-        />
-        {showClear() ? (
-          <button
-            type="button"
-            class="yohu-text-field__clear yohu-focus-ring"
-            aria-label="清除"
-            onClick={handleClear}
-          >
-            <Icon name="close" size={Layout.IconInline} />
-          </button>
-        ) : null}
+      </Show>
+      <div class="yohu-text-field__group">
+        <Show when={host()["data-addon-before"]}>
+          <span class="yohu-text-field__addon" data-edge="before">
+            {props.addonBefore}
+          </span>
+        </Show>
+        <div class="yohu-text-field__control yohu-focus-host">
+          <Show when={host()["data-prefix"]}>
+            <span class="yohu-text-field__affix" data-edge="start">
+              <TextFieldAffix value={props.prefix} />
+            </span>
+          </Show>
+          <input
+            ref={(el) => (inputRef = el)}
+            id={id}
+            class="yohu-text-field__input"
+            type={props.type ?? "text"}
+            value={props.value ?? ""}
+            placeholder={props.placeholder ?? ""}
+            aria-label={props.ariaLabel ?? props.label}
+            aria-invalid={host()["aria-invalid"]}
+            disabled={host().disabled}
+            onInput={handleInput}
+            onChange={handleChange}
+          />
+          <Show when={host()["data-suffix"]}>
+            <span class="yohu-text-field__affix" data-edge="end">
+              <TextFieldAffix value={props.suffix} />
+            </span>
+          </Show>
+          <Show when={interactive().showClear}>
+            <button
+              type="button"
+              class="yohu-text-field__clear yohu-focus-ring"
+              aria-label="清除"
+              onClick={handleClear}
+            >
+              <Icon name="close" size={Layout.IconInline} />
+            </button>
+          </Show>
+        </div>
+        <Show when={host()["data-addon-after"]}>
+          <span class="yohu-text-field__addon" data-edge="after">
+            {props.addonAfter}
+          </span>
+        </Show>
       </div>
     </div>
   );

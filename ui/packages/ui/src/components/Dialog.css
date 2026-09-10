@@ -1,7 +1,7 @@
 .yohu-dialog {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--yohu-z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19,7 +19,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  /* 对话框宽度单源：受页边距约束，且不超 dialog 层上限（命令管理整页对话框放开上限见 --sized）。 */
+  /* 对话框宽度单源：受页边距约束，且不超 dialog 层上限（命令管理整页对话框放开上限见 [data-sized]）。 */
   --yohu-dialog-width: min(var(--yohu-layout-dialog-max), calc(100% - var(--yohu-layout-page-margin) * 2));
   width: var(--yohu-dialog-width);
   max-width: var(--yohu-dialog-width);
@@ -34,7 +34,7 @@
 }
 
 /* 显式 width：放开弹出框 400 上限，仍受页边距约束（命令管理等整页对话框）。 */
-.yohu-dialog__panel--sized {
+.yohu-dialog__panel[data-sized] {
   max-width: calc(100% - var(--yohu-layout-page-margin) * 2);
 }
 
