@@ -1,4 +1,4 @@
-//! OS 应用数据根与打开路径。产品子目录仍由壳用 protocol `dir::*` 拼装。
+//! OS 应用数据根、安装根与打开路径。产品子目录仍由壳用 protocol `dir::*` 拼装。
 
 use std::path::{Path, PathBuf};
 
@@ -63,6 +63,30 @@ pub fn app_data_root(product_dir_name: &str) -> PathBuf {
             .join(".local")
             .join("share")
             .join(product_dir_name)
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        PathBuf::from(".").join(product_dir_name)
+    }
+}
+
+/// 本机 per-user 安装根（载荷，与数据根分离）。
+///
+/// Windows：`%LOCALAPPDATA%\Programs\<name>`（VS Code User / Known Folder 约定）。
+/// macOS：`/Applications/<name>.app`。其它 Unix：与 [`app_data_root`] 相同（产品不交付）。
+pub fn app_install_root(product_dir_name: &str) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(base).join("Programs").join(product_dir_name)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        PathBuf::from("/Applications").join(format!("{product_dir_name}.app"))
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        app_data_root(product_dir_name)
     }
     #[cfg(not(any(windows, unix)))]
     {
@@ -140,6 +164,26 @@ mod tests {
     fn app_data_root_joins_product_name() {
         let p = app_data_root("YohuAdbTools");
         assert!(p.ends_with("YohuAdbTools"));
+    }
+
+    #[test]
+    fn app_install_root_is_not_data_root_on_windows() {
+        let data = app_data_root("YohuAdbTools");
+        let install = app_install_root("YohuAdbTools");
+        assert!(install.ends_with("YohuAdbTools"));
+        #[cfg(windows)]
+        {
+            assert!(install
+                .parent()
+                .map(|d| d.ends_with("Programs"))
+                .unwrap_or(false));
+            assert_ne!(data, install);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            assert!(install.to_string_lossy().contains("YohuAdbTools.app"));
+            assert_ne!(data, install);
+        }
     }
 
     #[test]
