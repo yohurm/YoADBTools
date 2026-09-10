@@ -60,10 +60,14 @@ export const APP_IDENTITY: AppIdentity = {
 
 export const EMPTY_PATH_CATALOG: AppPathCatalog = {
   local_root: "",
-  settings_dir: "",
+  install_dir: "",
+  config_dir: "",
   settings_file: "",
   logs_dir: "",
   data_root: "",
+  cache_dir: "",
+  webview_dir: "",
+  update_cache_dir: "",
   adb_tools_dir: "",
   library_file: "",
   exports_dir: "",

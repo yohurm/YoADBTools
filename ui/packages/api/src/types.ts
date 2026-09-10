@@ -168,10 +168,14 @@ export interface AppIdentity {
 /** 解析后的绝对路径目录（`system.info.paths`）。 */
 export interface AppPathCatalog {
   local_root: string;
-  settings_dir: string;
+  install_dir: string;
+  config_dir: string;
   settings_file: string;
   logs_dir: string;
   data_root: string;
+  cache_dir: string;
+  webview_dir: string;
+  update_cache_dir: string;
   adb_tools_dir: string;
   library_file: string;
   exports_dir: string;

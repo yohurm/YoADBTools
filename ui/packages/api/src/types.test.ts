@@ -313,14 +313,18 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(JSON.parse(JSON.stringify(identity))).toEqual(identity);
     const paths = {
       local_root: "C:/Local/YohuAdbTools",
-      settings_dir: "C:/Local/YohuAdbTools/settings",
-      settings_file: "C:/Local/YohuAdbTools/settings/settings.json",
+      install_dir: "C:/Local/Programs/YohuAdbTools",
+      config_dir: "C:/Local/YohuAdbTools/config",
+      settings_file: "C:/Local/YohuAdbTools/config/settings.json",
       logs_dir: "C:/Local/YohuAdbTools/logs",
       data_root: "C:/Local/YohuAdbTools/data",
+      cache_dir: "C:/Local/YohuAdbTools/cache",
+      webview_dir: "C:/Local/YohuAdbTools/cache/webview",
+      update_cache_dir: "C:/Local/YohuAdbTools/cache/update",
       adb_tools_dir: "C:/Local/YohuAdbTools/data/tools/adb",
       library_file: "C:/Local/YohuAdbTools/data/modules/adb-terminal/config/library.json",
       exports_dir: "C:/Local/YohuAdbTools/data/modules/log-analyzer/exports",
-      drag_out_dir: "C:/Local/YohuAdbTools/data/modules/file-manager/drag-out",
+      drag_out_dir: "C:/Local/YohuAdbTools/cache/drag-out",
     };
     expect(JSON.parse(JSON.stringify(paths))).toEqual(paths);
   });
