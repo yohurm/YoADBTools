@@ -1,8 +1,28 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v1.98（2026-09-09，日志文档行）    
-> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）。  
+> **状态：** v2.17（2026-09-10，路径错误走 YoToast）    
+> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v2.17 变更（路径错误走 YoToast）：** 路径/浏览失败不再在路径栏上方挂错误卡片。统一 `YoToaster`（`toast` 进出场，≤ `--yohu-dur-toast`）。目录不存在文案：没有这个目录，请重新输入。
+> **v2.16 变更（路径异常不跳转）：** 路径提交先 `files.list`，失败不改当前目录、不关输入。禁止 `ls` 退出码原文。v2.17 撤回页内错误条。
+> **v2.15 变更（路径输入跟内容固有宽）：** 按 CSS Forms `field-sizing: content` + `width: auto` + `min-width: 100%`，去掉 `flex: 1` / `min-width: 0`（flex 会把盒缩回槽宽）。禁止指定 `width`、禁止 JS 测宽。槽是视野；全选看开头，光标在末尾时只滚 field。揭开/收回仍只动 `clip-path`。
+> **v2.14 变更（路径输入不抖）：** 曾锁死槽宽、只靠 input 内滑。长路径看起来像挤在槽里。v2.15 改走固有宽。
+> **v2.13 变更（清单列架收口 YoUI）：** 表头与行不再各写一套 `grid-template-columns`。`YoColFrame` 只写 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；表头 `YoColRow`，行 `YoColTrack` / `YoColCell`。文件清单与日志分析同一套，禁止模块再做 LogColFrame 一类适配层，禁止再写第二份列垫。PID/TID/级别默认宽要放下标题与六位数字。
+> **v2.12 变更（路径输入伸长）：** 曾按文字宽伸长输入盒；会抖。v2.13 撤回。
+> **v2.11 变更（路径槽 clip 倒放）：** 收回按展开倒放同一条 `clip-path`（`spatial-local`）。去掉 leaving / 淡出分轨。输入仍不受控并全选。
+> **v2.10 变更（路径槽收回淡出）：** 曾把收回改成满尺寸淡出。v2.11 按倒放撤回。
+> **v2.09 变更（路径槽淡入淡出）：** 曾把展开也改成淡入，进场变差。v2.10 撤回展开侧。
+> **v2.08 变更（路径槽全选与收回）：** 曾用 `clip-path` 往返；收回不好看，全选在 WebView 里仍丢。v2.09 撤回。
+> **v2.07 变更（路径槽重做）：** 废弃 PathBar / address / editor-clip / 常驻隐藏 input。新 `AddressSlot`：一条槽一格。浏览态只有面包屑 + 流内热区按钮（吃剩余，不是第二栏）。输入关闭时不在 DOM；打开后叠在同一 `grid-area`，`clip-path` 从左向右揭开。点热区或 `Ctrl+L` 进入；点槽外 / Esc 退出。禁止再叠一层常驻 input。
+> **v2.06 变更（路径栏单击展开）：** 曾靠关闭态 `pointer-events` 与去掉 `blur` 补丁；热区仍不是流内控件。v2.07 撤回。
+> **v2.05 变更（路径栏同槽 clip-path）：** 撤回 `container-type` + `100cqi` 裁宽（WebView 里地址槽会塌成 0，面包屑和输入都看不见）。输入层始终铺满同一槽，用 `clip-path: inset(0 100% 0 0)` → `inset(0)` 从左向右揭开。
+> **v2.04 变更（路径栏同槽展开）：** 撤回右侧另起输入栏。只保留一条地址槽：面包屑 hug 在槽内，单击空白后 clip 从槽左向右铺满同一槽。禁止第二路径栏、禁止 vacant 列。
+> **v2.03 变更（路径栏向右展开）：** 曾把输入放在面包屑右侧独立列；看起来像两条路径栏。v2.04 撤回。
+> **v2.02 变更（路径栏单击淡入）：** 曾用 `YoPresence fade` 铺满整条地址区；目录名会位移。v2.03 撤回。
+> **v2.01 变更（文件路径栏分区）：** 路径行四区：上级 | 面包屑 hug | 空白槽吃剩余 | 输入层。曾用双击 + 从右 `spatial-panel` 抹开；v2.02 撤回。
+> **v2.00 变更（文件路径栏对照资源管理器）：** 撤回 v1.99 的放大镜、建议列表与 `path-suggest`。曾把整条地址槽当 XOR；v2.01 改为分区。
+> **v1.99 变更（文件路径栏）：** 曾加放大镜与前缀补全；v2.00 撤回。解析策略（引号 / `file:` URI / 反斜杠 / 别名 / 相对 / `.` `..` + 安全根）仍留给提交。
 >
 > **v1.98 变更（日志文档行）：** 展示面板分两族。Family A（日志/控制台/终端 IO）是一份格式化文档，选区只有字符 Range；Family B（文件清单 / AG Grid）才是单元格/行块，且与选字互斥、不中途换挡。日志行 DOM 文本 === `formatLogLine`（空格是字符，对照 Logcat Formatter）。禁止 Grid 列盒 + 拖选切行块。表头仍是铬层可拖宽，不驱动行几何。
 > **v1.97 变更（日志选区双模式）：** 曾对照 Logcat 做 `text`/`rows` 中途切换；v1.98 撤回。该做法不属于成熟日志面板。
@@ -29,6 +49,12 @@
 > **v1.76 变更（启动交接）**：工作台 hydrate 之后才交接。同屏共享容器、异屏出场的数值仍用 `spatialPanel` / `spatialExit`。v1.78 起引擎改为分层快照，不再拉 HWND。品牌 Logo 按创建 DPI 冻结。系统关闭窗口动画则瞬时揭窗。禁止 WebView CSS 冒充启动过场。
 > **v1.75 变更（命令终端）**：导航与页眉展示名改为「命令终端」；常量在 `yohu-protocol::module_title` / `@yohu/api` `ModuleTitle`。目录 id 仍是 `adb-terminal`。
 > **v1.74 变更（启动数据单源）**：用户可见品牌只在原生小窗。HTML `#yohu-boot` 只铺画布。主窗居中读小窗锁定的工作区，不再二次 `GetCursorPos`。删除空命令 `boot.reveal` 与 `boot-reveal.js`。揭窗只走 `boot.showMain`。
+> **v1.76 变更（日志行跟表头轨道）**：日志行改为与表头同一 `logColTemplate` 网格（对标文件清单）。单元格文案 `logLineCellText`；复制仍走 `formatLogLine`，选区偏移从单元格映射回文档。解析失败行仍通栏。
+
+> **v1.75 变更（表头靠左+列垫）**：标题改回默认靠左。`--yohu-col-header-content-pad` 左 `space-md`、右 `space-sm`（鸿蒙 PC / Finder：不贴格边，左缘与文件名起笔对齐）。
+
+> **v1.74 变更（表头铬重写）**：列缝重写成 AG Grid 短柄（热区透明、可见 2×30% border 柄；悬停 accent；拖中铺满）。删除表头 `::after` 分割线与模块首列 content-pad 覆盖。禁止再把 6px 热区当色块。
+
 > **v1.73 变更（原生启动小窗）**：双击后先出 480×300 原生小窗（GDI，对齐 Android Studio / IntelliJ），主窗隐藏 hydrate 完成后再揭大窗并关掉小窗。禁止用 WebView 当启动小窗。
 > **v1.72 变更（揭窗从可见起算）**：`boot.reveal` 在 `#yohu-boot` 入 DOM 后立刻 show，不等 JS 包 / PageLoad Finished。最短 400ms 从揭窗时刻起算，禁止把隐藏等待算进启动页。工作台 CSS 延后到 `</body>`。
 > **v1.71 变更（同窗启动层）**：`#yohu-boot` 静态品牌页（Logo + 展示名，画布色）盖住 hydrate；PageLoad 揭窗；最短 400ms 后 200ms 加速淡出。禁止第二 WebView splash。禁止启动白/黑空白 >300ms。
@@ -54,6 +80,8 @@
 >
 > **v1.59 变更（投屏外框与铬层）**：停/开保留上次编码尺寸，面板外框不拆。HWND 内缩 hairline，YoPanel 描边和 XS 阴影画在 WebView。禁止 transition 宽高。
 >
+> **v1.59 变更（列拖 sash）**：`YoColResizer` 热区与指示铬分权。6px 命中区透明；可见的是居中 hairline + 中段握柄。悬停/焦点走 `--yohu-stroke-accent`；拖中铺满表头高。可拖列隐藏 `YoColHeader` 静态分割线。禁止把热区整块涂 accent。
+
 > **v1.58 变更（投屏启动不闪）**：`mirror/state=live` 带上宽高后，加载态 HWND 与铬层 CSS 同时 contain；禁止 Loading 清零画面尺寸导致出画瞬间从铺满跳到贴合。
 >
 > **v1.57 变更（设备状态统一）**：目录与运行时状态分流（ADR-v6-025）。设备栏次行展示 Android 版本/电量；投屏深浅色读 `DeviceSession.deviceStatuses`，禁止页面 2s 轮询。
@@ -380,9 +408,9 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.1 日志分析（核心打磨对象）
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
-- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor、VS Code Output / Debug Console、Chrome DevTools Console、lnav）：一行 = `formatLogLine` 文档。文件清单对齐 Family B（AG Grid / MUI Data Grid）：行/单元格选择，复制 TSV，与原生选字互斥。禁止把 Family B 的行块拖选套到日志上，也禁止拖选中途从选字自动切行块（PostHog 等 SaaS 日志是勾选/Shift 点记录 + 消息上拖字，两套手势分开）。
-- 行结构（**文档行**，等宽 `white-space: pre` + `tabular-nums`）：文本 === `formatLogLine` / 显示列裁过的文档（testdata 含解析失败 `?` 行）。UID 来自 `logcat -v threadtime,uid`（数字或 `root`/`shell`/`wifi` 名）。字段只包 span 着色，空格与 `: ` 是文本节点。禁止用独立 Grid 盒当可选项（盒间会变成复制碎片）。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`（绑定 `--yohu-level-*`）；左条 / 级别字 / Tag 共用 ink。Error 消息同色（`--yohu-level-e`）。Fatal 级别字母反色块（`radius-2xs`，`--yohu-level-f` on `--yohu-level-f-bg`），Tag 与左条用 f-bg。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class，禁止 Tag 走 `--yohu-accent` 或 `--yohu-tag`。清单关闭行多选。`user-select: text`；复制走 `copy.ts`（选区重建文档，中间未挂载行补 `formatLogLine`）。行间 hairline 走 VirtualList 单源。
-- **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（无排序；元数据列 `YoColResizer`；消息列 flex 不拖）。轨道字符串一律 `colTrackTemplate` / `logColTemplate`；模块只 `setColWidth(key, px)`，禁止累加 delta。表头 px 轨不驱动文档行几何（对照 Logcat：列是 Formatter 字符宽，不是独立 px 网格）。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
+- **面板家族：** 日志分析对齐 Family A 的复制模型（Android Studio Logcat Editor）：载荷是 `formatLogLine` 文档。视觉列与文件清单同一套 px 轨道。禁止把 Family B 的行块拖选套到日志上，也禁止拖选中途从选字自动切行块。
+- 行结构（**与表头同轨的单元格** + 等宽 `tabular-nums`）：`YoColFrame` 写一条 `--yohu-col-tracks`，表头 `YoColRow`，行 `YoColTrack` + `YoColCell`（与文件清单同一套）。单元格文案 `logLineCellText`（不含列间空格）。复制载荷仍是 `formatLogLine`。UID 来自 `logcat -v threadtime,uid`（数字或 `root`/`shell`/`wifi` 名）。解析失败（level=`?`）`YoColCell span` 通栏，不改 template。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`（绑定 `--yohu-level-*`）；左条 / 级别字 / Tag 共用 ink。Error 消息同色（`--yohu-level-e`）。Fatal 级别字母反色块（`radius-2xs`，`--yohu-level-f` on `--yohu-level-f-bg`），Tag 与左条用 f-bg。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class，禁止 Tag 走 `--yohu-accent` 或 `--yohu-tag`。禁止模块再写 `grid-template-columns` 或第二份列垫。清单关闭行多选。`user-select: text`；复制走 `copy.ts`（选区重建文档，中间未挂载行补 `formatLogLine`）。行间 hairline 走 VirtualList 单源。
+- **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题默认靠左；列垫继承 Frame 的 `--yohu-col-cell-pad`；无排序；元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
 - 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别含以上 / Tag / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
 - 会话 Tab：标题 + 采集绿点/信号红点 + 关闭 × + 新建 +；Tab 溢出可横向滚动；右键菜单（关闭其他/重命名/复制会话）走 `logs.tab` 场景。
@@ -406,8 +434,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 清单对齐 Family B（数据网格）：行/单元格选择 + 列宽轨道，不是日志那种文档选区。禁止把日志的字符 Range 模型套过来。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 上传/下载/刷新/预览）→ `YoPanel` 资源分区（路径栏 | 四列清单）与独立预览 `YoPanel` 并列 → 有任务时另起传输 `YoPanel`（Presence `rise` 升起；标题栏可点，列表 `YoCollapse recipe=panel`）。
-- 四列清单：`YoVirtualList` 选择模式（含 ripple 与多选邻接圆角）。表头走 `YoColRow` + `YoColHeader`（轨道 + 分割线 + 前三列 `YoColResizer`）；排序钮铺满列格，走 `.yohu-interactive`（宿主 padding 0）。列宽走 YoUI `col-model` / `col-resize`，模块只 `setColWidth(key, px)`，禁止累加 delta。悬浮片铺满列矩形（inset 0 / radius-none）；「名称」左缘由首列 `--yohu-col-header-content-pad`（写在 `.yohu-col-header__label`）与行内 `.yohu-files__name` 左垫对齐，不靠行容器左右 padding，也不靠 button 宿主 padding。行间 hairline 走 VirtualList 单源（`--yohu-border`）；表头与清单背板 `--yohu-canvas`（与面板 surface 分层）；选中宿主保持透明。清单视口与日志相同：`overflow: hidden` 给虚拟列表确定高度。禁止模块再写 `.yohu-virtual-list__row` 分割线。
-- 面包屑：祖先 `--yohu-fg-2`，当前段 `--yohu-fg` + semibold（不是全段 accent，也不是选中实底）；ripple 圆角覆盖为 `radius-xs`。路径栏与清单之间不拉分割线。
+- 四列清单：`YoVirtualList` 选择模式（含 ripple 与多选邻接圆角）。与日志同一套 `YoColFrame` + `YoColRow` / `YoColHeader` + `YoColTrack` / `YoColCell`（标题默认靠左，列垫左 md / 右 sm；前三列 `YoColResizer` 短柄）。排序钮铺满列格，走 `.yohu-interactive`（宿主 padding 0）。列宽走 YoUI `col-model` / `col-resize`，模块只 `setColWidth(key, px)`，禁止累加 delta，禁止再写 `grid-template-columns`。拖条热区透明，可见铬是居中短柄，禁止整块涂 accent。悬浮片铺满列矩形（inset 0 / radius-none）。名称列不再自写左右 padding，与表头同一 `--yohu-col-cell-pad`。行间 hairline 走 VirtualList 单源（`--yohu-border`）；表头与清单背板 `--yohu-canvas`（与面板 surface 分层）；选中宿主保持透明。清单视口与日志相同：`overflow: hidden` 给虚拟列表确定高度。禁止模块再写 `.yohu-virtual-list__row` 分割线。
+- 路径行：上级钮 + **一条**地址槽（`AddressSlot`）。槽是单格：面包屑 hug（祖先 `--yohu-fg-2`，当前 `--yohu-fg` + semibold，点分段跳转）+ 流内热区吃剩余。点热区或 `Ctrl+L` 后，输入同格 `clip-path` 从左向右揭开（`spatial-local`）并全选当前路径；收回倒放同一条 clip，播完再卸。输入盒 `field-sizing: content`，`width: auto`，短路径 `min-width: 100%` 铺满槽；长路径按文字固有宽超出槽，槽当视野。禁止指定 `width`、禁止逐字改 `style.width`、禁止 `width` 走 `spatial-local`。Enter 提交：解析/安全根/设备浏览任一步失败则保持编辑态并标 invalid，清单停在原目录，`YoToast` 提示（目录不存在为「没有这个目录，请重新输入」）；成功才收回。禁止再在路径栏上方挂错误卡片。Esc / 点槽外取消。禁止第二栏、禁止常驻隐藏 input、禁止 `100cqi` / `container-type`。路径栏与清单之间不拉分割线。
 - 预览是独立 `YoPanel`（宽 `--yohu-layout-preview`），不嵌进清单卡片；右键走 `files.list` 场景（新建/下载/复制路径/删除），由壳 `YoContextMenuHost` 呈现。
 - 目录首次加载（清单为空且正在读取）走 `YoLoading`；刷新按钮仍走 `YoIconButton.loading`。空目录才是 `YoEmptyState`。
 

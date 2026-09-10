@@ -15,7 +15,7 @@
 | `adb.exec` | 短命令 |
 | `terminal.eval` / `terminal.exec` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；组编排 |
 | `commandlib.load` / `save` | 命令库；损坏备份后默认库 |
-| `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core |
+| `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。设备侧 `ls`/`rm` 等失败由 `yohu-files` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等，壳 `ipc_file`：不存在 → `not_found`，其余路径类 → `invalid_args`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
