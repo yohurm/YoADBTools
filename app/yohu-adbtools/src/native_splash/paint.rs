@@ -14,13 +14,13 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::WindowsAndMessaging::{GetClientRect, GetWindowLongPtrW, GWLP_USERDATA};
 use yohu_protocol::DISPLAY_NAME;
 
+use super::geometry::boot_dark;
 use crate::window_boot::{brand_text_color, canvas_color};
 
 pub struct PaintData {
     pub bitmap: HBITMAP,
     pub image_w: i32,
     pub image_h: i32,
-    pub dark: bool,
     /// 按创建时 DPI 冻结，不随重绘改尺寸。
     pub icon_px: i32,
     pub gap_px: i32,
@@ -56,7 +56,8 @@ pub fn paint(hwnd: HWND) {
         let mem = CreateCompatibleDC(Some(hdc));
         let back = CreateCompatibleBitmap(hdc, w, h);
         let old_back = SelectObject(mem, back.into());
-        let bg = to_colorref(canvas_color(data.dark));
+        let dark = boot_dark();
+        let bg = to_colorref(canvas_color(dark));
         let brush = CreateSolidBrush(bg);
         FillRect(mem, &client, brush);
         let _ = DeleteObject(brush.into());
@@ -104,7 +105,7 @@ pub fn paint(hwnd: HWND) {
         SelectObject(icon_dc, old_icon);
         let _ = DeleteDC(icon_dc);
 
-        SetTextColor(mem, to_colorref(brand_text_color(data.dark)));
+        SetTextColor(mem, to_colorref(brand_text_color(dark)));
         let mut text_rect = RECT {
             left: 0,
             top: icon_y + icon + gap,

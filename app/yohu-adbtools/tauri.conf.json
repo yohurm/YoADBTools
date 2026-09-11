@@ -24,7 +24,7 @@
         "height": 800,
         "minWidth": 1024,
         "minHeight": 768,
-        "center": true,
+        "center": false,
         "decorations": false,
         "shadow": true,
         "visible": false,

@@ -1,5 +1,6 @@
 //! 主窗口启动：画布色对齐 `--yohu-bg-base`；工作台 hydrate 后再揭窗。
-//! Windows 揭窗走原生小窗交接（同屏共享容器 / 异屏出场）；HTML `#yohu-boot` 只盖住隐藏 WebView 的首帧。
+//! Windows 选屏只消费启动工作区（小窗锁定的主屏），禁止 Tao `center` / 光标屏第二套。
+//! 揭窗走原生小窗交接（同屏共享容器 / 异屏出场）；HTML `#yohu-boot` 只盖住隐藏 WebView 的首帧。
 
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -45,6 +46,12 @@ pub fn canvas_color(dark: bool) -> Color {
     }
 }
 
+/// DXGI / GDI DIB 用 B8G8R8A8。启动 overlay 填色只走这里，禁止从快照角点猜。
+pub fn canvas_bgra(dark: bool) -> [u8; 4] {
+    let Color(r, g, b, a) = canvas_color(dark);
+    [b, g, r, a]
+}
+
 pub fn brand_text_color(dark: bool) -> Color {
     if dark {
         BRAND_TEXT_DARK
@@ -65,9 +72,25 @@ fn window_is_dark(win: &WebviewWindow) -> bool {
     matches!(win.theme(), Ok(WindowTheme::Dark))
 }
 
+/// 启动会话已锁则用小窗那份；无 splash（非 Windows 或尚未 store_geometry）为 None。
+fn boot_session_dark() -> Option<bool> {
+    #[cfg(windows)]
+    if crate::native_splash::last_geometry().is_some() {
+        return Some(crate::native_splash::boot_dark());
+    }
+    None
+}
+
+/// 主窗 `dark` 与启动小窗同一份：有会话用 `boot_dark` 当 System 探针，否则回退窗口。
+fn prepare_dark(pref: Theme, boot: Option<bool>, window_dark: bool) -> bool {
+    resolve_dark(pref, boot.unwrap_or(window_dark))
+}
+
 /// 按设置主题铺窗口/WebView 底色；强制浅/深时同步原生 theme。
 pub fn prepare_main_window(win: &WebviewWindow, pref: Theme) {
-    let dark = resolve_dark(pref, window_is_dark(win));
+    let boot = boot_session_dark();
+    // 有会话不采样 win.theme()，避免第三条探针跟小窗分叉。
+    let dark = prepare_dark(pref, boot, boot.is_none() && window_is_dark(win));
     if matches!(pref, Theme::Dark | Theme::Light) {
         let theme = if dark {
             WindowTheme::Dark
@@ -83,16 +106,28 @@ pub fn prepare_main_window(win: &WebviewWindow, pref: Theme) {
     } else {
         tracing::info!(ms = elapsed_ms(), dark, "主窗画布色已对齐");
     }
+    #[cfg(windows)]
+    place_on_boot_work(win);
 }
 
+/// 把 Tao 坐标写到启动工作区。交接里的 `SetWindowPos` 不更新 Tao，揭窗前必须再写一次。
 #[cfg(windows)]
-fn place_on_splash_monitor(win: &WebviewWindow) {
+fn place_on_boot_work(win: &WebviewWindow) {
     let size = win
         .outer_size()
         .unwrap_or(tauri::PhysicalSize::new(MAIN_DEFAULT_W, MAIN_DEFAULT_H));
     let (x, y) = crate::native_splash::center_on_splash_work(size.width as i32, size.height as i32);
     if let Err(e) = win.set_position(tauri::PhysicalPosition::new(x, y)) {
-        tracing::warn!(ms = elapsed_ms(), x, y, "主窗跟启动小窗同屏居中失败: {e}");
+        tracing::warn!(ms = elapsed_ms(), x, y, "主窗落到启动工作区失败: {e}");
+    } else {
+        tracing::info!(
+            ms = elapsed_ms(),
+            x,
+            y,
+            w = size.width,
+            h = size.height,
+            "主窗已落到启动工作区"
+        );
     }
 }
 
@@ -113,7 +148,8 @@ pub fn show_if_hidden(win: &WebviewWindow, reason: &'static str) {
                     return;
                 }
                 // 交接可能已用 ShowWindow 揭 HWND，Tao 的 VISIBLE 仍是 false。
-                // 不补 show：最小化会在 VISIBLE=false 分支再 SW_HIDE，窗口从任务栏消失。
+                // 先把 Tao 坐标写成启动工作区，再 show：否则会写回创建时的光标屏位置。
+                place_on_boot_work(win);
                 if let Err(e) = win.show() {
                     tracing::warn!(ms = elapsed_ms(), reason, "同步 Tao 可见状态失败: {e}");
                 }
@@ -123,7 +159,7 @@ pub fn show_if_hidden(win: &WebviewWindow, reason: &'static str) {
             }
             Err(e) => tracing::warn!(ms = elapsed_ms(), "揭窗时无法取得主窗 HWND: {e}"),
         }
-        place_on_splash_monitor(win);
+        place_on_boot_work(win);
     }
     if let Err(e) = win.show() {
         tracing::warn!(ms = elapsed_ms(), reason, "揭窗失败: {e}");
@@ -178,6 +214,8 @@ mod tests {
         assert_eq!((r, g, b, a), (0xF1, 0xF3, 0xF5, 255));
         let Color(r, g, b, a) = canvas_color(true);
         assert_eq!((r, g, b, a), (0, 0, 0, 255));
+        assert_eq!(canvas_bgra(false), [0xF5, 0xF3, 0xF1, 255]);
+        assert_eq!(canvas_bgra(true), [0, 0, 0, 255]);
         let Color(r, g, b, a) = brand_text_color(false);
         assert_eq!((r, g, b, a), (0, 0, 0, 255));
         let Color(r, g, b, a) = brand_text_color(true);
@@ -190,6 +228,22 @@ mod tests {
         assert!(!resolve_dark(Theme::Light, true));
         assert!(resolve_dark(Theme::System, true));
         assert!(!resolve_dark(Theme::System, false));
+    }
+
+    #[test]
+    fn prepare_dark_follows_boot_session_when_locked() {
+        assert!(prepare_dark(Theme::System, Some(true), false));
+        assert!(!prepare_dark(Theme::System, Some(false), true));
+        assert!(!prepare_dark(Theme::Light, Some(true), true));
+        assert!(prepare_dark(Theme::Dark, Some(false), false));
+    }
+
+    #[test]
+    fn prepare_dark_falls_back_to_window_without_boot() {
+        assert!(prepare_dark(Theme::System, None, true));
+        assert!(!prepare_dark(Theme::System, None, false));
+        assert!(!prepare_dark(Theme::Light, None, true));
+        assert!(prepare_dark(Theme::Dark, None, false));
     }
 
     #[test]

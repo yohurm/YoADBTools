@@ -21,10 +21,11 @@ pub fn same_screen(
     splash: RECT,
     target: RECT,
     overlay_pump: HWND,
+    canvas: [u8; 4],
     on_covered: impl FnOnce(),
     on_present: impl FnOnce(),
 ) {
-    let Some(overlay) = overlay::open(target, &snap, OverlayKind::Shared) else {
+    let Some(overlay) = overlay::open(target, &snap, OverlayKind::Shared, canvas) else {
         on_covered();
         on_present();
         return;
@@ -55,10 +56,11 @@ pub fn cross_screen(
     snap: Snapshot,
     splash: RECT,
     overlay_pump: HWND,
+    canvas: [u8; 4],
     on_covered: impl FnOnce(),
     on_present: impl FnOnce(),
 ) {
-    let Some(overlay) = overlay::open(splash, &snap, OverlayKind::Exit) else {
+    let Some(overlay) = overlay::open(splash, &snap, OverlayKind::Exit, canvas) else {
         on_covered();
         on_present();
         return;

@@ -1,13 +1,12 @@
-//! 启动小窗几何：逻辑尺寸、Per-Monitor V2 缩放、光标屏工作区居中。
+//! 启动小窗几何：逻辑尺寸、Per-Monitor V2 缩放、主屏工作区居中。
 
 use std::sync::Mutex;
 
 use windows::Win32::Foundation::{POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    GetMonitorInfoW, MonitorFromPoint, HMONITOR, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 pub(crate) use yohu_motion::{rect_center, rect_height, rect_width, xywh};
 
@@ -22,7 +21,7 @@ pub const USER_DEFAULT_SCREEN_DPI: u32 = 96;
 const FALLBACK_WORK_W: i32 = 1920;
 const FALLBACK_WORK_H: i32 = 1080;
 
-/// 小窗物理几何 + 当时锁定的工作区。主窗居中只读这份工作区，不再重新 GetCursorPos。
+/// 启动会话：主屏工作区 + 主题。小窗、主窗、overlay 填色只读这一份。
 #[derive(Clone, Copy, Debug)]
 pub struct SplashPlacement {
     pub x: i32,
@@ -30,6 +29,7 @@ pub struct SplashPlacement {
     pub width: i32,
     pub height: i32,
     pub dpi: u32,
+    pub dark: bool,
     pub work_left: i32,
     pub work_top: i32,
     pub work_right: i32,
@@ -37,7 +37,7 @@ pub struct SplashPlacement {
 }
 
 impl SplashPlacement {
-    pub fn from_work(work: RECT, width: i32, height: i32, dpi: u32) -> Self {
+    pub fn from_work(work: RECT, width: i32, height: i32, dpi: u32, dark: bool) -> Self {
         let (x, y) = center_in_work_area(work, width, height);
         Self {
             x,
@@ -45,6 +45,7 @@ impl SplashPlacement {
             width,
             height,
             dpi,
+            dark,
             work_left: work.left,
             work_top: work.top,
             work_right: work.right,
@@ -101,7 +102,7 @@ pub fn classify_handover(splash: RECT, main: RECT, splash_work: RECT) -> Handove
 
 static LAST_GEOMETRY: Mutex<Option<SplashPlacement>> = Mutex::new(None);
 
-/// 在工作区矩形内居中（跟 Android Studio 一样：光标所在屏，避开任务栏）。
+/// 在工作区矩形内居中（避开任务栏）。
 pub fn center_in_work_area(work: RECT, w: i32, h: i32) -> (i32, i32) {
     let x = work.left + (work.right - work.left - w) / 2;
     let y = work.top + (work.bottom - work.top - h) / 2;
@@ -115,11 +116,17 @@ pub fn scale_px(logical: i32, dpi: u32) -> i32 {
     (logical as i64 * i64::from(dpi) / i64::from(USER_DEFAULT_SCREEN_DPI)) as i32
 }
 
-pub fn cursor_monitor() -> (RECT, u32) {
+/// 主屏工作区 + 有效 DPI。主屏原点恒为 (0, 0)（MSDN Multiple Display Monitors）。
+/// 禁止 `SM_CXSCREEN`（那是虚拟屏，不是主屏工作区）。
+pub fn primary_monitor() -> (RECT, u32) {
     unsafe {
-        let mut pt = POINT::default();
-        let _ = GetCursorPos(&mut pt);
-        let mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        let mon = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+        monitor_work_dpi(mon)
+    }
+}
+
+fn monitor_work_dpi(mon: HMONITOR) -> (RECT, u32) {
+    unsafe {
         let mut dpi_x = USER_DEFAULT_SCREEN_DPI;
         let mut dpi_y = USER_DEFAULT_SCREEN_DPI;
         let _ = GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
@@ -142,21 +149,24 @@ pub fn cursor_monitor() -> (RECT, u32) {
     }
 }
 
-fn center_on_cursor(w: i32, h: i32) -> (i32, i32) {
-    let (work, _) = cursor_monitor();
-    center_in_work_area(work, w, h)
-}
-
-/// 主窗跟小窗用同一块工作区。小窗没记下时才回退到当前光标屏。
+/// 主窗与小窗共用这块启动工作区。小窗没记下时回退到当前主屏。
 pub fn center_on_splash_work(w: i32, h: i32) -> (i32, i32) {
     match last_geometry() {
         Some(g) => center_in_work_area(g.work(), w, h),
-        None => center_on_cursor(w, h),
+        None => {
+            let (work, _) = primary_monitor();
+            center_in_work_area(work, w, h)
+        }
     }
 }
 
 pub fn last_geometry() -> Option<SplashPlacement> {
     *LAST_GEOMETRY.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// 小窗锁定的主题。绘制 / overlay 填色只问这里，不另存一份。
+pub fn boot_dark() -> bool {
+    last_geometry().map(|g| g.dark).unwrap_or(false)
 }
 
 pub(super) fn store_geometry(placement: SplashPlacement) {
@@ -173,6 +183,16 @@ mod tests {
             assert!(LOGICAL_W < WINDOW_MIN_W);
             assert!(LOGICAL_H < WINDOW_MIN_H);
         }
+    }
+
+    #[test]
+    fn primary_monitor_has_positive_work_area() {
+        let (work, dpi) = primary_monitor();
+        assert!(dpi >= USER_DEFAULT_SCREEN_DPI);
+        assert!(rect_width(work) > 0);
+        assert!(rect_height(work) > 0);
+        assert!(work.right > work.left);
+        assert!(work.bottom > work.top);
     }
 
     #[test]
@@ -207,7 +227,7 @@ mod tests {
             right: 3687,
             bottom: 1186,
         };
-        store_geometry(SplashPlacement::from_work(work, 840, 525, 168));
+        store_geometry(SplashPlacement::from_work(work, 840, 525, 168, false));
         let (x, y) = center_on_splash_work(1200, 800);
         assert_eq!((x, y), center_in_work_area(work, 1200, 800));
         assert_eq!(x, 1990);
@@ -251,5 +271,19 @@ mod tests {
         let clamped = clamp_rect_min(xywh(0, 0, 400, 300), WINDOW_MIN_W, WINDOW_MIN_H);
         assert_eq!(rect_width(clamped), WINDOW_MIN_W);
         assert_eq!(rect_height(clamped), WINDOW_MIN_H);
+    }
+
+    #[test]
+    fn boot_dark_matches_stored_placement() {
+        let work = RECT {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
+        store_geometry(SplashPlacement::from_work(work, 480, 300, 96, false));
+        assert!(!boot_dark());
+        store_geometry(SplashPlacement::from_work(work, 480, 300, 96, true));
+        assert!(boot_dark());
     }
 }

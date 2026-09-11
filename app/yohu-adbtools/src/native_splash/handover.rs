@@ -13,9 +13,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::window_boot::{elapsed_ms, MAIN_DEFAULT_H, MAIN_DEFAULT_W};
 
 use super::geometry::{
-    center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height, rect_width,
-    xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
+    boot_dark, center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height,
+    rect_width, xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
 };
+use crate::window_boot::canvas_bgra;
 use super::overlay;
 use super::recipe;
 use super::window::{splash_hwnd, splash_window_rect};
@@ -76,7 +77,8 @@ pub fn to_main(main: HWND) -> bool {
     );
 
     place_main_at_target(main, target);
-    let snap = overlay::capture(splash, splash_rect);
+    let canvas = canvas_bgra(boot_dark());
+    let snap = overlay::capture(splash, splash_rect, canvas);
     let cover = || {
         tracing::info!(ms = elapsed_ms(), "启动交接：overlay 已盖住，藏小窗");
         super::hide();
@@ -89,11 +91,11 @@ pub fn to_main(main: HWND) -> bool {
     match (kind, snap) {
         (HandoverKind::SameScreen, Some(snap)) => {
             tracing::info!(ms = elapsed_ms(), "启动交接：同屏共享容器");
-            recipe::same_screen(snap, splash_rect, target, main, cover, present);
+            recipe::same_screen(snap, splash_rect, target, main, canvas, cover, present);
         }
         (HandoverKind::CrossScreen, Some(snap)) => {
             tracing::info!(ms = elapsed_ms(), "启动交接：异屏出场");
-            recipe::cross_screen(snap, splash_rect, main, cover, present);
+            recipe::cross_screen(snap, splash_rect, main, canvas, cover, present);
         }
         _ => {
             tracing::info!(ms = elapsed_ms(), "启动交接：无快照，瞬时");

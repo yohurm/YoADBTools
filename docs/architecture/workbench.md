@@ -42,14 +42,14 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
 
 同窗启动层已改为 **原生小窗 → 主窗**（Android Studio / IntelliJ SplashManager / keyhop Win32 GDI；禁止第二 WebView splash，见 tauri#1850）：
 
-1. 进程入口立刻画 480×300 无边框原生小窗（GDI，图标 + 展示名，画布色对齐 `--yohu-bg-base`）。Tauri 是 Per-Monitor V2，GDI 不会自动缩放：尺寸用光标所在屏 `GetDpiForMonitor` 做 `MulDiv(logical, dpi, 96)`，再在该屏工作区居中。禁止 `dpi/96` 整数截断，禁止主屏 `SM_CXSCREEN`。**不等** WebView2。
-2. 主窗 `visible: false` 创建并加载工作台（`tauri.conf` `center: true` 可能把隐藏主窗放在主屏）；HTML `#yohu-boot` 只铺画布色盖住隐藏中的 hydrate，用户看不见，也不再画 Logo。
+1. 进程入口立刻画 480×300 无边框原生小窗（GDI，图标 + 展示名）。原生启动画布出口是 `window_boot::canvas_color` / `canvas_bgra`，对齐 `--yohu-bg-base`。`SplashPlacement` 锁定几何 + dark；绘制、overlay 与 `prepare_main_window` 问 `boot_dark()`，不另存一份。`Theme::System` 禁止再采 `win.theme()`。默认落在**主屏**工作区居中，不跟光标屏。Tauri 是 Per-Monitor V2，GDI 不会自动缩放：尺寸用主屏 `GetDpiForMonitor` 做 `MulDiv(logical, dpi, 96)`。禁止 `dpi/96` 整数截断，禁止 `SM_CXSCREEN`（虚拟屏宽）。**不等** WebView2。
+2. 主窗 `visible: false` 创建并加载工作台。Windows 禁止 `center: true`（Tao 自持坐标，揭 `show` 会写回，跟光标屏）。创建后与揭窗前都用小窗锁定的主屏工作区 `set_position`。HTML `#yohu-boot` 只铺画布色盖住隐藏中的 hydrate，用户看不见，也不再画 Logo。
 3. `settingsStore.load` + `deviceStore.load` 完成 → 拆掉 HTML 层 → 双 rAF → `windowShow`（`boot.showMain`）。壳在 **工作台已画好之后** 才交接，禁止边 hydrate 边播动画。
 4. 交接分类（小窗矩形 vs 隐藏主窗矩形是否落在小窗锁定的工作区）：
-   - **同屏**：主窗一次落到最终外框（仍隐藏）。Shared overlay 盖住后再藏小窗；fill morph 铺满之后才 `ShowWindow` 主窗，再 100ms 淡出 overlay。禁止在 morph 期间让工作台从透明区透出。禁止 `SetWindowPos` 插值小窗/主窗尺寸。
+   - **同屏**：主窗一次落到最终外框（仍隐藏）。Shared overlay 盖住后再藏小窗；fill morph 铺满之后才 `ShowWindow` 主窗，再 100ms 淡出 overlay。Shared fill 2×2 只消费 `canvas_bgra(boot_dark())`，不从 Snapshot 角点猜色。capture 客户区 DC，DIB 先铺画布色再 BitBlt。禁止 `fill_pixels` 采样快照角点。禁止在 morph 期间让工作台从透明区透出。禁止 `SetWindowPos` 插值小窗/主窗尺寸。
    - **异屏**：主窗一次落到小窗锁定的工作区（仍隐藏）。Exit overlay 出场结束后才揭主窗。禁止跨屏共享几何、禁止主窗 HWND 放大。视线留在小窗那块屏。
    - 系统 `SPI_GETCLIENTAREAANIMATION` 关闭时瞬时揭窗。
-   - 时长 / 曲线 / 消息泵 / `IDCompositionAnimation` 采样只走 `yohu-motion`。overlay HWND 与配方留在 `native_splash`，禁止引用投屏。
+   - 时长 / 曲线 / 消息泵 / `IDCompositionAnimation` 采样只走 `yohu-motion`。overlay HWND 与配方留在 `native_splash`。禁止 `yohu-motion` 持画布色，禁止引用投屏。投屏 `stage_palette` 是另一条 surface 链，不进本链路。
 5. `device.refresh` 在 `boot.showMain` **返回后**（动画已结束）发起，与 core 预热单飞。
 6. 2.5s 超时从壳 setup 完成起算（不是进程入口），避免小窗 + WebView2 创建把预算吃光后抢跑交接。Media Foundation HEVC 探测后置。
 

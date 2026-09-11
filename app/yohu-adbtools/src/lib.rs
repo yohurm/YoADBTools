@@ -102,6 +102,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             w = g.width,
             h = g.height,
             dpi = g.dpi,
+            dark = g.dark,
             work_left = g.work_left,
             work_top = g.work_top,
             work_right = g.work_right,

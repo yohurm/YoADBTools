@@ -1,5 +1,6 @@
 //! L2：冻结 HWND 快照，作为 DComp Visual 的 content。
 //! overlay HWND 外框固定；运动只改 Offset / Scale / Opacity。禁止 UpdateLayeredWindow，禁止改 HWND 尺寸。
+//! Shared fill 与快照底只消费启动画布 BGRA，禁止从快照角点猜色。
 
 use windows::core::{w, Interface};
 use windows::Win32::Foundation::{HWND, RECT};
@@ -23,7 +24,7 @@ use windows::Win32::Graphics::Dxgi::{
     DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, DXGI_USAGE_RENDER_TARGET_OUTPUT,
 };
 use windows::Win32::Graphics::Gdi::{
-    BitBlt, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetWindowDC, ReleaseDC,
+    BitBlt, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC,
     SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, RGBQUAD, SRCCOPY,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -314,20 +315,21 @@ impl Overlay {
     }
 }
 
-pub fn capture(hwnd: HWND, rect: RECT) -> Option<Snapshot> {
+pub fn capture(hwnd: HWND, rect: RECT, canvas: [u8; 4]) -> Option<Snapshot> {
     let w = rect_width(rect).max(1);
     let h = rect_height(rect).max(1);
     unsafe {
         let (dc, bmp, old, bits) = dib(w, h)?;
-        let window_dc = GetWindowDC(Some(hwnd));
-        if window_dc.is_invalid() {
+        fill_dib(bits, w, h, canvas);
+        let client_dc = GetDC(Some(hwnd));
+        if client_dc.is_invalid() {
             SelectObject(dc, old);
             let _ = DeleteObject(bmp.into());
             let _ = DeleteDC(dc);
             return None;
         }
-        let _ = BitBlt(dc, 0, 0, w, h, Some(window_dc), 0, 0, SRCCOPY);
-        ReleaseDC(Some(hwnd), window_dc);
+        let _ = BitBlt(dc, 0, 0, w, h, Some(client_dc), 0, 0, SRCCOPY);
+        ReleaseDC(Some(hwnd), client_dc);
         opaque_alpha(bits, w, h);
         let n = (w as usize) * (h as usize) * 4;
         let mut pixels = vec![0u8; n];
@@ -341,11 +343,11 @@ pub fn capture(hwnd: HWND, rect: RECT) -> Option<Snapshot> {
     }
 }
 
-pub fn open(screen: RECT, snap: &Snapshot, kind: OverlayKind) -> Option<Overlay> {
+pub fn open(screen: RECT, snap: &Snapshot, kind: OverlayKind, canvas: [u8; 4]) -> Option<Overlay> {
     let w = rect_width(screen).max(1);
     let h = rect_height(screen).max(1);
     let hwnd = create_hwnd(screen.left, screen.top, w, h)?;
-    match attach(hwnd, w, h, snap, kind) {
+    match attach(hwnd, w, h, snap, kind, canvas) {
         Some(overlay) => Some(overlay),
         None => {
             unsafe {
@@ -356,7 +358,14 @@ pub fn open(screen: RECT, snap: &Snapshot, kind: OverlayKind) -> Option<Overlay>
     }
 }
 
-fn attach(hwnd: HWND, w: i32, h: i32, snap: &Snapshot, kind: OverlayKind) -> Option<Overlay> {
+fn attach(
+    hwnd: HWND,
+    w: i32,
+    h: i32,
+    snap: &Snapshot,
+    kind: OverlayKind,
+    canvas: [u8; 4],
+) -> Option<Overlay> {
     let content_w = snap.w.max(1);
     let content_h = snap.h.max(1);
     let (d3d, context) = create_device()?;
@@ -378,7 +387,7 @@ fn attach(hwnd: HWND, w: i32, h: i32, snap: &Snapshot, kind: OverlayKind) -> Opt
                 &factory,
                 FILL_CONTENT,
                 FILL_CONTENT,
-                &fill_pixels(snap)?,
+                &fill_tile(canvas),
             )?;
             let fill = unsafe { device.CreateVisual().ok()? };
             let fill_scale = unsafe { device.CreateScaleTransform().ok()? };
@@ -541,21 +550,24 @@ fn present_bits(
     Some(swapchain)
 }
 
-fn fill_pixels(snap: &Snapshot) -> Option<[u8; 16]> {
-    if snap.pixels.len() < 4 {
-        return None;
-    }
-    let px = [
-        snap.pixels[0],
-        snap.pixels[1],
-        snap.pixels[2],
-        snap.pixels[3],
-    ];
+fn fill_tile(canvas: [u8; 4]) -> [u8; 16] {
     let mut out = [0u8; 16];
     for i in 0..4 {
-        out[i * 4..i * 4 + 4].copy_from_slice(&px);
+        out[i * 4..i * 4 + 4].copy_from_slice(&canvas);
     }
-    Some(out)
+    out
+}
+
+fn fill_dib(bits: *mut u8, w: i32, h: i32, canvas: [u8; 4]) {
+    if bits.is_null() {
+        return;
+    }
+    let n = (w as usize) * (h as usize);
+    unsafe {
+        for i in 0..n {
+            std::ptr::copy_nonoverlapping(canvas.as_ptr(), bits.add(i * 4), 4);
+        }
+    }
 }
 
 fn apply_pose_anim(
@@ -649,4 +661,20 @@ unsafe extern "system" fn wnd_proc(
     lparam: windows::Win32::Foundation::LPARAM,
 ) -> windows::Win32::Foundation::LRESULT {
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::window_boot::canvas_bgra;
+
+    #[test]
+    fn shared_fill_is_boot_canvas_not_snapshot_corner() {
+        let light = fill_tile(canvas_bgra(false));
+        assert_eq!(&light[0..4], &[0xF5, 0xF3, 0xF1, 255]);
+        assert_eq!(&light[12..16], &[0xF5, 0xF3, 0xF1, 255]);
+        assert_ne!(&light[0..4], &[0, 0, 0, 255]);
+        let dark = fill_tile(canvas_bgra(true));
+        assert_eq!(&dark[0..4], &[0, 0, 0, 255]);
+    }
 }

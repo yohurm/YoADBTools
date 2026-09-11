@@ -21,7 +21,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use yohu_protocol::DISPLAY_NAME;
 
 use super::geometry::{
-    cursor_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, CORNER_LOGICAL,
+    primary_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, CORNER_LOGICAL,
     FONT_LOGICAL, ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
 };
 use super::icon::{create_bitmap, load_icon, scale_bitmap};
@@ -92,13 +92,14 @@ fn show_inner(dark: bool) -> Result<(), String> {
         let _ = RegisterClassExW(&wc);
 
         let screen_dc = GetDC(None);
-        let (work, dpi) = cursor_monitor();
+        let (work, dpi) = primary_monitor();
         let mut title: Vec<u16> = DISPLAY_NAME.encode_utf16().chain([0]).collect();
         let placement = SplashPlacement::from_work(
             work,
             scale_px(LOGICAL_W, dpi),
             scale_px(LOGICAL_H, dpi),
             dpi,
+            dark,
         );
 
         let hwnd = CreateWindowExW(
@@ -118,7 +119,7 @@ fn show_inner(dark: bool) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
         // MSDN Direct2D：HWND 建好后用窗口自己的 DPI 再 MulDiv，不能信创建前的 96。
-        // 工作区仍用创建前锁定的那块，避免再次 GetCursorPos 把主窗送到另一屏。
+        // 工作区仍用创建前锁定的主屏，避免二次选屏把主窗送到另一块显示器。
         let hwnd_dpi = GetDpiForWindow(hwnd);
         let dpi = if hwnd_dpi >= USER_DEFAULT_SCREEN_DPI {
             hwnd_dpi
@@ -130,6 +131,7 @@ fn show_inner(dark: bool) -> Result<(), String> {
             scale_px(LOGICAL_W, dpi),
             scale_px(LOGICAL_H, dpi),
             dpi,
+            dark,
         );
         store_geometry(placement);
         let radius = scale_px(CORNER_LOGICAL, dpi);
@@ -170,7 +172,6 @@ fn show_inner(dark: bool) -> Result<(), String> {
             bitmap,
             image_w: icon_px,
             image_h: icon_px,
-            dark,
             icon_px,
             gap_px: scale_px(BRAND_GAP_LOGICAL, dpi),
             font_px: scale_px(FONT_LOGICAL, dpi),

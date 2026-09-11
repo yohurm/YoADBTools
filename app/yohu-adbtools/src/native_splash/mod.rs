@@ -24,7 +24,7 @@ use yohu_protocol::Theme;
 
 use crate::window_boot::resolve_dark;
 
-pub use geometry::{center_on_splash_work, last_geometry};
+pub use geometry::{boot_dark, center_on_splash_work, last_geometry};
 pub use handover::to_main;
 
 pub fn system_dark() -> bool {
