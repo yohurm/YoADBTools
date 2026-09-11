@@ -1,33 +1,33 @@
 /**
- * 命令管理右栏：恰好 1 条才出属性；多选只报条数。
+ * 命令管理右栏：选区 → createMemo(editorTarget) → 互斥 Show。
  * 铬走 YoPanel pane，与组 / 条目对齐高度与圆角。字段 hug 靠顶（fill 只铺宽）。
  */
 
-import { Show } from "solid-js";
+import { Show, createMemo } from "solid-js";
 
-import { COMMAND_BLOCK_GAPS_MS, commandBlockGapLabel } from "@yohu/api";
-import { YoFormRow, YoPanel, YoSelect, YoTextField } from "@yohu/ui";
+import { YoPanel, YoTextField } from "@yohu/ui";
 
-import { commandBody, formatAdbLine } from "../command-line";
-import { BlockSteps } from "./BlockSteps";
+import { BlockEditor } from "./BlockEditor";
+import { CommandEditor } from "./CommandEditor";
+import {
+  asBlock,
+  asCommand,
+  asGroup,
+  editorPaneTitle,
+  editorTarget,
+  multiCount,
+} from "./editor-target";
 import type { CommandManagerStore } from "./store";
 
-const GAP_OPTIONS = COMMAND_BLOCK_GAPS_MS.map((ms) => ({
-  value: String(ms),
-  label: commandBlockGapLabel(ms),
-}));
-
-function editorTitle(store: CommandManagerStore): string | undefined {
-  const entry = store.selectedEntry();
-  const groupName = store.selectedGroup()?.name || "未命名组";
-  if (entry?.kind === "block") return `命令块 · ${groupName}`;
-  if (entry) return `命令属性 · ${groupName}`;
-  if (store.ui.selectedEntryIds.length > 1) return undefined;
-  if (store.selectedGroup()) return "组属性";
-  return undefined;
-}
-
 export function EditorColumn(props: { store: CommandManagerStore }) {
+  const target = createMemo(() =>
+    editorTarget({
+      group: props.store.selectedGroup(),
+      entry: props.store.selectedEntry(),
+      selectedEntryCount: props.store.ui.selectedEntryIds.length,
+    }),
+  );
+
   return (
     <YoPanel
       class="yohu-cm__editor"
@@ -35,83 +35,29 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
       padding="md"
       gap="md"
       overflow="auto"
-      title={editorTitle(props.store)}
+      title={editorPaneTitle(target())}
     >
-      <Show
-        when={props.store.selectedEntry()}
-        keyed
-        fallback={
-          <Show
-            when={props.store.ui.selectedEntryIds.length > 1}
-            fallback={
-              <Show
-                when={props.store.selectedGroup()}
-                fallback={<p class="yohu-cm__empty">选择左侧命令组，或新建一组</p>}
-              >
-                {(group) => (
-                  <YoTextField
-                    block
-                    label="组名称"
-                    value={group().name}
-                    onInput={(v) => props.store.updateGroupName(group().id, v)}
-                  />
-                )}
-              </Show>
-            }
-          >
-            <p class="yohu-cm__empty">已选 {props.store.ui.selectedEntryIds.length} 条</p>
-          </Show>
-        }
-      >
-        {(entry) => (
-          <Show
-            when={entry.kind === "block" ? entry : undefined}
-            keyed
-            fallback={
-              <>
-                <YoTextField
-                  block
-                  label="命令名称"
-                  value={entry.name}
-                  onInput={(v) => props.store.updateEntry({ name: v })}
-                />
-                <YoTextField
-                  block
-                  label="具体命令"
-                  value={formatAdbLine("-", entry.kind === "command" ? entry.template : "")}
-                  onInput={(v) => props.store.updateEntry({ template: commandBody(v) })}
-                />
-              </>
-            }
-          >
-            {(block) => (
-              <>
-                <YoTextField
-                  block
-                  label="命令块名称"
-                  value={block.name}
-                  onInput={(v) => props.store.updateEntry({ name: v })}
-                />
-                <YoFormRow title="间隔">
-                  <YoSelect
-                    block
-                    options={GAP_OPTIONS}
-                    value={String(block.gap_ms)}
-                    onChange={(v) => props.store.updateEntry({ gap_ms: Number(v) })}
-                  />
-                </YoFormRow>
-                <BlockSteps
-                  steps={block.steps}
-                  onTemplate={(stepId, template) => props.store.updateBlockStep(stepId, template)}
-                  onAdd={() => props.store.addBlockStep()}
-                  onRemove={(stepId) => props.store.removeBlockStep(stepId)}
-                  onMoveTo={(from, to) => props.store.moveBlockStepTo(from, to)}
-                  onShift={(index, delta) => props.store.shiftBlockStep(index, delta)}
-                />
-              </>
-            )}
-          </Show>
+      <Show when={asCommand(target())} keyed>
+        {(command) => <CommandEditor command={command} store={props.store} />}
+      </Show>
+      <Show when={asBlock(target())} keyed>
+        {(block) => <BlockEditor block={block} store={props.store} />}
+      </Show>
+      <Show when={asGroup(target())} keyed>
+        {(group) => (
+          <YoTextField
+            block
+            label="组名称"
+            value={group.name}
+            onInput={(v) => props.store.updateGroupName(group.id, v)}
+          />
         )}
+      </Show>
+      <Show when={multiCount(target())}>
+        {(count) => <p class="yohu-cm__empty">已选 {count()} 条</p>}
+      </Show>
+      <Show when={target().kind === "empty"}>
+        <p class="yohu-cm__empty">选择左侧命令组，或新建一组</p>
       </Show>
     </YoPanel>
   );

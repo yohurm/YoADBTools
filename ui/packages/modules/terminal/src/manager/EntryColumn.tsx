@@ -1,6 +1,7 @@
 /**
  * 命令管理中栏：条目 listbox。选区走 YoVirtualList 多选。
  * 名称之间的分割线走 tone=list；铬走 YoPanel pane，与左右栏同一圆角。
+ * 整行按住拖动换位走 YoVirtualList onReorder（拖起时收成单选该条）。
  */
 
 import { Show } from "solid-js";
@@ -23,6 +24,7 @@ export function EntryColumn(props: {
   onContextMenu: (entry: DraftEntry, event: MouseEvent) => void;
 }) {
   const entries = (): DraftEntry[] => props.store.selectedGroup()?.entries ?? [];
+  const rowHeight = Density.Comfortable.controlHeight;
 
   return (
     <YoPanel class="yohu-cm__commands" variant="pane" overflow="hidden" header={
@@ -36,7 +38,7 @@ export function EntryColumn(props: {
       <div class="yohu-cm__list">
         <YoVirtualList<DraftEntry>
           items={entries}
-          itemHeight={Density.Comfortable.controlHeight}
+          itemHeight={rowHeight}
           tone="list"
           getItemKey={(entry) => entry.id}
           ariaLabel="条目"
@@ -44,6 +46,7 @@ export function EntryColumn(props: {
           onSelectRow={(entry, _key, event) => {
             props.store.selectEntry(entry.id, pointerSelectMode(event));
           }}
+          onReorder={(from, to) => props.store.moveEntryTo(from, to)}
           onRowContextMenu={(entry, _key, event) => {
             props.onContextMenu(entry, event);
           }}

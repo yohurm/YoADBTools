@@ -159,7 +159,6 @@
   resize: none;
   overflow: auto;
   font-family: var(--yohu-font-mono);
-  height: var(--yohu-control-height);
 }
 
 .yohu-terminal__send {
@@ -169,5 +168,27 @@
 .yohu-terminal__params {
   display: flex;
   flex-direction: column;
+  gap: var(--yohu-space-md);
+}
+
+.yohu-terminal__params-section {
+  display: flex;
+  flex-direction: column;
   gap: var(--yohu-space-sm);
 }
+
+.yohu-terminal__params-caption {
+  margin: 0;
+  font-size: var(--yohu-font-caption);
+  font-weight: var(--yohu-font-weight-semibold);
+  color: var(--yohu-fg-2);
+}
+
+.yohu-terminal__params-line {
+  margin: 0;
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  color: var(--yohu-fg-1);
+  overflow-wrap: anywhere;
+}
+

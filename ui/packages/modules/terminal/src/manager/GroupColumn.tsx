@@ -1,6 +1,7 @@
 /**
  * 命令管理左栏：组 listbox。选区走 YoVirtualList 单选。
  * 铬走 YoPanel pane，与中栏 / 编辑栏同一圆角。
+ * 整行按住拖动换位走 YoVirtualList onReorder。
  */
 
 import { Density, YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } from "@yohu/ui";
@@ -10,6 +11,7 @@ import type { CommandManagerStore } from "./store";
 
 export function GroupColumn(props: { store: CommandManagerStore }) {
   const groups = (): DraftGroup[] => props.store.draft.groups;
+  const rowHeight = Density.Comfortable.controlHeight;
 
   return (
     <YoPanel class="yohu-cm__groups" variant="pane" overflow="hidden" header={
@@ -22,11 +24,12 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
       <div class="yohu-cm__list">
         <YoVirtualList<DraftGroup>
           items={groups}
-          itemHeight={Density.Comfortable.controlHeight}
+          itemHeight={rowHeight}
           getItemKey={(group) => group.id}
           ariaLabel="命令组"
           selectedKey={() => props.store.ui.selectedGroupId}
           onSelectRow={(group) => props.store.selectGroup(group.id)}
+          onReorder={(from, to) => props.store.moveGroupTo(from, to)}
           renderRow={(group) => (
             <div class="yohu-cm__row">
               <span class="yohu-cm__row-name">{group.name || "（未命名）"}</span>

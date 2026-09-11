@@ -7,7 +7,7 @@
 import { createStore } from "solid-js/store";
 
 import type { CommandLibraryDto } from "@yohu/api";
-import { nextKeys, type SelectMode } from "@yohu/ui";
+import { moveItemTo, nextKeys, type SelectMode } from "@yohu/ui";
 
 import {
   emptyBlock,
@@ -22,7 +22,6 @@ import {
   type DraftGroup,
   type DraftState,
 } from "../draft";
-import { moveStep, moveStepTo } from "./reorder";
 
 export function createCommandManagerStore() {
   const [draft, setDraft] = createStore<DraftState>({ groups: [] });
@@ -112,6 +111,10 @@ export function createCommandManagerStore() {
     selectOnly(null);
   }
 
+  function moveGroupTo(from: number, to: number): void {
+    setDraft("groups", (groups) => moveItemTo(groups, from, to));
+  }
+
   function removeGroup(): void {
     const gid = ui.selectedGroupId;
     if (!gid) return;
@@ -136,6 +139,12 @@ export function createCommandManagerStore() {
     const id = nextDraftId("b");
     setDraft("groups", (g) => g.id === gid, "entries", (es) => [...es, emptyBlock(id, nextDraftId("s"))]);
     selectOnly(id);
+  }
+
+  function moveEntryTo(from: number, to: number): void {
+    const gid = ui.selectedGroupId;
+    if (!gid) return;
+    setDraft("groups", (g) => g.id === gid, "entries", (entries) => moveItemTo(entries, from, to));
   }
 
   function removeEntries(): void {
@@ -180,13 +189,13 @@ export function createCommandManagerStore() {
   function shiftBlockStep(index: number, delta: number): void {
     const entry = selectedEntry();
     if (!entry || entry.kind !== "block") return;
-    updateEntry({ steps: moveStep(entry.steps, index, delta) });
+    updateEntry({ steps: moveItemTo(entry.steps, index, index + delta) });
   }
 
   function moveBlockStepTo(from: number, to: number): void {
     const entry = selectedEntry();
     if (!entry || entry.kind !== "block") return;
-    updateEntry({ steps: moveStepTo(entry.steps, from, to) });
+    updateEntry({ steps: moveItemTo(entry.steps, from, to) });
   }
 
   return {
@@ -206,9 +215,11 @@ export function createCommandManagerStore() {
     setError,
     updateGroupName,
     addGroup,
+    moveGroupTo,
     removeGroup,
     addCommand,
     addBlock,
+    moveEntryTo,
     removeEntries,
     updateEntry,
     updateBlockStep,

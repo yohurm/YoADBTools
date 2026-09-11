@@ -3,20 +3,18 @@
  * 点预设命令排队到输入框上方（Cursor 排队发送）；纸飞机发送队列与草稿。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
 import {
   Icon,
   YoBadge,
   YoButton,
   YoChrome,
-  YoDialog,
   YoEmptyState,
   YoIconButton,
   YoListPresence,
   YoPage,
   YoPanel,
-  YoTextField,
   YoTree,
   YoTooltip,
   motionSpecMs,
@@ -27,10 +25,13 @@ import type { CommandBlockDto, CommandGroupDto, DeviceSession, LibraryEntryDto }
 import { ModuleTitle, commandBlockGapLabel } from "@yohu/api";
 
 import { CommandManager } from "./CommandManager";
+import { ParameterDialog } from "./ParameterDialog";
 import {
   commandBody,
-  entryArity,
+  entrySlots,
   entryNeedsInput,
+  entryParams,
+  entryTemplates,
   fillTemplate,
   formatAdbLine,
 } from "./command-line";
@@ -42,58 +43,6 @@ type QueuedSend =
   | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] };
 
 let nextQueueId = 1;
-
-/** 库命令占位符填值（填完进入排队，不立刻发送）。 */
-function ParameterDialog(props: {
-  title: string;
-  arity: number;
-  open: () => boolean;
-  onClose: () => void;
-  onSubmit: (values: string[]) => void;
-}) {
-  const arity = () => props.arity;
-  const [values, setValues] = createSignal<string[]>([]);
-
-  createEffect(() => {
-    if (props.open()) {
-      setValues(Array.from({ length: arity() }, () => ""));
-    }
-  });
-
-  const submit = (): void => {
-    props.onSubmit(values());
-    props.onClose();
-  };
-
-  return (
-    <YoDialog
-      open={props.open}
-      title={`填写参数: ${props.title}`}
-      onClose={props.onClose}
-      footer={
-        <>
-          <YoButton variant="ghost" tone="neutral" onClick={props.onClose}>
-            取消
-          </YoButton>
-          <YoButton onClick={submit}>加入队列</YoButton>
-        </>
-      }
-    >
-      <div class="yohu-terminal__params">
-        <For each={Array.from({ length: arity() }, (_, i) => i)}>
-          {(index) => (
-            <YoTextField
-              block
-              label={`参数 ${index + 1}`}
-              value={values()[index] ?? ""}
-              onInput={(v) => setValues((vs) => vs.map((old, i) => (i === index ? v : old)))}
-            />
-          )}
-        </For>
-      </div>
-    </YoDialog>
-  );
-}
 
 function IoRow(props: { line: IoLine }) {
   return (
@@ -413,7 +362,9 @@ export function TerminalView(props: DeviceSession) {
       <Show when={inputEntry()}>
         <ParameterDialog
           title={inputEntry()!.name}
-          arity={entryArity(inputEntry()!)}
+          templates={entryTemplates(inputEntry()!)}
+          params={entryParams(inputEntry()!)}
+          slots={entrySlots(inputEntry()!)}
           open={inputOpen}
           onClose={() => {
             setInputOpen(false);

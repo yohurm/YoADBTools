@@ -1,17 +1,37 @@
 /**
  * 命令管理草稿模型 + DTO ↔ 草稿转换。
- * 选区在 manager/select；步骤排序在 manager/reorder；校验在 core。
+ * 选区在 manager/store；换位几何走 @yohu/ui；校验在 core。
  */
 
-import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto, type LibraryEntryDto } from "@yohu/api";
+import {
+  COMMAND_LIBRARY_SCHEMA_VERSION,
+  type CommandLibraryDto,
+  type CommandParamDto,
+  type LibraryEntryDto,
+} from "@yohu/api";
+
+import { alignParams, placeholderSlots, templatesSlots } from "./command-line";
 
 export interface DraftStep {
   id: string;
   template: string;
 }
 
-export type DraftCommand = { kind: "command"; id: string; name: string; template: string };
-export type DraftBlock = { kind: "block"; id: string; name: string; gap_ms: number; steps: DraftStep[] };
+export type DraftCommand = {
+  kind: "command";
+  id: string;
+  name: string;
+  template: string;
+  params: CommandParamDto[];
+};
+export type DraftBlock = {
+  kind: "block";
+  id: string;
+  name: string;
+  gap_ms: number;
+  steps: DraftStep[];
+  params: CommandParamDto[];
+};
 export type DraftEntry = DraftCommand | DraftBlock;
 
 export interface DraftGroup {
@@ -29,6 +49,7 @@ export const emptyCommand = (id: string): DraftCommand => ({
   id,
   name: "",
   template: "",
+  params: [],
 });
 
 export const emptyStep = (id: string): DraftStep => ({ id, template: "" });
@@ -39,6 +60,7 @@ export const emptyBlock = (id: string, stepId: string): DraftBlock => ({
   name: "",
   gap_ms: 0,
   steps: [emptyStep(stepId)],
+  params: [],
 });
 
 export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", entries: [] });
@@ -71,7 +93,13 @@ export function fromDraft(draft: DraftState): CommandLibraryDto {
 
 function entryToDraft(entry: LibraryEntryDto): DraftEntry {
   if (entry.kind === "command") {
-    return { kind: "command", id: entry.id, name: entry.name, template: entry.template };
+    return {
+      kind: "command",
+      id: entry.id,
+      name: entry.name,
+      template: entry.template,
+      params: entry.params ?? [],
+    };
   }
   return {
     kind: "block",
@@ -79,18 +107,31 @@ function entryToDraft(entry: LibraryEntryDto): DraftEntry {
     name: entry.name,
     gap_ms: entry.gap_ms,
     steps: entry.steps.map((step) => ({ id: nextDraftId("s"), template: step.template })),
+    params: entry.params ?? [],
   };
 }
 
 function entryFromDraft(entry: DraftEntry): LibraryEntryDto {
   if (entry.kind === "command") {
-    return { kind: "command", id: entry.id, name: entry.name, template: entry.template };
+    const params = alignParams(placeholderSlots(entry.template), entry.params);
+    return {
+      kind: "command",
+      id: entry.id,
+      name: entry.name,
+      template: entry.template,
+      ...(params.length > 0 ? { params } : {}),
+    };
   }
+  const params = alignParams(
+    templatesSlots(entry.steps.map((step) => step.template)),
+    entry.params,
+  );
   return {
     kind: "block",
     id: entry.id,
     name: entry.name,
     gap_ms: entry.gap_ms,
     steps: entry.steps.map((step) => ({ template: step.template })),
+    ...(params.length > 0 ? { params } : {}),
   };
 }

@@ -1,14 +1,13 @@
 /**
- * 命令块步骤列表。拖动手势只在这里；排序算法走 reorder.ts。
+ * 命令块步骤列表。拖动手势只在这里；几何走 @yohu/ui 换位 API。
  */
 
 import { For, createSignal } from "solid-js";
 
-import { Icon, YoIconButton, YoTextField } from "@yohu/ui";
+import { Icon, YoIconButton, dropIndexFromCenters, shiftForReorder } from "@yohu/ui";
 
-import { commandBody, formatAdbLine } from "../command-line";
 import type { DraftStep } from "../draft";
-import { dropIndexFromCenters, shiftForReorder } from "./reorder";
+import { TemplateField } from "./TemplateField";
 
 export function BlockSteps(props: {
   steps: DraftStep[];
@@ -119,12 +118,13 @@ export function BlockSteps(props: {
             >
               <Icon name="grip" />
             </button>
-            <YoTextField
-              block
-              ariaLabel={`步骤 ${index() + 1}`}
-              value={formatAdbLine("-", step.template)}
-              onInput={(v) => props.onTemplate(step.id, commandBody(v))}
-            />
+            <div class="yohu-cm__step-editor">
+              <TemplateField
+                ariaLabel={`步骤 ${index() + 1}`}
+                value={step.template}
+                onChange={(template) => props.onTemplate(step.id, template)}
+              />
+            </div>
             <YoIconButton
               icon="trash"
               title="删除步骤"

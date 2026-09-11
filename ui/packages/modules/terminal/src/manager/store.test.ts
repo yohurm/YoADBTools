@@ -22,6 +22,11 @@ const sample: CommandLibraryDto = {
         },
       ],
     },
+    {
+      id: "g2",
+      name: "连接性",
+      entries: [{ kind: "command", id: "c3", name: "WiFi", template: "shell dumpsys wifi" }],
+    },
   ],
 };
 
@@ -68,6 +73,23 @@ describe("命令管理 store", () => {
     const out = store.library();
     expect(out.schema_version).toBe(COMMAND_LIBRARY_SCHEMA_VERSION);
     expect(out.groups[0]!.entries.map((e) => e.kind)).toEqual(["command", "command", "block"]);
+  });
+
+  it("组与条目拖动换位，选中身份跟 id", () => {
+    const store = createCommandManagerStore();
+    store.load(sample);
+    store.selectGroup("g1");
+    store.moveGroupTo(0, 1);
+    expect(store.draft.groups.map((g) => g.id)).toEqual(["g2", "g1"]);
+    expect(store.ui.selectedGroupId).toBe("g1");
+    store.moveGroupTo(1, 0);
+    expect(store.draft.groups.map((g) => g.id)).toEqual(["g1", "g2"]);
+    store.selectOnly("c1");
+    store.moveEntryTo(0, 2);
+    expect(store.selectedGroup()?.entries.map((e) => e.id)).toEqual(["c2", "b1", "c1"]);
+    expect(store.ui.selectedEntryIds).toEqual(["c1"]);
+    store.moveEntryTo(2, 1);
+    expect(store.selectedGroup()?.entries.map((e) => e.id)).toEqual(["c2", "c1", "b1"]);
   });
 
   it("块步骤排序只改当前选中块", () => {

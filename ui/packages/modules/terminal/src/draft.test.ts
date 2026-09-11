@@ -46,6 +46,37 @@ describe("命令管理草稿（DTO ↔ 草稿）", () => {
     expect(sample.groups[0]!.name).toBe("设备信息");
   });
 
+  it("参数描述往返，空说明不落盘", () => {
+    const withParams: CommandLibraryDto = {
+      ...sample,
+      groups: [
+        {
+          ...sample.groups[0]!,
+          entries: [
+            {
+              kind: "command",
+              id: "c2",
+              name: "ping",
+              template: "shell ping -c 3 {0}",
+              params: [{ index: 0, description: "主机" }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(fromDraft(toDraft(withParams))).toEqual(withParams);
+    const draft = toDraft(withParams);
+    if (draft.groups[0]!.entries[0]!.kind === "command") {
+      draft.groups[0]!.entries[0]!.params = [
+        { index: 0, description: "主机" },
+        { index: 1, description: "多余" },
+      ];
+    }
+    expect(fromDraft(draft).groups[0]!.entries[0]).toMatchObject({
+      params: [{ index: 0, description: "主机" }],
+    });
+  });
+
   it("组下命令与命令块同级往返", () => {
     const draft = toDraft(sample);
     expect(draft.groups[0]!.entries.map((e) => e.kind)).toEqual(["command", "command", "block"]);
