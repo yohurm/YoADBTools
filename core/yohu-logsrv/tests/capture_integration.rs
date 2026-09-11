@@ -63,9 +63,9 @@ fn build_service(adb_exe: PathBuf) -> (Arc<CaptureService>, mpsc::Receiver<AppEv
 const THREE_LINES_SCRIPT: &str = r#"{
     "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"],
     "logcat_lines": [
-        "01-02 03:04:05.678  1234  5678 I TestTag: hello one",
-        "01-02 03:04:05.779  1234  5678 W TestTag: hello two",
-        "01-02 03:04:05.880  9999  5678 E OtherTag: hello three"
+        "2026-01-02 03:04:05.678  1234  5678 I TestTag: hello one",
+        "2026-01-02 03:04:05.779  1234  5678 W TestTag: hello two",
+        "2026-01-02 03:04:05.880  9999  5678 E OtherTag: hello three"
     ],
     "logcat_delay_ms": 5
 }"#;
@@ -137,7 +137,7 @@ async fn stop_keeps_ring_and_clear_empties() {
 async fn start_while_live_adopts_same_generation() {
     let (service, _rx) = build_service(isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: tick"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
             "logcat_delay_ms": 20,
             "logcat_forever": true
         }"#,
@@ -164,7 +164,7 @@ async fn start_while_live_adopts_same_generation() {
 async fn concurrent_start_during_starting_shares_one_generation() {
     let (service, _rx) = build_service(isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: tick"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
             "logcat_delay_ms": 20,
             "logcat_forever": true
         }"#,
@@ -184,7 +184,7 @@ async fn concurrent_start_during_starting_shares_one_generation() {
 async fn stop_during_start_releases_slot_and_allows_restart() {
     let (service, _rx) = build_service(isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: tick"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
             "logcat_delay_ms": 20,
             "logcat_forever": true
         }"#,
@@ -221,7 +221,7 @@ async fn stop_during_start_releases_slot_and_allows_restart() {
 async fn start_during_stop_waits_then_opens_new_generation() {
     let (service, mut rx) = build_service(isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: tick"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
             "logcat_delay_ms": 20,
             "logcat_forever": true
         }"#,
@@ -299,7 +299,7 @@ async fn device_offline_stream_ends_with_state_stopped() {
     // 假 adb 输出一行后以掉线特征退出
     let exe = isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: bye"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: bye"],
             "logcat_delay_ms": 5,
             "logcat_exit_code": 1,
             "logcat_stderr": "adb: device offline"
@@ -353,7 +353,7 @@ async fn cancel_stops_long_running_stream() {
     // 长驻流（forever）：取消令牌终止进程树
     let exe = isolated_fake_adb(
         r#"{
-            "logcat_lines": ["01-02 03:04:05.678  1  2 I T: tick"],
+            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
             "logcat_delay_ms": 20,
             "logcat_forever": true
         }"#,

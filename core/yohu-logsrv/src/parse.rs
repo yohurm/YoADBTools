@@ -1,9 +1,10 @@
 //! threadtime 行解析。
 //!
-//! 格式：`MM-DD HH:MM:SS.mmm  PID  TID L TAG: MSG`（L = V/D/I/W/E/F）。
-//! `logcat -v threadtime,uid` 在 PID 前多一列 UID：数字或名（`root`/`shell`/`wifi`/`u0_a123`）。
-//! 宽容解析：格式漂移降级为「整行消息」（pid=0、level='?'），不中断采集。
+//! 格式：`YYYY-MM-DD HH:MM:SS.mmm  PID  TID L TAG: MSG`（`logcat -v threadtime,uid,year`）。
+//! UID 列可选：数字或名（`root`/`shell`/`wifi`/`u0_a123`）。
+//! 时间戳收到统一墙钟后再进 wire。格式漂移降级为「整行消息」（pid=0、level='?'）。
 
+use yohu_domain::canonicalize_datetime;
 use yohu_protocol::LogLine;
 
 fn is_level_token(s: &str) -> bool {
@@ -45,16 +46,9 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
         return fallback();
     }
 
-    // 时间戳：`MM-DD HH:MM:SS.mmm`（usec 时小数更长，取到第一个空格前）
-    if raw.len() < 18 || raw.as_bytes().get(2) != Some(&b'-') {
+    let Some((ts, rest)) = take_timestamp(raw) else {
         return fallback();
-    }
-    let ts_end = raw
-        .find(' ')
-        .and_then(|i| raw[i + 1..].find(' ').map(|j| i + 1 + j))
-        .unwrap_or(18);
-    let ts = raw[..ts_end].to_string();
-    let rest = raw[ts_end..].trim_start();
+    };
     if rest.is_empty() {
         return fallback();
     }
@@ -116,6 +110,15 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
     }
 }
 
+/// 前两列必须是可规范化的墙钟；缺年的旧 threadtime 视为格式漂移。
+fn take_timestamp(raw: &str) -> Option<(String, &str)> {
+    let first = raw.find(' ')?;
+    let second = raw[first + 1..].find(' ')?;
+    let end = first + 1 + second;
+    let ts = canonicalize_datetime(&raw[..end])?;
+    Some((ts, raw[end..].trim_start()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,8 +126,8 @@ mod tests {
     #[test]
     fn parses_normal_line() {
         let line =
-            parse_threadtime("01-02 03:04:05.678  1234  5678 I ActivityManager: Start proc 1234");
-        assert_eq!(line.ts, "01-02 03:04:05.678");
+            parse_threadtime("2026-01-02 03:04:05.678  1234  5678 I ActivityManager: Start proc 1234");
+        assert_eq!(line.ts, "2026-01-02 03:04:05.678");
         assert_eq!(line.pid, 1234);
         assert_eq!(line.tid, 5678);
         assert_eq!(line.level, 'I');
@@ -135,7 +138,7 @@ mod tests {
 
     #[test]
     fn parses_single_char_pid() {
-        let line = parse_threadtime("01-02 03:04:05.678     1     2 E T: boom");
+        let line = parse_threadtime("2026-01-02 03:04:05.678     1     2 E T: boom");
         assert_eq!(line.pid, 1);
         assert_eq!(line.tid, 2);
         assert_eq!(line.level, 'E');
@@ -150,8 +153,15 @@ mod tests {
     }
 
     #[test]
+    fn yearless_threadtime_degrades() {
+        let line = parse_threadtime("01-02 03:04:05.678  1234  5678 I T: x");
+        assert_eq!(line.level, '?');
+        assert_eq!(line.msg, "01-02 03:04:05.678  1234  5678 I T: x");
+    }
+
+    #[test]
     fn msg_can_contain_colons() {
-        let line = parse_threadtime("01-02 03:04:05.678  100  200 W Net: http://a:8080 failed");
+        let line = parse_threadtime("2026-01-02 03:04:05.678  100  200 W Net: http://a:8080 failed");
         assert_eq!(line.tag, "Net");
         assert_eq!(line.msg, "http://a:8080 failed");
     }
@@ -165,7 +175,7 @@ mod tests {
     #[test]
     fn parses_optional_uid_column() {
         let line = parse_threadtime(
-            "05-26 11:02:36.886  1000  5689  5689 D AndroidRuntime: CheckJNI is OFF",
+            "2026-05-26 11:02:36.886  1000  5689  5689 D AndroidRuntime: CheckJNI is OFF",
         );
         assert_eq!(line.uid.as_deref(), Some("1000"));
         assert_eq!(line.pid, 5689);
@@ -177,7 +187,7 @@ mod tests {
     #[test]
     fn parses_named_uid() {
         let line = parse_threadtime(
-            "08-20 18:48:42.359 shell  1705  1705 W binder:1705_2: type=1400 audit(0.0:2200040): avc: denied",
+            "2026-08-20 18:48:42.359 shell  1705  1705 W binder:1705_2: type=1400 audit(0.0:2200040): avc: denied",
         );
         assert_eq!(line.uid.as_deref(), Some("shell"));
         assert_eq!(line.pid, 1705);
@@ -190,7 +200,7 @@ mod tests {
     #[test]
     fn parses_root_uid_empty_tag() {
         let line = parse_threadtime(
-            "08-20 18:48:42.342  root     0     0 I         : [    C4] swpm_sp_routine",
+            "2026-08-20 18:48:42.342  root     0     0 I         : [    C4] swpm_sp_routine",
         );
         assert_eq!(line.uid.as_deref(), Some("root"));
         assert_eq!(line.pid, 0);

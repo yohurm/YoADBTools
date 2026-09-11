@@ -90,7 +90,7 @@ mod tests {
     fn line(pid: u32, msg: &str) -> LogLine {
         LogLine {
             seq: 0,
-            ts: "01-01 00:00:00.000".into(),
+            ts: "2026-01-01 00:00:00.000".into(),
             pid,
             tid: 1,
             uid: None,

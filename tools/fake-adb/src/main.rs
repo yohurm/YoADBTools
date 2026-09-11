@@ -7,14 +7,14 @@
 //! ```json
 //! {
 //!   "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"],
-//!   "logcat_lines": ["01-02 03:04:05.678  1234  5678 I TestTag: hello"],
+//!   "logcat_lines": ["2026-01-02 03:04:05.678  1234  5678 I TestTag: hello"],
 //!   "logcat_delay_ms": 10,
 //!   "logcat_forever": false,
 //!   "logcat_exit_code": 0,
 //!   "logcat_stderr": "",
 //!   "ps": "PID NAME\n1234 com.test.app\n",
 //!   "packages": "package:com.test.app\npackage:com.idle.app\n",
-//!   "ls": "drwxr-xr-x 2 root root 4096 2026-01-01 12:00 DCIM\n"
+//!   "ls": "drwxr-xr-x 2 root root 4096 2026-01-01 12:00:53.423950275 +0800 DCIM\n"
 //! }
 //! ```
 

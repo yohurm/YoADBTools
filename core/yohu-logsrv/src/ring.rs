@@ -130,7 +130,7 @@ mod tests {
     fn line(seq_hint: u64) -> LogLine {
         LogLine {
             seq: seq_hint,
-            ts: "01-01 00:00:00.000".into(),
+            ts: "2026-01-01 00:00:00.000".into(),
             pid: 1,
             tid: 1,
             uid: None,

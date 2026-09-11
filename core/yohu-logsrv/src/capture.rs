@@ -20,7 +20,7 @@ use yohu_protocol::{
     AppEvent, CaptureStart, CaptureState, CaptureStatus, LogBatch, ProcessEntry, ReplayRequest,
 };
 
-const LOGCAT_FORMAT: &str = "threadtime,uid";
+const LOGCAT_FORMAT: &str = "threadtime,uid,year";
 const INDEX_INTERVAL: Duration = Duration::from_millis(2500);
 /// 取消后等跟流任务收敛的上限。超时则 abort，禁止握着 logcat 管道死等。
 const STOP_JOIN: Duration = Duration::from_secs(3);
@@ -550,8 +550,8 @@ mod tests {
             [
                 "--------- beginning of main",
                 "",
-                "01-02 03:04:05.678  1234  5678 I TestTag: hello",
-                "01-02 03:04:05.779  1000  1234  5678 W TestTag: uid-col",
+                "2026-01-02 03:04:05.678  1234  5678 I TestTag: hello",
+                "2026-01-02 03:04:05.779  1000  1234  5678 W TestTag: uid-col",
             ],
         );
         assert_eq!(added, 2);

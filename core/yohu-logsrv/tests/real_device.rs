@@ -89,6 +89,12 @@ async fn real_capture_stream_batch_and_ring() {
         sample.level,
         sample.tag
     );
+    assert_eq!(
+        yohu_domain::canonicalize_datetime(&sample.ts).as_deref(),
+        Some(sample.ts.as_str()),
+        "采集时间戳应已是统一墙钟: {}",
+        sample.ts
+    );
     // threadtime 解析质量：多数行应有时间戳与级别
     let parsed_ok = lines
         .iter()
