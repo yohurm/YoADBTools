@@ -113,7 +113,6 @@ pub struct Gpu {
     panel_r: u32,
     panel_stroke: f32,
     panel_border: u32,
-    occupancy_dest: Letterbox,
 }
 
 /// Flip 交换链不能走 GDI `SetWindowRgn`（DWM 会出黑窗）。圆角与占用盒裁在 DComp visual 上。
@@ -210,13 +209,6 @@ impl Gpu {
             panel_r: 0,
             panel_stroke: 0.0,
             panel_border: 0,
-            occupancy_dest: Letterbox {
-                x: 0,
-                y: 0,
-                width,
-                height,
-                nearest: false,
-            },
         };
         gpu.bind_backbuffer()?;
         Ok(gpu)
@@ -258,7 +250,7 @@ impl Gpu {
             return Err(windows::core::Error::from_win32());
         };
         painter.present(&self.context, &self.swapchain, spec)?;
-        self.present_with_hairline(self.occupancy_dest)
+        self.commit_frame()
     }
 
     pub fn dxgi_manager(&self) -> Option<IMFDXGIDeviceManager> {
@@ -324,13 +316,6 @@ impl Gpu {
         radius: u32,
         animate: bool,
     ) -> WinResult<bool> {
-        self.occupancy_dest = Letterbox {
-            x,
-            y,
-            width: w.max(1),
-            height: h.max(1),
-            nearest: false,
-        };
         let left = x.max(0) as f32;
         let top = y.max(0) as f32;
         let right = left + w.max(1) as f32;
@@ -348,7 +333,7 @@ impl Gpu {
         if self.vp_ok && self.blit_cpu_vp(width, height, nv12, dest).is_ok() {
             self.last_cpu = Some(nv12.to_vec());
             self.last_video = None;
-            return self.present_with_hairline(dest);
+            return self.commit_frame();
         }
         if self.vp_ok {
             self.vp_ok = false;
@@ -358,7 +343,7 @@ impl Gpu {
         self.draw_shader(dest)?;
         self.last_cpu = Some(nv12.to_vec());
         self.last_video = None;
-        self.present_with_hairline(dest)
+        self.commit_frame()
     }
 
     pub fn present_gpu_nv12(
@@ -382,7 +367,7 @@ impl Gpu {
                 Ok(()) => {
                     self.last_cpu = None;
                     self.last_video = Some((texture.clone(), subresource));
-                    return self.present_with_hairline(dest);
+                    return self.commit_frame();
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "Video Processor 本帧失败，改 staging+shader");
@@ -401,7 +386,7 @@ impl Gpu {
         self.draw_shader(dest)?;
         self.last_cpu = Some(nv12);
         self.last_video = None;
-        self.present_with_hairline(dest)
+        self.commit_frame()
     }
 
     /// ResizeBuffers 之后立刻把上一帧按新 letterbox 画回去。
@@ -765,9 +750,19 @@ impl Gpu {
         Ok(())
     }
 
-    fn present_with_hairline(&mut self, dest: Letterbox) -> WinResult<()> {
-        // clip 动画期间边由 DWM 裁；CPU 描边会和 composition 时钟抢边。
-        if self.panel_stroke > 0.0 && self.panel_border != 0 && !clip_animating(&self.dcomp) {
+    fn visible_card(&self) -> Letterbox {
+        let (left, top, right, bottom) = clip_now(&self.dcomp);
+        Letterbox {
+            x: left.round() as i32,
+            y: top.round() as i32,
+            width: (right - left).round().max(1.0) as u32,
+            height: (bottom - top).round().max(1.0) as u32,
+            nearest: false,
+        }
+    }
+
+    fn commit_frame(&mut self) -> WinResult<()> {
+        if self.panel_stroke > 0.0 && self.panel_border != 0 {
             if self.chrome.is_none() {
                 self.chrome = Some(ChromePainter::new()?);
             }
@@ -775,7 +770,7 @@ impl Gpu {
                 painter.stroke(
                     &self.context,
                     &self.swapchain,
-                    dest,
+                    self.visible_card(),
                     self.panel_r,
                     self.panel_stroke,
                     self.panel_border,

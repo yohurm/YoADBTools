@@ -8,11 +8,24 @@ use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
 use super::scale::{contain_in_zone, fit_letterbox, Letterbox};
 
 const LIGHT_SURFACE: u32 = 0xFFFFFFFF;
+const LIGHT_SURFACE_2: u32 = 0xFFE5E5EA;
 const LIGHT_FG: u32 = 0xE5000000;
 const LIGHT_FG2: u32 = 0x99000000;
+const LIGHT_BORDER: u32 = 0x66000000;
 const DARK_SURFACE: u32 = 0xFF202224;
+const DARK_SURFACE_2: u32 = 0xFF2E3033;
 const DARK_FG: u32 = 0xE5FFFFFF;
 const DARK_FG2: u32 = 0x99FFFFFF;
+const DARK_BORDER: u32 = 0x66FFFFFF;
+
+pub struct StagePalette {
+    pub canvas_argb: u32,
+    pub title_argb: u32,
+    pub body_argb: u32,
+    pub icon_argb: u32,
+    pub well_argb: u32,
+    pub border_argb: u32,
+}
 
 pub struct ChromeSpec<'a> {
     pub mode: MirrorStageMode,
@@ -21,6 +34,8 @@ pub struct ChromeSpec<'a> {
     pub canvas_argb: u32,
     pub title_argb: u32,
     pub body_argb: u32,
+    pub icon_argb: u32,
+    pub well_argb: u32,
     pub icon_px: u32,
     pub title_px: u32,
     pub body_px: u32,
@@ -35,6 +50,8 @@ pub struct ChromeDraw {
     pub canvas_argb: u32,
     pub title_argb: u32,
     pub body_argb: u32,
+    pub icon_argb: u32,
+    pub well_argb: u32,
     pub icon_px: u32,
     pub title_px: u32,
     pub body_px: u32,
@@ -49,6 +66,8 @@ impl ChromeDraw {
             canvas_argb: self.canvas_argb,
             title_argb: self.title_argb,
             body_argb: self.body_argb,
+            icon_argb: self.icon_argb,
+            well_argb: self.well_argb,
             icon_px: self.icon_px,
             title_px: self.title_px,
             body_px: self.body_px,
@@ -81,7 +100,6 @@ pub struct Stage {
     video_h: u32,
     has_frame: bool,
     mode: MirrorStageMode,
-    chrome_dirty: bool,
 }
 
 impl Stage {
@@ -109,7 +127,6 @@ impl Stage {
             video_h: 0,
             has_frame: false,
             mode: MirrorStageMode::Empty,
-            chrome_dirty: true,
         }
     }
 
@@ -154,7 +171,6 @@ impl Stage {
         }
         self.video_w = width;
         self.video_h = height;
-        self.chrome_dirty = true;
         true
     }
 
@@ -169,13 +185,11 @@ impl Stage {
         }
         self.host_w = width;
         self.host_h = height;
-        self.chrome_dirty = true;
         true
     }
 
     fn refresh(&mut self) {
         self.mode = stage_mode(self.paused, self.bound, self.has_frame);
-        self.chrome_dirty = true;
     }
 
     pub fn mode(&self) -> MirrorStageMode {
@@ -279,7 +293,7 @@ impl Stage {
     }
 
     pub fn letterbox_argb(&self) -> u32 {
-        stage_palette(self.dark()).0
+        stage_palette(self.dark()).canvas_argb
     }
 
     pub fn panel_stroke(&self) -> (f32, u32) {
@@ -290,17 +304,9 @@ impl Stage {
         }
     }
 
-    fn take_chrome_dirty(&mut self) -> bool {
-        let dirty = self.chrome_dirty;
-        self.chrome_dirty = false;
-        dirty
-    }
-
-    pub fn chrome_draw(&mut self) -> Option<ChromeDraw> {
+    /// 铬模式的回缓冲规格。`shows_chrome()` 为真则每拍都有，不是 dirty overlay。
+    pub fn chrome_draw(&self) -> Option<ChromeDraw> {
         if !self.presentable() || !self.shows_chrome() {
-            return None;
-        }
-        if self.mode != MirrorStageMode::Loading && !self.take_chrome_dirty() {
             return None;
         }
         let (title, description) = stage_copy(
@@ -310,15 +316,17 @@ impl Stage {
             self.error(),
             self.video_w > 0 && self.video_h > 0,
         );
-        let (canvas_argb, title_argb, body_argb) = stage_palette(self.dark());
+        let pal = stage_palette(self.dark());
         let (icon_px, title_px, body_px) = stage_type_px(self.dpr());
         Some(ChromeDraw {
             mode: self.mode,
             title,
             description,
-            canvas_argb,
-            title_argb,
-            body_argb,
+            canvas_argb: pal.canvas_argb,
+            title_argb: pal.title_argb,
+            body_argb: pal.body_argb,
+            icon_argb: pal.icon_argb,
+            well_argb: pal.well_argb,
             icon_px,
             title_px,
             body_px,
@@ -370,21 +378,31 @@ fn empty_copy(has_device: bool, failed: bool, error: &str) -> (&'static str, Str
     }
 }
 
-pub fn stage_palette(dark: bool) -> (u32, u32, u32) {
+pub fn stage_palette(dark: bool) -> StagePalette {
     if dark {
-        (DARK_SURFACE, DARK_FG, DARK_FG2)
+        StagePalette {
+            canvas_argb: DARK_SURFACE,
+            title_argb: DARK_FG,
+            body_argb: DARK_FG2,
+            icon_argb: DARK_FG,
+            well_argb: DARK_SURFACE_2,
+            border_argb: DARK_BORDER,
+        }
     } else {
-        (LIGHT_SURFACE, LIGHT_FG, LIGHT_FG2)
+        StagePalette {
+            canvas_argb: LIGHT_SURFACE,
+            title_argb: LIGHT_FG,
+            body_argb: LIGHT_FG2,
+            icon_argb: LIGHT_FG,
+            well_argb: LIGHT_SURFACE_2,
+            border_argb: LIGHT_BORDER,
+        }
     }
 }
 
-/// YoPanel `--yohu-border`：浅 `#00000033` / 深 `#FFFFFF33`。
+/// HWND 无 XS 阴影；描边走 `--yohu-border-strong`，避免浅色白卡吃掉 hairline。
 pub fn stage_border_argb(dark: bool) -> u32 {
-    if dark {
-        0x33FFFFFF
-    } else {
-        0x33000000
-    }
+    stage_palette(dark).border_argb
 }
 
 pub fn stage_stroke_px(dpr: f32) -> f32 {
@@ -441,10 +459,24 @@ mod tests {
 
     #[test]
     fn chrome_fill_uses_panel_surface_not_canvas() {
-        let (light, _, _) = stage_palette(false);
-        let (dark, _, _) = stage_palette(true);
-        assert_eq!(light, 0xFFFFFFFF);
-        assert_eq!(dark, 0xFF202224);
+        let light = stage_palette(false);
+        let dark = stage_palette(true);
+        assert_eq!(light.canvas_argb, 0xFFFFFFFF);
+        assert_eq!(dark.canvas_argb, 0xFF202224);
+    }
+
+    #[test]
+    fn hwnd_card_uses_border_strong() {
+        assert_eq!(stage_border_argb(false), 0x66000000);
+        assert_eq!(stage_border_argb(true), 0x66FFFFFF);
+    }
+
+    #[test]
+    fn light_empty_icon_uses_fg_and_surface_2_well() {
+        let light = stage_palette(false);
+        assert_eq!(light.icon_argb, light.title_argb);
+        assert_eq!(light.well_argb, 0xFFE5E5EA);
+        assert_eq!(light.body_argb, 0x99000000);
     }
 
     #[test]
@@ -524,5 +556,22 @@ mod tests {
         assert_eq!(s.mode(), MirrorStageMode::Empty);
         assert!(!s.bound());
         assert_eq!(s.video_size(), (1088, 2400));
+    }
+
+    #[test]
+    fn chrome_owns_backbuffer_every_tick_while_empty() {
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        s.set_host_size(900, 950);
+        assert!(s.chrome_draw().is_some());
+        assert!(s.chrome_draw().is_some());
+        s.bind("S1".into(), 1);
+        s.set_video_size(1088, 2400);
+        s.mark_frame();
+        assert!(s.chrome_draw().is_none());
+        s.unbind();
+        assert!(s.shows_chrome());
+        assert!(s.chrome_draw().is_some());
+        assert!(s.chrome_draw().is_some());
     }
 }

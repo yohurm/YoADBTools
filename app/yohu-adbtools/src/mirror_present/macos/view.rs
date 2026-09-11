@@ -118,7 +118,7 @@ impl Host {
         let (icon_px, title_px, body_px) = stage_type_px(self.stage.dpr());
         let (host_w, host_h) = self.stage.host_size();
         let _ = host_w;
-        let (canvas, _, _) = stage_palette(self.stage.dark());
+        let canvas = stage_palette(self.stage.dark()).canvas_argb;
         let (stroke, border) = self.stage.panel_stroke();
         LayoutSnap {
             layout: MirrorLayout {
@@ -286,7 +286,9 @@ pub fn apply_snap(snap: LayoutSnap) {
                 unsafe { views.spin.stopAnimation(None) };
             }
             if snap.chrome {
-                let (_, title_c, body_c) = stage_palette(snap.dark);
+                let pal = stage_palette(snap.dark);
+                let title_c = pal.title_argb;
+                let body_c = pal.body_argb;
                 let card_h = oh as f64 / dpr;
                 let card_w = ow as f64 / dpr;
                 let icon_pt = f64::from(snap.icon_px) / dpr;

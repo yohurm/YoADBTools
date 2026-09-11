@@ -132,6 +132,8 @@ fn draw(
     let canvas = color(spec.canvas_argb);
     let title_c = color(spec.title_argb);
     let body_c = color(spec.body_argb);
+    let icon_c = color(spec.icon_argb);
+    let well_c = color(spec.well_argb);
     unsafe {
         rt.Clear(Some(&canvas));
     }
@@ -144,18 +146,20 @@ fn draw(
     let block = icon + gap + title_px + gap * 0.5 + body_px;
     let mut y = ((h - block) * 0.5).max(0.0);
     let cx = w * 0.5;
+    let cy = y + icon * 0.5;
+    draw_icon_well(rt, cx, cy, icon * 0.56, &well_c)?;
 
     match spec.mode {
         MirrorStageMode::Loading => draw_spinner(
             rt,
             cx,
-            y + icon * 0.5,
+            cy,
             icon * 0.42,
             spec.spin,
-            &title_c,
+            &icon_c,
             &body_c,
         )?,
-        _ => draw_mirror_icon(rt, cx, y, icon, &body_c)?,
+        _ => draw_mirror_icon(rt, cx, y, icon, &icon_c)?,
     }
     y += icon + gap;
 
@@ -191,11 +195,13 @@ fn stroke_frame(
     stroke_px: f32,
     border_argb: u32,
 ) -> WinResult<()> {
-    let inset = (stroke_px * 0.5).max(0.5);
+    // 整条描边落在 DComp clip 内侧；半线 inset 会被圆角裁掉一半。
+    let inset = stroke_px.max(1.0);
     let left = dest.x as f32 + inset;
     let top = dest.y as f32 + inset;
     let right = dest.x as f32 + dest.width as f32 - inset;
     let bottom = dest.y as f32 + dest.height as f32 - inset;
+    let corner = (radius as f32 - inset).max(0.0);
     let stroke_color = color(border_argb);
     let brush = unsafe { rt.CreateSolidColorBrush(&stroke_color, None)? };
     let style = stroke_style(rt)?;
@@ -206,8 +212,8 @@ fn stroke_frame(
             right: right.max(left + 1.0),
             bottom: bottom.max(top + 1.0),
         },
-        radiusX: radius as f32,
-        radiusY: radius as f32,
+        radiusX: corner,
+        radiusY: corner,
     };
     unsafe {
         rt.DrawRoundedRectangle(&rr, &brush, stroke_px, Some(&style));
@@ -260,6 +266,25 @@ fn draw_text(
     Ok(())
 }
 
+fn draw_icon_well(
+    rt: &ID2D1RenderTarget,
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    color: &D2D1_COLOR_F,
+) -> WinResult<()> {
+    let brush = unsafe { rt.CreateSolidColorBrush(color, None)? };
+    let ellipse = D2D1_ELLIPSE {
+        point: Vector2 { X: cx, Y: cy },
+        radiusX: radius,
+        radiusY: radius,
+    };
+    unsafe {
+        rt.FillEllipse(&ellipse, &brush);
+    }
+    Ok(())
+}
+
 fn draw_mirror_icon(
     rt: &ID2D1RenderTarget,
     cx: f32,
@@ -268,7 +293,7 @@ fn draw_mirror_icon(
     color: &D2D1_COLOR_F,
 ) -> WinResult<()> {
     let brush = unsafe { rt.CreateSolidColorBrush(color, None)? };
-    let stroke = (size / 12.0).clamp(1.5, 3.0);
+    let stroke = (size / 10.0).clamp(2.0, 3.5);
     let s = size / 24.0;
     let ox = cx - size * 0.5;
     let oy = top;

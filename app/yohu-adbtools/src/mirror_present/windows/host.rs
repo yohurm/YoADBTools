@@ -392,7 +392,7 @@ impl Host {
         self.stage.visible() && self.stage.shows_video()
     }
 
-    fn prepare_chrome(&mut self) -> Option<crate::mirror_present::stage::ChromeDraw> {
+    fn prepare_chrome(&self) -> Option<crate::mirror_present::stage::ChromeDraw> {
         if !self.gpu_matches_host() {
             return None;
         }
