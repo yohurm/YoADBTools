@@ -102,6 +102,9 @@ pub struct AppSettings {
     /// 终端输入默认在命令前加上 `adb`。立即生效；默认关。
     #[serde(default)]
     pub terminal_prepend_adb: bool,
+    /// 终端 IO 行时间显示形状。立即生效；默认时分秒.毫秒。
+    #[serde(default)]
+    pub terminal_time_format: TerminalTimeFormat,
 }
 
 /// 投屏链路协议。USB 与无线各套一套编码参数；改长边/码率/帧率不另立协议。
@@ -111,6 +114,21 @@ pub enum MirrorProtocol {
     #[default]
     Usb,
     Wifi,
+}
+
+/// 终端 IO 行时间显示形状。行上存墙钟毫秒；展示立即投影。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TerminalTimeFormat {
+    /// `HH:mm:ss.SSS`
+    #[default]
+    TimeMillis,
+    /// `HH:mm:ss`
+    Time,
+    /// `YYYY-MM-DD HH:mm:ss.SSS`
+    DatetimeMillis,
+    /// `YYYY-MM-DD HH:mm:ss`
+    Datetime,
 }
 
 fn default_buffer_capacity() -> usize {
@@ -157,6 +175,7 @@ impl Default for AppSettings {
             mirror_protocol: MirrorProtocol::Usb,
             mirror_force_forward: false,
             terminal_prepend_adb: false,
+            terminal_time_format: TerminalTimeFormat::TimeMillis,
         }
     }
 }
@@ -181,6 +200,7 @@ pub enum SettingKey {
     MirrorProtocol,
     MirrorForceForward,
     TerminalPrependAdb,
+    TerminalTimeFormat,
 }
 
 impl SettingKey {
@@ -203,6 +223,7 @@ impl SettingKey {
             SettingKey::MirrorProtocol => "mirror_protocol",
             SettingKey::MirrorForceForward => "mirror_force_forward",
             SettingKey::TerminalPrependAdb => "terminal_prepend_adb",
+            SettingKey::TerminalTimeFormat => "terminal_time_format",
         }
     }
 }
@@ -227,6 +248,7 @@ mod tests {
         assert_eq!(s.mirror_protocol, MirrorProtocol::Usb);
         assert!(!s.mirror_force_forward);
         assert!(!s.terminal_prepend_adb);
+        assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/app_settings_default.json"))
                 .expect("fixture");
@@ -312,6 +334,7 @@ mod tests {
             SettingKey::MirrorProtocol,
             SettingKey::MirrorForceForward,
             SettingKey::TerminalPrependAdb,
+            SettingKey::TerminalTimeFormat,
         ];
         for key in all {
             let wire = serde_json::to_value(key).unwrap();
@@ -364,6 +387,27 @@ mod tests {
         let s: AppSettings = serde_json::from_str(json).expect("缺 theme 应回落默认");
         assert_eq!(s.theme, Theme::System);
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
+        assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
+    }
+
+    #[test]
+    fn terminal_time_format_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_value(TerminalTimeFormat::TimeMillis).unwrap(),
+            serde_json::json!("time_millis")
+        );
+        assert_eq!(
+            serde_json::to_value(TerminalTimeFormat::Time).unwrap(),
+            serde_json::json!("time")
+        );
+        assert_eq!(
+            serde_json::to_value(TerminalTimeFormat::DatetimeMillis).unwrap(),
+            serde_json::json!("datetime_millis")
+        );
+        assert_eq!(
+            serde_json::to_value(TerminalTimeFormat::Datetime).unwrap(),
+            serde_json::json!("datetime")
+        );
     }
 
     #[test]
