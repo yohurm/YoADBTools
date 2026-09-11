@@ -20,7 +20,16 @@ export const SAFETY_ROOTS = ["/sdcard", "/storage"] as const;
 export const DEFAULT_BROWSE_ROOT = SAFETY_ROOTS[0];
 
 /** 命令库 schema（与 yohu-protocol::COMMAND_LIBRARY_SCHEMA_VERSION 对齐）。 */
-export const COMMAND_LIBRARY_SCHEMA_VERSION = 2;
+export const COMMAND_LIBRARY_SCHEMA_VERSION = 3;
+
+/** 命令块可选间隔（毫秒；与 yohu-protocol::COMMAND_BLOCK_GAPS_MS 对齐）。 */
+export const COMMAND_BLOCK_GAPS_MS = [0, 200, 500, 1000, 2000, 5000] as const;
+
+export function commandBlockGapLabel(ms: number): string {
+  if (ms === 0) return "无";
+  if (ms % 1000 === 0) return `${ms / 1000} 秒`;
+  return `${ms} 毫秒`;
+}
 
 /** 官方 scrcpy-server 钉死版本（与 yohu-protocol::scrcpy 对齐）。 */
 export const SCRCPY_SERVER_VERSION = "4.1";

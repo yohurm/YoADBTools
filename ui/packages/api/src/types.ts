@@ -326,10 +326,32 @@ export interface CommandDto {
   template: string;
 }
 
+export interface CommandStepDto {
+  template: string;
+}
+
+export interface CommandBlockDto {
+  id: string;
+  name: string;
+  gap_ms: number;
+  steps: CommandStepDto[];
+}
+
+export type LibraryEntryDto =
+  | ({ kind: "command" } & CommandDto)
+  | ({ kind: "block" } & CommandBlockDto);
+
 export interface CommandGroupDto {
   id: string;
   name: string;
-  commands: CommandDto[];
+  entries: LibraryEntryDto[];
+}
+
+/** `block.run` 请求。 */
+export interface BlockRunRequest {
+  block_id: string;
+  values: string[];
+  serials: string[];
 }
 
 export interface CommandLibraryDto {

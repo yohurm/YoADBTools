@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMAND_LIBRARY_SCHEMA_VERSION, DEFAULT_BROWSE_ROOT, MIRROR_MIN_LAYOUT_PX, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./identity";
+import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION, DEFAULT_BROWSE_ROOT, MIRROR_MIN_LAYOUT_PX, ModuleId, ModuleTitle, SAFETY_ROOTS, commandBlockGapLabel } from "./identity";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
 import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type Theme, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
@@ -376,7 +376,11 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     );
     const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as typeof APP_SETTINGS_DEFAULT;
     expect(APP_SETTINGS_DEFAULT).toEqual(fixture);
-    expect(COMMAND_LIBRARY_SCHEMA_VERSION).toBe(2);
+    expect(COMMAND_LIBRARY_SCHEMA_VERSION).toBe(3);
+    expect([...COMMAND_BLOCK_GAPS_MS]).toEqual([0, 200, 500, 1000, 2000, 5000]);
+    expect(commandBlockGapLabel(0)).toBe("无");
+    expect(commandBlockGapLabel(200)).toBe("200 毫秒");
+    expect(commandBlockGapLabel(1000)).toBe("1 秒");
     expect(DEFAULT_BROWSE_ROOT).toBe(SAFETY_ROOTS[0]);
   });
 

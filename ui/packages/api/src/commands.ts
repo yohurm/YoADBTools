@@ -13,6 +13,7 @@ import type {
   AppSettings,
   CaptureStart,
   CaptureStatus,
+  BlockRunRequest,
   CommandLibraryDto,
   DeviceInfo,
   DeviceStatus,
@@ -69,6 +70,8 @@ export const terminalExec = (req: TerminalExecRequest) =>
   invoke<SerialEvalResult[]>("terminal.exec", { req });
 
 export const groupRun = (req: GroupRunRequest) => invoke<number>("group.run", { req });
+
+export const blockRun = (req: BlockRunRequest) => invoke<number>("block.run", { req });
 
 export const groupCancel = (runId: number) => invoke<void>("group.cancel", { runId });
 
