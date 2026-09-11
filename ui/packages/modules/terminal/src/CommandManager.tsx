@@ -203,8 +203,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
                 <YoTextField block label="命令名称" value={command.name} onInput={(v) => updateCommand({ name: v })} />
                 <YoTextField
                   block
-                  label={`具体命令（占位符 {0} {1}…）`}
-                  ariaLabel="具体命令"
+                  label="具体命令"
                   value={formatAdbLine("-", command.template)}
                   onInput={(v) => updateCommand({ template: commandBody(v) })}
                 />

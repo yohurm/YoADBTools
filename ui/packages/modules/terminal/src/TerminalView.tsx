@@ -300,9 +300,7 @@ export function TerminalView(props: DeviceSession) {
                       {(item) => (
                         <div class="yohu-terminal__queue-item" role="listitem">
                           <span class="yohu-terminal__queue-title">{item.title}</span>
-                          <YoTooltip content={formatAdbLine("-", item.line)} block>
-                            <span class="yohu-terminal__queue-line">{formatAdbLine("-", item.line)}</span>
-                          </YoTooltip>
+                          <span class="yohu-terminal__queue-line">{formatAdbLine("-", item.line)}</span>
                           <YoIconButton
                             icon="close"
                             title="移出队列"
