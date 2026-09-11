@@ -84,6 +84,7 @@ describe("virtuallist-policy", () => {
       "aria-label": undefined,
       "aria-multiselectable": undefined,
       "data-tone": "document",
+      "data-reordering": undefined,
     });
     expect(
       virtualHostAttrs({ selectable: true, multi: true, tone: "list", ariaLabel: "文件" }),
@@ -92,6 +93,10 @@ describe("virtuallist-policy", () => {
       "aria-label": "文件",
       "aria-multiselectable": true,
       "data-tone": "list",
+      "data-reordering": undefined,
     });
+    expect(virtualHostAttrs({ selectable: true, multi: false, reordering: true })["data-reordering"]).toBe(
+      "",
+    );
   });
 });

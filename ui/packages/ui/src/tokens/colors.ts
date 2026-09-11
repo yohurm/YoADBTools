@@ -6,10 +6,10 @@
  *
  * 组件与模块样式 100% 引用语义/组件层，禁止裸色值。
  * 来源：yovo-harmonyos-docs / 设计指南 / 通用设计基础 / 视觉风格 / 色彩.md
- * 深色 background_primary 表值 #E5E5E5 与正文「深色 Primary/Secondary = 黑」冲突，
- * 落地以正文为准（harmonyos-design-notes.md §1.4）。
- * 深色次级表面走 gray_02 之后的下一档实色（background_fourth），保证层级随明度抬升，
- * 禁止再映射成比卡片更暗的 background_secondary。
+ * 深色 background_primary 表值 #E5E5E5 与正文「页面默认黑」冲突，primitive 仍记 #000000。
+ * 桌面画布不消费那档纯黑：浅/深都映射 background_secondary（雪域灰 / #191A1C），
+ * 与卡片 comp_background_primary 形成凹槽。#191A1C 禁止再当 surface-2
+ * （低于卡片明度）；次级表面走 background_fourth。见 harmonyos-design-notes.md §1.4 / §1.6。
  */
 
 /** HarmonyOS ARGB `#AARRGGBB` → CSS `#RRGGBB` / `#RRGGBBAA`。 */
@@ -68,6 +68,30 @@ function brandOverlay(brand: string, ink: "#000000" | "#FFFFFF", percent: number
   return `color-mix(in srgb, ${ink} ${percent}%, ${brand})`;
 }
 
+/** 两枚 #RRGGBB 按 percentA 混合。Fatal ink = warning 压黑（AS Assert 深于 Error）。 */
+function mixHex(a: string, b: string, percentA: number): string {
+  const rgb = (hex: string): [number, number, number] => {
+    const body = hex.replace(/^#/, "").slice(0, 6);
+    return [
+      Number.parseInt(body.slice(0, 2), 16),
+      Number.parseInt(body.slice(2, 4), 16),
+      Number.parseInt(body.slice(4, 6), 16),
+    ];
+  };
+  const [ar, ag, ab] = rgb(a);
+  const [br, bg, bb] = rgb(b);
+  const t = percentA / 100;
+  const ch = (x: number, y: number) =>
+    Math.round(x * t + y * (1 - t))
+      .toString(16)
+      .padStart(2, "0")
+      .toUpperCase();
+  return `#${ch(ar, br)}${ch(ag, bg)}${ch(ab, bb)}`;
+}
+
+/** Fatal 色相里 warning 的占比；其余是黑。对照 AS V2 Assert `#7f0000` / `#8b3c3c`。 */
+const FATAL_WARNING_MIX = 52;
+
 // ===== Semantic 层（浅色主题） =====
 
 export const Colors = {
@@ -109,14 +133,17 @@ export const Colors = {
   SwitchOff: Harmony.compBackgroundSecondary.light,
   SwitchOffHover: `color-mix(in srgb, ${Harmony.fontPrimary.light} 5%, ${Harmony.compBackgroundSecondary.light})`,
   SwitchOffPressed: `color-mix(in srgb, ${Harmony.fontPrimary.light} 10%, ${Harmony.compBackgroundSecondary.light})`,
+  /** 对话框压暗。浅色 10% 黑（不强遮罩）；禁止用 fg，深色会变成白雾。 */
+  Scrim: Harmony.compBackgroundSecondary.light,
 } as const;
 
 export type SemanticColorName = keyof typeof Colors;
 
 export const DarkColors: Record<SemanticColorName, string> = {
-  BgBase: Harmony.backgroundPrimary.dark,
+  /** 与浅色同构：凹槽画布 = background_secondary，不是 OLED 纯黑。 */
+  BgBase: Harmony.backgroundSecondary.dark,
   Surface: Harmony.compBackgroundPrimary.dark,
-  /** 深色灰阶随层级抬升：page 黑 → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
+  /** 深色灰阶随层级抬升：画布 #191A1C → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
   Surface2: Harmony.backgroundFourth.dark,
   Fg: Harmony.fontPrimary.dark,
   Fg2: Harmony.fontSecondary.dark,
@@ -151,29 +178,30 @@ export const DarkColors: Record<SemanticColorName, string> = {
   SwitchOff: Harmony.compBackgroundSecondary.dark,
   SwitchOffHover: `color-mix(in srgb, ${Harmony.fontPrimary.dark} 5%, ${Harmony.compBackgroundSecondary.dark})`,
   SwitchOffPressed: `color-mix(in srgb, ${Harmony.fontPrimary.dark} 10%, ${Harmony.compBackgroundSecondary.dark})`,
+  /** 深色压暗用 40% 黑（四级透明度阶梯），画布已抬离纯黑后才能看见。 */
+  Scrim: fromArgb("#66000000"),
 };
 
-/** logcat 级别板：复用官方 brand / confirm / alert / warning + 文本四级。
- *  排出 `--yohu-level-*`；日志行经 `levelKey` → `data-level` → `--yohu-log-ink` 消费，禁止模块另起色表。 */
-export const LogLevelLight = {
-  v: Harmony.fontTertiary.light,
-  d: Harmony.brand.light,
-  i: Harmony.confirm.light,
-  w: Harmony.alert.light,
-  e: Harmony.warning.light,
-  f: Harmony.fontOnPrimary.light,
-  fBg: Harmony.warning.light,
-} as const;
+/**
+ * logcat 级别板：键是小写 V–F，值是 ink 色相。
+ * V 用二级字色（可读弱化）；D/I/W/E 复用 brand/confirm/alert/warning；
+ * F 是 warning 压黑（AS Assert 深于 Error），反色字走 `--yohu-fg-on`。
+ * 排出 `--yohu-level-*`。模块只写 `--yohu-log-ink: var(--yohu-level-${key})`，禁止另起色表、禁止 f-bg。
+ */
+function logLevelBoard(mode: "light" | "dark") {
+  return {
+    v: Harmony.fontSecondary[mode],
+    d: Harmony.brand[mode],
+    i: Harmony.confirm[mode],
+    w: Harmony.alert[mode],
+    e: Harmony.warning[mode],
+    f: mixHex(Harmony.warning[mode], "#000000", FATAL_WARNING_MIX),
+  } as const;
+}
 
-export const LogLevelDark = {
-  v: Harmony.fontTertiary.dark,
-  d: Harmony.brand.dark,
-  i: Harmony.confirm.dark,
-  w: Harmony.alert.dark,
-  e: Harmony.warning.dark,
-  f: Harmony.fontOnPrimary.dark,
-  fBg: Harmony.warning.dark,
-} as const;
+export const LogLevelLight = logLevelBoard("light");
+export const LogLevelDark = logLevelBoard("dark");
+export type LogLevelKey = keyof typeof LogLevelLight;
 
 /**
  * YoFileIcon 组件板：每字形 body（主形）+ mark（折页/细节）。

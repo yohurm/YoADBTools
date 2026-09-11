@@ -11,8 +11,7 @@
 .yohu-dialog__backdrop {
   position: absolute;
   inset: 0;
-  /* 电脑弹出框不强遮罩：中性 10%（font_primary 叠透明） */
-  background-color: color-mix(in srgb, var(--yohu-fg) 10%, transparent);
+  background-color: var(--yohu-scrim);
 }
 
 .yohu-dialog__panel {

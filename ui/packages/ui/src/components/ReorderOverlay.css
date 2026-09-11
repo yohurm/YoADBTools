@@ -1,0 +1,28 @@
+/*
+ * 配方 reorder-overlay：抬起的行副本。跟指针（top 不过渡）；
+ * 开合只动 opacity / 阴影，对标鸿蒙浮起。
+ */
+.yohu-recipe-reorder-overlay {
+  position: absolute;
+  left: var(--yohu-space-xs);
+  right: var(--yohu-space-xs);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: var(--yohu-ripple-radius);
+  background: var(--yohu-surface);
+  box-shadow: none;
+  opacity: 0;
+}
+
+.yohu-recipe-reorder-overlay[data-ready] {
+  transition:
+    opacity var(--yohu-motion-effects-fast),
+    box-shadow var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-reorder-overlay[data-open] {
+  opacity: 1;
+  box-shadow: var(--yohu-shadow-overlay);
+}

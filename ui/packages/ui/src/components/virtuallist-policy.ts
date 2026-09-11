@@ -89,6 +89,7 @@ export interface VirtualHostAttrs {
   "aria-label": string | undefined;
   "aria-multiselectable": true | undefined;
   "data-tone": "document" | "list";
+  "data-reordering": "" | undefined;
 }
 
 export function virtualHostAttrs(input: {
@@ -96,11 +97,13 @@ export function virtualHostAttrs(input: {
   multi: boolean;
   tone?: "document" | "list";
   ariaLabel?: string;
+  reordering?: boolean;
 }): VirtualHostAttrs {
   return {
     role: input.selectable ? "listbox" : undefined,
     "aria-label": input.selectable ? input.ariaLabel : undefined,
     "aria-multiselectable": input.multi ? true : undefined,
     "data-tone": input.tone ?? VIRTUAL_DEFAULT_TONE,
+    "data-reordering": input.reordering ? "" : undefined,
   };
 }

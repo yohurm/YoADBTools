@@ -424,12 +424,14 @@
 
 /*
  * fill 滑块宽高走软弹簧过冲。绝对定位盒在 (0,0) 的未变换边框 ∪ 变换后的视觉盒
- * 会撑大宿主 scrollWidth。overflow:auto 双轴在 Windows 会画出横竖条并互相锁死
- *（同 Select v1.37）。横向永远裁切；纵滚仍由宿主自己的 overflow-y 决定。
+ * 会撑大宿主 scrollWidth / scrollHeight。只写 overflow-x:hidden 时，CSS Overflow
+ * 会把另一轴 visible 算成 auto（https://www.w3.org/TR/css-overflow-3/），Windows
+ * 在过冲瞬间画出右侧纵条（命令管理组切换同症）。两轴一律 hidden：裁切、不画条。
+ * 真正纵滚留给祖先 scroller（VirtualList / 设备栏 __scroller），禁止写在滑块宿主。
  * underline / thumb 不走这条：Tabs 要横向滚，分段钮要露出阴影。
  */
 .yohu-indicator-host[data-indicator-variant="fill"] {
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .yohu-recipe-indicator {
@@ -599,7 +601,10 @@ html[data-theme-transition] *::after {
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-switch,
   .yohu-switch__thumb,
+  .yohu-recipe-reorder-bar[data-ready],
+  .yohu-recipe-reorder-overlay[data-ready],
   .yohu-recipe-indicator[data-ready],
+  .yohu-virtual-list[data-reordering] .yohu-virtual-list__row,
   .yohu-tabs__tab,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,

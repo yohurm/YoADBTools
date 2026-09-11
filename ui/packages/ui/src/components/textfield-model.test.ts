@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { Density } from "../tokens/density";
+import { Stroke } from "../tokens/layout";
 import {
   DEFAULT_TEXT_FIELD_STATUS,
   hasTextFieldSlot,
@@ -6,6 +8,7 @@ import {
   resolveTextFieldSpec,
   resolveTextFieldStatus,
   resolveTextFieldWidthKind,
+  textFieldLineBoxPx,
   textFieldPaintKind,
 } from "./textfield-model";
 
@@ -58,6 +61,17 @@ describe("textfield-model", () => {
     expect(resolveTextFieldWidthKind({ type: "number", block: true })).toBe("fill");
     expect(resolveTextFieldSpec({ type: "number" }).width).toBe("number");
     expect(resolveTextFieldSpec({ block: true }).width).toBe("fill");
+  });
+
+  it("写入盒 = 铬高 − 两侧 hairline，随密度变", () => {
+    expect(textFieldLineBoxPx(Density.Comfortable.controlHeight)).toBe(
+      Density.Comfortable.controlHeight - Stroke.Hairline * 2,
+    );
+    expect(textFieldLineBoxPx(Density.Compact.controlHeight)).toBe(
+      Density.Compact.controlHeight - Stroke.Hairline * 2,
+    );
+    expect(textFieldLineBoxPx(Density.Comfortable.controlHeight)).toBe(30);
+    expect(textFieldLineBoxPx(Density.Compact.controlHeight)).toBe(24);
   });
 
   it("active 与 status 正交，默认关", () => {

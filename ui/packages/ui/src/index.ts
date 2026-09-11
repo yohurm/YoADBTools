@@ -115,6 +115,14 @@ export type { YoTreeProps, TreeNode } from "./components/Tree";
 export { YoVirtualList } from "./components/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./components/VirtualList";
 
+export {
+  dropIndexFromCenters,
+  insertIndexFromPointerY,
+  moveIndexFromInsert,
+  moveItemTo,
+  shiftForReorder,
+} from "./components/reorder-model";
+
 export { YoColResizer } from "./components/ColResizer";
 export type { YoColResizerProps } from "./components/ColResizer";
 

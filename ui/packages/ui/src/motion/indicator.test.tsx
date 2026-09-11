@@ -74,13 +74,16 @@ describe("YoIndicator", () => {
     expect(container.querySelector(".yohu-recipe-indicator")).toBe(first);
   });
 
-  it("fill 宿主裁切横向过冲，避免 overflow:auto 在 Windows 画出横条", () => {
+  it("fill 宿主两轴 hidden 裁切过冲，禁止只写 overflow-x 把纵轴算成 auto", () => {
     const css = loadMotionCss();
     expect(css).toMatch(
+      /\.yohu-indicator-host\[data-indicator-variant="fill"\]\s*\{[^}]*overflow:\s*hidden/,
+    );
+    expect(css).not.toMatch(
       /\.yohu-indicator-host\[data-indicator-variant="fill"\]\s*\{[^}]*overflow-x:\s*hidden/,
     );
     expect(css).not.toMatch(
-      /\.yohu-indicator-host\[data-indicator-variant="(underline|thumb)"\][^}]*overflow-x:\s*hidden/,
+      /\.yohu-indicator-host\[data-indicator-variant="(underline|thumb)"\][^}]*overflow:\s*hidden/,
     );
   });
 });

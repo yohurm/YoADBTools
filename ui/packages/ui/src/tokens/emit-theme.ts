@@ -36,16 +36,8 @@ function semanticVars(palette: Record<string, string>): Array<[string, string]> 
     .map(([name, value]) => [`--yohu-${kebab(name)}`, value]);
 }
 
-function levelVars(board: { v: string; d: string; i: string; w: string; e: string; f: string; fBg: string }): Array<[string, string]> {
-  return [
-    ["--yohu-level-v", board.v],
-    ["--yohu-level-d", board.d],
-    ["--yohu-level-i", board.i],
-    ["--yohu-level-w", board.w],
-    ["--yohu-level-e", board.e],
-    ["--yohu-level-f", board.f],
-    ["--yohu-level-f-bg", board.fBg],
-  ];
+function levelVars(board: Record<string, string>): Array<[string, string]> {
+  return Object.entries(board).map(([key, ink]) => [`--yohu-level-${key}`, ink]);
 }
 
 function fileIconVars(board: typeof FileIconLight): Array<[string, string]> {

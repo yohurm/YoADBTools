@@ -36,17 +36,17 @@
   --yohu-switch-off: #00000019;
   --yohu-switch-off-hover: color-mix(in srgb, #000000E5 5%, #00000019);
   --yohu-switch-off-pressed: color-mix(in srgb, #000000E5 10%, #00000019);
+  --yohu-scrim: #00000019;
   --yohu-shadow-xs: 0 1px 4px rgba(16, 24, 40, 0.10);
   --yohu-shadow-overlay: 0 4px 16px rgba(16, 24, 40, 0.16);
   --yohu-shadow-dialog: 0 8px 32px rgba(16, 24, 40, 0.22);
   --yohu-shadow-dialog-unfocused: 0 2px 8px rgba(16, 24, 40, 0.10);
-  --yohu-level-v: #00000066;
+  --yohu-level-v: #00000099;
   --yohu-level-d: #0A59F7;
   --yohu-level-i: #64BB5C;
   --yohu-level-w: #ED6F21;
   --yohu-level-e: #E84026;
-  --yohu-level-f: #FFFFFF;
-  --yohu-level-f-bg: #E84026;
+  --yohu-level-f: #792114;
   --yohu-file-icon-folder: #0A59F7;
   --yohu-file-icon-folder-mark: #0A59F766;
   --yohu-file-icon-file: #00000066;
@@ -207,7 +207,7 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --yohu-bg-base: #000000;
+  --yohu-bg-base: #191A1C;
   --yohu-surface: #202224;
   --yohu-surface-2: #2E3033;
   --yohu-fg: #FFFFFFE5;
@@ -242,17 +242,17 @@
   --yohu-switch-off: #FFFFFF19;
   --yohu-switch-off-hover: color-mix(in srgb, #FFFFFFE5 5%, #FFFFFF19);
   --yohu-switch-off-pressed: color-mix(in srgb, #FFFFFFE5 10%, #FFFFFF19);
-  --yohu-shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.40);
-  --yohu-shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.55);
-  --yohu-shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.55);
-  --yohu-shadow-dialog-unfocused: 0 2px 8px rgba(0, 0, 0, 0.35);
-  --yohu-level-v: #FFFFFF66;
+  --yohu-scrim: #00000066;
+  --yohu-shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.28);
+  --yohu-shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.36);
+  --yohu-shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.40);
+  --yohu-shadow-dialog-unfocused: 0 2px 8px rgba(0, 0, 0, 0.22);
+  --yohu-level-v: #FFFFFF99;
   --yohu-level-d: #317AF7;
   --yohu-level-i: #5BA854;
   --yohu-level-w: #DB6B42;
   --yohu-level-e: #D94838;
-  --yohu-level-f: #FFFFFF;
-  --yohu-level-f-bg: #D94838;
+  --yohu-level-f: #71251D;
   --yohu-file-icon-folder: #317AF7;
   --yohu-file-icon-folder-mark: #317AF766;
   --yohu-file-icon-file: #FFFFFF66;

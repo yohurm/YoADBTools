@@ -38,6 +38,20 @@ function options(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll('[role="option"]'));
 }
 
+/** jsdom 无 PointerEvent；clientY / pointerId 直接写到 Event 上。 */
+function firePointer(
+  target: EventTarget,
+  type: "pointerdown" | "pointermove" | "pointerup",
+  clientY: number,
+  pointerId = 1,
+): void {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clientY", { configurable: true, value: clientY });
+  Object.defineProperty(event, "button", { configurable: true, value: 0 });
+  Object.defineProperty(event, "pointerId", { configurable: true, value: pointerId });
+  target.dispatchEvent(event);
+}
+
 describe("YoVirtualList", () => {
   it("虚拟化：仅渲染可视区（含 overscan）内的行", () => {
     const items = makeItems(100);
@@ -78,6 +92,9 @@ describe("YoVirtualList", () => {
       /\[data-tone="document"\]:not\(\[role="listbox"\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
     expect(css).toMatch(/\[role="listbox"\][\s\S]*user-select: none;/);
+    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow-x:\s*hidden;/);
+    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow-y:\s*auto;/);
+    expect(css).not.toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*auto;/);
   });
 
   it("items 换新数组时相同 key 的行节点保持同一引用", async () => {
@@ -255,5 +272,147 @@ describe("YoVirtualList", () => {
     expect(row("row-5")?.classList.contains("yohu-interactive--sel-mid")).toBe(false);
     expect(row("row-5")?.classList.contains("yohu-interactive--sel-end")).toBe(false);
     expect(row("row-0")?.classList.contains("yohu-interactive--selected")).toBe(false);
+  });
+
+  it("未提供 onReorder 时不挂拖拽条", () => {
+    const items = makeItems(4);
+    const { container } = render(() => (
+      <YoVirtualList items={() => items} itemHeight={22} renderRow={(item) => <span>{item}</span>} />
+    ));
+    expect(container.querySelector(".yohu-recipe-reorder-bar")).toBeNull();
+  });
+
+  it("onReorder：过臂距才抬浮层，缝间插条，松手提交 from/to", () => {
+    const onReorder = vi.fn();
+    const items = ["a", "b", "c"];
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => items}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        selectedKey={() => "a"}
+        onSelectRow={() => undefined}
+        onReorder={onReorder}
+        renderRow={(item) => <span>{item}</span>}
+      />
+    ));
+    const list = container.querySelector(".yohu-virtual-list") as HTMLElement;
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      left: 0,
+      bottom: 66,
+      right: 100,
+      width: 100,
+      height: 66,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return {};
+      },
+    });
+    Object.defineProperty(list, "scrollTop", { value: 0, configurable: true, writable: true });
+    const bar = container.querySelector(".yohu-recipe-reorder-bar");
+    expect(bar).toBeTruthy();
+    expect(bar?.hasAttribute("data-open")).toBe(false);
+    const row = container.querySelector('[data-key="a"]') as HTMLElement;
+    firePointer(row, "pointerdown", 4);
+    expect(bar?.hasAttribute("data-open")).toBe(false);
+    firePointer(window, "pointermove", 12);
+    expect(list.hasAttribute("data-reordering")).toBe(true);
+    expect(row.getAttribute("data-reorder")).toBe("source");
+    expect(container.querySelector(".yohu-recipe-reorder-overlay")?.hasAttribute("data-open")).toBe(
+      true,
+    );
+    expect(bar?.hasAttribute("data-open")).toBe(false);
+    firePointer(window, "pointermove", 60);
+    expect(bar?.hasAttribute("data-open")).toBe(true);
+    firePointer(window, "pointerup", 60);
+    expect(onReorder).toHaveBeenCalledWith(0, 2);
+    expect(list.hasAttribute("data-reordering")).toBe(false);
+    expect(bar?.hasAttribute("data-open")).toBe(false);
+    expect(container.querySelector(".yohu-recipe-reorder-overlay")).toBeNull();
+  });
+
+  it("未过臂距不换位，点击仍选中", async () => {
+    const onReorder = vi.fn();
+    const onSelect = vi.fn();
+    const items = ["a", "b", "c"];
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => items}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        selectedKey={() => null}
+        onSelectRow={(_, key) => onSelect(key)}
+        onReorder={onReorder}
+        renderRow={(item) => <span>{item}</span>}
+      />
+    ));
+    const row = container.querySelector('[data-key="b"]') as HTMLElement;
+    firePointer(row, "pointerdown", 30, 2);
+    firePointer(window, "pointermove", 33, 2);
+    firePointer(window, "pointerup", 33, 2);
+    fireEvent.click(row);
+    await Promise.resolve();
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith("b");
+  });
+
+  it("Ctrl/Meta+方向键换位，不抢普通方向键选区", () => {
+    const onReorder = vi.fn();
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => ["a", "b", "c"]}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        selectedKey={() => "a"}
+        onSelectRow={() => undefined}
+        onReorder={onReorder}
+        renderRow={(item) => <span>{item}</span>}
+      />
+    ));
+    const row = container.querySelector('[data-key="a"]') as HTMLElement;
+    fireEvent.keyDown(row, { key: "ArrowDown" });
+    expect(onReorder).not.toHaveBeenCalled();
+    fireEvent.keyDown(row, { key: "ArrowDown", ctrlKey: true });
+    expect(onReorder).toHaveBeenCalledWith(0, 1);
+    const next = container.querySelector('[data-key="b"]') as HTMLElement;
+    fireEvent.keyDown(next, { key: "ArrowUp", metaKey: true });
+    expect(onReorder).toHaveBeenCalledWith(1, 0);
+  });
+
+  it("Escape 取消换位", () => {
+    const onReorder = vi.fn();
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => ["a", "b", "c"]}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        selectedKey={() => "a"}
+        onSelectRow={() => undefined}
+        onReorder={onReorder}
+        renderRow={(item) => <span>{item}</span>}
+      />
+    ));
+    const list = container.querySelector(".yohu-virtual-list") as HTMLElement;
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      left: 0,
+      bottom: 66,
+      right: 100,
+      width: 100,
+      height: 66,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return {};
+      },
+    });
+    const row = container.querySelector('[data-key="a"]') as HTMLElement;
+    firePointer(row, "pointerdown", 4);
+    firePointer(window, "pointermove", 60);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(list.hasAttribute("data-reordering")).toBe(false);
   });
 });

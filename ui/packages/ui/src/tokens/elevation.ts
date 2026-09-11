@@ -11,8 +11,8 @@ export const Elevation = {
 } as const;
 
 export const DarkElevation = {
-  Xs: "0 1px 4px rgba(0, 0, 0, 0.40)",
-  Overlay: "0 4px 16px rgba(0, 0, 0, 0.55)",
-  Dialog: "0 8px 32px rgba(0, 0, 0, 0.55)",
-  DialogUnfocused: "0 2px 8px rgba(0, 0, 0, 0.35)",
+  Xs: "0 1px 4px rgba(0, 0, 0, 0.28)",
+  Overlay: "0 4px 16px rgba(0, 0, 0, 0.36)",
+  Dialog: "0 8px 32px rgba(0, 0, 0, 0.40)",
+  DialogUnfocused: "0 2px 8px rgba(0, 0, 0, 0.22)",
 } as const;

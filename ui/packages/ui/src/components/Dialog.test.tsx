@@ -1,7 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { YoDialog } from "./Dialog";
+
+function loadDialogCss(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/components/Dialog.css"),
+    resolve(process.cwd(), "packages/ui/src/components/Dialog.css"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const dialogCss = loadDialogCss();
 
 describe("YoDialog", () => {
   it("open 为 false 时不渲染", () => {
@@ -44,6 +61,11 @@ describe("YoDialog", () => {
     ));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("遮罩只消费 --yohu-scrim，禁止 fg 10% 在深色里变成白雾", () => {
+    expect(dialogCss).toContain("background-color: var(--yohu-scrim)");
+    expect(dialogCss).not.toContain("var(--yohu-fg) 10%");
   });
 
   it("点击遮罩不触发 onClose（防误触）", () => {

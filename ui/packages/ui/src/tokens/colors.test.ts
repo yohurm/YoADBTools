@@ -40,10 +40,11 @@ const EXPECTED_LIGHT: Record<string, string> = {
   Offline: "#00000066",
   SwitchOff: "#00000019",
   TextSel: "#0A59F773",
+  Scrim: "#00000019",
 };
 
 const EXPECTED_DARK: Record<string, string> = {
-  BgBase: "#000000",
+  BgBase: "#191A1C",
   Surface: "#202224",
   Surface2: "#2E3033",
   Accent: "#317AF7",
@@ -53,6 +54,7 @@ const EXPECTED_DARK: Record<string, string> = {
   Error: "#D94838",
   SwitchOff: "#FFFFFF19",
   TextSel: "#317AF773",
+  Scrim: "#00000066",
 };
 
 function kebab(name: string): string {
@@ -135,6 +137,13 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     expect(luminance(DarkColors.Surface)).toBeLessThan(luminance(DarkColors.Surface2));
   });
 
+  it("遮罩浅/深都是压暗黑，不是深色白雾", () => {
+    expect(Colors.Scrim).toBe("#00000019");
+    expect(DarkColors.Scrim).toBe("#00000066");
+    expect(parseColor(DarkColors.Scrim)).toMatchObject({ r: 0, g: 0, b: 0 });
+    expect(parseColor(DarkColors.Scrim).a).toBeGreaterThan(parseColor(Colors.Scrim).a);
+  });
+
   it("深色色板覆盖全部语义键", () => {
     for (const name of Object.keys(Colors)) {
       expect(DarkColors[name], `DarkColors.${name}`).toBeTruthy();
@@ -146,6 +155,7 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     expect(Harmony.brand.dark).toBe("#317AF7");
     expect(Harmony.backgroundSecondary.light).toBe("#F1F3F5");
     expect(Harmony.backgroundPrimary.dark).toBe("#000000");
+    expect(Harmony.backgroundSecondary.dark).toBe("#191A1C");
     expect(Harmony.warning.light).toBe("#E84026");
     expect(Harmony.alert.light).toBe("#ED6F21");
     expect(Harmony.confirm.light).toBe("#64BB5C");
@@ -157,8 +167,10 @@ describe("HarmonyOS 对比度门禁（§1.6）", () => {
     expect(contrast(Colors.Fg, Colors.Surface)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("深色正文 Fg / Surface ≥ 5:1", () => {
+  it("深色正文 Fg / Surface ≥ 5:1，且不超过舒适上限 17.6:1", () => {
     expect(contrast(DarkColors.Fg, DarkColors.Surface)).toBeGreaterThanOrEqual(5);
+    expect(contrast(DarkColors.Fg, DarkColors.Surface)).toBeLessThanOrEqual(17.6);
+    expect(contrast(DarkColors.Fg, DarkColors.BgBase)).toBeLessThanOrEqual(17.6);
   });
 
   it("浅色二级文本 Fg2 / Surface ≥ 4.5:1", () => {
@@ -183,18 +195,27 @@ describe("HarmonyOS 对比度门禁（§1.6）", () => {
 });
 
 describe("logcat 级别板（复用官方语义色）", () => {
-  it("Fatal 反色块 font_on / warning ≥ 3:1", () => {
-    expect(contrast(LogLevelLight.f, LogLevelLight.fBg)).toBeGreaterThanOrEqual(3);
-    expect(contrast(LogLevelDark.f, LogLevelDark.fBg)).toBeGreaterThanOrEqual(3);
+  it("键是小写 V–F，浅/深一致", () => {
+    expect(Object.keys(LogLevelLight)).toEqual(["v", "d", "i", "w", "e", "f"]);
+    expect(Object.keys(LogLevelDark)).toEqual(Object.keys(LogLevelLight));
   });
 
-  it("级别色取自官方 brand/confirm/alert/warning", () => {
+  it("Fatal 反色块 font_on / Fatal ink ≥ 3:1，且深于 Error", () => {
+    expect(contrast(Harmony.fontOnPrimary.light, LogLevelLight.f)).toBeGreaterThanOrEqual(3);
+    expect(contrast(Harmony.fontOnPrimary.dark, LogLevelDark.f)).toBeGreaterThanOrEqual(3);
+    expect(LogLevelLight.f).not.toBe(LogLevelLight.e);
+    expect(LogLevelDark.f).not.toBe(LogLevelDark.e);
+  });
+
+  it("V 用二级字色；D/I/W/E 取自官方 brand/confirm/alert/warning", () => {
+    expect(LogLevelLight.v).toBe(Harmony.fontSecondary.light);
     expect(LogLevelLight.d).toBe(Harmony.brand.light);
     expect(LogLevelLight.i).toBe(Harmony.confirm.light);
     expect(LogLevelLight.w).toBe(Harmony.alert.light);
     expect(LogLevelLight.e).toBe(Harmony.warning.light);
     expect(LogLevelDark.d).toBe(Harmony.brand.dark);
     expect(LogLevelDark.e).toBe(Harmony.warning.dark);
+    expect(LogLevelDark.v).toBe(Harmony.fontSecondary.dark);
   });
 });
 
@@ -255,16 +276,18 @@ describe("theme.css 变量", () => {
   it("深色宇宙蓝与语义色已覆盖", () => {
     const darkBlock = themeCss.slice(themeCss.indexOf('[data-theme="dark"]'));
     expect(darkBlock).toContain("--yohu-accent: #317AF7");
-    expect(darkBlock).toContain("--yohu-bg-base: #000000");
+    expect(darkBlock).toContain("--yohu-bg-base: #191A1C");
+    expect(darkBlock).toContain("--yohu-scrim: #00000066");
     expect(darkBlock).toContain("--yohu-surface: #202224");
     expect(darkBlock).toContain("--yohu-surface-2: #2E3033");
     expect(darkBlock).toContain("--yohu-success: #5BA854");
   });
 
   it("级别板变量齐备（浅色+深色+反色块）", () => {
-    for (const name of ["v", "d", "i", "w", "e", "f", "f-bg"]) {
+    for (const name of ["v", "d", "i", "w", "e", "f"]) {
       expect(themeCss).toContain(`--yohu-level-${name}:`);
     }
+    expect(themeCss).not.toContain("--yohu-level-f-bg");
   });
 
   it("文件图标板变量齐备（浅色+深色，body/mark）", () => {

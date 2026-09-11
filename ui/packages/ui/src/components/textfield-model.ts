@@ -1,8 +1,10 @@
 /**
  * 输入框领域模型（L2）。
  * 盒内缀 / 盒外缀 / status / active 是不变式；涂装名给视图当 data-paint。active 不进涂装。
- * 不碰 DOM、不判定 disabled / 清除显隐。
+ * 写入盒由控件铬高减两侧 hairline 得出；不碰 DOM、不判定 disabled / 清除显隐。
  */
+
+import { Stroke } from "../tokens/layout";
 
 export type YoTextFieldStatus = "none" | "error" | "warning";
 
@@ -82,6 +84,17 @@ export function resolveTextFieldSpec(
     width: resolveTextFieldWidthKind(input),
     active: resolveTextFieldActive(input.active),
   };
+}
+
+/**
+ * 写入盒（px）：字与 caret 落在铬内，不含描边。
+ * L4 映射 `--yohu-text-field-line`。禁止再用 leading-ui 当输入行高。
+ */
+export function textFieldLineBoxPx(
+  controlHeight: number,
+  hairline: number = Stroke.Hairline,
+): number {
+  return controlHeight - hairline * 2;
 }
 
 /** CSS 只消费这个名字。disabled 由 L3 另写 data-disabled，不进涂装。 */

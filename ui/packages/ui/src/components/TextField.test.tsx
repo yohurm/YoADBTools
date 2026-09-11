@@ -110,6 +110,20 @@ describe("YoTextField", () => {
     expect(input.getAttribute("aria-invalid")).toBeNull();
   });
 
+  it("写入盒锁行高，不用 leading-ui，也不沿栏高 100%", () => {
+    expect(css).toContain("--yohu-text-field-line:");
+    expect(css).toContain("calc(var(--yohu-control-height) - 2 * var(--yohu-stroke-hairline))");
+    const inputBlock = css.slice(css.indexOf(".yohu-text-field__input {"));
+    const inputRule = inputBlock.slice(0, inputBlock.indexOf("}") + 1);
+    expect(inputRule).toContain("height: var(--yohu-text-field-line)");
+    expect(inputRule).toContain("line-height: var(--yohu-text-field-line)");
+    expect(inputRule).not.toContain("height: 100%");
+    expect(inputRule).not.toContain("--yohu-font-leading-ui");
+    const areaRule = css.slice(css.indexOf("textarea.yohu-text-field__input"));
+    expect(areaRule).toContain("line-height: var(--yohu-font-leading-ui)");
+    expect(areaRule).toContain("padding-block:");
+  });
+
   it("内容区重置 UA 盒模型，数字去掉原生步进", () => {
     expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?box-sizing: border-box/);
     expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?padding: 0/);

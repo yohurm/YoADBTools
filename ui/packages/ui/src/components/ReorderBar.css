@@ -1,0 +1,31 @@
+/*
+ * 配方 reorder-bar：插入缝上的一条 accent。默认 scaleX(0) 收回；
+ * data-open 横向展开。top 跟目标行缝，spatialSmall 可打断。
+ */
+.yohu-recipe-reorder-bar {
+  position: absolute;
+  left: var(--yohu-space-xs);
+  right: var(--yohu-space-xs);
+  height: var(--yohu-stroke-accent);
+  margin-top: calc(var(--yohu-stroke-accent) / -2);
+  background: var(--yohu-accent);
+  border-radius: var(--yohu-radius-pill);
+  pointer-events: none;
+  z-index: 1;
+  box-sizing: border-box;
+  transform: scaleX(0);
+  opacity: 0;
+  transform-origin: center;
+}
+
+.yohu-recipe-reorder-bar[data-ready] {
+  transition:
+    transform var(--yohu-motion-spatial-small),
+    opacity var(--yohu-motion-effects-fast),
+    top var(--yohu-motion-spatial-small);
+}
+
+.yohu-recipe-reorder-bar[data-open] {
+  transform: scaleX(1);
+  opacity: 1;
+}

@@ -2,7 +2,9 @@
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  /* 与设备栏 scroller 同契约：双轴 auto 会在 Windows 画出横竖条并互相锁死。 */
+  overflow-x: hidden;
+  overflow-y: auto;
   background-color: transparent;
   font-family: var(--yohu-font-sans);
   box-sizing: border-box;
@@ -41,4 +43,18 @@
 
 .yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected {
   border-bottom-color: transparent;
+}
+
+.yohu-virtual-list[data-reordering],
+.yohu-virtual-list[data-reordering] .yohu-virtual-list__row {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.yohu-virtual-list[data-reordering] .yohu-virtual-list__row:not([data-reorder="source"]) {
+  transition: transform var(--yohu-motion-spatial-small);
+}
+
+.yohu-virtual-list__row[data-reorder="source"] {
+  opacity: 0.32;
 }
