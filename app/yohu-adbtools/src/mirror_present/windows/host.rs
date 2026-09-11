@@ -22,17 +22,21 @@ use yohu_protocol::{
 use super::follow::GeomHost;
 use super::gpu::Gpu;
 use super::mf::DecodedPicture;
+use crate::mirror_present::pointer::{PointerGesture, PointerKind, TouchOut, TOUCH_DOWN};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PointerWatch {
+    #[default]
+    None,
+    Leave,
+}
 use crate::mirror_present::scale::map_client_to_video;
 use crate::mirror_present::stage::Stage;
-
-const TOUCH_DOWN: u8 = 0;
-const TOUCH_UP: u8 = 1;
-const TOUCH_MOVE: u8 = 2;
 
 pub struct Host {
     pub stage: Stage,
     gpu: Option<Gpu>,
-    pressing: bool,
+    gesture: PointerGesture,
     painted: u32,
     fps_at: Instant,
     skip_logged: Option<(bool, u32, u32)>,
@@ -53,7 +57,7 @@ impl Host {
         Self {
             stage: Stage::new(serial),
             gpu: Some(gpu),
-            pressing: false,
+            gesture: PointerGesture::default(),
             painted: 0,
             fps_at: Instant::now(),
             skip_logged: None,
@@ -91,6 +95,9 @@ impl Host {
             "投屏可用区已交给几何宿主"
         );
         self.place_occupancy();
+        if !self.stage.control() {
+            self.end_press();
+        }
     }
 
     pub fn bind(&mut self, hwnd: HWND, serial: String, generation: u64) {
@@ -113,6 +120,7 @@ impl Host {
         if !target.is_empty() && self.stage.serial != target {
             return false;
         }
+        self.end_press();
         let serial = self.stage.serial.clone();
         self.stage.unbind();
         tracing::info!(serial = %serial, "投屏解码管道已解开，舞台改画 chrome");
@@ -199,45 +207,61 @@ impl Host {
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> bool {
+        if self.gesture.pressing() {
+            return true;
+        }
         let d = self.stage.dest();
         let w = d.width as i32;
         let h = d.height as i32;
         x >= d.x && y >= d.y && x < d.x + w && y < d.y + h
     }
 
-    pub fn handle_pointer(&mut self, msg: u32, x: i32, y: i32) {
+    pub fn handle_pointer(&mut self, msg: u32, x: i32, y: i32) -> PointerWatch {
         if !self.stage.control() {
-            return;
+            self.end_press();
+            return PointerWatch::None;
         }
+        let kind = match msg {
+            WM_LBUTTONDOWN | WM_RBUTTONDOWN => PointerKind::Down,
+            WM_MOUSEMOVE => PointerKind::Move,
+            WM_LBUTTONUP | WM_RBUTTONUP => PointerKind::Up,
+            _ => return PointerWatch::None,
+        };
         let (video_w, video_h) = self.stage.video_size();
-        let Some((vx, vy)) = map_client_to_video(x, y, self.stage.dest(), video_w, video_h) else {
-            return;
+        let mapped = map_client_to_video(x, y, self.stage.dest(), video_w, video_h);
+        let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) else {
+            return PointerWatch::None;
         };
-        let action = match msg {
-            WM_LBUTTONDOWN | WM_RBUTTONDOWN => {
-                self.pressing = true;
-                TOUCH_DOWN
-            }
-            WM_MOUSEMOVE => {
-                if !self.pressing {
-                    return;
-                }
-                TOUCH_MOVE
-            }
-            WM_LBUTTONUP | WM_RBUTTONUP => {
-                self.pressing = false;
-                TOUCH_UP
-            }
-            _ => return,
+        let watch = if out.action == TOUCH_DOWN {
+            PointerWatch::Leave
+        } else {
+            PointerWatch::None
         };
+        self.inject_touch(out);
+        watch
+    }
+
+    pub fn handle_leave(&mut self) {
+        if let Some(out) = self.gesture.feed(PointerKind::Leave, None, 0, 0) {
+            self.inject_touch(out);
+        }
+    }
+
+    pub fn end_press(&mut self) {
+        if let Some(out) = self.gesture.cancel() {
+            self.inject_touch(out);
+        }
+    }
+
+    fn inject_touch(&self, out: TouchOut) {
         let serial = self.stage.serial.clone();
         let mirror = Arc::clone(&self.mirror);
         let message = MirrorControlMessage::Touch {
-            action,
-            x: vx,
-            y: vy,
-            width: video_w as u16,
-            height: video_h as u16,
+            action: out.action,
+            x: out.x,
+            y: out.y,
+            width: out.width,
+            height: out.height,
         };
         tauri::async_runtime::spawn(async move {
             let _ = mirror.inject(&serial, message).await;
@@ -396,6 +420,7 @@ pub fn install(hwnd: HWND, host: Host) {
 }
 
 pub fn uninstall(hwnd: HWND) -> Option<String> {
+    with_host(hwnd, |h| h.end_press());
     unsafe {
         let ptr = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
         if ptr == 0 {

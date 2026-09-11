@@ -10,6 +10,9 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Graphics::Gdi::{ScreenToClient, UpdateWindow, ValidateRect};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, LoadCursorW, PeekMessageW, RegisterClassExW,
     SetCursor, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HTTRANSPARENT,
@@ -20,8 +23,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::host;
+use super::host::PointerWatch;
 
 const CLASS: PCWSTR = w!("YohuMirrorPresent");
+/// `WM_MOUSELEAVE`（windows 0.61 只在 Controls feature）。
+const WM_MOUSELEAVE: u32 = 0x02A3;
 
 pub fn register_class() -> Result<(), String> {
     static ONCE: Once = Once::new();
@@ -140,7 +146,15 @@ unsafe extern "system" fn wnd_proc(
         WM_LBUTTONDOWN | WM_LBUTTONUP | WM_MOUSEMOVE | WM_RBUTTONDOWN | WM_RBUTTONUP => {
             let x = ((lparam.0 as i32) & 0xFFFF) as i16 as i32;
             let y = (((lparam.0 as i32) >> 16) & 0xFFFF) as i16 as i32;
-            host::with_host(hwnd, |h| h.handle_pointer(msg, x, y));
+            let watch = host::with_host(hwnd, |h| h.handle_pointer(msg, x, y))
+                .unwrap_or(PointerWatch::None);
+            if watch == PointerWatch::Leave {
+                watch_leave(hwnd);
+            }
+            LRESULT(0)
+        }
+        WM_MOUSELEAVE => {
+            host::with_host(hwnd, |h| h.handle_leave());
             LRESULT(0)
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -160,5 +174,18 @@ fn occupancy_hit_test(hwnd: HWND, lparam: LPARAM) -> LRESULT {
         unsafe { DefWindowProcW(hwnd, WM_NCHITTEST, WPARAM(0), lparam) }
     } else {
         LRESULT(HTTRANSPARENT as isize)
+    }
+}
+
+/// 必须在放下 Host 锁之后调用。USER32 可能同步派消息，持锁再进 wndproc 会卡死呈现泵。
+fn watch_leave(hwnd: HWND) {
+    let mut tme = TRACKMOUSEEVENT {
+        cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
+        dwFlags: TME_LEAVE,
+        hwndTrack: hwnd,
+        dwHoverTime: 0,
+    };
+    unsafe {
+        let _ = TrackMouseEvent(&mut tme);
     }
 }
