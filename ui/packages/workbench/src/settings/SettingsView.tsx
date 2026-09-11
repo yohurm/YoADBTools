@@ -202,7 +202,6 @@ export const SettingsView: Component = () => {
         <YoPanel title="工具链">
           <YoFormRow
             title="ADB 路径"
-            description="未指定时显示自动解析的绝对路径（用户设置 → DataRoot/tools/adb 解压副本）"
             note={<EffectBadge text="立即生效" />}
           >
             <PathControl
@@ -223,7 +222,6 @@ export const SettingsView: Component = () => {
 
           <YoFormRow
             title="数据目录"
-            description={`默认 ${settingsStore.paths.local_root || "应用数据目录"}/data。其下为 tools/adb 与 modules/（adb-terminal / log-analyzer）。配置、日志与缓存固定在产品家园，不随本目录迁移，也不搬家。`}
             note={<EffectBadge text="重启生效" />}
           >
             <PathControl
