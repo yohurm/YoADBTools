@@ -3,7 +3,8 @@
 - 能力：`yohu-logsrv` — 每设备一路 logcat（`-v threadtime,uid,year`）；槽位 Empty/Starting/Live/Stopping + generation（ADR-v6-016）
 - **时间戳：** 解析边界经 domain `canonicalize_datetime` 收到 `YYYY-MM-DD HH:mm:ss.SSS`；清单 / 复制 / 导出都用 `LogLine.ts` 原文，禁止再裁成 `MM-DD`
 - 过滤：UI `filter.ts` + domain `log_filter`（导出用）；共享 `core/yohu-domain/testdata/log_filter.json`。级别字母单源 `log_levels.json` ↔ `LEVELS`。`LogFilter.levels` 空 = 不限；非空 = 精确集合，禁止最低含以上
-- **级别钮：** 独立多选，走 `YoButton` `ink` + `flush`（不是 `YoSegmentedButton`）。槽写 `data-level`、`--yohu-log-ink` / `--yohu-log-fill`，并映射 `--yohu-button-ink` / `--yohu-button-fill`。禁止点 `.yohu-button` / `[aria-pressed]`。Tooltip 用公开 `stretch` 铺交叉轴，禁止点 `__anchor`
+- **级别钮：** 独立多选，走 `YoButton` `ink` + `flush`（不是 `YoSegmentedButton`）。槽写 `data-level` 与 `--yohu-log-ink: var(--yohu-level-${key})`（`levelInkStyle`），并映射 `--yohu-button-ink` / `--yohu-button-fill`。禁止 CSS 再列 V–F 六条映射，禁止点 `.yohu-button` / `[aria-pressed]`。Tooltip 用公开 `stretch` 铺交叉轴，禁止点 `__anchor`
+- **级别色：** `LogLevelLight/Dark` 只持 ink。V=`font_secondary`；D/I/W/E=brand/confirm/alert/warning；F=warning 压黑。paint 在 `level-paint.ts`：Fatal `invert`，Error/Fatal `tintMessage`。反色字走 `--yohu-fg-on`。禁止 `--yohu-level-f-bg`、禁止社区紫
 - **检索焦点：** `YoTextField` 公开 `inputRef` 转发内部 input。禁止宿主 `querySelector("input")`。过滤生效走公开 `active`，禁止模块点 `.yohu-text-field` 改铬 token
 - **清单选字：** `YoVirtualList` 默认 `tone=document` 承担 `user-select` / `cursor`。Ctrl+A 铺底只涂 `.yohu-logs__row--picked`。禁止点 `__row`
 - 窗口 = 会话订阅（serial / capturing / fromSeq）；设备流按窗口引用计数启停；切焦点不停其他设备

@@ -66,7 +66,7 @@
 | `background_fourth` | `#D1D1D6` | `#2E3033` | 四级背景 |
 | `background_emphasize` | `#0A59F7` | `#317AF7` | 高亮背景 |
 
-> **注（深色模式背景规则）：** 文档文字说明「深色模式下 Primary 与 Secondary 对应背景色默认都为黑色」；灰阶阶梯从 `gray_02` 起按显示层级逐级抬升/降低对比度。界面背景色**不可用透明色**（特殊场景可作组件背景）。文中 token 表 `background_primary` 的 Dark 值（`#E5E5E5`）与文字说明存在出入，工程落地以「深色页面 = 黑、卡片 `comp_background_primary` `#202224`、次级表面 `background_fourth` `#2E3033`」为准。`#191A1C` 是表内 `background_secondary`，低于卡片明度，不能再当作 `--yohu-surface-2`。
+> **注（深色模式背景规则）：** 文档文字说明「深色模式下 Primary 与 Secondary 对应背景色默认都为黑色」（手机 AMOLED）。表内 `background_secondary` Dark 仍是 `#191A1C`（gray_02）。Yohu 是桌面工作台：`--yohu-bg-base` 浅/深都映射 `background_secondary`（雪域灰 / `#191A1C`），与卡片 `comp_background_primary` 形成凹槽，避免纯黑页 + 近白字顶到 §1.6 舒适上限。`background_primary` primitive 仍记正文「黑」，不进画布。`#191A1C` 低于卡片明度，**不能**当作 `--yohu-surface-2`；次级表面走 `background_fourth` `#2E3033`。界面背景色**不可用透明色**。文中 token 表 `background_primary` 的 Dark 值（`#E5E5E5`）与文字说明冲突，忽略表值。
 
 ### 1.5 组件容器色与交互事件色
 
@@ -492,7 +492,7 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 | `warning` / `alert` / `confirm` | `--yohu-error` / `--yohu-warn` / `--yohu-success`（官方原值） |
 | `font_primary`…`fourth` 90/60/40/20% | `--yohu-fg` / `fg-2` / `fg-3` / `fg-4` |
 | `font_on_primary` | `--yohu-fg-on`（强调底反色字） |
-| `background_secondary` 雪域灰 / 深色黑 | `--yohu-bg-base` |
+| `background_secondary` 雪域灰 / `#191A1C` | `--yohu-bg-base` |
 | `comp_background_primary` | `--yohu-surface` |
 | `comp_emphasize_secondary` 20% | `--yohu-accent-soft`（徽章/芯片） |
 | `interactive_active` 品牌实底 | `--yohu-state-selected` + `--yohu-state-selected-fg`（全表面选中） |
@@ -506,7 +506,7 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 | 根节点 Body + `line-break: strict` | `theme.css` html/body；`.yohu-type-*` |
 | 效率型贴边、设置页 40vp 边距 | `.yohu-layout__content` padding 0；`YoPage` 消费 `--yohu-layout-page-inset` / `page-gap`；`YoChrome` 标题行 `--yohu-control-height`、底垫 `--yohu-layout-chrome-pad`；设置页眉/卡片共用 `--yohu-layout-page-margin` |
 | 栅格 gutter 16 / 最大宽 2220 | `--yohu-layout-gutter` / `grid-max` |
-| 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `fg` 10%；浮层小圆角 `radius-sm` |
+| 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `--yohu-scrim`（浅 10% 黑 / 深 40% 黑）；浮层小圆角 `radius-sm` |
 | Toast ≤3s、最大宽 400；按钮最大 448；菜单最小 224 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-min` |
 | 对比度：正文浅 4.5:1 / 深 5:1 | `colors.test.ts` 门禁；语义色按官方填充使用 |
 

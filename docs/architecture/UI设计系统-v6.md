@@ -1,12 +1,21 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.54（2026-09-11，撤回选中邻接分割线）
+> **状态：** v2.63（2026-09-11，命令参数插入与填参弹窗）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.63 变更（命令参数插入与填参弹窗）：** 命令管理具体命令标签为 `具体命令（{n}代表使用命令时需要填入的独立参数）`，按钮「插入参数」。每个实际出现的 `{n}` 是独立参数（`{13}` 不带出 `{0}`…`{12}`），可编描述（`params`，空不落盘）。填参弹窗列出原始命令与带描述的实际 `{n}`，不展示预览。见 [modules/terminal.md](modules/terminal.md)。
+> **v2.62 变更（换位浮层 + 让位 + 插缝）：** 对标鸿蒙 List 浮起占位、Apple 水平插缝、dnd-kit overlay。过臂距后：浮层跟指针、源行淡占位、邻行让位、插入条只出现在行缝（最近中线）。Escape 取消。禁止只画一条钉在行顶的线当换位。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v2.61 变更（VirtualList 统一换位）：** `onReorder` 收口几何；v2.62 补齐浮层与让位。撤回 v2.60 常驻手柄。
+> **v2.60 变更（已撤回）：** 曾用模块内 `ReorderGrip` 常驻手柄；v2.61 升到 VirtualList。
+> **v2.59 变更（fill 滑块宿主两轴 hidden）：** `YoIndicator` fill 宿主必须 `overflow: hidden`（两轴裁切、不画条）。禁止只写 `overflow-x: hidden`——CSS Overflow 会把另一轴 `visible` 算成 `auto`，弹簧过冲在 Windows 弹出右侧纵条（命令管理组切换同症）。`YoVirtualList` 滚轴与设备栏 scroller 同契约：`overflow-x: hidden` + `overflow-y: auto`。禁止在滑块宿主上写 `overflow: auto`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v2.58 变更（深色遮罩与阴影）：** `--yohu-scrim` 浅 10% 黑 / 深 40% 黑。`YoDialog` 遮罩只消费它，禁止 `fg` 10%（深色会洗成白雾）。深色阴影按抬升后的画布重校准，不再按纯黑页用 55% 黑。命令管理等全部 `YoDialog` 同一条链路。
+> **v2.57 变更（日志级别色单源收口）：** `--yohu-level-*` 只有 V–F 六枚 ink。V 用 `font_secondary`；D/I/W/E 仍是 brand/confirm/alert/warning；F 是 warning 压黑（对照 AS Assert，禁止社区紫、禁止 f-bg）。View 写 `--yohu-log-ink: var(--yohu-level-${key})`；Fatal 反色走 `data-paint=invert` + `fg-on`；Error/Fatal 消息走 `data-tint-msg`。CSS 禁止再列六条 `[data-level]`。见 [modules/logs.md](modules/logs.md)。
+> **v2.56 变更（深色画布凹槽）：** `--yohu-bg-base` 深色改映射 `background_secondary` `#191A1C`，与浅色雪域灰同构。卡片仍 `#202224`，次级仍 `#2E3033`。禁止再把桌面页铺成 OLED `#000000`。`window_boot::CANVAS_DARK` 必须同值。见 [harmonyos-design-notes.md](harmonyos-design-notes.md) §1.4 / §1.6。
+> **v2.55 变更（YoTextField 写入盒）：** 字/caret 落在 `--yohu-text-field-line`（铬高 − 两侧 hairline）。单行 input 高与行高等于写入盒，禁止 `height: 100%` 配 `leading-ui`。复用壳类的 textarea 用 `padding-block` 居中第一行。发送栏不再锁 `height: control-height`。见 [youi.md](youi.md) YoTextField。
 > **v2.54 变更（撤回选中邻接分割线）：** 删掉 `StateFill.SelectedRule` 与 start/mid `::after`。连续选中只保留邻接圆角。命令管理中栏只参考文件清单：条目名之间走 `YoVirtualList tone=list` hairline，清单背板 `--yohu-canvas`。不是文件表，不走 `YoColFrame`。禁止再为选中块另画项间线。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
 > **v2.53 变更（多选项间分割线）：** 曾用 `--yohu-state-selected-rule` 画连续选中项间线；v2.54 撤回。
 > **v2.52 变更（同屏 fill 跟启动画布）：** Shared overlay 2×2 fill 只消费 `window_boot::canvas_bgra(boot_dark())`，对齐 `--yohu-bg-base`。`SplashPlacement` 锁定几何 + dark。`prepare_main_window` 的 System 探针跟这份 `boot_dark()`，禁止再采 `win.theme()`。capture 客户区 DC，DIB 先铺画布色再 BitBlt。禁止从 Snapshot 角点猜色，禁止 `yohu-motion` 持画布色。见 [workbench.md](workbench.md)。
@@ -166,7 +175,7 @@
 >
 > **v1.41 变更（投屏页眉分组）**：投屏 `YoChrome` 主行只留开始/停止、暂停、截图、全屏。质量（长边/码率/帧率）、通道（只读/强制转发）、导航键进次行分组，禁止再把下拉和导航键平铺进 extra 一行。
 >
-> **v1.40 变更（设备栏选中滑块过冲）**：`YoIndicator` fill 宿主 `overflow-x: hidden`，裁切软弹簧宽过冲。设备列表宿主只 `overflow: hidden`；项滚动走内层 scroller（`overflow-x: hidden` + `overflow-y: auto`）。禁止在滑块宿主上写 `overflow: auto`——双轴 auto 会在 Windows 画出横竖条并互相锁死（同 v1.37）。
+> **v1.40 变更（设备栏选中滑块过冲）**：曾只给 fill 宿主写 `overflow-x: hidden`；v2.59 改为两轴 `overflow: hidden`。设备列表宿主只 `overflow: hidden`；项滚动走内层 scroller（`overflow-x: hidden` + `overflow-y: auto`）。禁止在滑块宿主上写 `overflow: auto`——双轴 auto 会在 Windows 画出横竖条并互相锁死（同 v1.37）。
 >
 > **v1.39 变更（页眉选中设备名）**：终端 / 文件 / 日志 / 投屏 `YoChrome` 标题后统一展示选中设备名（`deviceLabel`，中性徽章）。数据链：`DeviceInfo.model` → domain `device_display_name` → `DeviceSession.selectedLabel`。一台用型号（无型号回退 serial）；终端多台「首台名 等 n 台」；无选中不显示。设置不展示。禁止模块自拼 serial 或再扫目录取型号。
 >
@@ -283,11 +292,11 @@ Component（组件级：--yohu-state-* / --yohu-level-* / --yohu-file-icon-* / -
 
 ### 2.1 色彩系统（HarmonyOS NEXT 官方 Token）
 
-Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`），见 `tokens/colors.ts` 的 `Harmony`。深色 `background_primary` 以文档正文为准（黑），不用表内 `#E5E5E5`。
+Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`），见 `tokens/colors.ts` 的 `Harmony`。深色 `background_primary` primitive 以文档正文为准（黑），不用表内 `#E5E5E5`。桌面 `--yohu-bg-base` 不消费该纯黑，浅/深都走 `background_secondary`。
 
 | `--yohu-*` | 鸿蒙 Token | Light | Dark | 用途 |
 |------------|------------|-------|------|------|
-| `bg-base` | `background_secondary` / 深色 `background_primary` | `#F1F3F5` 雪域灰 | `#000000` | 窗口底色 |
+| `bg-base` | `background_secondary` | `#F1F3F5` 雪域灰 | `#191A1C` | 窗口底色（浅/深同构凹槽） |
 | `surface` | `comp_background_primary` | `#FFFFFF` | `#202224` | 面板/卡片 |
 | `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度） |
 | `fg` / `fg-2` / `fg-3` / `fg-4` | `font_primary`…`fourth` | 黑 90/60/40/20% | 白 90/60/40/20% | 文本四级 |
@@ -308,17 +317,18 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `disabled` | `background_fourth` | `#D1D1D6` | `#2E3033` | 禁用底 |
 | `switch-off` | `comp_background_secondary` | 黑 10% | 白 10% | Switch 关闭轨 |
 | `switch-off-hover` / `pressed` | 关闭轨 + `font_primary` 5% / 10% | 叠字色 | 叠字色 | Switch 关闭叠态；禁止组件再写 color-mix |
+| `scrim` | 黑 10% / 黑 40% | `#00000019` | `#00000066` | 对话框压暗；禁止用 `fg`（深色会变白雾） |
 
 **logcat 级别板（复用官方语义色，无独立鸿蒙级别 Token）：**
 
 | 级别 | 引用 | Light | Dark |
 |------|------|-------|------|
-| `--yohu-level-v` | `font_tertiary` | 黑 40% | 白 40% |
+| `--yohu-level-v` | `font_secondary` | 黑 60% | 白 60% |
 | `--yohu-level-d` | `brand` | `#0A59F7` | `#317AF7` |
 | `--yohu-level-i` | `confirm` | `#64BB5C` | `#5BA854` |
 | `--yohu-level-w` | `alert` | `#ED6F21` | `#DB6B42` |
 | `--yohu-level-e` | `warning` | `#E84026` | `#D94838` |
-| `--yohu-level-f` | `font_on` on `warning` | `#FFFFFF` on `#E84026` | `#FFFFFF` on `#D94838` |
+| `--yohu-level-f` | `warning` 压黑 52% | 深于 Error；反色字走 `--yohu-fg-on` | 同构 |
 
 **文件图标板（复用官方语义色，无 Material / 无自造 10 阶）：**
 
@@ -479,7 +489,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
 - **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 `formatLogDoc`。表头铬层可拖宽，行是连续文档，不是文件清单那种格子。禁止把 Family B 的行块拖选套到日志上。
-- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。时间列是统一墙钟 `YYYY-MM-DD HH:mm:ss.SSS`（`DATETIME_DISPLAY_LEN`）。解析失败（level=`?`）整行只有消息。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`；左条 / 级别字 / Tag 共用 ink。Error 消息同色。Fatal 级别字母反色块，Tag 与左条用 f-bg；反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
+- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。时间列是统一墙钟 `YYYY-MM-DD HH:mm:ss.SSS`（`DATETIME_DISPLAY_LEN`）。解析失败（level=`?`）整行只有消息。级别色：`levelKey` → View 写 `--yohu-log-ink: var(--yohu-level-${key})`；左条 / 级别字 / Tag 共用 ink。Error/Fatal 消息同色（`data-tint-msg`）。Fatal 字母反色块（`data-paint=invert`，字走 `--yohu-fg-on`，底走 ink）。禁止 CSS 再列 `[data-level]` ink 表，禁止 `--yohu-level-f-bg`。反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、Error/Fatal 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
 - **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题靠左，列垫 `list` = 左 md / 右 sm；无排序；元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
 - 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别独立切换（V–F 精确集合，可多选；全部弹起不限；与 Tag 同一控件铬，字母走级别 ink，按下 ink 软底） / Tag / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
@@ -496,7 +506,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
 - 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令与命令块同级：命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
-- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。列表项同样走 `.yohu-interactive`，禁止自写圆角底。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令或命令块。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；删除与命令输入同一行。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
+- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。列表项同样走 `.yohu-interactive`，禁止自写圆角底。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令或命令块。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。具体命令标签后括号说明 `{n}` 为独立参数；按钮「插入参数」在光标或选区写入下一个未用下标。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令自上而下（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与每个 `{n}`（有描述则跟在标签后），不展示预览；命令块一次填多步。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
@@ -527,7 +537,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
-- `YoDialog`：中性 10% 遮罩 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400、高 90%；标题 Title_S Bold；电脑小圆角 `radius-sm`。最小 360×240 仅适用于独立子窗口，不套浮层。
+- `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400、高 90%；标题 Title_S Bold；电脑小圆角 `radius-sm`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
 - `YoToast`：描边；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。
 
 ---
