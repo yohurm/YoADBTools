@@ -12,7 +12,6 @@ import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
 import type { ColResizePhase } from "./col-model";
 import { YoColResizer } from "./ColResizer";
-import { YoTooltip } from "./Tooltip";
 import "./ColHeader.css";
 
 export type YoColHeaderAlign = "start" | "end" | "center";
@@ -25,8 +24,6 @@ export interface YoColHeaderProps {
   ariaSort?: YoColHeaderSort;
   /** 有则库内渲染排序钮；模块只传回调，不自绘 button / __label */
   onSort?: () => void;
-  /** 排序/标题提示；库内包 YoTooltip */
-  tooltip?: string;
   /** 是否显示右缘拖拽条 */
   resizable?: boolean;
   /** 拖拽条无障碍名称 */
@@ -83,7 +80,7 @@ function ColHeaderBody(props: {
 }
 
 /**
- * 渲染一列的表头轨道。模块只传标题 / tooltip / onSort，不要点内部铬。
+ * 渲染一列的表头轨道。模块只传标题 / onSort，不要点内部铬。
  */
 export function YoColHeader(props: YoColHeaderProps): JSX.Element {
   const [resizing, setResizing] = createSignal(false);
@@ -104,20 +101,9 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
       data-resizing={resizing() ? "" : undefined}
     >
       <div class="yohu-col-header__content">
-        <Show
-          when={props.tooltip}
-          fallback={
-            <ColHeaderBody sort={sort()} onSort={props.onSort}>
-              {props.children}
-            </ColHeaderBody>
-          }
-        >
-          <YoTooltip content={props.tooltip ?? ""} block>
-            <ColHeaderBody sort={sort()} onSort={props.onSort}>
-              {props.children}
-            </ColHeaderBody>
-          </YoTooltip>
-        </Show>
+        <ColHeaderBody sort={sort()} onSort={props.onSort}>
+          {props.children}
+        </ColHeaderBody>
       </div>
       <Show when={props.resizable && props.onWidthChange !== undefined && props.width !== undefined}>
         <YoColResizer

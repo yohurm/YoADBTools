@@ -34,13 +34,7 @@
   min-height: 0;
 }
 
-.yohu-col-header__content > .yohu-tooltip__anchor {
-  height: 100%;
-  align-items: stretch;
-}
-
-.yohu-col-header__content > .yohu-interactive,
-.yohu-col-header__content > .yohu-tooltip__anchor > .yohu-interactive {
+.yohu-col-header__content > .yohu-interactive {
   display: flex;
   align-items: stretch;
   width: 100%;
@@ -59,8 +53,7 @@
   --yohu-ripple-radius: var(--yohu-col-header-overlay-radius);
 }
 
-.yohu-col-header__content > .yohu-interactive:hover,
-.yohu-col-header__content > .yohu-tooltip__anchor > .yohu-interactive:hover {
+.yohu-col-header__content > .yohu-interactive:hover {
   color: var(--yohu-fg);
 }
 

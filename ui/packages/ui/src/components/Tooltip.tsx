@@ -1,7 +1,8 @@
 /**
- * YoTooltip —— 气泡提示（L4 视图 / L5 门面）。
+ * YoTooltip —— 无可见文案铬的气泡（L4 视图 / L5 门面）。
  * 只绑 Presence + 内容区；定位走 tooltip-place → popover-place。
  * 密集提示共享一个 popup（YoTooltipHost）。无 Host 时不画。
+ * 禁止包已画出的字；省略号不靠气泡复述。图标钮走 YoIconButton.title。
  */
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext } from "solid-js";
 import type { JSX } from "solid-js";
@@ -35,9 +36,9 @@ export interface YoTooltipProps {
   delay?: MotionSpecName;
   /** 禁用：不出现示 */
   disabled?: boolean;
-  /** 铺满父级主轴（列表行 / 路径盒）。缺省 hug 锚点 */
+  /** 无文案铬铺满父级主轴（空热区）。缺省 hug 锚点 */
   block?: boolean;
-  /** 铺满父级交叉轴（过滤栏级别槽） */
+  /** 无文案铬铺满父级交叉轴 */
   stretch?: boolean;
 }
 

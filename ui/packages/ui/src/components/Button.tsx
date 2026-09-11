@@ -36,6 +36,8 @@ export interface YoButtonProps {
   "aria-expanded"?: boolean;
   /** 切换按下态 */
   "aria-pressed"?: boolean;
+  /** 可见文案不足时的无障碍名（如级别字母）；不画气泡 */
+  "aria-label"?: string;
   children: JSX.Element;
 }
 
@@ -59,6 +61,7 @@ export function YoButton(props: YoButtonProps): JSX.Element {
       aria-busy={host()["aria-busy"]}
       aria-expanded={props["aria-expanded"]}
       aria-pressed={props["aria-pressed"]}
+      aria-label={props["aria-label"]}
       onClick={props.onClick}
     >
       {props.loading ? <span class="yohu-button__spinner" aria-hidden="true" /> : null}

@@ -104,6 +104,16 @@ describe("YoButton", () => {
     expect(screen.getByRole("button", { name: "仅显示" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("可见字母不足时 aria-label 作无障碍名，不画气泡", () => {
+    const { container } = render(() => (
+      <YoButton variant="ghost" tone="neutral" ink flush aria-label="Verbose">
+        V
+      </YoButton>
+    ));
+    expect(screen.getByRole("button", { name: "Verbose" })).toBeTruthy();
+    expect(container.querySelector(".yohu-tooltip__anchor")).toBeNull();
+  });
+
   it("ink + flush 写 data-ink=inherit 与 data-flush，不改 paint", () => {
     render(() => (
       <YoButton variant="ghost" tone="neutral" ink flush aria-pressed>

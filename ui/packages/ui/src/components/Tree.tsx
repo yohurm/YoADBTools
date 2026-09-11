@@ -19,7 +19,6 @@ import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/collapse";
 import { YoIndicator } from "../motion/indicator";
 import { YoBadge } from "./Badge";
-import { YoTooltip } from "./Tooltip";
 import { flattenVisible, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,
@@ -43,7 +42,7 @@ export interface TreeNode<T = unknown> {
   data?: T;
   /** 尾部胶囊徽章（如命令数） */
   badge?: string;
-  /** hover 完整提示（如命令模板） */
+  /** 无障碍名（如完整命令模板）；不画气泡 */
   title?: string;
 }
 
@@ -130,6 +129,7 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
               role="treeitem"
               aria-expanded={attrs()["aria-expanded"]}
               aria-selected={attrs()["aria-selected"]}
+              aria-label={node.title}
               tabindex={attrs().tabindex}
               style={{
                 "padding-left": `calc(${depth} * var(--yohu-space-lg))`,
@@ -160,9 +160,7 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                 <span class="yohu-tree__chevron" data-leaf="" />
               )}
               {node.icon ? <Icon name={node.icon} size={Layout.IconSm} /> : null}
-              <YoTooltip content={node.title ?? node.label} disabled={!node.title}>
-                <span class="yohu-tree__label">{node.label}</span>
-              </YoTooltip>
+              <span class="yohu-tree__label">{node.label}</span>
               {node.badge ? <YoBadge text={node.badge} /> : null}
             </div>
             <Show when={hasChildren}>

@@ -79,7 +79,7 @@ describe("YoColHeader", () => {
     expect(colHeaderCss).toContain("--yohu-col-header-content-pad:");
     expect(colHeaderCss).toContain("--yohu-ripple-inset: var(--yohu-col-header-overlay-inset)");
     expect(colHeaderCss).toMatch(
-      /\.yohu-col-header__content\s*>\s*\.yohu-interactive,\s*\.yohu-col-header__content\s*>\s*\.yohu-tooltip__anchor\s*>\s*\.yohu-interactive\s*\{[^}]*padding:\s*0/,
+      /\.yohu-col-header__content\s*>\s*\.yohu-interactive\s*\{[^}]*padding:\s*0/,
     );
     expect(colHeaderCss).toMatch(
       /\.yohu-col-header__label\s*\{[^}]*padding:\s*var\(--yohu-col-header-content-pad\)/,
@@ -125,7 +125,7 @@ describe("YoColHeader", () => {
   it("有 onSort 时库内渲染 interactive、文案槽与 chevron", () => {
     const onSort = vi.fn();
     const { container } = render(() => (
-      <YoColHeader ariaSort="ascending" onSort={onSort} tooltip="按名称排序">
+      <YoColHeader ariaSort="ascending" onSort={onSort}>
         名称
       </YoColHeader>
     ));
@@ -134,7 +134,7 @@ describe("YoColHeader", () => {
     expect(container.querySelector(".yohu-col-header__label")).not.toBeNull();
     expect(container.querySelector(".yohu-col-header__title")?.textContent).toBe("名称");
     expect(container.querySelector("[data-icon='chevron-up']")).not.toBeNull();
-    expect(container.querySelector(".yohu-tooltip__anchor")).not.toBeNull();
+    expect(container.querySelector(".yohu-tooltip__anchor")).toBeNull();
     fireEvent.click(button!);
     expect(onSort).toHaveBeenCalledTimes(1);
   });

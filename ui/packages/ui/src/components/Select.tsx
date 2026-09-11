@@ -18,7 +18,6 @@ import { Icon } from "../icons";
 import { YoIndicator } from "../motion/indicator";
 import { YoPresence } from "../motion/presence";
 import { Layout } from "../tokens/layout";
-import { YoTooltip } from "./Tooltip";
 import {
   findOption,
   optionDomId,
@@ -165,11 +164,6 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
       data-disabled={host()["data-disabled"]}
       data-block={host()["data-block"]}
     >
-      <YoTooltip
-        content={selected()?.label ?? props.placeholder ?? ""}
-        disabled={Boolean(props.disabled) || !(selected()?.label || props.placeholder)}
-        block={props.block}
-      >
       <button
         ref={(el) => (triggerRef = el)}
         type="button"
@@ -191,7 +185,6 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
           <Icon name="chevron-down" size={Layout.IconInline} />
         </span>
       </button>
-      </YoTooltip>
       <Portal mount={document.body}>
         <YoPresence when={open()} recipe="popover">
           <div
