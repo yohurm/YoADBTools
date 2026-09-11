@@ -1,12 +1,19 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.40（2026-09-11，输入宽度单属性）    
+> **状态：** v2.47（2026-09-11，投屏舞台由工作台开关）    
 
 
 
-> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）。  
+> **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.47 变更（投屏舞台由工作台开关）：** HWND 显隐跟 `ModuleId.Mirror`，走 `mirror.present.setActive`。离开投屏同一拍拆窗，再淡出网页。`MirrorView` 只报 avail。删除 Presence 观察与 layout `epoch`。铬 `dark` 仍跟 `data-theme`。见 [modules/mirror.md](modules/mirror.md)、[ipc.md](ipc.md)。
+> **v2.46 变更（投屏 HWND 离场 + 铬跟主题）：** 曾用 Presence `data-state` + `epoch` 挡在途包；v2.47 撤回，改由工作台拥有开关。
+> **v2.45 变更（路径铬 hug + 指针门闩）：** 路径**行**铺满顶栏，**铬**只 hug 可见盒（浏览=面包屑+短热区，编辑=输入盒）。盒外（含顶栏剩余）不是路径栏：不进编辑、取消只认输入铬。编辑时面包屑 `display: none` 退出文档流，收回只 clip 输入铬，文字与边框同一盒。打开手势 `pointerdown` `preventDefault`，`pointerup` 后再 focus，避免 Chromium mouseup 全选；`Ctrl+L` 无门闩。见 [modules/files.md](modules/files.md)。
+> **v2.44 变更（投屏质量栏收窄）：** 右侧功能栏宽改走 `--yohu-layout-mirror-func`（200px），不再共用文件预览 `--yohu-layout-preview`（240px）。操作栏仍是 `--yohu-layout-mirror-ops`。
+> **v2.43 变更（路径展开不预选）：** 点空白 / `Ctrl+L` 展开后光标落在末尾，不预选全文。选区与槽滚动规则在 `address-edit`（`addressOpenCaret` / `addressScrollPin`）；揭开结束只保焦，不再二次改选区。见 [modules/files.md](modules/files.md)。
+> **v2.42 变更（路径输入 hug 文字）：** 点空白展开的是输入盒，不是整栏铺满。盒 `width: max-content` + `field-sizing: content`，`max-width: 100%` 只当槽视野；短路径不再 `min-width: 100%`。编辑时面包屑 `inert` 并隐藏，避免旁侧再露一段路径。见 [modules/files.md](modules/files.md)。
+> **v2.41 变更（路径栏点空白进编辑）：** YoPanel 自定义顶栏是块级槽（不是 title+actions 那条 flex 行），路径行铺满主轴。点分段右侧剩余 / 分隔符 / 行内边距进入同一格输入；点分段仍跳转。`YoTooltip` `block` 在 flex 行里 `flex: 1 1 0` 吃剩余。见 [youi.md](youi.md)、[modules/files.md](modules/files.md)。
 > **v2.40 变更（输入宽度单属性）：** `YoTextField` 宽度只写 `data-width`（`hug` / `number` / `fill`）。公开仍用 `block` 表示铺满（与 `YoSelect` 同名）。禁止再并列 `data-block`。见 [youi.md](youi.md)。
 > **v2.39 变更（设置行右槽簇）：** `YoFormRow` 右槽只 hug 贴尾。路径框 + 浏览是同一簇，禁止 `controlFill` / Tooltip `block` 把槽拉满后让固定宽输入悬在中间。对照 WinUI SettingsCard `HorizontalContentAlignment=Right`（内容列 Auto）。见 [youi.md](youi.md)。
 > **v2.38 变更（发送图标朝上）：** 命令终端纸飞机空内容水平向右；草稿或队列有内容时挂 `yohu-recipe-send-aim`，`spatialSmall` 转到朝上。清空转回。模块禁止自写 rotate。见 [动画系统-v6.md](动画系统-v6.md)。
@@ -350,7 +357,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `--yohu-segment-hybrid` | 44 | 56 | 分段按钮图文（V2 `doubleline_background_height`） |
 | `--yohu-title-bar-height` | 40 | 40 | 窗口铬（页眉回内容区后走 HarmonyOS Compact；不再随内容密度抬到 56） |
 
-布局常量（不随密度变）：`--yohu-layout-shell-nav: 232px`、`--yohu-layout-sidebar: 280px`、`--yohu-layout-preview: 240px`、`--yohu-layout-settings-max: 920px`、`--yohu-layout-output-max: 260px`、`--yohu-layout-hit-splitter: 6px`、`--yohu-layout-gutter: 16px`、`--yohu-layout-grid-max: 2220px`、`--yohu-layout-page-inset` / `--yohu-layout-page-gap`（数值 = `Spacing.Md` 12vp，经 `YoPage` 消费）、`--yohu-layout-chrome-pad`（数值 = `Spacing.Sm` 8vp，经 `YoChrome` 消费）。
+布局常量（不随密度变）：`--yohu-layout-shell-nav: 232px`、`--yohu-layout-sidebar: 280px`、`--yohu-layout-preview: 240px`、`--yohu-layout-mirror-ops: 48px`、`--yohu-layout-mirror-func: 200px`、`--yohu-layout-settings-max: 920px`、`--yohu-layout-output-max: 260px`、`--yohu-layout-hit-splitter: 6px`、`--yohu-layout-gutter: 16px`、`--yohu-layout-grid-max: 2220px`、`--yohu-layout-page-inset` / `--yohu-layout-page-gap`（数值 = `Spacing.Md` 12vp，经 `YoPage` 消费）、`--yohu-layout-chrome-pad`（数值 = `Spacing.Sm` 8vp，经 `YoChrome` 消费）。
 
 HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、**工作台主窗** `--yohu-layout-window-min-w/h: 1024×768`（与 Tauri `minWidth`/`minHeight` 同值；保证投屏竖屏 contain 短边 ≥280 CSS。鸿蒙对话框/子窗最小 360×240 **不**套主窗）、`--yohu-layout-page-margin: 40px`（PC 左右边距，设置页用）、`--yohu-layout-breakpoint-split: 600`（分栏）、`--yohu-layout-breakpoint-side: 840`（侧边页签）、`--yohu-layout-button-max: 448`、`--yohu-layout-dialog-max: 400`。数量约束 `LayoutLimits`：标题栏右侧 ≤3 图标、C 栏工具栏 ≤6、侧栏 ≤窗口宽 40%。间距补 `space-2xl=32`、`space-3xl=40`（Padding_level16/20）。控件行高仍按 P1 产线密度收敛，不改用手机 48vp 列表行。
 
@@ -491,15 +498,15 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 清单对齐 Family B（数据网格）：行/单元格选择 + 列宽轨道，不是日志那种文档选区。禁止把日志的字符 Range 模型套过来。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 上传/下载/刷新/预览）→ `YoPanel` 资源分区（路径栏 | 四列清单）与独立预览 `YoPanel` 并列 → 有任务时另起传输 `YoPanel`（Presence `rise` 升起；标题栏可点，列表 `YoCollapse recipe=panel`）。
 - 四列清单：`YoVirtualList` 选择模式（含 ripple 与多选邻接圆角）。与日志同一套 `YoColFrame` + `YoColRow` / `YoColHeader` + `YoColTrack` / `YoColCell`（标题默认靠左，列垫左 md / 右 sm；前三列 `YoColResizer` 短柄）。排序钮铺满列格，走 `.yohu-interactive`（宿主 padding 0）。列宽走 YoUI `col-model` / `col-resize`，模块只 `setColWidth(key, px)`，禁止累加 delta，禁止再写 `grid-template-columns`。拖条热区透明，可见铬是居中短柄，禁止整块涂 accent。悬浮片铺满列矩形（inset 0 / radius-none）。名称列不再自写左右 padding，与表头同一 `--yohu-col-cell-pad`。行间 hairline 走 VirtualList 单源（`--yohu-border`）；表头与清单背板 `--yohu-canvas`（与面板 surface 分层）；选中宿主保持透明。清单视口与日志相同：`overflow: hidden` 给虚拟列表确定高度。禁止模块再写 `.yohu-virtual-list__row` 分割线。
-- 路径行：上级钮 + **一条**地址槽（`AddressSlot`）。槽是单格：面包屑 hug（祖先 `--yohu-fg-2`，当前 `--yohu-fg` + semibold，点分段跳转）+ 流内热区吃剩余。点热区或 `Ctrl+L` 后，输入同格 `clip-path` 从左向右揭开（`spatial-local`）并全选当前路径；收回倒放同一条 clip，播完再卸。输入盒 `field-sizing: content`，`width: auto`，短路径 `min-width: 100%` 铺满槽；长路径按文字固有宽超出槽，槽当视野。禁止指定 `width`、禁止逐字改 `style.width`、禁止 `width` 走 `spatial-local`。Enter 提交：解析/安全根/设备浏览任一步失败则保持编辑态并标 invalid，清单停在原目录，`YoToast` 提示（目录不存在为「没有这个目录，请重新输入」）；成功才收回。禁止再在路径栏上方挂错误卡片。Esc / 点槽外取消。禁止第二栏、禁止常驻隐藏 input、禁止 `100cqi` / `container-type`。路径栏与清单之间不拉分割线。
+- 路径行：上级钮 + **地址铬**（`AddressSlot`）。行铺满顶栏，铬 hug：浏览=面包屑簇 + 短热区（`--yohu-space-lg`，不 stretch）；编辑=输入盒。盒外不是路径栏。点铬内热区 / 分隔符 / `Ctrl+L` 后，输入同格 `clip-path` 从左向右揭开（`spatial-local`），打开手势松开后再 focus，光标在末尾、不预选；收回倒放同一条 clip（只打输入铬），播完再卸。编辑时面包屑 `display: none`，不占位。输入盒 `field-sizing: content`，`width: max-content`，跟文字 hug，`max-width: 100%` 超出才当铬视野滚动。禁止把顶栏剩余当路径栏，禁止热区 `flex: 1`，禁止面包屑 `visibility: hidden` 占满槽。禁止指定 `width`、禁止逐字改 `style.width`、禁止 `width` 走 `spatial-local`。Enter 提交：解析/安全根/设备浏览任一步失败则保持编辑态并标 invalid，清单停在原目录，`YoToast` 提示（目录不存在为「没有这个目录，请重新输入」）；成功才收回。禁止再在路径栏上方挂错误卡片。Esc / 点输入铬外取消。禁止第二栏、禁止常驻隐藏 input、禁止 `100cqi` / `container-type`。路径栏与清单之间不拉分割线。
 - 预览是独立 `YoPanel`（宽 `--yohu-layout-preview`），不嵌进清单卡片；右键走 `files.list` 场景（新建/下载/复制路径/删除），由壳 `YoContextMenuHost` 呈现。
 - 目录首次加载（清单为空且正在读取）走 `YoLoading`；刷新按钮仍走 `YoIconButton.loading`。空目录才是 `YoEmptyState`。
 
 ### 4.4 投屏显示
 
 - 与效率型模块同一 `YoPage` + `YoChrome title="投屏显示"` + `deviceLabel`。内容区操作栏 / 质量是 `YoPanel`；舞台列是 `.yohu-mirror__avail` 透明洞（不是 YoPanel）。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片（ADR-v6-027）；idle 铺满 avail。不是编码器 `max_size`，也不是 UI `containInZone`。
-- 舞台像素由 HWND 独占（空态/加载/暂停/视频都画在 HWND 上，ADR-v6-026/027）；WebView 只留透明占位上报 avail。禁止 WebView overlay 与 HWND XOR。空态/加载/暂停的文案与颜色在壳内绘制，填充色走 surface token。空态只写终态（未选择设备 / 未开始 / 启动失败），不把模块名再写一遍。Live 不等于已出画：首帧 Present 前舞台保持加载，避免黑屏空等。上次编码尺寸留在 present，`stop` 不清零。占用 fill↔contain 走 DComp clip 动画。禁止 CSS 占用宽高过渡、禁止 UI 运行时 contain。
-- 页眉主行 ≤6：开始/停止、暂停画面、截图、面板内全屏、**仅显示**（按下=只看；默认未按=可操作）。**面板内全屏**只藏操作栏与功能栏，舞台吃满页眉以下；页眉「退出全屏」与 Esc 始终可点。禁止 `position:fixed; inset:0` 盖住工作台。**设备操作栏**（宽 `--yohu-layout-mirror-ops`，在画面与设置栏之间，非常驻于全屏）：返回 / Home / 多任务 / 音量± / 电源 / **设备深浅色（月亮=设备当前深色、太阳=浅色，同一钮，读 `deviceStatuses.night`）** / 亮度±，鸿蒙符号 `YoIconButton`。非全屏时导航/音量/电源/亮度在不可操作时禁用，不把栏藏起来以免布局跳动；深浅色钮跟连接设备，不跟工作台 theme，禁止本页轮询 dumpsys。**右侧功能栏**（宽 `--yohu-layout-preview`，`YoPanel`）：**质量**（投屏协议 USB/无线 / 长边 / 码率 / 帧率上限，**下次开始生效**）。禁止再把这些控件放进页眉 extra、设置页或通道开关。禁止把导航键放回设置栏。
+- 舞台像素由 HWND 独占（空态/加载/暂停/视频都画在 HWND 上，ADR-v6-026/027）；WebView 只留透明占位上报 avail。禁止 WebView overlay 与 HWND XOR。空态/加载/暂停的文案与颜色在壳内绘制，填充色走工作台 surface（`dark` = `data-theme`，不是设备夜览）。空态只写终态（未选择设备 / 未开始 / 启动失败），不把模块名再写一遍。Live 不等于已出画：首帧 Present 前舞台保持加载，避免黑屏空等。上次编码尺寸留在 present，`stop` 不清零。占用 fill↔contain 走 DComp clip 动画。禁止 CSS 占用宽高过渡、禁止 UI 运行时 contain。切走投屏由工作台先关舞台再淡出网页；禁止 View 观察 Presence。
+- 页眉主行 ≤6：开始/停止、暂停画面、截图、面板内全屏、**仅显示**（按下=只看；默认未按=可操作）。**面板内全屏**只藏操作栏与功能栏，舞台吃满页眉以下；页眉「退出全屏」与 Esc 始终可点。禁止 `position:fixed; inset:0` 盖住工作台。**设备操作栏**（宽 `--yohu-layout-mirror-ops`，在画面与设置栏之间，非常驻于全屏）：返回 / Home / 多任务 / 音量± / 电源 / **设备深浅色（月亮=设备当前深色、太阳=浅色，同一钮，读 `deviceStatuses.night`）** / 亮度±，鸿蒙符号 `YoIconButton`。非全屏时导航/音量/电源/亮度在不可操作时禁用，不把栏藏起来以免布局跳动；深浅色钮跟连接设备，不跟工作台 theme，禁止本页轮询 dumpsys。**右侧功能栏**（宽 `--yohu-layout-mirror-func`，`YoPanel`）：**质量**（投屏协议 USB/无线 / 长边 / 码率 / 帧率上限，**下次开始生效**）。禁止再把这些控件放进页眉 extra、设置页或通道开关。禁止把导航键放回设置栏。
 - 实测 fps 在状态栏右下角（1s 窗口已 Present 帧），不是画面角标，也不是质量栏的编码器上限。
 - 面板贴合：`mirror.layout` 报 `.yohu-mirror__avail` 客户区物理矩形 + 会话旗标。舞台透明洞稳定；HWND 铺满 avail；可见卡片 DComp clip contain。fill↔contain 走 `IDCompositionAnimation`。禁止 `screenX` 跟窗。主窗不得小于 `Layout.WindowMin*`（1024×768），否则竖屏画面会塌成不可读的窄条。
 

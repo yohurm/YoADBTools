@@ -19,13 +19,13 @@
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
-| `mirror.start/stop/inject/closeControl/layout/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**（舞台透明洞，不是 contain 目标、不是视觉插值盒）。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。禁止 `video_width` / `stroke_px`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。可见则 HWND 独占占用矩形的像素；`visible=false` 才拆表面。Live 状态只信 `mirror/state`，无 `mirror.status` |
+| `mirror.start/stop/inject/closeControl/present.setActive/layout/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。**舞台开关** `mirror.present.setActive` 只由 `@yohu/workbench` 在模块身份变化时调用（离开 `screen-mirror` 同一拍 `false` 并拆 HWND）。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。`dark` 跟工作台 `data-theme`。未激活时一切 layout（含 `visible=true`）丢弃。禁止 `video_width` / `stroke_px` / layout `epoch`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。Live 状态只信 `mirror/state`，无 `mirror.status` |
 | `settings.set` | 更新单键；推 `settings/changed` 全量快照。读走 `system.info` / 事件注入 |
 | `system.info` / `openPath` / `reportError` / `log` | 关于 / 打开路径 / 上报。`paths` 含 `install_dir` / `config_dir` / `cache_dir` / `webview_dir` / `update_cache_dir`（ADR-v6-031；无 `settings_dir`） |
 | `boot.showMain` | 工作台已 hydrate：Windows 上同屏铺满后再揭主窗内容 / 异屏出场后再揭；其它平台直接揭窗。幂等。 |
 | `update.check` / `info` / `download` / `install` / `cancel` / `open` | ADR-v6-022 |
 
-本机选路走 `@yohu/api` 的 `dialogOpen*` / `dialogSaveFile`（封装 `tauri-plugin-dialog`）。窗口三键走 `@yohu/api` 的 `windowMinimize` 等（封装 `@tauri-apps/api/window`）；启动是原生小窗（Win32 GDI，进程入口）→ 主窗 hydrate → `windowShow`（`boot.showMain`）按同屏/异屏交接。工作台不直连 Tauri。`mirror.layout.dark` 是设备 Hub 夜览，不是工作台 `data-theme`。
+本机选路走 `@yohu/api` 的 `dialogOpen*` / `dialogSaveFile`（封装 `tauri-plugin-dialog`）。窗口三键走 `@yohu/api` 的 `windowMinimize` 等（封装 `@tauri-apps/api/window`）；启动是原生小窗（Win32 GDI，进程入口）→ 主窗 hydrate → `windowShow`（`boot.showMain`）按同屏/异屏交接。工作台不直连 Tauri。`mirror.present.setActive` 由工作台调用；`mirror.layout.dark` 跟工作台 `data-theme`；设备夜览只走月亮钮 / `deviceStatuses.night`。
 
 ## 事件
 
