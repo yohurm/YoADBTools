@@ -101,6 +101,12 @@ describe("命令终端动效接线", () => {
     const managerCss = load("command-manager.css");
     expect(manager).toContain('pad="xs"');
     expect(manager).toContain("YoVirtualList");
+    expect(manager).toContain("YoPanel");
+    expect(load("manager/EntryColumn.tsx")).toContain('tone="list"');
+    expect(load("manager/EntryColumn.tsx")).not.toContain("YoColFrame");
+    expect(load("manager/EntryColumn.tsx")).not.toContain("YoColTrack");
+    expect(load("manager/EditorColumn.tsx")).toContain('variant="pane"');
+    expect(load("manager/EditorColumn.tsx")).not.toContain("<div class=\"yohu-cm__editor\"");
     expect(manager).toContain("pointerSelectMode");
     expect(manager).toContain("attachPanelKeys");
     expect(manager).toContain("COMMAND_MANAGER_KEY_BINDINGS");
@@ -117,5 +123,10 @@ describe("命令终端动效接线", () => {
     expect(managerStore).not.toContain("clipboard");
     expect(managerStore).not.toContain("querySelector");
     expect(managerCss).not.toContain(".yohu-toolbar");
+    expect(managerCss).not.toContain(".yohu-panel");
+    expect(managerCss).toContain(".yohu-cm__commands .yohu-cm__list");
+    expect(managerCss).toContain("var(--yohu-canvas)");
+    expect(managerCss).not.toContain(".yohu-cm__table");
+    expect(managerCss).not.toContain(".yohu-cm__cols");
   });
 });

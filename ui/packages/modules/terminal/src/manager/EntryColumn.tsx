@@ -1,5 +1,6 @@
 /**
- * 命令管理中栏：条目 listbox。选区与指示器走 YoVirtualList 多选。
+ * 命令管理中栏：条目 listbox。选区走 YoVirtualList 多选。
+ * 名称之间的分割线走 tone=list；铬走 YoPanel pane，与左右栏同一圆角。
  */
 
 import { Show } from "solid-js";
@@ -8,6 +9,7 @@ import {
   Density,
   YoBadge,
   YoIconButton,
+  YoPanel,
   YoToolbar,
   YoVirtualList,
   pointerSelectMode,
@@ -23,17 +25,19 @@ export function EntryColumn(props: {
   const entries = (): DraftEntry[] => props.store.selectedGroup()?.entries ?? [];
 
   return (
-    <div class="yohu-cm__commands">
+    <YoPanel class="yohu-cm__commands" variant="pane" overflow="hidden" header={
       <YoToolbar pad="xs">
         <span class="yohu-cm__caption">条目</span>
         <YoIconButton icon="plus" title="新增命令" onClick={() => props.store.addCommand()} />
         <YoIconButton icon="list" title="新增命令块" onClick={() => props.store.addBlock()} />
         <YoIconButton icon="trash" title="删除条目" onClick={() => props.store.removeEntries()} />
       </YoToolbar>
+    }>
       <div class="yohu-cm__list">
         <YoVirtualList<DraftEntry>
           items={entries}
           itemHeight={Density.Comfortable.controlHeight}
+          tone="list"
           getItemKey={(entry) => entry.id}
           ariaLabel="条目"
           selectedKeys={() => props.store.selectedEntrySet()}
@@ -53,6 +57,6 @@ export function EntryColumn(props: {
           )}
         />
       </div>
-    </div>
+    </YoPanel>
   );
 }

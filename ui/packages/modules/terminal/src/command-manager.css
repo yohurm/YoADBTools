@@ -9,15 +9,15 @@
   min-height: 0;
   min-width: 0;
   width: 100%;
+  padding: var(--yohu-space-md) var(--yohu-space-lg);
+  box-sizing: border-box;
 }
 
 .yohu-cm__groups,
-.yohu-cm__commands {
-  display: flex;
-  flex-direction: column;
+.yohu-cm__commands,
+.yohu-cm__editor {
   min-width: 0;
   min-height: 0;
-  background: var(--yohu-surface-2);
 }
 
 .yohu-cm__caption {
@@ -36,6 +36,10 @@
   padding: var(--yohu-space-xs);
 }
 
+.yohu-cm__commands .yohu-cm__list {
+  background-color: var(--yohu-canvas);
+}
+
 .yohu-cm__row {
   display: flex;
   align-items: center;
@@ -52,17 +56,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.yohu-cm__editor {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--yohu-space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-md);
-}
-
 
 .yohu-cm__empty {
   margin: auto;

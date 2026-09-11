@@ -1,8 +1,9 @@
 /**
- * 命令管理左栏：组 listbox。选区与指示器走 YoVirtualList 单选。
+ * 命令管理左栏：组 listbox。选区走 YoVirtualList 单选。
+ * 铬走 YoPanel pane，与中栏 / 编辑栏同一圆角。
  */
 
-import { Density, YoBadge, YoIconButton, YoToolbar, YoVirtualList } from "@yohu/ui";
+import { Density, YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } from "@yohu/ui";
 
 import type { DraftGroup } from "../draft";
 import type { CommandManagerStore } from "./store";
@@ -11,12 +12,13 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
   const groups = (): DraftGroup[] => props.store.draft.groups;
 
   return (
-    <div class="yohu-cm__groups">
+    <YoPanel class="yohu-cm__groups" variant="pane" overflow="hidden" header={
       <YoToolbar pad="xs">
         <span class="yohu-cm__caption">命令组</span>
         <YoIconButton icon="plus" title="新增组" onClick={() => props.store.addGroup()} />
         <YoIconButton icon="trash" title="删除组" onClick={() => props.store.removeGroup()} />
       </YoToolbar>
+    }>
       <div class="yohu-cm__list">
         <YoVirtualList<DraftGroup>
           items={groups}
@@ -33,6 +35,6 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
           )}
         />
       </div>
-    </div>
+    </YoPanel>
   );
 }

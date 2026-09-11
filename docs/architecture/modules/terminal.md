@@ -14,7 +14,7 @@
   - `manager/keys.ts`：命令管理绑定表；Dialog 内不用 `whenList`（会被 `inDialog` 挡掉）
   - `manager/reorder.ts`：步骤排序纯函数（`moveStepTo` / `dropIndexFromCenters` / `shiftForReorder`）
   - `manager/store.ts`：`createCommandManagerStore()` 持草稿 + 中栏选区 + 变更。选区直接调 YoUI `nextKeys`。**不** import 运行时终端 store；**不**开菜单、不写剪贴板、不查 DOM。Dialog 注入 `load(library)` / `library()`
-  - `manager/{Group,Entry,Editor}Column.tsx` + `BlockSteps.tsx`：三栏视图。组/条目清单是 `YoVirtualList`（单选 `selectedKey` / 多选 `selectedKeys` + `pointerSelectMode`）；禁止自挂 `ul`/`YoIndicator`。拖动手势只在 `BlockSteps`
+  - `manager/{Group,Entry,Editor}Column.tsx` + `BlockSteps.tsx`：三栏都是 `YoPanel variant=pane`（高度与圆角对齐）。组/条目清单是 `YoVirtualList`（单选 `selectedKey` / 多选 `selectedKeys` + `pointerSelectMode`）。中栏条目名之间走 `tone=list` hairline，清单背板 canvas；禁止自挂 `ul`/`YoIndicator`，不走 `YoColFrame`。拖动手势只在 `BlockSteps`
   - `CommandManager.tsx`：薄 Dialog。开窗 `store.load`、保存 `terminalStore.save(store.library())`、`attachPanelKeys`、`openContextMenu(terminalCommandMenu)` + clipboard。`view.test.ts` 仍在此文件扫到 `openContextMenu` / `terminalCommandMenu`，且不含 `<YoContextMenu`
   - `store.ts`（模块根）：运行时终端（`exec` / `blockRun` / 命令库持久化），与命令管理草稿 store 分开
   - **设计前链路：** `TerminalView` → 单文件 `CommandManager` 同时持草稿、多选、步骤 pointer 几何、`openContextMenu` + clipboard、三栏 JSX；`draft.ts` 夹拖动几何。问题：一层以上塞进同一文件

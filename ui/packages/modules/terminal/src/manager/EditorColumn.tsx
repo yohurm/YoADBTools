@@ -1,5 +1,6 @@
 /**
- * 命令管理右栏：恰好 1 条才出属性面板；多选只报条数。
+ * 命令管理右栏：恰好 1 条才出属性；多选只报条数。
+ * 铬走 YoPanel pane，与组 / 条目对齐高度与圆角。字段 hug 靠顶（fill 只铺宽）。
  */
 
 import { Show } from "solid-js";
@@ -16,9 +17,26 @@ const GAP_OPTIONS = COMMAND_BLOCK_GAPS_MS.map((ms) => ({
   label: commandBlockGapLabel(ms),
 }));
 
+function editorTitle(store: CommandManagerStore): string | undefined {
+  const entry = store.selectedEntry();
+  const groupName = store.selectedGroup()?.name || "未命名组";
+  if (entry?.kind === "block") return `命令块 · ${groupName}`;
+  if (entry) return `命令属性 · ${groupName}`;
+  if (store.ui.selectedEntryIds.length > 1) return undefined;
+  if (store.selectedGroup()) return "组属性";
+  return undefined;
+}
+
 export function EditorColumn(props: { store: CommandManagerStore }) {
   return (
-    <div class="yohu-cm__editor">
+    <YoPanel
+      class="yohu-cm__editor"
+      variant="pane"
+      padding="md"
+      gap="md"
+      overflow="auto"
+      title={editorTitle(props.store)}
+    >
       <Show
         when={props.store.selectedEntry()}
         keyed
@@ -31,14 +49,12 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
                 fallback={<p class="yohu-cm__empty">选择左侧命令组，或新建一组</p>}
               >
                 {(group) => (
-                  <YoPanel title="组属性">
-                    <YoTextField
-                      block
-                      label="组名称"
-                      value={group().name}
-                      onInput={(v) => props.store.updateGroupName(group().id, v)}
-                    />
-                  </YoPanel>
+                  <YoTextField
+                    block
+                    label="组名称"
+                    value={group().name}
+                    onInput={(v) => props.store.updateGroupName(group().id, v)}
+                  />
                 )}
               </Show>
             }
@@ -52,7 +68,7 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
             when={entry.kind === "block" ? entry : undefined}
             keyed
             fallback={
-              <YoPanel title={`命令属性 · ${props.store.selectedGroup()?.name || "未命名组"}`}>
+              <>
                 <YoTextField
                   block
                   label="命令名称"
@@ -65,11 +81,11 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
                   value={formatAdbLine("-", entry.kind === "command" ? entry.template : "")}
                   onInput={(v) => props.store.updateEntry({ template: commandBody(v) })}
                 />
-              </YoPanel>
+              </>
             }
           >
             {(block) => (
-              <YoPanel title={`命令块 · ${props.store.selectedGroup()?.name || "未命名组"}`}>
+              <>
                 <YoTextField
                   block
                   label="命令块名称"
@@ -92,11 +108,11 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
                   onMoveTo={(from, to) => props.store.moveBlockStepTo(from, to)}
                   onShift={(index, delta) => props.store.shiftBlockStep(index, delta)}
                 />
-              </YoPanel>
+              </>
             )}
           </Show>
         )}
       </Show>
-    </div>
+    </YoPanel>
   );
 }
