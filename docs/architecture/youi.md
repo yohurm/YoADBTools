@@ -379,7 +379,7 @@ YoTooltip(content, children, delay?: MotionSpecName)
 | L4 | Tooltip.tsx / Tooltip.css | 只绑 Presence + 内容区 `.yohu-tooltip__content` |
 | L5 | index.ts | YoTooltip、YoTooltipHost（不导出 Unique 工厂） |
 
-公开 API：`content` / `children` / `delay?: MotionSpecName`（缺省 `effectsEnter`）/ `disabled` / `block`（列表行 / 路径盒铺满主轴）/ `stretch`（铺交叉轴，过滤栏级别槽）。无 `Tooltip.show`。无 Host 不画。壳根与 `YoContextMenuHost` 并列挂一份 `YoTooltipHost`。图标钮的 `title` 由 `YoIconButton` 内包本组件。禁止模块再写原生 `title` 冒充提示，禁止点 `__anchor`。
+公开 API：`content` / `children` / `delay?: MotionSpecName`（缺省 `effectsEnter`）/ `disabled` / `block`（列表行 / 路径盒铺满主轴；flex 行里 `flex: 1 1 0` 吃剩余）/ `stretch`（铺交叉轴，过滤栏级别槽）。无 `Tooltip.show`。无 Host 不画。壳根与 `YoContextMenuHost` 并列挂一份 `YoTooltipHost`。图标钮的 `title` 由 `YoIconButton` 内包本组件。禁止模块再写原生 `title` 冒充提示，禁止点 `__anchor`。
 
 出示：悬停，或键盘模态下的焦点（Host 记 pointerdown / keydown）。禁止把点击后的程序 `.focus()`（对话框首焦）当悬停。按下锚点与模态 `attachDialog` 立即卸 Unique，不跟隐藏延迟。L5 不导出 Unique / 模态 / `dismissTooltipOverlay`。
 
@@ -396,7 +396,7 @@ variant / padding / header|title|actions / align / gap / overflow / overflowX / 
   → L4 铬在外壳，pane 裁切在 __clip；内容区只认 data-*
 ```
 
-投屏 ops/func 与终端结果区走这些 prop。禁止模块点 `__body`。
+投屏 ops/func 与终端结果区走这些 prop。禁止模块点 `__body`。自定义 `header` 是块级槽（`display: block`），路径**行**铺满主轴，地址**铬** hug；不要把顶栏剩余当成路径栏，也不要用 title+actions 那条 flex 行去 hug 整行。
 
 ---
 

@@ -54,6 +54,7 @@
 }
 
 .yohu-panel[data-header="custom"] .yohu-panel__header {
+  display: block;
   min-height: 0;
   padding: 0;
 }

@@ -78,6 +78,12 @@ describe("YoPanel", () => {
     expect(document.querySelector(".yohu-panel__heading")?.textContent).toBe("执行结果");
   });
 
+  it("自定义 header 是块级槽，子元素按块铺满主轴", () => {
+    expect(panelCss).toMatch(
+      /\[data-header="custom"\]\s+\.yohu-panel__header\s*\{[^}]*display:\s*block/,
+    );
+  });
+
   it("自定义 header 替代 title", () => {
     const { container } = render(() => (
       <YoPanel variant="pane" title="忽略" header={<div>路径</div>}>

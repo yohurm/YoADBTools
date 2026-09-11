@@ -152,6 +152,15 @@ describe("YoTooltip", () => {
     expect(tooltipUnique.session()).toBeNull();
   });
 
+  it("block 在 flex 行里吃剩余，不只写 width 100%", () => {
+    expect(css).toMatch(
+      /\.yohu-tooltip__anchor\[data-block\]\s*\{[^}]*flex:\s*1 1 0/,
+    );
+    expect(css).toMatch(
+      /\.yohu-tooltip__anchor\[data-block\]\s*\{[^}]*width:\s*100%/,
+    );
+  });
+
   it("stretch 写 data-stretch，铺满交叉轴而不改成 block", () => {
     render(() => (
       <YoTooltip content="Verbose" stretch>
