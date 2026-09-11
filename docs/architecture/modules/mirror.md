@@ -35,7 +35,7 @@ core 零 Tauri：`FramePipe` 在 `yohu-mirror`；解码 / 窗体 / GPU 只在 `y
 - `mirror.layout`：客户区物理像素 `{x,y,w,h,visible,…}` + 会话旗标 `{dpr,fullscreen,paused,control,has_device,failed,error,dark}`。`dark` 跟工作台 `data-theme`。报稳定 avail 格子，不是 contain 目标，不是视觉插值盒。禁止 `video_width` / `stroke_px` / `epoch`。编码尺寸只来自 FramePipe；present 在 stop 后保留上次尺寸
 - 整数倍（误差 &lt; 1%）吸附后最近邻；否则由 D3D11 Video Processor 缩放
 - 拖拽主窗：子窗自动跟；改尺寸在 owner `WM_WINDOWPOSCHANGING` 瞬时跟盒。侧栏每帧跟住。面板内全屏只藏操作栏/功能栏，页眉可点，Esc 退出。呈现线程跟子窗尺寸 `ResizeBuffers`；禁止 `SetWindowPos`；`SetWindowPos` 禁止 `SWP_NOCOPYBITS`
-- **舞台占用（ADR-v6-026）：** HWND 生命周期跟「当前模块是不是投屏」走（`mirror.present.setActive`），解码管道跟 start/stop 走。空态/加载/暂停由同一 HWND 用 Direct2D 绘制（文案、surface、hairline 在壳内；铬色跟工作台 theme）。WebView 舞台是透明洞，不是 YoPanel。停止投屏不解 HWND。离开投屏页由工作台在淡出**之前**关舞台。禁止 View 观察 Presence / 用 layout 代际补丁挡在途包
+- **舞台占用（ADR-v6-026）：** HWND 生命周期跟「当前模块是不是投屏」走（`mirror.present.setActive`），解码管道跟 start/stop 走。`Stage.mode` 决定回缓冲主人：Empty/Loading/Paused 每拍 Present 铬（文案、surface、描边）；Video 每拍 Present 帧。描边画在当前可见 DComp clip 内侧，色走 `--yohu-border-strong`。禁止 dirty 一次画铬、禁止动画期跳过描边后不再 Present。浅色空态图标走 `fg` + `surface-2` 井。WebView 舞台是透明洞，不是 YoPanel。停止投屏不解 HWND。离开投屏页由工作台在淡出**之前**关舞台。禁止 View 观察 Presence / 用 layout 代际补丁挡在途包
 - **呈现类型（两段寿命）：** `Stage`（OS 无关）是占用/模式/chrome 的唯一开关，`bound` 只在 BindPipe/UnbindPipe 写入。Windows 上 `Host` 持 GPU+Stage+输入（跟 HWND）；`DecodeBind` 持 FramePipe+MF（跟 start/stop，不碰 HWND）。呈现线程只调度 `Cmd`，禁止再用 `session` bool 与管道双轨
 - 截图：`mirror.screenshot` 按视频分辨率从 last NV12 纹理导出（不是交换链 letterbox）
 - 实测 fps：1s 窗口已 Present 帧，进状态栏右槽，不盖画面
