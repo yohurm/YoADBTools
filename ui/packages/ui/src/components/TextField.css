@@ -20,7 +20,8 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  flex: 1 1 auto;
+  /* 只铺父级宽。flex-grow 会在 pane 竖栏里把字段沿栏高拉开。 */
+  flex: 0 1 auto;
 }
 
 .yohu-text-field[data-active] {

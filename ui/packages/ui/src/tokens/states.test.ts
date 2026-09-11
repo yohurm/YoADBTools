@@ -42,15 +42,15 @@ describe("yohu-interactive 叠层契约", () => {
     expect(statesCss).toContain(".yohu-tone");
   });
 
-  it("连续选中削平邻接圆角，start/mid 画项间分割线", () => {
+  it("连续选中削平邻接圆角，不另画项间分割线", () => {
     expect(statesCss).toContain("yohu-interactive--sel-start");
     expect(statesCss).toContain("yohu-interactive--sel-mid");
     expect(statesCss).toContain("yohu-interactive--sel-end");
     expect(statesCss).toContain("border-end-start-radius: 0");
     expect(statesCss).toContain("border-radius: 0");
     expect(statesCss).toContain("border-start-start-radius: 0");
-    expect(statesCss).toContain("var(--yohu-state-selected-rule)");
-    expect(statesCss).toContain("sel-start::after");
-    expect(statesCss).toContain("sel-mid::after");
+    expect(statesCss).not.toContain("selected-rule");
+    expect(statesCss).not.toContain("sel-start::after");
+    expect(statesCss).not.toContain("sel-mid::after");
   });
 });

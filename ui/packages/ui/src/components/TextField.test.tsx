@@ -142,11 +142,16 @@ describe("YoTextField", () => {
     expect(input.tagName).toBe("INPUT");
   });
 
-  it("block 铺满父级，压过 number 宽", () => {
+  it("block 铺满父级宽，压过 number 宽，不沿栏高 stretch", () => {
     render(() => <YoTextField block type="number" ariaLabel="全宽数字" />);
     const host = screen.getByLabelText("全宽数字").closest(".yohu-text-field");
     expect(host?.getAttribute("data-width")).toBe("fill");
     expect(host?.hasAttribute("data-block")).toBe(false);
+    const fill = css.slice(css.indexOf('[data-width="fill"]'));
+    const rule = fill.slice(0, fill.indexOf("}") + 1);
+    expect(rule).toContain("width: 100%");
+    expect(rule).toContain("flex: 0 1 auto");
+    expect(rule).not.toContain("flex: 1");
   });
 
   it("active 写 data-active，描边走 accent；默认不加", () => {

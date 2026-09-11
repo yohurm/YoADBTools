@@ -9,8 +9,6 @@ export const StateFill = {
   Pressed: "#00000019",
   Selected: "var(--yohu-accent)",
   SelectedFg: "var(--yohu-fg-on)",
-  /** 连续选中块内的项间分割线（叠在选中片上，不用 selected 本色补缝）。 */
-  SelectedRule: "color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent))",
 } as const;
 
 export const DarkStateFill = {
@@ -18,7 +16,6 @@ export const DarkStateFill = {
   Pressed: "#FFFFFF19",
   Selected: "var(--yohu-accent)",
   SelectedFg: "var(--yohu-fg-on)",
-  SelectedRule: "color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent))",
 } as const;
 
 /**

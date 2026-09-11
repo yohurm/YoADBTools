@@ -75,7 +75,6 @@
   --yohu-state-pressed: #00000019;
   --yohu-state-selected: var(--yohu-accent);
   --yohu-state-selected-fg: var(--yohu-fg-on);
-  --yohu-state-selected-rule: color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent));
   --yohu-font-caption-m: 10px;
   --yohu-font-caption: 12px;
   --yohu-font-body: 14px;
@@ -142,8 +141,8 @@
   --yohu-layout-crumb-max: 160px;
   --yohu-layout-cm-group-min: 168px;
   --yohu-layout-cm-group-max: 200px;
-  --yohu-layout-cm-cmd-min: 188px;
-  --yohu-layout-cm-cmd-max: 228px;
+  --yohu-layout-cm-cmd-min: 160px;
+  --yohu-layout-cm-cmd-max: 196px;
   --yohu-layout-hit-splitter: 6px;
   --yohu-layout-hit-nudge: 3px;
   --yohu-layout-icon-tiny: 12px;
@@ -281,7 +280,6 @@
   --yohu-state-pressed: #FFFFFF19;
   --yohu-state-selected: var(--yohu-accent);
   --yohu-state-selected-fg: var(--yohu-fg-on);
-  --yohu-state-selected-rule: color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent));
 }
 
 [data-density="compact"] {

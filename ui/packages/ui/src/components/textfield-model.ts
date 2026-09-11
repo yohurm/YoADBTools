@@ -11,7 +11,7 @@ export const DEFAULT_TEXT_FIELD_STATUS: YoTextFieldStatus = "none";
 
 export type TextFieldPaintKind = "neutral" | "error" | "warning";
 
-/** 宽度契约。fill=铺满父级；number=数字 hug；hug=默认最小宽。不是 size 轴。 */
+/** 宽度契约。fill=铺满父级宽（不沿栏高 stretch）；number=数字 hug；hug=默认最小宽。不是 size 轴。 */
 export type TextFieldWidthKind = "hug" | "fill" | "number";
 
 export interface TextFieldSlotInput {
