@@ -56,7 +56,6 @@ export type FileColAlign = "start" | "end";
 export interface FileColumnSpec {
   key: SortKey;
   header: string;
-  sortTitle: string;
   resizeLabel: string;
   defaultWidth: number;
   minWidth: number;
@@ -68,7 +67,6 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
   {
     key: "name",
     header: "名称",
-    sortTitle: "按名称排序",
     resizeLabel: "调节名称列宽",
     defaultWidth: 240,
     minWidth: 140,
@@ -78,7 +76,6 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
   {
     key: "type",
     header: "类型",
-    sortTitle: "按类型排序",
     resizeLabel: "调节类型列宽",
     defaultWidth: 72,
     minWidth: 56,
@@ -88,7 +85,6 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
   {
     key: "size",
     header: "大小",
-    sortTitle: "按大小排序",
     resizeLabel: "调节大小列宽",
     defaultWidth: 80,
     minWidth: 64,
@@ -98,7 +94,6 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
   {
     key: "mtime",
     header: "日期",
-    sortTitle: "按日期排序",
     resizeLabel: "调节日期列宽",
     defaultWidth: 168,
     minWidth: 140,

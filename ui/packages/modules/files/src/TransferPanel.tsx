@@ -53,12 +53,12 @@ export function TransferPanel() {
         class="yohu-files__transfers"
         padding="none"
         header={
-          <YoTooltip content={listOpen() ? "收起传输" : "展开传输"} block>
           <button
             type="button"
             class="yohu-files__transfer-bar yohu-interactive yohu-focus-ring"
             aria-expanded={listOpen()}
             aria-controls="yohu-files-transfer-list"
+            aria-label={listOpen() ? "收起传输" : "展开传输"}
             onClick={() => fileStore.toggleTransfers()}
           >
             <span
@@ -75,12 +75,9 @@ export function TransferPanel() {
               tone={runningCount() > 0 ? "accent" : "neutral"}
             />
             <Show when={!listOpen() && collapsedSummary()}>
-              <YoTooltip content={collapsedSummary()}>
-                <span class="yohu-files__transfer-summary">{collapsedSummary()}</span>
-              </YoTooltip>
+              <span class="yohu-files__transfer-summary">{collapsedSummary()}</span>
             </Show>
           </button>
-          </YoTooltip>
         }
       >
         <YoCollapse open={listOpen()} recipe="panel">
@@ -101,9 +98,7 @@ export function TransferPanel() {
                   </YoTooltip>
                   <div class="yohu-files__transfer-body">
                     <div class="yohu-files__transfer-head">
-                      <YoTooltip content={transfer.name}>
-                        <span class="yohu-files__transfer-name">{transfer.name}</span>
-                      </YoTooltip>
+                      <span class="yohu-files__transfer-name">{transfer.name}</span>
                       <YoBadge text={transferLabel(transfer)} tone={transferTone(transfer)} />
                       <Show when={transfer.state === "running"}>
                         <YoIconButton

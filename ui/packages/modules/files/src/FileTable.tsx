@@ -15,7 +15,6 @@ import {
   YoFileIcon,
   YoLoading,
   YoVirtualList,
-  YoTooltip,
   pointerSelectMode,
 } from "@yohu/ui";
 import type { RemoteEntry } from "@yohu/api";
@@ -47,7 +46,6 @@ function ColHead(props: { col: FileColumnSpec }) {
       minWidth={props.col.minWidth}
       onWidthChange={(width) => fileStore.setColWidth(props.col.key, width)}
       onSort={() => fileStore.setSort(props.col.key)}
-      tooltip={props.col.sortTitle}
     >
       {props.col.header}
     </YoColHeader>
@@ -63,29 +61,15 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
       return (
         <YoColCell class="yohu-files__name">
           <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={16} />
-          <YoTooltip content={props.entry.name}>
-            <span class="yohu-files__name-text">{props.entry.name}</span>
-          </YoTooltip>
+          <span class="yohu-files__name-text">{props.entry.name}</span>
         </YoColCell>
       );
     case "type":
-      return (
-        <YoTooltip content={type()}>
-          <YoColCell class="yohu-files__cell">{type()}</YoColCell>
-        </YoTooltip>
-      );
+      return <YoColCell class="yohu-files__cell">{type()}</YoColCell>;
     case "size":
-      return (
-        <YoTooltip content={size()} disabled={!size()}>
-          <YoColCell class="yohu-files__num">{size()}</YoColCell>
-        </YoTooltip>
-      );
+      return <YoColCell class="yohu-files__num">{size()}</YoColCell>;
     case "mtime":
-      return (
-        <YoTooltip content={props.entry.mtime ?? ""} disabled={!props.entry.mtime}>
-          <YoColCell class="yohu-files__mtime">{mtime()}</YoColCell>
-        </YoTooltip>
-      );
+      return <YoColCell class="yohu-files__mtime">{mtime()}</YoColCell>;
   }
 }
 

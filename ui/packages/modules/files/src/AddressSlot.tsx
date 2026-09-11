@@ -249,17 +249,15 @@ function Crumb(props: { segment: string; index: number }) {
           ▸
         </span>
       </Show>
-      <YoTooltip content={target()}>
-        <button
-          type="button"
-          class="yohu-files__crumb yohu-interactive yohu-focus-ring"
-          classList={{ "yohu-files__crumb--current": props.index === segments().length - 1 }}
-          data-address="crumb"
-          onClick={() => void fileStore.goTo(target())}
-        >
-          {props.segment}
-        </button>
-      </YoTooltip>
+      <button
+        type="button"
+        class="yohu-files__crumb yohu-interactive yohu-focus-ring"
+        classList={{ "yohu-files__crumb--current": props.index === segments().length - 1 }}
+        data-address="crumb"
+        onClick={() => void fileStore.goTo(target())}
+      >
+        {props.segment}
+      </button>
     </>
   );
 }
