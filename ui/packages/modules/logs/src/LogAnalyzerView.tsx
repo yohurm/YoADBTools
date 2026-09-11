@@ -4,7 +4,7 @@
  * 行是 formatLogDoc 文档；表头铬层可拖宽。选区走原生 Selection。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type JSX } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor, type JSX } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
 import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
@@ -45,8 +45,6 @@ import {
   DEFAULT_CH_PX,
   formatLogDocParts,
   joinLogDoc,
-  logDocColumns,
-  logDocTrackPx,
   logDocTrackTemplate,
   measureChPx,
   splitLevelGlyph,
@@ -54,7 +52,7 @@ import {
 } from "./doc";
 import { highlightMessage } from "./highlight";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
-import { DEFAULT_LOG_DISPLAY_COLUMNS } from "./layout";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, tsFieldPx, visibleLogColumns } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { LEVELS, levelInkStyle, levelKey, levelLabel, levelPaint, toggleLevel, type ViewRow } from "./pipeline";
@@ -92,10 +90,10 @@ const beginCapture = (): void => {
 
 const rowKey = (row: ViewRow): string => `${row.line.seq}-${row.line.pid}`;
 
-function LogLineDoc(props: { row: ViewRow; keyword: string; layout: LogDocLayout }) {
+function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<LogDocLayout> }) {
   const line = (): ViewRow["line"] => props.row.line;
   const parts = createMemo(
-    () => formatLogDocParts(line(), props.layout),
+    () => formatLogDocParts(line(), props.layout()),
     [],
     { equals: (prev, next) => joinLogDoc(prev) === joinLogDoc(next) },
   );
@@ -258,11 +256,28 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
-  const docLayout = createMemo((): LogDocLayout => ({
-    display: displayColumns(),
-    widths: logStore.state.colWidths,
-    chPx: chPx(),
-  }));
+  const docLayout = createMemo((): LogDocLayout => {
+    const widths = logStore.state.colWidths;
+    return {
+      display: displayColumns(),
+      widths: {
+        ts: widths.ts,
+        uid: widths.uid,
+        pid: widths.pid,
+        tid: widths.tid,
+        level: widths.level,
+        tag: widths.tag,
+        msg: widths.msg,
+      },
+      chPx: chPx(),
+      timeFormat: props.settings.log_time_format,
+    };
+  });
+
+  createEffect(() => {
+    const format = props.settings.log_time_format;
+    logStore.setColWidth("ts", tsFieldPx(format));
+  });
 
   createEffect(() => {
     props.settings.density;
@@ -577,13 +592,14 @@ export function LogAnalyzerView(props: DeviceSession) {
                 template={logDocTrackTemplate(docLayout())}
               >
                 <YoColRow class="yohu-logs__cols yohu-logs__cols--head">
-                  <For each={logDocColumns(docLayout())}>
+                  <For each={visibleLogColumns(displayColumns())}>
                     {(col) => (
                       <YoColHeader
+                        align={col.align}
                         resizable={!col.flex}
                         resizeLabel={col.resizeLabel}
-                        width={logDocTrackPx(col, chPx())}
-                        minWidth={col.minWidthPx}
+                        width={logStore.state.colWidths[col.key]}
+                        minWidth={col.key === "ts" ? tsFieldPx(docLayout().timeFormat) : col.minWidth}
                         onWidthChange={(width) => logStore.setColWidth(col.key, width)}
                       >
                         {col.header}
@@ -641,7 +657,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                             "yohu-logs__row--picked": pick().kind === "all",
                           }}
                         >
-                          <LogLineDoc row={row} keyword={session.keyword} layout={docLayout()} />
+                          <LogLineDoc row={row} keyword={session.keyword} layout={docLayout} />
                         </div>
                         );
                       }}

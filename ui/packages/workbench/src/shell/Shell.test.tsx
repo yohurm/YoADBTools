@@ -583,11 +583,21 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
+  it("日志时间格式切换立即写入 log_time_format", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("清单时间显示")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "日期 + 时分秒.毫秒（默认）" }));
+    fireEvent.click(screen.getByText("时分秒.毫秒", { exact: true }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("log_time_format", "time_millis");
+    });
+  });
+
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒（默认）" }));
-    fireEvent.click(screen.getByText("日期 + 时分秒.毫秒"));
+    fireEvent.click(screen.getByText("日期 + 时分秒.毫秒", { exact: true }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_time_format", "datetime_millis");
     });

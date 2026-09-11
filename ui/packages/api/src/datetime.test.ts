@@ -10,9 +10,11 @@ import {
   TIME_MILLIS_DISPLAY_LEN,
   canonicalizeDateTime,
   canonicalizeDateTimeSeconds,
+  clockDisplayLen,
   formatClock,
   formatDateTime,
   formatDateTimeFromMs,
+  formatLogTs,
 } from "./datetime";
 
 const testdata = resolve(
@@ -68,5 +70,16 @@ describe("datetime（与 domain testdata/datetime.json 同一套向量）", () =
     expect(formatClock(...args, "time_millis")?.length).toBe(TIME_MILLIS_DISPLAY_LEN);
     expect(formatClock(...args, "time")?.length).toBe(TIME_DISPLAY_LEN);
     expect(formatClock(2026, 13, 1, 0, 0, 0, 0, "time_millis")).toBeNull();
+  });
+
+  it("formatLogTs 投影规范化墙钟；默认 datetime_millis 不改原文", () => {
+    const ts = "2026-09-11 16:45:07.089";
+    expect(formatLogTs(ts, "datetime_millis")).toBe(ts);
+    expect(formatLogTs(ts, "datetime")).toBe("2026-09-11 16:45:07");
+    expect(formatLogTs(ts, "time_millis")).toBe("16:45:07.089");
+    expect(formatLogTs(ts, "time")).toBe("16:45:07");
+    expect(clockDisplayLen("datetime_millis")).toBe(DATETIME_DISPLAY_LEN);
+    expect(clockDisplayLen("time_millis")).toBe(TIME_MILLIS_DISPLAY_LEN);
+    expect(formatLogTs("raw", "time")).toBe("raw");
   });
 });

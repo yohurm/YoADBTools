@@ -84,6 +84,9 @@ pub struct AppSettings {
     /// 日志清单显示列（立即生效；消息列始终在）
     #[serde(default)]
     pub log_display_columns: LogDisplayColumns,
+    /// 日志清单时间显示形状。立即生效；默认日期+时分秒.毫秒（与当前清单一致）。
+    #[serde(default = "default_log_time_format")]
+    pub log_time_format: TerminalTimeFormat,
     /// 投屏长边上限（像素）；0 = 设备原始。下次启动生效。
     #[serde(default = "default_mirror_max_size")]
     pub mirror_max_size: u32,
@@ -107,6 +110,10 @@ pub struct AppSettings {
     pub terminal_time_format: TerminalTimeFormat,
 }
 
+fn default_log_time_format() -> TerminalTimeFormat {
+    TerminalTimeFormat::DatetimeMillis
+}
+
 /// 投屏链路协议。USB 与无线各套一套编码参数；改长边/码率/帧率不另立协议。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -116,7 +123,7 @@ pub enum MirrorProtocol {
     Wifi,
 }
 
-/// 终端 IO 行时间显示形状。行上存墙钟毫秒；展示立即投影。
+/// 墙钟显示形状。终端默认 time_millis；日志默认 datetime_millis。行上存完整墙钟，展示投影。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TerminalTimeFormat {
@@ -169,6 +176,7 @@ impl Default for AppSettings {
             export_default_path: String::new(),
             export_ask_every_time: default_export_ask(),
             log_display_columns: LogDisplayColumns::default(),
+            log_time_format: default_log_time_format(),
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
@@ -194,6 +202,7 @@ pub enum SettingKey {
     ExportDefaultPath,
     ExportAskEveryTime,
     LogDisplayColumns,
+    LogTimeFormat,
     MirrorMaxSize,
     MirrorVideoBitRate,
     MirrorMaxFps,
@@ -217,6 +226,7 @@ impl SettingKey {
             SettingKey::ExportDefaultPath => "export_default_path",
             SettingKey::ExportAskEveryTime => "export_ask_every_time",
             SettingKey::LogDisplayColumns => "log_display_columns",
+            SettingKey::LogTimeFormat => "log_time_format",
             SettingKey::MirrorMaxSize => "mirror_max_size",
             SettingKey::MirrorVideoBitRate => "mirror_video_bit_rate",
             SettingKey::MirrorMaxFps => "mirror_max_fps",
@@ -249,6 +259,7 @@ mod tests {
         assert!(!s.mirror_force_forward);
         assert!(!s.terminal_prepend_adb);
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
+        assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/app_settings_default.json"))
                 .expect("fixture");
@@ -328,6 +339,7 @@ mod tests {
             SettingKey::ExportDefaultPath,
             SettingKey::ExportAskEveryTime,
             SettingKey::LogDisplayColumns,
+            SettingKey::LogTimeFormat,
             SettingKey::MirrorMaxSize,
             SettingKey::MirrorVideoBitRate,
             SettingKey::MirrorMaxFps,
@@ -388,6 +400,7 @@ mod tests {
         assert_eq!(s.theme, Theme::System);
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
+        assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
     }
 
     #[test]

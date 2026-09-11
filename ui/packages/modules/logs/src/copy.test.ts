@@ -146,8 +146,9 @@ describe("documentCopyText", () => {
     list.append(rowEl);
     document.body.append(list);
     const parts = formatLogDocParts(item, layout);
-    const before = parts.filter((part) => part.kind !== "tag" && part.kind !== "msg").reduce((n, part) => n + part.text.length, 0);
-    const tag = parts.find((part) => part.kind === "tag")!;
+    const tagAt = parts.findIndex((part) => part.kind === "tag");
+    const before = parts.slice(0, tagAt).reduce((n, part) => n + part.text.length, 0);
+    const tag = parts[tagAt]!;
     const lead = tag.text.length - tag.text.trimStart().length;
     const selection = selectDoc(rowEl, before + lead, rowEl, before + tag.text.trimEnd().length);
     expect(documentCopyText(list, selection, [{ line: item }], layout)).toBe("ActivityManager");
@@ -170,8 +171,9 @@ describe("documentCopyText", () => {
     list.append(rowEl);
     document.body.append(list);
     const parts = formatLogDocParts(item, layout);
-    const before = parts.filter((part) => part.kind !== "tag" && part.kind !== "msg").reduce((n, part) => n + part.text.length, 0);
-    const tag = parts.find((part) => part.kind === "tag")!;
+    const tagAt = parts.findIndex((part) => part.kind === "tag");
+    const before = parts.slice(0, tagAt).reduce((n, part) => n + part.text.length, 0);
+    const tag = parts[tagAt]!;
     expect(tag.text.trimStart().startsWith("Yohu")).toBe(true);
     expect(tag.text.length).toBeGreaterThan(4);
     const selection = selectDoc(rowEl, before, rowEl, before + tag.text.length);

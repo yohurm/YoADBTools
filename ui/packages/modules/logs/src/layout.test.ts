@@ -8,7 +8,9 @@ import {
   DEFAULT_LOG_DISPLAY_COLUMNS,
   LOG_COLUMNS,
   defaultLogColWidths,
+  headerLabelChars,
   logFieldText,
+  logSlotChars,
   visibleLogColumns,
 } from "./layout";
 
@@ -73,15 +75,15 @@ describe("日志表头布局契约", () => {
 });
 
 describe("日志显示列", () => {
-  it("默认不含 UID/TID，含时间/PID/级别/Tag/消息", () => {
+  it("默认不含 UID/TID，列序时间/PID/Tag/级别/消息", () => {
     expect(logDocTrackTemplate(defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(
-      "26ch 13ch 11ch 27ch minmax(10ch, 1fr)",
+      "26ch 8ch 27ch 7ch minmax(10ch, 1fr)",
     );
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
       "pid",
-      "level",
       "tag",
+      "level",
       "msg",
     ]);
   });
@@ -89,7 +91,7 @@ describe("日志显示列", () => {
   it("关闭元数据列后消息仍在，轨道只留可见列", () => {
     const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
     expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
-    expect(logDocTrackTemplate(defaultLogDocLayout(display))).toBe("13ch 11ch minmax(10ch, 1fr)");
+    expect(logDocTrackTemplate(defaultLogDocLayout(display))).toBe("8ch 7ch minmax(10ch, 1fr)");
   });
 
   it("全部元数据关闭只剩消息", () => {
@@ -111,10 +113,20 @@ describe("日志显示列", () => {
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((col) => logFieldText(line, col.key))).toEqual([
       "2026-01-01 12:00:00.000",
       "100",
-      "I",
       "Yohu",
+      "I",
       "hello",
     ]);
+  });
+
+  it("表头全角计入列尺：级别 4ch，不被一字母字段压扁", () => {
+    expect(headerLabelChars("级别")).toBe(4);
+    expect(headerLabelChars("时间")).toBe(4);
+    expect(headerLabelChars("PID")).toBe(3);
+    expect(logSlotChars("level", "级别")).toBe(4);
+    expect(logSlotChars("pid", "PID")).toBe(5);
+    expect(logSlotChars("ts", "时间", "time_millis")).toBe(12);
+    expect(LOG_COLUMNS.find((col) => col.key === "level")?.minWidth).toBe(32);
   });
 
   it("写绝对宽度，不低于 min，消息列不拖", () => {
@@ -123,8 +135,34 @@ describe("日志显示列", () => {
     const pid = LOG_COLUMNS.find((col) => col.key === "pid")!;
     const msg = LOG_COLUMNS.find((col) => col.key === "msg")!;
     expect(setColWidth(start, tag, 212).tag).toBe(212);
-    expect(setColWidth(start, pid, 10).pid).toBe(56);
+    expect(setColWidth(start, pid, 10).pid).toBe(40);
     expect(setColWidth(start, msg, 200)).toBe(start);
+  });
+
+  it("visibleLogColumns 复用 LOG_COLUMNS 引用，表头 For 拖宽才不重挂", () => {
+    const a = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
+    const b = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
+    expect(a.map((col) => col.key)).toEqual(b.map((col) => col.key));
+    for (const col of a) {
+      expect(col).toBe(LOG_COLUMNS.find((item) => item.key === col.key));
+      expect(col).toBe(b.find((item) => item.key === col.key));
+    }
+  });
+
+  it("表头 For 遍历稳定规格，拖条写字段 px", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/LogAnalyzerView.tsx"),
+      resolve(process.cwd(), "packages/modules/logs/src/LogAnalyzerView.tsx"),
+    ];
+    const view =
+      candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
+    expect(view).toContain("visibleLogColumns(displayColumns())");
+    expect(view).not.toContain("logDocColumns(docLayout())");
+    expect(view).not.toContain("logDocTrackPx");
+    expect(view).toContain("width={logStore.state.colWidths[col.key]}");
+    expect(view).toContain("align={col.align}");
+    expect(view).toContain("layout={docLayout}");
+    expect(view).not.toContain("layout={docLayout()}");
   });
 });
 

@@ -7,12 +7,14 @@
  * domain formatLogLine 只给导出，不进这条链。
  */
 
-import { DATETIME_DISPLAY_LEN, type LogDisplayColumns, type LogLine } from "@yohu/api";
+import { APP_SETTINGS_DEFAULT, formatLogTs, type LogDisplayColumns, type LogLine, type TerminalTimeFormat } from "@yohu/api";
 import { Spacing } from "@yohu/ui";
 
 import type { LogLinePart } from "./format";
 import {
   defaultLogColWidths,
+  logSlotChars,
+  LOG_CH_PX,
   LOG_COLUMNS,
   visibleLogColumns,
   type LogColKey,
@@ -20,25 +22,22 @@ import {
   type LogMetaColKey,
 } from "./layout";
 
-export const DEFAULT_CH_PX = 8;
+export const DEFAULT_CH_PX = LOG_CH_PX;
 
 export interface LogDocLayout {
   display: LogDisplayColumns;
   widths: LogColWidths;
   chPx: number;
+  timeFormat: TerminalTimeFormat;
 }
 
-const MIN_CH: Record<LogMetaColKey, number> = {
-  ts: DATETIME_DISPLAY_LEN,
-  uid: 8,
-  pid: 5,
-  tid: 5,
-  level: 1,
-  tag: 10,
-};
-
 export function defaultLogDocLayout(display: LogDisplayColumns): LogDocLayout {
-  return { display, widths: defaultLogColWidths(), chPx: DEFAULT_CH_PX };
+  return {
+    display,
+    widths: defaultLogColWidths(),
+    chPx: DEFAULT_CH_PX,
+    timeFormat: APP_SETTINGS_DEFAULT.log_time_format,
+  };
 }
 
 export interface LogDocColumn {
@@ -56,8 +55,9 @@ export interface LogDocColumn {
   minWidthPx: number;
 }
 
-export function fieldChars(px: number, chPx: number, min: number): number {
-  return Math.max(min, Math.floor(px / Math.max(chPx, 1)));
+/** 字段 px → 字符。用设计尺 LOG_CH_PX，不用 measureChPx（小字会把默认列撑开）。 */
+export function fieldChars(px: number, min: number): number {
+  return Math.max(min, Math.floor(px / LOG_CH_PX));
 }
 
 /** 表头左垫 space-md → 字符。禁止 cellPad=none 把标题贴格边。 */
@@ -81,7 +81,8 @@ export function logDocColumns(layout: LogDocLayout): LogDocColumn[] {
         minWidthPx: col.minWidth,
       };
     }
-    const chars = fieldChars(layout.widths[col.key] ?? col.defaultWidth, layout.chPx, MIN_CH[col.key]);
+    const minCh = logSlotChars(col.key, col.header, layout.timeFormat);
+    const chars = fieldChars(layout.widths[col.key] ?? col.defaultWidth, minCh);
     return {
       key: col.key,
       header: col.header,
@@ -91,7 +92,7 @@ export function logDocColumns(layout: LogDocLayout): LogDocColumn[] {
       gutter: 1,
       align: alignOf(col.key),
       flex: false,
-      minWidthPx: Math.max(col.minWidth, (padLeft + MIN_CH[col.key] + 1) * layout.chPx),
+      minWidthPx: Math.max(col.minWidth, (padLeft + minCh + 1) * layout.chPx),
     };
   });
 }
@@ -120,7 +121,7 @@ export function logDocTrackTemplate(layout: LogDocLayout): string {
 
 /**
  * 只能量行内探针。行 class 是 display:block，会吃满宿主宽，
- * chPx 变成整行/10，列全部被压到 MIN_CH（表头 PID+级别粘连、Tag 无 pad）。
+ * chPx 变成整行/10，列全部被压到 logSlotChars（表头 PID+级别粘连、Tag 无 pad）。
  */
 export function measureChPx(host: HTMLElement): number {
   const probe = document.createElement("span");
@@ -135,10 +136,10 @@ export function measureChPx(host: HTMLElement): number {
   return width;
 }
 
-function rawField(line: LogLine, key: LogMetaColKey): string {
+function rawField(line: LogLine, key: LogMetaColKey, format: TerminalTimeFormat): string {
   switch (key) {
     case "ts":
-      return line.ts;
+      return formatLogTs(line.ts, format);
     case "uid":
       return line.uid ?? "";
     case "pid":
@@ -163,8 +164,7 @@ export function clipPadField(text: string, width: number, align: "start" | "end"
 }
 
 function alignOf(key: LogColKey): "start" | "end" {
-  const spec = LOG_COLUMNS.find((col) => col.key === key);
-  return spec?.align === "end" || key === "uid" || key === "pid" || key === "tid" ? "end" : "start";
+  return LOG_COLUMNS.find((col) => col.key === key)?.align === "end" ? "end" : "start";
 }
 
 export function formatLogDocParts(line: LogLine, layout: LogDocLayout): LogLinePart[] {
@@ -181,7 +181,7 @@ export function formatLogDocParts(line: LogLine, layout: LogDocLayout): LogLineP
     }
     parts.push({
       kind: col.key,
-      text: `${lead}${clipPadField(rawField(line, col.key), col.chars, col.align)} `,
+      text: `${lead}${clipPadField(rawField(line, col.key, layout.timeFormat), col.chars, col.align)} `,
     });
   }
   return parts;

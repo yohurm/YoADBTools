@@ -273,6 +273,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         export_default_path: "",
         export_ask_every_time: true,
         log_display_columns: { ts: true, uid: false, pid: true, tid: true, level: true, tag: true },
+        log_time_format: "datetime_millis",
         mirror_max_size: 0,
         mirror_video_bit_rate: 16_000_000,
         mirror_max_fps: 0,

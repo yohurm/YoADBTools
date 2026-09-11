@@ -103,7 +103,7 @@ export type Density = "compact" | "comfortable";
 
 export type MirrorProtocol = "usb" | "wifi";
 
-/** 终端 IO 行时间显示形状。行上存墙钟毫秒；展示立即投影。 */
+/** 墙钟显示形状。终端默认 time_millis；日志默认 datetime_millis。 */
 export type TerminalTimeFormat = "time_millis" | "time" | "datetime_millis" | "datetime";
 
 export interface AppSettings {
@@ -117,6 +117,7 @@ export interface AppSettings {
   export_default_path: string;
   export_ask_every_time: boolean;
   log_display_columns: LogDisplayColumns;
+  log_time_format: TerminalTimeFormat;
   mirror_max_size: number;
   mirror_video_bit_rate: number;
   mirror_max_fps: number;
@@ -147,6 +148,7 @@ export type SettingKey =
   | "export_default_path"
   | "export_ask_every_time"
   | "log_display_columns"
+  | "log_time_format"
   | "mirror_max_size"
   | "mirror_video_bit_rate"
   | "mirror_max_fps"

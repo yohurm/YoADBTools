@@ -23,6 +23,15 @@ fn must_bool(key: SettingKey, value: &serde_json::Value) -> Result<bool, String>
         .ok_or_else(|| format!("{} 必须是布尔值", key.as_str()))
 }
 
+fn must_clock_format(key: SettingKey, value: &serde_json::Value) -> Result<TerminalTimeFormat, String> {
+    serde_json::from_value(value.clone()).map_err(|_| {
+        format!(
+            "{} 必须是 time_millis、time、datetime_millis 或 datetime",
+            key.as_str()
+        )
+    })
+}
+
 /// 把单键 JSON 写入快照。不落盘、不触发 sidecar / 采集副作用。
 pub fn apply_setting(
     settings: &mut AppSettings,
@@ -72,6 +81,9 @@ pub fn apply_setting(
                 )
             })?;
         }
+        SettingKey::LogTimeFormat => {
+            settings.log_time_format = must_clock_format(key, value)?;
+        }
         SettingKey::MirrorMaxSize => {
             let n = must_u64(key, value)?;
             settings.mirror_max_size = u32::try_from(n).map_err(|_| "数值过大")?;
@@ -99,12 +111,7 @@ pub fn apply_setting(
             settings.terminal_prepend_adb = must_bool(key, value)?;
         }
         SettingKey::TerminalTimeFormat => {
-            settings.terminal_time_format = serde_json::from_value(value.clone()).map_err(|_| {
-                format!(
-                    "{} 必须是 time_millis、time、datetime_millis 或 datetime",
-                    key.as_str()
-                )
-            })?;
+            settings.terminal_time_format = must_clock_format(key, value)?;
         }
     }
     Ok(())
@@ -166,5 +173,13 @@ mod tests {
         let err = apply_setting(&mut s, SettingKey::TerminalTimeFormat, &json!("iso8601"))
             .unwrap_err();
         assert!(err.contains("time_millis"));
+    }
+
+    #[test]
+    fn log_time_format_applies_default_datetime_millis() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
+        apply_setting(&mut s, SettingKey::LogTimeFormat, &json!("time_millis")).unwrap();
+        assert_eq!(s.log_time_format, TerminalTimeFormat::TimeMillis);
     }
 }

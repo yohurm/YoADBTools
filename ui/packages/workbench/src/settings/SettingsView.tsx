@@ -50,12 +50,36 @@ const DENSITY_OPTIONS: { value: Density; label: string }[] = [
   { value: "compact", label: "紧凑" },
 ];
 
-const TERMINAL_TIME_FORMAT_OPTIONS: { value: TerminalTimeFormat; label: string }[] = [
-  { value: "time_millis", label: "时分秒.毫秒（默认）" },
-  { value: "time", label: "时分秒" },
-  { value: "datetime_millis", label: "日期 + 时分秒.毫秒" },
-  { value: "datetime", label: "日期 + 时分秒" },
-];
+const CLOCK_FORMAT_LABEL: Record<TerminalTimeFormat, string> = {
+  time_millis: "时分秒.毫秒",
+  time: "时分秒",
+  datetime_millis: "日期 + 时分秒.毫秒",
+  datetime: "日期 + 时分秒",
+};
+
+function clockFormatOptions(
+  defaultValue: TerminalTimeFormat,
+  order: TerminalTimeFormat[],
+): { value: TerminalTimeFormat; label: string }[] {
+  return order.map((value) => ({
+    value,
+    label: value === defaultValue ? `${CLOCK_FORMAT_LABEL[value]}（默认）` : CLOCK_FORMAT_LABEL[value],
+  }));
+}
+
+const TERMINAL_TIME_FORMAT_OPTIONS = clockFormatOptions("time_millis", [
+  "time_millis",
+  "time",
+  "datetime_millis",
+  "datetime",
+]);
+
+const LOG_TIME_FORMAT_OPTIONS = clockFormatOptions("datetime_millis", [
+  "datetime_millis",
+  "datetime",
+  "time_millis",
+  "time",
+]);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -68,8 +92,8 @@ const LOG_COLUMN_OPTIONS: { key: keyof LogDisplayColumns; label: string }[] = [
   { key: "uid", label: "UID" },
   { key: "pid", label: "PID" },
   { key: "tid", label: "TID" },
-  { key: "level", label: "级别" },
   { key: "tag", label: "Tag" },
+  { key: "level", label: "级别" },
 ];
 
 /** 设置页级 toaster（模块生命周期 = 应用生命周期）。 */
@@ -269,6 +293,13 @@ export const SettingsView: Component = () => {
         </YoPanel>
 
         <YoPanel title={ModuleTitle.Logs}>
+          <YoFormRow title="清单时间显示" note={<EffectBadge text="立即生效" />}>
+            <YoSelect
+              options={LOG_TIME_FORMAT_OPTIONS}
+              value={settingsStore.state.log_time_format}
+              onChange={(v) => save("log_time_format", v, "已保存（立即生效）")}
+            />
+          </YoFormRow>
           <YoFormRow
             title="缓冲最大行数"
             note={<EffectBadge text="窗口立即裁剪，采集环下次启动" />}

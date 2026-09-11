@@ -1,6 +1,6 @@
 /**
  * 墙钟解析单点。与 yohu-domain::datetime 同一套 testdata/datetime.json。
- * 日志带毫秒完整墙钟；终端按 `TerminalTimeFormat` 投影；文件只到秒。
+ * 日志带毫秒完整墙钟，清单按 `log_time_format` 投影；终端按 `terminal_time_format`；文件只到秒。
  * 禁止把「只有时分」补成秒或毫秒。
  */
 
@@ -80,6 +80,30 @@ export function formatClock(
 /** 本地墙钟完整形状（日志 / 规范化）。 */
 export function formatDateTimeFromMs(ms: number): string {
   return formatClockFromMs(ms, "datetime_millis");
+}
+
+/** 显示形状对应的字段字符数。 */
+export function clockDisplayLen(format: TerminalTimeFormat): number {
+  switch (format) {
+    case "time_millis":
+      return TIME_MILLIS_DISPLAY_LEN;
+    case "time":
+      return TIME_DISPLAY_LEN;
+    case "datetime_millis":
+      return DATETIME_DISPLAY_LEN;
+    case "datetime":
+      return DATETIME_SECONDS_LEN;
+  }
+}
+
+/** 把规范化墙钟 `YYYY-MM-DD HH:mm:ss.SSS` 投影成显示形状。解析失败回原文。 */
+export function formatLogTs(ts: string, format: TerminalTimeFormat): string {
+  if (format === "datetime_millis" && ts.length === DATETIME_DISPLAY_LEN) {
+    return ts;
+  }
+  const parsed = parseParts(ts);
+  if (!parsed) return ts;
+  return formatClock(parsed[0], parsed[1], parsed[2], parsed[3], parsed[4], parsed[5], parsed[6], format) ?? ts;
 }
 
 /** 本地墙钟按终端显示形状投影。 */

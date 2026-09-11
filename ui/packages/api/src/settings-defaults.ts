@@ -23,6 +23,7 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
     level: true,
     tag: true,
   },
+  log_time_format: "datetime_millis",
   mirror_max_size: 0,
   mirror_video_bit_rate: 16_000_000,
   mirror_max_fps: 0,

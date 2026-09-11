@@ -14,6 +14,7 @@ import {
   formatLogDocParts,
   joinLogDoc,
   logDocColumns,
+  logDocTrackPx,
   logDocTrackTemplate,
   splitLevelGlyph,
 } from "./doc";
@@ -47,9 +48,10 @@ describe("clipPadField / fieldChars", () => {
     expect(clipPadField("ActivityManager", 8, "start").length).toBe(8);
   });
 
-  it("列像素换成字符数，不低于下限", () => {
-    expect(fieldChars(192, 8, 10)).toBe(24);
-    expect(fieldChars(40, 8, 10)).toBe(10);
+  it("列像素换成字符数，不低于下限；用设计尺不跟 measureChPx", () => {
+    expect(fieldChars(192, 10)).toBe(24);
+    expect(fieldChars(40, 10)).toBe(10);
+    expect(fieldChars(184, 23)).toBe(23);
   });
 });
 
@@ -74,10 +76,11 @@ describe("formatLogDoc", () => {
     expect(doc).not.toBe(formatLogLine(item));
   });
 
-  it("PID 与级别之间有真实空格，不会 100I 粘在一起", () => {
+  it("邻列之间有真实空格，数字与级别不会粘连", () => {
     const pid = formatLogDocParts(line(), layout).find((part) => part.kind === "pid");
     expect(pid?.text.endsWith(" ")).toBe(true);
     expect(formatLogDoc(line(), layout)).not.toMatch(/100I/);
+    expect(formatLogDoc(line(), layout)).not.toMatch(/YohuI/);
   });
 
   it("级别字母与后面的 pad 分开，Fatal 反色只包字母", () => {
@@ -96,6 +99,7 @@ describe("formatLogDoc", () => {
       display: { ts: false, uid: false, pid: true, tid: false, level: true, tag: false },
       widths: defaultLogColWidths(),
       chPx: 8,
+      timeFormat: "datetime_millis",
     });
     expect(hidden.includes("2026-01-01")).toBe(false);
     expect(hidden.includes("Yohu")).toBe(false);
@@ -110,7 +114,52 @@ describe("formatLogDoc", () => {
       const part = parts.find((item) => item.kind === col.key);
       expect(part?.text.length).toBe(col.padLeft + col.chars + col.gutter);
     }
-    expect(logDocTrackTemplate(layout)).toBe("26ch 13ch 11ch 27ch minmax(10ch, 1fr)");
+    expect(logDocTrackTemplate(layout)).toBe("26ch 8ch 27ch 7ch minmax(10ch, 1fr)");
+  });
+
+  it("默认字段字符对齐内容；级别槽按表头全角 4ch；PID 与规格同为 end", () => {
+    const layout = defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS);
+    const cols = logDocColumns(layout);
+    expect(cols.find((col) => col.key === "ts")?.chars).toBe(23);
+    expect(cols.find((col) => col.key === "pid")?.chars).toBe(5);
+    expect(cols.find((col) => col.key === "level")?.chars).toBe(4);
+    expect(cols.find((col) => col.key === "pid")?.align).toBe("end");
+    expect(formatLogDocParts(line({ pid: 100 }), layout).find((part) => part.kind === "pid")?.text).toMatch(/  100 /);
+    expect(formatLogDocParts(line(), layout).find((part) => part.kind === "level")?.text).toMatch(/I {3} /);
+  });
+
+  it("清单时间按 timeFormat 投影，默认仍是完整墙钟", () => {
+    const full = defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS);
+    const clock = {
+      ...full,
+      timeFormat: "time_millis" as const,
+      widths: { ...full.widths, ts: 12 * 8 },
+    };
+    expect(formatLogDocParts(line(), full).find((part) => part.kind === "ts")?.text).toContain("2026-01-01 12:00:00.000");
+    expect(formatLogDocParts(line(), clock).find((part) => part.kind === "ts")?.text).toContain("12:00:00.000");
+    expect(formatLogDocParts(line(), clock).find((part) => part.kind === "ts")?.text).not.toContain("2026-01-01");
+    expect(logDocColumns(clock).find((col) => col.key === "ts")?.chars).toBe(12);
+  });
+
+  it("拖字段 px 才按 ch 步进；轨道 px 回写会跳 pad+gutter", () => {
+    const layout = defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS);
+    const tag = logDocColumns(layout).find((col) => col.key === "tag");
+    expect(tag?.chars).toBeDefined();
+    const fieldPx = layout.widths.tag;
+    const trackPx = logDocTrackPx(tag!, layout.chPx);
+    expect(trackPx).toBeGreaterThan(fieldPx);
+
+    const grown = logDocColumns({
+      ...layout,
+      widths: { ...layout.widths, tag: fieldPx + layout.chPx },
+    }).find((col) => col.key === "tag");
+    expect(grown?.chars).toBe(tag!.chars! + 1);
+
+    const jumped = logDocColumns({
+      ...layout,
+      widths: { ...layout.widths, tag: trackPx },
+    }).find((col) => col.key === "tag");
+    expect(jumped?.chars).toBeGreaterThan(tag!.chars! + 1);
   });
 });
 
