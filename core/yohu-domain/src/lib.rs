@@ -7,6 +7,7 @@
 pub mod applog;
 pub mod catalog;
 pub mod command;
+pub mod datetime;
 pub mod focus;
 pub mod log_filter;
 pub mod log_format;
@@ -16,6 +17,10 @@ pub mod settings;
 
 pub use applog::{AppLog, AppLogEntry, LogLevel};
 pub use catalog::{catalog_after_scan, device_display_name, lookup_selected_devices};
+pub use datetime::{
+    canonicalize_datetime, canonicalize_datetime_seconds, format_datetime, format_datetime_seconds,
+    DATETIME_DISPLAY_LEN, DATETIME_SECONDS_LEN,
+};
 pub use command::{
     combine_output, default_library, placeholder_arity, run_command, run_line, split_command_line,
     strip_leading_adb, CommandDefinition, CommandGroup, CommandLibrary, CommandRun, GroupExecutor,
