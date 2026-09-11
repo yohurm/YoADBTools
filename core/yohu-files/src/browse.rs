@@ -39,7 +39,7 @@ impl FileBrowser {
 
     /// 列出设备目录。路径必须位于安全根内（含根本身）；不信任 UI。
     ///
-    /// 尾斜杠语义：`ls -la /sdcard/` 会跟随符号链接列出目标目录内容
+    /// 尾斜杠语义：`ls -lla /sdcard/` 会跟随符号链接列出目标目录内容
     /// （部分机型 `/sdcard -> /storage/self/primary`，不带尾斜杠只列出链接本身）。
     pub async fn list(
         &self,

@@ -51,9 +51,25 @@ async fn real_browse_and_transfer_roundtrip() {
     assert!(!entries.is_empty());
     assert!(
         entries.iter().any(|e| e.mtime.is_some()),
-        "ls -la 解析应携带修改时间列（文件列表展示依据）"
+        "ls -lla 解析应携带修改时间列（文件列表展示依据）"
     );
-    eprintln!("[真机] /sdcard 条目 {} 个（含 mtime 解析）", entries.len());
+    for entry in entries.iter().filter(|e| e.mtime.is_some()) {
+        let mtime = entry.mtime.as_deref().unwrap();
+        assert_eq!(
+            yohu_domain::canonicalize_datetime_seconds(mtime).as_deref(),
+            Some(mtime),
+            "文件 mtime 应已是到秒的墙钟: {mtime}"
+        );
+        assert!(
+            !mtime.contains('.'),
+            "文件日期不显示毫秒: {mtime}"
+        );
+    }
+    let sample = entries.iter().find_map(|e| e.mtime.as_deref()).unwrap_or("");
+    eprintln!(
+        "[真机] /sdcard 条目 {} 个，样例 mtime={sample}",
+        entries.len()
+    );
 
     // 2) push 一个测试文件
     let stamp = std::time::SystemTime::now()
