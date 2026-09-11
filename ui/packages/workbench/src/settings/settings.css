@@ -1,5 +1,5 @@
 /* 设置页：页眉铺满内容区；标题与分组卡片共用 page-margin 左缘。
- * 表单项排布走 YoFormRow；本文件只留路径展示、关于、数字宽等页面特有样式。 */
+ * 表单项排布走 YoFormRow（右槽 hug 贴尾）；数字宽走 YoTextField type=number。 */
 
 .yohu-settings {
   display: flex;
@@ -12,7 +12,8 @@
   box-sizing: border-box;
 }
 
-.yohu-settings > .yohu-chrome {
+.yohu-settings__chrome {
+  flex: 0 0 auto;
   padding-inline: var(--yohu-layout-page-margin);
   padding-top: var(--yohu-space-md);
 }
@@ -31,25 +32,11 @@
   box-sizing: border-box;
 }
 
-.yohu-settings .yohu-panel {
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
-.yohu-settings .yohu-form-row__control .yohu-text-field {
-  width: var(--yohu-layout-settings-number-w);
-  flex: 0 0 auto;
-}
-
-.yohu-settings__path-row > .yohu-form-row__control {
-  flex: 1 1 auto;
-}
-
 .yohu-settings__path {
   display: flex;
   align-items: center;
   min-width: 0;
-  flex: 1 1 var(--yohu-layout-settings-control-max);
+  flex: 0 1 var(--yohu-layout-settings-control-max);
   width: var(--yohu-layout-settings-control-max);
   max-width: var(--yohu-layout-settings-control-max);
   height: var(--yohu-control-height);
@@ -105,10 +92,7 @@
   align-items: center;
   gap: var(--yohu-space-md);
   padding: var(--yohu-space-md) 0;
-}
-
-.yohu-settings__about + .yohu-form-row {
-  border-top: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
 .yohu-settings__about-icon {

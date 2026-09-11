@@ -73,17 +73,24 @@ function EffectBadge(props: { text: string }): JSX.Element {
   return <YoBadge text={props.text} tone={props.text === "立即生效" ? "accent" : "neutral"} />;
 }
 
-/** 文件位置：只读绝对路径展示框 + 浏览。超长时 head 省略、末段保留。 */
-function PathControl(props: { label: string; path: string; onBrowse: () => void }): JSX.Element {
+/** 只读路径盒：中间省略、末段保留。不是 YoTextField。 */
+function PathBox(props: { label: string; path: string }): JSX.Element {
   const parts = () => splitPathEnds(props.path);
   return (
+    <YoTooltip content={props.path} disabled={!props.path}>
+      <div class="yohu-settings__path" aria-label={props.label}>
+        <span class="yohu-settings__path-head">{parts().head}</span>
+        <span class="yohu-settings__path-tail">{parts().tail}</span>
+      </div>
+    </YoTooltip>
+  );
+}
+
+/** 文件位置：只读绝对路径展示框 + 浏览。 */
+function PathControl(props: { label: string; path: string; onBrowse: () => void }): JSX.Element {
+  return (
     <>
-      <YoTooltip content={props.path} disabled={!props.path} block>
-        <div class="yohu-settings__path" aria-label={props.label}>
-          <span class="yohu-settings__path-head">{parts().head}</span>
-          <span class="yohu-settings__path-tail">{parts().tail}</span>
-        </div>
-      </YoTooltip>
+      <PathBox label={props.label} path={props.path} />
       <YoButton variant="outlined" tone="neutral" onClick={() => props.onBrowse()}>
         浏览
       </YoButton>
@@ -93,15 +100,9 @@ function PathControl(props: { label: string; path: string; onBrowse: () => void 
 
 /** 只读路径 + 打开资源管理器。 */
 function PathOpenRow(props: { title: string; path: string }): JSX.Element {
-  const parts = () => splitPathEnds(props.path);
   return (
-    <YoFormRow class="yohu-settings__path-row" title={props.title}>
-      <YoTooltip content={props.path} disabled={!props.path} block>
-        <div class="yohu-settings__path" aria-label={props.title}>
-          <span class="yohu-settings__path-head">{parts().head}</span>
-          <span class="yohu-settings__path-tail">{parts().tail}</span>
-        </div>
-      </YoTooltip>
+    <YoFormRow title={props.title}>
+      <PathBox label={props.title} path={props.path} />
       <YoButton
         variant="outlined" tone="neutral"
         disabled={!props.path}
@@ -193,14 +194,15 @@ export const SettingsView: Component = () => {
 
   return (
     <div class="yohu-settings">
-      <YoChrome title={ModuleTitle.Settings} />
+      <div class="yohu-settings__chrome">
+        <YoChrome title={ModuleTitle.Settings} />
+      </div>
 
       <div class="yohu-settings__body">
         <YoPanel title="工具链">
           <YoFormRow
-            class="yohu-settings__path-row"
             title="ADB 路径"
-              description="未指定时显示自动解析的绝对路径（用户设置 → DataRoot/tools/adb 解压副本）"
+            description="未指定时显示自动解析的绝对路径（用户设置 → DataRoot/tools/adb 解压副本）"
             note={<EffectBadge text="立即生效" />}
           >
             <PathControl
@@ -220,7 +222,6 @@ export const SettingsView: Component = () => {
           </YoFormRow>
 
           <YoFormRow
-            class="yohu-settings__path-row"
             title="数据目录"
             description={`默认 ${settingsStore.paths.local_root || "应用数据目录"}/data。其下为 tools/adb 与 modules/（adb-terminal / log-analyzer）。配置、日志与缓存固定在产品家园，不随本目录迁移，也不搬家。`}
             note={<EffectBadge text="重启生效" />}
@@ -287,7 +288,6 @@ export const SettingsView: Component = () => {
           </YoFormRow>
 
           <YoFormRow
-            class="yohu-settings__path-row"
             title="默认导出路径"
             note={<EffectBadge text="立即生效" />}
           >

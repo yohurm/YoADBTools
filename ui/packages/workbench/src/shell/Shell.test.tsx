@@ -377,6 +377,18 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(decls("yohu-device-rail__list")).not.toMatch(/overflow:\s*auto/);
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-x:\s*hidden/);
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-y:\s*auto/);
+    expect(css).not.toContain(".yohu-collapse__inner");
+  });
+
+  it("设备列表折叠走 YoCollapse fill，不穿 __inner", () => {
+    const { container } = render(() => <DeviceRail />);
+    const collapse = container.querySelector(".yohu-collapse");
+    expect(collapse?.getAttribute("data-recipe")).toBe("fill");
+    expect(collapse?.getAttribute("data-open")).toBe("true");
+    const inner = collapse?.querySelector(":scope > .yohu-collapse__inner");
+    expect(inner?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
+    expect(inner?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
+    expect(inner?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
   });
 });
 
@@ -596,8 +608,10 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("页眉与分组卡片分列：标题不进滚动容器", () => {
     const { container } = render(() => <SettingsView />);
     const root = container.querySelector(".yohu-settings");
-    const chrome = root?.querySelector(":scope > .yohu-chrome");
+    const chromeWrap = root?.querySelector(":scope > .yohu-settings__chrome");
+    const chrome = chromeWrap?.querySelector(".yohu-chrome");
     const body = root?.querySelector(":scope > .yohu-settings__body");
+    expect(chromeWrap).toBeTruthy();
     expect(chrome).toBeTruthy();
     expect(body).toBeTruthy();
     expect(body?.querySelector(".yohu-panel")).toBeTruthy();

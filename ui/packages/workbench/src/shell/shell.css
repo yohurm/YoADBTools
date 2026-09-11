@@ -91,18 +91,8 @@
   overflow: hidden;
 }
 
-/* 折叠打开时允许列表在 42% 帽下收缩，由 scroller 纵滚；不要 min-content 把项撑出帽。 */
+/* 折叠根是壳的孩子：排自己的 flex。内层填满走 YoCollapse recipe=fill，禁止再点 __inner。 */
 .yohu-device-rail .yohu-collapse {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.yohu-device-rail .yohu-collapse__inner {
-  display: flex;
-  flex-direction: column;
-}
-
-.yohu-device-rail .yohu-collapse__inner > .yohu-device-rail__list {
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -127,6 +117,14 @@
   color: var(--yohu-fg);
 }
 
+/* fill 只有一个直接子级：列表吃剩余高度，空态卡片 hug，避免两者各 flex:1。 */
+.yohu-device-rail__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .yohu-device-rail__list {
   position: relative;
   list-style: none;
@@ -134,6 +132,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   /* 宿主只裁切 fill 滑块过冲；双轴 auto 会在 Windows 画出横竖条并互相锁死。 */
   overflow: hidden;
@@ -301,7 +300,7 @@
   text-align: left;
 }
 
-.yohu-nav__item.yohu-interactive--selected {
+.yohu-nav__item[aria-current] {
   font-weight: var(--yohu-font-weight-semibold);
 }
 

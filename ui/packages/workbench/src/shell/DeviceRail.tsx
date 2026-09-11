@@ -86,7 +86,8 @@ export const DeviceRail: Component<{
           onClick={() => void deviceStore.refresh()}
         />
       </div>
-      <YoCollapse open={expanded()}>
+      <YoCollapse open={expanded()} recipe="fill">
+        <div class="yohu-device-rail__body">
         <div
           class="yohu-device-rail__list"
           role="listbox"
@@ -164,6 +165,7 @@ export const DeviceRail: Component<{
             </YoButton>
           </div>
         </Show>
+        </div>
       </YoCollapse>
     </div>
   );
