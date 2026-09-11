@@ -1,6 +1,6 @@
 //! 设置键校验与应用（贴 protocol 模型；落盘与副作用仍在壳）。
 
-use yohu_protocol::{AppSettings, MirrorProtocol, SettingKey};
+use yohu_protocol::{AppSettings, MirrorProtocol, SettingKey, TerminalTimeFormat};
 
 use crate::mirror::apply_protocol;
 
@@ -98,6 +98,14 @@ pub fn apply_setting(
         SettingKey::TerminalPrependAdb => {
             settings.terminal_prepend_adb = must_bool(key, value)?;
         }
+        SettingKey::TerminalTimeFormat => {
+            settings.terminal_time_format = serde_json::from_value(value.clone()).map_err(|_| {
+                format!(
+                    "{} 必须是 time_millis、time、datetime_millis 或 datetime",
+                    key.as_str()
+                )
+            })?;
+        }
     }
     Ok(())
 }
@@ -142,5 +150,21 @@ mod tests {
         assert!(!s.terminal_prepend_adb);
         apply_setting(&mut s, SettingKey::TerminalPrependAdb, &json!(true)).unwrap();
         assert!(s.terminal_prepend_adb);
+    }
+
+    #[test]
+    fn terminal_time_format_applies() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
+        apply_setting(
+            &mut s,
+            SettingKey::TerminalTimeFormat,
+            &json!("datetime_millis"),
+        )
+        .unwrap();
+        assert_eq!(s.terminal_time_format, TerminalTimeFormat::DatetimeMillis);
+        let err = apply_setting(&mut s, SettingKey::TerminalTimeFormat, &json!("iso8601"))
+            .unwrap_err();
+        assert!(err.contains("time_millis"));
     }
 }
