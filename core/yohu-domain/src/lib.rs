@@ -22,10 +22,12 @@ pub use datetime::{
     DATETIME_DISPLAY_LEN, DATETIME_SECONDS_LEN,
 };
 pub use command::{
-    combine_output, default_library, placeholder_arity, run_command, run_line, split_command_line,
-    strip_leading_adb, CommandBlock, CommandDefinition, CommandGroup, CommandLibrary, CommandRun,
-    CommandStep, GroupExecutor, GroupRunEvent, LibraryEntry, LibraryError, RunError, Runner,
-    ScheduledStep,
+    align_params, combine_output, default_library, insert_placeholder, next_placeholder_index,
+    param_description, placeholder_arity, placeholder_slots, placeholder_tokens, preview_fill,
+    run_command, run_line, templates_slots,
+    split_command_line, strip_leading_adb, CommandBlock, CommandDefinition, CommandGroup,
+    CommandLibrary, CommandRun, CommandStep, GroupExecutor, GroupRunEvent, LibraryEntry,
+    LibraryError, PlaceholderToken, RunError, Runner, ScheduledStep,
 };
 pub use focus::{
     assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,

@@ -10,6 +10,8 @@ pub use executor::{
     GroupExecutor, GroupRunEvent, RunError, Runner, ScheduledStep,
 };
 pub use library::{
-    placeholder_arity, CommandBlock, CommandDefinition, CommandGroup, CommandLibrary, CommandStep,
-    LibraryEntry, LibraryError,
+    align_params, insert_placeholder, next_placeholder_index, param_description, placeholder_arity,
+    placeholder_slots, placeholder_tokens, preview_fill, templates_slots, CommandBlock,
+    CommandDefinition, CommandGroup,
+    CommandLibrary, CommandStep, LibraryEntry, LibraryError, PlaceholderToken,
 };

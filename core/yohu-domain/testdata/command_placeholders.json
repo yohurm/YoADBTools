@@ -1,0 +1,75 @@
+{
+  "tokens": [
+    {
+      "template": "shell ping {0}",
+      "arity": 1,
+      "slots": [0],
+      "next": 1,
+      "tokens": [{ "index": 0, "start": 11, "end": 14 }]
+    },
+    {
+      "template": "{0} {1} {0}",
+      "arity": 2,
+      "slots": [0, 1],
+      "next": 2,
+      "tokens": [
+        { "index": 0, "start": 0, "end": 3 },
+        { "index": 1, "start": 4, "end": 7 },
+        { "index": 0, "start": 8, "end": 11 }
+      ]
+    },
+    {
+      "template": "{2}",
+      "arity": 1,
+      "slots": [2],
+      "next": 0,
+      "tokens": [{ "index": 2, "start": 0, "end": 3 }]
+    },
+    {
+      "template": "ping {0} {2}",
+      "arity": 2,
+      "slots": [0, 2],
+      "next": 1,
+      "tokens": [
+        { "index": 0, "start": 5, "end": 8 },
+        { "index": 2, "start": 9, "end": 12 }
+      ]
+    },
+    {
+      "template": "shell ls",
+      "arity": 0,
+      "slots": [],
+      "next": 0,
+      "tokens": []
+    },
+    {
+      "template": "echo {abc} {0}",
+      "arity": 1,
+      "slots": [0],
+      "next": 1,
+      "tokens": [{ "index": 0, "start": 11, "end": 14 }]
+    },
+    {
+      "template": "shell ping -c 3 {13}",
+      "arity": 1,
+      "slots": [13],
+      "next": 0,
+      "tokens": [{ "index": 13, "start": 16, "end": 20 }]
+    }
+  ],
+  "insert": [
+    { "template": "ping ", "start": 5, "end": 5, "result": "ping {0}", "caret": 8 },
+    { "template": "ping {0}", "start": 8, "end": 8, "result": "ping {0} {1}", "caret": 12 },
+    { "template": "ping {0} {2}", "start": 8, "end": 8, "result": "ping {0} {1} {2}", "caret": 12 },
+    { "template": "ping host", "start": 5, "end": 9, "result": "ping {0}", "caret": 8 },
+    { "template": "", "start": 0, "end": 0, "result": "{0}", "caret": 3 },
+    { "template": "ab", "start": 9, "end": 9, "result": "ab {0}", "caret": 6 }
+  ],
+  "preview": [
+    { "template": "ping {0}", "values": [""], "preview": "ping {0}" },
+    { "template": "ping {0}", "values": ["8.8.8.8"], "preview": "ping 8.8.8.8" },
+    { "template": "{0} {1}", "values": ["a", ""], "preview": "a {1}" },
+    { "template": "{0} {1}", "values": ["a"], "preview": "a {1}" },
+    { "template": "ping {13}", "values": ["8.8.8.8"], "preview": "ping 8.8.8.8" }
+  ]
+}

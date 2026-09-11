@@ -250,6 +250,7 @@ impl<R: Runner> GroupExecutor<R> {
                 id: String::new(),
                 name: step.name.clone(),
                 template: step.template.clone(),
+                params: vec![],
             };
             let (message, exit_code, duration_ms) =
                 match run_command(&*self.runner, serial, &command, cancel.clone()).await {
@@ -398,6 +399,7 @@ mod tests {
             id: id.into(),
             name: id.into(),
             template: template.into(),
+            params: vec![],
         }
     }
 
@@ -534,6 +536,7 @@ mod tests {
                     template: "echo b".into(),
                 },
             ],
+            params: vec![],
         };
         let steps = block.scheduled_steps();
         assert_eq!(steps.len(), 2);

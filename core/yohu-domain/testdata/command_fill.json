@@ -25,9 +25,15 @@
   },
   {
     "template": "{2}",
-    "values": ["x", "y", "z"],
-    "arity": 3,
+    "values": ["z"],
+    "arity": 1,
     "filled": "z"
+  },
+  {
+    "template": "shell ping -c 3 {13}",
+    "values": ["8.8.8.8"],
+    "arity": 1,
+    "filled": "shell ping -c 3 8.8.8.8"
   },
   {
     "template": "{0}",
