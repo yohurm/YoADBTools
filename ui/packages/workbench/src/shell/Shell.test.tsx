@@ -93,6 +93,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     onTaskSummary: (h: (e: unknown) => void): void => {
       mocks.taskHandler = h;
     },
+    mirrorPresentSetActive: vi.fn(async () => undefined),
+    mirrorLayout: vi.fn(async () => undefined),
     windowMinimize: vi.fn(async () => undefined),
     windowToggleMaximize: vi.fn(async () => undefined),
     windowClose: vi.fn(async () => undefined),
@@ -564,6 +566,12 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(boxes[3]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
+    for (const title of ["ADB 路径", "数据目录"]) {
+      const heading = [...container.querySelectorAll(".yohu-form-row__title")].find(
+        (el) => el.textContent === title,
+      );
+      expect(heading?.closest(".yohu-form-row")?.querySelector(".yohu-form-row__description")).toBeNull();
+    }
 
     mocks.dialogOpenDirectory.mockResolvedValue("D:\\YohuData");
     fireEvent.click(screen.getAllByText("浏览")[1] as HTMLElement);

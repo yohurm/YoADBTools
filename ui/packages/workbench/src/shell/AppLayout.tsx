@@ -4,7 +4,8 @@
  * 单一 canvas 铺满窗口；标题栏/侧栏/状态栏不刷互打架的实底。
  */
 
-import { type Component, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { type Component, Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
+import { mirrorPresentSetActive } from "@yohu/api";
 
 import { APP_ICON_SRC } from "../app-identity";
 import { selectedDeviceLabel } from "./device-label";
@@ -24,6 +25,7 @@ import { deviceStore, settingsStore } from "../stores";
 import { DeviceRail } from "./DeviceRail";
 import { NavList } from "./NavList";
 import { StatusBar } from "./StatusBar";
+import { mirrorPresentShouldBeActive } from "./mirror-stage";
 
 /** 模块区：PC 层级转场淡入淡出（动画系统-v6.md 配方 module-fade）。 */
 const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
@@ -45,19 +47,31 @@ const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
   );
 };
 
+function syncMirrorPresent(moduleId: string | undefined): void {
+  void mirrorPresentSetActive(mirrorPresentShouldBeActive(moduleId));
+}
+
 const ModuleStage: Component<{
   current: ModuleDescriptor | undefined;
 }> = (props) => {
   const [shown, setShown] = createSignal<ModuleDescriptor | undefined>(props.current);
   const [gate, setGate] = createSignal(true);
 
+  onMount(() => {
+    syncMirrorPresent(shown()?.id);
+  });
+
   createEffect(() => {
     const next = props.current;
     const cur = shown();
     if (next?.id === cur?.id) return;
+    if (cur && !mirrorPresentShouldBeActive(next?.id)) {
+      syncMirrorPresent(next?.id);
+    }
     if (!cur || shouldSkipMotion()) {
       setShown(next);
       setGate(true);
+      if (mirrorPresentShouldBeActive(next?.id)) syncMirrorPresent(next?.id);
       return;
     }
     setGate(false);
@@ -70,6 +84,7 @@ const ModuleStage: Component<{
       onExitComplete={() => {
         setShown(props.current);
         setGate(true);
+        syncMirrorPresent(props.current?.id);
       }}
     >
       <Show when={shown()} keyed>
