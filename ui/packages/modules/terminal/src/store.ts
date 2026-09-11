@@ -11,7 +11,6 @@ import {
   blockRun,
   commandlibLoad,
   commandlibSave,
-  formatDateTimeFromMs,
   groupCancel,
   groupRun,
   onGroupProgress,
@@ -33,18 +32,16 @@ export { commandNeedsInput };
 
 export type IoKind = "in" | "out";
 
-/** 一条终端行：输入或输出标识 + 时间 + 内容。 */
+/** 一条终端行：输入或输出标识 + 墙钟毫秒 + 内容。展示形状由设置投影。 */
 export interface IoLine {
   id: number;
   kind: IoKind;
-  time: string;
+  at: number;
   text: string;
 }
 
 let nextId = 1;
 let activeGroupRun: number | null = null;
-
-const nowText = (): string => formatDateTimeFromMs(Date.now());
 
 export function createTerminalStore() {
   let prependAdb = false;
@@ -59,7 +56,7 @@ export function createTerminalStore() {
   }
 
   function pushLine(kind: IoKind, text: string): void {
-    setLines((rows) => [...rows, { id: nextId++, kind, time: nowText(), text }]);
+    setLines((rows) => [...rows, { id: nextId++, kind, at: Date.now(), text }]);
   }
 
   function pushOut(text: string): void {

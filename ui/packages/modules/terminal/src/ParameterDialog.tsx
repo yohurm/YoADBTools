@@ -61,7 +61,7 @@ export function ParameterDialog(props: {
         </section>
         <section class="yohu-terminal__params-section">
           <p class="yohu-terminal__params-caption">填写参数</p>
-          <For each={() => props.slots}>
+          <For each={props.slots}>
             {(index, position) => (
               <YoTextField
                 block

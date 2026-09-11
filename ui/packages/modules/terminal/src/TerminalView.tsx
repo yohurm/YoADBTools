@@ -21,8 +21,14 @@ import {
   shouldSkipMotion,
 } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
-import type { CommandBlockDto, CommandGroupDto, DeviceSession, LibraryEntryDto } from "@yohu/api";
-import { ModuleTitle, commandBlockGapLabel } from "@yohu/api";
+import type {
+  CommandBlockDto,
+  CommandGroupDto,
+  DeviceSession,
+  LibraryEntryDto,
+  TerminalTimeFormat,
+} from "@yohu/api";
+import { ModuleTitle, commandBlockGapLabel, formatClockFromMs } from "@yohu/api";
 
 import { CommandManager } from "./CommandManager";
 import { ParameterDialog } from "./ParameterDialog";
@@ -44,7 +50,7 @@ type QueuedSend =
 
 let nextQueueId = 1;
 
-function IoRow(props: { line: IoLine }) {
+function IoRow(props: { line: IoLine; format: TerminalTimeFormat }) {
   return (
     <div class="yohu-terminal__line" data-kind={props.line.kind}>
       <span
@@ -56,7 +62,7 @@ function IoRow(props: { line: IoLine }) {
       >
         {props.line.kind === "in" ? ">>>" : "<<<"}
       </span>
-      <time class="yohu-terminal__line-time">{props.line.time}</time>
+      <time class="yohu-terminal__line-time">{formatClockFromMs(props.line.at, props.format)}</time>
       <span class="yohu-terminal__line-text">{props.line.text}</span>
     </div>
   );
@@ -258,7 +264,9 @@ export function TerminalView(props: DeviceSession) {
                 }
               >
                 <YoListPresence each={terminalStore.lines} key={(line) => line.id} exit={false}>
-                  {(line) => <IoRow line={line} />}
+                  {(line) => (
+                    <IoRow line={line} format={props.settings.terminal_time_format} />
+                  )}
                 </YoListPresence>
               </Show>
             </div>

@@ -146,4 +146,17 @@ describe("send / runCommand / runGroup 目标设备", () => {
     store.clearResults();
     expect(store.lines).toEqual([]);
   });
+
+  it("IO 行记下墙钟毫秒，不烘焙展示字符串", async () => {
+    const before = Date.now();
+    const store = createTerminalStore();
+    await store.runCommand([], COMMAND, ["hi"]);
+    const after = Date.now();
+    expect(store.lines.length).toBeGreaterThan(0);
+    for (const row of store.lines) {
+      expect(row.at).toBeGreaterThanOrEqual(before);
+      expect(row.at).toBeLessThanOrEqual(after);
+      expect(row).not.toHaveProperty("time");
+    }
+  });
 });
