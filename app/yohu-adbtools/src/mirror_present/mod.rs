@@ -10,6 +10,7 @@ mod backend;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+mod pointer;
 mod scale;
 mod stage;
 #[cfg(windows)]
