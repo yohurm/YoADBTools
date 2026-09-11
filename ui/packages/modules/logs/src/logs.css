@@ -26,8 +26,10 @@
   min-width: 0;
 }
 
-.yohu-logs__filter .yohu-text-field {
+.yohu-logs__field {
   width: calc(var(--yohu-space-xl) * 7);
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .yohu-logs__levels {
@@ -40,73 +42,26 @@
   border-radius: var(--yohu-radius-sm);
   background-color: var(--yohu-surface);
   flex-shrink: 0;
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .yohu-logs__level-slot {
   display: inline-flex;
   height: 100%;
   --yohu-log-fill: color-mix(in srgb, var(--yohu-log-ink) 20%, var(--yohu-surface));
-}
-
-.yohu-logs__level-slot .yohu-tooltip__anchor {
-  display: inline-flex;
-  height: 100%;
+  --yohu-button-ink: var(--yohu-log-ink);
+  --yohu-button-fill: var(--yohu-log-fill);
 }
 
 .yohu-logs__level-slot:not(:last-child) {
   border-inline-end: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
-.yohu-logs__level-slot .yohu-button {
-  height: 100%;
-  min-width: var(--yohu-control-height-sm);
-  padding-inline: var(--yohu-space-sm);
-  border: 0;
-  border-radius: var(--yohu-radius-none);
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-caption);
-  font-variant-numeric: tabular-nums;
-  color: var(--yohu-log-ink);
-}
-
-.yohu-logs__level-slot .yohu-button:not(:disabled):hover,
-.yohu-logs__level-slot .yohu-button:not(:disabled):active,
-.yohu-logs__level-slot .yohu-button[aria-pressed="true"] {
-  color: var(--yohu-log-ink);
-}
-
-.yohu-logs__level-slot .yohu-button[aria-pressed="true"] {
-  background-color: var(--yohu-log-fill);
-}
-
-.yohu-logs__level-slot .yohu-button[aria-pressed="true"]:not(:disabled):hover,
-.yohu-logs__level-slot .yohu-button[aria-pressed="true"]:not(:disabled):active {
-  background-color: var(--yohu-log-fill);
-}
-
-/* 检索框：放大镜图标 + 过滤生效 accent 边框 */
+/* 检索框：前缀走 YoTextField prefix；过滤生效走公开 active */
 .yohu-logs__search {
-  position: relative;
   display: inline-flex;
-}
-
-.yohu-logs__search-icon {
-  position: absolute;
-  left: var(--yohu-space-sm);
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  color: var(--yohu-fg-3);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.yohu-logs__search .yohu-text-field__input {
-  padding-left: calc(var(--yohu-space-md) + var(--yohu-space-sm));
-}
-
-.yohu-logs__search[data-active] .yohu-text-field__control {
-  border-color: var(--yohu-accent);
 }
 
 .yohu-logs__scope {
@@ -136,8 +91,7 @@
 }
 
 /* Ctrl+A 未挂载行：与拖选同一 --yohu-text-sel，不是徽章软底。 */
-.yohu-logs__row--picked,
-.yohu-virtual-list__row:has(.yohu-logs__row--picked) {
+.yohu-logs__row--picked {
   background-color: var(--yohu-text-sel);
 }
 
@@ -195,12 +149,6 @@
   user-select: text;
   cursor: text;
   border-left-color: var(--yohu-log-ink);
-}
-
-.yohu-logs__list .yohu-virtual-list,
-.yohu-logs__list .yohu-virtual-list__row {
-  user-select: text;
-  cursor: text;
 }
 
 .yohu-logs__list ::selection {
@@ -334,13 +282,6 @@
   background-color: var(--yohu-canvas);
 }
 
-/* 对话框自行管理滚动：仅进程列表滚动，避免下拉菜单撑出双滚动条 */
-.yohu-dialog__body:has(.yohu-logs__new) {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .yohu-logs__new {
   display: flex;
   flex-direction: column;
@@ -371,28 +312,8 @@
 }
 
 .yohu-logs__new-search {
-  position: relative;
   display: flex;
   flex-shrink: 0;
-}
-
-.yohu-logs__new-search .yohu-text-field {
-  width: 100%;
-}
-
-.yohu-logs__new-search-icon {
-  position: absolute;
-  left: var(--yohu-space-sm);
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  color: var(--yohu-fg-3);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.yohu-logs__new-search .yohu-text-field__input {
-  padding-left: calc(var(--yohu-space-md) + var(--yohu-space-sm));
 }
 
 .yohu-logs__new-list {
@@ -456,10 +377,4 @@
 
 .yohu-logs__new-error {
   color: var(--yohu-error);
-}
-
-.yohu-logs__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-sm);
 }

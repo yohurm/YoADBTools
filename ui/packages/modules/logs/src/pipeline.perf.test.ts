@@ -13,7 +13,7 @@ import type { SessionFilter } from "./pipeline";
 
 const line = (seq: number): LogLine => ({
   seq,
-  ts: "08-17 10:00:00.000",
+  ts: "2026-08-17 10:00:00.000",
   pid: 100 + (seq % 500),
   tid: 1,
   level: LEVELS[seq % LEVELS.length]!,

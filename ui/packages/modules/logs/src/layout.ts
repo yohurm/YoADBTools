@@ -4,7 +4,7 @@
  * 列宽代数走 YoUI col-model；本文件只留业务默认值。
  */
 
-import { APP_SETTINGS_DEFAULT, type LogDisplayColumns, type LogLine } from "@yohu/api";
+import { APP_SETTINGS_DEFAULT, DATETIME_DISPLAY_LEN, type LogDisplayColumns, type LogLine } from "@yohu/api";
 import { defaultColWidths } from "@yohu/ui";
 
 export type LogMetaColKey = keyof LogDisplayColumns;
@@ -29,7 +29,7 @@ export const DEFAULT_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
 
 /** 定宽轨道；消息列吃剩余。默认宽要放下标题列垫 + 六位 PID / 「级别」。 */
 export const LOG_COLUMNS: readonly LogColumnSpec[] = [
-  { key: "ts", header: "时间", resizeLabel: "调节时间列宽", defaultWidth: 144, minWidth: 72, flex: false },
+  { key: "ts", header: "时间", resizeLabel: "调节时间列宽", defaultWidth: 184, minWidth: 120, flex: false },
   { key: "uid", header: "UID", resizeLabel: "调节 UID 列宽", defaultWidth: 80, minWidth: 40, flex: false, align: "end" },
   { key: "pid", header: "PID", resizeLabel: "调节 PID 列宽", defaultWidth: 80, minWidth: 56, flex: false, align: "end" },
   { key: "tid", header: "TID", resizeLabel: "调节 TID 列宽", defaultWidth: 80, minWidth: 56, flex: false, align: "end" },

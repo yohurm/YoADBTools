@@ -108,7 +108,7 @@ import type { LogStoreApi } from "./store";
 
 const mk = (seq: number, over: Partial<LogLine> = {}): LogLine => ({
   seq,
-  ts: "01-01 00:00:00.000",
+  ts: "2026-01-01 00:00:00.000",
   pid: 100,
   tid: 1,
   level: "I",

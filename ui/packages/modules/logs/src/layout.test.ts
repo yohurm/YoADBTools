@@ -55,6 +55,18 @@ describe("日志表头布局契约", () => {
     expect(logsCss).not.toContain("--yohu-col-cell-pad");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*border-bottom:/);
     expect(logsCss).not.toMatch(/\.yohu-virtual-list__row\s*\{[^}]*border-bottom:/);
+    expect(logsCss).not.toContain(".yohu-dialog__body");
+    expect(logsCss).not.toContain(".yohu-button");
+    expect(logsCss).not.toContain(".yohu-text-field");
+    expect(logsCss).not.toContain(".yohu-tooltip__anchor");
+    const dialogCandidates = [
+      resolve(process.cwd(), "src/NewSessionDialog.tsx"),
+      resolve(process.cwd(), "packages/modules/logs/src/NewSessionDialog.tsx"),
+    ];
+    const dialog =
+      dialogCandidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ??
+      "";
+    expect(dialog).toContain('bodyOverflow="hidden"');
     expect(logsCss).toMatch(/\.yohu-logs__ch-probe\s*\{[^}]*display:\s*inline/);
     expect(logsCss).not.toMatch(/\.yohu-logs__ch-probe\s*\{[^}]*display:\s*block/);
   });
@@ -63,7 +75,7 @@ describe("日志表头布局契约", () => {
 describe("日志显示列", () => {
   it("默认不含 UID/TID，含时间/PID/级别/Tag/消息", () => {
     expect(logDocTrackTemplate(defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(
-      "22ch 13ch 11ch 27ch minmax(10ch, 1fr)",
+      "26ch 13ch 11ch 27ch minmax(10ch, 1fr)",
     );
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
@@ -88,7 +100,7 @@ describe("日志显示列", () => {
   it("字段原文与表头同序，不含 pad / 列间空格", () => {
     const line = {
       seq: 1,
-      ts: "01-01 12:00:00.000",
+      ts: "2026-01-01 12:00:00.000",
       uid: "shell",
       pid: 100,
       tid: 200,
@@ -97,7 +109,7 @@ describe("日志显示列", () => {
       msg: "hello",
     };
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((col) => logFieldText(line, col.key))).toEqual([
-      "01-01 12:00:00.000",
+      "2026-01-01 12:00:00.000",
       "100",
       "I",
       "Yohu",
@@ -129,6 +141,13 @@ describe("日志级别色单源", () => {
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");
     expect(logsCss).toContain("--yohu-log-fill: color-mix(in srgb, var(--yohu-log-ink) 20%, var(--yohu-surface))");
+    expect(logsCss).toContain("--yohu-button-ink: var(--yohu-log-ink)");
+    expect(logsCss).toContain("--yohu-button-fill: var(--yohu-log-fill)");
+    expect(logsCss).not.toContain(".yohu-button");
+    expect(logsCss).not.toContain(".yohu-text-field");
+    expect(logsCss).not.toContain("[aria-pressed]");
+    expect(logsCss).not.toContain(".yohu-tooltip__anchor");
+    expect(logsCss).not.toContain(".yohu-virtual-list");
     expect(logsCss).not.toMatch(/box-shadow:\s*inset 0 calc\(-1 \* var\(--yohu-stroke-accent\)\)/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row-tag\s*\{\s*color:\s*var\(--yohu-accent\)/);
   });

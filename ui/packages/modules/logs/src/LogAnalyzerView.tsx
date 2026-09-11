@@ -519,11 +519,13 @@ export function LogAnalyzerView(props: DeviceSession) {
                           class="yohu-logs__level-slot yohu-tone"
                           data-level={levelKey(letter) ?? undefined}
                         >
-                          <YoTooltip content={levelLabel(letter)}>
+                          <YoTooltip content={levelLabel(letter)} stretch>
                             <YoButton
                               variant="ghost"
                               tone="neutral"
                               size="md"
+                              ink
+                              flush
                               aria-pressed={pressed()}
                               onClick={() =>
                                 logStore.patchFilter(session.id, {
@@ -539,28 +541,28 @@ export function LogAnalyzerView(props: DeviceSession) {
                     }}
                   </For>
                 </div>
-                <YoTextField
-                  ariaLabel="Tag"
-                  placeholder="Tag"
-                  value={session.tagContains}
-                  clearable
-                  onInput={(v) => logStore.patchFilter(session.id, { tagContains: v })}
-                />
-                <span
-                  class="yohu-logs__search"
-                  data-active={session.keyword.length > 0 ? "" : undefined}
-                  ref={(el) => {
-                    keywordRef = el.querySelector("input") ?? undefined;
-                  }}
-                >
-                  <span class="yohu-logs__search-icon" aria-hidden="true">
-                    <Icon name="search" size={13} />
-                  </span>
+                <span class="yohu-logs__field">
                   <YoTextField
+                    block
+                    ariaLabel="Tag"
+                    placeholder="Tag"
+                    value={session.tagContains}
+                    clearable
+                    onInput={(v) => logStore.patchFilter(session.id, { tagContains: v })}
+                  />
+                </span>
+                <span class="yohu-logs__search yohu-logs__field">
+                  <YoTextField
+                    block
+                    prefix="search"
                     ariaLabel="关键字"
                     placeholder="检索消息"
                     value={session.keyword}
                     clearable
+                    active={session.keyword.length > 0}
+                    inputRef={(el) => {
+                      keywordRef = el;
+                    }}
                     onInput={(v) => logStore.patchFilter(session.id, { keyword: v })}
                   />
                 </span>
@@ -583,7 +585,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                         minWidth={col.minWidthPx}
                         onWidthChange={(width) => logStore.setColWidth(col.key, width)}
                       >
-                        <span class="yohu-col-header__label">{col.header}</span>
+                        {col.header}
                       </YoColHeader>
                     )}
                   </For>
@@ -705,7 +707,7 @@ export function LogAnalyzerView(props: DeviceSession) {
           </>
         }
       >
-        <YoTextField label="会话标题" value={renameText()} onInput={setRenameText} />
+        <YoTextField block label="会话标题" value={renameText()} onInput={setRenameText} />
       </YoDialog>
 
       <YoToaster toaster={toaster} />

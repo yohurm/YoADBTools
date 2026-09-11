@@ -7,7 +7,7 @@
  * domain formatLogLine 只给导出，不进这条链。
  */
 
-import type { LogDisplayColumns, LogLine } from "@yohu/api";
+import { DATETIME_DISPLAY_LEN, type LogDisplayColumns, type LogLine } from "@yohu/api";
 import { Spacing } from "@yohu/ui";
 
 import type { LogLinePart } from "./format";
@@ -29,7 +29,7 @@ export interface LogDocLayout {
 }
 
 const MIN_CH: Record<LogMetaColKey, number> = {
-  ts: 19,
+  ts: DATETIME_DISPLAY_LEN,
   uid: 8,
   pid: 5,
   tid: 5,

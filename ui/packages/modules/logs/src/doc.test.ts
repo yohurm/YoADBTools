@@ -22,7 +22,7 @@ import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultLogColWidths } from "./layout";
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
     seq: 1,
-    ts: "01-01 12:00:00.000",
+    ts: "2026-01-01 12:00:00.000",
     pid: 100,
     tid: 200,
     level: "I",
@@ -97,7 +97,7 @@ describe("formatLogDoc", () => {
       widths: defaultLogColWidths(),
       chPx: 8,
     });
-    expect(hidden.includes("01-01")).toBe(false);
+    expect(hidden.includes("2026-01-01")).toBe(false);
     expect(hidden.includes("Yohu")).toBe(false);
     expect(hidden.includes("hello")).toBe(true);
   });
@@ -110,7 +110,7 @@ describe("formatLogDoc", () => {
       const part = parts.find((item) => item.kind === col.key);
       expect(part?.text.length).toBe(col.padLeft + col.chars + col.gutter);
     }
-    expect(logDocTrackTemplate(layout)).toBe("22ch 13ch 11ch 27ch minmax(10ch, 1fr)");
+    expect(logDocTrackTemplate(layout)).toBe("26ch 13ch 11ch 27ch minmax(10ch, 1fr)");
   });
 });
 

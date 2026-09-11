@@ -21,7 +21,7 @@ const layout = defaultLogDocLayout(ALL_LOG_DISPLAY_COLUMNS);
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
     seq: 1,
-    ts: "01-01 12:00:00.000",
+    ts: "2026-01-01 12:00:00.000",
     pid: 100,
     tid: 200,
     level: "I",

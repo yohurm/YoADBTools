@@ -8,7 +8,6 @@ import { For, Show, createEffect, createMemo, createSignal, untrack } from "soli
 
 import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
 import {
-  Icon,
   YoButton,
   YoCheckbox,
   YoDialog,
@@ -180,6 +179,7 @@ export function NewSessionDialog(props: {
       open={props.open}
       title="新建日志窗口"
       height={NEW_SESSION_DIALOG_HEIGHT}
+      bodyOverflow="hidden"
       onClose={props.onClose}
       footer={
         <>
@@ -226,10 +226,9 @@ export function NewSessionDialog(props: {
         </div>
 
         <div class="yohu-logs__new-search">
-          <span class="yohu-logs__new-search-icon" aria-hidden="true">
-            <Icon name="search" size={13} />
-          </span>
           <YoTextField
+            block
+            prefix="search"
             ariaLabel={mode() === "package" ? "过滤或输入包名" : "过滤进程或输入 PID"}
             value={query()}
             clearable

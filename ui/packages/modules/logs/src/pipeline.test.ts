@@ -26,7 +26,7 @@ import {
 
 const line = (over: Partial<LogLine>): LogLine => ({
   seq: 0,
-  ts: "01-01 00:00:00.000",
+  ts: "2026-01-01 00:00:00.000",
   pid: 100,
   tid: 1,
   level: "I",

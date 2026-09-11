@@ -1,9 +1,13 @@
 # 模块：日志分析
 
-- 能力：`yohu-logsrv` — 每设备一路 logcat；槽位 Empty/Starting/Live/Stopping + generation（ADR-v6-016）
+- 能力：`yohu-logsrv` — 每设备一路 logcat（`-v threadtime,uid,year`）；槽位 Empty/Starting/Live/Stopping + generation（ADR-v6-016）
+- **时间戳：** 解析边界经 domain `canonicalize_datetime` 收到 `YYYY-MM-DD HH:mm:ss.SSS`；清单 / 复制 / 导出都用 `LogLine.ts` 原文，禁止再裁成 `MM-DD`
 - 过滤：UI `filter.ts` + domain `log_filter`（导出用）；共享 `core/yohu-domain/testdata/log_filter.json`。级别字母单源 `log_levels.json` ↔ `LEVELS`。`LogFilter.levels` 空 = 不限；非空 = 精确集合，禁止最低含以上
+- **级别钮：** 独立多选，走 `YoButton` `ink` + `flush`（不是 `YoSegmentedButton`）。槽写 `data-level`、`--yohu-log-ink` / `--yohu-log-fill`，并映射 `--yohu-button-ink` / `--yohu-button-fill`。禁止点 `.yohu-button` / `[aria-pressed]`。Tooltip 用公开 `stretch` 铺交叉轴，禁止点 `__anchor`
+- **检索焦点：** `YoTextField` 公开 `inputRef` 转发内部 input。禁止宿主 `querySelector("input")`。过滤生效走公开 `active`，禁止模块点 `.yohu-text-field` 改铬 token
+- **清单选字：** `YoVirtualList` 默认 `tone=document` 承担 `user-select` / `cursor`。Ctrl+A 铺底只涂 `.yohu-logs__row--picked`。禁止点 `__row`
 - 窗口 = 会话订阅（serial / capturing / fromSeq）；设备流按窗口引用计数启停；切焦点不停其他设备
-- **新建窗口：** 包名检索走 `log.packageSnapshot`（`pm list packages` 已安装列表）；PID 检索走 `ps` 进程索引。进程索引仍只用于包名 PID 重绑，不是新建窗口的包名源
+- **新建窗口：** 包名检索走 `log.packageSnapshot`（`pm list packages` 已安装列表）；PID 检索走 `ps` 进程索引。进程索引仍只用于包名 PID 重绑，不是新建窗口的包名源。对话框 `YoDialog bodyOverflow="hidden"`，禁止点 `__body` / `:has`
 - **UI store 分层：** `workspace`（Tab/过滤/面板）∥ `ingest`（批次按 serial 扇出）∥ `capture`（每设备启停/世代/溢出回补）。门面显式拼装；`closeSession` / `closeOthers` / `resumeFollow` 以 capture 为准。进程索引、世代、溢出按 serial 分桶
 - **显示面板：** 窗口私有。唯一游标 `fromSeq`：一行能进面板 ⟺ 已订阅 && `seq >= fromSeq` &&（跟滚 || `seq ≤ frozenThroughSeq`）&& 过滤命中。入镜 / PID 重绑 / 跟滚走 `applyAppend`；改过滤走 `projectWindow`（镜像覆盖游标范围时镜像是唯一权威，否则只收窄已画行）。**清空可见区** `discardView`：把 `fromSeq` 推过已见与镜像末 seq，旧行不得再投影回来。**冻结与过滤解耦：** 离开底部记下 `frozenThroughSeq`；未跟滚只合并到该上限，其后计 pending。**空面板不能冻结**（`canFreezeFollow`）：没有已画行就没有底部，`detachFollow` 空操作；否则 `frozenThroughSeq=fromSeq-1`，新行全进 pending，空态仍显示「等待设备输出」。点开始订阅时强制跟滚。暂停只挡入镜/catchUp，不进 `patchFilter`。点开始才订阅：先 `log.processSnapshot` 绑 PID，`fromSeq=0`，按本窗口过滤从当前环补齐
 - 环：`buffer_capacity` 默认 10000；掉线清该 serial 的 core 环与 UI 镜像，**不清面板**
