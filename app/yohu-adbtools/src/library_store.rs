@@ -64,6 +64,7 @@ fn migrate_v2(file: &Path, text: &str) -> Result<CommandLibrary, String> {
                             id: c.id,
                             name: c.name,
                             template: c.template,
+                            params: vec![],
                         })
                     })
                     .collect(),
