@@ -6,8 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   DATETIME_DISPLAY_LEN,
   DATETIME_SECONDS_LEN,
+  TIME_DISPLAY_LEN,
+  TIME_MILLIS_DISPLAY_LEN,
   canonicalizeDateTime,
   canonicalizeDateTimeSeconds,
+  formatClock,
   formatDateTime,
   formatDateTimeFromMs,
 } from "./datetime";
@@ -54,5 +57,16 @@ describe("datetime（与 domain testdata/datetime.json 同一套向量）", () =
 
   it("formatDateTimeFromMs 是毫秒墙钟形状", () => {
     expect(formatDateTimeFromMs(Date.now())).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+  });
+
+  it("formatClock 按终端显示形状投影，不改部件", () => {
+    const args = [2026, 9, 11, 16, 45, 7, 89] as const;
+    expect(formatClock(...args, "time_millis")).toBe("16:45:07.089");
+    expect(formatClock(...args, "time")).toBe("16:45:07");
+    expect(formatClock(...args, "datetime_millis")).toBe("2026-09-11 16:45:07.089");
+    expect(formatClock(...args, "datetime")).toBe("2026-09-11 16:45:07");
+    expect(formatClock(...args, "time_millis")?.length).toBe(TIME_MILLIS_DISPLAY_LEN);
+    expect(formatClock(...args, "time")?.length).toBe(TIME_DISPLAY_LEN);
+    expect(formatClock(2026, 13, 1, 0, 0, 0, 0, "time_millis")).toBeNull();
   });
 });

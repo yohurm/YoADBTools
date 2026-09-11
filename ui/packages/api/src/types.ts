@@ -103,6 +103,9 @@ export type Density = "compact" | "comfortable";
 
 export type MirrorProtocol = "usb" | "wifi";
 
+/** 终端 IO 行时间显示形状。行上存墙钟毫秒；展示立即投影。 */
+export type TerminalTimeFormat = "time_millis" | "time" | "datetime_millis" | "datetime";
+
 export interface AppSettings {
   adb_path: string;
   data_root: string;
@@ -120,6 +123,7 @@ export interface AppSettings {
   mirror_protocol: MirrorProtocol;
   mirror_force_forward: boolean;
   terminal_prepend_adb: boolean;
+  terminal_time_format: TerminalTimeFormat;
 }
 
 /** 日志清单元数据列开关；消息列始终显示。 */
@@ -148,7 +152,8 @@ export type SettingKey =
   | "mirror_max_fps"
   | "mirror_protocol"
   | "mirror_force_forward"
-  | "terminal_prepend_adb";
+  | "terminal_prepend_adb"
+  | "terminal_time_format";
 
 /** `settings.set` 单键值类型：按键映射到 `AppSettings` 对应字段类型。
  * `SettingKey` 成员与 `AppSettings` 字段一一同名，故索引映射即精确值类型。

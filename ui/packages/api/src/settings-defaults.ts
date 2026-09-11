@@ -29,4 +29,5 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   mirror_protocol: "usb",
   mirror_force_forward: false,
   terminal_prepend_adb: false,
+  terminal_time_format: "time_millis",
 };

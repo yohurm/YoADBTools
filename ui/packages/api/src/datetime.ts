@@ -1,12 +1,19 @@
 /**
  * 墙钟解析单点。与 yohu-domain::datetime 同一套 testdata/datetime.json。
- * 日志/终端带毫秒；文件只到秒。禁止把「只有时分」补成秒或毫秒。
+ * 日志带毫秒完整墙钟；终端按 `TerminalTimeFormat` 投影；文件只到秒。
+ * 禁止把「只有时分」补成秒或毫秒。
  */
+
+import type { TerminalTimeFormat } from "./types";
 
 /** `2026-09-10 17:20:45.123` */
 export const DATETIME_DISPLAY_LEN = 23;
 /** `2026-09-10 17:20:45` */
 export const DATETIME_SECONDS_LEN = 19;
+/** `17:20:45.123` */
+export const TIME_MILLIS_DISPLAY_LEN = 12;
+/** `17:20:45` */
+export const TIME_DISPLAY_LEN = 8;
 
 export function formatDateTime(
   year: number,
@@ -45,10 +52,40 @@ export function canonicalizeDateTimeSeconds(raw: string): string | null {
   return formatDateTimeSeconds(p[0], p[1], p[2], p[3], p[4], p[5]);
 }
 
-/** 本地墙钟。终端 IO 行。 */
+/** 按显示形状投影墙钟部件。 */
+export function formatClock(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  millis: number,
+  format: TerminalTimeFormat,
+): string | null {
+  switch (format) {
+    case "time_millis":
+      if (!validParts(year, month, day, hour, minute, second, millis)) return null;
+      return `${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}.${pad(millis, 3)}`;
+    case "time":
+      if (!validParts(year, month, day, hour, minute, second, 0)) return null;
+      return `${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}`;
+    case "datetime_millis":
+      return formatDateTime(year, month, day, hour, minute, second, millis);
+    case "datetime":
+      return formatDateTimeSeconds(year, month, day, hour, minute, second);
+  }
+}
+
+/** 本地墙钟完整形状（日志 / 规范化）。 */
 export function formatDateTimeFromMs(ms: number): string {
+  return formatClockFromMs(ms, "datetime_millis");
+}
+
+/** 本地墙钟按终端显示形状投影。 */
+export function formatClockFromMs(ms: number, format: TerminalTimeFormat): string {
   const date = new Date(ms);
-  return formatDateTime(
+  return formatClock(
     date.getFullYear(),
     date.getMonth() + 1,
     date.getDate(),
@@ -56,6 +93,7 @@ export function formatDateTimeFromMs(ms: number): string {
     date.getMinutes(),
     date.getSeconds(),
     date.getMilliseconds(),
+    format,
   )!;
 }
 
