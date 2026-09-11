@@ -320,10 +320,17 @@ export interface EvalResult {
   duration_ms: number;
 }
 
+export interface CommandParamDto {
+  index: number;
+  description: string;
+}
+
 export interface CommandDto {
   id: string;
   name: string;
   template: string;
+  /** `{n}` 的说明；缺省空。 */
+  params?: CommandParamDto[];
 }
 
 export interface CommandStepDto {
@@ -335,6 +342,7 @@ export interface CommandBlockDto {
   name: string;
   gap_ms: number;
   steps: CommandStepDto[];
+  params?: CommandParamDto[];
 }
 
 export type LibraryEntryDto =
