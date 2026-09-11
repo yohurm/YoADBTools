@@ -1,4 +1,5 @@
-//! 命令组编排：多设备并行、组内串行。不判定成败、不延时、不因失败中断。
+//! 命令组 / 命令块编排：多设备并行、组内串行。不判定成败、不因失败中断。
+//! 组条目之间无额外间隔；命令块步间可按允许的常量集等待。
 //!
 //! 执行能力经 [`Runner`] 端口注入（yohu-adb 实现），本层不做进程 IO —— 可单测。
 //! 依赖倒置：端口与其错误类型都定义在 domain，适配层（yohu-adb）负责映射。
@@ -9,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::library::CommandDefinition;
+use super::library::{CommandBlock, CommandDefinition, LibraryEntry};
 use yohu_protocol::ExecOutcome;
 
 /// 执行端口错误（domain 自有类型；适配层映射）。
@@ -143,6 +144,57 @@ pub struct GroupRunEvent {
     pub duration_ms: u64,
 }
 
+/// 已展开的一步（命令或命令块的一步）。`gap_after_ms` 只加在本步之后、下一步之前。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduledStep {
+    pub name: String,
+    pub template: String,
+    pub gap_after_ms: u64,
+}
+
+impl ScheduledStep {
+    pub fn from_command(command: &CommandDefinition) -> Self {
+        Self {
+            name: command.name.clone(),
+            template: command.template.clone(),
+            gap_after_ms: 0,
+        }
+    }
+}
+
+impl CommandBlock {
+    pub fn scheduled_steps(&self) -> Vec<ScheduledStep> {
+        let last = self.steps.len().saturating_sub(1);
+        self.steps
+            .iter()
+            .enumerate()
+            .map(|(index, step)| ScheduledStep {
+                name: self.name.clone(),
+                template: step.template.clone(),
+                gap_after_ms: if index < last { self.gap_ms } else { 0 },
+            })
+            .collect()
+    }
+}
+
+impl LibraryEntry {
+    pub fn scheduled_steps(&self) -> Vec<ScheduledStep> {
+        match self {
+            Self::Command(command) => vec![ScheduledStep::from_command(command)],
+            Self::Block(block) => block.scheduled_steps(),
+        }
+    }
+}
+
+impl super::library::CommandGroup {
+    pub fn scheduled_steps(&self) -> Vec<ScheduledStep> {
+        self.entries
+            .iter()
+            .flat_map(LibraryEntry::scheduled_steps)
+            .collect()
+    }
+}
+
 /// 组执行编排器（无状态，可复用）。
 pub struct GroupExecutor<R: Runner> {
     runner: Arc<R>,
@@ -155,25 +207,25 @@ impl<R: Runner> GroupExecutor<R> {
         }
     }
 
-    /// 对每个设备并行执行整组命令；组内串行，跑完全部命令。
-    /// 进度经 `progress_tx` 推送；`cancel` 取消整个运行。
+    /// 对每个设备并行执行已展开的步骤；设备内串行。
+    /// 进度经 `progress_tx` 推送；`cancel` 取消整个运行（含间隔等待）。
     pub async fn run(
         &self,
-        group: &[CommandDefinition],
+        steps: &[ScheduledStep],
         serials: &[String],
         progress_tx: mpsc::Sender<GroupRunEvent>,
         cancel: CancellationToken,
     ) {
         let mut joins = Vec::with_capacity(serials.len());
         for serial in serials {
-            let group = group.to_vec();
+            let steps = steps.to_vec();
             let runner = Arc::clone(&self.runner);
             let tx = progress_tx.clone();
             let cancel = cancel.clone();
             let serial = serial.clone();
             joins.push(tokio::spawn(async move {
                 let executor = GroupExecutor { runner };
-                executor.run_for_device(&group, &serial, tx, cancel).await;
+                executor.run_for_device(&steps, &serial, tx, cancel).await;
             }));
         }
         for j in joins {
@@ -183,19 +235,24 @@ impl<R: Runner> GroupExecutor<R> {
 
     async fn run_for_device(
         &self,
-        group: &[CommandDefinition],
+        steps: &[ScheduledStep],
         serial: &str,
         progress_tx: mpsc::Sender<GroupRunEvent>,
         cancel: CancellationToken,
     ) {
-        let total = group.len();
-        for (index, command) in group.iter().enumerate() {
+        let total = steps.len();
+        for (index, step) in steps.iter().enumerate() {
             if cancel.is_cancelled() {
                 return;
             }
             let started = std::time::Instant::now();
+            let command = CommandDefinition {
+                id: String::new(),
+                name: step.name.clone(),
+                template: step.template.clone(),
+            };
             let (message, exit_code, duration_ms) =
-                match run_command(&*self.runner, serial, command, cancel.clone()).await {
+                match run_command(&*self.runner, serial, &command, cancel.clone()).await {
                     Ok(run) => (
                         combine_output(&run.outcome.stdout, &run.outcome.stderr),
                         run.outcome.exit_code,
@@ -212,8 +269,8 @@ impl<R: Runner> GroupExecutor<R> {
             if progress_tx
                 .send(GroupRunEvent {
                     serial: serial.to_string(),
-                    name: command.name.clone(),
-                    template: command.template.clone(),
+                    name: step.name.clone(),
+                    template: step.template.clone(),
                     command_index: index,
                     total,
                     message,
@@ -225,7 +282,21 @@ impl<R: Runner> GroupExecutor<R> {
             {
                 return;
             }
+            if !wait_gap(step.gap_after_ms, &cancel).await {
+                return;
+            }
         }
+    }
+}
+
+/// 返回 `false` 表示等待被取消。
+async fn wait_gap(gap_ms: u64, cancel: &CancellationToken) -> bool {
+    if gap_ms == 0 {
+        return true;
+    }
+    tokio::select! {
+        _ = cancel.cancelled() => false,
+        _ = tokio::time::sleep(std::time::Duration::from_millis(gap_ms)) => true,
     }
 }
 
@@ -330,6 +401,10 @@ mod tests {
         }
     }
 
+    fn steps(commands: &[CommandDefinition]) -> Vec<ScheduledStep> {
+        commands.iter().map(ScheduledStep::from_command).collect()
+    }
+
     #[tokio::test]
     async fn parallel_per_device_sequential_within() {
         let runner = FakeRunner {
@@ -337,7 +412,7 @@ mod tests {
             exit_codes: Mutex::new(vec![0, 0, 0, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a"), command("b", "echo b")];
+        let group = steps(&[command("a", "echo a"), command("b", "echo b")]);
         let (tx, mut rx) = mpsc::channel(16);
 
         executor
@@ -370,7 +445,7 @@ mod tests {
             exit_codes: Mutex::new(vec![1, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a"), command("b", "echo b")];
+        let group = steps(&[command("a", "echo a"), command("b", "echo b")]);
         let (tx, mut rx) = mpsc::channel(16);
 
         executor
@@ -394,7 +469,7 @@ mod tests {
             exit_codes: Mutex::new(vec![0, 0]),
         };
         let executor = GroupExecutor::new(runner);
-        let group = vec![command("a", "echo a"), command("b", "echo b")];
+        let group = steps(&[command("a", "echo a"), command("b", "echo b")]);
         let (tx, mut rx) = mpsc::channel(16);
         let cancel = CancellationToken::new();
         cancel.cancel();
@@ -443,5 +518,36 @@ mod tests {
         assert_eq!(combine_output("", "err"), "err");
         assert_eq!(combine_output("out", "err"), "out\nerr");
         assert_eq!(combine_output("", ""), "");
+    }
+
+    #[test]
+    fn block_gap_sits_between_steps_only() {
+        let block = CommandBlock {
+            id: "b1".into(),
+            name: "自检".into(),
+            gap_ms: 1000,
+            steps: vec![
+                super::super::library::CommandStep {
+                    template: "echo a".into(),
+                },
+                super::super::library::CommandStep {
+                    template: "echo b".into(),
+                },
+            ],
+        };
+        let steps = block.scheduled_steps();
+        assert_eq!(steps.len(), 2);
+        assert_eq!(steps[0].gap_after_ms, 1000);
+        assert_eq!(steps[1].gap_after_ms, 0);
+        assert_eq!(steps[0].name, "自检");
+        assert_eq!(steps[1].template, "echo b");
+    }
+
+    #[tokio::test]
+    async fn cancel_aborts_gap_wait() {
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        assert!(!wait_gap(60_000, &cancel).await);
+        assert!(wait_gap(0, &CancellationToken::new()).await);
     }
 }

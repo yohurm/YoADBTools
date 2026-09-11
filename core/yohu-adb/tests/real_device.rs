@@ -216,13 +216,13 @@ async fn real_device_group_run_end_to_end() {
     };
     let library = default_library();
     let group = library.group("g-device").expect("默认库含 g-device 组");
-    assert_eq!(group.commands.len(), 3);
+    assert_eq!(group.entries.len(), 3);
 
     let executor = GroupExecutor::new(client);
     let (tx, mut rx) = mpsc::channel::<yohu_domain::GroupRunEvent>(16);
     executor
         .run(
-            &group.commands,
+            &group.scheduled_steps(),
             std::slice::from_ref(&serial),
             tx,
             CancellationToken::new(),

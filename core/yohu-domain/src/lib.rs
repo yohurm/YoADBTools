@@ -23,8 +23,9 @@ pub use datetime::{
 };
 pub use command::{
     combine_output, default_library, placeholder_arity, run_command, run_line, split_command_line,
-    strip_leading_adb, CommandDefinition, CommandGroup, CommandLibrary, CommandRun, GroupExecutor,
-    GroupRunEvent, LibraryError, RunError, Runner,
+    strip_leading_adb, CommandBlock, CommandDefinition, CommandGroup, CommandLibrary, CommandRun,
+    CommandStep, GroupExecutor, GroupRunEvent, LibraryEntry, LibraryError, RunError, Runner,
+    ScheduledStep,
 };
 pub use focus::{
     assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,

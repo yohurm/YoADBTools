@@ -1,19 +1,21 @@
 //! 默认命令库（首次启动/损坏重建时写入；纯代码构造，可单测）。
 
-use super::{CommandDefinition, CommandGroup, CommandLibrary};
+use super::{CommandDefinition, CommandGroup, CommandLibrary, LibraryEntry};
 
-/// 产线常用默认命令库（schemaVersion 2）。新增命令不做成功/失败正则。
+/// 产线常用默认命令库（schemaVersion 3）。新增命令不做成功/失败正则。
 pub fn default_library() -> CommandLibrary {
-    let g = |id: &str, name: &str, commands: Vec<CommandDefinition>| CommandGroup {
+    let g = |id: &str, name: &str, entries: Vec<LibraryEntry>| CommandGroup {
         id: id.into(),
         name: name.into(),
-        commands,
+        entries,
     };
 
-    let c = |id: &str, name: &str, template: &str| CommandDefinition {
-        id: id.into(),
-        name: name.into(),
-        template: template.into(),
+    let c = |id: &str, name: &str, template: &str| {
+        LibraryEntry::Command(CommandDefinition {
+            id: id.into(),
+            name: name.into(),
+            template: template.into(),
+        })
     };
 
     CommandLibrary {
@@ -68,7 +70,7 @@ mod tests {
         assert!(lib.validate().is_ok());
         assert_eq!(lib.groups.len(), 3);
         assert_eq!(
-            lib.groups.iter().map(|g| g.commands.len()).sum::<usize>(),
+            lib.groups.iter().map(|g| g.entries.len()).sum::<usize>(),
             9
         );
     }
