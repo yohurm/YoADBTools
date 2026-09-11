@@ -379,6 +379,9 @@ impl Views {
                     || loc.x > bounds.size.width
                     || loc.y > bounds.size.height
                 {
+                    if let Ok(mut h) = host.lock() {
+                        h.handle_leave();
+                    }
                     return;
                 }
                 if let Ok(mut h) = host.lock() {

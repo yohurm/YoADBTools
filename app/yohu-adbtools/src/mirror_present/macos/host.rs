@@ -7,18 +7,15 @@ use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
 use yohu_protocol::{AppEvent, MirrorControlMessage, MirrorLayout};
 
+use super::super::pointer::{PointerGesture, PointerKind, TouchOut, TOUCH_DOWN, TOUCH_MOVE, TOUCH_UP};
 use super::super::scale::map_client_to_video;
 use super::super::stage::Stage;
 use super::vt::Picture;
 
-const TOUCH_DOWN: u8 = 0;
-const TOUCH_UP: u8 = 1;
-const TOUCH_MOVE: u8 = 2;
-
 pub struct Host {
     pub stage: Stage,
     last_pic: Option<Picture>,
-    pressing: bool,
+    gesture: PointerGesture,
     painted: u32,
     fps_at: Instant,
     present_err_logged: bool,
@@ -35,7 +32,7 @@ impl Host {
         Self {
             stage: Stage::new(serial),
             last_pic: None,
-            pressing: false,
+            gesture: PointerGesture::default(),
             painted: 0,
             fps_at: Instant::now(),
             present_err_logged: false,
@@ -47,6 +44,9 @@ impl Host {
     pub fn apply_layout(&mut self, layout: &MirrorLayout) {
         self.stage.apply_layout(layout);
         self.stage.set_host_size(layout.width, layout.height);
+        if !self.stage.control() {
+            self.end_press();
+        }
         tracing::debug!(
             serial = %self.stage.serial,
             x = layout.x,
@@ -74,6 +74,7 @@ impl Host {
         if !target.is_empty() && self.stage.serial != target {
             return false;
         }
+        self.end_press();
         let serial = self.stage.serial.clone();
         self.stage.unbind();
         tracing::info!(serial = %serial, "投屏解码管道已解开，舞台改画 chrome");
@@ -117,37 +118,43 @@ impl Host {
 
     pub fn handle_pointer(&mut self, action: u8, x: i32, y: i32) {
         if !self.stage.control() {
+            self.end_press();
             return;
         }
-        let (video_w, video_h) = self.stage.video_size();
-        let Some((vx, vy)) = map_client_to_video(x, y, self.stage.dest(), video_w, video_h) else {
-            return;
-        };
-        let mapped = match action {
-            TOUCH_DOWN => {
-                self.pressing = true;
-                TOUCH_DOWN
-            }
-            TOUCH_MOVE => {
-                if !self.pressing {
-                    return;
-                }
-                TOUCH_MOVE
-            }
-            TOUCH_UP => {
-                self.pressing = false;
-                TOUCH_UP
-            }
+        let kind = match action {
+            TOUCH_DOWN => PointerKind::Down,
+            TOUCH_MOVE => PointerKind::Move,
+            TOUCH_UP => PointerKind::Up,
             _ => return,
         };
+        let (video_w, video_h) = self.stage.video_size();
+        let mapped = map_client_to_video(x, y, self.stage.dest(), video_w, video_h);
+        if let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) {
+            self.inject_touch(out);
+        }
+    }
+
+    pub fn handle_leave(&mut self) {
+        if let Some(out) = self.gesture.feed(PointerKind::Leave, None, 0, 0) {
+            self.inject_touch(out);
+        }
+    }
+
+    pub fn end_press(&mut self) {
+        if let Some(out) = self.gesture.cancel() {
+            self.inject_touch(out);
+        }
+    }
+
+    fn inject_touch(&self, out: TouchOut) {
         let serial = self.stage.serial.clone();
         let mirror = Arc::clone(&self.mirror);
         let message = MirrorControlMessage::Touch {
-            action: mapped,
-            x: vx,
-            y: vy,
-            width: video_w as u16,
-            height: video_h as u16,
+            action: out.action,
+            x: out.x,
+            y: out.y,
+            width: out.width,
+            height: out.height,
         };
         tauri::async_runtime::spawn(async move {
             let _ = mirror.inject(&serial, message).await;

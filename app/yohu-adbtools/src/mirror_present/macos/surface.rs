@@ -74,6 +74,9 @@ fn run_loop(
         }
     }
     drop(decode);
+    if let Ok(mut h) = host.lock() {
+        h.end_press();
+    }
     view::detach();
     Ok(())
 }
