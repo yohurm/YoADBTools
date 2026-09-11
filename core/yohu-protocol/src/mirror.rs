@@ -96,7 +96,7 @@ pub struct MirrorLayout {
     pub failed: bool,
     #[serde(default)]
     pub error: String,
-    /// 设备夜览（`DeviceStatusHub.night`）。不是工作台 `data-theme`。
+    /// HWND chrome / letterbox 跟工作台 `data-theme`，不是设备夜览。
     pub dark: bool,
 }
 

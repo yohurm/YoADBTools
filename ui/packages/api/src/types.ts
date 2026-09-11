@@ -432,7 +432,7 @@ export interface MirrorLayout {
   has_device: boolean;
   failed: boolean;
   error: string;
-  /** 设备夜览（DeviceStatusHub.night）。不是工作台 data-theme。 */
+  /** HWND chrome / letterbox 跟工作台 `data-theme`，不是设备夜览。 */
   dark: boolean;
 }
 

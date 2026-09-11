@@ -137,6 +137,10 @@ export const mirrorInject = (req: MirrorInjectRequest) =>
 export const mirrorCloseControl = (serial: string) =>
   invoke<void>("mirror.closeControl", { serial });
 
+/** 工作台在模块身份变化时开关舞台。未激活时 `mirror.layout` 不得建 HWND。 */
+export const mirrorPresentSetActive = (active: boolean) =>
+  invoke<void>("mirror.present.setActive", { active });
+
 export const mirrorLayout = (req: MirrorLayout) => invoke<void>("mirror.layout", { req });
 
 export const mirrorScreenshot = (req: MirrorScreenshotRequest) =>
