@@ -1,15 +1,21 @@
 /**
- * 路径行：上级 + 一条地址槽。
- * 展开 / 收回只动 clip-path。输入盒走 field-sizing:content（固有宽跟 value），
- * 禁止指定 width、禁止逐字改 style.width。槽是视野；光标在两端时只滚 field。
- * 输入不受控，避免父级重绘清掉全选。
- * 这是路径编辑（面包屑同格揭开），不是第二套输入皮；不能塞进 YoTextField。
+ * 路径行：上级 + 地址铬。
+ * 铬 = 浏览态面包屑簇（含一小段空白热区）或编辑态输入盒。盒外不是路径栏。
+ * 打开手势 pointerup 后再 focus，避免 Chromium mouseup 全选。
+ * 展开 / 收回只 clip 输入铬；面包屑在 held 期间退出文档流。
+ * 输入不受控。展开不预选，光标在末尾。
  */
 
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
 import { YoIconButton, YoTooltip, motionSpecMs } from "@yohu/ui";
 
+import {
+  addressDismissOutside,
+  addressOpenCaret,
+  addressScrollPin,
+  isAddressVacantClick,
+} from "./address-edit";
 import { parentWithinSafety, splitPath } from "./model";
 import { resolveRemotePath } from "./path-resolve";
 import { fileStore } from "./store";
@@ -25,44 +31,80 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
   const [held, setHeld] = createSignal(false);
   const [seed, setSeed] = createSignal(fileStore.session.path);
   const [invalid, setInvalid] = createSignal(false);
-  let slotEl: HTMLDivElement | undefined;
+  const [pointerGate, setPointerGate] = createSignal(false);
   let fieldEl: HTMLDivElement | undefined;
   let inputEl: HTMLInputElement | undefined;
+  let releasePointer: (() => void) | undefined;
 
   const pinFieldToCaret = (): void => {
     const field = fieldEl;
     const input = inputEl;
     if (!field || !input) return;
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-    const all = start === 0 && end === input.value.length && end > 0;
-    if (all || start === 0 && end === 0) {
+    const pin = addressScrollPin(
+      { start: input.selectionStart ?? 0, end: input.selectionEnd ?? 0 },
+      input.value.length,
+    );
+    if (pin === "start") {
       field.scrollLeft = 0;
       return;
     }
-    if (start === end && end >= input.value.length) {
+    if (pin === "end") {
       field.scrollLeft = Math.max(0, field.scrollWidth - field.clientWidth);
     }
   };
 
-  const selectPath = (): void => {
+  const focusField = (placeOpenCaret: boolean): void => {
     const el = inputEl;
     if (!el) return;
     el.focus({ preventScroll: true });
-    el.setSelectionRange(0, el.value.length);
-    if (fieldEl) fieldEl.scrollLeft = 0;
+    if (placeOpenCaret) {
+      const caret = addressOpenCaret(el.value);
+      el.setSelectionRange(caret.start, caret.end);
+    }
+    pinFieldToCaret();
   };
 
-  const startEdit = (): void => {
+  const clearPointerGate = (focus: boolean): void => {
+    setPointerGate(false);
+    releasePointer?.();
+    releasePointer = undefined;
+    if (focus) requestAnimationFrame(() => focusField(true));
+  };
+
+  const armPointerGate = (): void => {
+    setPointerGate(true);
+    const release = (event: PointerEvent): void => {
+      event.preventDefault();
+      clearPointerGate(true);
+    };
+    document.addEventListener("pointerup", release);
+    document.addEventListener("pointercancel", release);
+    releasePointer = () => {
+      document.removeEventListener("pointerup", release);
+      document.removeEventListener("pointercancel", release);
+    };
+  };
+
+  const startEdit = (fromPointer: boolean): void => {
+    if (held()) return;
     setSeed(fileStore.session.path);
     setInvalid(false);
+    if (fromPointer) armPointerGate();
+    else setPointerGate(false);
     setHeld(true);
     requestAnimationFrame(() => setOpen(true));
+  };
+
+  const onPathPointerDown = (event: PointerEvent): void => {
+    if (!isAddressVacantClick(event.target, event.currentTarget as Element)) return;
+    event.preventDefault();
+    startEdit(true);
   };
 
   const stopEdit = (): void => {
     if (!held() || !open()) return;
     setInvalid(false);
+    clearPointerGate(false);
     setOpen(false);
   };
 
@@ -85,14 +127,19 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
   };
 
   onMount(() => {
-    props.api?.({ open: startEdit });
+    props.api?.({ open: () => startEdit(false) });
+    onCleanup(() => releasePointer?.());
   });
 
   createEffect(() => {
     const path = seed();
+    if (!held()) return;
     if (inputEl) inputEl.value = path;
-    if (!open()) return;
-    const frame = requestAnimationFrame(selectPath);
+  });
+
+  createEffect(() => {
+    if (!open() || pointerGate()) return;
+    const frame = requestAnimationFrame(() => focusField(true));
     onCleanup(() => cancelAnimationFrame(frame));
   });
 
@@ -106,10 +153,9 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
   });
 
   createEffect(() => {
-    if (!open()) return;
+    if (!open() || pointerGate()) return;
     const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target as Node | null;
-      if (target && slotEl?.contains(target)) return;
+      if (!addressDismissOutside(event.target, fieldEl ?? null)) return;
       stopEdit();
     };
     document.addEventListener("pointerdown", onPointerDown);
@@ -117,33 +163,30 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
   });
 
   return (
-    <div class="yohu-files__path">
-      <YoIconButton
-        icon="chevron-up"
-        title="上级目录"
-        disabled={parentWithinSafety(fileStore.session.path) === null}
-        onClick={() => {
-          stopEdit();
-          void fileStore.goUp();
-        }}
-      />
-      <div
-        ref={(el) => {
-          slotEl = el;
-        }}
-        class="yohu-files__slot"
-      >
+    <div class="yohu-files__path" onPointerDown={onPathPointerDown}>
+      <span data-address="up">
+        <YoIconButton
+          icon="chevron-up"
+          title="上级目录"
+          disabled={parentWithinSafety(fileStore.session.path) === null}
+          onClick={() => {
+            stopEdit();
+            void fileStore.goUp();
+          }}
+        />
+      </span>
+      <div class="yohu-files__slot" data-address="slot">
         <nav class="yohu-files__crumbs" aria-label="当前路径" inert={held() || undefined}>
           <For each={splitPath(fileStore.session.path)}>
             {(segment, index) => <Crumb segment={segment} index={index()} />}
           </For>
-          <YoTooltip content="输入路径" block>
+          <YoTooltip content="输入路径" stretch>
             <button
               type="button"
               class="yohu-files__slot-hit"
+              data-address="hit"
               aria-label="输入路径"
               onPointerDown={(event) => event.preventDefault()}
-              onClick={startEdit}
             />
           </YoTooltip>
         </nav>
@@ -154,16 +197,18 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
             }}
             class="yohu-files__field"
             classList={{ "yohu-files__field--invalid": invalid() }}
+            data-address="field"
             data-reveal={open() ? "1" : "0"}
+            data-gate={pointerGate() ? "" : undefined}
             onTransitionEnd={(event) => {
               if (event.target !== fieldEl || event.propertyName !== "clip-path") return;
-              if (open()) selectPath();
-              else finishClose();
+              if (!open()) finishClose();
             }}
           >
             <input
               ref={(el) => {
                 inputEl = el;
+                el.value = seed();
               }}
               class="yohu-files__field-input"
               spellcheck={false}
@@ -209,6 +254,7 @@ function Crumb(props: { segment: string; index: number }) {
           type="button"
           class="yohu-files__crumb yohu-interactive yohu-focus-ring"
           classList={{ "yohu-files__crumb--current": props.index === segments().length - 1 }}
+          data-address="crumb"
           onClick={() => void fileStore.goTo(target())}
         >
           {props.segment}

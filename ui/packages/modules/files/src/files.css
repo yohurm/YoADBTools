@@ -1,26 +1,36 @@
 /* ============================================================================
  * 文件管理（UI设计系统-v6.md §4.3）。
- * 路径行（上级 + 一条地址槽：面包屑与热区同槽，输入同格 clip 揭开/倒放，field-sizing 跟内容固有宽）→ 四列清单（名称定宽截断 / 类型 / 大小 / 日期吃剩余；
+ * 路径行（上级 + 地址铬 hug：浏览=面包屑+短热区，编辑=输入盒；盒外不是路径栏；clip 只打铬）→ 四列清单（名称定宽截断 / 类型 / 大小 / 日期吃剩余；
  * 表头轨道走 YoColHeader（悬浮片与文案边距分权）；行间 hairline 走 YoVirtualList tone=list，背板 canvas）
  * + 独立预览分区 → 传输面板（Presence rise + Collapse panel 双轨；终态 3s 淡出）。
  * ========================================================================== */
 
-/* ===== 路径行：上级 + 一条地址槽（一格叠两层：面包屑+热区 / clip 揭开与倒放；输入 field-sizing:content） ===== */
+/* ===== 路径行：上级 + 地址铬 hug（盒外不是路径栏；收回只 clip 输入铬） ===== */
 
 .yohu-files__path {
   display: flex;
   align-items: center;
   gap: var(--yohu-space-sm);
   padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  flex-shrink: 0;
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  cursor: default;
+}
+
+.yohu-files__path > [data-address="up"] {
+  flex: 0 0 auto;
+  display: inline-flex;
+  cursor: default;
 }
 
 .yohu-files__slot {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: max-content;
   grid-template-rows: minmax(0, 1fr);
-  flex: 1;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
   height: var(--yohu-control-height);
   overflow: hidden;
@@ -33,16 +43,21 @@
 
 .yohu-files__crumbs {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--yohu-space-xs);
   min-width: 0;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
+.yohu-files__crumbs[inert] {
+  display: none;
+}
+
 .yohu-files__slot-hit {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   align-self: stretch;
   min-width: var(--yohu-space-lg);
   margin: 0;
@@ -52,12 +67,14 @@
   cursor: text;
 }
 
-/* 路径编辑揭开层：与面包屑同格 clip，不是第二套 YoTextField 皮。铬只消费 token。 */
+/* 路径编辑揭开层：同格 clip，盒跟文字 hug，不铺满槽剩余。不是第二套 YoTextField 皮。 */
 .yohu-files__field {
   display: flex;
   align-items: center;
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
-  width: 100%;
   height: 100%;
   box-sizing: border-box;
   border: var(--yohu-stroke-hairline) solid var(--yohu-accent);
@@ -75,6 +92,10 @@
   pointer-events: auto;
 }
 
+.yohu-files__field[data-gate] {
+  pointer-events: none;
+}
+
 .yohu-files__field--invalid {
   border-color: var(--yohu-error);
 }
@@ -84,7 +105,7 @@
   flex: 0 0 auto;
   field-sizing: content;
   width: auto;
-  min-width: 100%;
+  min-width: 0;
   max-width: none;
   height: 100%;
   margin: 0;
@@ -99,6 +120,8 @@
 }
 
 .yohu-files__crumb {
+  display: inline-flex;
+  align-items: center;
   flex: 0 1 auto;
   border: none;
   background: transparent;
@@ -122,6 +145,7 @@
 
 .yohu-files__crumb-sep {
   flex: 0 0 auto;
+  align-self: center;
   color: var(--yohu-fg-3);
   font-size: var(--yohu-font-caption);
 }

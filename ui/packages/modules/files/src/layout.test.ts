@@ -40,6 +40,17 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toMatch(/\.yohu-files__name\s*\{[^}]*padding-left/);
   });
 
+  it("地址铬 hug，盒外不是路径栏", () => {
+    const path = filesCss.match(/\.yohu-files__path\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(path).toContain("width: 100%");
+    expect(path).toContain("cursor: default");
+    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*width:\s*max-content/);
+    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*flex:\s*0 1 auto/);
+    expect(filesCss).not.toMatch(/\.yohu-files__slot-hit\s*\{[^}]*flex:\s*1 1 auto/);
+    expect(filesCss).toMatch(/\.yohu-files__crumbs\[inert\]\s*\{[^}]*display:\s*none/);
+    expect(filesCss).toMatch(/\.yohu-files__field\[data-gate\]\s*\{[^}]*pointer-events:\s*none/);
+  });
+
   it("路径行只有一条地址槽：展开与收回共用 clip-path", () => {
     expect(filesCss).toContain(".yohu-files__slot");
     expect(filesCss).toContain(".yohu-files__slot-hit");
@@ -48,12 +59,16 @@ describe("文件表头布局契约", () => {
     expect(filesCss).toContain("clip-path: inset(0 100% 0 0)");
     expect(filesCss).toContain("clip-path var(--yohu-motion-spatial-local)");
     expect(filesCss).not.toContain("width var(--yohu-motion-spatial-local)");
+    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*width:\s*max-content/);
+    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*max-width:\s*100%/);
+    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*justify-self:\s*start/);
+    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*(?<![-])width:\s*100%/);
     const fieldInput = filesCss.match(/\.yohu-files__field-input\s*\{[^}]*\}/)?.[0] ?? "";
     expect(fieldInput).toContain("field-sizing: content");
     expect(fieldInput).toContain("width: auto");
-    expect(fieldInput).toContain("min-width: 100%");
+    expect(fieldInput).toContain("min-width: 0");
+    expect(fieldInput).not.toMatch(/min-width:\s*100%/);
     expect(fieldInput).not.toMatch(/(?<![-])width:\s*100%/);
-    expect(fieldInput).not.toMatch(/min-width:\s*0/);
     expect(fieldInput).not.toMatch(/flex:\s*1/);
     expect(filesCss).not.toContain("[data-leave");
     expect(filesCss).not.toContain("effects-exit");
