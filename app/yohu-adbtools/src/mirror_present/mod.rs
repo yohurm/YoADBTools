@@ -45,6 +45,8 @@ struct Inner {
     owner: isize,
     /// 主窗至多一块舞台表面（本期否决多设备同时投屏）。
     surface: Option<Sender<Cmd>>,
+    /// 仅工作台在 `screen-mirror` 为当前模块时为 true。淡出中的 View 报 layout 也不得建窗。
+    active: bool,
 }
 
 pub fn probe() -> Caps {
@@ -84,6 +86,7 @@ impl PresentHost {
             inner: Mutex::new(Inner {
                 owner: 0,
                 surface: None,
+                active: false,
             }),
             #[cfg(windows)]
             geom,
@@ -139,7 +142,30 @@ impl PresentHost {
         }
     }
 
+    /// 工作台拥有舞台开关。未激活时一切 `mirror.layout`（含 `visible=true`）丢弃。
+    pub fn set_active(&self, active: bool) {
+        {
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            inner.active = active;
+        }
+        if active {
+            tracing::info!("投屏舞台激活");
+        } else {
+            tracing::info!("投屏舞台关闭（模块不是投屏）");
+            self.shutdown();
+        }
+    }
+
     pub fn layout(&self, layout: MirrorLayout) {
+        let active = self.inner.lock().expect("present lock poisoned").active;
+        if !active {
+            tracing::info!(
+                serial = %layout.serial,
+                visible = layout.visible,
+                "投屏 layout 丢弃：舞台未激活"
+            );
+            return;
+        }
         if !layout.visible
             || layout.width < MIRROR_MIN_LAYOUT_PX
             || layout.height < MIRROR_MIN_LAYOUT_PX

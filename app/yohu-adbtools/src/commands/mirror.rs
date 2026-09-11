@@ -98,6 +98,12 @@ pub fn mirror_close_control(state: State<'_, AppState>, serial: String) -> Resul
     state.mirror.close_control(&serial).map_err(ipc_mirror)
 }
 
+#[tauri::command(rename = "mirror.present.setActive")]
+pub fn mirror_present_set_active(state: State<'_, AppState>, active: bool) -> Result<(), IpcError> {
+    state.present.set_active(active);
+    Ok(())
+}
+
 #[tauri::command(rename = "mirror.layout")]
 pub async fn mirror_layout(state: State<'_, AppState>, req: MirrorLayout) -> Result<(), IpcError> {
     state.present.layout(req);
