@@ -18,7 +18,7 @@ import {
 } from "@yohu/ui";
 
 import { AndroidKey } from "./keys";
-import { clientZoneRect, layoutIsPresentable } from "./layout";
+import { clientZoneRect, layoutIsPresentable, workbenchDark } from "./layout";
 import { mirrorStore } from "./store";
 import "./mirror.css";
 
@@ -83,27 +83,10 @@ function ipcMessage(error: unknown): string {
   return errorText(error);
 }
 
-function shutdownLayout(): Parameters<typeof mirrorStore.syncLayout>[0] {
-  return {
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    visible: false,
-    dpr: 1,
-    fullscreen: false,
-    paused: false,
-    control: false,
-    has_device: false,
-    failed: false,
-    error: "",
-    dark: false,
-  };
-}
-
 export function MirrorView(props: DeviceSession) {
   let avail: HTMLDivElement | undefined;
   let zoneObserver: ResizeObserver | undefined;
+  let themeObserver: MutationObserver | undefined;
   let layoutRaf = 0;
   let layoutVisible: boolean | undefined;
   let lastInsetKey = "";
@@ -131,12 +114,12 @@ export function MirrorView(props: DeviceSession) {
       const phase = mirrorStore.state.phase;
       const live = phase === "live";
       const hasFrame = mirrorStore.state.hasFrame;
-      const visibleNow = layoutVisible !== false;
+      const visibleNow = layoutVisible !== false && document.visibilityState === "visible";
       const control = live && hasFrame && !mirrorStore.state.readOnly && mirrorStore.state.control;
       const hasDevice = props.selectedSerials.length > 0;
       const failed = phase === "failed";
       const error = mirrorStore.state.error ?? "";
-      const dark = deviceNight() === true;
+      const dark = workbenchDark(document);
       const fullscreen = mirrorStore.state.fullscreen;
       const paused = mirrorStore.state.paused;
       const insetKey = `${props.selectedSerials[0] ?? ""},${rect.x},${rect.y},${rect.width}x${rect.height},v=${visibleNow},dpr=${dpr},f=${fullscreen},p=${paused},c=${control},dev=${hasDevice},fail=${failed},e=${error},dark=${dark}`;
@@ -165,6 +148,11 @@ export function MirrorView(props: DeviceSession) {
       });
       zoneObserver.observe(avail);
     }
+    themeObserver = new MutationObserver(() => {
+      lastInsetKey = "";
+      pushLayout();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("scroll", onWin, true);
     window.addEventListener("keydown", onEsc);
     document.addEventListener("visibilitychange", onVis);
@@ -172,11 +160,10 @@ export function MirrorView(props: DeviceSession) {
   onCleanup(() => {
     if (layoutRaf !== 0) window.cancelAnimationFrame(layoutRaf);
     zoneObserver?.disconnect();
+    themeObserver?.disconnect();
     window.removeEventListener("scroll", onWin, true);
     window.removeEventListener("keydown", onEsc);
     document.removeEventListener("visibilitychange", onVis);
-    lastInsetKey = "";
-    void mirrorStore.syncLayout(shutdownLayout());
   });
 
   function onWin(): void {
@@ -221,7 +208,6 @@ export function MirrorView(props: DeviceSession) {
     const _ctrl = mirrorStore.state.control;
     const _err = mirrorStore.state.error;
     const _serial = props.selectedSerials[0];
-    const _night = deviceNight();
     void _phase;
     void _paused;
     void _full;
@@ -230,7 +216,6 @@ export function MirrorView(props: DeviceSession) {
     void _ctrl;
     void _err;
     void _serial;
-    void _night;
     pushLayout(document.visibilityState === "visible");
   });
 
@@ -370,58 +355,56 @@ export function MirrorView(props: DeviceSession) {
           </For>
         </YoPanel>
 
-        <YoPanel class="yohu-mirror__func" variant="pane" padding="md" gap="lg" aria-label="投屏功能栏">
-          <YoTooltip content="下次开始生效" block>
-          <div class="yohu-mirror__group">
+        <YoPanel class="yohu-mirror__func" variant="pane" padding="md" gap="sm" align="start" aria-label="投屏功能栏">
+          <YoTooltip content="下次开始生效">
             <div class="yohu-mirror__group-label">质量</div>
-            <label class="yohu-mirror__field">
-              <span class="yohu-mirror__field-name">投屏协议</span>
-              <YoSelect
-                block
-                options={PROTOCOL_OPTIONS}
-                value={mirrorStore.state.protocol}
-                disabled={mirrorStore.state.phase === "starting"}
-                onChange={(v) => void mirrorStore.persistQuality("mirror_protocol", v as "usb" | "wifi")}
-              />
-            </label>
-            <label class="yohu-mirror__field">
-              <span class="yohu-mirror__field-name">长边</span>
-              <YoSelect
-                block
-                options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, (n) =>
-                  n === 0 ? "原始" : String(n),
-                )}
-                value={String(mirrorStore.state.maxSize)}
-                disabled={mirrorStore.state.phase === "starting"}
-                onChange={(v) => void mirrorStore.persistQuality("mirror_max_size", Number.parseInt(v, 10))}
-              />
-            </label>
-            <label class="yohu-mirror__field">
-              <span class="yohu-mirror__field-name">码率</span>
-              <YoSelect
-                block
-                options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, (n) =>
-                  n >= 1_000_000 ? `${n / 1_000_000} Mbps` : `${n} bps`,
-                )}
-                value={String(mirrorStore.state.videoBitRate)}
-                disabled={mirrorStore.state.phase === "starting"}
-                onChange={(v) => void mirrorStore.persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
-              />
-            </label>
-            <label class="yohu-mirror__field">
-              <span class="yohu-mirror__field-name">帧率</span>
-              <YoSelect
-                block
-                options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, (n) =>
-                  n === 0 ? "不限" : `${n} fps`,
-                )}
-                value={String(mirrorStore.state.maxFps)}
-                disabled={mirrorStore.state.phase === "starting"}
-                onChange={(v) => void mirrorStore.persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
-              />
-            </label>
-          </div>
           </YoTooltip>
+          <label class="yohu-mirror__field">
+            <span class="yohu-mirror__field-name">投屏协议</span>
+            <YoSelect
+              block
+              options={PROTOCOL_OPTIONS}
+              value={mirrorStore.state.protocol}
+              disabled={mirrorStore.state.phase === "starting"}
+              onChange={(v) => void mirrorStore.persistQuality("mirror_protocol", v as "usb" | "wifi")}
+            />
+          </label>
+          <label class="yohu-mirror__field">
+            <span class="yohu-mirror__field-name">长边</span>
+            <YoSelect
+              block
+              options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, (n) =>
+                n === 0 ? "原始" : String(n),
+              )}
+              value={String(mirrorStore.state.maxSize)}
+              disabled={mirrorStore.state.phase === "starting"}
+              onChange={(v) => void mirrorStore.persistQuality("mirror_max_size", Number.parseInt(v, 10))}
+            />
+          </label>
+          <label class="yohu-mirror__field">
+            <span class="yohu-mirror__field-name">码率</span>
+            <YoSelect
+              block
+              options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, (n) =>
+                n >= 1_000_000 ? `${n / 1_000_000} Mbps` : `${n} bps`,
+              )}
+              value={String(mirrorStore.state.videoBitRate)}
+              disabled={mirrorStore.state.phase === "starting"}
+              onChange={(v) => void mirrorStore.persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
+            />
+          </label>
+          <label class="yohu-mirror__field">
+            <span class="yohu-mirror__field-name">帧率</span>
+            <YoSelect
+              block
+              options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, (n) =>
+                n === 0 ? "不限" : `${n} fps`,
+              )}
+              value={String(mirrorStore.state.maxFps)}
+              disabled={mirrorStore.state.phase === "starting"}
+              onChange={(v) => void mirrorStore.persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
+            />
+          </label>
         </YoPanel>
       </div>
       <YoToaster toaster={toaster} />

@@ -40,16 +40,9 @@
 }
 
 .yohu-mirror__func.yohu-panel[data-variant="pane"] {
-  flex: 0 0 var(--yohu-layout-preview);
-  width: var(--yohu-layout-preview);
-  max-width: var(--yohu-layout-preview);
-}
-
-.yohu-mirror__group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-sm);
-  min-width: 0;
+  flex: 0 0 var(--yohu-layout-mirror-func);
+  width: var(--yohu-layout-mirror-func);
+  max-width: var(--yohu-layout-mirror-func);
 }
 
 .yohu-mirror__group-label {
@@ -64,6 +57,7 @@
   flex-direction: column;
   gap: var(--yohu-space-2xs);
   min-width: 0;
+  width: 100%;
 }
 
 .yohu-mirror__field-name {

@@ -6,7 +6,7 @@ vi.mock("@yohu/api", () => ({
 
 import { MIRROR_MIN_LAYOUT_PX } from "@yohu/api";
 
-import { clientZoneRect, layoutIsPresentable } from "./layout";
+import { clientZoneRect, layoutIsPresentable, workbenchDark } from "./layout";
 
 describe("clientZoneRect", () => {
   it("把 CSS 盒乘 DPR，不加屏幕原点", () => {
@@ -47,5 +47,17 @@ describe("layoutIsPresentable", () => {
     expect(MIRROR_MIN_LAYOUT_PX).toBe(64);
     expect(layoutIsPresentable(486, 1)).toBe(false);
     expect(layoutIsPresentable(MIRROR_MIN_LAYOUT_PX, MIRROR_MIN_LAYOUT_PX)).toBe(true);
+  });
+});
+
+describe("workbenchDark", () => {
+  it("只认 html data-theme=dark", () => {
+    const prev = document.documentElement.getAttribute("data-theme");
+    document.documentElement.setAttribute("data-theme", "dark");
+    expect(workbenchDark(document)).toBe(true);
+    document.documentElement.setAttribute("data-theme", "light");
+    expect(workbenchDark(document)).toBe(false);
+    if (prev === null) document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", prev);
   });
 });

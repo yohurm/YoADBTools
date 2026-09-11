@@ -44,3 +44,8 @@ export function clientZoneRect(
 export function layoutIsPresentable(width: number, height: number): boolean {
   return width >= MIRROR_MIN_LAYOUT_PX && height >= MIRROR_MIN_LAYOUT_PX;
 }
+
+/** HWND chrome / letterbox 跟工作台主题，不是设备夜览。 */
+export function workbenchDark(doc: Document): boolean {
+  return doc.documentElement.getAttribute("data-theme") === "dark";
+}

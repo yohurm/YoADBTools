@@ -323,6 +323,7 @@ describe("mirror store", () => {
       error: "",
       dark: false,
     });
+    expect(mocks.mirrorLayout.mock.calls[0]?.[0]).not.toHaveProperty("epoch");
     expect(mocks.mirrorLayout.mock.calls[0]?.[0]).not.toHaveProperty("video_width");
     expect(mocks.mirrorLayout.mock.calls[0]?.[0]).not.toHaveProperty("mode");
   });
