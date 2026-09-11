@@ -6,7 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   combineOutput,
   commandBody,
+  commandCopyText,
+  commandCopyLines,
   commandNeedsInput,
+  entryArity,
+  entryNeedsInput,
   fillTemplate,
   formatAdbLine,
   placeholderArity,
@@ -24,6 +28,30 @@ describe("command-line", () => {
   it("commandNeedsInput 看占位符", () => {
     expect(commandNeedsInput("shell ls")).toBe(false);
     expect(commandNeedsInput("shell ping {0}")).toBe(true);
+  });
+
+  it("entryArity 取命令或块内全步最大元数", () => {
+    expect(
+      entryArity({ kind: "command", id: "c", name: "ls", template: "shell ls" }),
+    ).toBe(0);
+    expect(
+      entryNeedsInput({
+        kind: "block",
+        id: "b",
+        name: "ping",
+        gap_ms: 0,
+        steps: [{ template: "shell echo {0}" }, { template: "shell ping {1}" }],
+      }),
+    ).toBe(true);
+    expect(
+      entryArity({
+        kind: "block",
+        id: "b",
+        name: "ping",
+        gap_ms: 0,
+        steps: [{ template: "shell echo {0}" }, { template: "shell ping {1}" }],
+      }),
+    ).toBe(2);
   });
 
   it("fillTemplate 与 domain testdata/command_fill.json 同一套向量", () => {
@@ -59,6 +87,16 @@ describe("command-line", () => {
     expect(formatAdbLine("ABC", "shell getprop")).toBe("adb -s ABC shell getprop");
     expect(formatAdbLine("ABC", "adb shell ls")).toBe("adb -s ABC shell ls");
     expect(formatAdbLine("-", "shell ls")).toBe("adb shell ls");
+  });
+
+  it("commandCopyText 就是编辑器里的具体命令", () => {
+    expect(commandCopyText("shell getprop ro.product.model")).toBe(
+      "adb shell getprop ro.product.model",
+    );
+  });
+
+  it("commandCopyLines 按序拼接、跳过空正文", () => {
+    expect(commandCopyLines(["shell ls", "  ", "shell pwd"])).toBe("adb shell ls\nadb shell pwd");
   });
 
   it("toExecLine 仅开关打开时补 adb", () => {

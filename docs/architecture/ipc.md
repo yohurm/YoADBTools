@@ -13,7 +13,7 @@
 | `device.status` | 读运行时状态缓存（可选 `serial`）；不触发扫描 |
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
-| `terminal.eval` / `terminal.exec` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；组编排 |
+| `terminal.eval` / `terminal.exec` / `block.run` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；`block.run` 跑组下同级命令块（步间按块级间隔）；组编排；取消兼取消块 |
 | `commandlib.load` / `save` | 命令库；损坏备份后默认库 |
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。设备侧 `ls`/`rm` 等失败由 `yohu-files` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等，壳 `ipc_file`：不存在 → `not_found`，其余路径类 → `invalid_args`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |

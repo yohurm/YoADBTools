@@ -1,99 +1,99 @@
 /**
- * 命令管理窗口：快照编辑（深拷贝 draft）、全量提交、取消零污染。
+ * 命令管理 Dialog：开窗快照、保存全量提交、打开右键菜单。
+ * 草稿与选区在 manager/store；三栏视图各自渲染。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
-import { createStore } from "solid-js/store";
+import { Show, createEffect, onCleanup, onMount, untrack } from "solid-js";
 
-import { YoBadge, YoButton, YoDialog, YoIconButton, YoIndicator, YoPanel, YoTextField, YoToolbar } from "@yohu/ui";
+import { errorText } from "@yohu/api";
+import {
+  YoButton,
+  YoDialog,
+  attachPanelKeys,
+  closeContextMenu,
+  createToaster,
+  openContextMenu,
+} from "@yohu/ui";
 
-import { commandBody, formatAdbLine } from "./command-line";
-import { emptyCommand, emptyGroup, fromDraft, nextDraftId, toDraft, type DraftCommand, type DraftGroup, type DraftState } from "./draft";
+import { commandCopyLines } from "./command-line";
+import { terminalCommandMenu } from "./menu";
+import type { DraftEntry } from "./draft";
+import { EditorColumn } from "./manager/EditorColumn";
+import { EntryColumn } from "./manager/EntryColumn";
+import { GroupColumn } from "./manager/GroupColumn";
+import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./manager/keys";
+import { createCommandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./command-manager.css";
 
+const toaster = createToaster();
+
 export function CommandManager(props: { open: () => boolean; onClose: () => void }) {
-  const [draft, setDraft] = createStore<DraftState>({ groups: [] });
-  const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(null);
-  const [selectedCommandId, setSelectedCommandId] = createSignal<string | null>(null);
-  const [saving, setSaving] = createSignal(false);
-  const [error, setError] = createSignal("");
+  const store = createCommandManagerStore();
+  let root: HTMLDivElement | undefined;
 
-  const selectedGroup = createMemo<DraftGroup | undefined>(() =>
-    draft.groups.find((g) => g.id === selectedGroupId()),
-  );
-  const selectedCommand = createMemo<DraftCommand | undefined>(() =>
-    selectedGroup()?.commands.find((c) => c.id === selectedCommandId()),
-  );
-
-  /** 打开时深拷贝快照（编辑即快照：取消零污染）。 */
   const openDraft = (): void => {
-    const snapshot = structuredClone(toDraft(terminalStore.library));
-    setDraft({ groups: snapshot.groups });
-    setSelectedGroupId(snapshot.groups[0]?.id ?? null);
-    setSelectedCommandId(null);
-    setError("");
+    store.load(terminalStore.library);
+    closeContextMenu();
   };
+
+  onMount(() => {
+    if (!root) return;
+    const stop = attachPanelKeys(root, {
+      listSelector: COMMAND_MANAGER_LIST_SELECTOR,
+      bindings: COMMAND_MANAGER_KEY_BINDINGS,
+      onAction: (action) => {
+        if (action === "select-all") store.selectAllEntries();
+      },
+    });
+    onCleanup(stop);
+  });
 
   createEffect((wasOpen?: boolean) => {
     const open = props.open();
     if (open && !wasOpen) {
       untrack(openDraft);
     }
+    if (!open) closeContextMenu();
     return open;
   }, false);
 
-  const updateCommand = (patch: Partial<DraftCommand>): void => {
-    const gid = selectedGroupId();
-    const cid = selectedCommandId();
-    if (!gid || !cid) return;
-    setDraft("groups", (g) => g.id === gid, "commands", (c) => c.id === cid, patch);
-  };
-
-  const addGroup = (): void => {
-    const id = nextDraftId("g");
-    setDraft("groups", (g) => [...g, emptyGroup(id)]);
-    setSelectedGroupId(id);
-    setSelectedCommandId(null);
-  };
-
-  const removeGroup = (): void => {
-    const gid = selectedGroupId();
-    if (!gid) return;
-    setDraft("groups", (groups) => groups.filter((g) => g.id !== gid));
-    const remaining = draft.groups.filter((g) => g.id !== gid);
-    setSelectedGroupId(remaining[0]?.id ?? null);
-    setSelectedCommandId(remaining[0]?.commands[0]?.id ?? null);
-  };
-
-  const addCommand = (): void => {
-    const gid = selectedGroupId();
-    if (!gid) return;
-    const id = nextDraftId("c");
-    setDraft("groups", (g) => g.id === gid, "commands", (cs) => [...cs, emptyCommand(id)]);
-    setSelectedCommandId(id);
-  };
-
-  const removeCommand = (): void => {
-    const gid = selectedGroupId();
-    const cid = selectedCommandId();
-    if (!gid || !cid) return;
-    setDraft("groups", (g) => g.id === gid, "commands", (cs) => cs.filter((c) => c.id !== cid));
-    const remaining = selectedGroup()?.commands.filter((c) => c.id !== cid) ?? [];
-    setSelectedCommandId(remaining[0]?.id ?? null);
+  const close = (): void => {
+    closeContextMenu();
+    props.onClose();
   };
 
   const save = async (): Promise<void> => {
-    setSaving(true);
-    setError("");
+    store.setSaving(true);
+    store.setError("");
     try {
-      await terminalStore.save(fromDraft({ groups: draft.groups }));
-      props.onClose();
+      await terminalStore.save(store.library());
+      close();
     } catch (e) {
-      setError(typeof e === "string" ? e : JSON.stringify(e));
+      store.setError(typeof e === "string" ? e : JSON.stringify(e));
     } finally {
-      setSaving(false);
+      store.setSaving(false);
     }
+  };
+
+  const openCommandMenu = (entry: DraftEntry, event: MouseEvent): void => {
+    if (!store.ui.selectedEntryIds.includes(entry.id)) {
+      store.selectOnly(entry.id);
+    }
+    const text = commandCopyLines(store.selectedCommands().map((command) => command.template));
+    openContextMenu(terminalCommandMenu, {
+      x: event.clientX,
+      y: event.clientY,
+      ctx: {
+        canCopy: text.length > 0,
+        copy: () => {
+          void navigator.clipboard.writeText(text).catch((e) => {
+            toaster.show(`复制失败: ${errorText(e)}`, "error");
+          });
+        },
+        remove: () => store.removeEntries(),
+      },
+    });
   };
 
   return (
@@ -104,113 +104,25 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
       height={560}
       bodyOverflow="hidden"
       bodyPad="none"
-      onClose={props.onClose}
+      onClose={close}
       footer={
         <>
-          <Show when={error()}>
-            <span class="yohu-cm__error">{error()}</span>
+          <Show when={store.ui.error}>
+            <span class="yohu-cm__error">{store.ui.error}</span>
           </Show>
-          <YoButton variant="ghost" tone="neutral" onClick={props.onClose} disabled={saving()}>
+          <YoButton variant="ghost" tone="neutral" onClick={close} disabled={store.ui.saving}>
             取消
           </YoButton>
-          <YoButton onClick={() => void save()} loading={saving()}>
+          <YoButton onClick={() => void save()} loading={store.ui.saving}>
             保存
           </YoButton>
         </>
       }
     >
-      <div class="yohu-cm">
-        <div class="yohu-cm__groups">
-          <YoToolbar pad="xs">
-            <span class="yohu-cm__caption">命令组</span>
-            <YoIconButton icon="plus" title="新增组" onClick={addGroup} />
-            <YoIconButton icon="trash" title="删除组" onClick={removeGroup} />
-          </YoToolbar>
-          <div class="yohu-cm__list">
-            <YoIndicator follow={selectedGroupId()} variant="fill" />
-            <ul class="yohu-cm__items">
-              <For each={draft.groups}>
-                {(group) => (
-                  <li
-                    class="yohu-cm__item yohu-interactive"
-                    classList={{
-                      "yohu-interactive--selected": group.id === selectedGroupId(),
-                    }}
-                    onClick={() => {
-                      setSelectedGroupId(group.id);
-                      setSelectedCommandId(null);
-                    }}
-                  >
-                    <span class="yohu-cm__item-name">{group.name || "（未命名）"}</span>
-                    <YoBadge text={String(group.commands.length)} tone="neutral" />
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </div>
-
-        <div class="yohu-cm__commands">
-          <YoToolbar pad="xs">
-            <span class="yohu-cm__caption">命令</span>
-            <YoIconButton icon="plus" title="新增命令" onClick={addCommand} />
-            <YoIconButton icon="trash" title="删除命令" onClick={removeCommand} />
-          </YoToolbar>
-          <div class="yohu-cm__list">
-            <YoIndicator follow={selectedCommandId()} variant="fill" />
-            <ul class="yohu-cm__items">
-              <For each={selectedGroup()?.commands ?? []}>
-                {(command) => (
-                  <li
-                    class="yohu-cm__item yohu-interactive"
-                    classList={{
-                      "yohu-interactive--selected": command.id === selectedCommandId(),
-                    }}
-                    onClick={() => setSelectedCommandId(command.id)}
-                  >
-                    <span class="yohu-cm__item-name">{command.name || "（未命名）"}</span>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </div>
-
-        <div class="yohu-cm__editor">
-          <Show
-            when={selectedCommand()}
-            keyed
-            fallback={
-              <Show
-                when={selectedGroup()}
-                fallback={<p class="yohu-cm__empty">选择左侧命令组，或新建一组</p>}
-              >
-                {(group) => (
-                  <YoPanel title="组属性">
-                    <YoTextField
-                      block
-                      label="组名称"
-                      value={group().name}
-                      onInput={(v) => setDraft("groups", (g) => g.id === group().id, "name", v)}
-                    />
-                  </YoPanel>
-                )}
-              </Show>
-            }
-          >
-            {(command) => (
-              <YoPanel title={`命令属性 · ${selectedGroup()?.name || "未命名组"}`}>
-                <YoTextField block label="命令名称" value={command.name} onInput={(v) => updateCommand({ name: v })} />
-                <YoTextField
-                  block
-                  label="具体命令"
-                  value={formatAdbLine("-", command.template)}
-                  onInput={(v) => updateCommand({ template: commandBody(v) })}
-                />
-              </YoPanel>
-            )}
-          </Show>
-        </div>
+      <div class="yohu-cm" ref={(el) => { root = el; }}>
+        <GroupColumn store={store} />
+        <EntryColumn store={store} onContextMenu={openCommandMenu} />
+        <EditorColumn store={store} />
       </div>
     </YoDialog>
   );

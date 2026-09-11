@@ -8,6 +8,7 @@ import { createStore } from "solid-js/store";
 
 import {
   COMMAND_LIBRARY_SCHEMA_VERSION,
+  blockRun,
   commandlibLoad,
   commandlibSave,
   formatDateTimeFromMs,
@@ -17,11 +18,12 @@ import {
   terminalExec,
   YoLog,
 } from "@yohu/api";
-import type { CommandDto, CommandGroupDto, CommandLibraryDto } from "@yohu/api";
+import type { CommandBlockDto, CommandDto, CommandGroupDto, CommandLibraryDto } from "@yohu/api";
 
 import {
   combineOutput,
   commandNeedsInput,
+  entryNeedsInput,
   fillTemplate,
   formatAdbLine,
   toExecLine,
@@ -105,12 +107,28 @@ export function createTerminalStore() {
     await send(serials, fillTemplate(command.template, values));
   }
 
+  /** 执行命令块（进度经 group/progress 回流为输入/输出行）。 */
+  async function runBlockSeq(serials: string[], block: CommandBlockDto, values: string[]): Promise<void> {
+    if (serials.length === 0) {
+      pushLine("in", `块: ${block.name}`);
+      pushOut("未选择在线设备");
+      return;
+    }
+    try {
+      activeGroupRun = await blockRun({ block_id: block.id, values, serials });
+    } catch (e) {
+      activeGroupRun = null;
+      pushLine("in", `块: ${block.name}`);
+      pushOut(String(e));
+    }
+  }
+
   /** 执行命令组（进度经 group/progress 回流为输入/输出行）。 */
   async function runGroup(serials: string[], group: CommandGroupDto): Promise<void> {
-    const needing = group.commands.find((c) => commandNeedsInput(c.template));
+    const needing = group.entries.find((entry) => entryNeedsInput(entry));
     if (needing) {
       pushLine("in", `组: ${group.name}`);
-      pushOut(`命令组含需填值的命令（${needing.name}），请逐条执行`);
+      pushOut(`命令组含需填值的条目（${needing.name}），请逐条执行`);
       return;
     }
     if (serials.length === 0) {
@@ -155,6 +173,7 @@ export function createTerminalStore() {
     setPrependAdb,
     send,
     runCommand,
+    runBlock: runBlockSeq,
     runGroup,
     cancelGroup,
     clearResults,

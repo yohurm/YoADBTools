@@ -23,30 +23,35 @@ import {
   shouldSkipMotion,
 } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
-import type { CommandDto, CommandGroupDto, DeviceSession } from "@yohu/api";
-import { ModuleTitle } from "@yohu/api";
+import type { CommandBlockDto, CommandGroupDto, DeviceSession, LibraryEntryDto } from "@yohu/api";
+import { ModuleTitle, commandBlockGapLabel } from "@yohu/api";
 
 import { CommandManager } from "./CommandManager";
-import { commandBody, commandNeedsInput, fillTemplate, formatAdbLine, placeholderArity } from "./command-line";
+import {
+  commandBody,
+  entryArity,
+  entryNeedsInput,
+  fillTemplate,
+  formatAdbLine,
+} from "./command-line";
 import { terminalStore, type IoLine } from "./store";
 import "./terminal.css";
 
-interface QueuedSend {
-  id: number;
-  title: string;
-  line: string;
-}
+type QueuedSend =
+  | { id: number; title: string; kind: "line"; line: string }
+  | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] };
 
 let nextQueueId = 1;
 
 /** 库命令占位符填值（填完进入排队，不立刻发送）。 */
 function ParameterDialog(props: {
-  command: CommandDto;
+  title: string;
+  arity: number;
   open: () => boolean;
   onClose: () => void;
   onSubmit: (values: string[]) => void;
 }) {
-  const arity = () => placeholderArity(props.command.template);
+  const arity = () => props.arity;
   const [values, setValues] = createSignal<string[]>([]);
 
   createEffect(() => {
@@ -63,7 +68,7 @@ function ParameterDialog(props: {
   return (
     <YoDialog
       open={props.open}
-      title={`填写参数: ${props.command.name}`}
+      title={`填写参数: ${props.title}`}
       onClose={props.onClose}
       footer={
         <>
@@ -111,7 +116,7 @@ function IoRow(props: { line: IoLine }) {
 export function TerminalView(props: DeviceSession) {
   const [busy, setBusy] = createSignal(false);
   const [managerOpen, setManagerOpen] = createSignal(false);
-  const [inputCommand, setInputCommand] = createSignal<CommandDto | null>(null);
+  const [inputEntry, setInputEntry] = createSignal<LibraryEntryDto | null>(null);
   const [inputOpen, setInputOpen] = createSignal(false);
   const [draft, setDraft] = createSignal("");
   const [composerOpen, setComposerOpen] = createSignal(true);
@@ -150,20 +155,30 @@ export function TerminalView(props: DeviceSession) {
     onCleanup(() => window.cancelAnimationFrame(frame));
   });
 
-  const treeData = createMemo<TreeNode<CommandDto | CommandGroupDto>[]>(() =>
+  const treeData = createMemo<TreeNode<LibraryEntryDto | CommandGroupDto>[]>(() =>
     terminalStore.library.groups.map((group) => ({
       key: `g:${group.id}`,
       label: group.name,
       icon: "folder" as const,
       data: group,
-      badge: String(group.commands.length),
-      children: group.commands.map((command) => ({
-        key: `c:${command.id}`,
-        label: command.name,
-        icon: "terminal" as const,
-        data: command,
-        title: formatAdbLine("-", command.template),
-      })),
+      badge: String(group.entries.length),
+      children: group.entries.map((entry) =>
+        entry.kind === "command"
+          ? {
+              key: `c:${entry.id}`,
+              label: entry.name,
+              icon: "terminal" as const,
+              data: entry,
+              title: formatAdbLine("-", entry.template),
+            }
+          : {
+              key: `b:${entry.id}`,
+              label: entry.name,
+              icon: "list" as const,
+              data: entry,
+              title: `${entry.steps.length} 条 · 间隔 ${commandBlockGapLabel(entry.gap_ms)}`,
+            },
+      ),
     })),
   );
 
@@ -174,7 +189,13 @@ export function TerminalView(props: DeviceSession) {
   const enqueueLine = (title: string, line: string): void => {
     const body = commandBody(line);
     if (!body) return;
-    setQueue((items) => [...items, { id: nextQueueId++, title, line: body }]);
+    setQueue((items) => [...items, { id: nextQueueId++, title, kind: "line", line: body }]);
+    setComposerOpen(true);
+  };
+
+  const enqueueBlock = (block: CommandBlockDto, values: string[]): void => {
+    if (block.steps.length === 0) return;
+    setQueue((items) => [...items, { id: nextQueueId++, title: block.name, kind: "block", block, values }]);
     setComposerOpen(true);
   };
 
@@ -182,16 +203,20 @@ export function TerminalView(props: DeviceSession) {
     setQueue((items) => items.filter((item) => item.id !== id));
   };
 
-  const onTreeSelect = (key: string, node: TreeNode<CommandDto | CommandGroupDto>): void => {
-    if (!key.startsWith("c:")) return;
-    const command = node.data;
-    if (!command || !("template" in command)) return;
-    if (commandNeedsInput(command.template)) {
-      setInputCommand(command);
+  const onTreeSelect = (key: string, node: TreeNode<LibraryEntryDto | CommandGroupDto>): void => {
+    if (key.startsWith("g:")) return;
+    const entry = node.data;
+    if (!entry || !("kind" in entry)) return;
+    if (entryNeedsInput(entry)) {
+      setInputEntry(entry);
       setInputOpen(true);
       return;
     }
-    enqueueLine(command.name, command.template);
+    if (entry.kind === "command") {
+      enqueueLine(entry.name, entry.template);
+      return;
+    }
+    enqueueBlock(entry, []);
   };
 
   const sendAll = (): void => {
@@ -204,7 +229,11 @@ export function TerminalView(props: DeviceSession) {
     void (async () => {
       try {
         for (const item of items) {
-          await terminalStore.send(props.selectedSerials, item.line);
+          if (item.kind === "line") {
+            await terminalStore.send(props.selectedSerials, item.line);
+          } else {
+            await terminalStore.runBlock(props.selectedSerials, item.block, item.values);
+          }
         }
         if (text) {
           await terminalStore.send(props.selectedSerials, text);
@@ -300,7 +329,11 @@ export function TerminalView(props: DeviceSession) {
                       {(item) => (
                         <div class="yohu-terminal__queue-item" role="listitem">
                           <span class="yohu-terminal__queue-title">{item.title}</span>
-                          <span class="yohu-terminal__queue-line">{formatAdbLine("-", item.line)}</span>
+                          <span class="yohu-terminal__queue-line">
+                            {item.kind === "line"
+                              ? formatAdbLine("-", item.line)
+                              : `${item.block.steps.length} 条 · 间隔 ${commandBlockGapLabel(item.block.gap_ms)}`}
+                          </span>
                           <YoIconButton
                             icon="close"
                             title="移出队列"
@@ -377,20 +410,23 @@ export function TerminalView(props: DeviceSession) {
 
       <CommandManager open={managerOpen} onClose={() => setManagerOpen(false)} />
 
-      <Show when={inputCommand()}>
+      <Show when={inputEntry()}>
         <ParameterDialog
-          command={inputCommand()!}
+          title={inputEntry()!.name}
+          arity={entryArity(inputEntry()!)}
           open={inputOpen}
           onClose={() => {
             setInputOpen(false);
-            setInputCommand(null);
+            setInputEntry(null);
           }}
           onSubmit={(values) => {
-            const command = inputCommand();
-            if (command) {
-              enqueueLine(command.name, fillTemplate(command.template, values));
+            const entry = inputEntry();
+            if (entry?.kind === "command") {
+              enqueueLine(entry.name, fillTemplate(entry.template, values));
+            } else if (entry?.kind === "block") {
+              enqueueBlock(entry, values);
             }
-            setInputCommand(null);
+            setInputEntry(null);
           }}
         />
       </Show>

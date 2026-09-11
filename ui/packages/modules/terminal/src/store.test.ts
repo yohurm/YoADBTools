@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { CommandDto, CommandGroupDto } from "@yohu/api";
+import type { CommandBlockDto, CommandDto, CommandGroupDto } from "@yohu/api";
 
 const mocks = vi.hoisted(() => ({
   terminalExec: vi.fn(),
   groupRun: vi.fn(),
+  blockRun: vi.fn(),
   groupCancel: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@yohu/api", async () => {
     commandlibLoad: vi.fn(),
     commandlibSave: vi.fn(),
     groupRun: (...a: unknown[]) => mocks.groupRun(...a),
+    blockRun: (...a: unknown[]) => mocks.blockRun(...a),
     groupCancel: (...a: unknown[]) => mocks.groupCancel(...a),
     onGroupProgress: vi.fn(() => undefined),
     terminalExec: (...a: unknown[]) => mocks.terminalExec(...a),
@@ -32,7 +34,14 @@ const COMMAND: CommandDto = {
 const GROUP: CommandGroupDto = {
   id: "g1",
   name: "demo",
-  commands: [{ id: "c0", name: "echo", template: "echo hi" }],
+  entries: [{ kind: "command", id: "c0", name: "echo", template: "echo hi" }],
+};
+
+const BLOCK: CommandBlockDto = {
+  id: "b1",
+  name: "连上再看",
+  gap_ms: 200,
+  steps: [{ template: "wait-for-device" }, { template: "shell getprop ro.product.model" }],
 };
 
 function texts(store: ReturnType<typeof createTerminalStore>): string[] {
@@ -68,11 +77,14 @@ describe("send / runCommand / runGroup 目标设备", () => {
   it("空目标不调用 IPC，仍记输入输出行", async () => {
     mocks.terminalExec.mockClear();
     mocks.groupRun.mockClear();
+    mocks.blockRun.mockClear();
     const store = createTerminalStore();
     await store.runCommand([], COMMAND, ["hi"]);
     await store.runGroup([], GROUP);
+    await store.runBlock([], BLOCK, []);
     expect(mocks.terminalExec).not.toHaveBeenCalled();
     expect(mocks.groupRun).not.toHaveBeenCalled();
+    expect(mocks.blockRun).not.toHaveBeenCalled();
     expect(store.lines.some((row) => row.text === "未选择在线设备")).toBe(true);
   });
 
@@ -88,7 +100,7 @@ describe("send / runCommand / runGroup 目标设备", () => {
     const store = createTerminalStore();
     await store.runGroup(["B2"], {
       ...GROUP,
-      commands: [{ ...COMMAND }],
+      entries: [{ kind: "command", ...COMMAND }],
     });
     expect(mocks.groupRun).not.toHaveBeenCalled();
     expect(store.lines.some((row) => row.text.includes("请逐条执行"))).toBe(true);
@@ -109,6 +121,13 @@ describe("send / runCommand / runGroup 目标设备", () => {
     const store = createTerminalStore();
     await store.send(["A1"], "shell ls");
     expect(texts(store)).toEqual(["in:adb -s A1 shell ls", "out:a\nb"]);
+  });
+
+  it("命令块把 id/values/serials 交给 blockRun", async () => {
+    mocks.blockRun.mockResolvedValue(8);
+    const store = createTerminalStore();
+    await store.runBlock(["B2"], BLOCK, []);
+    expect(mocks.blockRun).toHaveBeenCalledWith({ block_id: "b1", values: [], serials: ["B2"] });
   });
 
   it("cancelGroup 把 run_id 交给 groupCancel", async () => {

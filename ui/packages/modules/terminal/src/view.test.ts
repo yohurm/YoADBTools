@@ -93,9 +93,29 @@ describe("命令终端动效接线", () => {
   it("流/排队认 data-first，命令管理走 Toolbar pad，不点内部根", () => {
     expect(css).toContain("[data-first]");
     expect(css).not.toContain(".yohu-presence");
-    const manager = load("CommandManager.tsx");
+    const manager = [
+      load("CommandManager.tsx"),
+      load("manager/GroupColumn.tsx"),
+      load("manager/EntryColumn.tsx"),
+    ].join("\n");
     const managerCss = load("command-manager.css");
     expect(manager).toContain('pad="xs"');
+    expect(manager).toContain("YoVirtualList");
+    expect(manager).toContain("pointerSelectMode");
+    expect(manager).toContain("attachPanelKeys");
+    expect(manager).toContain("COMMAND_MANAGER_KEY_BINDINGS");
+    expect(manager).toContain("openContextMenu");
+    expect(manager).toContain("terminalCommandMenu");
+    expect(manager).not.toContain("<YoContextMenu");
+    expect(manager).not.toContain("<ul");
+    expect(manager).not.toContain("<li");
+    expect(load("CommandManager.tsx")).not.toContain("querySelectorAll");
+    expect(load("CommandManager.tsx")).not.toContain("createStore");
+    const managerStore = load("manager/store.ts");
+    expect(managerStore).not.toMatch(/from ["']\.\.\/store["']/);
+    expect(managerStore).not.toContain("openContextMenu");
+    expect(managerStore).not.toContain("clipboard");
+    expect(managerStore).not.toContain("querySelector");
     expect(managerCss).not.toContain(".yohu-toolbar");
   });
 });

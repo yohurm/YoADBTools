@@ -1,4 +1,4 @@
-/* 命令管理：三栏（组 | 命令 | 编辑器），各自滚动，互不挤压。
+/* 命令管理：三栏（组 | 条目 | 编辑器），各自滚动，互不挤压。
  * 对话框内容区走 YoDialog bodyOverflow=hidden bodyPad=none，禁止再点 __body。 */
 
 .yohu-cm {
@@ -32,29 +32,21 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--yohu-space-xs);
 }
 
-.yohu-cm__items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.yohu-cm__item {
+.yohu-cm__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--yohu-space-sm);
-  min-height: var(--yohu-control-height);
+  height: 100%;
+  min-width: 0;
   padding: 0 var(--yohu-space-sm);
-  cursor: pointer;
-  color: var(--yohu-fg);
-  font-size: var(--yohu-font-body);
 }
 
-.yohu-cm__item-name {
+.yohu-cm__row-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,4 +74,62 @@
   margin-right: auto;
   color: var(--yohu-error);
   font-size: var(--yohu-font-caption);
+}
+
+.yohu-cm__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yohu-space-sm);
+}
+
+.yohu-cm__steps-head {
+  display: flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+}
+
+.yohu-cm__steps--dragging {
+  user-select: none;
+}
+
+.yohu-cm__steps--dragging .yohu-cm__step:not(.yohu-cm__step--dragging) {
+  transition: transform var(--yohu-motion-spatial-small);
+}
+
+.yohu-cm__step {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--yohu-space-xs);
+  position: relative;
+}
+
+.yohu-cm__step--dragging {
+  z-index: 1;
+  border-radius: var(--yohu-radius-sm);
+  box-shadow: var(--yohu-shadow-xs);
+  background: var(--yohu-surface);
+}
+
+.yohu-cm__step-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--yohu-control-height);
+  width: var(--yohu-control-height);
+  height: var(--yohu-control-height);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: grab;
+}
+
+.yohu-cm__step-grip:disabled {
+  cursor: default;
+  color: var(--yohu-fg-4);
+}
+
+.yohu-cm__steps--dragging .yohu-cm__step-grip {
+  cursor: grabbing;
 }

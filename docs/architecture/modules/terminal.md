@@ -1,12 +1,22 @@
 # 模块：命令终端
 
-- 领域：`yohu-domain` 命令库 / `GroupExecutor`（多设备并行、组内串行；不判定成败、不延时、不因失败中断）
+- 领域：`yohu-domain` 命令库 / `GroupExecutor`（多设备并行、组内串行；不判定成败、不因失败中断。组条目之间无额外间隔；命令块步间可按 `COMMAND_BLOCK_GAPS_MS` 等待）
 - 运输：`yohu-adb` 实现 `Runner`
 - UI：`@yohu/module-terminal`；选择模式 `multiOptional`
-- 数据：`DataRoot/modules/adb-terminal/config/library.json`（schemaVersion 2；损坏 `.corrupt-<ts>` 后写默认库）
-- 编辑即快照：深拷贝、全量提交、取消零污染。组只存名称；命令只存名称 + 具体命令行（可含 `{0}`）；不配置标签、成功/失败正则、输入提示、组内延时、失败中断
+- 数据：`DataRoot/modules/adb-terminal/config/library.json`（schemaVersion 3；schema 2 一次性迁到 3：`commands` → `entries` 且 `kind:command`；其余损坏 `.corrupt-<ts>` 后写默认库）
+- 编辑即快照：深拷贝、全量提交、取消零污染。组只存名称。组下叶子是同级「命令」或「命令块」：命令只存名称 + 一行 template（可含 `{0}`）；命令块存名称 + `steps[]` + 块级 `gap_ms`（`0/200/500/1000/2000/5000`，只发生在步与步之间）。不配置标签、成功/失败正则、输入提示、组条目间隔、失败中断
 - 结果：统一输入/输出块（一次 `>>>` + 一条多行 `<<<`，标识 + 时间 + 内容），自上而下；空态在视口正中。库命令与发送栏同一 `send` → `terminal.exec`。IO 行时间走 `@yohu/api` `formatDateTimeFromMs`（本地墙钟 `YYYY-MM-DD HH:mm:ss.SSS`），与日志同一形状；文件日期只到秒
 - 发送栏：贴右双轴开合（`yohu-recipe-inline-end`：宽 compact↔100%，高 0fr↔1fr；空态跟随挤位）；点预设命令在输入框上方排队（`YoListPresence`）；纸飞机发送队列与草稿（空内容向右，有内容 `yohu-recipe-send-aim` 朝上）。composer 弱多行仍是 textarea（不做 YoTextArea）；DOM 复用 TextField 壳类（`yohu-text-field` / `__control` / `__input` + `yohu-focus-host`），模块 CSS 只留 resize / overflow / mono / 行高锁。结果区新 IO 块升起，清屏直切。流/排队首项身份走 Presence 宿主 `data-first`（含出场中），禁止点 `.yohu-presence`。设置 `terminal_prepend_adb`（默认关）决定是否在发送前加上 `adb`
-- 占位符：单条命令 UI `fillTemplate` 后 `terminal.exec`；组与 `terminal.eval` 走 domain `CommandDefinition::fill`。两边共用 `core/yohu-domain/testdata/command_fill.json`（元数不一致则拒绝，值内 `{n}` 样文本按字面量）
-- 命令管理：`YoDialog bodyOverflow="hidden" bodyPad="none"`。两栏 `YoToolbar pad="xs"`，禁止点 `.yohu-toolbar`。结果区 `YoPanel overflow="hidden"`。参数对话框只读受控 `values()`。禁止点 `__body` / `:has`，禁止 `querySelectorAll("input")`
-- IPC：`terminal.exec` / `group.run` / `group.cancel` / `commandlib.*`；进度 `group/progress`。`terminal.eval` 仍可按库 id 填充执行，UI 不走这条
+- 占位符：单条命令 UI `fillTemplate` 后 `terminal.exec`；命令块一次填值后走 `block.run`（domain `CommandBlock::fill`，元数=全步最大 `{n}`）；组与 `terminal.eval` 走 domain `fill`。含未填占位符的组拒跑。两边共用 `core/yohu-domain/testdata/command_fill.json`（元数不一致则拒绝，值内 `{n}` 样文本按字面量）
+- 命令管理：`YoDialog bodyOverflow="hidden" bodyPad="none"`。两栏 `YoToolbar pad="xs"`，禁止点 `.yohu-toolbar`。结果区 `YoPanel overflow="hidden"`。参数对话框只读受控 `values()`。禁止点 `__body` / `:has`，禁止 `querySelectorAll("input")`。中栏条目 Ctrl 点选 / Shift 范围选。右键走 `terminal.command`（复制所选具体命令 / 删除所选）；场景表在模块根 `menu.ts`
+- **命令管理分层**（对标 files：`model` / `store` / `menu.ts` / 列视图；不新开 Yo 组件、不把 menu 挪出模块根）
+  - `draft.ts`：只做 DTO ↔ 草稿、`empty*`、`nextDraftId`。不放选区、不放拖动几何
+  - `manager/keys.ts`：命令管理绑定表；Dialog 内不用 `whenList`（会被 `inDialog` 挡掉）
+  - `manager/reorder.ts`：步骤排序纯函数（`moveStepTo` / `dropIndexFromCenters` / `shiftForReorder`）
+  - `manager/store.ts`：`createCommandManagerStore()` 持草稿 + 中栏选区 + 变更。选区直接调 YoUI `nextKeys`。**不** import 运行时终端 store；**不**开菜单、不写剪贴板、不查 DOM。Dialog 注入 `load(library)` / `library()`
+  - `manager/{Group,Entry,Editor}Column.tsx` + `BlockSteps.tsx`：三栏视图。组/条目清单是 `YoVirtualList`（单选 `selectedKey` / 多选 `selectedKeys` + `pointerSelectMode`）；禁止自挂 `ul`/`YoIndicator`。拖动手势只在 `BlockSteps`
+  - `CommandManager.tsx`：薄 Dialog。开窗 `store.load`、保存 `terminalStore.save(store.library())`、`attachPanelKeys`、`openContextMenu(terminalCommandMenu)` + clipboard。`view.test.ts` 仍在此文件扫到 `openContextMenu` / `terminalCommandMenu`，且不含 `<YoContextMenu`
+  - `store.ts`（模块根）：运行时终端（`exec` / `blockRun` / 命令库持久化），与命令管理草稿 store 分开
+  - **设计前链路：** `TerminalView` → 单文件 `CommandManager` 同时持草稿、多选、步骤 pointer 几何、`openContextMenu` + clipboard、三栏 JSX；`draft.ts` 夹拖动几何。问题：一层以上塞进同一文件
+  - **设计后链路：** `TerminalView` → Dialog `load` → `manager/store`（草稿/选区）→ `YoVirtualList` 渲染选中片与指示器；右键 Dialog 打开 `menu.ts` 场景；复制 `commandCopyLines`（列表顺序、只要命令）；删除 `removeEntries`；保存 Dialog → `terminalStore.save` → `commandlib.save`。步骤拖动 `BlockSteps` → `reorder.ts` → `store.moveBlockStepTo`
+- IPC：`terminal.exec` / `block.run` / `group.run` / `group.cancel` / `commandlib.*`；进度 `group/progress`（块与组共用，取消同一 `group.cancel`）。`terminal.eval` 仍可按库 id 填充执行，UI 不走这条。间隔与多步只在 domain 编排，禁止 UI `setTimeout` 串 `terminal.exec`

@@ -17,7 +17,7 @@
 
 ## 核心功能
 1. **设备管理** — `yohu-adb` 的 `devices -l` 扫描（device/unauthorized/offline + 型号）是**目录**唯一源（空列表即无设备）；在线设备运行时状态（夜览/电量/SDK/亮屏等）由 `DeviceStatusHub` 统一采样，经 `device/status` 投影到设备栏与 `DeviceSession.deviceStatuses`（ADR-v6-025，禁止模块自轮询）；全局焦点 + 每模块选择作用域（终端 MultiOptional，文件/日志 SingleRequired）；手动刷新 + 启动预热 + 可选自动刷新（`devices_auto_refresh`）
-2. **命令终端** — 命令库/命令组（占位符 `{0}{1}`）/多设备并行/组内串行（无组内延时、不因失败中断）；结果为统一输入/输出块（`>>>` / `<<<` + 时间 + 内容，一次输入对应整段输出）；流自上而下；发送栏整栏收缩；预设命令排队后纸飞机发送；设置 `terminal_prepend_adb`（默认关）；命令管理窗口（深拷贝编辑、全量提交、取消零污染；新增命令不配置成功/失败正则）
+2. **命令终端** — 命令库/命令组（组下叶子为同级命令或命令块；占位符 `{0}{1}`）/多设备并行/组内串行（组条目之间无额外间隔、不因失败中断）；命令块按选定间隔顺序执行各步；结果为统一输入/输出块（`>>>` / `<<<` + 时间 + 内容，一次输入对应整段输出）；流自上而下；发送栏整栏收缩；预设命令/命令块排队后纸飞机发送；设置 `terminal_prepend_adb`（默认关）；命令管理窗口（深拷贝编辑、全量提交、取消零污染；新增命令不配置成功/失败正则）
 3. **文件管理** — `ls` 浏览、push/pull（`transfer/progress` 事件 200ms 节流 + 可取消）、删除/新建目录；**core 侧 SafetyRoot 强制校验**（`/sdcard`、`/storage` 子路径，拒绝 `..`，不信任 UI，ADR-v6-013）
 4. **日志分析** — core **每设备一路** logcat（`adb logcat -v threadtime,uid,year`）+ 设备级共享环形缓冲（`buffer_capacity` 默认 10000，与 UI 镜像/可见区同一上限）；日志/终端墙钟 `YYYY-MM-DD HH:mm:ss.SSS`（`canonicalize_datetime`）；文件修改时间 `YYYY-MM-DD HH:mm:ss`（`ls -lla` + `canonicalize_datetime_seconds`）；**窗口/过滤在 UI 消费端**（ADR-v6-006）：多窗口 Tab（默认 System，Scope=all；可按包名/PID 再开）；每窗口绑定 serial + capturing/fromSeq；启停只打当前窗口，设备流按窗口引用计数 0↔1 / 1↔0；切焦点不停其他设备；进程索引（`ps` 2.5s 周期）+ 包名 PID 自动重绑（历史 PID 集上限 8）；窗口第一次点开始先 `processSnapshot` 再 `fromSeq=0` 按过滤从当前环补齐；AS 风格过滤栏（级别独立精确筛选/包名含子进程开关/精确 PID/Tag/关键字，无正则）；每窗口独立暂停（Space）与滚动挂起（离开底部只计数不跟滚）；清设备缓冲 = `logcat -c` + 清共享缓冲；导出 txt 走 core（`log.export`，当前窗口过滤后的环快照）；快捷键 Space/Ctrl+L/Ctrl+F/Ctrl+T/Ctrl+W/Ctrl+Tab；掉线只停该 serial 的采集，已画出的行保留
 5. **投屏显示** — 官方 `scrcpy-server` 4.1 sidecar + `yohu-mirror` 自写客户端（USB reverse 优先，`tcp:` 默认 forward）；投屏协议 usb/wifi；帧在壳内 **系统硬解** 呈现（Windows = Media Foundation → D3D11 YUV HWND；macOS = VideoToolbox → NSView，ADR-v6-024/028/030；禁止 FFmpeg）；**舞台像素由嵌入表面独占**（空态/加载/暂停也在同一表面，ADR-v6-026）；**UI 只报 avail**（Windows：HWND 铺满 avail，占用卡片 DComp clip contain；macOS：NSView 铺满 avail，占用卡片圆角层 contain；fill↔contain 禁止 CSS / 运行时 `containInZone`）；默认可操作，页眉可切仅显示；设备深浅色读统一状态 Hub，不是工作台 theme；每设备一路 + generation
@@ -35,7 +35,7 @@
 - **编辑即快照**：命令管理深拷贝编辑、保存全量提交（原子写：临时文件 + rename，损坏备份 `.corrupt-<ts>`）
 - **后台任务**：长任务（采集/传输/命令组/投屏）登记任务中心，状态栏展示；退出序列 = 根 CancellationToken cancel → 任务收敛（超时 3s 强杀 adb 进程树）→ 设置 flush
 - **新增模块**：实现 `ModuleDescriptor`（见 `docs/architecture/workbench.md`）→ 在 `apps/shell` 静态 `registerModule`
-- **数据与路径（ADR-v6-031）**：安装根 Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；产品家园 `%LOCALAPPDATA%\YohuAdbTools\`（`config/` `data/` `cache/` `logs/`，无管理员权限）。命令库 `data/modules/adb-terminal/config/library.json`（schemaVersion 2；损坏或 schema 不匹配则备份后写默认库）
+- **数据与路径（ADR-v6-031）**：安装根 Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；产品家园 `%LOCALAPPDATA%\YohuAdbTools\`（`config/` `data/` `cache/` `logs/`，无管理员权限）。命令库 `data/modules/adb-terminal/config/library.json`（schemaVersion 3；schema 2 一次性迁到 3；损坏或其余 schema 不匹配则备份后写默认库）
 
 ## 目录结构（v6 目标，见架构文档 §4.1）
 ```

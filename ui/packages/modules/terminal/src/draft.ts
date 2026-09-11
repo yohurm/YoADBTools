@@ -1,20 +1,23 @@
 /**
- * 命令管理编辑器的草稿模型 + 纯转换（DTO ↔ 草稿）。
- * View 只消费本模块；提交前转换、校验在 core。
+ * 命令管理草稿模型 + DTO ↔ 草稿转换。
+ * 选区在 manager/select；步骤排序在 manager/reorder；校验在 core。
  */
 
-import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto } from "@yohu/api";
+import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto, type LibraryEntryDto } from "@yohu/api";
 
-export interface DraftCommand {
+export interface DraftStep {
   id: string;
-  name: string;
   template: string;
 }
+
+export type DraftCommand = { kind: "command"; id: string; name: string; template: string };
+export type DraftBlock = { kind: "block"; id: string; name: string; gap_ms: number; steps: DraftStep[] };
+export type DraftEntry = DraftCommand | DraftBlock;
 
 export interface DraftGroup {
   id: string;
   name: string;
-  commands: DraftCommand[];
+  entries: DraftEntry[];
 }
 
 export interface DraftState {
@@ -22,12 +25,23 @@ export interface DraftState {
 }
 
 export const emptyCommand = (id: string): DraftCommand => ({
+  kind: "command",
   id,
   name: "",
   template: "",
 });
 
-export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", commands: [] });
+export const emptyStep = (id: string): DraftStep => ({ id, template: "" });
+
+export const emptyBlock = (id: string, stepId: string): DraftBlock => ({
+  kind: "block",
+  id,
+  name: "",
+  gap_ms: 0,
+  steps: [emptyStep(stepId)],
+});
+
+export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", entries: [] });
 
 let draftId = 0;
 export const nextDraftId = (prefix: string): string => `${prefix}-draft-${++draftId}`;
@@ -38,11 +52,7 @@ export function toDraft(library: CommandLibraryDto): DraftState {
     groups: library.groups.map((g) => ({
       id: g.id,
       name: g.name,
-      commands: g.commands.map((c) => ({
-        id: c.id,
-        name: c.name,
-        template: c.template,
-      })),
+      entries: g.entries.map(entryToDraft),
     })),
   };
 }
@@ -54,11 +64,33 @@ export function fromDraft(draft: DraftState): CommandLibraryDto {
     groups: draft.groups.map((g) => ({
       id: g.id,
       name: g.name,
-      commands: g.commands.map((c) => ({
-        id: c.id,
-        name: c.name,
-        template: c.template,
-      })),
+      entries: g.entries.map(entryFromDraft),
     })),
+  };
+}
+
+function entryToDraft(entry: LibraryEntryDto): DraftEntry {
+  if (entry.kind === "command") {
+    return { kind: "command", id: entry.id, name: entry.name, template: entry.template };
+  }
+  return {
+    kind: "block",
+    id: entry.id,
+    name: entry.name,
+    gap_ms: entry.gap_ms,
+    steps: entry.steps.map((step) => ({ id: nextDraftId("s"), template: step.template })),
+  };
+}
+
+function entryFromDraft(entry: DraftEntry): LibraryEntryDto {
+  if (entry.kind === "command") {
+    return { kind: "command", id: entry.id, name: entry.name, template: entry.template };
+  }
+  return {
+    kind: "block",
+    id: entry.id,
+    name: entry.name,
+    gap_ms: entry.gap_ms,
+    steps: entry.steps.map((step) => ({ template: step.template })),
   };
 }

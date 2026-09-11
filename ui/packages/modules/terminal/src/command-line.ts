@@ -2,6 +2,8 @@
  * 命令行展示与占位符填充（与 core `placeholder_arity` / `fill` / `strip_leading_adb` 对齐）。
  */
 
+import type { LibraryEntryDto } from "@yohu/api";
+
 /** 模板中 `{n}` 的最大索引 + 1；无占位符则为 0。 */
 export function placeholderArity(template: string): number {
   let maxIndex: number | undefined;
@@ -24,6 +26,19 @@ export function placeholderArity(template: string): number {
 
 export function commandNeedsInput(template: string): boolean {
   return placeholderArity(template) > 0;
+}
+
+export function templatesArity(templates: readonly string[]): number {
+  return templates.reduce((max, template) => Math.max(max, placeholderArity(template)), 0);
+}
+
+export function entryArity(entry: LibraryEntryDto): number {
+  if (entry.kind === "command") return placeholderArity(entry.template);
+  return templatesArity(entry.steps.map((step) => step.template));
+}
+
+export function entryNeedsInput(entry: LibraryEntryDto): boolean {
+  return entryArity(entry) > 0;
 }
 
 /** 按序替换 `{0}` `{1}` …；值本身含 `{n}` 样文本按字面量保留。元数必须与 domain `fill` 一致。 */
@@ -80,6 +95,19 @@ export function formatAdbLine(serial: string, input: string): string {
   const body = commandBody(input);
   const device = serial && serial !== "-" ? `-s ${serial}` : "";
   return ["adb", device, body].filter(Boolean).join(" ");
+}
+
+/** 命令管理右键「复制」：与编辑器具体命令同一行（始终带 `adb`）。 */
+export function commandCopyText(template: string): string {
+  return formatAdbLine("-", template);
+}
+
+/** 多选复制：按序拼接具体命令，空正文跳过。 */
+export function commandCopyLines(templates: readonly string[]): string {
+  return templates
+    .filter((template) => commandBody(template).length > 0)
+    .map(commandCopyText)
+    .join("\n");
 }
 
 /** 交给 `terminal.exec` 的载荷；仅设置打开时补 `adb`。 */
