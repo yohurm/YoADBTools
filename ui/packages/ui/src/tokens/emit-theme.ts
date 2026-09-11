@@ -112,6 +112,7 @@ export function emitThemeCss(): string {
     ["--yohu-state-pressed", StateFill.Pressed],
     ["--yohu-state-selected", StateFill.Selected],
     ["--yohu-state-selected-fg", StateFill.SelectedFg],
+    ["--yohu-state-selected-rule", StateFill.SelectedRule],
     ...fontSizeVars(FontSizes),
     ...leadingVars(FontLeading),
     ["--yohu-font-sans", FontFamilies.Sans],
@@ -156,6 +157,7 @@ export function emitThemeCss(): string {
     ["--yohu-state-pressed", DarkStateFill.Pressed],
     ["--yohu-state-selected", DarkStateFill.Selected],
     ["--yohu-state-selected-fg", DarkStateFill.SelectedFg],
+    ["--yohu-state-selected-rule", DarkStateFill.SelectedRule],
   ];
 
   const compact: Array<[string, string]> = [

@@ -72,11 +72,12 @@ describe("YoVirtualList", () => {
     );
     expect(css).toMatch(/\[data-tone="list"\] \.yohu-virtual-list__row \{\s*border-bottom:/);
     expect(css).toMatch(
-      /\[data-tone="document"\] \{\s*user-select: text;\s*cursor: text;\s*\}/,
+      /\[data-tone="document"\]:not\(\[role="listbox"\]\) \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
     expect(css).toMatch(
-      /\[data-tone="document"\] \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
+      /\[data-tone="document"\]:not\(\[role="listbox"\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
+    expect(css).toMatch(/\[role="listbox"\][\s\S]*user-select: none;/);
   });
 
   it("items 换新数组时相同 key 的行节点保持同一引用", async () => {

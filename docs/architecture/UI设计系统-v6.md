@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.52（2026-09-11，同屏 fill 跟启动画布）
+> **状态：** v2.53（2026-09-11，多选项间分割线）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.53 变更（多选项间分割线）：** 连续选中块在 start/mid 底边画 `--yohu-state-selected-rule`（`::after`），不再用 selected 本色补缝。色在 `StateFill.SelectedRule`。禁止模块再写选中行间线。见 [youi.md](youi.md)。
 > **v2.52 变更（同屏 fill 跟启动画布）：** Shared overlay 2×2 fill 只消费 `window_boot::canvas_bgra(boot_dark())`，对齐 `--yohu-bg-base`。`SplashPlacement` 锁定几何 + dark。`prepare_main_window` 的 System 探针跟这份 `boot_dark()`，禁止再采 `win.theme()`。capture 客户区 DC，DIB 先铺画布色再 BitBlt。禁止从 Snapshot 角点猜色，禁止 `yohu-motion` 持画布色。见 [workbench.md](workbench.md)。
 > **v2.51 变更（气泡只给无文案铬）：** `YoTooltip` Unique 槽只服务图标钮 / 窗控 / 空热区。`Tree` / `Select` / `ColHeader` 不再内包气泡。可见文案（设备卡、表格格、路径、任务名、级别字母）不弹气泡；多出来的信息画在界面或只走 `aria-label`。禁止用气泡复述已画出的字，禁止原生 `title` 顶替。见 [youi.md](youi.md)。
 > **v2.50 变更（主窗跟启动工作区）：** 小窗锁定主屏工作区；主窗创建与揭窗前都 `set_position` 到同一块。禁止 `tauri.conf` `center`、禁止交接只 `SetWindowPos` 不写 Tao。见 [workbench.md](workbench.md)。
@@ -432,7 +433,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
-- **多选邻接圆角（VirtualList / 文件清单 / 日志）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。邻接缝的 hairline 用 `--yohu-state-selected` 补色。禁止模块再写一套选中圆角。
+- **多选邻接圆角（VirtualList / 文件清单 / 命令管理）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。邻接项之间的分割线走 `--yohu-state-selected-rule`（`::after` 画在 start/mid 底边），禁止再用 selected 本色补缝，禁止模块再写一套选中圆角或行间线。
 
 **焦点环（单源）**
 
@@ -493,8 +494,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
-- 命令库树：组节点加命令数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
-- **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
+- 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令与命令块同级：命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
+- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑）。列表项同样走 `.yohu-interactive`，禁止自写圆角底。中栏可新增命令或命令块。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；删除与命令输入同一行。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 

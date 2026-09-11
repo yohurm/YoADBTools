@@ -75,6 +75,7 @@
   --yohu-state-pressed: #00000019;
   --yohu-state-selected: var(--yohu-accent);
   --yohu-state-selected-fg: var(--yohu-fg-on);
+  --yohu-state-selected-rule: color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent));
   --yohu-font-caption-m: 10px;
   --yohu-font-caption: 12px;
   --yohu-font-body: 14px;
@@ -280,6 +281,7 @@
   --yohu-state-pressed: #FFFFFF19;
   --yohu-state-selected: var(--yohu-accent);
   --yohu-state-selected-fg: var(--yohu-fg-on);
+  --yohu-state-selected-rule: color-mix(in srgb, var(--yohu-fg-on) 22%, var(--yohu-accent));
 }
 
 [data-density="compact"] {

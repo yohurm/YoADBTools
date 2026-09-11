@@ -15,6 +15,8 @@ export type IconName =
   | "terminal"
   | "folder"
   | "log"
+  | "list"
+  | "grip"
   | "mirror"
   | "close"
   | "plus"
@@ -45,7 +47,7 @@ export interface IconProps {
   size?: number;
 }
 
-const FILLED: ReadonlySet<IconName> = new Set(["play", "pause"]);
+const FILLED: ReadonlySet<IconName> = new Set(["play", "pause", "grip"]);
 
 /** 图标路径工厂。描边 24×24；鸿蒙符号见 `HARMONY_GLYPHS`（1024 填充）。 */
 const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
@@ -75,6 +77,26 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
       <line x1="17" y1="10" x2="3" y2="10" />
       <line x1="21" y1="14" x2="3" y2="14" />
       <line x1="17" y1="18" x2="3" y2="18" />
+    </>
+  ),
+  list: () => (
+    <>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </>
+  ),
+  grip: () => (
+    <>
+      <circle cx="9" cy="5" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="9" cy="19" r="1" />
+      <circle cx="15" cy="5" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="15" cy="19" r="1" />
     </>
   ),
   mirror: () => (

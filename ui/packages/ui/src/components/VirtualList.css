@@ -8,9 +8,15 @@
   box-sizing: border-box;
 }
 
-.yohu-virtual-list[data-tone="document"] {
+.yohu-virtual-list[data-tone="document"]:not([role="listbox"]) {
   user-select: text;
   cursor: text;
+}
+
+.yohu-virtual-list[role="listbox"],
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row {
+  user-select: none;
+  cursor: default;
 }
 
 .yohu-virtual-list__inner {
@@ -24,7 +30,7 @@
   overflow: hidden;
 }
 
-.yohu-virtual-list[data-tone="document"] .yohu-virtual-list__row {
+.yohu-virtual-list[data-tone="document"]:not([role="listbox"]) .yohu-virtual-list__row {
   user-select: text;
   cursor: text;
 }
@@ -35,14 +41,4 @@
 
 .yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected {
   border-bottom-color: transparent;
-}
-
-.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start,
-.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid {
-  border-bottom-color: var(--yohu-state-selected);
-}
-
-.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start:hover,
-.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid:hover {
-  border-bottom-color: var(--yohu-accent-hover);
 }

@@ -306,6 +306,7 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("color-scheme: dark");
     expect(themeCss).toContain("--yohu-state-selected: var(--yohu-accent)");
     expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg-on)");
+    expect(themeCss).toContain("--yohu-state-selected-rule:");
     expect(themeCss).toContain("--yohu-text-sel:");
     expect(themeCss).toContain("--yohu-ripple-inset: 0");
     expect(themeCss).toContain("--yohu-space-3xl: 40px");

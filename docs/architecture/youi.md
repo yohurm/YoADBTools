@@ -25,7 +25,7 @@ L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplat
 2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；表头与滚动体预留同一条 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。日志文档把同一左垫收进 `padLeftChars`，禁止 `cellPad=none` 把标题贴边。
 3. `YoColRow` / `YoColHeader` / `YoColResizer`：表头行
 4. `YoColTrack` / `YoColCell`：Family B 清单行（`span` 通栏，不改 template）
-5. `YoVirtualList`：`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。
+5. `YoVirtualList`：`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。开启选择（`selectedKey` / `selectedKeys`）后宿主 `role=listbox`，`user-select: none`，禁止模块再自挂 `ul` 选区。
 
 `col-resize` 从 `startX` 重算绝对宽，禁止每帧累加 `dx`。模块只存 `colWidths` 并 `setColWidth(key, px)`，禁止再写 `grid-template-columns` 或第二份列垫。文件清单走 `YoColTrack` / `YoColCell`。日志表头走同一套 `YoColRow` / `YoColHeader`，轨道是 `logDocTrackTemplate` 的 `ch`，与 `formatLogDoc` 同一把尺；行是文档不是格子。拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。
 
@@ -549,7 +549,7 @@ items / selectedKey|selectedKeys / onSelectRow / tone
   → L4 只绑滚动与 YoIndicator
 ```
 
-`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。
+`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字。
 
 ### 分层与状态
 
@@ -562,7 +562,7 @@ items / selectedKey|selectedKeys / onSelectRow / tone
 | L4 | `VirtualList.tsx` + `VirtualList.css` | 只绑滚动与 Indicator | 不在 TSX 里算窗口或按键意图 |
 | L5 | `index.ts` | `YoVirtualList` + Props / Tone | 公开 API 不变 |
 
-运行时所有权：数据与选中 key 在调用方；窗口与选择代数在 L2；键盘/贴底/行 attrs 在 L3；滚动度量与 Indicator 跟标在 L4。`For` 按 `getItemKey` 的原始值做身份，不把每次新建的窗口包装对象交给 `For`（否则行重挂、原生 Selection 被清掉）。未开选择模式时行不进焦点序列。单选高亮走 `YoIndicator` fill；多选 ≥2 退回每项 `::before`。行级禁动。
+运行时所有权：数据与选中 key 在调用方；窗口与选择代数在 L2；键盘/贴底/行 attrs 在 L3；滚动度量与 Indicator 跟标在 L4。`For` 按 `getItemKey` 的原始值做身份，不把每次新建的窗口包装对象交给 `For`（否则行重挂、原生 Selection 被清掉）。未开选择模式时行不进焦点序列。单选高亮走 `YoIndicator` fill；多选 ≥2 退回每项 `::before`，邻接缝分割线走 `.yohu-interactive` 的 `::after`。行级禁动。
 
 ### 公开 API（不变）
 
