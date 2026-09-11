@@ -24,7 +24,6 @@ import {
   YoTabs,
   YoTextField,
   YoToaster,
-  YoTooltip,
   YoVirtualList,
   attachPanelKeys,
   closeContextMenu,
@@ -140,7 +139,7 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: LogDocLayout
               {part.text}
             </span>
           );
-          return part.kind === "tag" ? <YoTooltip content={line().tag}>{cell}</YoTooltip> : cell;
+          return cell;
         }}
       </For>
       <Show when={props.row.collapsedAfter}>
@@ -519,23 +518,22 @@ export function LogAnalyzerView(props: DeviceSession) {
                           class="yohu-logs__level-slot yohu-tone"
                           data-level={levelKey(letter) ?? undefined}
                         >
-                          <YoTooltip content={levelLabel(letter)} stretch>
-                            <YoButton
-                              variant="ghost"
-                              tone="neutral"
-                              size="md"
-                              ink
-                              flush
-                              aria-pressed={pressed()}
-                              onClick={() =>
-                                logStore.patchFilter(session.id, {
-                                  levels: toggleLevel(session.levels, letter),
-                                })
-                              }
-                            >
-                              {letter}
-                            </YoButton>
-                          </YoTooltip>
+                          <YoButton
+                            variant="ghost"
+                            tone="neutral"
+                            size="md"
+                            ink
+                            flush
+                            aria-label={levelLabel(letter)}
+                            aria-pressed={pressed()}
+                            onClick={() =>
+                              logStore.patchFilter(session.id, {
+                                levels: toggleLevel(session.levels, letter),
+                              })
+                            }
+                          >
+                            {letter}
+                          </YoButton>
                         </span>
                       );
                     }}
