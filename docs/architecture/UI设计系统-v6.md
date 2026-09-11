@@ -1,12 +1,16 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.48（2026-09-11，投屏铬拥有回缓冲）    
+> **状态：** v2.52（2026-09-11，同屏 fill 跟启动画布）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.52 变更（同屏 fill 跟启动画布）：** Shared overlay 2×2 fill 只消费 `window_boot::canvas_bgra(boot_dark())`，对齐 `--yohu-bg-base`。`SplashPlacement` 锁定几何 + dark。`prepare_main_window` 的 System 探针跟这份 `boot_dark()`，禁止再采 `win.theme()`。capture 客户区 DC，DIB 先铺画布色再 BitBlt。禁止从 Snapshot 角点猜色，禁止 `yohu-motion` 持画布色。见 [workbench.md](workbench.md)。
+> **v2.51 变更（气泡只给无文案铬）：** `YoTooltip` Unique 槽只服务图标钮 / 窗控 / 空热区。`Tree` / `Select` / `ColHeader` 不再内包气泡。可见文案（设备卡、表格格、路径、任务名、级别字母）不弹气泡；多出来的信息画在界面或只走 `aria-label`。禁止用气泡复述已画出的字，禁止原生 `title` 顶替。见 [youi.md](youi.md)。
+> **v2.50 变更（主窗跟启动工作区）：** 小窗锁定主屏工作区；主窗创建与揭窗前都 `set_position` 到同一块。禁止 `tauri.conf` `center`、禁止交接只 `SetWindowPos` 不写 Tao。见 [workbench.md](workbench.md)。
+> **v2.49 变更（启动小窗落主屏）：** 原生小窗在主屏工作区居中，不跟光标所在屏。尺寸用主屏 `GetDpiForMonitor`。禁止 `GetCursorPos` 选屏，禁止 `SM_CXSCREEN`。见 [workbench.md](workbench.md)。
 > **v2.48 变更（投屏铬拥有回缓冲）：** Empty/Loading/Paused 每拍 Present 铬（填充+文案+描边）。描边画在当前可见 clip（`clip_now`），完整落在内侧。禁止 dirty 一次画完，禁止动画期跳过描边后再也不画。色板：surface 填、`--yohu-border-strong` 边、空态图标 `fg` + `surface-2` 井。见 [modules/mirror.md](modules/mirror.md)。
 > **v2.47 变更（投屏舞台由工作台开关）：** HWND 显隐跟 `ModuleId.Mirror`，走 `mirror.present.setActive`。离开投屏同一拍拆窗，再淡出网页。`MirrorView` 只报 avail。删除 Presence 观察与 layout `epoch`。铬 `dark` 仍跟 `data-theme`。见 [modules/mirror.md](modules/mirror.md)、[ipc.md](ipc.md)。
 > **v2.46 变更（投屏 HWND 离场 + 铬跟主题）：** 曾用 Presence `data-state` + `epoch` 挡在途包；v2.47 撤回，改由工作台拥有开关。
@@ -21,7 +25,7 @@
 > **v2.37 变更（输入宽度契约）：** `YoTextField` L2 定 `hug | fill | number`。`input size=1` 中性化 UA 固有宽。数字槽宽只走 `--yohu-layout-settings-number-w`（`data-width=number`）；对话框/编辑栏走 `block`。禁止页面再写 `.yohu-text-field { width }` 或叠一层搜图标。见 [youi.md](youi.md)。
 > **v2.36 变更（YoTextField 内容区）：** 输入重置 UA `padding` / `box-sizing` / `appearance`，高度锁在 `--yohu-control-height` 内。`type=number` 去掉原生步进钮，值 `text-align: end` 贴尾，避免短数字在 96vp 槽里居中。`YoFormRow` 改 `justify-content: flex-end`，折行后控件仍贴行尾。禁止再靠页面 CSS 改 `__input` 盒模型。见 [youi.md](youi.md) YoTextField。
 > **v2.35 变更（日志级别按下填充）：** 选中格用 `--yohu-log-ink` 叠到 surface 的软底（透明度对齐 `--yohu-accent-soft` 的 20%），字母仍走 ink。禁止底条 / inset shadow 冒充选中。
-> **v2.34 变更（日志级别筛选铬）：** 级别 V–F 与 Tag / 检索同一条控件铬（`--yohu-surface` + hairline + `radius-sm` + `--yohu-control-height`），内部格线分隔，不是六颗独立描边按钮。字母始终走 `--yohu-log-ink`；按下用级别 ink 软底。悬停名走 `YoTooltip`（Verbose…Fatal）。禁止再拆成 outlined 按钮带 gap。
+> **v2.34 变更（日志级别筛选铬）：** 级别 V–F 与 Tag / 检索同一条控件铬（`--yohu-surface` + hairline + `radius-sm` + `--yohu-control-height`），内部格线分隔，不是六颗独立描边按钮。字母始终走 `--yohu-log-ink`；按下用级别 ink 软底。全名走 `aria-label`，不画悬停气泡。禁止再拆成 outlined 按钮带 gap。
 > **v2.33 变更（日志级别独立筛选）：** 过滤栏不再用「最低含以上」下拉。`LEVELS`（`log_levels.json`）是选项与匹配的唯一字母表。按下的级别是精确集合：选 W 只留 W，可再按下 E 同时留 W+E；全部弹起 = 不限（含 `?`）。wire `LogFilter.levels` 空则不限。禁止再写 `min_level` / 按 `levelRank` 筛选。
 > **v2.32 变更（折叠不盖子项行高）：** `YoCollapse` 只靠 `inner` 的 `overflow: hidden` 裁切 0fr/1fr。禁止 `inner > * { min-height: min-content }`：选择器压过 `YoTree` 的 `--yohu-row-height-nav`，展开后的命令行变成内容高（约 18px），组行仍是 36px。需要收缩的消费者（设备栏列表）自己写 `min-height: 0`。见 [动画系统-v6.md](动画系统-v6.md) §5.1、[youi.md](youi.md) YoTree。
 > **v2.31 变更（气泡与模态分层）：** `YoTooltip` 出示只走悬停或键盘模态下的焦点（Host 记 pointerdown / keydown）。点击「命令管理」后对话框程序首焦「新增组」仍是 pointer，不得弹出描述气泡。按下锚点与模态入栈立即 `dismissTooltipOverlay`（Unique 槽 z 高于 dialog）。禁止在命令管理里摘掉 IconButton title 来藏现象。见 [youi.md](youi.md) YoTooltip / YoDialog。
@@ -462,7 +466,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏展开时与内容区之间画 hairline。模块分区 = `YoPanel`（surface + radius-md + hairline 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行、对话框头尾、输入类控件。路径栏与清单靠 canvas 分层，不另拉线。
 - **状态栏**：左「展示名 v版本」（`system.info.identity`）/ 中留白 / 右「设备 · 任务 · 状态」；任务悬停显示明细。状态槽由模块 `Status` 贡献（投屏出画后显示实测 fps）。透明贴合 canvas。Caption + leading-tight。
 - **对话框**：Title_S Bold；PC 小圆角 `radius-sm`；宽 ≤400、高 ≤90%；**不要**把窗口最小 360×240 套到浮层确认框。
-- **启动交接（Windows）**：用户看见的是原生 GDI 小窗，不是 `#yohu-boot`。hydrate 完成且双 rAF 之后卸掉 HTML 画布层，再 `boot.showMain`。主窗一次落到最终矩形但保持隐藏；同屏 Shared overlay 铺满之后才揭内容并淡出；异屏 Exit overlay 结束后才揭主窗。禁止插值 HWND 宽高、禁止 CSS 缩放主窗、禁止 HTML 启动层淡出、禁止第二 WebView splash。
+- **启动交接（Windows）**：用户看见的是原生 GDI 小窗，不是 `#yohu-boot`。小窗与主窗共用锁定的主屏工作区，不跟光标屏。画布色出口是 `window_boot::canvas_color` / `canvas_bgra`，对齐 `--yohu-bg-base`；`SplashPlacement` 锁定几何 + dark，绘制、overlay 与 `prepare_main_window` 问 `boot_dark()`。`Theme::System` 禁止再采 `win.theme()`。同屏 Shared fill 2×2 只消费 `canvas_bgra(boot_dark())`。capture 客户区 DC，DIB 先铺画布色再 BitBlt。禁止从 Snapshot 角点猜色，禁止 `fill_pixels` 采样快照。hydrate 完成且双 rAF 之后卸掉 HTML 画布层，再 `boot.showMain`。主窗一次落到最终矩形但保持隐藏；同屏 Shared overlay 铺满之后才揭内容并淡出；异屏 Exit overlay 结束后才揭主窗。禁止 `center` 与光标屏第二套选屏。禁止插值 HWND 宽高、禁止 CSS 缩放主窗、禁止 HTML 启动层淡出、禁止第二 WebView splash。禁止 `yohu-motion` 持画布色。
 - **快捷键统一表（v6.1 目标）**：`Ctrl+K` 命令面板（模块跳转/刷新设备/开始采集…）；模块内快捷键不变。
 
 ---
@@ -489,7 +493,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
-- 命令库树：组节点加命令数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`，不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
+- 命令库树：组节点加命令数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`。点击叶子命令加入发送队列（需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏。列表项同样走 `.yohu-interactive`，禁止自写圆角底。具体命令编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。不提供成功/失败正则、输入提示、组内延时、失败中断。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
@@ -536,7 +540,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | YoTree | ↑/↓ 移动；→ 展开/← 收起；Enter 选中 | `role=tree/treeitem aria-expanded` |
 | YoVirtualList | 选择模式：roving tabindex + ↑/↓/Home/End/Enter/Space | 选择模式 `role=listbox/option` + `aria-selected` |
 | YoContextMenuHost | 应用根唯一实例；Portal 到 body；同时只开一个场景。模块禁止自挂 List | `role=menu/menuitem`（Host 内 List） |
-| YoTooltip / YoTooltipHost | 悬停或键盘焦点出示；指针点击后的程序移焦 / 按下 / 模态入栈立即卸；密集提示共一个 popup；无 Host 不画 | `role=tooltip` + `aria-describedby` |
+| YoTooltip / YoTooltipHost | 只给无可见文案的铬；悬停或键盘焦点出示；指针点击后的程序移焦 / 按下 / 模态入栈立即卸；密集提示共一个 popup；无 Host 不画 | `role=tooltip` + `aria-describedby` |
 | YoIconButton | 激活执行；`loading` 时不可激活；可见提示走 YoTooltip | `aria-label`（title）+ `aria-busy` |
 | YoLoading | 非交互；减动效时环静止 | `role=status aria-busy aria-live=polite` |
 | YoFormRow | 非交互容器；左侧标题栈与右侧控件垂直居中 | 无；控件自带 ARIA |
