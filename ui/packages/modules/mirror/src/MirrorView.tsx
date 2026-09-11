@@ -326,7 +326,16 @@ export function MirrorView(props: DeviceSession) {
           </div>
         </div>
 
-        <YoPanel class="yohu-mirror__ops" variant="pane" padding="none" aria-label="设备操作">
+        <YoPanel
+          class="yohu-mirror__ops"
+          variant="pane"
+          padding="none"
+          paddingBlock="xs"
+          align="center"
+          gap="2xs"
+          overflowX="hidden"
+          aria-label="设备操作"
+        >
           <For each={NAV_OPS}>
             {(op) => (
               <YoIconButton
@@ -361,7 +370,7 @@ export function MirrorView(props: DeviceSession) {
           </For>
         </YoPanel>
 
-        <YoPanel class="yohu-mirror__func" variant="pane" padding="md" aria-label="投屏功能栏">
+        <YoPanel class="yohu-mirror__func" variant="pane" padding="md" gap="lg" aria-label="投屏功能栏">
           <YoTooltip content="下次开始生效" block>
           <div class="yohu-mirror__group">
             <div class="yohu-mirror__group-label">质量</div>
