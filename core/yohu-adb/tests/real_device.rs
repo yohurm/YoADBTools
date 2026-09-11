@@ -101,7 +101,13 @@ async fn real_device_ls_parse() {
         entries.len()
     );
     for e in entries.iter().take(5) {
-        eprintln!("  [{:?}] {} ({})", e.kind, e.name, e.permission);
+        eprintln!(
+            "  [{:?}] {} ({}) mtime={}",
+            e.kind,
+            e.name,
+            e.permission,
+            e.mtime.as_deref().unwrap_or("-")
+        );
     }
     assert!(
         entries

@@ -266,7 +266,7 @@ impl AdbClient {
                 &[
                     "shell".into(),
                     "ls".into(),
-                    "-la".into(),
+                    "-lla".into(),
                     crate::shell_quote(path),
                 ],
                 Some(LIST_PS_TIMEOUT_MS),

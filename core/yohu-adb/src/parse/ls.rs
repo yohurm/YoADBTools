@@ -1,11 +1,12 @@
-//! `ls -la` 输出解析（设备文件浏览）。
+//! `ls -lla` 输出解析（设备文件浏览；`-ll` = toybox 秒+纳秒+时区）。
 
+use yohu_domain::canonicalize_datetime_seconds;
 use yohu_protocol::{EntryKind, RemoteEntry};
 
-/// 解析 `adb shell ls -la <dir>` 输出。
+/// 解析 `adb shell ls -lla <dir>` 输出。
 ///
-/// 行形如：`drwxr-xr-x 2 root root 4096 2026-01-01 12:00 DCIM`
-/// 符号链接：`lrwxrwxrwx 1 root root 12 2026-01-01 12:00 link -> /sdcard/x`
+/// 行形如：`drwxr-xr-x 2 root root 4096 2026-01-01 12:00:53.423950275 +0800 DCIM`
+/// 符号链接：`lrwxrwxrwx 1 root root 12 2026-01-01 12:00:53.000000000 +0800 link -> /sdcard/x`
 /// 宽容解析：跳过 `total` 行、`.`/`..`、无法识别的行。
 pub fn parse_ls(output: &str) -> Vec<RemoteEntry> {
     output
@@ -15,7 +16,6 @@ pub fn parse_ls(output: &str) -> Vec<RemoteEntry> {
             if line.is_empty() || line.starts_with("total ") {
                 return None;
             }
-            // 符号链接拆分："name -> target"
             let (head, link_target) = match line.split_once(" -> ") {
                 Some((h, t)) => (h, Some(t.trim().to_string())),
                 None => (line, None),
@@ -28,7 +28,6 @@ pub fn parse_ls(output: &str) -> Vec<RemoteEntry> {
                 Some('-') => EntryKind::File,
                 _ => EntryKind::Other,
             };
-            // count owner group size
             fields.next()?;
             fields.next()?;
             fields.next()?;
@@ -50,23 +49,26 @@ pub fn parse_ls(output: &str) -> Vec<RemoteEntry> {
         .collect()
 }
 
-/// toybox：`2026-01-01 12:00 name`；认不出日期则整段当名称、mtime 空（不丢行）。
+/// toybox `-ll`：`2026-01-01 12:00:53.423950275 +0800 name` → 到秒。
+/// 只有时分、认不出日期：不补造，mtime 空；日期列仍从名称里剥掉以免污染文件名。
 fn split_mtime_and_name(rest: &[&str]) -> (Option<String>, String) {
-    if rest.len() >= 3 && looks_date(rest[0]) && looks_time(rest[1]) {
-        return (
-            Some(format!("{} {}", rest[0], rest[1])),
-            rest[2..].join(" "),
-        );
+    if rest.len() >= 4 {
+        let raw = format!("{} {} {}", rest[0], rest[1], rest[2]);
+        if let Some(mtime) = canonicalize_datetime_seconds(&raw) {
+            return (Some(mtime), rest[3..].join(" "));
+        }
+    }
+    if rest.len() >= 3 {
+        let raw = format!("{} {}", rest[0], rest[1]);
+        if canonicalize_datetime_seconds(&raw).is_some() || looks_date_time(rest[0], rest[1]) {
+            return (canonicalize_datetime_seconds(&raw), rest[2..].join(" "));
+        }
     }
     (None, rest.join(" "))
 }
 
-fn looks_date(token: &str) -> bool {
-    token.len() >= 8 && token.contains('-')
-}
-
-fn looks_time(token: &str) -> bool {
-    token.len() >= 4 && token.contains(':')
+fn looks_date_time(date: &str, time: &str) -> bool {
+    date.len() == 10 && date.as_bytes().get(4) == Some(&b'-') && time.contains(':')
 }
 
 #[cfg(test)]
@@ -75,37 +77,48 @@ mod tests {
 
     const SAMPLE: &str = "\
 total 84
-drwxr-xr-x 2 root root 4096 2026-01-01 12:00 Alarms
--rw-rw---- 1 root sdcard_rw 12345 2026-01-02 08:30 report.txt
-lrwxrwxrwx 1 root root 12 2026-01-03 09:00 data -> /sdcard/DCIM
+drwxr-xr-x 2 root root 4096 2026-01-01 12:00:53.423950275 +0800 Alarms
+-rw-rw---- 1 root sdcard_rw 12345 2026-01-02 08:30:07.000000000 +0800 report.txt
+lrwxrwxrwx 1 root root 12 2026-01-03 09:00:01.111111111 +0800 data -> /sdcard/DCIM
 ";
 
     #[test]
-    fn parses_entries_and_skips_total() {
+    fn parses_full_time_to_seconds() {
         let entries = parse_ls(SAMPLE);
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].name, "Alarms");
         assert_eq!(entries[0].kind, EntryKind::Dir);
         assert_eq!(entries[0].size, 4096);
-        assert_eq!(entries[0].mtime.as_deref(), Some("2026-01-01 12:00"));
+        assert_eq!(entries[0].mtime.as_deref(), Some("2026-01-01 12:00:53"));
         assert_eq!(entries[1].kind, EntryKind::File);
         assert_eq!(entries[1].size, 12345);
-        assert_eq!(entries[1].mtime.as_deref(), Some("2026-01-02 08:30"));
+        assert_eq!(entries[1].mtime.as_deref(), Some("2026-01-02 08:30:07"));
         assert_eq!(entries[2].kind, EntryKind::Symlink);
         assert_eq!(entries[2].link_target.as_deref(), Some("/sdcard/DCIM"));
+        assert_eq!(entries[2].mtime.as_deref(), Some("2026-01-03 09:00:01"));
+    }
+
+    #[test]
+    fn minute_only_does_not_invent_seconds() {
+        let out = "-rw-rw---- 1 root root 10 2026-01-01 12:00 keep-me.bin\n";
+        let entries = parse_ls(out);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "keep-me.bin");
+        assert!(entries[0].mtime.is_none());
     }
 
     #[test]
     fn skips_dot_entries_and_garbage() {
-        let out = "total 0\n. .\ndrwxr-xr-x 2 root root 0 2026-01-01 00:00 ..\nnot a valid line\n";
+        let out = "total 0\n. .\ndrwxr-xr-x 2 root root 0 2026-01-01 00:00:00.000000000 +0800 ..\nnot a valid line\n";
         assert!(parse_ls(out).is_empty());
     }
 
     #[test]
     fn name_with_spaces() {
-        let out = "-rw-rw---- 1 root root 10 2026-01-01 00:00 my file.txt\n";
+        let out = "-rw-rw---- 1 root root 10 2026-01-01 00:00:08.1 +0800 my file.txt\n";
         let entries = parse_ls(out);
         assert_eq!(entries[0].name, "my file.txt");
+        assert_eq!(entries[0].mtime.as_deref(), Some("2026-01-01 00:00:08"));
     }
 
     #[test]
