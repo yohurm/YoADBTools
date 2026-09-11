@@ -11,7 +11,9 @@ import {
   collapseStack,
   emptyBinding,
   LEVELS,
+  levelInkStyle,
   levelKey,
+  levelPaint,
   levelLabel,
   levelRank,
   matchesLine,
@@ -50,6 +52,19 @@ describe("levelRank", () => {
     expect(levelRank("W")).toBeLessThan(levelRank("E"));
     expect(levelRank("F")).toBe(6);
     expect(levelRank("?")).toBe(0);
+  });
+});
+
+describe("levelPaint（反色 / 消息同色，色相仍走 --yohu-level-*）", () => {
+  it("Fatal 反色；Error 与 Fatal 消息同 ink", () => {
+    expect(levelPaint("f")).toEqual({ invert: true, tintMessage: true });
+    expect(levelPaint("e")).toEqual({ invert: false, tintMessage: true });
+    expect(levelPaint("w")).toEqual({ invert: false, tintMessage: false });
+  });
+
+  it("ink 样式只引用 token 名", () => {
+    expect(levelInkStyle("e")).toEqual({ "--yohu-log-ink": "var(--yohu-level-e)" });
+    expect(levelInkStyle("f")).toEqual({ "--yohu-log-ink": "var(--yohu-level-f)" });
   });
 });
 

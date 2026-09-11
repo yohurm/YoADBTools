@@ -5,8 +5,8 @@
  * 行是一份 white-space:pre 文档。表头与行共用 logDocColumns 一把尺。
  * 列间空白是 formatLogDoc 的 pad 空格。选区走原生 ::selection（--yohu-text-sel）。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
- * 行 data-level 绑定 --yohu-log-ink（token 板 --yohu-level-* 单源）：
- * 左条 / 级别字 / Tag 共用 ink；Error 消息同色；Fatal 级别字母反色块，Tag 用 f-bg；
+ * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
+ * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
  * Ctrl+A 同色铺底。禁止 accent-soft / 列表选中片冒充选字。
  * ========================================================================== */
@@ -155,19 +155,7 @@
   background-color: var(--yohu-text-sel);
 }
 
-.yohu-logs__row[data-level="v"],
-.yohu-logs__level-slot[data-level="v"] { --yohu-log-ink: var(--yohu-level-v); }
-.yohu-logs__row[data-level="d"],
-.yohu-logs__level-slot[data-level="d"] { --yohu-log-ink: var(--yohu-level-d); }
-.yohu-logs__row[data-level="i"],
-.yohu-logs__level-slot[data-level="i"] { --yohu-log-ink: var(--yohu-level-i); }
-.yohu-logs__row[data-level="w"],
-.yohu-logs__level-slot[data-level="w"] { --yohu-log-ink: var(--yohu-level-w); }
-.yohu-logs__row[data-level="e"],
-.yohu-logs__level-slot[data-level="e"] { --yohu-log-ink: var(--yohu-level-e); }
-/* Fatal 字母是反色块（--yohu-level-f = font_on）；Tag / 左条 / 筛选按下用 warning 底色才可读。 */
-.yohu-logs__row[data-level="f"],
-.yohu-logs__level-slot[data-level="f"] { --yohu-log-ink: var(--yohu-level-f-bg); }
+/* ink 由 View 写入 --yohu-log-ink。 */
 
 /* 信号行（崩溃/ANR）：信号底色 + Error 左条。Ctrl+A 铺底时让位。 */
 .yohu-logs__row--signal {
@@ -202,10 +190,10 @@
   box-sizing: border-box;
 }
 
-/* Fatal 反色块：字母用 font_on，不走 ink。 */
-.yohu-logs__row[data-level="f"] .yohu-logs__row-level {
-  color: var(--yohu-level-f);
-  background-color: var(--yohu-level-f-bg);
+/* Fatal 反色块：字母用 font_on，底用 ink（更深的 warning）。 */
+.yohu-logs__row[data-paint="invert"] .yohu-logs__row-level {
+  color: var(--yohu-fg-on);
+  background-color: var(--yohu-log-ink);
   border-radius: var(--yohu-radius-2xs);
 }
 
@@ -214,7 +202,7 @@
   min-width: 0;
 }
 
-.yohu-logs__row[data-level="e"] .yohu-logs__row-msg {
+.yohu-logs__row[data-tint-msg] .yohu-logs__row-msg {
   color: var(--yohu-log-ink);
 }
 

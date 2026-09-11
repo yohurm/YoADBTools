@@ -4,7 +4,7 @@
  * 行是 formatLogDoc 文档；表头铬层可拖宽。选区走原生 Selection。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type JSX } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
 import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
@@ -57,7 +57,7 @@ import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./key
 import { DEFAULT_LOG_DISPLAY_COLUMNS } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
-import { LEVELS, levelKey, levelLabel, toggleLevel, type ViewRow } from "./pipeline";
+import { LEVELS, levelInkStyle, levelKey, levelLabel, levelPaint, toggleLevel, type ViewRow } from "./pipeline";
 import {
   sessionCaptureLabel,
   sessionCapturePhase,
@@ -114,10 +114,11 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: LogDocLayout
             );
           }
           if (part.kind === "msg") {
+            const key = levelKey(line().level);
             return (
               <span
                 class="yohu-logs__row-msg"
-                classList={{ "yohu-tone": levelKey(line().level) === "e" }}
+                classList={{ "yohu-tone": key ? levelPaint(key).tintMessage : false }}
               >
                 <Show when={props.keyword} keyed fallback={part.text}>
                   {(keyword) => (
@@ -513,10 +514,12 @@ export function LogAnalyzerView(props: DeviceSession) {
                   <For each={LEVELS}>
                     {(letter) => {
                       const pressed = (): boolean => session.levels.includes(letter);
+                      const key = levelKey(letter);
                       return (
                         <span
                           class="yohu-logs__level-slot yohu-tone"
-                          data-level={levelKey(letter) ?? undefined}
+                          data-level={key ?? undefined}
+                          style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
                         >
                           <YoButton
                             variant="ghost"
@@ -621,11 +624,17 @@ export function LogAnalyzerView(props: DeviceSession) {
                           },
                         });
                       }}
-                      renderRow={(row) => (
+                      renderRow={(row) => {
+                        const key = levelKey(row.line.level);
+                        const paint = key ? levelPaint(key) : null;
+                        return (
                         <div
                           class="yohu-logs__cols yohu-logs__row"
                           data-seq={String(row.line.seq)}
-                          data-level={levelKey(row.line.level) ?? undefined}
+                          data-level={key ?? undefined}
+                          data-paint={paint?.invert ? "invert" : undefined}
+                          data-tint-msg={paint?.tintMessage ? "" : undefined}
+                          style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
                           classList={{
                             "yohu-logs__row--signal": row.signal !== undefined,
                             "yohu-logs__row--raw": row.line.level === "?",
@@ -634,7 +643,8 @@ export function LogAnalyzerView(props: DeviceSession) {
                         >
                           <LogLineDoc row={row} keyword={session.keyword} layout={docLayout()} />
                         </div>
-                      )}
+                        );
+                      }}
                     />
                     <Show
                       when={

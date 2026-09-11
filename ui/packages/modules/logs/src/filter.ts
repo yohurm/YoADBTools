@@ -1,7 +1,7 @@
 /**
  * 日志过滤（纯函数，ADR-v6-006 消费端）：级别精确集合 / Tag·关键字包含 / Scope。
  * 与 yohu-domain::log_filter_matches 同一套 testdata/log_filter.json。
- * 级别字母单源：testdata/log_levels.json ↔ LEVELS；着色键仍走同一张表。
+ * 级别字母单源：testdata/log_levels.json ↔ LEVELS；着色键 LevelKey = Lowercase<LevelLetter>。
  */
 
 import type { LogFilter, LogLine } from "@yohu/api";
@@ -10,8 +10,8 @@ import { pidSetOf, type PidBinding } from "./binding";
 
 export const LEVELS = ["V", "D", "I", "W", "E", "F"] as const;
 export type LevelLetter = (typeof LEVELS)[number];
-/** 与 `--yohu-level-*` / 行 `data-level` 对齐的小写键。 */
-export type LevelKey = "v" | "d" | "i" | "w" | "e" | "f";
+/** 与 `--yohu-level-*` / 行 `data-level` 对齐；由 LEVELS 派生，禁止再写一份小写表。 */
+export type LevelKey = Lowercase<LevelLetter>;
 
 function levelIndex(level: string): number {
   return (LEVELS as readonly string[]).indexOf(level.toUpperCase());

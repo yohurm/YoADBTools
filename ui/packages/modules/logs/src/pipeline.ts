@@ -4,6 +4,7 @@
  */
 
 export * from "./filter";
+export * from "./level-paint";
 export * from "./binding";
 export * from "./signals";
 export * from "./stack";

@@ -129,14 +129,16 @@ describe("日志显示列", () => {
 });
 
 describe("日志级别色单源", () => {
-  it("行 data-level 绑定 --yohu-log-ink，不再用 level/bar 双 class", () => {
+  it("行 --yohu-log-ink 由 View 写入，CSS 不再列 V–F 映射", () => {
     expect(logsCss).toContain('--yohu-log-ink: var(--yohu-fg-3)');
-    expect(logsCss).toContain('[data-level="e"] { --yohu-log-ink: var(--yohu-level-e); }');
-    expect(logsCss).toContain('[data-level="f"] { --yohu-log-ink: var(--yohu-level-f-bg); }');
+    expect(logsCss).not.toMatch(/\[data-level="[vdiwe]"\]/);
+    expect(logsCss).not.toContain("--yohu-level-f-bg");
+    expect(logsCss).toContain('[data-paint="invert"]');
+    expect(logsCss).toContain("[data-tint-msg]");
     expect(logsCss).toContain(".yohu-logs__row-tag {");
     expect(logsCss).toContain("color: var(--yohu-log-ink)");
     expect(logsCss).not.toMatch(/\.yohu-logs__row-level\s*\{[^}]*text-align:\s*center/);
-    expect(logsCss).toContain('[data-level="e"] .yohu-logs__row-msg');
+    expect(logsCss).toContain("[data-tint-msg] .yohu-logs__row-msg");
     expect(logsCss).not.toContain(".yohu-logs__level--");
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");
