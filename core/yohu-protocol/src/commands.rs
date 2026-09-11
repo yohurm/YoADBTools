@@ -131,12 +131,23 @@ pub struct EvalResult {
 
 // ===== 命令库 wire 结构（schemaVersion 3） =====
 
+/// 占位符 `{n}` 的说明。缺席或空串 = 填参时只显示 `{n}`。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandParamDto {
+    pub index: usize,
+    #[serde(default)]
+    pub description: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandDto {
     pub id: String,
     pub name: String,
     /// 具体命令行，可含 `{0}` `{1}`；执行前由 domain `fill`，不信任 UI 改写后的行
     pub template: String,
+    /// `{n}` 的说明；缺省空。空项不落盘。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<CommandParamDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -151,6 +162,9 @@ pub struct CommandBlockDto {
     #[serde(default)]
     pub gap_ms: u64,
     pub steps: Vec<CommandStepDto>,
+    /// 全步共享的 `{n}` 说明；缺省空。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<CommandParamDto>,
 }
 
 /// 命令组下的同级叶子：单条命令或命令块。
@@ -161,6 +175,8 @@ pub enum LibraryEntryDto {
         id: String,
         name: String,
         template: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        params: Vec<CommandParamDto>,
     },
     Block {
         id: String,
@@ -168,6 +184,8 @@ pub enum LibraryEntryDto {
         #[serde(default)]
         gap_ms: u64,
         steps: Vec<CommandStepDto>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        params: Vec<CommandParamDto>,
     },
 }
 
@@ -258,6 +276,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(extra.template, "shell getprop");
+        assert!(extra.params.is_empty());
+        let with_params: CommandDto = serde_json::from_str(
+            r#"{"id":"c1","name":"ping","template":"ping {0}","params":[{"index":0,"description":"主机"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(with_params.params[0].description, "主机");
     }
 
     #[test]
