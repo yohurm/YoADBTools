@@ -19,7 +19,7 @@ describe("mirror.css", () => {
     expect(css).toMatch(/\.yohu-mirror__field\s*\{[^}]*width:\s*100%/);
     expect(css).not.toMatch(/\.yohu-mirror__group\s*\{/);
     expect(css).not.toContain("justify-content: space-between");
-    expect(view).toContain('YoTooltip content="下次开始生效"');
-    expect(view).not.toMatch(/YoTooltip content="下次开始生效" block/);
+    expect(view).toContain('YoBadge text="下次开始生效"');
+    expect(view).not.toContain("YoTooltip");
   });
 });

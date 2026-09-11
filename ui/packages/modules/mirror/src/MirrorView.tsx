@@ -5,6 +5,7 @@
 import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
+  YoBadge,
   YoButton,
   YoChrome,
   YoIconButton,
@@ -12,7 +13,6 @@ import {
   YoPanel,
   YoSelect,
   YoToaster,
-  YoTooltip,
   createToaster,
   type IconName,
 } from "@yohu/ui";
@@ -356,9 +356,10 @@ export function MirrorView(props: DeviceSession) {
         </YoPanel>
 
         <YoPanel class="yohu-mirror__func" variant="pane" padding="md" gap="sm" align="start" aria-label="投屏功能栏">
-          <YoTooltip content="下次开始生效">
-            <div class="yohu-mirror__group-label">质量</div>
-          </YoTooltip>
+          <div class="yohu-mirror__group-label">
+            质量
+            <YoBadge text="下次开始生效" tone="neutral" />
+          </div>
           <label class="yohu-mirror__field">
             <span class="yohu-mirror__field-name">投屏协议</span>
             <YoSelect
