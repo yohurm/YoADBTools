@@ -1,6 +1,6 @@
 /**
- * 清单列宽代数（L1）。只出规格、clamp、轨道字符串。
- * 宿主是 YoColFrame（L2，写 --yohu-col-tracks）；表头/拖条是 YoColRow / Header / Resizer。
+ * 清单列宽代数（L2）。只出规格、clamp、轨道字符串、列宽写入相位。
+ * 宿主是 YoColFrame（L4，写 --yohu-col-tracks）；表头/拖条是 YoColRow / Header / Resizer。
  * 对照：TanStack columnSizing；AG Grid actualWidth + min/max。
  */
 
@@ -19,6 +19,9 @@ export interface YoColSpec {
 }
 
 export type YoColWidths = Record<string, number>;
+
+/** 列宽写入相位。会话在 L3 col-resize；本类型只描述回调契约。 */
+export type ColResizePhase = "start" | "move" | "end";
 
 export function clampColWidth(spec: YoColSpec, px: number): number {
   const max = spec.maxWidth ?? Number.POSITIVE_INFINITY;

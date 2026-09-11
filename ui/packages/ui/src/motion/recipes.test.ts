@@ -67,6 +67,19 @@ describe("motion recipes", () => {
     expect(inner).not.toContain("min-height: min-content");
   });
 
+  it("fill 内层 column flex，直接子级填满可收缩，高度仍 0fr/1fr", () => {
+    const css = loadMotionCss();
+    const fill = css.slice(css.indexOf("配方 fill"));
+    const untilRail = fill.slice(0, fill.indexOf(".yohu-recipe-rail"));
+    expect(untilRail).toContain('.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner');
+    expect(untilRail).toContain("flex-direction: column");
+    expect(untilRail).toContain(".yohu-collapse__inner > *");
+    expect(untilRail).toContain("flex: 1");
+    expect(untilRail).toContain("min-height: 0");
+    expect(untilRail).not.toContain("grid-template-rows");
+    expect(untilRail).not.toContain("min-height: min-content");
+  });
+
   it("inline-end 双轴插值，禁止高度离散跳变", () => {
     const css = loadMotionCss();
     expect(css).toContain("yohu-recipe-inline-end");

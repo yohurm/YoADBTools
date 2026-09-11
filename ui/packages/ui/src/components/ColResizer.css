@@ -39,9 +39,9 @@
   background: var(--yohu-accent);
 }
 
-.yohu-col-resizer--active::before,
-.yohu-col-resizer--active:hover::before,
-.yohu-col-resizer--active:focus-visible::before {
+.yohu-col-resizer[data-active]::before,
+.yohu-col-resizer[data-active]:hover::before,
+.yohu-col-resizer[data-active]:focus-visible::before {
   height: 100%;
   background: var(--yohu-accent);
   border-radius: var(--yohu-radius-none);

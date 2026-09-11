@@ -1,13 +1,17 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.36（2026-09-10，发送图标有内容朝上）    
+> **状态：** v2.40（2026-09-11，输入宽度单属性）    
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
-> **v2.36 变更（发送图标朝上）：** 命令终端纸飞机空内容水平向右；草稿或队列有内容时挂 `yohu-recipe-send-aim`，`spatialSmall` 转到朝上。清空转回。模块禁止自写 rotate。见 [动画系统-v6.md](动画系统-v6.md)。
+> **v2.40 变更（输入宽度单属性）：** `YoTextField` 宽度只写 `data-width`（`hug` / `number` / `fill`）。公开仍用 `block` 表示铺满（与 `YoSelect` 同名）。禁止再并列 `data-block`。见 [youi.md](youi.md)。
+> **v2.39 变更（设置行右槽簇）：** `YoFormRow` 右槽只 hug 贴尾。路径框 + 浏览是同一簇，禁止 `controlFill` / Tooltip `block` 把槽拉满后让固定宽输入悬在中间。对照 WinUI SettingsCard `HorizontalContentAlignment=Right`（内容列 Auto）。见 [youi.md](youi.md)。
+> **v2.38 变更（发送图标朝上）：** 命令终端纸飞机空内容水平向右；草稿或队列有内容时挂 `yohu-recipe-send-aim`，`spatialSmall` 转到朝上。清空转回。模块禁止自写 rotate。见 [动画系统-v6.md](动画系统-v6.md)。
+> **v2.37 变更（输入宽度契约）：** `YoTextField` L2 定 `hug | fill | number`。`input size=1` 中性化 UA 固有宽。数字槽宽只走 `--yohu-layout-settings-number-w`（`data-width=number`）；对话框/编辑栏走 `block`。禁止页面再写 `.yohu-text-field { width }` 或叠一层搜图标。见 [youi.md](youi.md)。
+> **v2.36 变更（YoTextField 内容区）：** 输入重置 UA `padding` / `box-sizing` / `appearance`，高度锁在 `--yohu-control-height` 内。`type=number` 去掉原生步进钮，值 `text-align: end` 贴尾，避免短数字在 96vp 槽里居中。`YoFormRow` 改 `justify-content: flex-end`，折行后控件仍贴行尾。禁止再靠页面 CSS 改 `__input` 盒模型。见 [youi.md](youi.md) YoTextField。
 > **v2.35 变更（日志级别按下填充）：** 选中格用 `--yohu-log-ink` 叠到 surface 的软底（透明度对齐 `--yohu-accent-soft` 的 20%），字母仍走 ink。禁止底条 / inset shadow 冒充选中。
 > **v2.34 变更（日志级别筛选铬）：** 级别 V–F 与 Tag / 检索同一条控件铬（`--yohu-surface` + hairline + `radius-sm` + `--yohu-control-height`），内部格线分隔，不是六颗独立描边按钮。字母始终走 `--yohu-log-ink`；按下用级别 ink 软底。悬停名走 `YoTooltip`（Verbose…Fatal）。禁止再拆成 outlined 按钮带 gap。
 > **v2.33 变更（日志级别独立筛选）：** 过滤栏不再用「最低含以上」下拉。`LEVELS`（`log_levels.json`）是选项与匹配的唯一字母表。按下的级别是精确集合：选 W 只留 W，可再按下 E 同时留 W+E；全部弹起 = 不限（含 `?`）。wire `LogFilter.levels` 空则不限。禁止再写 `min_level` / 按 `levelRank` 筛选。
@@ -388,7 +392,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 2.7 交互态与选中 Ripple（单源）
 
-列表行、树行、下拉选项、菜单项、导航项、命令管理项、表头排序 **共用同一配方**，禁止各文件再写 `background: accent-soft` / `nav-hover`。表头排序钮铺满 `YoColHeader` 内容区；悬浮片 `--yohu-col-header-overlay-inset: 0`、圆角 `none`（铺满矩形列格）；文案边距 `--yohu-col-header-content-pad` 只写在 `.yohu-col-header__label`，禁止写在 `.yohu-interactive` 宿主。禁止在 `.yohu-files__cols` 上用左右 padding 把首列轨道推离左缘。
+列表行、树行、下拉选项、菜单项、导航项、命令管理项、表头排序 **共用同一配方**，禁止各文件再写 `background: accent-soft` / `nav-hover`。表头排序钮由 `YoColHeader` 在有 `onSort` 时自绘并铺满内容区；模块不挂 `__label`、不自绘第二套排序钮。悬浮片 `--yohu-col-header-overlay-inset: 0`、圆角 `none`（铺满矩形列格）；文案边距 `--yohu-col-header-content-pad` 只写在 `.yohu-col-header__label`，禁止写在 `.yohu-interactive` 宿主。禁止在 `.yohu-files__cols` 上用左右 padding 把首列轨道推离左缘。
 
 **状态色（Component 层）**
 
@@ -461,7 +465,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
 - **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 `formatLogDoc`。表头铬层可拖宽，行是连续文档，不是文件清单那种格子。禁止把 Family B 的行块拖选套到日志上。
-- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid`。解析失败（level=`?`）整行只有消息。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`；左条 / 级别字 / Tag 共用 ink。Error 消息同色。Fatal 级别字母反色块，Tag 与左条用 f-bg；反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
+- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。时间列是统一墙钟 `YYYY-MM-DD HH:mm:ss.SSS`（`DATETIME_DISPLAY_LEN`）。解析失败（level=`?`）整行只有消息。级别色：`pipeline.levelKey` → 行 `data-level` → `--yohu-log-ink`；左条 / 级别字 / Tag 共用 ink。Error 消息同色。Fatal 级别字母反色块，Tag 与左条用 f-bg；反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、Error 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
 - **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题靠左，列垫 `list` = 左 md / 右 sm；无排序；元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
 - 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别独立切换（V–F 精确集合，可多选；全部弹起不限；与 Tag 同一控件铬，字母走级别 ink，按下 ink 软底） / Tag / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
@@ -503,8 +507,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 页壳不滚动；`YoChrome` 钉在内容区顶部。分组卡片放进 `.yohu-settings__body` 滚动；`YoPanel` 不裁切表单项。
 - 页眉与卡片左缘共用 `--yohu-layout-page-margin`（PC 40vp）；页宽 `--yohu-layout-settings-max` 只约束滚动列，不把标题挤进 920 列。
-- 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug；两列 `align-items: center`。开关 / 数字 / 下拉 / 多选复选进右侧槽。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex。
-- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：只读展示框显示绝对路径 + 「浏览」；展示框宽 ≤ `--yohu-layout-settings-control-max`，超长折叠中间（目录头 ellipsis、末段完整）。空值显示 `system.info` 解析路径。数字/下拉仍走 `YoTextField`/`YoSelect`。
+- 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug 贴尾；两列 `align-items: center`。开关 / 数字 / 下拉 / 多选复选进右侧槽。路径框与「浏览」同一右簇、中间只有行内 gap，禁止把右槽 stretch 出空档。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex 或给 `YoTextField` 写 width。
+- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：只读展示框显示绝对路径 + 「浏览」；展示框宽 ≤ `--yohu-layout-settings-control-max`，超长折叠中间（目录头 ellipsis、末段完整）。空值显示 `system.info` 解析路径。数字走 `YoTextField type=number`（槽宽 `--yohu-layout-settings-number-w`），下拉走 `YoSelect`。
 - 投屏协议 / 长边 / 码率 / 帧率只在投屏显示页。设置页「投屏显示」仅保留强制 ADB forward。
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。

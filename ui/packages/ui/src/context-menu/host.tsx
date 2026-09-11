@@ -8,14 +8,18 @@ import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 
 import { YoContextMenu } from "../components/ContextMenu";
-import { contextMenu, type ContextMenuController } from "./controller";
+import { contextMenu, type ContextMenuController, type ContextMenuHostController } from "./controller";
 
 export interface YoContextMenuHostProps {
   controller?: ContextMenuController;
 }
 
+function asHost(ctl: ContextMenuController): ContextMenuHostController {
+  return ctl as ContextMenuHostController;
+}
+
 export function YoContextMenuHost(props: YoContextMenuHostProps): JSX.Element {
-  const ctl = (): ContextMenuController => props.controller ?? contextMenu;
+  const ctl = (): ContextMenuHostController => asHost(props.controller ?? contextMenu);
   const session = () => ctl().session();
 
   return (

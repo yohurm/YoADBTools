@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { YoFormRow } from "./FormRow";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "FormRow.css"), "utf8");
 
 describe("YoFormRow", () => {
   it("左侧标题信息、右侧控件为两列兄弟，说明不独占下一行", () => {
@@ -37,5 +42,17 @@ describe("YoFormRow", () => {
     expect(container.querySelector(".yohu-form-row")?.getAttribute("data-has-note")).toBeNull();
     expect(container.querySelector(".yohu-form-row__description")).toBeNull();
     expect(container.querySelector(".yohu-form-row__note")).toBeNull();
+  });
+
+  it("行主轴贴尾，控件槽 margin-inline-start:auto，折行后仍靠右", () => {
+    expect(css).toMatch(/\.yohu-form-row \{[\s\S]*?justify-content: flex-end/);
+    expect(css).toContain("margin-inline-start: auto");
+    expect(css).not.toContain("justify-content: space-between");
+  });
+
+  it("右槽 hug 贴尾，不 stretch；路径与按钮同簇", () => {
+    expect(css).toContain("flex: 0 1 auto");
+    expect(css).not.toContain("data-control-fill");
+    expect(css).not.toMatch(/\.yohu-form-row__control[\s\S]*?flex:\s*1 1 auto/);
   });
 });

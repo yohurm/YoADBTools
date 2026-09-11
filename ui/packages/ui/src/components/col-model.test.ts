@@ -8,6 +8,7 @@ import {
   defaultColWidths,
   nudgeColWidth,
   setColWidth,
+  type ColResizePhase,
   type YoColSpec,
 } from "./col-model";
 
@@ -47,5 +48,10 @@ describe("col-model", () => {
     expect(nudgeColWidth(144, spec, 1)).toBe(152);
     expect(nudgeColWidth(72, spec, -1)).toBe(72);
     expect(colWidthOf(spec, {})).toBe(144);
+  });
+
+  it("列宽相位在 L2", () => {
+    const phases: ColResizePhase[] = ["start", "move", "end"];
+    expect(phases).toEqual(["start", "move", "end"]);
   });
 });

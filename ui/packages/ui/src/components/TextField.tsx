@@ -1,6 +1,6 @@
 /**
  * YoTextField —— 单行输入框（L4 视图）。
- * 盒内缀 / 盒外缀 / status / 禁用由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
+ * 盒内缀 / 盒外缀 / status / active / 禁用由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
  * HarmonyOS 对照：TextInput；status 边走语义 token，不引进 antd Input。
  */
 import { Show, createMemo, createUniqueId } from "solid-js";
@@ -8,7 +8,7 @@ import type { JSX } from "solid-js";
 import { ICON_NAMES, Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import type { YoTextFieldStatus } from "./textfield-model";
-import { resolveTextFieldInteractive, textFieldHostAttrs } from "./textfield-policy";
+import { textFieldHostAttrs } from "./textfield-policy";
 import "./TextField.css";
 
 export type { YoTextFieldStatus };
@@ -43,6 +43,12 @@ export interface YoTextFieldProps {
   addonAfter?: JSX.Element;
   /** 校验态。默认 none */
   status?: YoTextFieldStatus;
+  /** 过滤/内容生效描边。与 status 正交，默认关 */
+  active?: boolean;
+  /** 铺满父级（对话框 / 编辑栏）。默认 hug；type=number 走数字槽宽 */
+  block?: boolean;
+  /** 转发内部 input，供宿主快捷键聚焦。不进模型。 */
+  inputRef?: (el: HTMLInputElement) => void;
 }
 
 function isIconName(value: unknown): value is IconName {
@@ -64,7 +70,6 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
   const id = createUniqueId();
   let inputRef: HTMLInputElement | undefined;
   const host = createMemo(() => textFieldHostAttrs(props));
-  const interactive = createMemo(() => resolveTextFieldInteractive(props));
 
   const handleInput = (event: InputEvent): void => {
     const target = event.currentTarget as HTMLInputElement;
@@ -78,7 +83,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
   };
 
   const handleClear = (): void => {
-    if (interactive().disabled) return;
+    if (host().disabled) return;
     if (inputRef) {
       inputRef.value = "";
       inputRef.focus();
@@ -95,8 +100,10 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-suffix={host()["data-suffix"]}
       data-addon-before={host()["data-addon-before"]}
       data-addon-after={host()["data-addon-after"]}
+      data-width={host()["data-width"]}
       data-clearable={host()["data-clearable"]}
       data-disabled={host()["data-disabled"]}
+      data-active={host()["data-active"]}
     >
       <Show when={props.label}>
         <label class="yohu-text-field__label" for={id}>
@@ -116,10 +123,14 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             </span>
           </Show>
           <input
-            ref={(el) => (inputRef = el)}
+            ref={(el) => {
+              inputRef = el;
+              props.inputRef?.(el);
+            }}
             id={id}
             class="yohu-text-field__input"
             type={props.type ?? "text"}
+            size={1}
             value={props.value ?? ""}
             placeholder={props.placeholder ?? ""}
             aria-label={props.ariaLabel ?? props.label}
@@ -133,7 +144,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
               <TextFieldAffix value={props.suffix} />
             </span>
           </Show>
-          <Show when={interactive().showClear}>
+          <Show when={host()["data-clearable"]}>
             <button
               type="button"
               class="yohu-text-field__clear yohu-focus-ring"

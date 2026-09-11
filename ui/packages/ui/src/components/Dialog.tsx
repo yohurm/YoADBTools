@@ -2,7 +2,7 @@
  * YoDialog —— 模态对话框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：弹出框；最大宽 400vp；遮罩 10% 中性，不点遮罩关闭。
  * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
- * 受控 API：open / title / width / height / onClose / footer / children。
+ * 受控 API：open / title / width / height / bodyLayout / bodyOverflow / bodyPad / onClose / footer / children。
  *
  * 可达性：
  * - `role=dialog aria-modal`；打开后焦点移入面板（优先首个可聚焦元素）
@@ -18,13 +18,21 @@ import { createEffect, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
 import { YoPresence } from "../motion/presence";
 import {
-  attachDialog,
-  dialogLayerStyle,
   dialogPanelPaint,
+  type YoDialogBodyLayout,
+  type YoDialogBodyOverflow,
+  type YoDialogBodyPad,
+} from "./dialog-model";
+import {
+  attachDialog,
+  dialogBodyAttrs,
+  dialogLayerStyle,
   resolveDialogOpen,
   type DialogStackEntry,
 } from "./dialog-policy";
 import "./Dialog.css";
+
+export type { YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad };
 
 export interface YoDialogProps {
   /** 是否打开（布尔值或响应式访问器） */
@@ -35,6 +43,12 @@ export interface YoDialogProps {
   width?: number;
   /** 面板高度（px）；不设则随内容，受 max-height 约束 */
   height?: number;
+  /** 内容区排列。默认 stack（纵向 flex）。 */
+  bodyLayout?: YoDialogBodyLayout;
+  /** 内容区溢出。默认 auto。 */
+  bodyOverflow?: YoDialogBodyOverflow;
+  /** 内容区垫。默认 lg；整页铺满用 none。 */
+  bodyPad?: YoDialogBodyPad;
   /** 关闭回调（Esc 触发） */
   onClose: () => void;
   /** 底部按钮区 */
@@ -64,6 +78,12 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
   });
 
   const paint = (): ReturnType<typeof dialogPanelPaint> => dialogPanelPaint(props.width, props.height);
+  const body = (): ReturnType<typeof dialogBodyAttrs> =>
+    dialogBodyAttrs({
+      layout: props.bodyLayout,
+      overflow: props.bodyOverflow,
+      pad: props.bodyPad,
+    });
 
   return (
     <YoPresence when={isOpen()} recipe="dialog">
@@ -82,7 +102,14 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
           style={paint().style}
         >
           {props.title ? <h3 class="yohu-dialog__title">{props.title}</h3> : null}
-          <div class="yohu-dialog__body">{props.children}</div>
+          <div
+            class="yohu-dialog__body"
+            data-layout={body()["data-layout"]}
+            data-overflow={body()["data-overflow"]}
+            data-pad={body()["data-pad"]}
+          >
+            {props.children}
+          </div>
           {props.footer ? <div class="yohu-dialog__footer">{props.footer}</div> : null}
         </div>
       </div>

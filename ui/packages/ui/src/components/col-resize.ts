@@ -1,6 +1,7 @@
 /**
- * 列宽拖拽会话（L2）。每帧从起点重算绝对宽度，禁止累加 dx。
+ * 列宽拖拽会话（L3）。每帧从起点重算绝对宽度，禁止累加 dx。
  * 对照：AG Grid HorizontalResizeService；TanStack startOffset / startSize。
+ * 相位类型在 L2 col-model；本文件不导出到包入口。
  */
 
 import { clampColWidth, type YoColSpec } from "./col-model";
@@ -10,8 +11,6 @@ export interface ColResizeSession {
   startX: number;
   startWidth: number;
 }
-
-export type ColResizePhase = "start" | "move" | "end";
 
 export function beginColResize(key: string, startX: number, startWidth: number): ColResizeSession {
   return { key, startX, startWidth };

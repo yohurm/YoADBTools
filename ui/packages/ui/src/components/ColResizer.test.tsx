@@ -73,7 +73,7 @@ describe("YoColResizer", () => {
   it("热区透明，可见铬是居中短柄而不是整块 accent", () => {
     expect(colResizerCss).toMatch(/\.yohu-col-resizer\s*\{[^}]*background:\s*transparent/);
     expect(colResizerCss).not.toMatch(
-      /\.yohu-col-resizer:hover\s*,\s*\.yohu-col-resizer:focus-visible\s*,\s*\.yohu-col-resizer--active\s*\{[^}]*background-color:\s*var\(--yohu-accent\)/,
+      /\.yohu-col-resizer:hover\s*,\s*\.yohu-col-resizer:focus-visible\s*,\s*\.yohu-col-resizer\[data-active\]\s*\{[^}]*background-color:\s*var\(--yohu-accent\)/,
     );
     expect(colResizerCss).toContain(".yohu-col-resizer::before");
     expect(colResizerCss).not.toContain(".yohu-col-resizer::after");

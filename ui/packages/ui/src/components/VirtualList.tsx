@@ -326,7 +326,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
             const row = createMemo(() => rowByKey().get(key));
             const attrs = () => {
               const current = row();
-              return current ? rowSnapshot(current) : rowSnapshot({ index: 0, item: undefined as never, key });
+              return current ? rowSnapshot(current) : rowSnapshot({ index: 0, key });
             };
             return (
               <div
@@ -358,6 +358,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
                   const current = row();
                   if (!current || !props.onRowContextMenu) return;
                   event.preventDefault();
+                  event.stopPropagation();
                   props.onRowContextMenu(current.item, current.key, event);
                 }}
                 onKeyDown={(event) => {

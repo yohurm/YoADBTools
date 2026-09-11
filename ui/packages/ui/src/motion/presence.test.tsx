@@ -42,6 +42,24 @@ describe("YoPresence", () => {
     expect(host?.getAttribute("data-state")).toBe("open");
     expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("行");
   });
+
+  it("first 写成宿主 data-first", () => {
+    render(() => (
+      <YoPresence when recipe="list" first>
+        <div>行</div>
+      </YoPresence>
+    ));
+    expect(document.querySelector(".yohu-presence")?.hasAttribute("data-first")).toBe(true);
+  });
+
+  it("未标 first 不写 data-first", () => {
+    render(() => (
+      <YoPresence when recipe="list">
+        <div>行</div>
+      </YoPresence>
+    ));
+    expect(document.querySelector(".yohu-presence")?.hasAttribute("data-first")).toBe(false);
+  });
 });
 
 describe("YoCollapse", () => {
@@ -68,5 +86,17 @@ describe("YoCollapse", () => {
       </YoCollapse>
     ));
     expect(document.querySelector(".yohu-collapse")?.getAttribute("data-recipe")).toBe("panel");
+  });
+
+  it("recipe=fill 写入 data-recipe", () => {
+    render(() => (
+      <YoCollapse open={false} recipe="fill">
+        <div>填满</div>
+      </YoCollapse>
+    ));
+    const root = document.querySelector(".yohu-collapse");
+    expect(root?.getAttribute("data-recipe")).toBe("fill");
+    expect(root?.getAttribute("data-open")).toBe("false");
+    expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
   });
 });

@@ -9,6 +9,7 @@ import { resolveEmptyStateSpec, type EmptyStateInput } from "./empty-model";
 export interface EmptyStateHostAttrs {
   "data-has-icon": true | undefined;
   "data-has-action": true | undefined;
+  "data-fill": true | undefined;
 }
 
 export function emptyStateHostAttrs(input: EmptyStateInput): EmptyStateHostAttrs {
@@ -16,5 +17,6 @@ export function emptyStateHostAttrs(input: EmptyStateInput): EmptyStateHostAttrs
   return {
     "data-has-icon": spec.hasIcon ? true : undefined,
     "data-has-action": spec.hasAction ? true : undefined,
+    "data-fill": spec.fill ? true : undefined,
   };
 }

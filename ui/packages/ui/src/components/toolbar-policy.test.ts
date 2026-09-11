@@ -8,6 +8,16 @@ describe("toolbar-policy", () => {
       role: "toolbar",
       "data-chrome": "band",
       "data-overflow": "scroll",
+      "data-pad": "band",
+    });
+  });
+
+  it("pad=xs 写成 data-pad", () => {
+    expect(toolbarHostAttrs({ pad: "xs" })).toEqual({
+      role: "toolbar",
+      "data-chrome": "band",
+      "data-overflow": "scroll",
+      "data-pad": "xs",
     });
   });
 });

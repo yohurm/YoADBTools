@@ -379,6 +379,21 @@
     transform var(--yohu-motion-effects-enter);
 }
 
+/*
+ * 配方 fill：高度仍 0fr/1fr（spatialLocal），不改过渡语义。
+ * 内层 column flex，直接子级填满并可收缩，供设备栏等在父级帽下由 scroller 纵滚。
+ * 禁止默认 collapse 给 __inner > * 写 min-height（会压过 Tree 行高）。
+ */
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner > * {
+  flex: 1;
+  min-height: 0;
+}
+
 .yohu-recipe-rail {
   transition: grid-template-columns var(--yohu-motion-spatial-panel);
 }

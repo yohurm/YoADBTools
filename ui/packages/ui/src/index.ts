@@ -1,7 +1,18 @@
 /**
  * @yohu/ui 组件库入口。
  * 导出全部 token、图标与公开组件（Yo* 标注）。
+ * 工厂公开返回值只带模块契约；Host 队列 / 会话快照留在内部类型。
  */
+import {
+  YoContextMenuHost,
+  closeContextMenu,
+  createContextMenuController as createContextMenuHost,
+  defineContextMenu,
+  openContextMenu,
+} from "./context-menu";
+import type { ContextMenuController } from "./context-menu";
+import { YoToast, YoToaster, createToaster as createToasterHost } from "./components/Toast";
+import type { Toaster } from "./components/Toast";
 
 // —— tokens ——
 // 公开面只表达契约：`MotionDuration` / `MotionEasing` / `MotionSpec`、`motionDurationMs` / `motionSpecMs`。
@@ -93,7 +104,7 @@ export type { YoProgressBarProps } from "./components/ProgressBar";
 
 // —— 导航 ——
 export { YoToolbar } from "./components/Toolbar";
-export type { YoToolbarProps } from "./components/Toolbar";
+export type { YoToolbarProps, YoToolbarPad } from "./components/Toolbar";
 
 export { YoTabs } from "./components/Tabs";
 export type { YoTabsProps, YoTabItem, YoTabDot, YoTabDotTone } from "./components/Tabs";
@@ -128,10 +139,16 @@ export {
   setColWidth,
 } from "./components/col-model";
 export type { YoColSpec, YoColWidths } from "./components/col-model";
-export type { ColResizePhase } from "./components/col-resize";
 
 export { YoPanel } from "./components/Panel";
-export type { YoPanelProps, YoPanelPadding, YoPanelVariant } from "./components/Panel";
+export type {
+  YoPanelProps,
+  YoPanelAlign,
+  YoPanelGap,
+  YoPanelOverflow,
+  YoPanelPadding,
+  YoPanelVariant,
+} from "./components/Panel";
 
 export { YoPage } from "./components/Page";
 export type { YoPageProps } from "./components/Page";
@@ -181,33 +198,32 @@ export { YoLoading } from "./components/Loading";
 export type { YoLoadingProps } from "./components/Loading";
 
 export { YoDialog } from "./components/Dialog";
-export type { YoDialogProps } from "./components/Dialog";
+export type { YoDialogProps, YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad } from "./components/Dialog";
 
 export { YoTooltip, YoTooltipHost } from "./components/Tooltip";
 export type { YoTooltipProps, YoTooltipHostProps } from "./components/Tooltip";
 
 // —— 右键菜单（L1；页面提供场景表，壳挂唯一 Host；YoContextMenu 仅 Host 内部使用） ——
-// 注意：默认单例 `contextMenu` 只被 YoContextMenuHost 内部读取；公开导出可变全局本体没有意义，
-// 故不从此处导出。页面/模块统一走 `openContextMenu` / `closeContextMenu` 薄转发；
-// 需要独立实例时用工厂 `createContextMenuController`。
+// 默认单例只被 Host 内部读取，不从此处导出。
+// 页面/模块走 `openContextMenu` / `closeContextMenu`；独立实例用工厂。
 export {
   YoContextMenuHost,
   closeContextMenu,
-  createContextMenuController,
   defineContextMenu,
   openContextMenu,
-} from "./context-menu";
+};
+export const createContextMenuController: () => ContextMenuController = createContextMenuHost;
 export type {
   ContextMenuController,
   ContextMenuRequest,
   ContextMenuScene,
-  ContextMenuSession,
   YoContextMenuHostProps,
   YoMenuItem,
 } from "./context-menu";
 
-export { YoToast, YoToaster, createToaster } from "./components/Toast";
-export type { ToastItem, ToastTone, Toaster, YoToastProps, YoToasterProps } from "./components/Toast";
+export { YoToast, YoToaster };
+export const createToaster: () => Toaster = createToasterHost;
+export type { ToastTone, Toaster, YoToastProps, YoToasterProps } from "./components/Toast";
 
 export {
   YoPresence,

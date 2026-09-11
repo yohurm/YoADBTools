@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 
 import { motionSpecMs } from "../tokens/motion";
 import { YoTooltip, YoTooltipHost } from "./Tooltip";
 import { tooltipNoteInput, tooltipUnique } from "./tooltip-policy";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Tooltip.css"), "utf8");
 
 function enterAnchor(name: string): void {
   const trigger = screen.getByRole("button", { name });
@@ -145,6 +150,20 @@ describe("YoTooltip", () => {
     expect(screen.getByRole("tooltip")).toBeTruthy();
     fireEvent.pointerDown(screen.getByRole("button", { name: "锚" }).parentElement as HTMLElement);
     expect(tooltipUnique.session()).toBeNull();
+  });
+
+  it("stretch 写 data-stretch，铺满交叉轴而不改成 block", () => {
+    render(() => (
+      <YoTooltip content="Verbose" stretch>
+        <button type="button">V</button>
+      </YoTooltip>
+    ));
+    const anchor = screen.getByRole("button", { name: "V" }).parentElement;
+    expect(anchor?.hasAttribute("data-stretch")).toBe(true);
+    expect(anchor?.hasAttribute("data-block")).toBe(false);
+    expect(css).toContain("[data-stretch]");
+    expect(css).toContain("height: 100%");
+    expect(css).toContain("align-self: stretch");
   });
 
   it("离开锚点后延迟卸节点", () => {

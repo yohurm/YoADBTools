@@ -6,9 +6,11 @@
 
 import {
   resolveTextFieldSpec,
+  resolveTextFieldStatus,
   textFieldPaintKind,
   type TextFieldPaintKind,
   type TextFieldSlotInput,
+  type TextFieldWidthKind,
   type YoTextFieldStatus,
 } from "./textfield-model";
 
@@ -29,43 +31,46 @@ export interface TextFieldInteractive {
 export function resolveTextFieldInteractive(
   input: TextFieldInteractiveInput,
 ): TextFieldInteractive {
-  const spec = resolveTextFieldSpec(input);
   const disabled = Boolean(input.disabled);
   const value = input.value ?? "";
   return {
     disabled,
     showClear: Boolean(input.clearable) && value.length > 0 && !disabled,
-    status: spec.status,
+    status: resolveTextFieldStatus(input.status),
   };
 }
 
 export interface TextFieldHostAttrs {
   "data-status": YoTextFieldStatus;
   "data-paint": TextFieldPaintKind;
+  "data-width": TextFieldWidthKind;
   "data-prefix": true | undefined;
   "data-suffix": true | undefined;
   "data-addon-before": true | undefined;
   "data-addon-after": true | undefined;
   "data-clearable": true | undefined;
   "data-disabled": true | undefined;
+  "data-active": true | undefined;
   disabled: boolean;
   "aria-invalid": true | undefined;
 }
 
 export function textFieldHostAttrs(
-  input: TextFieldSlotInput & TextFieldInteractiveInput,
+  input: TextFieldSlotInput & TextFieldInteractiveInput & { block?: boolean; type?: string; active?: boolean },
 ): TextFieldHostAttrs {
   const spec = resolveTextFieldSpec(input);
   const interactive = resolveTextFieldInteractive(input);
   return {
     "data-status": spec.status,
     "data-paint": textFieldPaintKind(spec.status),
+    "data-width": spec.width,
     "data-prefix": spec.slots.prefix ? true : undefined,
     "data-suffix": spec.slots.suffix ? true : undefined,
     "data-addon-before": spec.slots.addonBefore ? true : undefined,
     "data-addon-after": spec.slots.addonAfter ? true : undefined,
     "data-clearable": interactive.showClear ? true : undefined,
     "data-disabled": interactive.disabled ? true : undefined,
+    "data-active": spec.active ? true : undefined,
     disabled: interactive.disabled,
     "aria-invalid": spec.status === "error" ? true : undefined,
   };

@@ -11,8 +11,14 @@ import {
 } from "./button-model";
 
 describe("button-model", () => {
-  it("缺省是 solid + accent + md", () => {
-    expect(resolveButtonSpec({})).toEqual({ variant: "solid", tone: "accent", size: "md" });
+  it("缺省是 solid + accent + md，ink=tone，不 flush", () => {
+    expect(resolveButtonSpec({})).toEqual({
+      variant: "solid",
+      tone: "accent",
+      size: "md",
+      ink: "tone",
+      flush: false,
+    });
   });
 
   it("传入轴原样保留", () => {
@@ -20,6 +26,18 @@ describe("button-model", () => {
       variant: "ghost",
       tone: "danger",
       size: "sm",
+      ink: "tone",
+      flush: false,
+    });
+  });
+
+  it("ink 与 flush 是独立契约，不改涂装轴", () => {
+    expect(resolveButtonSpec({ variant: "ghost", tone: "neutral", ink: true, flush: true })).toEqual({
+      variant: "ghost",
+      tone: "neutral",
+      size: "md",
+      ink: "inherit",
+      flush: true,
     });
   });
 

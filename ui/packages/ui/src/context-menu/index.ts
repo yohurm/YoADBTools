@@ -20,6 +20,6 @@ export {
   defineContextMenu,
   openContextMenu,
 } from "./controller";
-export type { ContextMenuController } from "./controller";
+export type { ContextMenuController, ContextMenuHostController } from "./controller";
 export { YoContextMenuHost } from "./host";
 export type { YoContextMenuHostProps } from "./host";

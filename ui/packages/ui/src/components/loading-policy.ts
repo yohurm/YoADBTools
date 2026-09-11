@@ -11,6 +11,7 @@ export interface LoadingHostAttrs {
   "aria-busy": true;
   "aria-live": "polite";
   "data-cover": true | undefined;
+  "data-fill": true | undefined;
 }
 
 export function loadingHostAttrs(input: LoadingInput): LoadingHostAttrs {
@@ -20,5 +21,6 @@ export function loadingHostAttrs(input: LoadingInput): LoadingHostAttrs {
     "aria-busy": true,
     "aria-live": "polite",
     "data-cover": spec.cover ? true : undefined,
+    "data-fill": spec.fill ? true : undefined,
   };
 }

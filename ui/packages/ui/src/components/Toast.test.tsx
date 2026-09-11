@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
-import { YoToaster, YoToast, createToaster } from "./Toast";
+import { YoToaster, YoToast, createToaster, type ToasterHost } from "./Toast";
 import { toastHoldMs } from "./toast-policy";
 
 describe("createToaster + YoToaster", () => {
@@ -48,8 +48,8 @@ describe("createToaster + YoToaster", () => {
     }
   });
 
-  it("toasts 访问器暴露当前消息", () => {
-    const toaster = createToaster();
+  it("Host 经内部队列读当前消息", () => {
+    const toaster: ToasterHost = createToaster();
     expect(toaster.toasts()).toEqual([]);
     toaster.show("一条");
     expect(toaster.toasts()).toHaveLength(1);
@@ -57,7 +57,7 @@ describe("createToaster + YoToaster", () => {
   });
 
   it("destroy 后 show 不再入队", () => {
-    const toaster = createToaster();
+    const toaster: ToasterHost = createToaster();
     toaster.show("一条");
     toaster.destroy();
     expect(toaster.toasts()).toEqual([]);

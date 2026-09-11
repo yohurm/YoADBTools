@@ -85,7 +85,66 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.yohu-panel[data-align="start"] .yohu-panel__body {
+  align-items: start;
+}
+
+.yohu-panel[data-align="center"] .yohu-panel__body {
+  align-items: center;
+}
+
+.yohu-panel[data-align="end"] .yohu-panel__body {
+  align-items: end;
+}
+
+.yohu-panel[data-gap="2xs"] .yohu-panel__body {
+  gap: var(--yohu-space-2xs);
+}
+
+.yohu-panel[data-gap="xs"] .yohu-panel__body {
+  gap: var(--yohu-space-xs);
+}
+
+.yohu-panel[data-gap="sm"] .yohu-panel__body {
+  gap: var(--yohu-space-sm);
+}
+
+.yohu-panel[data-gap="md"] .yohu-panel__body {
+  gap: var(--yohu-space-md);
+}
+
+.yohu-panel[data-gap="lg"] .yohu-panel__body {
+  gap: var(--yohu-space-lg);
+}
+
+.yohu-panel[data-gap="xl"] .yohu-panel__body {
+  gap: var(--yohu-space-xl);
+}
+
+.yohu-panel[data-overflow="auto"] .yohu-panel__body {
   overflow: auto;
+}
+
+.yohu-panel[data-overflow="hidden"] .yohu-panel__body {
+  overflow: hidden;
+}
+
+.yohu-panel[data-overflow="visible"] .yohu-panel__body {
+  overflow: visible;
+}
+
+.yohu-panel[data-overflow-x="auto"] .yohu-panel__body {
+  overflow-x: auto;
+}
+
+.yohu-panel[data-overflow-x="hidden"] .yohu-panel__body {
+  overflow-x: hidden;
+}
+
+.yohu-panel[data-overflow-x="visible"] .yohu-panel__body {
+  overflow-x: visible;
 }
 
 .yohu-panel[data-padding="none"] .yohu-panel__body {
@@ -110,4 +169,28 @@
 
 .yohu-panel[data-padding="xl"] .yohu-panel__body {
   padding: var(--yohu-space-xl);
+}
+
+.yohu-panel[data-padding-block="none"] .yohu-panel__body {
+  padding-block: 0;
+}
+
+.yohu-panel[data-padding-block="xs"] .yohu-panel__body {
+  padding-block: var(--yohu-space-xs);
+}
+
+.yohu-panel[data-padding-block="sm"] .yohu-panel__body {
+  padding-block: var(--yohu-space-sm);
+}
+
+.yohu-panel[data-padding-block="md"] .yohu-panel__body {
+  padding-block: var(--yohu-space-md);
+}
+
+.yohu-panel[data-padding-block="lg"] .yohu-panel__body {
+  padding-block: var(--yohu-space-lg);
+}
+
+.yohu-panel[data-padding-block="xl"] .yohu-panel__body {
+  padding-block: var(--yohu-space-xl);
 }

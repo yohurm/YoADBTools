@@ -1,6 +1,7 @@
 /**
  * 下拉选择领域模型（L2）。
  * 视图只消费这些纯函数，禁止在 TSX 里再写一套选中 / 键盘索引算法。
+ * 菜单落点的盒 / 高度估计只放数据，不碰 DOM。
  */
 
 export interface YoSelectOption {
@@ -8,6 +9,28 @@ export interface YoSelectOption {
   value: string;
   /** 选项显示文本 */
   label: string;
+}
+
+/** 触发钮视口盒。视图读几何后交给 L3。 */
+export interface SelectTriggerBox {
+  top: number;
+  left: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+/** 菜单高度估计输入：实测高 + 选项行数。 */
+export interface SelectMenuMeasure {
+  optionCount: number;
+  scrollHeight: number;
+}
+
+/** L3 落点写回视图的快照。 */
+export interface SelectMenuLayout {
+  placement: "bottom" | "top";
+  overflowY: boolean;
+  style: Record<string, string>;
 }
 
 /** 空字符串 value（如级别「全部」）不能生成 `yohu-option-` 这种残缺 id。 */

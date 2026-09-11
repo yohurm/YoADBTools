@@ -1,15 +1,21 @@
 /**
  * YoPanel —— 画布上的卡片/分区唯一容器（L4 视图）。
- * 变体 / 内边距 / 顶栏形态由 panel-model + panel-policy 决定；本文件只绑属性与内容区。
+ * 变体 / 内边距 / 顶栏 / 内容区排布由 panel-model + panel-policy 决定；本文件只绑属性与内容区。
  * 铬（surface + radius-md + hairline + XS 阴影）只写在 Panel.css。
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
-import type { YoPanelPadding, YoPanelVariant } from "./panel-model";
+import type {
+  YoPanelAlign,
+  YoPanelGap,
+  YoPanelOverflow,
+  YoPanelPadding,
+  YoPanelVariant,
+} from "./panel-model";
 import { panelHostAttrs } from "./panel-policy";
 import "./Panel.css";
 
-export type { YoPanelPadding, YoPanelVariant };
+export type { YoPanelAlign, YoPanelGap, YoPanelOverflow, YoPanelPadding, YoPanelVariant };
 
 export interface YoPanelProps {
   /** 面板标题 */
@@ -20,6 +26,16 @@ export interface YoPanelProps {
   header?: JSX.Element;
   /** 内边距；card 默认 md，pane 默认 none */
   padding?: YoPanelPadding;
+  /** 块轴内边距，叠在 padding 上；未设则不另写 */
+  paddingBlock?: YoPanelPadding;
+  /** 内容区交叉轴对齐；默认 stretch */
+  align?: YoPanelAlign;
+  /** 内容区间隙；默认 none */
+  gap?: YoPanelGap;
+  /** 内容区溢出；pane 默认 auto，card 默认 visible */
+  overflow?: YoPanelOverflow;
+  /** 内容区横向溢出；未设时跟 overflow */
+  overflowX?: YoPanelOverflow;
   /** 默认 card */
   variant?: YoPanelVariant;
   class?: string;
@@ -34,6 +50,11 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
     panelHostAttrs({
       variant: props.variant,
       padding: props.padding,
+      paddingBlock: props.paddingBlock,
+      align: props.align,
+      gap: props.gap,
+      overflow: props.overflow,
+      overflowX: props.overflowX,
       header: Boolean(props.header),
       title: Boolean(props.title),
       actions: Boolean(props.actions),
@@ -47,6 +68,11 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       data-variant={host()["data-variant"]}
       data-padding={host()["data-padding"]}
       data-header={host()["data-header"]}
+      data-align={host()["data-align"]}
+      data-gap={host()["data-gap"]}
+      data-overflow={host()["data-overflow"]}
+      data-overflow-x={host()["data-overflow-x"]}
+      data-padding-block={host()["data-padding-block"]}
       aria-label={props["aria-label"]}
     >
       <div class="yohu-panel__clip">

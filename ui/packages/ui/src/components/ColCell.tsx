@@ -16,7 +16,8 @@ export function YoColCell(props: YoColCellProps): JSX.Element {
     <span
       {...rest}
       class={`yohu-col-cell${local.class ? ` ${local.class}` : ""}`}
-      classList={{ "yohu-col-cell--span": local.span === true, ...local.classList }}
+      classList={local.classList}
+      data-span={local.span ? "" : undefined}
     />
   );
 }

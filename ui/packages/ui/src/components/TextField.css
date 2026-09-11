@@ -3,7 +3,28 @@
   display: inline-flex;
   flex-direction: column;
   gap: var(--yohu-space-xs);
+  min-width: calc(var(--yohu-space-xl) * 5);
+  max-width: 100%;
+  vertical-align: middle;
+  box-sizing: border-box;
   font-family: var(--yohu-font-sans);
+}
+
+.yohu-text-field[data-width="number"] {
+  width: var(--yohu-layout-settings-number-w);
+  min-width: var(--yohu-layout-settings-number-w);
+  flex: 0 0 auto;
+}
+
+.yohu-text-field[data-width="fill"] {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.yohu-text-field[data-active] {
+  --yohu-text-field-edge: var(--yohu-accent);
 }
 
 .yohu-text-field[data-paint="error"] {
@@ -23,6 +44,7 @@
 .yohu-text-field__group {
   display: flex;
   align-items: stretch;
+  width: 100%;
   min-width: 0;
 }
 
@@ -88,16 +110,34 @@
 }
 
 .yohu-text-field__input {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
   border: none;
   outline: none;
+  box-sizing: border-box;
+  appearance: none;
   background: transparent;
   color: var(--yohu-fg);
   font-family: inherit;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
+}
+
+/* 数字：去掉 UA 步进钮；值贴尾缘，避免短数字在槽里看起来居中。 */
+.yohu-text-field__input[type="number"] {
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.yohu-text-field__input[type="number"]::-webkit-outer-spin-button,
+.yohu-text-field__input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .yohu-text-field__input::placeholder {

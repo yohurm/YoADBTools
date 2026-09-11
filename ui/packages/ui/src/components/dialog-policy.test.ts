@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSignal } from "solid-js";
 
 import { motionSpecMs } from "../tokens/motion";
-import { attachDialog, dialogLayerStyle, dialogPanelPaint, resolveDialogOpen } from "./dialog-policy";
+import { attachDialog, dialogBodyAttrs, dialogLayerStyle, resolveDialogOpen } from "./dialog-policy";
 import { tooltipUnique } from "./tooltip-policy";
 
 describe("dialog-policy", () => {
@@ -18,16 +18,32 @@ describe("dialog-policy", () => {
     expect(resolveDialogOpen(open)).toBe(true);
   });
 
-  it("未指定宽高不写 inline，显式宽高才 sized", () => {
-    expect(dialogPanelPaint()).toEqual({ sized: false, style: {} });
-    expect(dialogPanelPaint(960, 480)).toEqual({
-      sized: true,
-      style: { width: "960px", height: "480px" },
+  it("叠层走 overlay dialog token，不写魔法数", () => {
+    expect(dialogLayerStyle().zIndex).toBe("var(--yohu-z-dialog)");
+  });
+
+  it("内容区缺省写成 stack / auto / lg", () => {
+    expect(dialogBodyAttrs({})).toEqual({
+      "data-layout": "stack",
+      "data-overflow": "auto",
+      "data-pad": "lg",
     });
   });
 
-  it("叠层走 overlay dialog token，不写魔法数", () => {
-    expect(dialogLayerStyle().zIndex).toBe("var(--yohu-z-dialog)");
+  it("stack + hidden 写成 data-overflow", () => {
+    expect(dialogBodyAttrs({ overflow: "hidden" })).toEqual({
+      "data-layout": "stack",
+      "data-overflow": "hidden",
+      "data-pad": "lg",
+    });
+  });
+
+  it("pad none 写成 data-pad", () => {
+    expect(dialogBodyAttrs({ pad: "none" })).toEqual({
+      "data-layout": "stack",
+      "data-overflow": "auto",
+      "data-pad": "none",
+    });
   });
 
   it("入栈立即卸缺省 Tooltip Unique，不把气泡压到模态上", () => {

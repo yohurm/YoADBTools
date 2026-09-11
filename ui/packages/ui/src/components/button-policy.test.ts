@@ -27,9 +27,23 @@ describe("button-policy", () => {
       "data-tone": "accent",
       "data-size": "md",
       "data-paint": "solid-on",
+      "data-ink": undefined,
+      "data-flush": undefined,
       disabled: false,
       "aria-busy": undefined,
     });
+  });
+
+  it("ink + flush 只写 data-ink/data-flush，不改 paint", () => {
+    const attrs = buttonHostAttrs({
+      variant: "ghost",
+      tone: "neutral",
+      ink: true,
+      flush: true,
+    });
+    expect(attrs["data-paint"]).toBe("ghost-neutral");
+    expect(attrs["data-ink"]).toBe("inherit");
+    expect(attrs["data-flush"]).toBe("");
   });
 
   it("outlined + neutral 对应旧 secondary", () => {

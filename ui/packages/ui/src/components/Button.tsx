@@ -20,6 +20,10 @@ export interface YoButtonProps {
   tone?: YoButtonTone;
   /** 尺寸 */
   size?: YoButtonSize;
+  /** 字色与按下填充消费父级 `--yohu-button-ink` / `--yohu-button-fill` */
+  ink?: boolean;
+  /** 铺满父级交叉轴，自隐边框与圆角（组内容单元） */
+  flush?: boolean;
   /** 加载态（spinner + 禁用 + aria-busy） */
   loading?: boolean;
   /** 禁用 */
@@ -49,6 +53,8 @@ export function YoButton(props: YoButtonProps): JSX.Element {
       data-tone={host()["data-tone"]}
       data-size={host()["data-size"]}
       data-paint={host()["data-paint"]}
+      data-ink={host()["data-ink"]}
+      data-flush={host()["data-flush"]}
       disabled={host().disabled}
       aria-busy={host()["aria-busy"]}
       aria-expanded={props["aria-expanded"]}

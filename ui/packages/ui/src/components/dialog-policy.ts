@@ -1,12 +1,19 @@
 /**
  * 对话框策略门面（L3）。
- * 栈与焦点陷阱已在 dialog-stack / dialog-focus；本文件只装配视图该绑的入口。
+ * 栈与焦点陷阱已在 dialog-stack / dialog-focus；本文件只装配 attach、开闭读取与内容区 data-*。
  * 禁止另起一套 Modal.confirm / 第二套 keydown。
  */
 
 import type { Accessor } from "solid-js";
 
 import { dialogFocusables } from "./dialog-focus";
+import {
+  resolveDialogBodySpec,
+  type DialogBodyInput,
+  type YoDialogBodyLayout,
+  type YoDialogBodyOverflow,
+  type YoDialogBodyPad,
+} from "./dialog-model";
 import { popDialog, pushDialog, type DialogStackEntry } from "./dialog-stack";
 import { overlayLayerStyle } from "./popover-place";
 import { dismissTooltipOverlay } from "./tooltip-policy";
@@ -23,18 +30,19 @@ export function dialogLayerStyle(): Record<string, string> {
   return overlayLayerStyle("dialog");
 }
 
-export interface DialogPanelPaint {
-  sized: boolean;
-  style: { width?: string; height?: string };
+export interface DialogBodyAttrs {
+  "data-layout": YoDialogBodyLayout;
+  "data-overflow": YoDialogBodyOverflow;
+  "data-pad": YoDialogBodyPad;
 }
 
-export function dialogPanelPaint(width?: number, height?: number): DialogPanelPaint {
+/** 内容区契约写成 data-*；CSS 只认这些名字，禁止模块 :has 穿皮。 */
+export function dialogBodyAttrs(input: DialogBodyInput): DialogBodyAttrs {
+  const spec = resolveDialogBodySpec(input);
   return {
-    sized: width !== undefined,
-    style: {
-      ...(width !== undefined ? { width: `${width}px` } : {}),
-      ...(height !== undefined ? { height: `${height}px` } : {}),
-    },
+    "data-layout": spec.layout,
+    "data-overflow": spec.overflow,
+    "data-pad": spec.pad,
   };
 }
 

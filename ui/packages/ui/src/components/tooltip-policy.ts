@@ -36,6 +36,22 @@ export function resolveTooltipDelay(name?: MotionSpecName): MotionSpecName {
   return name ?? DEFAULT_TOOLTIP_DELAY;
 }
 
+export interface TooltipAnchorAttrs {
+  "data-block": "" | undefined;
+  "data-stretch": "" | undefined;
+}
+
+/** 锚点铺满：block=主轴，stretch=交叉轴。不碰定位。 */
+export function tooltipAnchorAttrs(input: {
+  block?: boolean;
+  stretch?: boolean;
+}): TooltipAnchorAttrs {
+  return {
+    "data-block": input.block ? "" : undefined,
+    "data-stretch": input.stretch ? "" : undefined,
+  };
+}
+
 export function tooltipCanShow(disabled: boolean | undefined, content: unknown): boolean {
   return !disabled && !tooltipIsEmpty(content);
 }

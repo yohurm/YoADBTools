@@ -8,10 +8,17 @@ describe("loading-policy", () => {
       "aria-busy": true,
       "aria-live": "polite",
       "data-cover": undefined,
+      "data-fill": undefined,
     });
   });
 
   it("cover 写入 data-cover", () => {
     expect(loadingHostAttrs({ title: "加载中", cover: true })["data-cover"]).toBe(true);
+    expect(loadingHostAttrs({ title: "加载中", cover: true })["data-fill"]).toBeUndefined();
+  });
+
+  it("fill 写入 data-fill，不是 data-cover", () => {
+    expect(loadingHostAttrs({ title: "加载中", fill: true })["data-fill"]).toBe(true);
+    expect(loadingHostAttrs({ title: "加载中", fill: true })["data-cover"]).toBeUndefined();
   });
 });

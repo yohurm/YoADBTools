@@ -15,6 +15,8 @@ export interface YoLoadingProps {
   description?: string;
   /** 铺满父级（盖住下层内容，如投屏画布） */
   cover?: boolean;
+  /** 在父级剩余空间内伸展并居中。不是 cover */
+  fill?: boolean;
 }
 
 /** 渲染一个居中的加载占位。内容区 = 环 + 文案。 */
@@ -24,6 +26,7 @@ export function YoLoading(props: YoLoadingProps): JSX.Element {
     <div
       class="yohu-loading"
       data-cover={host()["data-cover"]}
+      data-fill={host()["data-fill"]}
       role={host().role}
       aria-busy={host()["aria-busy"]}
       aria-live={host()["aria-live"]}

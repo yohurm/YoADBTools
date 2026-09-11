@@ -8,6 +8,9 @@ import {
   resolvePanelSpec,
   type PanelInput,
   type PanelSpec,
+  type YoPanelAlign,
+  type YoPanelGap,
+  type YoPanelOverflow,
   type YoPanelPadding,
   type YoPanelVariant,
 } from "./panel-model";
@@ -38,6 +41,11 @@ export interface PanelHostAttrs {
   "data-variant": YoPanelVariant;
   "data-padding": YoPanelPadding;
   "data-header": PanelHeaderKind;
+  "data-align": YoPanelAlign;
+  "data-gap": YoPanelGap;
+  "data-overflow": YoPanelOverflow;
+  "data-overflow-x"?: YoPanelOverflow;
+  "data-padding-block"?: YoPanelPadding;
 }
 
 export function panelHostAttrs(input: PanelInput & PanelHeaderInput): PanelHostAttrs {
@@ -46,6 +54,10 @@ export function panelHostAttrs(input: PanelInput & PanelHeaderInput): PanelHostA
     "data-variant": spec.variant,
     "data-padding": spec.padding,
     "data-header": resolvePanelHeaderKind(spec, input),
+    "data-align": spec.align,
+    "data-gap": spec.gap,
+    "data-overflow": spec.overflow,
+    ...(spec.overflowX !== spec.overflow ? { "data-overflow-x": spec.overflowX } : {}),
+    ...(spec.paddingBlock ? { "data-padding-block": spec.paddingBlock } : {}),
   };
 }
-

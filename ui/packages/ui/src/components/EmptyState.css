@@ -14,6 +14,12 @@
   box-sizing: border-box;
 }
 
+.yohu-empty-state[data-fill] {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
 .yohu-empty-state__illustration {
   display: flex;
   align-items: center;

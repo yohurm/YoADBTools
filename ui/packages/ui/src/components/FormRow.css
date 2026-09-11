@@ -1,10 +1,11 @@
-/* 表单行默认排布：左信息栈、右控件 hug，两列垂直居中。 */
+/* 表单行默认排布：左信息栈吃剩余、右控件 hug 贴尾，两列垂直居中。
+ * justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。 */
 
 .yohu-form-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   column-gap: var(--yohu-space-md);
   row-gap: var(--yohu-space-sm);
   padding: var(--yohu-space-md) 0;
@@ -63,5 +64,5 @@
   gap: var(--yohu-space-sm);
   min-width: 0;
   flex: 0 1 auto;
-  margin-left: auto;
+  margin-inline-start: auto;
 }

@@ -21,23 +21,23 @@ import "./Toast.css";
 
 export type { ToastItem, ToastTone };
 
-/** createToaster() 的返回值 */
+/** 模块契约：只发、撤、毁。队列快照留给 YoToaster。 */
 export interface Toaster {
-  /** 当前消息列表（响应式访问器） */
-  toasts: () => readonly ToastItem[];
-  /** 弹出一条消息 */
   show: (text: string, tone?: ToastTone) => void;
-  /** 出场结束后移除 */
   dismiss: (id: number) => void;
-  /** 清定时器并拒绝后续写入 */
   destroy: () => void;
+}
+
+/** YoToaster 专用。不进 `@yohu/ui` 包入口。 */
+export interface ToasterHost extends Toaster {
+  toasts: () => readonly ToastItem[];
 }
 
 /**
  * 创建一个 toaster 实例（每个实例独立维护自己的消息列表）。
  * 必须挂回树上的 YoToaster，禁止静态 Toast.success。
  */
-export function createToaster(): Toaster {
+export function createToaster(): ToasterHost {
   let queue = createToastQueue();
   const [toasts, setToasts] = createSignal<readonly ToastItem[]>([]);
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -98,18 +98,22 @@ export function YoToast(props: YoToastProps): JSX.Element {
 }
 
 export interface YoToasterProps {
-  /** toaster 实例 */
   toaster: Toaster;
+}
+
+function asToasterHost(toaster: Toaster): ToasterHost {
+  return toaster as ToasterHost;
 }
 
 /** 渲染 toaster 消息堆栈（右上角）。只按快照画。 */
 export function YoToaster(props: YoToasterProps): JSX.Element {
   const host = toasterHostAttrs();
+  const queue = (): ToasterHost => asToasterHost(props.toaster);
   return (
     <div class="yohu-toaster" role={host.role} aria-label={host["aria-label"]}>
-      <For each={props.toaster.toasts()}>
+      <For each={queue().toasts()}>
         {(toast) => (
-          <YoPresence when={toast.open} recipe="toast" onExitComplete={() => props.toaster.dismiss(toast.id)}>
+          <YoPresence when={toast.open} recipe="toast" onExitComplete={() => queue().dismiss(toast.id)}>
             <YoToast toast={toast} />
           </YoPresence>
         )}

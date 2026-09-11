@@ -4,7 +4,7 @@ import { MotionSpec, type MotionDurationName } from "../tokens/motion";
 export type PresenceRecipe = "dialog" | "toast" | "popover" | "fade" | "rise" | "list";
 
 /** Collapse 配方名（与 motion.css data-recipe 对齐）。 */
-export type CollapseRecipe = "collapse" | "panel";
+export type CollapseRecipe = "collapse" | "panel" | "fill";
 
 /**
  * 出场等待时长：全部指向 MotionSpec，禁止在配方层再写 "local" 字面量。

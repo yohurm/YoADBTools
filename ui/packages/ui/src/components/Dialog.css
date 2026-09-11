@@ -53,11 +53,36 @@
 
 .yohu-dialog__body {
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  padding: var(--yohu-space-lg);
-  overflow: auto;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
+}
+
+.yohu-dialog__body[data-layout="stack"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.yohu-dialog__body[data-layout="row"] {
+  display: flex;
+  flex-direction: row;
+}
+
+.yohu-dialog__body[data-overflow="auto"] {
+  overflow: auto;
+}
+
+.yohu-dialog__body[data-overflow="hidden"] {
+  overflow: hidden;
+}
+
+.yohu-dialog__body[data-pad="lg"] {
+  padding: var(--yohu-space-lg);
+}
+
+.yohu-dialog__body[data-pad="none"] {
+  padding: 0;
 }
 
 .yohu-dialog__footer {

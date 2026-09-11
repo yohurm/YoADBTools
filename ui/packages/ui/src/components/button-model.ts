@@ -7,6 +7,8 @@
 export type YoButtonVariant = "solid" | "outlined" | "ghost";
 export type YoButtonTone = "accent" | "neutral" | "danger" | "success" | "warning";
 export type YoButtonSize = "sm" | "md";
+/** tone = 语义色轴；inherit = 消费父级 `--yohu-button-ink` / `--yohu-button-fill`。 */
+export type ButtonInkSource = "tone" | "inherit";
 
 export const BUTTON_VARIANTS = ["solid", "outlined", "ghost"] as const;
 export const BUTTON_TONES = ["accent", "neutral", "danger", "success", "warning"] as const;
@@ -15,17 +17,24 @@ export const BUTTON_SIZES = ["sm", "md"] as const;
 export const DEFAULT_BUTTON_VARIANT: YoButtonVariant = "solid";
 export const DEFAULT_BUTTON_TONE: YoButtonTone = "accent";
 export const DEFAULT_BUTTON_SIZE: YoButtonSize = "md";
+export const DEFAULT_BUTTON_INK: ButtonInkSource = "tone";
 
 export interface ButtonInput {
   variant?: YoButtonVariant;
   tone?: YoButtonTone;
   size?: YoButtonSize;
+  /** true = inherit 父级 ink/fill token */
+  ink?: boolean;
+  /** true = 铺满父级、自隐边框圆角 */
+  flush?: boolean;
 }
 
 export interface ButtonSpec {
   variant: YoButtonVariant;
   tone: YoButtonTone;
   size: YoButtonSize;
+  ink: ButtonInkSource;
+  flush: boolean;
 }
 
 /**
@@ -51,6 +60,8 @@ export function resolveButtonSpec(input: ButtonInput): ButtonSpec {
     variant: input.variant ?? DEFAULT_BUTTON_VARIANT,
     tone: input.tone ?? DEFAULT_BUTTON_TONE,
     size: input.size ?? DEFAULT_BUTTON_SIZE,
+    ink: input.ink ? "inherit" : DEFAULT_BUTTON_INK,
+    flush: Boolean(input.flush),
   };
 }
 
@@ -60,8 +71,8 @@ export function buttonSolidInk(tone: YoButtonTone): ButtonSolidInk {
   return "on";
 }
 
-/** 15 格 variant×tone → 涂装。CSS 只消费这个名字，不重写鸿蒙规则。 */
-export function buttonPaintKind(spec: ButtonSpec): ButtonPaintKind {
+/** 15 格 variant×tone → 涂装。CSS 只消费这个名字，不重写鸿蒙规则。ink/flush 不进涂装轴。 */
+export function buttonPaintKind(spec: Pick<ButtonSpec, "variant" | "tone">): ButtonPaintKind {
   if (spec.variant === "solid") {
     const ink = buttonSolidInk(spec.tone);
     if (ink === "on") return "solid-on";

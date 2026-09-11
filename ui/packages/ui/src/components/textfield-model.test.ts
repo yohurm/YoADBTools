@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TEXT_FIELD_STATUS,
   hasTextFieldSlot,
+  resolveTextFieldActive,
   resolveTextFieldSpec,
   resolveTextFieldStatus,
+  resolveTextFieldWidthKind,
   textFieldPaintKind,
 } from "./textfield-model";
 
@@ -12,6 +14,8 @@ describe("textfield-model", () => {
     expect(resolveTextFieldSpec({})).toEqual({
       status: DEFAULT_TEXT_FIELD_STATUS,
       slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false },
+      width: "hug",
+      active: false,
     });
     expect(textFieldPaintKind("none")).toBe("neutral");
   });
@@ -46,5 +50,27 @@ describe("textfield-model", () => {
         status: "error",
       }).slots,
     ).toEqual({ prefix: true, suffix: false, addonBefore: true, addonAfter: false });
+  });
+
+  it("宽度：默认 hug，number 次之，block 优先", () => {
+    expect(resolveTextFieldWidthKind({})).toBe("hug");
+    expect(resolveTextFieldWidthKind({ type: "number" })).toBe("number");
+    expect(resolveTextFieldWidthKind({ type: "number", block: true })).toBe("fill");
+    expect(resolveTextFieldSpec({ type: "number" }).width).toBe("number");
+    expect(resolveTextFieldSpec({ block: true }).width).toBe("fill");
+  });
+
+  it("active 与 status 正交，默认关", () => {
+    expect(resolveTextFieldActive()).toBe(false);
+    expect(resolveTextFieldActive(false)).toBe(false);
+    expect(resolveTextFieldActive(true)).toBe(true);
+    expect(resolveTextFieldSpec({ active: true }).active).toBe(true);
+    expect(resolveTextFieldSpec({ active: true, status: "error" })).toEqual({
+      status: "error",
+      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false },
+      width: "hug",
+      active: true,
+    });
+    expect(textFieldPaintKind(resolveTextFieldSpec({ active: true }).status)).toBe("neutral");
   });
 });

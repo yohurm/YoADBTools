@@ -6,6 +6,7 @@ describe("empty-policy", () => {
     expect(emptyStateHostAttrs({ title: "空" })).toEqual({
       "data-has-icon": undefined,
       "data-has-action": undefined,
+      "data-fill": undefined,
     });
   });
 
@@ -13,6 +14,11 @@ describe("empty-policy", () => {
     expect(emptyStateHostAttrs({ title: "空", hasIcon: true, hasAction: true })).toEqual({
       "data-has-icon": true,
       "data-has-action": true,
+      "data-fill": undefined,
     });
+  });
+
+  it("fill 写入 data-fill", () => {
+    expect(emptyStateHostAttrs({ title: "空", fill: true })["data-fill"]).toBe(true);
   });
 });

@@ -2,10 +2,12 @@
  * YoListPresence —— 非虚拟短列表的 insert/remove（动画系统-v6.md 配方 list）。
  * 保留正在出场的项直到 YoPresence 卸完；清屏等一次性整表移除可 `exit={false}` 直切。
  */
-import { For, createEffect } from "solid-js";
+import { For, createEffect, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
+import { firstPresentSlotKey, type ListPresenceSlot } from "./list-presence-model";
+import { listPresenceHostAttrs } from "./list-presence-policy";
 import { YoPresence } from "./presence";
 
 export interface YoListPresenceProps<T> {
@@ -16,7 +18,7 @@ export interface YoListPresenceProps<T> {
   children: (item: T) => JSX.Element;
 }
 
-type Slot<T> = { key: string; item: T; present: boolean };
+type Slot<T> = ListPresenceSlot<T>;
 
 export function YoListPresence<T>(props: YoListPresenceProps<T>): JSX.Element {
   const [slots, setSlots] = createStore<Slot<T>[]>([]);
@@ -63,12 +65,15 @@ export function YoListPresence<T>(props: YoListPresenceProps<T>): JSX.Element {
     );
   });
 
+  const firstKey = createMemo(() => firstPresentSlotKey(slots));
+
   return (
     <For each={slots}>
       {(slot) => (
         <YoPresence
           when={slot.present}
           recipe="list"
+          first={listPresenceHostAttrs(firstKey(), slot.key).first}
           onExitComplete={() => {
             setSlots(
               produce((list) => {

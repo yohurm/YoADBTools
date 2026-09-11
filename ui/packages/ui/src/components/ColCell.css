@@ -9,6 +9,6 @@
   padding: var(--yohu-col-cell-pad, var(--yohu-col-header-content-pad));
 }
 
-.yohu-col-cell--span {
+.yohu-col-cell[data-span] {
   grid-column: 1 / -1;
 }

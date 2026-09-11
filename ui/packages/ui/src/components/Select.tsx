@@ -1,6 +1,6 @@
 /**
  * YoSelect —— 自绘下拉选择框（L4 视图 / L5 门面）。
- * HarmonyOS 对照：Select。定位在 popover-place；选中在 select-model；开合/键盘/禁用在 select-policy。
+ * HarmonyOS 对照：Select。落点在 select-place → popover-place；选中在 select-model；开合/键盘/禁用在 select-policy。
  * 受控 API：options / value / onChange / disabled / placeholder / block。
  * 默认 hug 选中文案；最小宽在触发钮上（禁止写在根上，否则短文案按钮靠左）。
  *
@@ -18,22 +18,14 @@ import { Icon } from "../icons";
 import { YoIndicator } from "../motion/indicator";
 import { YoPresence } from "../motion/presence";
 import { Layout } from "../tokens/layout";
-import { Spacing } from "../tokens/spacing";
 import { YoTooltip } from "./Tooltip";
-import {
-  applyPopoverBox,
-  estimateMenuHeight,
-  placePopover,
-  popoverLayerStyle,
-  readCssPx,
-  readViewport,
-  type PopoverPlacement,
-} from "./popover-place";
 import {
   findOption,
   optionDomId,
+  type SelectMenuLayout,
   type YoSelectOption,
 } from "./select-model";
+import { layoutSelectMenu, readSelectTrigger } from "./select-place";
 import {
   applySelectEscape,
   applySelectHover,
@@ -67,7 +59,7 @@ export interface YoSelectProps {
  */
 export function YoSelect(props: YoSelectProps): JSX.Element {
   const [session, setSession] = createSignal<SelectSession>(idleSelectSession());
-  const [placement, setPlacement] = createSignal<PopoverPlacement>("bottom");
+  const [placement, setPlacement] = createSignal<SelectMenuLayout["placement"]>("bottom");
   const [overflowY, setOverflowY] = createSignal(false);
   const [menuStyle, setMenuStyle] = createSignal<JSX.CSSProperties>({});
   let rootRef: HTMLDivElement | undefined;
@@ -85,24 +77,19 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     return props.value ?? "";
   };
 
-  const layoutMenu = (): void => {
+  const syncMenuPlace = (): void => {
     const trigger = triggerRef;
     const layer = layerRef;
     const menu = menuRef;
     if (!trigger || !layer || !menu) return;
-    const rect = trigger.getBoundingClientRect();
-    const row = rect.height || readCssPx("--yohu-control-height", 32);
-    const box = placePopover({
-      trigger: { top: rect.top, left: rect.left, bottom: rect.bottom, width: rect.width },
-      menuHeight: Math.max(menu.scrollHeight, estimateMenuHeight(props.options.length, row, Spacing.Xs * 2)),
-      viewport: readViewport(),
-      gap: Spacing.Sm,
-      maxHeightCap: Spacing.Xl * 10,
-    });
-    applyPopoverBox(layer, box);
-    setPlacement(box.placement);
-    setOverflowY(box.overflowY);
-    setMenuStyle(popoverLayerStyle(box) as JSX.CSSProperties);
+    const laid = layoutSelectMenu(
+      readSelectTrigger(trigger),
+      { optionCount: props.options.length, scrollHeight: menu.scrollHeight },
+      layer,
+    );
+    setPlacement(laid.placement);
+    setOverflowY(laid.overflowY);
+    setMenuStyle(laid.style as JSX.CSSProperties);
   };
 
   const commitValue = (value: string): void => {
@@ -143,8 +130,8 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
 
   createEffect(() => {
     if (!open()) return;
-    const frame = requestAnimationFrame(() => layoutMenu());
-    const onRelayout = (): void => layoutMenu();
+    const frame = requestAnimationFrame(() => syncMenuPlace());
+    const onRelayout = (): void => syncMenuPlace();
     window.addEventListener("resize", onRelayout);
     window.addEventListener("scroll", onRelayout, true);
     window.visualViewport?.addEventListener("resize", onRelayout);
@@ -210,7 +197,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
           <div
             ref={(el) => {
               layerRef = el;
-              if (el) layoutMenu();
+              if (el) syncMenuPlace();
             }}
             class="yohu-select__layer"
             data-placement={placement()}
@@ -220,7 +207,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
             <div
               ref={(el) => {
                 menuRef = el;
-                if (el) layoutMenu();
+                if (el) syncMenuPlace();
               }}
               class="yohu-select__menu"
               data-placement={placement()}

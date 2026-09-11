@@ -7,6 +7,7 @@ describe("loading-model", () => {
       title: "加载中",
       description: undefined,
       cover: false,
+      fill: false,
     });
   });
 
@@ -19,6 +20,18 @@ describe("loading-model", () => {
       title: "加载中",
       description: "请稍候",
       cover: true,
+      fill: false,
     });
+  });
+
+  it("fill 与 cover 不是别名", () => {
+    expect(resolveLoadingSpec({ title: "加载中", fill: true })).toEqual({
+      title: "加载中",
+      description: undefined,
+      cover: false,
+      fill: true,
+    });
+    expect(resolveLoadingSpec({ title: "加载中", cover: true }).fill).toBe(false);
+    expect(resolveLoadingSpec({ title: "加载中", fill: true }).cover).toBe(false);
   });
 });

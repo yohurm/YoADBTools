@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { YoTextField } from "./TextField";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.css"), "utf8");
 
 describe("YoTextField", () => {
   it("渲染标签与输入框", () => {
@@ -103,5 +108,57 @@ describe("YoTextField", () => {
     const input = screen.getByLabelText("容量");
     expect(input.closest(".yohu-text-field")?.getAttribute("data-paint")).toBe("warning");
     expect(input.getAttribute("aria-invalid")).toBeNull();
+  });
+
+  it("内容区重置 UA 盒模型，数字去掉原生步进", () => {
+    expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?box-sizing: border-box/);
+    expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?padding: 0/);
+    expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?appearance: none/);
+    expect(css).toContain('appearance: textfield');
+    expect(css).toContain("text-align: end");
+    expect(css).toContain("::-webkit-inner-spin-button");
+    expect(css).toContain('[data-width="number"]');
+    expect(css).toContain('[data-width="fill"]');
+    expect(css).not.toContain("[data-block]");
+    render(() => <YoTextField ariaLabel="缓冲最大行数" type="number" value="10000" />);
+    const input = screen.getByLabelText("缓冲最大行数") as HTMLInputElement;
+    expect(input.type).toBe("number");
+    expect(input.size).toBe(1);
+    expect(input.closest(".yohu-text-field")?.getAttribute("data-width")).toBe("number");
+  });
+
+  it("inputRef 转发内部 input，不挖宿主 DOM", () => {
+    let forwarded: HTMLInputElement | undefined;
+    render(() => (
+      <YoTextField
+        ariaLabel="关键字"
+        inputRef={(el) => {
+          forwarded = el;
+        }}
+      />
+    ));
+    const input = screen.getByLabelText("关键字") as HTMLInputElement;
+    expect(forwarded).toBe(input);
+    expect(input.tagName).toBe("INPUT");
+  });
+
+  it("block 铺满父级，压过 number 宽", () => {
+    render(() => <YoTextField block type="number" ariaLabel="全宽数字" />);
+    const host = screen.getByLabelText("全宽数字").closest(".yohu-text-field");
+    expect(host?.getAttribute("data-width")).toBe("fill");
+    expect(host?.hasAttribute("data-block")).toBe(false);
+  });
+
+  it("active 写 data-active，描边走 accent；默认不加", () => {
+    const { container, unmount } = render(() => <YoTextField ariaLabel="关键字" active />);
+    const host = container.querySelector(".yohu-text-field");
+    expect(host?.getAttribute("data-active")).toBe("true");
+    expect(host?.getAttribute("data-paint")).toBe("neutral");
+    expect(css).toMatch(
+      /\.yohu-text-field\[data-active\]\s*\{[^}]*--yohu-text-field-edge:\s*var\(--yohu-accent\)/,
+    );
+    unmount();
+    const idle = render(() => <YoTextField ariaLabel="Tag" />);
+    expect(idle.container.querySelector(".yohu-text-field")?.hasAttribute("data-active")).toBe(false);
   });
 });

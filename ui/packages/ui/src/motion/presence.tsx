@@ -14,6 +14,8 @@ export interface YoPresenceProps {
   when: boolean;
   recipe?: PresenceRecipe;
   onExitComplete?: () => void;
+  /** 短列表当前可见第一项（含出场中）。由 YoListPresence 写入。 */
+  first?: boolean;
   children: JSX.Element;
 }
 
@@ -99,6 +101,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
         data-state={state()}
         data-recipe={recipe()}
         data-exiting={exiting() ? "" : undefined}
+        data-first={props.first ? "" : undefined}
       >
         {recipe() === "list" ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
       </div>

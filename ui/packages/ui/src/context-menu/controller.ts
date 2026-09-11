@@ -10,8 +10,8 @@ import { readViewport } from "../placement/viewport";
 import { clampContextMenuPoint, clampToRect } from "./place";
 import type { ContextMenuRequest, ContextMenuScene, ContextMenuSession } from "./types";
 
+/** 模块契约：只开合与二次夹紧。会话快照留给 Host。 */
 export interface ContextMenuController {
-  session: Accessor<ContextMenuSession | null>;
   open: <Ctx, Action extends string>(
     scene: ContextMenuScene<Ctx, Action>,
     request: ContextMenuRequest<Ctx>,
@@ -19,6 +19,11 @@ export interface ContextMenuController {
   close: () => void;
   /** 菜单挂载后按实测尺寸二次夹紧；id 不匹配或已关闭则忽略。 */
   refine: (id: string, size: { width: number; height: number }) => void;
+}
+
+/** Host 专用。不进 `@yohu/ui` 包入口。 */
+export interface ContextMenuHostController extends ContextMenuController {
+  session: Accessor<ContextMenuSession | null>;
 }
 
 export function defineContextMenu<Ctx, Action extends string>(
@@ -30,7 +35,7 @@ export function defineContextMenu<Ctx, Action extends string>(
   return scene;
 }
 
-export function createContextMenuController(): ContextMenuController {
+export function createContextMenuController(): ContextMenuHostController {
   const [session, setSession] = createSignal<ContextMenuSession | null>(null);
 
   const close = (): void => {

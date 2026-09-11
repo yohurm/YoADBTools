@@ -5,13 +5,21 @@
   flex-shrink: 0;
   gap: var(--yohu-space-sm);
   min-height: var(--yohu-control-height);
-  margin-bottom: var(--yohu-space-sm);
   overflow-x: auto;
   box-sizing: border-box;
 }
 
 .yohu-toolbar[data-chrome="band"] {
-  padding: 0 var(--yohu-space-xs);
   background: var(--yohu-surface-2);
   border-radius: var(--yohu-radius-sm);
+}
+
+.yohu-toolbar[data-pad="band"] {
+  margin-bottom: var(--yohu-space-sm);
+  padding: 0 var(--yohu-space-xs);
+}
+
+.yohu-toolbar[data-pad="xs"] {
+  margin: 0;
+  padding: var(--yohu-space-xs) var(--yohu-space-sm);
 }

@@ -222,6 +222,24 @@ describe("YoSelect", () => {
   });
 });
 
+describe("YoSelect 分层契约", () => {
+  it("视图不内嵌 placePopover / 测量算法，也不留 layoutMenu 包装", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/components/Select.tsx"),
+      resolve(process.cwd(), "packages/ui/src/components/Select.tsx"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    expect(src).not.toMatch(/\bplacePopover\b/);
+    expect(src).not.toMatch(/\bestimateMenuHeight\b/);
+    expect(src).not.toMatch(/\bapplyPopoverBox\b/);
+    expect(src).not.toMatch(/\bgetBoundingClientRect\b/);
+    expect(src).not.toMatch(/\blayoutMenu\b/);
+    expect(src).toMatch(/\blayoutSelectMenu\b/);
+    expect(src).toMatch(/\breadSelectTrigger\b/);
+  });
+});
+
 describe("YoSelect 触发布局契约", () => {
   it("min-width 写在触发钮，不写在根上，避免短文案按钮偏左", () => {
     const candidates = [

@@ -12,6 +12,6 @@
   user-select: none;
 }
 
-.yohu-col-row--resizing {
+.yohu-col-row[data-resizing] {
   cursor: col-resize;
 }

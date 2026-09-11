@@ -10,6 +10,11 @@
   min-width: 0;
 }
 
+.yohu-tooltip__anchor[data-stretch] {
+  align-self: stretch;
+  height: 100%;
+}
+
 .yohu-tooltip__layer {
   position: fixed;
   z-index: var(--yohu-z-overlay);

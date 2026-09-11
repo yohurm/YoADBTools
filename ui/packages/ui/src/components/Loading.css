@@ -20,6 +20,12 @@
   background-color: var(--yohu-canvas);
 }
 
+.yohu-loading[data-fill] {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
 .yohu-loading__spinner {
   width: var(--yohu-space-3xl);
   height: var(--yohu-space-3xl);

@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { YoButton } from "./Button";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Button.css"), "utf8");
 
 describe("YoButton", () => {
   it("无 props 是 solid+accent 主按钮，没有旧变体 class", () => {
@@ -97,5 +102,29 @@ describe("YoButton", () => {
       </YoButton>
     ));
     expect(screen.getByRole("button", { name: "仅显示" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("ink + flush 写 data-ink=inherit 与 data-flush，不改 paint", () => {
+    render(() => (
+      <YoButton variant="ghost" tone="neutral" ink flush aria-pressed>
+        V
+      </YoButton>
+    ));
+    const btn = screen.getByRole("button", { name: "V" });
+    expect(btn.getAttribute("data-paint")).toBe("ghost-neutral");
+    expect(btn.getAttribute("data-ink")).toBe("inherit");
+    expect(btn.hasAttribute("data-flush")).toBe(true);
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("inherit 按下消费 --yohu-button-fill；flush 铺满且自隐铬", () => {
+    expect(css).toContain('[data-ink="inherit"]');
+    expect(css).toContain("--yohu-button-ink: inherit");
+    expect(css).toContain("--yohu-button-fill: inherit");
+    expect(css).toContain('[data-ink="inherit"][aria-pressed="true"]');
+    expect(css).toContain("background-color: var(--yohu-button-fill)");
+    expect(css).toContain("[data-flush]");
+    expect(css).toContain("height: 100%");
+    expect(css).toContain("border-radius: var(--yohu-radius-none)");
   });
 });

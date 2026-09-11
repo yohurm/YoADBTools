@@ -20,7 +20,7 @@ export function YoColRow(props: YoColRowProps): JSX.Element {
   return (
     <div
       class={`yohu-col-row${props.class ? ` ${props.class}` : ""}`}
-      classList={{ "yohu-col-row--resizing": props.resizing === true }}
+      data-resizing={props.resizing ? "" : undefined}
       role="row"
       style={props.template ? { "grid-template-columns": props.template } : undefined}
     >

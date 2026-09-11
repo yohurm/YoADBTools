@@ -17,7 +17,7 @@ export const Layout = {
   SettingsLabelMax: 240,
   /** 设置页路径类控件上限，避免输入框横向拉满。 */
   SettingsControlMax: 360,
-  /** 设置页数字输入宽度。 */
+  /** 数字输入 hug 宽（YoTextField type=number；设置行消费同一槽）。 */
   SettingsNumberW: 96,
   OutputMax: 260,
   CrumbMax: 160,

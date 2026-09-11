@@ -6,7 +6,8 @@
  */
 import type { JSX } from "solid-js";
 import { Show, createMemo } from "solid-js";
-import { formRowHostAttrs, shouldRenderFormRowSlot } from "./formrow-policy";
+import { hasFormRowSlot } from "./formrow-model";
+import { formRowHostAttrs } from "./formrow-policy";
 import "./FormRow.css";
 
 export interface YoFormRowProps {
@@ -37,11 +38,11 @@ export function YoFormRow(props: YoFormRowProps): JSX.Element {
       <div class="yohu-form-row__info">
         <div class="yohu-form-row__heading">
           <div class="yohu-form-row__title">{props.title}</div>
-          <Show when={shouldRenderFormRowSlot(props.note)}>
+          <Show when={hasFormRowSlot(props.note)}>
             <div class="yohu-form-row__note">{props.note}</div>
           </Show>
         </div>
-        <Show when={shouldRenderFormRowSlot(props.description)}>
+        <Show when={hasFormRowSlot(props.description)}>
           <div class="yohu-form-row__description">{props.description}</div>
         </Show>
       </div>

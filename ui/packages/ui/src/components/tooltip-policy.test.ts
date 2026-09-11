@@ -6,6 +6,7 @@ import {
   createTooltipUnique,
   dismissTooltipOverlay,
   resolveTooltipDelay,
+  tooltipAnchorAttrs,
   tooltipCanShow,
   tooltipCanShowOnFocus,
   tooltipNoteInput,
@@ -19,6 +20,25 @@ describe("tooltip-policy", () => {
     tooltipNoteInput("pointer");
     tooltipUnique.dismiss();
     vi.useRealTimers();
+  });
+
+  it("锚点布局：block 主轴、stretch 交叉轴，可叠加", () => {
+    expect(tooltipAnchorAttrs({})).toEqual({
+      "data-block": undefined,
+      "data-stretch": undefined,
+    });
+    expect(tooltipAnchorAttrs({ block: true })).toEqual({
+      "data-block": "",
+      "data-stretch": undefined,
+    });
+    expect(tooltipAnchorAttrs({ stretch: true })).toEqual({
+      "data-block": undefined,
+      "data-stretch": "",
+    });
+    expect(tooltipAnchorAttrs({ block: true, stretch: true })).toEqual({
+      "data-block": "",
+      "data-stretch": "",
+    });
   });
 
   it("延迟名缺省 effectsEnter；禁用或空文案不能出示", () => {

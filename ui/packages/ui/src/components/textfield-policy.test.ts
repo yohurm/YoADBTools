@@ -26,12 +26,14 @@ describe("textfield-policy", () => {
     expect(textFieldHostAttrs({})).toEqual({
       "data-status": "none",
       "data-paint": "neutral",
+      "data-width": "hug",
       "data-prefix": undefined,
       "data-suffix": undefined,
       "data-addon-before": undefined,
       "data-addon-after": undefined,
       "data-clearable": undefined,
       "data-disabled": undefined,
+      "data-active": undefined,
       disabled: false,
       "aria-invalid": undefined,
     });
@@ -57,5 +59,21 @@ describe("textfield-policy", () => {
     expect(attrs.disabled).toBe(true);
     expect(attrs["data-disabled"]).toBe(true);
     expect(attrs["data-paint"]).toBe("error");
+  });
+
+  it("宽度只写 data-width：number / fill / hug", () => {
+    expect(textFieldHostAttrs({ type: "number" })["data-width"]).toBe("number");
+    expect(textFieldHostAttrs({ type: "number", block: true })["data-width"]).toBe("fill");
+    expect(textFieldHostAttrs({})["data-width"]).toBe("hug");
+  });
+
+  it("active 只写 data-active，不改涂装", () => {
+    const idle = textFieldHostAttrs({});
+    expect(idle["data-active"]).toBeUndefined();
+    expect(idle["data-paint"]).toBe("neutral");
+    const attrs = textFieldHostAttrs({ active: true, status: "warning" });
+    expect(attrs["data-active"]).toBe(true);
+    expect(attrs["data-paint"]).toBe("warning");
+    expect(attrs["data-status"]).toBe("warning");
   });
 });

@@ -76,6 +76,40 @@ describe("YoDialog", () => {
     expect(screen.getByRole("button", { name: "确定" })).toBeTruthy();
   });
 
+  it("内容区缺省写成 stack / auto / lg", () => {
+    const { container } = render(() => (
+      <YoDialog open onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    expect(body.getAttribute("data-layout")).toBe("stack");
+    expect(body.getAttribute("data-overflow")).toBe("auto");
+    expect(body.getAttribute("data-pad")).toBe("lg");
+  });
+
+  it("bodyOverflow=hidden 保持 stack 与 lg 垫", () => {
+    const { container } = render(() => (
+      <YoDialog open bodyOverflow="hidden" onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    expect(body.getAttribute("data-layout")).toBe("stack");
+    expect(body.getAttribute("data-overflow")).toBe("hidden");
+    expect(body.getAttribute("data-pad")).toBe("lg");
+  });
+
+  it("bodyPad=none 去掉内容区垫", () => {
+    const { container } = render(() => (
+      <YoDialog open bodyPad="none" onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    expect(body.getAttribute("data-pad")).toBe("none");
+  });
+
   it("未指定宽度时不写 inline，由 layout token 约束", () => {
     const { container } = render(() => (
       <YoDialog open onClose={() => {}}>

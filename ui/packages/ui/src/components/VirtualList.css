@@ -8,6 +8,11 @@
   box-sizing: border-box;
 }
 
+.yohu-virtual-list[data-tone="document"] {
+  user-select: text;
+  cursor: text;
+}
+
 .yohu-virtual-list__inner {
   position: relative;
   width: 100%;
@@ -17,6 +22,11 @@
 .yohu-virtual-list__row {
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.yohu-virtual-list[data-tone="document"] .yohu-virtual-list__row {
+  user-select: text;
+  cursor: text;
 }
 
 .yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row {

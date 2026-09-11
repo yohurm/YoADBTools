@@ -1,25 +1,24 @@
 /**
  * YoTooltip —— 气泡提示（L4 视图 / L5 门面）。
- * 密集提示共享一个 popup（YoTooltipHost）；定位走 popover-place，禁止每处一棵 Portal。
- * 延迟只收 MotionSpec 名。无 Host 时不画（必须挂回树）。
+ * 只绑 Presence + 内容区；定位走 tooltip-place → popover-place。
+ * 密集提示共享一个 popup（YoTooltipHost）。无 Host 时不画。
  */
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoPresence } from "../motion/presence";
-import { Spacing } from "../tokens/spacing";
 import type { MotionSpecName } from "../tokens/motion";
 import {
   applyPopoverBox,
-  placePopover,
   popoverLayerStyle,
-  readViewport,
   type PopoverPlacement,
 } from "./popover-place";
 import { allocTooltipId, tooltipDomId } from "./tooltip-model";
+import { placeTooltip, readTooltipTrigger } from "./tooltip-place";
 import {
   bindTooltipInputModality,
   resolveTooltipDelay,
+  tooltipAnchorAttrs,
   tooltipCanShow,
   tooltipCanShowOnFocus,
   tooltipUnique,
@@ -36,8 +35,10 @@ export interface YoTooltipProps {
   delay?: MotionSpecName;
   /** 禁用：不出现示 */
   disabled?: boolean;
-  /** 铺满父级（列表行 / 路径盒）。缺省 hug 锚点 */
+  /** 铺满父级主轴（列表行 / 路径盒）。缺省 hug 锚点 */
   block?: boolean;
+  /** 铺满父级交叉轴（过滤栏级别槽） */
+  stretch?: boolean;
 }
 
 export interface YoTooltipHostProps {
@@ -81,20 +82,9 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
     const layer = layerRef;
     if (!live || !layer) return;
     const bubble = bubbleRef;
-    const box = placePopover({
-      trigger: {
-        top: live.trigger.top,
-        left: live.trigger.left,
-        bottom: live.trigger.bottom,
-        width: live.trigger.width,
-      },
-      menuHeight: Math.max(bubble?.scrollHeight ?? 0, live.trigger.height, 1),
-      viewport: readViewport(),
-      gap: Spacing.Xs,
-      maxHeightCap: Spacing.Xl * 8,
-      prefer: "top",
-      minWidth: Math.max(bubble?.scrollWidth ?? 0, 0),
-      align: "center",
+    const box = placeTooltip(live.trigger, {
+      width: bubble?.scrollWidth ?? 0,
+      height: bubble?.scrollHeight ?? 0,
     });
     applyPopoverBox(layer, box);
     setPlacement(box.placement);
@@ -150,16 +140,10 @@ export function YoTooltip(props: YoTooltipProps): JSX.Element {
   const id = allocTooltipId();
   let anchorRef: HTMLSpanElement | undefined;
 
-  const readTrigger = (): { top: number; left: number; bottom: number; width: number; height: number } => {
-    const rect = anchorRef?.getBoundingClientRect();
-    if (!rect) return { top: 0, left: 0, bottom: 0, width: 0, height: 0 };
-    return { top: rect.top, left: rect.left, bottom: rect.bottom, width: rect.width, height: rect.height };
-  };
-
   const show = (): void => {
     if (!tooltipCanShow(props.disabled, props.content)) return;
     unique.requestShow(
-      { id, content: props.content, trigger: readTrigger() },
+      { id, content: props.content, trigger: readTooltipTrigger(anchorRef) },
       resolveTooltipDelay(props.delay),
     );
   };
@@ -176,11 +160,14 @@ export function YoTooltip(props: YoTooltipProps): JSX.Element {
     unique.requestHide(id, "effectsFast");
   });
 
+  const anchor = () => tooltipAnchorAttrs({ block: props.block, stretch: props.stretch });
+
   return (
     <span
       ref={(el) => (anchorRef = el)}
       class="yohu-tooltip__anchor"
-      data-block={props.block ? "" : undefined}
+      data-block={anchor()["data-block"]}
+      data-stretch={anchor()["data-stretch"]}
       aria-describedby={unique.session()?.id === id ? tooltipDomId(id) : undefined}
       onMouseEnter={show}
       onMouseLeave={hide}

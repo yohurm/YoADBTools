@@ -6,11 +6,9 @@
  */
 import { createSignal, onCleanup, type JSX } from "solid-js";
 
-import { nudgeColWidth, type YoColSpec } from "./col-model";
-import { beginColResize, moveColResize, type ColResizePhase, type ColResizeSession } from "./col-resize";
+import { nudgeColWidth, type ColResizePhase, type YoColSpec } from "./col-model";
+import { beginColResize, moveColResize, type ColResizeSession } from "./col-resize";
 import "./ColResizer.css";
-
-export type { ColResizePhase } from "./col-resize";
 
 export interface YoColResizerProps {
   width: number;
@@ -131,7 +129,7 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
       aria-valuemax={props.maxWidth ?? undefined}
       tabindex="0"
       class="yohu-col-resizer"
-      classList={{ "yohu-col-resizer--active": active() }}
+      data-active={active() ? "" : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

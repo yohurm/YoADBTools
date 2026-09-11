@@ -171,6 +171,40 @@
   background-color: var(--yohu-state-pressed);
 }
 
+.yohu-button[data-ink="inherit"] {
+  --yohu-button-ink: inherit;
+  --yohu-button-fill: inherit;
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-ink="inherit"]:not(:disabled):hover,
+.yohu-button[data-ink="inherit"]:not(:disabled):active {
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-ink="inherit"][aria-pressed="true"] {
+  background-color: var(--yohu-button-fill);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-ink="inherit"][aria-pressed="true"]:not(:disabled):hover,
+.yohu-button[data-ink="inherit"][aria-pressed="true"]:not(:disabled):active {
+  background-color: var(--yohu-button-fill);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-flush] {
+  height: 100%;
+  max-width: none;
+  min-width: var(--yohu-control-height-sm);
+  padding-inline: var(--yohu-space-sm);
+  border: 0;
+  border-radius: var(--yohu-radius-none);
+  font-family: inherit;
+  font-size: inherit;
+  font-variant-numeric: inherit;
+}
+
 .yohu-button:disabled {
   cursor: not-allowed;
   background-color: var(--yohu-disabled);
