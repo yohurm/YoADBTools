@@ -675,6 +675,6 @@ mod tests {
         assert_eq!(&light[12..16], &[0xF5, 0xF3, 0xF1, 255]);
         assert_ne!(&light[0..4], &[0, 0, 0, 255]);
         let dark = fill_tile(canvas_bgra(true));
-        assert_eq!(&dark[0..4], &[0, 0, 0, 255]);
+        assert_eq!(&dark[0..4], &[0x1C, 0x1A, 0x19, 255]);
     }
 }

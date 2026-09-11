@@ -13,7 +13,7 @@ use yohu_protocol::Theme;
 
 /// 与 `Colors.BgBase` / `DarkColors.BgBase` 同值。
 pub const CANVAS_LIGHT: Color = Color(0xF1, 0xF3, 0xF5, 255);
-pub const CANVAS_DARK: Color = Color(0, 0, 0, 255);
+pub const CANVAS_DARK: Color = Color(0x19, 0x1A, 0x1C, 255);
 /// 与 `Colors.Fg` / `DarkColors.Fg` 同值（GDI 不画 alpha）。
 pub const BRAND_TEXT_LIGHT: Color = Color(0, 0, 0, 255);
 pub const BRAND_TEXT_DARK: Color = Color(0xE5, 0xE5, 0xE5, 255);
@@ -213,9 +213,9 @@ mod tests {
         let Color(r, g, b, a) = canvas_color(false);
         assert_eq!((r, g, b, a), (0xF1, 0xF3, 0xF5, 255));
         let Color(r, g, b, a) = canvas_color(true);
-        assert_eq!((r, g, b, a), (0, 0, 0, 255));
+        assert_eq!((r, g, b, a), (0x19, 0x1A, 0x1C, 255));
         assert_eq!(canvas_bgra(false), [0xF5, 0xF3, 0xF1, 255]);
-        assert_eq!(canvas_bgra(true), [0, 0, 0, 255]);
+        assert_eq!(canvas_bgra(true), [0x1C, 0x1A, 0x19, 255]);
         let Color(r, g, b, a) = brand_text_color(false);
         assert_eq!((r, g, b, a), (0, 0, 0, 255));
         let Color(r, g, b, a) = brand_text_color(true);

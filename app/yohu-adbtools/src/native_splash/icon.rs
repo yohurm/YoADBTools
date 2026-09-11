@@ -220,7 +220,7 @@ mod tests {
         let icon = load_icon().expect("128x128.png");
         let Color(r, g, b, _) = CANVAS_DARK;
         let painted = icon.onto_canvas(r, g, b);
-        assert_eq!(&painted.data[0..4], [0, 0, 0, 255]);
+        assert_eq!(&painted.data[0..4], [r, g, b, 255]);
         assert!(painted.data.chunks_exact(4).all(|px| px[3] == 255));
     }
 }
