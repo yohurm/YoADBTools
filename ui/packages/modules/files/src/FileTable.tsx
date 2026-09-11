@@ -6,8 +6,6 @@
 import { For, Show } from "solid-js";
 
 import {
-  Icon,
-  Layout,
   YoColCell,
   YoColFrame,
   YoColHeader,
@@ -26,7 +24,6 @@ import {
   FILE_COLUMNS,
   fileColTemplate,
   fileTypeLabel,
-  formatMtime,
   formatSize,
   type FileColumnSpec,
 } from "./model";
@@ -42,29 +39,17 @@ function ColHead(props: { col: FileColumnSpec }) {
   };
   return (
     <YoColHeader
+      align={props.col.align}
       ariaSort={ariaSort()}
       resizable={!props.col.flex}
       resizeLabel={props.col.resizeLabel}
       width={fileStore.ui.colWidths[props.col.key] ?? props.col.defaultWidth}
       minWidth={props.col.minWidth}
       onWidthChange={(width) => fileStore.setColWidth(props.col.key, width)}
+      onSort={() => fileStore.setSort(props.col.key)}
+      tooltip={props.col.sortTitle}
     >
-      <YoTooltip content={props.col.sortTitle}>
-      <button
-        type="button"
-        class="yohu-files__sort yohu-interactive yohu-focus-ring--inset"
-        onClick={() => fileStore.setSort(props.col.key)}
-      >
-        <span class="yohu-col-header__label">
-          <span class="yohu-files__sort-label">{props.col.header}</span>
-          <Show when={ariaSort() !== "none"}>
-            <span class="yohu-files__sort-icon" aria-hidden="true">
-              <Icon name={ariaSort() === "ascending" ? "chevron-up" : "chevron-down"} size={Layout.IconTiny} />
-            </span>
-          </Show>
-        </span>
-      </button>
-      </YoTooltip>
+      {props.col.header}
     </YoColHeader>
   );
 }
@@ -72,7 +57,7 @@ function ColHead(props: { col: FileColumnSpec }) {
 function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
   const type = (): string => fileTypeLabel(props.entry);
   const size = (): string => (props.entry.kind === "file" ? formatSize(props.entry.size) : "");
-  const mtime = (): string => formatMtime(props.entry.mtime);
+  const mtime = (): string => props.entry.mtime ?? "";
   switch (props.col.key) {
     case "name":
       return (
@@ -116,7 +101,6 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
       <div
         class="yohu-files__table-list"
         onContextMenu={(event) => {
-          if ((event.target as HTMLElement).closest(".yohu-virtual-list__row")) return;
           event.preventDefault();
           fileStore.clearSelection();
           props.onContextMenu(event.clientX, event.clientY);
@@ -127,9 +111,9 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
           fallback={
             <Show
               when={fileStore.session.loading}
-              fallback={<YoEmptyState icon="folder" title="此文件夹为空" />}
+              fallback={<YoEmptyState fill icon="folder" title="此文件夹为空" />}
             >
-              <YoLoading title="加载中" description="正在读取目录" />
+              <YoLoading fill title="加载中" description="正在读取目录" />
             </Show>
           }
         >

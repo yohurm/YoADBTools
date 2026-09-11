@@ -52,6 +52,7 @@
   cursor: text;
 }
 
+/* 路径编辑揭开层：与面包屑同格 clip，不是第二套 YoTextField 皮。铬只消费 token。 */
 .yohu-files__field {
   display: flex;
   align-items: center;
@@ -159,7 +160,8 @@
   height: 100%;
 }
 
-.yohu-files__explorer--drop > .yohu-panel {
+/* 描边和软底画在模块自己的 pane class 上；不透明卡片会盖住 explorer 宿主底。 */
+.yohu-files__explorer--drop .yohu-files__explorer-pane {
   outline: var(--yohu-stroke-accent) dashed var(--yohu-accent);
   outline-offset: calc(var(--yohu-stroke-hairline) * -1);
   background-color: var(--yohu-accent-soft);
@@ -192,47 +194,6 @@
   font-size: var(--yohu-font-caption);
   font-weight: var(--yohu-font-weight-regular);
   color: var(--yohu-fg-2);
-}
-
-.yohu-col-header[aria-sort="ascending"] .yohu-files__sort-label,
-.yohu-col-header[aria-sort="descending"] .yohu-files__sort-label {
-  color: var(--yohu-fg);
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
-.yohu-files__sort {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: inherit;
-}
-
-.yohu-files__sort:hover {
-  color: var(--yohu-fg);
-}
-
-.yohu-files__sort-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.yohu-files__sort-icon {
-  flex: 0 0 var(--yohu-layout-icon-tiny);
-  width: var(--yohu-layout-icon-tiny);
-  height: var(--yohu-layout-icon-tiny);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .yohu-files__table-list {
@@ -325,13 +286,6 @@
   margin: 0;
   color: var(--yohu-fg);
   font-family: var(--yohu-font-mono);
-}
-
-.yohu-files__table-list .yohu-empty-state,
-.yohu-files__table-list .yohu-loading,
-.yohu-files__explorer .yohu-empty-state {
-  height: 100%;
-  flex: 1 1 auto;
 }
 
 /* ===== 传输列表（容器走 YoPanel；开合走 YoCollapse） ===== */

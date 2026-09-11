@@ -260,12 +260,13 @@ export function FileView(props: DeviceSession) {
           data-drop="files"
         >
           <YoPanel
+            class="yohu-files__explorer-pane"
             variant="pane"
             header={<AddressSlot api={(slot) => { addressSlot = slot; }} />}
           >
             <Show
               when={props.selectedSerials[0]}
-              fallback={<YoEmptyState icon="folder" title="未选择设备" description="请在左侧设备栏选择在线设备" />}
+              fallback={<YoEmptyState fill icon="folder" title="未选择设备" description="请在左侧设备栏选择在线设备" />}
             >
               <FileTable dropDirName={dropDirName()} onContextMenu={openListMenu} />
             </Show>
@@ -316,6 +317,7 @@ export function FileView(props: DeviceSession) {
           }
         >
           <YoTextField
+            block
             label="名称"
             value={createName()}
             onInput={(v) => {

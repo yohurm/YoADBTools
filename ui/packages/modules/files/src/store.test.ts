@@ -17,7 +17,6 @@ import {
   fileCategory,
   fileColTemplate,
   fileTypeLabel,
-  formatMtime,
   formatSize,
   joinPath,
   parentOf,
@@ -103,8 +102,8 @@ describe("sortEntries", () => {
   it("按修改时间升序，空时间置后", () => {
     const sorted = sortEntries(
       [
-        e("new.txt", "file", { mtime: "2026-08-18 12:00" }),
-        e("old.txt", "file", { mtime: "2026-01-01 08:00" }),
+        e("new.txt", "file", { mtime: "2026-08-18 12:00:08" }),
+        e("old.txt", "file", { mtime: "2026-01-01 08:00:03" }),
         e("none.txt", "file"),
       ],
       "mtime",
@@ -192,20 +191,9 @@ describe("fileTypeLabel（类型列）", () => {
   });
 });
 
-describe("formatMtime", () => {
-  it("压缩为月日时分", () => {
-    expect(formatMtime("2024-01-11 23:11")).toBe("01-11 23:11");
-    expect(formatMtime("2026-08-18T09:07:00")).toBe("08-18 09:07");
-  });
-  it("空值与无法解析原样", () => {
-    expect(formatMtime()).toBe("");
-    expect(formatMtime("昨天")).toBe("昨天");
-  });
-});
-
 describe("fileColTemplate", () => {
   it("前三列定宽，日期列吃剩余", () => {
-    expect(fileColTemplate(defaultFileColWidths())).toBe("240px 72px 80px minmax(108px, 1fr)");
+    expect(fileColTemplate(defaultFileColWidths())).toBe("240px 72px 80px minmax(168px, 1fr)");
   });
 });
 

@@ -100,8 +100,8 @@ export const FILE_COLUMNS: readonly FileColumnSpec[] = [
     header: "日期",
     sortTitle: "按日期排序",
     resizeLabel: "调节日期列宽",
-    defaultWidth: 108,
-    minWidth: 88,
+    defaultWidth: 168,
+    minWidth: 140,
     flex: true,
     align: "start",
   },
@@ -188,14 +188,6 @@ export function fileTypeLabel(entry: RemoteEntry): string {
   const ext = entry.name.split(".").pop();
   if (ext && ext !== entry.name) return ext.toUpperCase();
   return "文件";
-}
-
-/** `2024-01-11 23:11` → `01-11 23:11`；无法解析则原样返回。 */
-export function formatMtime(mtime?: string): string {
-  if (!mtime) return "";
-  const match = mtime.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-  if (!match) return mtime;
-  return `${match[2]}-${match[3]} ${match[4]}:${match[5]}`;
 }
 
 export function isCancelledError(e: unknown): boolean {

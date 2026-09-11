@@ -3,6 +3,7 @@
  * 展开 / 收回只动 clip-path。输入盒走 field-sizing:content（固有宽跟 value），
  * 禁止指定 width、禁止逐字改 style.width。槽是视野；光标在两端时只滚 field。
  * 输入不受控，避免父级重绘清掉全选。
+ * 这是路径编辑（面包屑同格揭开），不是第二套输入皮；不能塞进 YoTextField。
  */
 
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";

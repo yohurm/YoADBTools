@@ -23,10 +23,20 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toMatch(/\.yohu-files__cols\s*\{[^}]*padding:[^;}]*space-/);
   });
 
-  it("表头与名称列垫交给 YoColCell，排序钮宿主 padding 为 0", () => {
+  it("表头与名称列垫交给 YoColCell，模块不自绘排序钮", () => {
     expect(filesCss).not.toContain("--yohu-col-header-content-pad:");
     expect(filesCss).not.toContain("--yohu-col-cell-pad");
-    expect(filesCss).toMatch(/\.yohu-files__sort\s*\{[^}]*padding:\s*0/);
+    expect(filesCss).not.toContain("yohu-col-header");
+    expect(filesCss).not.toContain(".yohu-files__sort");
+    const tableCandidates = [
+      resolve(process.cwd(), "src/FileTable.tsx"),
+      resolve(process.cwd(), "packages/modules/files/src/FileTable.tsx"),
+    ];
+    const table =
+      tableCandidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ??
+      "";
+    expect(table).not.toContain("yohu-virtual-list__row");
+    expect(table).not.toContain("yohu-col-header__label");
     expect(filesCss).not.toMatch(/\.yohu-files__name\s*\{[^}]*padding-left/);
   });
 
@@ -53,6 +63,12 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toContain(".yohu-presence");
     expect(filesCss).not.toContain("100cqi");
     expect(filesCss).not.toContain("container-type");
+    expect(filesCss).not.toContain(".yohu-text-field");
+    expect(filesCss).toMatch(
+      /\.yohu-files__field\s*\{[^}]*border:\s*var\(--yohu-stroke-hairline\)\s+solid\s+var\(--yohu-accent\)/,
+    );
+    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*border-radius:\s*var\(--yohu-radius-sm\)/);
+    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*height:\s*var\(--yohu-control-height\)/);
   });
 
   it("拖入高亮走 accent token", () => {
@@ -61,6 +77,13 @@ describe("文件表头布局契约", () => {
     expect(filesCss).toContain("var(--yohu-accent-soft)");
     expect(filesCss).toContain("var(--yohu-accent)");
     expect(filesCss).toContain("var(--yohu-stroke-accent)");
+    const drop =
+      filesCss.match(/\.yohu-files__explorer--drop\s+\.yohu-files__explorer-pane\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(drop).toContain("outline:");
+    expect(drop).toContain("var(--yohu-accent-soft)");
+    expect(filesCss).not.toContain(".yohu-empty-state");
+    expect(filesCss).not.toContain(".yohu-loading");
+    expect(filesCss).not.toContain(".yohu-panel");
   });
 });
 
