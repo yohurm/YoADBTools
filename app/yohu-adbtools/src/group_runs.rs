@@ -1,4 +1,4 @@
-//! 命令组运行生命周期：任务中心登记、进度转发、取消。编排在 domain GroupExecutor。
+//! 命令组 / 命令块运行生命周期：任务中心登记、进度转发、取消。编排在 domain GroupExecutor。
 
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
@@ -6,10 +6,12 @@ use tokio_util::sync::CancellationToken;
 
 use crate::commands::{ipc_code, ipc_library};
 use crate::state::AppState;
-use yohu_domain::{CommandGroup, GroupExecutor, LibraryError};
-use yohu_protocol::{AppEvent, GroupProgress, GroupRunRequest, IpcError, IpcErrorCode};
+use yohu_domain::{GroupExecutor, LibraryError, ScheduledStep};
+use yohu_protocol::{
+    AppEvent, BlockRunRequest, GroupProgress, GroupRunRequest, IpcError, IpcErrorCode,
+};
 
-/// 查库、校验占位符、登记并异步跑一组命令；立即返回 run_id。
+/// 查库、校验占位符、登记并异步跑一组条目；立即返回 run_id。
 pub fn start(app: AppHandle, state: &AppState, req: GroupRunRequest) -> Result<u32, IpcError> {
     let group = {
         let library = state.library.lock().expect("library lock poisoned");
@@ -20,16 +22,54 @@ pub fn start(app: AppHandle, state: &AppState, req: GroupRunRequest) -> Result<u
             )
         })?
     };
-    if let Some(command) = group.first_command_needing_values() {
+    if let Some(entry) = group.first_entry_needing_values() {
         return Err(ipc_library(LibraryError::GroupNeedsValues {
             group_id: group.id.clone(),
-            command_id: command.id.clone(),
+            entry_id: entry.id().to_string(),
         }));
     }
-    Ok(spawn(app, state, group, req.serials))
+    let steps = group.scheduled_steps();
+    Ok(spawn(
+        app,
+        state,
+        format!("命令组: {}", group.name),
+        format!("{} 台设备 · {} 条命令", req.serials.len(), steps.len()),
+        steps,
+        req.serials,
+    ))
 }
 
-fn spawn(app: AppHandle, state: &AppState, group: CommandGroup, serials: Vec<String>) -> u32 {
+/// 查库、填充、登记并异步跑一个命令块。
+pub fn start_block(app: AppHandle, state: &AppState, req: BlockRunRequest) -> Result<u32, IpcError> {
+    let block = {
+        let library = state.library.lock().expect("library lock poisoned");
+        library.block(&req.block_id).cloned().ok_or_else(|| {
+            ipc_code(
+                IpcErrorCode::NotFound,
+                format!("命令块不存在: {}", req.block_id),
+            )
+        })?
+    };
+    let filled = block.fill(&req.values).map_err(ipc_library)?;
+    let steps = filled.scheduled_steps();
+    Ok(spawn(
+        app,
+        state,
+        format!("命令块: {}", block.name),
+        format!("{} 台设备 · {} 条命令", req.serials.len(), steps.len()),
+        steps,
+        req.serials,
+    ))
+}
+
+fn spawn(
+    app: AppHandle,
+    state: &AppState,
+    task_name: String,
+    detail: String,
+    steps: Vec<ScheduledStep>,
+    serials: Vec<String>,
+) -> u32 {
     let run_id = state
         .group_next
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -41,13 +81,9 @@ fn spawn(app: AppHandle, state: &AppState, group: CommandGroup, serials: Vec<Str
         .expect("group lock poisoned")
         .insert(run_id, cancel.clone());
 
-    let task_id = state.tasks.register(
-        format!("命令组: {}", group.name),
-        format!("{} 台设备 · {} 条命令", serials.len(), group.commands.len()),
-    );
+    let task_id = state.tasks.register(task_name, detail);
     let (tx, mut rx) = mpsc::channel::<yohu_domain::GroupRunEvent>(64);
     let sink = state.event_tx.clone();
-    let commands = group.commands.clone();
 
     tokio::spawn(async move {
         let forward = tokio::spawn(async move {
@@ -72,7 +108,7 @@ fn spawn(app: AppHandle, state: &AppState, group: CommandGroup, serials: Vec<Str
             let state = app.state::<AppState>();
             state.client.clone()
         });
-        executor.run(&commands, &serials, tx, cancel).await;
+        executor.run(&steps, &serials, tx, cancel).await;
         let _ = forward.await;
 
         let state = app.state::<AppState>();

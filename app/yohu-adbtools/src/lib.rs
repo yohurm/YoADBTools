@@ -314,6 +314,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminal::terminal_eval,
             commands::terminal::terminal_exec,
             commands::terminal::group_run,
+            commands::terminal::block_run,
             commands::terminal::group_cancel,
             commands::commandlib::commandlib_load,
             commands::commandlib::commandlib_save,
