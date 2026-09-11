@@ -234,7 +234,7 @@ export interface RemoteEntry {
   size: number;
   permission: string;
   link_target?: string;
-  /** 修改时间（ls -la 日期时间列原文） */
+  /** 修改时间（`YYYY-MM-DD HH:mm:ss`；`ls -lla` 规范化后） */
   mtime?: string;
 }
 

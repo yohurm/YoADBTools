@@ -16,7 +16,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
     const line: LogLine = {
       seq: 1,
-      ts: "01-02 03:04:05.678",
+      ts: "2026-01-02 03:04:05.678",
       pid: 1234,
       tid: 5678,
       level: "I",
@@ -25,7 +25,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     };
     expect(JSON.parse(JSON.stringify(line))).toEqual({
       seq: 1,
-      ts: "01-02 03:04:05.678",
+      ts: "2026-01-02 03:04:05.678",
       pid: 1234,
       tid: 5678,
       level: "I",
@@ -62,7 +62,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine.uid 缺省时不出现在 JSON", () => {
     const withUid: LogLine = {
       seq: 1,
-      ts: "01-02 03:04:05.678",
+      ts: "2026-01-02 03:04:05.678",
       pid: 1234,
       tid: 5678,
       uid: "1000",
