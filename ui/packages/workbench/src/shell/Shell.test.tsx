@@ -449,7 +449,7 @@ describe("NavList（§3 模块导航）", () => {
 });
 
 describe("StatusBar（§3 状态栏）", () => {
-  it("任务项悬停明细走 YoTooltip（aria-label = TaskInfo.detail）", async () => {
+  it("任务项明细走 aria-label，不画气泡", async () => {
     expect(mocks.taskHandler).not.toBeNull();
     mocks.taskHandler?.({
       tasks: [
@@ -462,7 +462,7 @@ describe("StatusBar（§3 状态栏）", () => {
     expect(task?.textContent).toBe("上传: x.apk");
     expect(task?.getAttribute("title")).toBeNull();
     expect(task?.getAttribute("aria-label")).toBe("C:\\x.apk → /sdcard/x.apk");
-    expect(task?.closest(".yohu-tooltip__anchor")).toBeTruthy();
+    expect(task?.closest(".yohu-tooltip__anchor")).toBeNull();
   });
 
   it("版本文案来自 system.info 身份", async () => {
@@ -559,11 +559,11 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     const boxes = container.querySelectorAll(".yohu-settings__path");
     expect(boxes).toHaveLength(4);
     expect(boxes[0]?.getAttribute("title")).toBeNull();
-    expect(boxes[0]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
+    expect(boxes[0]?.closest(".yohu-tooltip__anchor")).toBeNull();
     expect(boxes[0]?.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
-    expect(boxes[1]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
-    expect(boxes[2]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
-    expect(boxes[3]?.closest(".yohu-tooltip__anchor")).toBeTruthy();
+    expect(boxes[1]?.closest(".yohu-tooltip__anchor")).toBeNull();
+    expect(boxes[2]?.closest(".yohu-tooltip__anchor")).toBeNull();
+    expect(boxes[3]?.closest(".yohu-tooltip__anchor")).toBeNull();
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
     for (const title of ["ADB 路径", "数据目录"]) {

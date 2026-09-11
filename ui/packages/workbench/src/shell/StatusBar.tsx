@@ -1,11 +1,11 @@
 /**
  * 底部状态栏（UI设计系统-v6.md §3）：左版本 · 中留白 · 右「设备 · 任务 · 状态」。
- * 状态槽由已注册模块的 Status 贡献（投屏实测 fps 等）；任务项悬停显示明细。
+ * 状态槽由已注册模块的 Status 贡献（投屏实测 fps 等）；任务明细走 aria-label，不画气泡。
  */
 
 import { Component, For, Show } from "solid-js";
 
-import { YoStatusBar, YoTooltip } from "@yohu/ui";
+import { YoStatusBar } from "@yohu/ui";
 
 import { modules } from "../registry";
 import { deviceStore, settingsStore, taskStore } from "../stores";
@@ -30,11 +30,9 @@ export const StatusBar: Component = () => {
               任务:
               <For each={activeTasks()}>
                 {(t) => (
-                  <YoTooltip content={t.detail ?? t.name}>
-                    <span class="yohu-status__task" aria-label={t.detail ?? t.name}>
-                      {t.name}
-                    </span>
-                  </YoTooltip>
+                  <span class="yohu-status__task" aria-label={t.detail ?? t.name}>
+                    {t.name}
+                  </span>
                 )}
               </For>
             </span>

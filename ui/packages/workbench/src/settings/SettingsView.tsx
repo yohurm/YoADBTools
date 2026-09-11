@@ -31,7 +31,6 @@ import {
   YoSwitch,
   YoTextField,
   YoToaster,
-  YoTooltip,
   createToaster,
 } from "@yohu/ui";
 
@@ -77,12 +76,10 @@ function EffectBadge(props: { text: string }): JSX.Element {
 function PathBox(props: { label: string; path: string }): JSX.Element {
   const parts = () => splitPathEnds(props.path);
   return (
-    <YoTooltip content={props.path} disabled={!props.path}>
-      <div class="yohu-settings__path" aria-label={props.label}>
-        <span class="yohu-settings__path-head">{parts().head}</span>
-        <span class="yohu-settings__path-tail">{parts().tail}</span>
-      </div>
-    </YoTooltip>
+    <div class="yohu-settings__path" aria-label={props.label}>
+      <span class="yohu-settings__path-head">{parts().head}</span>
+      <span class="yohu-settings__path-tail">{parts().tail}</span>
+    </div>
   );
 }
 

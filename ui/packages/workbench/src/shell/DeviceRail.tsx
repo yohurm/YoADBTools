@@ -10,24 +10,12 @@
 
 import { Component, Show, createSignal } from "solid-js";
 
-import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence, YoTooltip } from "@yohu/ui";
-import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
+import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence } from "@yohu/ui";
+import { deviceDisplayName } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
 import { deviceStore } from "../stores";
-import { formatDeviceStatusHint, formatDeviceStatusMeta } from "./device-status-format";
-
-/** 设备状态可读文本（YoTooltip）。 */
-function stateText(state: DeviceInfo["state"]): string {
-  switch (state) {
-    case "online":
-      return "在线";
-    case "unauthorized":
-      return "未授权";
-    case "offline":
-      return "离线";
-  }
-}
+import { formatDeviceStatusMeta } from "./device-status-format";
 
 export const DeviceRail: Component<{
   moduleId?: string;
@@ -100,17 +88,9 @@ export const DeviceRail: Component<{
               {(device) => {
                 const focused = () => deviceStore.state.focusSerial === device.serial;
                 const runtime = () => deviceStore.state.statuses[device.serial];
-                const hint = () => formatDeviceStatusHint(runtime());
                 const meta = () => formatDeviceStatusMeta(runtime());
                 const first = () => deviceStore.state.devices[0]?.serial === device.serial;
-                const title = () => {
-                  const extra = hint();
-                  return extra
-                    ? `${deviceDisplayName(device)} · ${device.serial} · ${stateText(device.state)} · ${extra}`
-                    : `${deviceDisplayName(device)} · ${device.serial} · ${stateText(device.state)}`;
-                };
                 return (
-                  <YoTooltip content={title()} block>
                   <div
                     class="yohu-device-rail__item yohu-interactive yohu-focus-ring"
                     classList={{
@@ -141,7 +121,6 @@ export const DeviceRail: Component<{
                       <YoBadge text="未授权" tone="warning" />
                     </Show>
                   </div>
-                  </YoTooltip>
                 );
               }}
             </YoListPresence>
