@@ -19,10 +19,6 @@
   container-type: inline-size;
 }
 
-.yohu-terminal__output.yohu-panel[data-variant="pane"] .yohu-panel__body {
-  overflow: hidden;
-}
-
 .yohu-terminal__stream {
   display: flex;
   flex-direction: column;
@@ -50,13 +46,14 @@
   margin-top: var(--yohu-space-sm);
 }
 
-.yohu-terminal__stream > .yohu-presence:first-child .yohu-terminal__line[data-kind="in"] {
+.yohu-terminal__stream [data-first] .yohu-terminal__line[data-kind="in"] {
   margin-top: 0;
 }
 
 .yohu-terminal__line-time {
   flex-shrink: 0;
   color: var(--yohu-fg-3);
+  font-family: var(--yohu-font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -129,7 +126,7 @@
   background: var(--yohu-surface);
 }
 
-.yohu-terminal__queue > .yohu-presence:first-child .yohu-terminal__queue-item {
+.yohu-terminal__queue [data-first] .yohu-terminal__queue-item {
   margin-top: var(--yohu-space-sm);
 }
 
@@ -159,44 +156,14 @@
 }
 
 .yohu-terminal__composer-input {
-  flex: 1;
-  min-width: 0;
-  height: var(--yohu-control-height);
-  box-sizing: border-box;
   resize: none;
   overflow: auto;
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
-  color: var(--yohu-fg);
   font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-body);
-  line-height: var(--yohu-font-leading-ui);
-  transition:
-    border-color var(--yohu-motion-effects-fast),
-    background-color var(--yohu-motion-effects-fast),
-    color var(--yohu-motion-effects-fast);
-}
-
-.yohu-terminal__composer-input:focus {
-  border-color: var(--yohu-accent);
-  outline: none;
-}
-
-.yohu-terminal__composer-input:disabled {
-  background-color: var(--yohu-surface-2);
-  color: var(--yohu-disabled);
-  cursor: not-allowed;
+  height: var(--yohu-control-height);
 }
 
 .yohu-terminal__send {
   flex-shrink: 0;
-}
-
-.yohu-terminal__send .yohu-icon-button:disabled {
-  color: var(--yohu-fg-3);
-  opacity: 1;
 }
 
 .yohu-terminal__params {

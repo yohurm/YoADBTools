@@ -56,14 +56,9 @@ function ParameterDialog(props: {
   });
 
   const submit = (): void => {
-    const live = fieldsRoot
-      ? Array.from(fieldsRoot.querySelectorAll("input")).map((el) => (el as HTMLInputElement).value)
-      : values();
-    props.onSubmit(live.length > 0 ? live : values());
+    props.onSubmit(values());
     props.onClose();
   };
-
-  let fieldsRoot: HTMLDivElement | undefined;
 
   return (
     <YoDialog
@@ -79,15 +74,11 @@ function ParameterDialog(props: {
         </>
       }
     >
-      <div
-        class="yohu-terminal__params"
-        ref={(el) => {
-          fieldsRoot = el;
-        }}
-      >
+      <div class="yohu-terminal__params">
         <For each={Array.from({ length: arity() }, (_, i) => i)}>
           {(index) => (
             <YoTextField
+              block
               label={`参数 ${index + 1}`}
               value={values()[index] ?? ""}
               onInput={(v) => setValues((vs) => vs.map((old, i) => (i === index ? v : old)))}
@@ -262,6 +253,7 @@ export function TerminalView(props: DeviceSession) {
           class="yohu-terminal__output"
           variant="pane"
           padding="none"
+          overflow="hidden"
           title="执行结果"
           actions={
             <Show when={running()}>
@@ -327,15 +319,24 @@ export function TerminalView(props: DeviceSession) {
                       aria-expanded={true}
                       onClick={() => setComposerOpen(false)}
                     />
-                    <textarea
-                      class="yohu-terminal__composer-input yohu-focus-ring"
-                      rows={1}
-                      aria-label="命令"
-                      value={draft()}
-                      disabled={running()}
-                      onInput={(event) => setDraft(event.currentTarget.value)}
-                      onKeyDown={onComposerKey}
-                    />
+                    <div
+                      class="yohu-text-field"
+                      data-paint="neutral"
+                      data-width="fill"
+                      data-disabled={running() ? true : undefined}
+                    >
+                      <div class="yohu-text-field__control yohu-focus-host">
+                        <textarea
+                          class="yohu-text-field__input yohu-terminal__composer-input"
+                          rows={1}
+                          aria-label="命令"
+                          value={draft()}
+                          disabled={running()}
+                          onInput={(event) => setDraft(event.currentTarget.value)}
+                          onKeyDown={onComposerKey}
+                        />
+                      </div>
+                    </div>
                     <span
                       class="yohu-terminal__send yohu-recipe-send-aim"
                       data-armed={canSend() ? "true" : "false"}

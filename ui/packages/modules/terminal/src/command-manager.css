@@ -1,11 +1,5 @@
-/* 命令管理：三栏（组 | 命令 | 编辑器），各自滚动，互不挤压。 */
-
-.yohu-dialog:has(.yohu-cm) .yohu-dialog__body {
-  display: flex;
-  overflow: hidden;
-  padding: 0;
-  min-height: 0;
-}
+/* 命令管理：三栏（组 | 命令 | 编辑器），各自滚动，互不挤压。
+ * 对话框内容区走 YoDialog bodyOverflow=hidden bodyPad=none，禁止再点 __body。 */
 
 .yohu-cm {
   display: grid;
@@ -24,12 +18,6 @@
   min-width: 0;
   min-height: 0;
   background: var(--yohu-surface-2);
-}
-
-.yohu-cm__groups .yohu-toolbar,
-.yohu-cm__commands .yohu-toolbar {
-  margin: 0;
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
 }
 
 .yohu-cm__caption {
@@ -83,10 +71,6 @@
   gap: var(--yohu-space-md);
 }
 
-.yohu-cm__editor .yohu-text-field {
-  display: flex;
-  width: 100%;
-}
 
 .yohu-cm__empty {
   margin: auto;

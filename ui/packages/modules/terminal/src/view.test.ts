@@ -51,4 +51,51 @@ describe("命令终端动效接线", () => {
     expect(view).toContain('icon="send"');
     expect(css).not.toContain("rotate(");
   });
+
+  it("composer textarea 复用 TextField 壳类，模块 CSS 只留布局", () => {
+    expect(view).toContain("<textarea");
+    expect(view).toContain("yohu-text-field__control");
+    expect(view).toContain("yohu-focus-host");
+    expect(view).toContain("yohu-text-field__input");
+    expect(view).toContain("yohu-terminal__composer-input");
+    expect(view).toContain('data-paint="neutral"');
+    expect(view).toContain('data-width="fill"');
+    expect(view).not.toContain("YoTextArea");
+    expect(view).toContain('class="yohu-text-field__input yohu-terminal__composer-input"');
+    expect(view).not.toContain("yohu-terminal__composer-input yohu-focus-ring");
+
+    const composerBlock = css.slice(css.indexOf(".yohu-terminal__composer-input"));
+    const composerRule = composerBlock.slice(0, composerBlock.indexOf("}") + 1);
+    expect(composerRule).toContain("resize: none");
+    expect(composerRule).toContain("overflow: auto");
+    expect(composerRule).toContain("var(--yohu-font-mono)");
+    expect(composerRule).toContain("var(--yohu-control-height)");
+    expect(composerRule).not.toMatch(/border(-radius|-color)?:/);
+    expect(composerRule).not.toContain("background");
+    expect(composerRule).not.toContain("border-color");
+    expect(css).not.toContain(".yohu-terminal__composer-input:focus");
+    expect(css).not.toContain(".yohu-terminal__composer-input:disabled");
+    expect(css).not.toContain(".yohu-terminal__send .yohu-icon-button:disabled");
+  });
+
+  it("结果区与参数对话框走公开契约，不点内部槽、不挖 input", () => {
+    expect(view).toContain('overflow="hidden"');
+    expect(view).not.toContain('querySelectorAll("input")');
+    expect(view).not.toContain("fieldsRoot");
+    expect(css).not.toContain(".yohu-panel__body");
+    const manager = load("CommandManager.tsx");
+    const managerCss = load("command-manager.css");
+    expect(manager).toContain('bodyOverflow="hidden"');
+    expect(manager).toContain('bodyPad="none"');
+    expect(managerCss).not.toContain(".yohu-dialog__body");
+  });
+
+  it("流/排队认 data-first，命令管理走 Toolbar pad，不点内部根", () => {
+    expect(css).toContain("[data-first]");
+    expect(css).not.toContain(".yohu-presence");
+    const manager = load("CommandManager.tsx");
+    const managerCss = load("command-manager.css");
+    expect(manager).toContain('pad="xs"');
+    expect(managerCss).not.toContain(".yohu-toolbar");
+  });
 });

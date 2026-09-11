@@ -10,6 +10,7 @@ import {
   COMMAND_LIBRARY_SCHEMA_VERSION,
   commandlibLoad,
   commandlibSave,
+  formatDateTimeFromMs,
   groupCancel,
   groupRun,
   onGroupProgress,
@@ -41,7 +42,7 @@ export interface IoLine {
 let nextId = 1;
 let activeGroupRun: number | null = null;
 
-const nowText = (): string => new Date().toLocaleTimeString("zh-CN", { hour12: false });
+const nowText = (): string => formatDateTimeFromMs(Date.now());
 
 export function createTerminalStore() {
   let prependAdb = false;

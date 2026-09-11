@@ -102,6 +102,8 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
       title="命令管理"
       width={960}
       height={560}
+      bodyOverflow="hidden"
+      bodyPad="none"
       onClose={props.onClose}
       footer={
         <>
@@ -119,7 +121,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
     >
       <div class="yohu-cm">
         <div class="yohu-cm__groups">
-          <YoToolbar>
+          <YoToolbar pad="xs">
             <span class="yohu-cm__caption">命令组</span>
             <YoIconButton icon="plus" title="新增组" onClick={addGroup} />
             <YoIconButton icon="trash" title="删除组" onClick={removeGroup} />
@@ -149,7 +151,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
         </div>
 
         <div class="yohu-cm__commands">
-          <YoToolbar>
+          <YoToolbar pad="xs">
             <span class="yohu-cm__caption">命令</span>
             <YoIconButton icon="plus" title="新增命令" onClick={addCommand} />
             <YoIconButton icon="trash" title="删除命令" onClick={removeCommand} />
@@ -186,6 +188,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
                 {(group) => (
                   <YoPanel title="组属性">
                     <YoTextField
+                      block
                       label="组名称"
                       value={group().name}
                       onInput={(v) => setDraft("groups", (g) => g.id === group().id, "name", v)}
@@ -197,8 +200,9 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
           >
             {(command) => (
               <YoPanel title={`命令属性 · ${selectedGroup()?.name || "未命名组"}`}>
-                <YoTextField label="命令名称" value={command.name} onInput={(v) => updateCommand({ name: v })} />
+                <YoTextField block label="命令名称" value={command.name} onInput={(v) => updateCommand({ name: v })} />
                 <YoTextField
+                  block
                   label={`具体命令（占位符 {0} {1}…）`}
                   ariaLabel="具体命令"
                   value={formatAdbLine("-", command.template)}
