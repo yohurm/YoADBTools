@@ -42,4 +42,4 @@ core 零 Tauri：`FramePipe` 在 `yohu-mirror`；解码 / 窗体 / GPU 只在 `y
 
 ## UI
 
-`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏；月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。操作栏 / 功能栏是 `YoPanel` pane，内容区排布走库的 align / gap / overflow，模块 CSS 只锁栏宽。状态采样见 [device.md](device.md)。
+`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏；月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。操作栏 / 功能栏是 `YoPanel` pane，内容区排布走库的 align / gap / overflow，模块 CSS 只锁栏宽。状态采样见 [device.md](device.md)。
