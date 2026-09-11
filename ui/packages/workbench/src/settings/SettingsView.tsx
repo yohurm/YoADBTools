@@ -16,6 +16,7 @@ import {
   type Density,
   type LogDisplayColumns,
   type SettingKey,
+  type TerminalTimeFormat,
   type Theme,
 } from "@yohu/api";
 import {
@@ -47,6 +48,13 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 const DENSITY_OPTIONS: { value: Density; label: string }[] = [
   { value: "comfortable", label: "舒适（默认）" },
   { value: "compact", label: "紧凑" },
+];
+
+const TERMINAL_TIME_FORMAT_OPTIONS: { value: TerminalTimeFormat; label: string }[] = [
+  { value: "time_millis", label: "时分秒.毫秒（默认）" },
+  { value: "time", label: "时分秒" },
+  { value: "datetime_millis", label: "日期 + 时分秒.毫秒" },
+  { value: "datetime", label: "日期 + 时分秒" },
 ];
 
 function formatBytes(bytes: number): string {
@@ -249,6 +257,13 @@ export const SettingsView: Component = () => {
               ariaLabel="输入命令默认加上 adb"
               checked={settingsStore.state.terminal_prepend_adb}
               onChange={(v) => save("terminal_prepend_adb", v, "已保存（立即生效）")}
+            />
+          </YoFormRow>
+          <YoFormRow title="结果显示时间格式" note={<EffectBadge text="立即生效" />}>
+            <YoSelect
+              options={TERMINAL_TIME_FORMAT_OPTIONS}
+              value={settingsStore.state.terminal_time_format}
+              onChange={(v) => save("terminal_time_format", v, "已保存（立即生效）")}
             />
           </YoFormRow>
         </YoPanel>

@@ -583,6 +583,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
+  it("终端时间格式切换立即写入 terminal_time_format", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("结果显示时间格式")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒（默认）" }));
+    fireEvent.click(screen.getByText("日期 + 时分秒.毫秒"));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_time_format", "datetime_millis");
+    });
+  });
+
   it("密度切换：保存到 core 并应用到 documentElement", async () => {
     render(() => <SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: "舒适（默认）" }));
