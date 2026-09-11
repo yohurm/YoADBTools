@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogLine {
     pub seq: u64,
-    /// threadtime 时间戳原文（`MM-DD HH:MM:SS.mmm`）
+    /// 墙钟文本（`YYYY-MM-DD HH:mm:ss.SSS`；采集自 `logcat -v threadtime,uid,year`）
     pub ts: String,
     pub pid: u32,
     pub tid: u32,
-    /// `logcat -v threadtime,uid` 的 UID：数字或名（`root`/`shell`）；旧格式或缺列时为 None
+    /// `logcat -v threadtime,uid,year` 的 UID：数字或名（`root`/`shell`）；缺列时为 None
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
     /// 级别字母：V/D/I/W/E/F；解析失败时为 '?'

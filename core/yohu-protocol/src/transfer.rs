@@ -45,7 +45,7 @@ pub enum EntryKind {
     Other,
 }
 
-/// `ls -la` 解析出的条目。
+/// `ls -lla` 解析出的条目。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RemoteEntry {
     pub name: String,
@@ -56,7 +56,7 @@ pub struct RemoteEntry {
     /// 符号链接目标（kind = symlink 时）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub link_target: Option<String>,
-    /// 修改时间（`ls -la` 日期时间列原文，如 `2026-01-01 12:00`）
+    /// 修改时间（`YYYY-MM-DD HH:mm:ss`；来自 `ls -lla` 后再规范化，不到毫秒）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mtime: Option<String>,
 }
