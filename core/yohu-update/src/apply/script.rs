@@ -1,6 +1,8 @@
 //! Windows 覆盖助手脚本：等 PID → 退避重试 NSIS → 记日志 → 拉起。
 
-use super::plan::{NSIS_OVERLAY_ARGS, SETTLE_SECS, SETUP_TRIES, WAIT_PID_MINUTES};
+use super::plan::{
+    NSIS_OVERLAY_ARGS, RELAUNCH_SETTLE_SECS, SETTLE_SECS, SETUP_TRIES, WAIT_PID_MINUTES,
+};
 
 /// 由 [`super::ApplyPlan`] 写入 `cache/update/apply-update.ps1`。
 pub fn apply_script() -> String {
@@ -57,7 +59,7 @@ if (-not $ok) {{
   exit 4
 }}
 Remove-Item -LiteralPath $Setup -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds {RELAUNCH_SETTLE_SECS}
 if (Test-Path -LiteralPath $App) {{
   Write-ApplyLog "relaunch $App"
   Start-Process -FilePath $App

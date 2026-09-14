@@ -20,6 +20,15 @@ impl InstallerKind {
         }
     }
 
+    /// 当前 OS 应安装的形态。
+    pub fn for_os(os: &str) -> Option<Self> {
+        match os.trim().to_ascii_lowercase().as_str() {
+            "windows" => Some(Self::Nsis),
+            "macos" | "darwin" => Some(Self::Dmg),
+            _ => None,
+        }
+    }
+
     pub fn extension(self) -> &'static str {
         match self {
             Self::Nsis => "exe",
@@ -43,5 +52,15 @@ mod tests {
             Some(InstallerKind::Dmg)
         );
         assert_eq!(InstallerKind::from_name("releases/tag/v0.1.3"), None);
+        assert_eq!(InstallerKind::from_name("YohuAdbTools_0.1.3_x64.msi"), None);
+        assert_eq!(InstallerKind::from_name("YohuAdbTools.app"), None);
+    }
+
+    #[test]
+    fn for_os_matches_product_targets() {
+        assert_eq!(InstallerKind::for_os("windows"), Some(InstallerKind::Nsis));
+        assert_eq!(InstallerKind::for_os("macos"), Some(InstallerKind::Dmg));
+        assert_eq!(InstallerKind::for_os("darwin"), Some(InstallerKind::Dmg));
+        assert_eq!(InstallerKind::for_os("linux"), None);
     }
 }

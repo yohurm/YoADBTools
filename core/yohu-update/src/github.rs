@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use reqwest::Client;
 use serde::Deserialize;
-use yohu_protocol::{RemoteUpdate, PRODUCT_NAME};
+use yohu_protocol::RemoteUpdate;
 
 use crate::contract::UpdateCheckProvider;
 use crate::error::UpdateError;
@@ -12,6 +12,7 @@ use crate::platform::PlatformInfo;
 use crate::release::{remote_from_release, ReleaseAsset};
 
 const API_LATEST: &str = "https://api.github.com/repos";
+const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_OWNER: &str = "yohurm";
 pub const DEFAULT_REPO: &str = "Windows-YoADBTools";
 
@@ -60,7 +61,7 @@ impl GitHubReleaseProvider {
         endpoint: impl Into<String>,
     ) -> Result<Self, UpdateError> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(10))
+            .timeout(CHECK_TIMEOUT)
             .build()
             .map_err(|e| UpdateError::Network(e.to_string()))?;
         Ok(Self {
@@ -78,7 +79,7 @@ impl UpdateCheckProvider for GitHubReleaseProvider {
             .get(&self.endpoint)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", format!("{PRODUCT_NAME}/{}", platform.version));
+            .header("User-Agent", crate::platform::user_agent(&platform.version));
         if !self.source.token.is_empty() {
             req = req.bearer_auth(&self.source.token);
         }
@@ -86,7 +87,7 @@ impl UpdateCheckProvider for GitHubReleaseProvider {
         let status = response.status();
         let text = response.text().await?;
         if status.as_u16() == 404 {
-            return Err(UpdateError::Platform("GitHub 上还没有 Release".into()));
+            return Err(UpdateError::NoRelease);
         }
         if !status.is_success() {
             let hint = github_error_message(&text);
@@ -99,7 +100,7 @@ impl UpdateCheckProvider for GitHubReleaseProvider {
     }
 }
 
-pub fn latest_endpoint(owner: &str, repo: &str) -> String {
+fn latest_endpoint(owner: &str, repo: &str) -> String {
     format!("{API_LATEST}/{owner}/{repo}/releases/latest")
 }
 
@@ -117,14 +118,11 @@ struct GhRelease {
     assets: Vec<ReleaseAsset>,
 }
 
-pub fn parse_release_body(
-    body: &str,
-    platform: &PlatformInfo,
-) -> Result<RemoteUpdate, UpdateError> {
+fn parse_release_body(body: &str, platform: &PlatformInfo) -> Result<RemoteUpdate, UpdateError> {
     let release: GhRelease =
         serde_json::from_str(body).map_err(|e| UpdateError::Parse(e.to_string()))?;
     if release.draft {
-        return Err(UpdateError::Platform("最新 Release 仍是草稿".into()));
+        return Err(UpdateError::DraftRelease);
     }
     remote_from_release(
         &release.tag_name,
@@ -187,10 +185,19 @@ mod tests {
         assert!(update.has_new_version);
         assert_eq!(update.version, "1.2.0");
         assert_eq!(update.description, "fix windows nsis");
-        assert!(update.download_url.ends_with("x64-setup.exe"));
+        assert_eq!(
+            update
+                .installer_url
+                .as_deref()
+                .map(|u| u.ends_with("x64-setup.exe")),
+            Some(true)
+        );
+        assert_eq!(
+            update.page_url,
+            "https://github.com/yohurm/Windows-YoADBTools/releases/tag/v1.2.0"
+        );
         assert_eq!(update.size_bytes, 6081740);
         assert_eq!(update.sha256, "deadbeef");
-        assert!(!update.force_update);
     }
 
     #[test]
@@ -203,10 +210,23 @@ mod tests {
         }"#;
         let update = parse_release_body(body, &win64()).unwrap();
         assert!(!update.has_new_version);
-        assert_eq!(
-            update.download_url,
-            "https://github.com/o/r/releases/tag/0.1.0"
-        );
+        assert!(update.installer_url.is_none());
+        assert_eq!(update.page_url, "https://github.com/o/r/releases/tag/0.1.0");
+    }
+
+    #[test]
+    fn parse_release_draft_is_typed_error() {
+        let body = r#"{
+            "tag_name": "v1.2.0",
+            "body": "",
+            "html_url": "https://github.com/o/r/releases/tag/v1.2.0",
+            "draft": true,
+            "assets": []
+        }"#;
+        assert!(matches!(
+            parse_release_body(body, &win64()),
+            Err(UpdateError::DraftRelease)
+        ));
     }
 
     #[test]

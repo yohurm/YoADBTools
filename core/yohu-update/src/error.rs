@@ -2,13 +2,19 @@
 
 use thiserror::Error;
 
-/// 更新模块错误。
+/// 更新模块错误。用户可见文案只定义在此。
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum UpdateError {
     #[error("未配置 GitHub 仓库（config/update.json 或 YOHU_GITHUB_*）")]
     NotConfigured,
-    #[error("未获取到有效下载地址")]
-    NoDownloadUrl,
+    #[error("新版本没有安装包也没有发布页")]
+    NoInstallerOrPage,
+    #[error("GitHub 上还没有 Release")]
+    NoRelease,
+    #[error("最新 Release 仍是草稿")]
+    DraftRelease,
+    #[error("Release 缺少 tag_name")]
+    MissingTag,
     #[error("更新平台返回错误: {0}")]
     Platform(String),
     #[error("检查更新 HTTP {0}")]

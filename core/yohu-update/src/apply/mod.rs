@@ -12,7 +12,7 @@ use std::path::Path;
 use std::process::Stdio;
 
 use crate::artifact::InstallerKind;
-use crate::download::assert_cached_installer;
+use crate::cache::assert_cached_installer;
 use crate::error::UpdateError;
 
 /// 拉起覆盖安装。返回是否应退出当前进程（Windows 必须退出才能覆盖主程序）。
@@ -31,9 +31,11 @@ pub fn spawn_overlay_install(
         InstallerKind::Nsis => {
             #[cfg(windows)]
             {
-                spawn_windows(
-                    &ApplyPlan::new(installer, app_pid, relaunch_exe.to_path_buf()),
-                )?;
+                spawn_windows(&ApplyPlan::new(
+                    installer,
+                    app_pid,
+                    relaunch_exe.to_path_buf(),
+                )?)?;
                 Ok(true)
             }
             #[cfg(not(windows))]
@@ -73,7 +75,7 @@ fn spawn_windows(plan: &ApplyPlan) -> Result<(), UpdateError> {
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
-    let cache = crate::download::update_cache_dir();
+    let cache = crate::cache::update_cache_dir()?;
     std::fs::create_dir_all(&cache).map_err(|e| UpdateError::Io(e.to_string()))?;
     let script = cache.join("apply-update.ps1");
     {

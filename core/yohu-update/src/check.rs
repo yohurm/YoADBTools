@@ -1,9 +1,9 @@
-//! 检查编排：把平台信息交给 Provider，有新版本则要求可用下载地址。
+//! 检查编排：把平台信息交给 Provider；新版本可只有 Release 页。
 
 use crate::contract::UpdateCheckProvider;
 use crate::error::UpdateError;
-use crate::mapper;
 use crate::platform::PlatformInfo;
+use crate::url_policy;
 use yohu_protocol::RemoteUpdate;
 
 /// 使用当前平台身份检查更新。
@@ -18,32 +18,44 @@ pub async fn check_update<P: UpdateCheckProvider>(
         arch = %platform.arch,
         "开始检查更新"
     );
-    let update = provider.check(platform).await?;
+    let update = normalize(provider.check(platform).await?)?;
     if !update.has_new_version {
         tracing::info!(version = %update.version, "已是最新版本");
         return Ok(update);
     }
-    let resolved = update.with_download_url(update.download_url.trim());
-    if !mapper::has_usable_url(&resolved.download_url) {
-        tracing::warn!(version = %resolved.version, "检查到新版本但无有效下载地址");
-        return Err(UpdateError::NoDownloadUrl);
+    if update.installer_url.is_none() && update.page_url.is_empty() {
+        tracing::warn!(version = %update.version, "检查到新版本但无安装包也无 Release 页");
+        return Err(UpdateError::NoInstallerOrPage);
     }
     tracing::info!(
-        version = %resolved.version,
-        force = resolved.force_update,
+        version = %update.version,
+        has_installer = update.installer_url.is_some(),
         "检查到新版本"
     );
-    Ok(resolved)
+    Ok(update)
 }
 
-/// 仅允许打开 http(s) 下载地址。
-pub fn assert_http_url(url: &str) -> Result<&str, UpdateError> {
-    let trimmed = url.trim();
-    if mapper::is_http_url(trimmed) {
-        Ok(trimmed)
-    } else {
-        Err(UpdateError::InvalidUrl)
-    }
+fn normalize(mut update: RemoteUpdate) -> Result<RemoteUpdate, UpdateError> {
+    update.page_url = {
+        let trimmed = update.page_url.trim();
+        if trimmed.is_empty() {
+            String::new()
+        } else {
+            url_policy::assert_http_url(trimmed)?.to_string()
+        }
+    };
+    update.installer_url = match update.installer_url {
+        Some(url) => {
+            let trimmed = url.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(url_policy::assert_http_url(trimmed)?.to_string())
+            }
+        }
+        None => None,
+    };
+    Ok(update)
 }
 
 #[cfg(test)]
@@ -75,15 +87,13 @@ mod tests {
         }
     }
 
-    fn remote(has_new: bool, url: &str) -> RemoteUpdate {
+    fn remote(has_new: bool, installer: Option<&str>, page: &str) -> RemoteUpdate {
         RemoteUpdate {
             has_new_version: has_new,
             version: "1.2.0".into(),
-            version_code: 12,
             description: "fix".into(),
-            download_url: url.into(),
-            force_update: false,
-            md5: String::new(),
+            installer_url: installer.map(str::to_string),
+            page_url: page.into(),
             sha256: String::new(),
             size_bytes: 0,
         }
@@ -93,7 +103,7 @@ mod tests {
     async fn check_passes_platform_identity_to_provider() {
         let spy = SpyProvider {
             seen: Mutex::new(None),
-            result: Ok(remote(false, "")),
+            result: Ok(remote(false, None, "")),
         };
         check_update(&spy, &platform()).await.unwrap();
         let seen = spy.seen.lock().unwrap().clone().unwrap();
@@ -104,31 +114,89 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn new_version_without_usable_url_errors() {
+    async fn new_version_without_installer_keeps_page_url() {
         let spy = SpyProvider {
             seen: Mutex::new(None),
-            result: Ok(remote(true, "/relative.exe")),
+            result: Ok(remote(
+                true,
+                None,
+                "https://github.com/o/r/releases/tag/v1.2.0",
+            )),
         };
-        let err = check_update(&spy, &platform()).await.unwrap_err();
-        assert!(matches!(err, UpdateError::NoDownloadUrl));
+        let update = check_update(&spy, &platform()).await.unwrap();
+        assert!(update.installer_url.is_none());
+        assert_eq!(
+            update.page_url,
+            "https://github.com/o/r/releases/tag/v1.2.0"
+        );
     }
 
     #[tokio::test]
-    async fn new_version_trims_download_url() {
+    async fn new_version_invalid_installer_url_errors() {
         let spy = SpyProvider {
             seen: Mutex::new(None),
-            result: Ok(remote(true, "  https://cdn.example.com/setup.exe  ")),
+            result: Ok(remote(true, Some("/relative.exe"), "")),
         };
-        let update = check_update(&spy, &platform()).await.unwrap();
-        assert_eq!(update.download_url, "https://cdn.example.com/setup.exe");
+        let err = check_update(&spy, &platform()).await.unwrap_err();
+        assert!(matches!(err, UpdateError::InvalidUrl));
     }
 
-    #[test]
-    fn assert_http_url_rejects_local_paths() {
-        assert!(assert_http_url(r"C:\setup.exe").is_err());
+    #[tokio::test]
+    async fn new_version_without_installer_or_page_errors() {
+        let spy = SpyProvider {
+            seen: Mutex::new(None),
+            result: Ok(remote(true, None, "")),
+        };
+        let err = check_update(&spy, &platform()).await.unwrap_err();
+        assert!(matches!(err, UpdateError::NoInstallerOrPage));
+    }
+
+    #[tokio::test]
+    async fn new_version_invalid_page_url_errors_even_with_installer() {
+        let spy = SpyProvider {
+            seen: Mutex::new(None),
+            result: Ok(remote(
+                true,
+                Some("https://cdn.example.com/setup.exe"),
+                "not-a-url",
+            )),
+        };
+        let err = check_update(&spy, &platform()).await.unwrap_err();
+        assert!(matches!(err, UpdateError::InvalidUrl));
+    }
+
+    #[tokio::test]
+    async fn new_version_empty_page_with_installer_ok() {
+        let spy = SpyProvider {
+            seen: Mutex::new(None),
+            result: Ok(remote(true, Some("https://cdn.example.com/setup.exe"), "")),
+        };
+        let update = check_update(&spy, &platform()).await.unwrap();
         assert_eq!(
-            assert_http_url(" https://example.com/a.exe ").unwrap(),
-            "https://example.com/a.exe"
+            update.installer_url.as_deref(),
+            Some("https://cdn.example.com/setup.exe")
+        );
+        assert!(update.page_url.is_empty());
+    }
+
+    #[tokio::test]
+    async fn new_version_trims_installer_url() {
+        let spy = SpyProvider {
+            seen: Mutex::new(None),
+            result: Ok(remote(
+                true,
+                Some("  https://cdn.example.com/setup.exe  "),
+                " https://github.com/o/r/releases/tag/v1.2.0 ",
+            )),
+        };
+        let update = check_update(&spy, &platform()).await.unwrap();
+        assert_eq!(
+            update.installer_url.as_deref(),
+            Some("https://cdn.example.com/setup.exe")
+        );
+        assert_eq!(
+            update.page_url,
+            "https://github.com/o/r/releases/tag/v1.2.0"
         );
     }
 }

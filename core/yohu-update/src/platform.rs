@@ -1,6 +1,11 @@
 //! 本机平台信息：检查更新时交给 Provider（版本比较 / 安装包筛选）。
 
-use yohu_protocol::AppIdentity;
+use yohu_protocol::{AppIdentity, PRODUCT_NAME};
+
+/// 检查与下载共用的 User-Agent：`{PRODUCT_NAME}/{version}`。
+pub fn user_agent(version: &str) -> String {
+    format!("{PRODUCT_NAME}/{version}")
+}
 
 /// 当前安装的平台身份（版本 / 包标识 / OS / 架构）。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,7 +31,12 @@ impl PlatformInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yohu_protocol::{AppIdentity, IDENTIFIER};
+    use yohu_protocol::{AppIdentity, IDENTIFIER, PRODUCT_NAME};
+
+    #[test]
+    fn user_agent_is_product_slash_version() {
+        assert_eq!(user_agent("0.1.2"), format!("{PRODUCT_NAME}/0.1.2"));
+    }
 
     #[test]
     fn from_identity_keeps_version_and_package_id() {

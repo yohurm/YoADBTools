@@ -2,13 +2,11 @@
 
 use std::path::PathBuf;
 
-#[cfg(not(target_os = "macos"))]
-use yohu_protocol::DATA_DIR_NAME;
-use yohu_protocol::PRODUCT_NAME;
-#[cfg(not(target_os = "macos"))]
+use yohu_protocol::{DATA_DIR_NAME, PRODUCT_NAME};
 use yohu_runtime::app_install_root;
 
-use crate::download::update_cache_dir;
+use crate::cache::update_cache_dir;
+use crate::error::UpdateError;
 
 /// Tauri NSIS 应用内更新开关（对照 plugin-updater）。
 ///
@@ -25,6 +23,8 @@ pub const WAIT_PID_MINUTES: u32 = 5;
 pub const SETTLE_SECS: u32 = 2;
 /// setup 失败重试次数（Omaha：忙/锁则退避）。
 pub const SETUP_TRIES: u32 = 4;
+/// 覆盖成功后再等，再拉起新主程序。
+pub const RELAUNCH_SETTLE_SECS: u32 = 1;
 
 /// 一次覆盖安装的冻结参数。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,37 +36,41 @@ pub struct ApplyPlan {
 }
 
 impl ApplyPlan {
-    pub fn new(installer: PathBuf, wait_pid: u32, relaunch: PathBuf) -> Self {
-        Self {
+    pub fn new(installer: PathBuf, wait_pid: u32, relaunch: PathBuf) -> Result<Self, UpdateError> {
+        Ok(Self {
             installer,
             wait_pid,
             relaunch,
-            log_path: apply_log_path(),
-        }
+            log_path: apply_log_path()?,
+        })
     }
 }
 
-pub fn apply_log_path() -> PathBuf {
-    update_cache_dir().join("apply.log")
+pub fn apply_log_path() -> Result<PathBuf, UpdateError> {
+    Ok(update_cache_dir()?.join("apply.log"))
 }
 
 /// NSIS per-user 安装后的主程序。
-pub fn installed_exe_path() -> PathBuf {
+pub fn installed_exe_path() -> Result<PathBuf, UpdateError> {
     #[cfg(windows)]
     {
-        app_install_root(DATA_DIR_NAME).join(format!("{PRODUCT_NAME}.exe"))
+        Ok(app_install_root(DATA_DIR_NAME)
+            .map_err(|e| UpdateError::Io(e.to_string()))?
+            .join(format!("{PRODUCT_NAME}.exe")))
     }
     #[cfg(target_os = "macos")]
     {
-        PathBuf::from("/Applications")
-            .join(format!("{PRODUCT_NAME}.app"))
+        Ok(app_install_root(DATA_DIR_NAME)
+            .map_err(|e| UpdateError::Io(e.to_string()))?
             .join("Contents")
             .join("MacOS")
-            .join(PRODUCT_NAME)
+            .join(PRODUCT_NAME))
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
-        app_install_root(DATA_DIR_NAME).join(PRODUCT_NAME)
+        Ok(app_install_root(DATA_DIR_NAME)
+            .map_err(|e| UpdateError::Io(e.to_string()))?
+            .join(PRODUCT_NAME))
     }
 }
 
@@ -87,14 +91,15 @@ mod tests {
             PathBuf::from("C:/cache/setup.exe"),
             42,
             PathBuf::from("C:/Programs/YohuAdbTools.exe"),
-        );
+        )
+        .expect("os app data root");
         assert_eq!(plan.wait_pid, 42);
         assert!(plan.log_path.ends_with("apply.log"));
     }
 
     #[test]
     fn installed_exe_is_under_product_install_root() {
-        let p = installed_exe_path();
+        let p = installed_exe_path().expect("os install root");
         #[cfg(windows)]
         {
             assert!(p.ends_with("YohuAdbTools.exe"));
@@ -107,8 +112,12 @@ mod tests {
         }
         #[cfg(target_os = "macos")]
         {
-            assert!(p.ends_with("YohuAdbTools"));
-            assert!(p.to_string_lossy().contains("YohuAdbTools.app"));
+            let expected = app_install_root(DATA_DIR_NAME)
+                .expect("os install root")
+                .join("Contents")
+                .join("MacOS")
+                .join(PRODUCT_NAME);
+            assert_eq!(p, expected);
         }
     }
 }

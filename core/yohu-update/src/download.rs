@@ -1,85 +1,29 @@
-//! 把 GitHub Release 安装包下到临时目录，流式 SHA-256 校验。
+//! HTTP 流：把安装包下到缓存，边写边做 SHA-256。
+//!
+//! 公开入口在 crate 根：`download_configured` / `download_with_github`。
+//! 本文件只做流式写入；Authorization 必须先过 GitHub 主机判定。
 
-use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
-use yohu_protocol::{
-    dir, UpdateDownloadResult, UpdateProgress, UpdateStage, DATA_DIR_NAME,
-};
-use yohu_runtime::app_data_root;
+use yohu_protocol::{UpdateDownloadResult, UpdateProgress, UpdateStage};
 
+use crate::cache::installer_dest;
 use crate::error::UpdateError;
+use crate::url_policy::{assert_http_url, github_bearer_token};
+use crate::verify::{hex_lower, sha256_hex, sha256_matches, MAX_INSTALLER_BYTES};
 
-/// 安装包缓存上限（防异常 Content-Length 填盘）。
-pub const MAX_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-
-/// 产品家园 `cache/update/`：不进 NSIS INSTDIR，覆盖安装时不会自删。
-pub fn update_cache_dir() -> PathBuf {
-    app_data_root(DATA_DIR_NAME)
-        .join(dir::CACHE)
-        .join(dir::UPDATE)
-}
-
-/// 从下载 URL 取出合法的安装包文件名（`.exe` / `.dmg`）。
-pub fn installer_file_name(url: &str) -> Result<String, UpdateError> {
-    let trimmed = url.trim();
-    let without_query = trimmed.split(['?', '#']).next().unwrap_or(trimmed);
-    let raw = without_query.rsplit('/').next().unwrap_or("").trim();
-    if raw.is_empty() {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    let decoded = raw.replace("%20", " ");
-    if crate::artifact::InstallerKind::from_name(&decoded).is_none() {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    if decoded
-        .chars()
-        .any(|c| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ' ')))
-    {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    if decoded.contains("..") {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    Ok(decoded)
-}
-
-/// 把检查结果里的 URL 编成缓存路径。
-pub fn installer_dest(url: &str) -> Result<PathBuf, UpdateError> {
-    Ok(update_cache_dir().join(installer_file_name(url)?))
-}
-
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    hex_lower(&digest)
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push(HEX[(b >> 4) as usize] as char);
-        out.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    out
-}
-
-pub fn sha256_matches(expected: &str, actual: &str) -> bool {
-    let exp = expected.trim();
-    if exp.is_empty() {
-        return true;
-    }
-    exp.eq_ignore_ascii_case(actual.trim())
-}
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// 下载安装包到缓存目录；已存在且校验通过则跳过网络。
-pub async fn download_installer(
+///
+/// `token` 只在 GitHub 主机上进入 Authorization；调用方不得绕过主机判定。
+pub(crate) async fn stream_installer(
     url: &str,
     expected_sha256: &str,
     expected_size: u64,
@@ -88,7 +32,7 @@ pub async fn download_installer(
     cancel: CancellationToken,
     mut on_progress: impl FnMut(UpdateProgress),
 ) -> Result<UpdateDownloadResult, UpdateError> {
-    let url = crate::assert_http_url(url)?.to_string();
+    let url = assert_http_url(url)?.to_string();
     if expected_size > MAX_INSTALLER_BYTES {
         return Err(UpdateError::TooLarge);
     }
@@ -122,13 +66,10 @@ pub async fn download_installer(
 
     let client = reqwest::Client::builder()
         .timeout(DOWNLOAD_TIMEOUT)
-        .connect_timeout(Duration::from_secs(15))
+        .connect_timeout(CONNECT_TIMEOUT)
         .build()
         .map_err(|e| UpdateError::Network(e.to_string()))?;
-    let mut req = client.get(&url).header("User-Agent", user_agent);
-    if !token.trim().is_empty() {
-        req = req.bearer_auth(token.trim());
-    }
+    let req = apply_download_headers(client.get(&url), &url, token, user_agent);
     let response = tokio::select! {
         biased;
         _ = cancel.cancelled() => return Err(UpdateError::Cancelled),
@@ -240,72 +181,79 @@ pub async fn download_installer(
     })
 }
 
-/// 安装包必须落在更新缓存目录内，且为 `.exe` / `.dmg`。
-pub fn assert_cached_installer(path: &Path) -> Result<PathBuf, UpdateError> {
-    if !path.is_absolute() {
-        return Err(UpdateError::InvalidInstaller);
+fn apply_download_headers(
+    builder: reqwest::RequestBuilder,
+    url: &str,
+    token: &str,
+    user_agent: &str,
+) -> reqwest::RequestBuilder {
+    let builder = builder.header("User-Agent", user_agent);
+    match github_bearer_token(url, token) {
+        Some(token) => builder.bearer_auth(token),
+        None => builder,
     }
-    let name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or(UpdateError::InvalidInstaller)?;
-    if crate::artifact::InstallerKind::from_name(name).is_none() {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    if !path.is_file() {
-        return Err(UpdateError::InstallerNotFound);
-    }
-    let cache = update_cache_dir()
-        .canonicalize()
-        .map_err(|_| UpdateError::InstallerNotFound)?;
-    let file = path
-        .canonicalize()
-        .map_err(|_| UpdateError::InstallerNotFound)?;
-    if !file.starts_with(&cache) {
-        return Err(UpdateError::InvalidInstaller);
-    }
-    Ok(file)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::installer_dest;
+    use crate::download_with_github;
+    use crate::github::GitHubReleaseSource;
+    use tokio_util::sync::CancellationToken;
+    use yohu_protocol::UpdateDownloadRequest;
 
-    #[test]
-    fn installer_file_name_from_github_asset() {
-        let name = installer_file_name(
-            "https://github.com/yohurm/Windows-YoADBTools/releases/download/v0.1.2/YohuAdbTools_0.1.2_x64-setup.exe",
-        )
-        .unwrap();
-        assert_eq!(name, "YohuAdbTools_0.1.2_x64-setup.exe");
-        let dmg = installer_file_name(
-            "https://github.com/yohurm/Windows-YoADBTools/releases/download/v0.1.2/YohuAdbTools_0.1.2_aarch64.dmg",
-        )
-        .unwrap();
-        assert_eq!(dmg, "YohuAdbTools_0.1.2_aarch64.dmg");
+    fn source_with_token(token: &str) -> GitHubReleaseSource {
+        GitHubReleaseSource::new("yohurm", "Windows-YoADBTools")
+            .unwrap()
+            .with_token(token)
+    }
+
+    fn request(url: &str, sha: &str, size: u64, version: &str) -> UpdateDownloadRequest {
+        UpdateDownloadRequest {
+            url: url.into(),
+            sha256: sha.into(),
+            size_bytes: size,
+            version: version.into(),
+        }
+    }
+
+    fn authorization(url: &str, token: &str) -> Option<String> {
+        let client = reqwest::Client::new();
+        let req = apply_download_headers(client.get(url), url, token, "YohuAdbTools/0.1.0")
+            .build()
+            .unwrap();
+        req.headers()
+            .get(reqwest::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string)
     }
 
     #[test]
-    fn installer_file_name_rejects_html_release_page() {
-        assert!(matches!(
-            installer_file_name("https://github.com/yohurm/Windows-YoADBTools/releases/tag/v0.1.2"),
-            Err(UpdateError::InvalidInstaller)
-        ));
+    fn github_url_with_token_sets_authorization() {
+        for url in [
+            "https://github.com/yohurm/Windows-YoADBTools/releases/download/v1.0.0/YohuAdbTools_1.0.0_x64-setup.exe",
+            "https://api.github.com/repos/o/r/releases/assets/1",
+            "https://objects.githubusercontent.com/release-assets/1",
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1",
+        ] {
+            assert_eq!(
+                authorization(url, "secret-pat").as_deref(),
+                Some("Bearer secret-pat"),
+                "{url}"
+            );
+        }
     }
 
     #[test]
-    fn sha256_empty_expected_always_matches() {
-        assert!(sha256_matches("", "deadbeef"));
-        assert!(sha256_matches("AB", "ab"));
-        assert!(!sha256_matches("aa", "bb"));
-    }
-
-    #[test]
-    fn sha256_hex_known() {
-        assert_eq!(
-            sha256_hex(b"abc"),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+    fn non_github_url_never_sets_authorization() {
+        for url in [
+            "https://cdn.example.com/YohuAdbTools_1.0.0_x64-setup.exe",
+            "https://github.com.evil.com/YohuAdbTools_1.0.0_x64-setup.exe",
+            "http://127.0.0.1:9/YohuAdbTools_1.0.0_x64-setup.exe",
+        ] {
+            assert_eq!(authorization(url, "secret-pat"), None, "{url}");
+        }
     }
 
     #[tokio::test]
@@ -317,8 +265,13 @@ mod tests {
         tokio::spawn(async move {
             let (mut sock, _) = listener.accept().await.unwrap();
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
-            let mut buf = vec![0u8; 1024];
-            let _ = sock.read(&mut buf).await;
+            let mut buf = vec![0u8; 2048];
+            let n = sock.read(&mut buf).await.unwrap_or(0);
+            let seen = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
+            assert!(
+                !seen.contains("authorization"),
+                "non-GitHub URL must not send Authorization"
+            );
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
@@ -327,14 +280,64 @@ mod tests {
             let _ = sock.write_all(body).await;
         });
         let url = format!("http://{addr}/YohuAdbTools_test_x64-setup.exe");
-        let dest = installer_dest(&url).unwrap();
+        let dest = installer_dest(&url).expect("os app data root");
         let _ = tokio::fs::remove_file(&dest).await;
-        let result = download_installer(
-            &url,
-            &sha,
-            body.len() as u64,
-            "",
-            "YohuAdbTools/0.1.2",
+        let mut versions = Vec::new();
+        let result = download_with_github(
+            source_with_token("secret-must-not-leak"),
+            request(&url, &sha, body.len() as u64, "1.2.0"),
+            CancellationToken::new(),
+            |progress| versions.push(progress.version.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(tokio::fs::read(&result.path).await.unwrap(), body);
+        assert!(!versions.is_empty());
+        assert!(versions.iter().all(|v| v == "1.2.0"));
+        let _ = tokio::fs::remove_file(&result.path).await;
+    }
+
+    #[tokio::test]
+    async fn download_configured_does_not_authorize_non_github_url() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let body = b"configured-setup-bytes";
+        let sha = sha256_hex(body);
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut buf = vec![0u8; 2048];
+            let n = sock.read(&mut buf).await.unwrap_or(0);
+            let seen = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
+            assert!(
+                !seen.contains("authorization"),
+                "download_configured must not attach token to non-GitHub hosts"
+            );
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = sock.write_all(header.as_bytes()).await;
+            let _ = sock.write_all(body).await;
+        });
+        let url = format!("http://{addr}/YohuAdbTools_configured_x64-setup.exe");
+        let dest = installer_dest(&url).expect("os app data root");
+        let _ = tokio::fs::remove_file(&dest).await;
+        let root = std::env::temp_dir().join(format!(
+            "yohu-update-dl-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("update.json"),
+            r#"{"github":{"token":"file-pat-must-not-leak"}}"#,
+        )
+        .unwrap();
+        let result = crate::download_configured(
+            &root,
+            request(&url, &sha, body.len() as u64, "1.2.0"),
             CancellationToken::new(),
             |_| {},
         )
@@ -342,5 +345,6 @@ mod tests {
         .unwrap();
         assert_eq!(tokio::fs::read(&result.path).await.unwrap(), body);
         let _ = tokio::fs::remove_file(&result.path).await;
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

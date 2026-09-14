@@ -2,8 +2,10 @@
 
 use yohu_protocol::RemoteUpdate;
 
+use crate::artifact::InstallerKind;
 use crate::error::UpdateError;
 use crate::platform::PlatformInfo;
+use crate::url_policy;
 
 /// 仓库 Release 里的一个附件（平台字段对齐）。
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -46,14 +48,14 @@ fn version_parts(value: &str) -> Vec<u64> {
         .collect()
 }
 
-/// 按当前 OS / 架构挑安装包。
+/// 按当前 OS / 架构挑安装包。形态只认 [`InstallerKind`]。
 pub fn pick_asset<'a>(
     assets: &'a [ReleaseAsset],
     platform: &PlatformInfo,
 ) -> Option<&'a ReleaseAsset> {
     assets
         .iter()
-        .filter(|a| crate::mapper::is_http_url(a.browser_download_url.trim()))
+        .filter(|a| url_policy::is_http_url(a.browser_download_url.trim()))
         .filter_map(|a| {
             let score = asset_score(&a.name, platform)?;
             Some((score, a))
@@ -62,41 +64,18 @@ pub fn pick_asset<'a>(
         .map(|(_, a)| a)
 }
 
-/// 按当前 OS / 架构给安装包打分；明显不匹配返回 None。
+/// 按当前 OS / 架构给安装包打分；形态或架构不匹配返回 None。
 fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
-    let n = name.to_ascii_lowercase();
-    if n.is_empty() {
+    let kind = InstallerKind::from_name(name)?;
+    let want = InstallerKind::for_os(&platform.os)?;
+    if kind != want {
         return None;
     }
-    let os = platform.os.to_ascii_lowercase();
+    let n = name.to_ascii_lowercase();
     let arch = platform.arch.to_ascii_lowercase();
     let is_x64 = arch == "x86_64" || arch == "amd64";
     let is_arm64 = arch == "aarch64" || arch == "arm64";
 
-    if os == "windows"
-        && (contains_any(
-            &n,
-            &[
-                ".dmg",
-                ".appimage",
-                ".deb",
-                ".rpm",
-                ".apk",
-                "darwin",
-                "macos",
-                "osx",
-            ],
-        ) || (contains_any(&n, &["linux"]) && !n.contains("win")))
-    {
-        return None;
-    }
-    if (os == "macos" || os == "darwin")
-        && (n.ends_with(".exe")
-            || n.ends_with(".msi")
-            || contains_any(&n, &[".appimage", ".deb", ".rpm", "linux", "win32"]))
-    {
-        return None;
-    }
     if is_x64
         && contains_any(&n, &["arm64", "aarch64", "armv7"])
         && !contains_any(&n, &["x64", "x86_64", "amd64"])
@@ -110,37 +89,24 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
         return None;
     }
 
-    let mut score = 0;
-    if os == "windows" {
-        if n.ends_with(".exe") {
-            score += 12;
-        } else if n.ends_with(".msi") {
-            score += 10;
-        } else {
-            return None;
+    let mut score = 12;
+    match kind {
+        InstallerKind::Nsis => {
+            if n.contains("setup") {
+                score += 6;
+            }
+            if n.contains("nsis") {
+                score += 3;
+            }
+            if n.contains("win") {
+                score += 2;
+            }
         }
-        if n.contains("setup") {
-            score += 6;
+        InstallerKind::Dmg => {
+            if contains_any(&n, &["darwin", "macos", "osx"]) {
+                score += 3;
+            }
         }
-        if n.contains("nsis") {
-            score += 3;
-        }
-        if n.contains("win") {
-            score += 2;
-        }
-    } else if os == "macos" || os == "darwin" {
-        if n.ends_with(".dmg") {
-            score += 12;
-        } else if n.contains(".app") {
-            score += 8;
-        } else {
-            return None;
-        }
-        if contains_any(&n, &["darwin", "macos", "osx"]) {
-            score += 3;
-        }
-    } else {
-        return None;
     }
     if is_x64 && contains_any(&n, &["x64", "x86_64", "amd64", "win64"]) {
         score += 8;
@@ -176,25 +142,24 @@ pub fn remote_from_release(
 ) -> Result<RemoteUpdate, UpdateError> {
     let version = strip_tag_prefix(tag_name).to_string();
     if version.is_empty() {
-        return Err(UpdateError::Parse("Release 缺少 tag_name".into()));
+        return Err(UpdateError::MissingTag);
     }
-    let (download_url, size_bytes, sha256) = if let Some(asset) = pick_asset(assets, platform) {
+    let page_url = page_url.trim().to_string();
+    let (installer_url, size_bytes, sha256) = if let Some(asset) = pick_asset(assets, platform) {
         (
-            asset.browser_download_url.trim().to_string(),
+            Some(asset.browser_download_url.trim().to_string()),
             asset.size,
             sha256_from_digest(&asset.digest),
         )
     } else {
-        (page_url.trim().to_string(), 0, String::new())
+        (None, 0, String::new())
     };
     Ok(RemoteUpdate {
         has_new_version: is_newer(&version, &platform.version),
         version,
-        version_code: 0,
         description: body.trim().to_string(),
-        download_url,
-        force_update: false,
-        md5: String::new(),
+        installer_url,
+        page_url,
         sha256,
         size_bytes,
     })
@@ -254,6 +219,23 @@ mod tests {
         assert!(picked.name.contains("x64-setup.exe"));
     }
 
+    #[test]
+    fn pick_asset_ignores_msi_and_app() {
+        let assets = vec![
+            asset(
+                "YohuAdbTools_1.2.0_x64.msi",
+                "https://example.com/setup.msi",
+                99,
+            ),
+            asset(
+                "YohuAdbTools.app.zip",
+                "https://example.com/YohuAdbTools.app.zip",
+                80,
+            ),
+        ];
+        assert!(pick_asset(&assets, &win64()).is_none());
+    }
+
     fn mac_arm() -> PlatformInfo {
         PlatformInfo {
             version: "0.1.0".into(),
@@ -287,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_from_release_same_version_is_not_newer() {
+    fn remote_from_release_same_version_keeps_page_not_installer() {
         let update = remote_from_release(
             "0.1.0",
             "",
@@ -297,8 +279,9 @@ mod tests {
         )
         .unwrap();
         assert!(!update.has_new_version);
+        assert!(update.installer_url.is_none());
         assert_eq!(
-            update.download_url,
+            update.page_url,
             "https://github.com/yohurm/Windows-YoADBTools"
         );
     }
