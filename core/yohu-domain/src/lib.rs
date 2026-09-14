@@ -17,26 +17,26 @@ pub mod settings;
 
 pub use applog::{AppLog, AppLogEntry, LogLevel};
 pub use catalog::{catalog_after_scan, device_display_name, lookup_selected_devices};
+pub use command::{
+    align_params, combine_output, default_library, insert_placeholder, next_placeholder_index,
+    param_description, placeholder_arity, placeholder_slots, placeholder_tokens, preview_fill,
+    run_command, run_line, split_command_line, strip_leading_adb, templates_slots, CommandBlock,
+    CommandDefinition, CommandGroup, CommandLibrary, CommandParam, CommandRun, CommandStep,
+    GroupExecutor, GroupRunEvent, LibraryEntry, LibraryError, PlaceholderToken, RunError, Runner,
+    ScheduledStep,
+};
 pub use datetime::{
     canonicalize_datetime, canonicalize_datetime_seconds, format_datetime, format_datetime_seconds,
     DATETIME_DISPLAY_LEN, DATETIME_SECONDS_LEN,
 };
-pub use command::{
-    align_params, combine_output, default_library, insert_placeholder, next_placeholder_index,
-    param_description, placeholder_arity, placeholder_slots, placeholder_tokens, preview_fill,
-    run_command, run_line, templates_slots,
-    split_command_line, strip_leading_adb, CommandBlock, CommandDefinition, CommandGroup,
-    CommandLibrary, CommandRun, CommandStep, GroupExecutor, GroupRunEvent, LibraryEntry,
-    LibraryError, PlaceholderToken, RunError, Runner, ScheduledStep,
-};
 pub use focus::{
     assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,
 };
-pub use log_filter::{level_rank, log_filter_matches};
+pub use log_filter::{is_log_level_letter, log_filter_matches, LOG_LEVEL_LETTERS};
 pub use log_format::format_log_line;
 pub use mirror::{
-    apply_protocol, encoder_limits, is_tcp_connection, params_of, start_encode,
-    start_force_forward, EncoderLimits, MirrorEncodeParams, USB_ENCODE, WIFI_ENCODE,
+    apply_protocol, is_tcp_connection, params_of, start_encode, start_force_forward,
+    MirrorEncodeParams, USB_ENCODE, WIFI_ENCODE,
 };
 pub use safety::{validate_entry_name, PathError, RemotePath, SafetyError, SafetyRoot};
-pub use settings::apply_setting;
+pub use settings::{apply_setting, SettingError};

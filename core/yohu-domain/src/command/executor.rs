@@ -1,5 +1,5 @@
 //! 命令组 / 命令块编排：多设备并行、组内串行。不判定成败、不因失败中断。
-//! 组条目之间无额外间隔；命令块步间可按允许的常量集等待。
+//! 组条目之间无额外间隔；块间隔只在采纳时经 `validate` 核允许集，展开与等待不再重核。
 //!
 //! 执行能力经 [`Runner`] 端口注入（yohu-adb 实现），本层不做进程 IO —— 可单测。
 //! 依赖倒置：端口与其错误类型都定义在 domain，适配层（yohu-adb）负责映射。
@@ -229,7 +229,7 @@ impl<R: Runner> GroupExecutor<R> {
             }));
         }
         for j in joins {
-            let _ = j.await;
+            j.await.expect("group device task");
         }
     }
 
@@ -259,11 +259,7 @@ impl<R: Runner> GroupExecutor<R> {
                         run.outcome.exit_code,
                         run.duration_ms,
                     ),
-                    Err(e) => (
-                        e.to_string(),
-                        -1,
-                        started.elapsed().as_millis() as u64,
-                    ),
+                    Err(e) => (e.to_string(), -1, started.elapsed().as_millis() as u64),
                 };
             // 每条命令的组进度是结果区渲染依据（非可丢的背压类推送），必须可靠送达；
             // 若消费方通道已关闭，说明该设备运行被放弃，停止后续命令。
@@ -363,12 +359,18 @@ mod tests {
     }
 
     #[test]
-    fn strip_leading_adb_variants() {
-        assert_eq!(strip_leading_adb("  shell ls  "), "shell ls");
-        assert_eq!(strip_leading_adb("adb shell ls"), "shell ls");
-        assert_eq!(strip_leading_adb("ADB.exe shell ls"), "shell ls");
-        assert_eq!(strip_leading_adb("adb"), "");
-        assert_eq!(strip_leading_adb("adbd"), "adbd");
+    fn strip_leading_adb_matches_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            input: String,
+            body: String,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../testdata/command_body.json"))
+                .expect("fixture");
+        for (i, case) in cases.iter().enumerate() {
+            assert_eq!(strip_leading_adb(&case.input), case.body, "body case {i}");
+        }
     }
 
     struct FakeRunner {
@@ -515,11 +517,23 @@ mod tests {
     }
 
     #[test]
-    fn combine_output_joins_streams() {
-        assert_eq!(combine_output("out", ""), "out");
-        assert_eq!(combine_output("", "err"), "err");
-        assert_eq!(combine_output("out", "err"), "out\nerr");
-        assert_eq!(combine_output("", ""), "");
+    fn combine_output_matches_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            stdout: String,
+            stderr: String,
+            text: String,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../testdata/combine_output.json"))
+                .expect("fixture");
+        for (i, case) in cases.iter().enumerate() {
+            assert_eq!(
+                combine_output(&case.stdout, &case.stderr),
+                case.text,
+                "combine case {i}"
+            );
+        }
     }
 
     #[test]

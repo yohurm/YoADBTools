@@ -81,6 +81,8 @@ pub fn validate_entry_name(name: &str) -> Result<(), PathError> {
 /// 安全根违反。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SafetyError {
+    #[error(transparent)]
+    Path(#[from] PathError),
     #[error("路径不在安全根内: {0}")]
     OutsideRoot(String),
 }
@@ -108,7 +110,7 @@ impl SafetyRoot {
 
     /// 浏览范围：等于或位于安全根之下。
     pub fn check(&self, raw: &str) -> Result<RemotePath, SafetyError> {
-        let path = RemotePath::parse(raw).map_err(|e| SafetyError::OutsideRoot(e.to_string()))?;
+        let path = RemotePath::parse(raw)?;
         if self.roots.iter().any(|r| path.is_under(r)) {
             Ok(path)
         } else {
@@ -118,7 +120,7 @@ impl SafetyRoot {
 
     /// 删除/新建/传输：必须是安全根的**真子路径**，禁止对 `/sdcard` 等根本身动手。
     pub fn check_descendant(&self, raw: &str) -> Result<RemotePath, SafetyError> {
-        let path = RemotePath::parse(raw).map_err(|e| SafetyError::OutsideRoot(e.to_string()))?;
+        let path = RemotePath::parse(raw)?;
         if self.roots.iter().any(|r| path.is_strictly_under(r)) {
             Ok(path)
         } else {
@@ -167,23 +169,42 @@ mod tests {
     }
 
     #[test]
-    fn safety_root_checks() {
+    fn safety_root_check_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            path: String,
+            #[serde(default)]
+            ok: bool,
+            #[serde(default)]
+            normalized: Option<String>,
+            #[serde(default)]
+            error: Option<String>,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../testdata/safety_root.json")).expect("fixture");
         let safety = SafetyRoot::default();
-        assert!(safety.check("/sdcard/DCIM/a.jpg").is_ok());
-        assert!(safety.check("/storage/emulated/0/b").is_ok());
-        assert!(safety.check("/sdcard").is_ok());
-        assert!(matches!(
-            safety.check("/"),
-            Err(SafetyError::OutsideRoot(_))
-        ));
-        assert!(matches!(
-            safety.check("/data/local/tmp/x"),
-            Err(SafetyError::OutsideRoot(_))
-        ));
-        assert!(matches!(
-            safety.check("/sdcard/../data/x"),
-            Err(SafetyError::OutsideRoot(_))
-        ));
+        for (i, case) in cases.iter().enumerate() {
+            match safety.check(&case.path) {
+                Ok(path) => {
+                    assert!(case.ok, "case {i} expected error");
+                    if let Some(expected) = &case.normalized {
+                        assert_eq!(path.as_str(), expected, "case {i}");
+                    }
+                }
+                Err(SafetyError::OutsideRoot(_)) => {
+                    assert_eq!(case.error.as_deref(), Some("outside_root"), "case {i}");
+                }
+                Err(SafetyError::Path(PathError::NotAbsolute(_))) => {
+                    assert_eq!(case.error.as_deref(), Some("not_absolute"), "case {i}");
+                }
+                Err(SafetyError::Path(PathError::Traversal(_))) => {
+                    assert_eq!(case.error.as_deref(), Some("traversal"), "case {i}");
+                }
+                Err(SafetyError::Path(PathError::InvalidName(_))) => {
+                    assert_eq!(case.error.as_deref(), Some("invalid_name"), "case {i}");
+                }
+            }
+        }
     }
 
     #[test]

@@ -5,16 +5,15 @@
 
 use yohu_protocol::{LogFilter, LogLine, LogScope};
 
-/// 级别序：V < D < I < W < E < F；未知为 0（低于任意已知级别）。
-pub fn level_rank(level: char) -> u8 {
-    match level {
-        'V' | 'v' => 1,
-        'D' | 'd' => 2,
-        'I' | 'i' => 3,
-        'W' | 'w' => 4,
-        'E' | 'e' => 5,
-        'F' | 'f' => 6,
-        _ => 0,
+/// 级别字母表（V→F）。与 testdata/log_levels.json、UI `LEVELS` 同一份；禁止再写第三份。
+pub const LOG_LEVEL_LETTERS: [char; 6] = ['V', 'D', 'I', 'W', 'E', 'F'];
+
+/// 单字符级别 token（大小写不敏感）是否属于 [`LOG_LEVEL_LETTERS`]。
+pub fn is_log_level_letter(token: &str) -> bool {
+    let mut chars = token.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) => LOG_LEVEL_LETTERS.contains(&c.to_ascii_uppercase()),
+        _ => false,
     }
 }
 
@@ -38,7 +37,9 @@ fn level_in_set(levels: &[char], line: char) -> bool {
         return true;
     }
     let needle = line.to_ascii_uppercase();
-    levels.iter().any(|item| item.to_ascii_uppercase() == needle)
+    levels
+        .iter()
+        .any(|item| item.to_ascii_uppercase() == needle)
 }
 
 fn is_tag_needle_sep(c: char) -> bool {
@@ -98,16 +99,6 @@ mod tests {
     use yohu_protocol::LogLine;
 
     #[test]
-    fn level_rank_order() {
-        assert!(level_rank('V') < level_rank('D'));
-        assert!(level_rank('D') < level_rank('I'));
-        assert!(level_rank('I') < level_rank('W'));
-        assert!(level_rank('W') < level_rank('E'));
-        assert!(level_rank('E') < level_rank('F'));
-        assert_eq!(level_rank('?'), 0);
-    }
-
-    #[test]
     fn matches_shared_fixture() {
         #[derive(serde::Deserialize)]
         struct Case {
@@ -127,26 +118,18 @@ mod tests {
     }
 
     #[test]
-    fn level_rank_shared_fixture() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            level: char,
-            rank: u8,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../testdata/level_rank.json")).expect("fixture");
-        for (i, case) in cases.iter().enumerate() {
-            assert_eq!(level_rank(case.level), case.rank, "case {i}");
-        }
-    }
-
-    #[test]
     fn known_levels_shared_fixture() {
         let letters: Vec<char> =
             serde_json::from_str(include_str!("../testdata/log_levels.json")).expect("fixture");
-        assert_eq!(letters, vec!['V', 'D', 'I', 'W', 'E', 'F']);
-        for (i, letter) in letters.iter().enumerate() {
-            assert_eq!(level_rank(*letter), (i + 1) as u8, "letter {letter}");
+        assert_eq!(letters.as_slice(), LOG_LEVEL_LETTERS.as_slice());
+        for letter in &letters {
+            assert!(is_log_level_letter(&letter.to_string()));
+            assert!(is_log_level_letter(
+                &letter.to_ascii_lowercase().to_string()
+            ));
         }
+        assert!(!is_log_level_letter(""));
+        assert!(!is_log_level_letter("VV"));
+        assert!(!is_log_level_letter("?"));
     }
 }

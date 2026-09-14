@@ -4,32 +4,54 @@ use yohu_protocol::{AppSettings, MirrorProtocol, SettingKey, TerminalTimeFormat}
 
 use crate::mirror::apply_protocol;
 
-fn must_str(key: SettingKey, value: &serde_json::Value) -> Result<String, String> {
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SettingError {
+    #[error("{0} 必须是字符串")]
+    ExpectString(&'static str),
+    #[error("{0} 必须是非负整数")]
+    ExpectInteger(&'static str),
+    #[error("{0} 必须是布尔值")]
+    ExpectBool(&'static str),
+    #[error("{0} 必须是 time_millis、time、datetime_millis 或 datetime")]
+    ExpectClockFormat(&'static str),
+    #[error("{0} 必须大于 0")]
+    MustPositive(&'static str),
+    #[error("数值过大")]
+    TooLarge,
+    #[error("{0} 必须是 light、dark 或 system")]
+    ExpectTheme(&'static str),
+    #[error("{0} 必须是 compact 或 comfortable")]
+    ExpectDensity(&'static str),
+    #[error("{0} 必须是列开关对象（ts/uid/pid/tid/level/tag）")]
+    ExpectLogColumns(&'static str),
+    #[error("{0} 必须是 usb 或 wifi")]
+    ExpectMirrorProtocol(&'static str),
+}
+
+fn must_str(key: SettingKey, value: &serde_json::Value) -> Result<String, SettingError> {
     value
         .as_str()
         .map(str::to_string)
-        .ok_or_else(|| format!("{} 必须是字符串", key.as_str()))
+        .ok_or(SettingError::ExpectString(key.as_str()))
 }
 
-fn must_u64(key: SettingKey, value: &serde_json::Value) -> Result<u64, String> {
+fn must_u64(key: SettingKey, value: &serde_json::Value) -> Result<u64, SettingError> {
     value
         .as_u64()
-        .ok_or_else(|| format!("{} 必须是非负整数", key.as_str()))
+        .ok_or(SettingError::ExpectInteger(key.as_str()))
 }
 
-fn must_bool(key: SettingKey, value: &serde_json::Value) -> Result<bool, String> {
+fn must_bool(key: SettingKey, value: &serde_json::Value) -> Result<bool, SettingError> {
     value
         .as_bool()
-        .ok_or_else(|| format!("{} 必须是布尔值", key.as_str()))
+        .ok_or(SettingError::ExpectBool(key.as_str()))
 }
 
-fn must_clock_format(key: SettingKey, value: &serde_json::Value) -> Result<TerminalTimeFormat, String> {
-    serde_json::from_value(value.clone()).map_err(|_| {
-        format!(
-            "{} 必须是 time_millis、time、datetime_millis 或 datetime",
-            key.as_str()
-        )
-    })
+fn must_clock_format(
+    key: SettingKey,
+    value: &serde_json::Value,
+) -> Result<TerminalTimeFormat, SettingError> {
+    serde_json::from_value(value.clone()).map_err(|_| SettingError::ExpectClockFormat(key.as_str()))
 }
 
 /// 把单键 JSON 写入快照。不落盘、不触发 sidecar / 采集副作用。
@@ -37,7 +59,7 @@ pub fn apply_setting(
     settings: &mut AppSettings,
     key: SettingKey,
     value: &serde_json::Value,
-) -> Result<(), String> {
+) -> Result<(), SettingError> {
     match key {
         SettingKey::AdbPath => {
             settings.adb_path = must_str(key, value)?;
@@ -47,12 +69,12 @@ pub fn apply_setting(
         }
         SettingKey::DevicesAutoRefresh => {
             let n = must_u64(key, value)?;
-            settings.devices_auto_refresh = u32::try_from(n).map_err(|_| "数值过大")?;
+            settings.devices_auto_refresh = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::BufferCapacity => {
             let n = must_u64(key, value)?;
             if n == 0 {
-                return Err(format!("{} 必须大于 0", key.as_str()));
+                return Err(SettingError::MustPositive(key.as_str()));
             }
             settings.buffer_capacity = n as usize;
         }
@@ -61,11 +83,11 @@ pub fn apply_setting(
         }
         SettingKey::Theme => {
             settings.theme = serde_json::from_value(value.clone())
-                .map_err(|_| format!("{} 必须是 light、dark 或 system", key.as_str()))?;
+                .map_err(|_| SettingError::ExpectTheme(key.as_str()))?;
         }
         SettingKey::Density => {
             settings.density = serde_json::from_value(value.clone())
-                .map_err(|_| format!("{} 必须是 compact 或 comfortable", key.as_str()))?;
+                .map_err(|_| SettingError::ExpectDensity(key.as_str()))?;
         }
         SettingKey::ExportDefaultPath => {
             settings.export_default_path = must_str(key, value)?;
@@ -74,34 +96,31 @@ pub fn apply_setting(
             settings.export_ask_every_time = must_bool(key, value)?;
         }
         SettingKey::LogDisplayColumns => {
-            settings.log_display_columns = serde_json::from_value(value.clone()).map_err(|_| {
-                format!(
-                    "{} 必须是列开关对象（ts/uid/pid/tid/level/tag）",
-                    key.as_str()
-                )
-            })?;
+            settings.log_display_columns = serde_json::from_value(value.clone())
+                .map_err(|_| SettingError::ExpectLogColumns(key.as_str()))?;
         }
         SettingKey::LogTimeFormat => {
             settings.log_time_format = must_clock_format(key, value)?;
         }
         SettingKey::MirrorMaxSize => {
             let n = must_u64(key, value)?;
-            settings.mirror_max_size = u32::try_from(n).map_err(|_| "数值过大")?;
+            settings.mirror_max_size = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::MirrorVideoBitRate => {
             let n = must_u64(key, value)?;
             if n == 0 {
-                return Err(format!("{} 必须大于 0", key.as_str()));
+                return Err(SettingError::MustPositive(key.as_str()));
             }
-            settings.mirror_video_bit_rate = u32::try_from(n).map_err(|_| "数值过大")?;
+            settings.mirror_video_bit_rate =
+                u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::MirrorMaxFps => {
             let n = must_u64(key, value)?;
-            settings.mirror_max_fps = u32::try_from(n).map_err(|_| "数值过大")?;
+            settings.mirror_max_fps = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::MirrorProtocol => {
             let protocol: MirrorProtocol = serde_json::from_value(value.clone())
-                .map_err(|_| format!("{} 必须是 usb 或 wifi", key.as_str()))?;
+                .map_err(|_| SettingError::ExpectMirrorProtocol(key.as_str()))?;
             apply_protocol(settings, protocol);
         }
         SettingKey::MirrorForceForward => {
@@ -126,7 +145,8 @@ mod tests {
     fn buffer_capacity_rejects_zero() {
         let mut s = AppSettings::default();
         let err = apply_setting(&mut s, SettingKey::BufferCapacity, &json!(0)).unwrap_err();
-        assert!(err.contains("必须大于 0"));
+        assert!(matches!(err, SettingError::MustPositive(_)));
+        assert!(err.to_string().contains("必须大于 0"));
     }
 
     #[test]
@@ -170,9 +190,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::DatetimeMillis);
-        let err = apply_setting(&mut s, SettingKey::TerminalTimeFormat, &json!("iso8601"))
-            .unwrap_err();
-        assert!(err.contains("time_millis"));
+        let err =
+            apply_setting(&mut s, SettingKey::TerminalTimeFormat, &json!("iso8601")).unwrap_err();
+        assert!(matches!(err, SettingError::ExpectClockFormat(_)));
+        assert!(err.to_string().contains("time_millis"));
     }
 
     #[test]

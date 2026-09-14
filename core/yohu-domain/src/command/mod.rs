@@ -12,6 +12,6 @@ pub use executor::{
 pub use library::{
     align_params, insert_placeholder, next_placeholder_index, param_description, placeholder_arity,
     placeholder_slots, placeholder_tokens, preview_fill, templates_slots, CommandBlock,
-    CommandDefinition, CommandGroup,
-    CommandLibrary, CommandStep, LibraryEntry, LibraryError, PlaceholderToken,
+    CommandDefinition, CommandGroup, CommandLibrary, CommandParam, CommandStep, LibraryEntry,
+    LibraryError, PlaceholderToken,
 };

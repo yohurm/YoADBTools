@@ -51,9 +51,7 @@ pub fn format_datetime_seconds(
 /// 收到带毫秒的墙钟。缺秒则空，不补造。
 pub fn canonicalize_datetime(raw: &str) -> Option<String> {
     let p = parse_parts(raw)?;
-    format_datetime(
-        p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis,
-    )
+    format_datetime(p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis)
 }
 
 /// 收到到秒的墙钟（`ls -lla` / `stat %y` 的小数与时区丢弃）。缺秒则空。

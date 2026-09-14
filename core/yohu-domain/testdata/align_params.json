@@ -1,0 +1,24 @@
+[
+  {
+    "slots": [0, 1],
+    "params": [
+      { "index": 0, "description": " 主机 " },
+      { "index": 2, "description": "多余" },
+      { "index": 1, "description": "  " }
+    ],
+    "aligned": [{ "index": 0, "description": "主机" }]
+  },
+  {
+    "slots": [13],
+    "params": [
+      { "index": 0, "description": "幽灵" },
+      { "index": 13, "description": " 主机 " }
+    ],
+    "aligned": [{ "index": 13, "description": "主机" }]
+  },
+  {
+    "slots": [],
+    "params": [{ "index": 0, "description": "主机" }],
+    "aligned": []
+  }
+]

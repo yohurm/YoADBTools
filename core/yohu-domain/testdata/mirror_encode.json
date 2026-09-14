@@ -1,0 +1,14 @@
+{
+  "usb": {
+    "max_size": 0,
+    "video_bit_rate": 16000000,
+    "max_fps": 0,
+    "video_codec": "h265"
+  },
+  "wifi": {
+    "max_size": 1280,
+    "video_bit_rate": 4000000,
+    "max_fps": 30,
+    "video_codec": "h264"
+  }
+}

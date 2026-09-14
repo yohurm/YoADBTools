@@ -6,74 +6,79 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use yohu_protocol::{
-    is_allowed_block_gap, CommandDto, CommandGroupDto, CommandLibraryDto, CommandParamDto,
-    CommandStepDto, LibraryEntryDto,
+    CommandBlockDto, CommandDto, CommandGroupDto, CommandLibraryDto, CommandParamDto,
+    CommandStepDto, LibraryEntryDto, COMMAND_BLOCK_GAPS_MS,
 };
 
+/// 占位符 `{n}` 的说明。空串 = 填参时只显示 `{n}`。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandParam {
+    pub index: usize,
+    pub description: String,
+}
+
 /// 一条命令。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandDefinition {
     pub id: String,
     pub name: String,
     /// 具体命令行（不含 `adb` 二进制）。可含 `{0}` `{1}` …，执行前由 [`CommandDefinition::fill`]。
     pub template: String,
     /// `{n}` 的说明；只保留有文案且 index 属于模板实际槽位的项。
-    #[serde(default)]
-    pub params: Vec<CommandParamDto>,
+    pub params: Vec<CommandParam>,
 }
 
 /// 命令块里的一步（一行 ADB 正文）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandStep {
     pub template: String,
 }
 
 /// 命令块：与命令同级，顺序执行多步，步间使用块级间隔。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandBlock {
     pub id: String,
     pub name: String,
     pub gap_ms: u64,
     pub steps: Vec<CommandStep>,
     /// 全步共享的 `{n}` 说明。
-    #[serde(default)]
-    pub params: Vec<CommandParamDto>,
+    pub params: Vec<CommandParam>,
 }
 
 /// 命令组下的叶子（命令或命令块）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LibraryEntry {
     Command(CommandDefinition),
     Block(CommandBlock),
 }
 
 /// 命令组（组内顺序执行全部条目；条目之间无额外间隔）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandGroup {
     pub id: String,
     pub name: String,
-    #[serde(default)]
     pub entries: Vec<LibraryEntry>,
 }
 
-/// 命令库（`library.json` 全量结构）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// 命令库（内存领域模型；磁盘与 IPC 走 [`CommandLibraryDto`]）。
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandLibrary {
     pub schema_version: u32,
-    #[serde(default)]
     pub groups: Vec<CommandGroup>,
 }
 
-/// 命令库校验/IO 错误。
+/// 命令库校验错误。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LibraryError {
+    #[error("命令库 schema 不是 {expected}（实际 {actual}）")]
+    UnsupportedSchema { expected: u32, actual: u32 },
     #[error("命令 ID 重复: {0}")]
     DuplicateCommandId(String),
     #[error("条目名称为空 (id={0})")]
     EmptyEntryName(String),
+    #[error("命令模板为空 (id={0})")]
+    EmptyTemplate(String),
     #[error("组 ID 重复: {0}")]
     DuplicateGroupId(String),
     #[error("命令块为空 (id={0})")]
@@ -90,8 +95,10 @@ pub enum LibraryError {
     },
     #[error("命令组含需填值的条目 (group={group_id}, entry={entry_id})，请逐条执行")]
     GroupNeedsValues { group_id: String, entry_id: String },
-    #[error("读取/写入失败: {0}")]
-    Io(String),
+}
+
+fn is_allowed_block_gap(ms: u64) -> bool {
+    COMMAND_BLOCK_GAPS_MS.contains(&ms)
 }
 
 impl CommandLibrary {
@@ -104,8 +111,14 @@ impl CommandLibrary {
         }
     }
 
-    /// 全量校验（保存前调用；保存必须全量提交、取消零污染）。
+    /// 全量校验。保存与 [`Self::from_dto`] 共用；未通过则不得进内存。
     pub fn validate(&self) -> Result<(), LibraryError> {
+        if self.schema_version != Self::SCHEMA_VERSION {
+            return Err(LibraryError::UnsupportedSchema {
+                expected: Self::SCHEMA_VERSION,
+                actual: self.schema_version,
+            });
+        }
         let mut group_ids = std::collections::HashSet::new();
         let mut entry_ids = std::collections::HashSet::new();
         for g in &self.groups {
@@ -119,8 +132,13 @@ impl CommandLibrary {
                 if !entry_ids.insert(entry.id()) {
                     return Err(LibraryError::DuplicateCommandId(entry.id().to_string()));
                 }
-                if let LibraryEntry::Block(block) = entry {
-                    block.validate()?;
+                match entry {
+                    LibraryEntry::Command(command) => {
+                        if command.template.trim().is_empty() {
+                            return Err(LibraryError::EmptyTemplate(command.id.clone()));
+                        }
+                    }
+                    LibraryEntry::Block(block) => block.validate()?,
                 }
             }
         }
@@ -145,16 +163,19 @@ impl CommandLibrary {
             .find_map(|e| e.as_block().filter(|b| b.id == id))
     }
 
-    pub fn from_dto(dto: &CommandLibraryDto) -> Self {
-        Self {
+    /// DTO → 领域模型，并跑与保存相同的 [`Self::validate`]（含块间隔允许集）。
+    pub fn from_dto(dto: &CommandLibraryDto) -> Result<Self, LibraryError> {
+        let library = Self {
             schema_version: dto.schema_version,
             groups: dto.groups.iter().map(group_from_dto).collect(),
-        }
+        };
+        library.validate()?;
+        Ok(library)
     }
 
     pub fn to_dto(&self) -> CommandLibraryDto {
         CommandLibraryDto {
-            schema_version: self.schema_version,
+            schema_version: Self::SCHEMA_VERSION,
             groups: self.groups.iter().map(group_to_dto).collect(),
         }
     }
@@ -204,6 +225,40 @@ impl LibraryEntry {
 }
 
 impl CommandBlock {
+    pub fn from_dto(b: &CommandBlockDto) -> Self {
+        let steps: Vec<CommandStep> = b
+            .steps
+            .iter()
+            .map(|s| CommandStep {
+                template: s.template.clone(),
+            })
+            .collect();
+        let slots = templates_slots(steps.iter().map(|s| s.template.as_str()));
+        Self {
+            id: b.id.clone(),
+            name: b.name.clone(),
+            gap_ms: b.gap_ms,
+            steps,
+            params: align_params(&slots, &params_from_dto(&b.params)),
+        }
+    }
+
+    pub fn to_dto(&self) -> CommandBlockDto {
+        CommandBlockDto {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            gap_ms: self.gap_ms,
+            steps: self
+                .steps
+                .iter()
+                .map(|s| CommandStepDto {
+                    template: s.template.clone(),
+                })
+                .collect(),
+            params: params_to_dto(&self.placeholder_slots(), &self.params),
+        }
+    }
+
     pub fn validate(&self) -> Result<(), LibraryError> {
         if self.steps.is_empty() {
             return Err(LibraryError::EmptyBlock(self.id.clone()));
@@ -262,11 +317,21 @@ impl CommandBlock {
 
 impl CommandDefinition {
     pub fn from_dto(c: &CommandDto) -> Self {
-        command_from_dto(c)
+        Self {
+            id: c.id.clone(),
+            name: c.name.clone(),
+            template: c.template.clone(),
+            params: align_params(&placeholder_slots(&c.template), &params_from_dto(&c.params)),
+        }
     }
 
     pub fn to_dto(&self) -> CommandDto {
-        command_to_dto(self)
+        CommandDto {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            template: self.template.clone(),
+            params: params_to_dto(&self.placeholder_slots(), &self.params),
+        }
     }
 
     pub fn placeholder_slots(&self) -> Vec<usize> {
@@ -391,11 +456,11 @@ pub fn insert_placeholder(template: &str, start: usize, end: usize) -> (String, 
 }
 
 /// 只保留 `index` 属于实际槽位且说明非空的项，按 index 排序。
-pub fn align_params(slots: &[usize], params: &[CommandParamDto]) -> Vec<CommandParamDto> {
-    let mut out: Vec<CommandParamDto> = params
+pub fn align_params(slots: &[usize], params: &[CommandParam]) -> Vec<CommandParam> {
+    let mut out: Vec<CommandParam> = params
         .iter()
         .filter(|param| slots.contains(&param.index) && !param.description.trim().is_empty())
-        .map(|param| CommandParamDto {
+        .map(|param| CommandParam {
             index: param.index,
             description: param.description.trim().to_string(),
         })
@@ -405,7 +470,7 @@ pub fn align_params(slots: &[usize], params: &[CommandParamDto]) -> Vec<CommandP
     out
 }
 
-pub fn param_description(params: &[CommandParamDto], index: usize) -> String {
+pub fn param_description(params: &[CommandParam], index: usize) -> String {
     params
         .iter()
         .find(|param| param.index == index)
@@ -463,6 +528,26 @@ fn apply_placeholders(template: &str, by_index: &HashMap<usize, &str>, skip_empt
     out
 }
 
+fn params_from_dto(params: &[CommandParamDto]) -> Vec<CommandParam> {
+    params
+        .iter()
+        .map(|param| CommandParam {
+            index: param.index,
+            description: param.description.clone(),
+        })
+        .collect()
+}
+
+fn params_to_dto(slots: &[usize], params: &[CommandParam]) -> Vec<CommandParamDto> {
+    align_params(slots, params)
+        .into_iter()
+        .map(|param| CommandParamDto {
+            index: param.index,
+            description: param.description,
+        })
+        .collect()
+}
+
 fn group_from_dto(g: &CommandGroupDto) -> CommandGroup {
     CommandGroup {
         id: g.id.clone(),
@@ -481,77 +566,15 @@ fn group_to_dto(g: &CommandGroup) -> CommandGroupDto {
 
 fn entry_from_dto(entry: &LibraryEntryDto) -> LibraryEntry {
     match entry {
-        LibraryEntryDto::Command {
-            id,
-            name,
-            template,
-            params,
-        } => LibraryEntry::Command(CommandDefinition {
-            id: id.clone(),
-            name: name.clone(),
-            template: template.clone(),
-            params: params.clone(),
-        }),
-        LibraryEntryDto::Block {
-            id,
-            name,
-            gap_ms,
-            steps,
-            params,
-        } => LibraryEntry::Block(CommandBlock {
-            id: id.clone(),
-            name: name.clone(),
-            gap_ms: *gap_ms,
-            steps: steps
-                .iter()
-                .map(|s| CommandStep {
-                    template: s.template.clone(),
-                })
-                .collect(),
-            params: params.clone(),
-        }),
+        LibraryEntryDto::Command(c) => LibraryEntry::Command(CommandDefinition::from_dto(c)),
+        LibraryEntryDto::Block(b) => LibraryEntry::Block(CommandBlock::from_dto(b)),
     }
 }
 
 fn entry_to_dto(entry: &LibraryEntry) -> LibraryEntryDto {
     match entry {
-        LibraryEntry::Command(c) => LibraryEntryDto::Command {
-            id: c.id.clone(),
-            name: c.name.clone(),
-            template: c.template.clone(),
-            params: align_params(&c.placeholder_slots(), &c.params),
-        },
-        LibraryEntry::Block(b) => LibraryEntryDto::Block {
-            id: b.id.clone(),
-            name: b.name.clone(),
-            gap_ms: b.gap_ms,
-            steps: b
-                .steps
-                .iter()
-                .map(|s| CommandStepDto {
-                    template: s.template.clone(),
-                })
-                .collect(),
-            params: align_params(&b.placeholder_slots(), &b.params),
-        },
-    }
-}
-
-fn command_from_dto(c: &CommandDto) -> CommandDefinition {
-    CommandDefinition {
-        id: c.id.clone(),
-        name: c.name.clone(),
-        template: c.template.clone(),
-        params: c.params.clone(),
-    }
-}
-
-fn command_to_dto(c: &CommandDefinition) -> CommandDto {
-    CommandDto {
-        id: c.id.clone(),
-        name: c.name.clone(),
-        template: c.template.clone(),
-        params: align_params(&c.placeholder_slots(), &c.params),
+        LibraryEntry::Command(c) => LibraryEntryDto::Command(c.to_dto()),
+        LibraryEntry::Block(b) => LibraryEntryDto::Block(b.to_dto()),
     }
 }
 
@@ -644,6 +667,42 @@ mod tests {
     }
 
     #[test]
+    fn command_and_block_dto_are_entry_production_path() {
+        let command = CommandDefinition {
+            id: "c1".into(),
+            name: "版本".into(),
+            template: "shell getprop {0}".into(),
+            params: vec![CommandParam {
+                index: 0,
+                description: "属性".into(),
+            }],
+        };
+        let block = block("b1", 500, &["echo a", "echo {0}"]);
+        assert_eq!(CommandDefinition::from_dto(&command.to_dto()), command);
+        assert_eq!(CommandBlock::from_dto(&block.to_dto()), block);
+        let lib = CommandLibrary {
+            schema_version: CommandLibrary::SCHEMA_VERSION,
+            groups: vec![group(
+                "g1",
+                vec![
+                    LibraryEntry::Command(command.clone()),
+                    LibraryEntry::Block(block.clone()),
+                ],
+            )],
+        };
+        let dto = lib.to_dto();
+        assert!(matches!(
+            &dto.groups[0].entries[0],
+            LibraryEntryDto::Command(CommandDto { id, .. }) if id == "c1"
+        ));
+        assert!(matches!(
+            &dto.groups[0].entries[1],
+            LibraryEntryDto::Block(CommandBlockDto { id, .. }) if id == "b1"
+        ));
+        assert_eq!(CommandLibrary::from_dto(&dto).unwrap(), lib);
+    }
+
+    #[test]
     fn dto_roundtrip_mixed_entries() {
         let lib = CommandLibrary {
             schema_version: CommandLibrary::SCHEMA_VERSION,
@@ -661,52 +720,36 @@ mod tests {
             )],
         };
         let dto = lib.to_dto();
-        let back = CommandLibrary::from_dto(&dto);
+        let back = CommandLibrary::from_dto(&dto).unwrap();
         assert_eq!(back, lib);
     }
 
     #[test]
-    fn align_params_keeps_in_range_nonempty() {
-        let params = vec![
-            CommandParamDto {
-                index: 0,
-                description: " 主机 ".into(),
-            },
-            CommandParamDto {
-                index: 2,
-                description: "多余".into(),
-            },
-            CommandParamDto {
-                index: 1,
-                description: "  ".into(),
-            },
-        ];
-        assert_eq!(
-            align_params(&[0, 1], &params),
-            vec![CommandParamDto {
-                index: 0,
-                description: "主机".into(),
-            }]
-        );
-        assert_eq!(
-            align_params(
-                &[13],
-                &[
-                    CommandParamDto {
-                        index: 0,
-                        description: "幽灵".into(),
-                    },
-                    CommandParamDto {
-                        index: 13,
-                        description: " 主机 ".into(),
-                    },
-                ],
-            ),
-            vec![CommandParamDto {
-                index: 13,
-                description: "主机".into(),
-            }]
-        );
+    fn align_params_matches_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            slots: Vec<usize>,
+            params: Vec<CommandParamDto>,
+            aligned: Vec<CommandParamDto>,
+        }
+        fn to_param(dto: &CommandParamDto) -> CommandParam {
+            CommandParam {
+                index: dto.index,
+                description: dto.description.clone(),
+            }
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../testdata/align_params.json"))
+                .expect("fixture");
+        for (i, case) in cases.iter().enumerate() {
+            let params: Vec<CommandParam> = case.params.iter().map(to_param).collect();
+            let aligned: Vec<CommandParam> = case.aligned.iter().map(to_param).collect();
+            assert_eq!(
+                align_params(&case.slots, &params),
+                aligned,
+                "align case {i}"
+            );
+        }
     }
 
     #[test]
@@ -800,10 +843,15 @@ mod tests {
             error: Option<String>,
         }
         let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../../testdata/command_fill.json")).expect("fixture");
+            serde_json::from_str(include_str!("../../testdata/command_fill.json"))
+                .expect("fixture");
         for (i, case) in cases.iter().enumerate() {
             let c = cmd("c", "n", &case.template);
-            assert_eq!(placeholder_arity(&case.template), case.arity, "arity case {i}");
+            assert_eq!(
+                placeholder_arity(&case.template),
+                case.arity,
+                "arity case {i}"
+            );
             if case.error.as_deref() == Some("arity") {
                 assert!(
                     matches!(
@@ -827,7 +875,9 @@ mod tests {
         let b = block("b1", 0, &["ping {0}", "getprop {1}"]);
         assert_eq!(b.placeholder_slots(), vec![0, 1]);
         assert_eq!(b.placeholder_arity(), 2);
-        let filled = b.fill(&["8.8.8.8".into(), "ro.product.model".into()]).unwrap();
+        let filled = b
+            .fill(&["8.8.8.8".into(), "ro.product.model".into()])
+            .unwrap();
         assert_eq!(filled.steps[0].template, "ping 8.8.8.8");
         assert_eq!(filled.steps[1].template, "getprop ro.product.model");
         let sparse = block("b2", 0, &["ping {13}", "echo {0}"]);
@@ -857,26 +907,78 @@ mod tests {
             "g1",
             vec![LibraryEntry::Command(cmd("c1", "ping", "ping {0}"))],
         );
-        assert_eq!(
-            g.first_entry_needing_values().map(|e| e.id()),
-            Some("c1")
+        assert_eq!(g.first_entry_needing_values().map(|e| e.id()), Some("c1"));
+        assert!(
+            group("g2", vec![LibraryEntry::Command(cmd("c2", "a", "echo 1"))])
+                .first_entry_needing_values()
+                .is_none()
         );
-        assert!(group(
-            "g2",
-            vec![LibraryEntry::Command(cmd("c2", "a", "echo 1"))]
-        )
-        .first_entry_needing_values()
-        .is_none());
+    }
+
+    fn lib_with(entries: Vec<LibraryEntry>) -> CommandLibrary {
+        CommandLibrary {
+            schema_version: CommandLibrary::SCHEMA_VERSION,
+            groups: vec![group("g1", entries)],
+        }
     }
 
     #[test]
-    fn legacy_group_tags_are_ignored_on_disk() {
-        let lib: CommandLibrary = serde_json::from_str(
-            r#"{"schema_version":3,"groups":[{"id":"g1","name":"设备信息","tags":["产线"],"entries":[]}]}"#,
-        )
-        .unwrap();
-        assert_eq!(lib.groups[0].name, "设备信息");
-        let json = serde_json::to_value(&lib).unwrap();
-        assert!(json["groups"][0].get("tags").is_none());
+    fn from_dto_rejects_non_schema_3() {
+        let dto = CommandLibraryDto {
+            schema_version: 2,
+            groups: vec![],
+        };
+        assert!(matches!(
+            CommandLibrary::from_dto(&dto),
+            Err(LibraryError::UnsupportedSchema {
+                expected: 3,
+                actual: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn from_dto_runs_the_same_validate_as_save() {
+        let invalid = [
+            lib_with(vec![LibraryEntry::Command(cmd("c1", "空", "  "))]),
+            lib_with(vec![LibraryEntry::Block(block("b1", 300, &["echo 1"]))]),
+            lib_with(vec![LibraryEntry::Block(block("b1", 0, &[]))]),
+            lib_with(vec![LibraryEntry::Block(block("b1", 0, &["  "]))]),
+            lib_with(vec![LibraryEntry::Command(cmd("c1", "  ", "echo 1"))]),
+        ];
+        for lib in invalid {
+            let expected = lib.validate().expect_err("fixture must be invalid");
+            assert_eq!(CommandLibrary::from_dto(&lib.to_dto()), Err(expected));
+        }
+        let valid = lib_with(vec![
+            LibraryEntry::Command(cmd("c1", "版本", "echo 1")),
+            LibraryEntry::Block(block("b1", 500, &["echo a", "echo b"])),
+        ]);
+        assert!(valid.validate().is_ok());
+        assert_eq!(CommandLibrary::from_dto(&valid.to_dto()).unwrap(), valid);
+    }
+
+    #[test]
+    fn validate_rejects_wrong_schema_and_empty_template() {
+        let mut lib = CommandLibrary::empty();
+        lib.schema_version = 2;
+        assert!(matches!(
+            lib.validate(),
+            Err(LibraryError::UnsupportedSchema {
+                expected: 3,
+                actual: 2
+            })
+        ));
+        let lib = CommandLibrary {
+            schema_version: CommandLibrary::SCHEMA_VERSION,
+            groups: vec![group(
+                "g1",
+                vec![LibraryEntry::Command(cmd("c1", "空", "  "))],
+            )],
+        };
+        assert!(matches!(
+            lib.validate(),
+            Err(LibraryError::EmptyTemplate(_))
+        ));
     }
 }

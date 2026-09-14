@@ -1,0 +1,6 @@
+[
+  { "stdout": "out", "stderr": "", "text": "out" },
+  { "stdout": "", "stderr": "err", "text": "err" },
+  { "stdout": "out", "stderr": "err", "text": "out\nerr" },
+  { "stdout": "", "stderr": "", "text": "" }
+]

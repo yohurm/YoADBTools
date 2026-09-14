@@ -1,8 +1,6 @@
 //! 默认命令库（首次启动/损坏重建时写入；纯代码构造，可单测）。
 
-use yohu_protocol::CommandParamDto;
-
-use super::{CommandDefinition, CommandGroup, CommandLibrary, LibraryEntry};
+use super::{CommandDefinition, CommandGroup, CommandLibrary, CommandParam, LibraryEntry};
 
 /// 产线常用默认命令库（schemaVersion 3）。新增命令不做成功/失败正则。
 pub fn default_library() -> CommandLibrary {
@@ -12,7 +10,7 @@ pub fn default_library() -> CommandLibrary {
         entries,
     };
 
-    let c = |id: &str, name: &str, template: &str, params: Vec<CommandParamDto>| {
+    let c = |id: &str, name: &str, template: &str, params: Vec<CommandParam>| {
         LibraryEntry::Command(CommandDefinition {
             id: id.into(),
             name: name.into(),
@@ -21,7 +19,7 @@ pub fn default_library() -> CommandLibrary {
         })
     };
     let p0 = |description: &str| {
-        vec![CommandParamDto {
+        vec![CommandParam {
             index: 0,
             description: description.into(),
         }]
@@ -41,7 +39,12 @@ pub fn default_library() -> CommandLibrary {
                         "shell getprop ro.build.version.release",
                         vec![],
                     ),
-                    c("c-serial", "设备序列号", "shell getprop ro.serialno", vec![]),
+                    c(
+                        "c-serial",
+                        "设备序列号",
+                        "shell getprop ro.serialno",
+                        vec![],
+                    ),
                 ],
             ),
             g(
@@ -63,7 +66,12 @@ pub fn default_library() -> CommandLibrary {
                         "shell dumpsys wifi | grep -E 'Wi-Fi is|mNetworkInfo'",
                         vec![],
                     ),
-                    c("c-ping", "网络连通性（主机）", "shell ping -c 3 {0}", p0("主机")),
+                    c(
+                        "c-ping",
+                        "网络连通性（主机）",
+                        "shell ping -c 3 {0}",
+                        p0("主机"),
+                    ),
                     c("c-props", "查询属性", "shell getprop {0}", p0("属性名")),
                 ],
             ),
@@ -80,10 +88,7 @@ mod tests {
         let lib = default_library();
         assert!(lib.validate().is_ok());
         assert_eq!(lib.groups.len(), 3);
-        assert_eq!(
-            lib.groups.iter().map(|g| g.entries.len()).sum::<usize>(),
-            9
-        );
+        assert_eq!(lib.groups.iter().map(|g| g.entries.len()).sum::<usize>(), 9);
     }
 
     #[test]

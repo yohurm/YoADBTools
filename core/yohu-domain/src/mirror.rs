@@ -1,6 +1,9 @@
 //! 投屏协议与编码参数（纯函数；无 IO）。
 
-use yohu_protocol::{AppSettings, MirrorProtocol};
+use yohu_protocol::{
+    default_mirror_max_fps, default_mirror_max_size, default_mirror_video_bit_rate, AppSettings,
+    MirrorProtocol,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirrorEncodeParams {
@@ -11,9 +14,9 @@ pub struct MirrorEncodeParams {
 }
 
 pub const USB_ENCODE: MirrorEncodeParams = MirrorEncodeParams {
-    max_size: 0,
-    video_bit_rate: 16_000_000,
-    max_fps: 0,
+    max_size: default_mirror_max_size(),
+    video_bit_rate: default_mirror_video_bit_rate(),
+    max_fps: default_mirror_max_fps(),
     video_codec: "h265",
 };
 
@@ -23,17 +26,6 @@ pub const WIFI_ENCODE: MirrorEncodeParams = MirrorEncodeParams {
     max_fps: 30,
     video_codec: "h264",
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EncoderLimits {
-    pub max_size: u32,
-    pub max_fps: u32,
-}
-
-/// UI 质量选项 → 编码器实际参数。0 = 设备原始，不再封顶。
-pub fn encoder_limits(max_size: u32, max_fps: u32) -> EncoderLimits {
-    EncoderLimits { max_size, max_fps }
-}
 
 pub fn params_of(protocol: MirrorProtocol) -> MirrorEncodeParams {
     match protocol {
@@ -88,38 +80,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn original_size_stays_zero() {
-        assert_eq!(
-            encoder_limits(0, 0),
-            EncoderLimits {
-                max_size: 0,
-                max_fps: 0
-            }
-        );
-        assert_eq!(
-            encoder_limits(1920, 0),
-            EncoderLimits {
-                max_size: 1920,
-                max_fps: 0
-            }
-        );
-        assert_eq!(
-            encoder_limits(1024, 15),
-            EncoderLimits {
-                max_size: 1024,
-                max_fps: 15
-            }
-        );
-    }
-
-    #[test]
     fn protocol_params_are_fixed() {
+        assert_eq!(USB_ENCODE.max_size, default_mirror_max_size());
+        assert_eq!(USB_ENCODE.video_bit_rate, default_mirror_video_bit_rate());
+        assert_eq!(USB_ENCODE.max_fps, default_mirror_max_fps());
         assert_eq!(params_of(MirrorProtocol::Usb), USB_ENCODE);
         assert_eq!(params_of(MirrorProtocol::Wifi), WIFI_ENCODE);
-        assert_eq!(USB_ENCODE.max_size, 0);
-        assert_eq!(USB_ENCODE.video_codec, "h265");
-        assert_eq!(WIFI_ENCODE.max_size, 1280);
-        assert_eq!(WIFI_ENCODE.video_codec, "h264");
+        let table: serde_json::Value =
+            serde_json::from_str(include_str!("../testdata/mirror_encode.json")).expect("fixture");
+        for (name, params) in [("usb", USB_ENCODE), ("wifi", WIFI_ENCODE)] {
+            let row = &table[name];
+            assert_eq!(row["max_size"], params.max_size);
+            assert_eq!(row["video_bit_rate"], params.video_bit_rate);
+            assert_eq!(row["max_fps"], params.max_fps);
+            assert_eq!(row["video_codec"], params.video_codec);
+        }
     }
 
     #[test]

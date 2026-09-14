@@ -41,7 +41,7 @@ impl AppLog {
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Mutex::new(VecDeque::with_capacity(capacity)),
-            capacity: capacity.max(1),
+            capacity,
         }
     }
 
@@ -104,5 +104,12 @@ mod tests {
         let log = AppLog::new(10);
         log.error("e");
         assert_eq!(log.snapshot()[0].level, LogLevel::Error);
+    }
+
+    #[test]
+    fn zero_capacity_stores_nothing() {
+        let log = AppLog::new(0);
+        log.info("a");
+        assert!(log.snapshot().is_empty());
     }
 }

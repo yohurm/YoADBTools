@@ -1,0 +1,7 @@
+[
+  { "input": "  shell ls  ", "body": "shell ls" },
+  { "input": "adb shell ls", "body": "shell ls" },
+  { "input": "ADB.exe shell ls", "body": "shell ls" },
+  { "input": "adb", "body": "" },
+  { "input": "adbd", "body": "adbd" }
+]

@@ -1,0 +1,10 @@
+[
+  { "path": "/sdcard/DCIM/a.jpg", "ok": true, "normalized": "/sdcard/DCIM/a.jpg" },
+  { "path": "/storage/emulated/0/b", "ok": true, "normalized": "/storage/emulated/0/b" },
+  { "path": "/sdcard", "ok": true, "normalized": "/sdcard" },
+  { "path": "/", "error": "outside_root" },
+  { "path": "/data/local/tmp/x", "error": "outside_root" },
+  { "path": "/sdcardevil", "error": "outside_root" },
+  { "path": "/sdcard/../data/x", "error": "traversal" },
+  { "path": "sdcard/a", "error": "not_absolute" }
+]
