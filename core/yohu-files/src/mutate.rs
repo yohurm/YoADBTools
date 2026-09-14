@@ -1,15 +1,19 @@
 //! 危险操作（删除/新建）：core 侧 SafetyRoot + 末段名强制校验。
+//!
+//! 变更超时只在本文件。`readlink -f` 超时在运输层。
 
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::{file_error_from_adb, resolve_and_recheck, FileError};
-const DELETE_TIMEOUT_MS: u64 = 30_000;
-const MUTATE_TIMEOUT_MS: u64 = 15_000;
+use crate::fault::{file_error_from_adb, FileError};
+use crate::guard::{normalize_mut, resolve_and_recheck, RecheckKind};
 use yohu_adb::shell_quote;
 use yohu_adb::AdbClient;
-use yohu_domain::{validate_entry_name, RemotePath, SafetyRoot};
+use yohu_domain::SafetyRoot;
+
+const DELETE_TIMEOUT_MS: u64 = 30_000;
+const MUTATE_TIMEOUT_MS: u64 = 15_000;
 
 /// 设备文件变更器。
 pub struct FileMutator {
@@ -25,15 +29,6 @@ impl FileMutator {
         }
     }
 
-    fn normalize_mut(&self, path: &str) -> Result<RemotePath, FileError> {
-        let normalized = self
-            .safety
-            .check_descendant(path)
-            .map_err(|e| FileError::OutsideRoot(e.to_string()))?;
-        validate_entry_name(normalized.file_name()).map_err(|e| FileError::Path(e.to_string()))?;
-        Ok(normalized)
-    }
-
     /// 删除（递归）。**必须通过安全根校验**，用户确认由 UI 负责、core 二次强制。
     pub async fn delete(
         &self,
@@ -41,9 +36,16 @@ impl FileMutator {
         path: &str,
         cancel: CancellationToken,
     ) -> Result<(), FileError> {
-        let normalized = self.normalize_mut(path)?;
-        // 符号链接逃逸守卫：rm -rf /sdcard/link/... 会跟随链接删到安全根外，先解析 realpath 复核
-        resolve_and_recheck(&self.adb, &self.safety, serial, &normalized, cancel.clone()).await?;
+        let normalized = normalize_mut(&self.safety, path)?;
+        resolve_and_recheck(
+            &self.adb,
+            &self.safety,
+            serial,
+            &normalized,
+            RecheckKind::Descendant,
+            cancel.clone(),
+        )
+        .await?;
         let out = self
             .adb
             .run(
@@ -78,9 +80,16 @@ impl FileMutator {
         path: &str,
         cancel: CancellationToken,
     ) -> Result<(), FileError> {
-        let normalized = self.normalize_mut(path)?;
-        // 符号链接逃逸守卫：mkdir -p /sdcard/link/... 会把目录建到安全根外
-        resolve_and_recheck(&self.adb, &self.safety, serial, &normalized, cancel.clone()).await?;
+        let normalized = normalize_mut(&self.safety, path)?;
+        resolve_and_recheck(
+            &self.adb,
+            &self.safety,
+            serial,
+            &normalized,
+            RecheckKind::Descendant,
+            cancel.clone(),
+        )
+        .await?;
         let out = self
             .adb
             .run(
@@ -115,9 +124,16 @@ impl FileMutator {
         path: &str,
         cancel: CancellationToken,
     ) -> Result<(), FileError> {
-        let normalized = self.normalize_mut(path)?;
-        // 符号链接逃逸守卫：touch /sdcard/link/... 会作用到安全根外
-        resolve_and_recheck(&self.adb, &self.safety, serial, &normalized, cancel.clone()).await?;
+        let normalized = normalize_mut(&self.safety, path)?;
+        resolve_and_recheck(
+            &self.adb,
+            &self.safety,
+            serial,
+            &normalized,
+            RecheckKind::Descendant,
+            cancel.clone(),
+        )
+        .await?;
         let out = self
             .adb
             .run(

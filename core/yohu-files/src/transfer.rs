@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{file_error_from_adb, resolve_and_recheck, FileError};
+use crate::fault::{file_error_from_adb, FileError};
+use crate::guard::{normalize_mut, resolve_and_recheck, RecheckKind};
 use yohu_adb::AdbClient;
 use yohu_domain::SafetyRoot;
 use yohu_protocol::{AppEvent, Direction, TransferProgress, TransferState};
@@ -55,17 +56,13 @@ impl TransferRunner {
             remote,
         } = spec;
         let local_path = PathBuf::from(&local);
-        let remote_norm = self
-            .safety
-            .check_descendant(&remote)
-            .map_err(|e| FileError::OutsideRoot(e.to_string()))?;
-        // 符号链接逃逸守卫：push/pull 的 remote 经设备端 realpath 复核（防止经 /sdcard 内链接作用到安全根外）。
-        // 解析成功且逃逸 → 拒绝；解析失败/命令不可用/目标未存在 → 保守放行（词典校验已过）。
+        let remote_norm = normalize_mut(&self.safety, &remote)?;
         resolve_and_recheck(
             &self.adb,
             &self.safety,
             &serial,
             &remote_norm,
+            RecheckKind::Descendant,
             cancel.clone(),
         )
         .await?;
@@ -123,39 +120,51 @@ impl TransferRunner {
 
         progress.bytes = total_bytes;
         match outcome {
+            Ok(0) => {
+                progress.state = TransferState::Done;
+                emit_terminal(&sink, progress).await?;
+                Ok(total_bytes)
+            }
             Ok(code) => {
-                if code == 0 {
-                    progress.state = TransferState::Done;
-                    emit(&sink, progress, true).await;
-                    Ok(total_bytes)
-                } else {
-                    cleanup_pull(direction, &local_path);
-                    let err = file_error_from_adb(
-                        remote_norm.as_str(),
-                        yohu_adb::AdbError::BadExit {
-                            exit_code: code,
-                            stderr: last_summary,
-                        },
-                    );
-                    progress.state = TransferState::Failed;
-                    progress.message = Some(err.to_string());
-                    emit(&sink, progress, true).await;
-                    Err(err)
-                }
+                let err = file_error_from_adb(
+                    remote_norm.as_str(),
+                    yohu_adb::AdbError::BadExit {
+                        exit_code: code,
+                        stderr: last_summary,
+                    },
+                );
+                finish_unsuccessful(
+                    &sink,
+                    progress,
+                    direction,
+                    &local_path,
+                    TransferState::Failed,
+                    err,
+                )
+                .await
             }
             Err(yohu_adb::AdbError::Cancelled) => {
-                cleanup_pull(direction, &local_path);
-                progress.state = TransferState::Cancelled;
-                emit(&sink, progress, true).await;
-                Err(FileError::Adb(yohu_adb::AdbError::Cancelled))
+                finish_unsuccessful(
+                    &sink,
+                    progress,
+                    direction,
+                    &local_path,
+                    TransferState::Cancelled,
+                    FileError::Adb(yohu_adb::AdbError::Cancelled),
+                )
+                .await
             }
             Err(e) => {
-                cleanup_pull(direction, &local_path);
                 let err = file_error_from_adb(remote_norm.as_str(), e);
-                progress.state = TransferState::Failed;
-                progress.message = Some(err.to_string());
-                emit(&sink, progress, true).await;
-                Err(err)
+                finish_unsuccessful(
+                    &sink,
+                    progress,
+                    direction,
+                    &local_path,
+                    TransferState::Failed,
+                    err,
+                )
+                .await
             }
         }
     }
@@ -170,28 +179,64 @@ async fn emit(sink: &mpsc::Sender<AppEvent>, progress: TransferProgress, reliabl
     }
 }
 
+async fn emit_terminal(
+    sink: &mpsc::Sender<AppEvent>,
+    progress: TransferProgress,
+) -> Result<(), FileError> {
+    sink.send(AppEvent::TransferProgress(progress))
+        .await
+        .map_err(|_| FileError::ProgressClosed)
+}
+
+async fn finish_unsuccessful(
+    sink: &mpsc::Sender<AppEvent>,
+    mut progress: TransferProgress,
+    direction: Direction,
+    local: &Path,
+    state: TransferState,
+    err: FileError,
+) -> Result<u64, FileError> {
+    let cleanup = cleanup_pull(direction, local);
+    progress.state = state;
+    if state == TransferState::Failed {
+        progress.message = Some(err.to_string());
+    }
+    emit_terminal(sink, progress).await?;
+    cleanup?;
+    Err(err)
+}
+
+fn local_fs_error(err: std::io::Error, path: &Path) -> FileError {
+    let shown = path.display().to_string();
+    if err.kind() == std::io::ErrorKind::NotFound {
+        FileError::LocalNotFound(shown)
+    } else {
+        FileError::Local(shown)
+    }
+}
+
 /// 文件给 `adb push` 用精确字节；目录交给 adb 递归，总数等摘要行。
 fn push_local_total(path: &Path) -> Result<u64, FileError> {
-    let meta = std::fs::metadata(path)
-        .map_err(|_| FileError::LocalNotFound(path.display().to_string()))?;
+    let meta = std::fs::metadata(path).map_err(|e| local_fs_error(e, path))?;
     if meta.is_file() {
         Ok(meta.len())
     } else if meta.is_dir() {
         Ok(0)
     } else {
-        Err(FileError::LocalNotFound(path.display().to_string()))
+        Err(FileError::Local(path.display().to_string()))
     }
 }
 
-fn cleanup_pull(direction: Direction, local: &Path) {
-    if direction != Direction::Pull {
-        return;
+fn cleanup_pull(direction: Direction, local: &Path) -> Result<(), FileError> {
+    if direction != Direction::Pull || !local.exists() {
+        return Ok(());
     }
-    if local.is_dir() {
-        let _ = std::fs::remove_dir_all(local);
+    let result = if local.is_dir() {
+        std::fs::remove_dir_all(local)
     } else {
-        let _ = std::fs::remove_file(local);
-    }
+        std::fs::remove_file(local)
+    };
+    result.map_err(|_| FileError::Local(local.display().to_string()))
 }
 
 /// 从 adb 摘要行提取字节数：`... (3456 bytes in 0.001s)`。
@@ -246,9 +291,37 @@ mod tests {
 
         assert_eq!(push_local_total(&file).unwrap(), 5);
         assert_eq!(push_local_total(&nested).unwrap(), 0);
-        assert!(push_local_total(&root.join("missing")).is_err());
+        let missing = root.join("missing");
+        let missing_shown = missing.display().to_string();
+        assert!(matches!(
+            push_local_total(&missing),
+            Err(FileError::LocalNotFound(ref p)) if p == &missing_shown
+        ));
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn local_fs_error_classifies_not_found_only() {
+        let path = Path::new(r"C:\tmp\yohu-local.bin");
+        let shown = path.display().to_string();
+        assert!(matches!(
+            local_fs_error(
+                std::io::Error::new(std::io::ErrorKind::NotFound, "gone"),
+                path
+            ),
+            FileError::LocalNotFound(ref p) if p == &shown
+        ));
+        let denied = local_fs_error(
+            std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "access denied sentence",
+            ),
+            path,
+        );
+        assert!(matches!(denied, FileError::Local(ref p) if p == &shown));
+        assert_eq!(denied.to_string(), format!("本地操作失败: {shown}"));
+        assert!(!denied.to_string().contains("access denied sentence"));
     }
 
     #[test]
@@ -260,13 +333,13 @@ mod tests {
         std::fs::write(dir.join("a.txt"), b"x").unwrap();
         std::fs::write(&file, b"abc").unwrap();
 
-        cleanup_pull(Direction::Push, &file);
+        cleanup_pull(Direction::Push, &file).unwrap();
         assert!(file.exists());
 
-        cleanup_pull(Direction::Pull, &file);
+        cleanup_pull(Direction::Pull, &file).unwrap();
         assert!(!file.exists());
 
-        cleanup_pull(Direction::Pull, &dir);
+        cleanup_pull(Direction::Pull, &dir).unwrap();
         assert!(!dir.exists());
 
         let _ = std::fs::remove_dir_all(&root);

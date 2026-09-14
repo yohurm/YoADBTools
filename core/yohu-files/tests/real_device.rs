@@ -60,12 +60,12 @@ async fn real_browse_and_transfer_roundtrip() {
             Some(mtime),
             "文件 mtime 应已是到秒的墙钟: {mtime}"
         );
-        assert!(
-            !mtime.contains('.'),
-            "文件日期不显示毫秒: {mtime}"
-        );
+        assert!(!mtime.contains('.'), "文件日期不显示毫秒: {mtime}");
     }
-    let sample = entries.iter().find_map(|e| e.mtime.as_deref()).unwrap_or("");
+    let sample = entries
+        .iter()
+        .find_map(|e| e.mtime.as_deref())
+        .unwrap_or("");
     eprintln!(
         "[真机] /sdcard 条目 {} 个，样例 mtime={sample}",
         entries.len()
