@@ -2,8 +2,10 @@
  * 右栏：恰好一条命令块。名称 + 间隔 + 步骤 + 全步共享 `{n}` 描述。
  */
 
-import { COMMAND_BLOCK_GAPS_MS, commandBlockGapLabel } from "@yohu/api";
+import { COMMAND_BLOCK_GAPS_MS } from "@yohu/api";
 import { YoFormRow, YoSelect, YoTextField } from "@yohu/ui";
+
+import { commandBlockGapLabel } from "../block-gap";
 
 import { templatesSlots } from "../command-line";
 import type { DraftBlock } from "../draft";
@@ -39,7 +41,6 @@ export function BlockEditor(props: { block: DraftBlock; store: CommandManagerSto
         onAdd={() => props.store.addBlockStep()}
         onRemove={(stepId) => props.store.removeBlockStep(stepId)}
         onMoveTo={(from, to) => props.store.moveBlockStepTo(from, to)}
-        onShift={(index, delta) => props.store.shiftBlockStep(index, delta)}
       />
       <ParamDescriptions
         slots={templatesSlots(props.block.steps.map((step) => step.template))}

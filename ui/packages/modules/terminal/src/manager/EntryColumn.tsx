@@ -4,10 +4,9 @@
  * 整行按住拖动换位走 YoVirtualList onReorder（拖起时收成单选该条）。
  */
 
-import { For, Show } from "solid-js";
+import { Show } from "solid-js";
 
 import {
-  Density,
   YoBadge,
   YoIconButton,
   YoPanel,
@@ -17,6 +16,7 @@ import {
 } from "@yohu/ui";
 
 import type { DraftEntry } from "../draft";
+import { controlRowHeight } from "../layout";
 import type { CommandManagerStore } from "./store";
 
 function EntryRow(props: { item: DraftEntry; index: number }) {
@@ -35,7 +35,7 @@ export function EntryColumn(props: {
   onContextMenu: (entry: DraftEntry, event: MouseEvent) => void;
 }) {
   const entries = (): DraftEntry[] => props.store.selectedGroup()?.entries ?? [];
-  const rowHeight = Density.Comfortable.controlHeight;
+  const rowHeight = controlRowHeight();
 
   return (
     <YoPanel class="yohu-cm__commands" variant="pane" overflow="hidden" header={

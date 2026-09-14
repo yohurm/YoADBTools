@@ -2,6 +2,11 @@
  * 命令管理 store：草稿 + 选区。
  * 不依赖运行时终端 store；load / library 由 Dialog 注入。
  * 不开菜单、不写剪贴板、不查 DOM。
+ *
+ * 设计后链路（换位）：
+ *   定高组/条目 YoVirtualList.onReorder → moveGroupTo / moveEntryTo
+ *   变高步骤 YoReorderList.onReorder（及 Ctrl/Meta+↑/↓）→ moveBlockStepTo
+ *   三者都只调 @yohu/ui moveItemTo。禁止 shift 包装、禁止第二套几何。
  */
 
 import { createStore } from "solid-js/store";
@@ -186,12 +191,6 @@ export function createCommandManagerStore() {
     updateEntry({ steps: entry.steps.filter((step) => step.id !== stepId) });
   }
 
-  function shiftBlockStep(index: number, delta: number): void {
-    const entry = selectedEntry();
-    if (!entry || entry.kind !== "block") return;
-    updateEntry({ steps: moveItemTo(entry.steps, index, index + delta) });
-  }
-
   function moveBlockStepTo(from: number, to: number): void {
     const entry = selectedEntry();
     if (!entry || entry.kind !== "block") return;
@@ -225,7 +224,6 @@ export function createCommandManagerStore() {
     updateBlockStep,
     addBlockStep,
     removeBlockStep,
-    shiftBlockStep,
     moveBlockStepTo,
   };
 }

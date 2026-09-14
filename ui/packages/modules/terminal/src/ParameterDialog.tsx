@@ -9,6 +9,7 @@ import type { CommandParamDto } from "@yohu/api";
 import { YoButton, YoDialog, YoTextField } from "@yohu/ui";
 
 import { formatAdbLine, paramDescription } from "./command-line";
+import { PARAM_DIALOG_WIDTH } from "./layout";
 
 export function ParameterDialog(props: {
   title: string;
@@ -43,7 +44,7 @@ export function ParameterDialog(props: {
     <YoDialog
       open={props.open}
       title={`填写参数: ${props.title}`}
-      width={480}
+      width={PARAM_DIALOG_WIDTH}
       onClose={props.onClose}
       footer={
         <>

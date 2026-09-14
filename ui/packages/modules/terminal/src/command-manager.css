@@ -81,14 +81,6 @@
   gap: var(--yohu-space-sm);
 }
 
-.yohu-cm__steps--dragging {
-  user-select: none;
-}
-
-.yohu-cm__steps--dragging .yohu-cm__step:not(.yohu-cm__step--dragging) {
-  transition: transform var(--yohu-motion-spatial-small);
-}
-
 .yohu-cm__template {
   display: flex;
   flex-direction: column;
@@ -122,40 +114,10 @@
   flex-direction: row;
   align-items: flex-start;
   gap: var(--yohu-space-xs);
-  position: relative;
+  padding-block: calc(var(--yohu-space-sm) / 2);
 }
 
 .yohu-cm__step-editor {
   flex: 1;
   min-width: 0;
-}
-
-.yohu-cm__step--dragging {
-  z-index: 1;
-  border-radius: var(--yohu-radius-sm);
-  box-shadow: var(--yohu-shadow-xs);
-  background: var(--yohu-surface);
-}
-
-.yohu-cm__step-grip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 var(--yohu-control-height);
-  width: var(--yohu-control-height);
-  height: var(--yohu-control-height);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--yohu-fg-3);
-  cursor: grab;
-}
-
-.yohu-cm__step-grip:disabled {
-  cursor: default;
-  color: var(--yohu-fg-4);
-}
-
-.yohu-cm__steps--dragging .yohu-cm__step-grip {
-  cursor: grabbing;
 }

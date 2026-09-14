@@ -15,7 +15,12 @@ function load(name: string): string {
   return "";
 }
 
-const view = load("TerminalView.tsx");
+const view = [
+  load("TerminalView.tsx"),
+  load("CommandTree.tsx"),
+  load("ResultStream.tsx"),
+  load("Composer.tsx"),
+].join("\n");
 const css = load("terminal.css");
 
 describe("命令终端动效接线", () => {
@@ -30,7 +35,7 @@ describe("命令终端动效接线", () => {
 
   it("发送栏贴右横向开合，禁止纵向 XOR panel", () => {
     expect(view).toContain("yohu-recipe-inline-end");
-    expect(view).toContain("data-open={composerOpen() ? \"true\" : \"false\"}");
+    expect(view).toContain("data-open={open() ? \"true\" : \"false\"}");
     expect(view).toContain("chevron-right");
     expect(view).toContain("chevron-left");
     expect(view).not.toContain("yohu-recipe-xor");
@@ -52,32 +57,20 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain("rotate(");
   });
 
-  it("composer textarea 复用 TextField 壳类，模块 CSS 只留布局", () => {
-    expect(view).toContain("<textarea");
-    expect(view).toContain("yohu-text-field__control");
-    expect(view).toContain("yohu-focus-host");
-    expect(view).toContain("yohu-text-field__input");
-    expect(view).toContain("yohu-terminal__composer-input");
-    expect(view).toContain('data-paint="neutral"');
-    expect(view).toContain('data-width="fill"');
-    expect(view).not.toContain("YoTextArea");
-    expect(view).toContain('class="yohu-text-field__input yohu-terminal__composer-input"');
-    expect(view).not.toContain("yohu-terminal__composer-input yohu-focus-ring");
-
-    const composerBlock = css.slice(css.indexOf(".yohu-terminal__composer-input"));
-    const composerRule = composerBlock.slice(0, composerBlock.indexOf("}") + 1);
-    expect(composerRule).toContain("resize: none");
-    expect(composerRule).toContain("overflow: auto");
-    expect(composerRule).toContain("var(--yohu-font-mono)");
-    expect(composerRule).not.toContain("var(--yohu-control-height)");
-    expect(composerRule).not.toContain("height:");
-    expect(composerRule).not.toContain("line-height:");
-    expect(composerRule).not.toContain("padding");
-    expect(composerRule).not.toMatch(/border(-radius|-color)?:/);
-    expect(composerRule).not.toContain("background");
-    expect(composerRule).not.toContain("border-color");
-    expect(css).not.toContain(".yohu-terminal__composer-input:focus");
-    expect(css).not.toContain(".yohu-terminal__composer-input:disabled");
+  it("composer 走 YoTextField multiline，不自挂 textarea 壳", () => {
+    const composer = load("Composer.tsx");
+    expect(composer).toContain("YoTextField");
+    expect(composer).toContain("multiline");
+    expect(composer).toContain("rows={1}");
+    expect(composer).not.toContain("<textarea");
+    expect(composer).not.toContain("YoTextArea");
+    expect(composer).not.toContain("yohu-text-field__control");
+    expect(composer).not.toContain("yohu-text-field__input");
+    expect(composer).not.toContain("yohu-terminal__composer-input");
+    expect(css).not.toContain(".yohu-terminal__composer-input");
+    expect(css).not.toContain(".yohu-text-field");
+    expect(css).toContain(".yohu-terminal__composer-field");
+    expect(css).toContain("var(--yohu-font-mono)");
     expect(css).not.toContain(".yohu-terminal__send .yohu-icon-button:disabled");
   });
 
@@ -139,8 +132,14 @@ describe("命令终端动效接线", () => {
     expect(load("manager/store.ts")).not.toContain("shiftGroup");
     expect(load("manager/store.ts")).not.toContain("shiftEntry");
     expect(load("manager/store.ts")).not.toContain("./reorder");
-    expect(load("manager/BlockSteps.tsx")).toContain("dropIndexFromCenters");
+    expect(load("manager/BlockSteps.tsx")).toContain("YoReorderList");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("dropIndexFromCenters");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("shiftForReorder");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("querySelector");
     expect(load("manager/BlockSteps.tsx")).not.toContain("./reorder");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__step-grip");
+    expect(load("manager/BlockSteps.tsx")).not.toContain('name="grip"');
+    expect(load("manager/BlockSteps.tsx")).not.toContain("onShift");
     expect(load("manager/EntryColumn.tsx")).toContain('tone="list"');
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColFrame");
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColTrack");
@@ -167,5 +166,33 @@ describe("命令终端动效接线", () => {
     expect(managerCss).toContain("var(--yohu-canvas)");
     expect(managerCss).not.toContain(".yohu-cm__table");
     expect(managerCss).not.toContain(".yohu-cm__cols");
+  });
+
+  it("发送/组编排在 store，View 不双轨、不写死 Comfortable", () => {
+    expect(load("CommandTree.tsx")).toContain("enqueueGroup");
+    expect(load("CommandTree.tsx")).not.toMatch(/if \(key\.startsWith\("g:"\)\) return;/);
+    expect(load("TerminalView.tsx")).toContain("cancelGroup");
+    expect(load("TerminalView.tsx")).not.toContain("fillTemplate");
+    expect(load("Composer.tsx")).toContain("sendAll");
+    expect(load("Composer.tsx")).toContain("YoChip");
+    expect(load("Composer.tsx")).toContain("leading={queuedLeading(item)}");
+    expect(load("Composer.tsx")).toContain('dismiss="hover"');
+    expect(load("Composer.tsx")).toContain("onDismiss");
+    expect(load("Composer.tsx")).not.toContain("<textarea");
+    expect(load("store.ts")).not.toContain("function runCommand");
+    expect(load("store.ts")).toContain("onTaskSummary");
+    expect(load("store.ts")).not.toContain("请逐条执行");
+    expect(load("manager/GroupColumn.tsx")).toContain("controlRowHeight");
+    expect(load("manager/EntryColumn.tsx")).toContain("controlRowHeight");
+    expect(load("manager/GroupColumn.tsx")).not.toContain("Density.Comfortable");
+    expect(load("manager/EntryColumn.tsx")).not.toContain("Density.Comfortable");
+    expect(load("CommandManager.tsx")).toContain("errorText(e)");
+    expect(load("CommandManager.tsx")).not.toContain("JSON.stringify(e)");
+    expect(load("CommandManager.tsx")).toContain("MANAGER_DIALOG");
+    expect(load("command-manager.css")).not.toContain("var(--yohu-z-overlay)");
+    expect(load("command-manager.css")).not.toContain(".yohu-cm__step-grip");
+    expect(load("command-manager.css")).not.toContain("position: absolute");
+    expect(load("manager/BlockSteps.tsx")).not.toContain('"z-index": 1');
+    expect(load("manager/TemplateField.tsx")).not.toContain("dataset.slotBound");
   });
 });

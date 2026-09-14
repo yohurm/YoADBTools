@@ -3,7 +3,9 @@
  * 选区记在 input 上，不挖 querySelector。
  */
 
-import { YoButton, YoTextField } from "@yohu/ui";
+import { createEffect, createSignal, onCleanup } from "solid-js";
+
+import { YoButton, YoTextField, type YoTextFieldControl } from "@yohu/ui";
 
 import { commandBody, formatAdbLine, insertPlaceholderAtDisplay } from "../command-line";
 
@@ -13,15 +15,14 @@ export function TemplateField(props: {
   value: string;
   onChange: (body: string) => void;
 }) {
-  let input: HTMLInputElement | undefined;
+  const [input, setInput] = createSignal<YoTextFieldControl | undefined>();
   let range = { start: 0, end: 0 };
 
   const display = (): string => formatAdbLine("-", props.value);
 
-  const bind = (el: HTMLInputElement): void => {
-    input = el;
-    if (el.dataset.slotBound === "1") return;
-    el.dataset.slotBound = "1";
+  createEffect(() => {
+    const el = input();
+    if (!el) return;
     const save = (): void => {
       range = {
         start: el.selectionStart ?? 0,
@@ -33,10 +34,17 @@ export function TemplateField(props: {
     el.addEventListener("mouseup", save);
     el.addEventListener("focus", save);
     el.addEventListener("input", save);
-  };
+    onCleanup(() => {
+      el.removeEventListener("select", save);
+      el.removeEventListener("keyup", save);
+      el.removeEventListener("mouseup", save);
+      el.removeEventListener("focus", save);
+      el.removeEventListener("input", save);
+    });
+  });
 
   const insert = (): void => {
-    const el = input;
+    const el = input();
     const focused = el !== undefined && document.activeElement === el;
     const start = focused ? (el.selectionStart ?? range.start) : display().length;
     const end = focused ? (el.selectionEnd ?? range.end) : start;
@@ -59,7 +67,7 @@ export function TemplateField(props: {
             ariaLabel={props.ariaLabel}
             value={display()}
             onInput={(v) => props.onChange(commandBody(v))}
-            inputRef={bind}
+            inputRef={(el) => setInput(el)}
           />
         </div>
         <YoButton

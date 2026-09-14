@@ -4,9 +4,10 @@
  * 整行按住拖动换位走 YoVirtualList onReorder。
  */
 
-import { Density, YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } from "@yohu/ui";
+import { YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } from "@yohu/ui";
 
 import type { DraftGroup } from "../draft";
+import { controlRowHeight } from "../layout";
 import type { CommandManagerStore } from "./store";
 
 function GroupRow(props: { item: DraftGroup; index: number }) {
@@ -20,7 +21,7 @@ function GroupRow(props: { item: DraftGroup; index: number }) {
 
 export function GroupColumn(props: { store: CommandManagerStore }) {
   const groups = (): DraftGroup[] => props.store.draft.groups;
-  const rowHeight = Density.Comfortable.controlHeight;
+  const rowHeight = controlRowHeight();
 
   return (
     <YoPanel class="yohu-cm__groups" variant="pane" overflow="hidden" header={

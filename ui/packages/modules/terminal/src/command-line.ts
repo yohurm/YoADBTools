@@ -137,19 +137,25 @@ export function previewFill(template: string, values: readonly string[]): string
   return applyPlaceholders(template, bindValues(placeholderSlots(template), values), true);
 }
 
+/** `formatAdbLine("-", body)` 里正文之前的前缀长度（含空格）。 */
+export function adbDisplayPrefix(input: string): number {
+  const body = commandBody(input);
+  return formatAdbLine("-", body).length - body.length;
+}
+
 /** 展示行（`adb …`）光标映射回正文后插入。 */
 export function insertPlaceholderAtDisplay(
   body: string,
   displayStart: number,
   displayEnd: number,
 ): { body: string; caret: number } {
-  const prefix = commandBody(body).length === 0 ? 3 : 4;
-  const max = commandBody(body).length;
+  const text = commandBody(body);
+  const prefix = adbDisplayPrefix(text);
+  const max = text.length;
   const start = Math.min(max, Math.max(0, displayStart - prefix));
   const end = Math.min(max, Math.max(start, displayEnd - prefix));
-  const inserted = insertPlaceholder(commandBody(body), start, end);
-  const nextPrefix = inserted.template.length === 0 ? 3 : 4;
-  return { body: inserted.template, caret: nextPrefix + inserted.caret };
+  const inserted = insertPlaceholder(text, start, end);
+  return { body: inserted.template, caret: adbDisplayPrefix(inserted.template) + inserted.caret };
 }
 
 export function entryTemplates(entry: LibraryEntryDto): string[] {
@@ -215,6 +221,15 @@ export function entryNeedsInput(entry: LibraryEntryDto): boolean {
   return entryArity(entry) > 0;
 }
 
+/** 命令 1 步；块按 steps 条数。组/块进度事件数 = 步数 × 设备数。 */
+export function entryStepCount(entry: LibraryEntryDto): number {
+  return entry.kind === "command" ? 1 : entry.steps.length;
+}
+
+export function groupStepCount(group: { entries: readonly LibraryEntryDto[] }): number {
+  return group.entries.reduce((count, entry) => count + entryStepCount(entry), 0);
+}
+
 /** 按独立槽位顺序替换 `{n}`；值本身含 `{n}` 样文本按字面量保留。个数必须与 domain `fill` 一致。 */
 export function fillTemplate(template: string, values: readonly string[]): string {
   const slots = placeholderSlots(template);
@@ -266,10 +281,10 @@ export function toExecLine(input: string, prependAdb: boolean): string {
   return body ? `adb ${body}` : "adb";
 }
 
-/** stdout / stderr / 错误文案拼成一段输出。 */
-export function combineOutput(stdout: string, stderr: string, fallback = ""): string {
+/** stdout / stderr 拼成一段输出。与 domain `combine_output` 同一语义，无第三参。 */
+export function combineOutput(stdout: string, stderr: string): string {
   if (stdout && stderr) return `${stdout}\n${stderr}`;
   if (stdout) return stdout;
   if (stderr) return stderr;
-  return fallback;
+  return "";
 }

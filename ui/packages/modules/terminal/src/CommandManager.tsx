@@ -21,6 +21,7 @@ import type { DraftEntry } from "./draft";
 import { EditorColumn } from "./manager/EditorColumn";
 import { EntryColumn } from "./manager/EntryColumn";
 import { GroupColumn } from "./manager/GroupColumn";
+import { MANAGER_DIALOG } from "./layout";
 import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./manager/keys";
 import { createCommandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
@@ -70,7 +71,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
       await terminalStore.save(store.library());
       close();
     } catch (e) {
-      store.setError(typeof e === "string" ? e : JSON.stringify(e));
+      store.setError(errorText(e));
     } finally {
       store.setSaving(false);
     }
@@ -87,8 +88,9 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
       ctx: {
         canCopy: text.length > 0,
         copy: () => {
-          void navigator.clipboard.writeText(text).catch((e) => {
-            toaster.show(`复制失败: ${errorText(e)}`, "error");
+          void navigator.clipboard.writeText(text).catch((e: unknown) => {
+            const detail = e instanceof Error ? e.message : "复制失败";
+            toaster.show(`复制失败: ${detail}`, "error");
           });
         },
         remove: () => store.removeEntries(),
@@ -100,8 +102,8 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
     <YoDialog
       open={props.open}
       title="命令管理"
-      width={960}
-      height={560}
+      width={MANAGER_DIALOG.width}
+      height={MANAGER_DIALOG.height}
       bodyOverflow="hidden"
       bodyPad="none"
       onClose={close}

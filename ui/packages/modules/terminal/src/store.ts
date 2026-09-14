@@ -1,7 +1,7 @@
 /**
- * 终端模块 store：命令库 + 统一输入/输出行。
- * 库命令、自定义输入都走 `send` → `terminal.exec`。
- * 执行目标 serials 由壳按 SelectionMode 注入，禁止再扫全部在线设备。
+ * 终端运行时 store：命令库、队列、统一输入/输出行。
+ * View 只绑事件；发送 / 组 / 块编排在本层经 @yohu/api。
+ * 块与组 busy 等到进度终态或任务终态，不把 run_id 当成完成。
  */
 
 import { createStore } from "solid-js/store";
@@ -11,24 +11,30 @@ import {
   blockRun,
   commandlibLoad,
   commandlibSave,
+  errorText,
   groupCancel,
   groupRun,
   onGroupProgress,
+  onTaskSummary,
   terminalExec,
   YoLog,
 } from "@yohu/api";
-import type { CommandBlockDto, CommandDto, CommandGroupDto, CommandLibraryDto } from "@yohu/api";
+import type {
+  CommandBlockDto,
+  CommandDto,
+  CommandGroupDto,
+  CommandLibraryDto,
+  TaskInfo,
+} from "@yohu/api";
 
 import {
   combineOutput,
-  commandNeedsInput,
-  entryNeedsInput,
+  commandBody,
   fillTemplate,
   formatAdbLine,
+  groupStepCount,
   toExecLine,
 } from "./command-line";
-
-export { commandNeedsInput };
 
 export type IoKind = "in" | "out";
 
@@ -40,27 +46,98 @@ export interface IoLine {
   text: string;
 }
 
-let nextId = 1;
-let activeGroupRun: number | null = null;
+export type QueuedSend =
+  | { id: number; title: string; kind: "line"; line: string }
+  | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] }
+  | { id: number; title: string; kind: "group"; group: CommandGroupDto };
+
+type RunWait = {
+  generation: number;
+  runId: number;
+  taskName: string;
+  taskId: number | null;
+  expected: number;
+  seen: number;
+  resolve: () => void;
+};
 
 export function createTerminalStore() {
   let prependAdb = false;
+  let nextLineId = 1;
+  let nextQueueId = 1;
+  let generation = 0;
+  let drainGen = 0;
+  let lastTasks: TaskInfo[] = [];
+  let wait: RunWait | null = null;
+
   const [library, setLibrary] = createStore<CommandLibraryDto>({
     schema_version: COMMAND_LIBRARY_SCHEMA_VERSION,
     groups: [],
   });
   const [lines, setLines] = createStore<IoLine[]>([]);
+  const [session, setSession] = createStore({
+    queue: [] as QueuedSend[],
+    draft: "",
+    composerOpen: true,
+    busy: false,
+    activeRunId: null as number | null,
+  });
 
   function setPrependAdb(value: boolean): void {
     prependAdb = value;
   }
 
   function pushLine(kind: IoKind, text: string): void {
-    setLines((rows) => [...rows, { id: nextId++, kind, at: Date.now(), text }]);
+    setLines((rows) => [...rows, { id: nextLineId++, kind, at: Date.now(), text }]);
   }
 
   function pushOut(text: string): void {
     pushLine("out", text.replace(/\n+$/, ""));
+  }
+
+  function bindTaskId(current: RunWait): void {
+    if (current.taskId !== null) return;
+    const active = lastTasks.find((task) => task.active && task.name === current.taskName);
+    if (active) current.taskId = active.id;
+  }
+
+  function isRunFinished(current: RunWait): boolean {
+    if (current.expected > 0 && current.seen >= current.expected) return true;
+    bindTaskId(current);
+    if (current.taskId === null) return false;
+    const task = lastTasks.find((item) => item.id === current.taskId);
+    return !task || !task.active;
+  }
+
+  function settleRun(): void {
+    const current = wait;
+    if (!current) return;
+    wait = null;
+    if (session.activeRunId === current.runId) setSession("activeRunId", null);
+    current.resolve();
+  }
+
+  function considerSettle(): void {
+    const current = wait;
+    if (!current) return;
+    if (isRunFinished(current)) settleRun();
+  }
+
+  function awaitRun(runId: number, taskName: string, expected: number): Promise<void> {
+    const gen = ++generation;
+    return new Promise((resolve) => {
+      wait = {
+        generation: gen,
+        runId,
+        taskName,
+        taskId: null,
+        expected,
+        seen: 0,
+        resolve,
+      };
+      setSession("activeRunId", runId);
+      considerSettle();
+    });
   }
 
   async function load(): Promise<void> {
@@ -91,20 +168,15 @@ export function createTerminalStore() {
       const rows = await terminalExec({ command: prepared, serials });
       YoLog.info("terminal", "命令完成", { command: prepared, serials });
       for (const row of rows) {
-        pushOut(combineOutput(row.stdout, row.stderr, row.message));
+        const text = combineOutput(row.stdout, row.stderr);
+        pushOut(text.length > 0 ? text : row.message);
       }
     } catch (e) {
-      YoLog.error("terminal", "发送失败", { command: prepared, error: String(e) });
-      pushOut(String(e));
+      YoLog.error("terminal", "发送失败", { command: prepared, error: errorText(e) });
+      pushOut(errorText(e));
     }
   }
 
-  /** 库命令：填充后走同一条发送。 */
-  async function runCommand(serials: string[], command: CommandDto, values: string[]): Promise<void> {
-    await send(serials, fillTemplate(command.template, values));
-  }
-
-  /** 执行命令块（进度经 group/progress 回流为输入/输出行）。 */
   async function runBlockSeq(serials: string[], block: CommandBlockDto, values: string[]): Promise<void> {
     if (serials.length === 0) {
       pushLine("in", `块: ${block.name}`);
@@ -112,49 +184,116 @@ export function createTerminalStore() {
       return;
     }
     try {
-      activeGroupRun = await blockRun({ block_id: block.id, values, serials });
+      const runId = await blockRun({ block_id: block.id, values, serials });
+      await awaitRun(runId, `命令块: ${block.name}`, block.steps.length * serials.length);
     } catch (e) {
-      activeGroupRun = null;
+      setSession("activeRunId", null);
       pushLine("in", `块: ${block.name}`);
-      pushOut(String(e));
+      pushOut(errorText(e));
     }
   }
 
-  /** 执行命令组（进度经 group/progress 回流为输入/输出行）。 */
   async function runGroup(serials: string[], group: CommandGroupDto): Promise<void> {
-    const needing = group.entries.find((entry) => entryNeedsInput(entry));
-    if (needing) {
-      pushLine("in", `组: ${group.name}`);
-      pushOut(`命令组含需填值的条目（${needing.name}），请逐条执行`);
-      return;
-    }
     if (serials.length === 0) {
       pushLine("in", `组: ${group.name}`);
       pushOut("未选择在线设备");
       return;
     }
     try {
-      activeGroupRun = await groupRun({ group_id: group.id, serials });
+      const runId = await groupRun({ group_id: group.id, serials });
+      await awaitRun(runId, `命令组: ${group.name}`, groupStepCount(group) * serials.length);
     } catch (e) {
-      activeGroupRun = null;
+      setSession("activeRunId", null);
       pushLine("in", `组: ${group.name}`);
-      pushOut(String(e));
+      pushOut(errorText(e));
     }
   }
 
   async function cancelGroup(): Promise<void> {
-    const runId = activeGroupRun;
+    drainGen += 1;
+    const current = wait;
+    const runId = current?.runId ?? session.activeRunId;
     if (runId === null) return;
     try {
       await groupCancel(runId);
+    } catch (e) {
+      YoLog.warn("terminal", "取消失败", { runId, error: errorText(e) });
+      if (wait?.runId === runId) settleRun();
+    }
+  }
+
+  function enqueueLine(title: string, line: string): void {
+    const body = commandBody(line);
+    if (!body) return;
+    setSession("queue", (items) => [...items, { id: nextQueueId++, title, kind: "line", line: body }]);
+    setSession("composerOpen", true);
+  }
+
+  function enqueueCommand(command: CommandDto, values: string[]): void {
+    enqueueLine(command.name, fillTemplate(command.template, values));
+  }
+
+  function enqueueBlock(block: CommandBlockDto, values: string[]): void {
+    if (block.steps.length === 0) return;
+    setSession("queue", (items) => [...items, { id: nextQueueId++, title: block.name, kind: "block", block, values }]);
+    setSession("composerOpen", true);
+  }
+
+  function enqueueGroup(group: CommandGroupDto): void {
+    if (group.entries.length === 0) return;
+    setSession("queue", (items) => [...items, { id: nextQueueId++, title: group.name, kind: "group", group }]);
+    setSession("composerOpen", true);
+  }
+
+  function removeQueued(id: number): void {
+    setSession("queue", (items) => items.filter((item) => item.id !== id));
+  }
+
+  function setDraft(value: string): void {
+    setSession("draft", value);
+  }
+
+  function setComposerOpen(open: boolean): void {
+    setSession("composerOpen", open);
+  }
+
+  function canSend(): boolean {
+    return session.queue.length > 0 || session.draft.trim().length > 0;
+  }
+
+  async function sendAll(serials: string[]): Promise<void> {
+    if (session.busy || !canSend()) return;
+    const items = session.queue;
+    const text = session.draft.trim();
+    const gen = ++drainGen;
+    setSession("queue", []);
+    setSession("draft", "");
+    setSession("busy", true);
+    try {
+      for (const item of items) {
+        if (gen !== drainGen) break;
+        if (item.kind === "line") await send(serials, item.line);
+        else if (item.kind === "block") await runBlockSeq(serials, item.block, item.values);
+        else await runGroup(serials, item.group);
+      }
+      if (gen === drainGen && text) await send(serials, text);
     } finally {
-      activeGroupRun = null;
+      setSession("busy", false);
     }
   }
 
   void onGroupProgress((e) => {
     pushLine("in", formatAdbLine(e.serial, e.template));
     pushOut(e.message ?? "");
+    const current = wait;
+    if (!current || e.run_id !== current.runId) return;
+    current.seen += 1;
+    considerSettle();
+  });
+
+  void onTaskSummary((e) => {
+    lastTasks = e.tasks;
+    considerSettle();
   });
 
   /** 清屏：只清 UI 结果面板（不落盘、不影响命令库）。 */
@@ -165,14 +304,23 @@ export function createTerminalStore() {
   return {
     library,
     lines,
+    session,
     load,
     save,
     setPrependAdb,
     send,
-    runCommand,
     runBlock: runBlockSeq,
     runGroup,
     cancelGroup,
+    enqueueLine,
+    enqueueCommand,
+    enqueueBlock,
+    enqueueGroup,
+    removeQueued,
+    setDraft,
+    setComposerOpen,
+    canSend,
+    sendAll,
     clearResults,
   };
 }

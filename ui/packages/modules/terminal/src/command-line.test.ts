@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  adbDisplayPrefix,
   alignParams,
   combineOutput,
   commandBody,
@@ -15,8 +16,10 @@ import {
   entryNeedsInput,
   entryParams,
   entrySlots,
+  entryStepCount,
   entryTemplates,
   fillTemplate,
+  groupStepCount,
   placeholderSlots,
   formatAdbLine,
   insertPlaceholder,
@@ -119,6 +122,8 @@ describe("command-line", () => {
   });
 
   it("insertPlaceholderAtDisplay 把 adb 前缀映射回正文", () => {
+    expect(adbDisplayPrefix("")).toBe(formatAdbLine("-", "").length);
+    expect(adbDisplayPrefix("shell ping")).toBe(formatAdbLine("-", "shell ping").length - "shell ping".length);
     expect(insertPlaceholderAtDisplay("shell ping", 14, 14)).toEqual({
       body: "shell ping {0}",
       caret: 18,
@@ -137,23 +142,21 @@ describe("command-line", () => {
     expect(commandTemplateLabel()).toBe("具体命令（{n}代表使用命令时需要填入的独立参数）");
   });
 
-  it("参数描述按独立槽位对齐、空说明丢弃", () => {
+  it("alignParams 与 domain testdata/align_params.json 同一套向量", () => {
+    const testdata = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../core/yohu-domain/testdata/align_params.json",
+    );
+    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
+      slots: number[];
+      params: { index: number; description: string }[];
+      aligned: { index: number; description: string }[];
+    }[];
+    for (const c of fixture) {
+      expect(alignParams(c.slots, c.params)).toEqual(c.aligned);
+    }
     const params = setParamDescription([], 0, "主机");
     expect(paramDescription(params, 0)).toBe("主机");
-    expect(alignParams([0], params)).toEqual([{ index: 0, description: "主机" }]);
-    expect(alignParams([], params)).toEqual([]);
-    expect(alignParams([0, 1], setParamDescription(params, 1, "  "))).toEqual([
-      { index: 0, description: "主机" },
-    ]);
-    expect(
-      alignParams(
-        [13],
-        [
-          { index: 0, description: "幽灵" },
-          { index: 13, description: " 主机 " },
-        ],
-      ),
-    ).toEqual([{ index: 13, description: "主机" }]);
     expect(
       entryParams({
         kind: "command",
@@ -163,6 +166,33 @@ describe("command-line", () => {
         params: [{ index: 0, description: "主机" }],
       }),
     ).toEqual([{ index: 0, description: "主机" }]);
+  });
+
+  it("entryStepCount / groupStepCount 按叶子步数计进度", () => {
+    expect(entryStepCount({ kind: "command", id: "c", name: "ls", template: "shell ls" })).toBe(1);
+    expect(
+      entryStepCount({
+        kind: "block",
+        id: "b",
+        name: "两步",
+        gap_ms: 0,
+        steps: [{ template: "a" }, { template: "b" }],
+      }),
+    ).toBe(2);
+    expect(
+      groupStepCount({
+        entries: [
+          { kind: "command", id: "c", name: "ls", template: "shell ls" },
+          {
+            kind: "block",
+            id: "b",
+            name: "两步",
+            gap_ms: 0,
+            steps: [{ template: "a" }, { template: "b" }],
+          },
+        ],
+      }),
+    ).toBe(3);
   });
 
   it("entryTemplates 列出命令或块内全部步骤", () => {
@@ -202,11 +232,15 @@ describe("command-line", () => {
     }
   });
 
-  it("commandBody 去掉前导 adb", () => {
-    expect(commandBody("  shell ls  ")).toBe("shell ls");
-    expect(commandBody("adb shell ls")).toBe("shell ls");
-    expect(commandBody("ADB.exe shell ls")).toBe("shell ls");
-    expect(commandBody("adbd")).toBe("adbd");
+  it("commandBody 与 domain testdata/command_body.json 同一套向量", () => {
+    const testdata = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../core/yohu-domain/testdata/command_body.json",
+    );
+    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as { input: string; body: string }[];
+    for (const c of fixture) {
+      expect(commandBody(c.input)).toBe(c.body);
+    }
   });
 
   it("formatAdbLine 始终带 adb", () => {
@@ -232,10 +266,18 @@ describe("command-line", () => {
     expect(toExecLine("ADB.exe devices", true)).toBe("adb devices");
   });
 
-  it("combineOutput 拼接两路", () => {
-    expect(combineOutput("out", "")).toBe("out");
-    expect(combineOutput("", "err")).toBe("err");
-    expect(combineOutput("out", "err")).toBe("out\nerr");
-    expect(combineOutput("", "", "fallback")).toBe("fallback");
+  it("combineOutput 与 domain testdata/combine_output.json 同一套向量", () => {
+    const testdata = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../core/yohu-domain/testdata/combine_output.json",
+    );
+    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
+      stdout: string;
+      stderr: string;
+      text: string;
+    }[];
+    for (const c of fixture) {
+      expect(combineOutput(c.stdout, c.stderr)).toBe(c.text);
+    }
   });
 });
