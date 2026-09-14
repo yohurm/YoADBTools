@@ -3,16 +3,12 @@
 //! 格式：`YYYY-MM-DD HH:MM:SS.mmm  PID  TID L TAG: MSG`（`logcat -v threadtime,uid,year`）。
 //! UID 列可选：数字或名（`root`/`shell`/`wifi`/`u0_a123`）。
 //! 时间戳收到统一墙钟后再进 wire。格式漂移降级为「整行消息」（pid=0、level='?'）。
+//! 空行与 `---------` 缓冲头不是日志行（跟流 ingest 与本函数同一语义）。
 
-use yohu_domain::canonicalize_datetime;
+use yohu_domain::{canonicalize_datetime, is_log_level_letter};
 use yohu_protocol::LogLine;
 
-fn is_level_token(s: &str) -> bool {
-    matches!(
-        s,
-        "V" | "D" | "I" | "W" | "E" | "F" | "v" | "d" | "i" | "w" | "e" | "f"
-    )
-}
+const BUFFER_HEADER_PREFIX: &str = "---------";
 
 fn parse_u32(s: &str) -> Option<u32> {
     s.parse().ok()
@@ -27,8 +23,20 @@ fn level_tag_from<'a>(level_first: &'a str, rest: &[&'a str]) -> String {
     level_tag
 }
 
+fn is_non_line(raw: &str) -> bool {
+    raw.trim().is_empty() || raw.trim_start().starts_with(BUFFER_HEADER_PREFIX)
+}
+
 /// 解析一行 threadtime 输出；`seq` 由环形缓冲分配（此处为 0）。
-pub fn parse_threadtime(raw: &str) -> LogLine {
+/// 空行与缓冲头返回 `None`（不得入环）。
+pub(crate) fn parse_threadtime(raw: &str) -> Option<LogLine> {
+    if is_non_line(raw) {
+        return None;
+    }
+    Some(parse_threadtime_line(raw))
+}
+
+fn parse_threadtime_line(raw: &str) -> LogLine {
     let fallback = || LogLine {
         seq: 0,
         ts: String::new(),
@@ -40,12 +48,6 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
         msg: raw.to_string(),
     };
 
-    // 跳过 logd 缓冲区头（`--------- beginning of main`）
-    let trimmed = raw.trim_start();
-    if trimmed.starts_with("---------") {
-        return fallback();
-    }
-
     let Some((ts, rest)) = take_timestamp(raw) else {
         return fallback();
     };
@@ -53,13 +55,12 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
         return fallback();
     }
 
-    // pid / tid / 级别：可选 UID 列（数字或名）
     let tokens: Vec<&str> = rest.split_whitespace().collect();
     let (pid, tid, uid, level_tag) = match tokens.as_slice() {
         [uid_str, pid_str, tid_str, level_first, rest @ ..]
             if parse_u32(pid_str).is_some()
                 && parse_u32(tid_str).is_some()
-                && is_level_token(level_first) =>
+                && is_log_level_letter(level_first) =>
         {
             (
                 parse_u32(pid_str).unwrap_or(0),
@@ -71,7 +72,7 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
         [pid_str, tid_str, level_first, rest @ ..]
             if parse_u32(pid_str).is_some()
                 && parse_u32(tid_str).is_some()
-                && is_level_token(level_first) =>
+                && is_log_level_letter(level_first) =>
         {
             (
                 parse_u32(pid_str).unwrap_or(0),
@@ -83,7 +84,6 @@ pub fn parse_threadtime(raw: &str) -> LogLine {
         _ => return fallback(),
     };
 
-    // level_tag 形如 `I TAG: MSG` 或 `I`（无 tag 的行）
     let mut chars = level_tag.chars();
     let Some(level) = chars.next() else {
         return fallback();
@@ -122,11 +122,14 @@ fn take_timestamp(raw: &str) -> Option<(String, &str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yohu_domain::LOG_LEVEL_LETTERS;
 
     #[test]
     fn parses_normal_line() {
-        let line =
-            parse_threadtime("2026-01-02 03:04:05.678  1234  5678 I ActivityManager: Start proc 1234");
+        let line = parse_threadtime(
+            "2026-01-02 03:04:05.678  1234  5678 I ActivityManager: Start proc 1234",
+        )
+        .expect("line");
         assert_eq!(line.ts, "2026-01-02 03:04:05.678");
         assert_eq!(line.pid, 1234);
         assert_eq!(line.tid, 5678);
@@ -138,7 +141,7 @@ mod tests {
 
     #[test]
     fn parses_single_char_pid() {
-        let line = parse_threadtime("2026-01-02 03:04:05.678     1     2 E T: boom");
+        let line = parse_threadtime("2026-01-02 03:04:05.678     1     2 E T: boom").expect("line");
         assert_eq!(line.pid, 1);
         assert_eq!(line.tid, 2);
         assert_eq!(line.level, 'E');
@@ -146,7 +149,7 @@ mod tests {
 
     #[test]
     fn degrades_on_malformed() {
-        let line = parse_threadtime("this is not a logcat line at all");
+        let line = parse_threadtime("this is not a logcat line at all").expect("fallback");
         assert_eq!(line.level, '?');
         assert_eq!(line.pid, 0);
         assert_eq!(line.msg, "this is not a logcat line at all");
@@ -154,29 +157,54 @@ mod tests {
 
     #[test]
     fn yearless_threadtime_degrades() {
-        let line = parse_threadtime("01-02 03:04:05.678  1234  5678 I T: x");
+        let line = parse_threadtime("01-02 03:04:05.678  1234  5678 I T: x").expect("fallback");
         assert_eq!(line.level, '?');
         assert_eq!(line.msg, "01-02 03:04:05.678  1234  5678 I T: x");
     }
 
     #[test]
     fn msg_can_contain_colons() {
-        let line = parse_threadtime("2026-01-02 03:04:05.678  100  200 W Net: http://a:8080 failed");
+        let line =
+            parse_threadtime("2026-01-02 03:04:05.678  100  200 W Net: http://a:8080 failed")
+                .expect("line");
         assert_eq!(line.tag, "Net");
         assert_eq!(line.msg, "http://a:8080 failed");
     }
 
     #[test]
-    fn skips_buffer_header() {
-        let line = parse_threadtime("--------- beginning of main");
-        assert_eq!(line.level, '?');
+    fn buffer_header_and_blank_are_not_lines() {
+        assert!(parse_threadtime("--------- beginning of main").is_none());
+        assert!(parse_threadtime("  --------- beginning of system").is_none());
+        assert!(parse_threadtime("").is_none());
+        assert!(parse_threadtime("   ").is_none());
+    }
+
+    #[test]
+    fn ingest_and_parse_share_header_skip() {
+        let raw = [
+            "--------- beginning of main",
+            "",
+            "2026-01-02 03:04:05.678  1234  5678 I TestTag: hello",
+            "2026-01-02 03:04:05.779  1000  1234  5678 W TestTag: uid-col",
+        ];
+        let lines: Vec<_> = raw
+            .iter()
+            .filter_map(|line| parse_threadtime(line))
+            .collect();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].pid, 1234);
+        assert_eq!(lines[0].uid, None);
+        assert_eq!(lines[1].pid, 1234);
+        assert_eq!(lines[1].uid.as_deref(), Some("1000"));
+        assert_eq!(lines[1].level, 'W');
     }
 
     #[test]
     fn parses_optional_uid_column() {
         let line = parse_threadtime(
             "2026-05-26 11:02:36.886  1000  5689  5689 D AndroidRuntime: CheckJNI is OFF",
-        );
+        )
+        .expect("line");
         assert_eq!(line.uid.as_deref(), Some("1000"));
         assert_eq!(line.pid, 5689);
         assert_eq!(line.tid, 5689);
@@ -188,7 +216,8 @@ mod tests {
     fn parses_named_uid() {
         let line = parse_threadtime(
             "2026-08-20 18:48:42.359 shell  1705  1705 W binder:1705_2: type=1400 audit(0.0:2200040): avc: denied",
-        );
+        )
+        .expect("line");
         assert_eq!(line.uid.as_deref(), Some("shell"));
         assert_eq!(line.pid, 1705);
         assert_eq!(line.tid, 1705);
@@ -201,12 +230,29 @@ mod tests {
     fn parses_root_uid_empty_tag() {
         let line = parse_threadtime(
             "2026-08-20 18:48:42.342  root     0     0 I         : [    C4] swpm_sp_routine",
-        );
+        )
+        .expect("line");
         assert_eq!(line.uid.as_deref(), Some("root"));
         assert_eq!(line.pid, 0);
         assert_eq!(line.tid, 0);
         assert_eq!(line.level, 'I');
         assert_eq!(line.tag, "");
         assert!(line.msg.contains("swpm_sp_routine"));
+    }
+
+    #[test]
+    fn level_tokens_follow_domain_alphabet() {
+        for letter in LOG_LEVEL_LETTERS {
+            let upper = format!("2026-01-02 03:04:05.678  1  2 {letter} T: x");
+            let lower = format!(
+                "2026-01-02 03:04:05.678  1  2 {} T: x",
+                letter.to_ascii_lowercase()
+            );
+            assert_eq!(parse_threadtime(&upper).expect("upper").level, letter);
+            assert_eq!(
+                parse_threadtime(&lower).expect("lower").level,
+                letter.to_ascii_lowercase()
+            );
+        }
     }
 }

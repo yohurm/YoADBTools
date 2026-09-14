@@ -3,12 +3,12 @@
 //! - `seq` 单调递增（设备内），是回补/溢出检测的锚点
 //! - 设备切换/掉线 → `clear()`（防串设备）
 //! - 导出/重放永远基于本缓冲快照（与推送通道状态无关 → 数据不丢）
+//! - 过滤不在本环：导出在 `export` 调 domain `log_filter_matches`
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use yohu_domain::log_filter_matches;
-use yohu_protocol::{LogFilter, LogLine};
+use yohu_protocol::LogLine;
 
 struct State {
     buf: VecDeque<LogLine>,
@@ -17,12 +17,12 @@ struct State {
 }
 
 /// 设备级共享环形缓冲。
-pub struct RingBuffer {
+pub(crate) struct RingBuffer {
     inner: Mutex<State>,
 }
 
 impl RingBuffer {
-    pub fn new(capacity: usize) -> Self {
+    pub(crate) fn new(capacity: usize) -> Self {
         let capacity = capacity.max(1);
         Self {
             inner: Mutex::new(State {
@@ -34,7 +34,7 @@ impl RingBuffer {
     }
 
     /// 下次写入起生效；已超出的旧行立即从头部淘汰。
-    pub fn set_capacity(&self, capacity: usize) {
+    pub(crate) fn set_capacity(&self, capacity: usize) {
         let capacity = capacity.max(1);
         let mut state = self.inner.lock().expect("ring lock poisoned");
         state.capacity = capacity;
@@ -44,7 +44,7 @@ impl RingBuffer {
     }
 
     /// 写入一行（分配 seq）；返回该行 seq。
-    pub fn push(&self, mut line: LogLine) -> u64 {
+    pub(crate) fn push(&self, mut line: LogLine) -> u64 {
         let mut state = self.inner.lock().expect("ring lock poisoned");
         let seq = state.next_seq;
         line.seq = seq;
@@ -57,7 +57,7 @@ impl RingBuffer {
     }
 
     /// 快照：`seq >= from_seq` 的前 `limit` 行（回补用）。
-    pub fn snapshot(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
+    pub(crate) fn snapshot(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
         let state = self.inner.lock().expect("ring lock poisoned");
         state
             .buf
@@ -68,19 +68,8 @@ impl RingBuffer {
             .collect()
     }
 
-    /// 过滤快照（导出用）：`seq >= from_seq` 且匹配 filter。环本身已受容量约束。
-    pub fn snapshot_filtered(&self, from_seq: u64, filter: &LogFilter) -> Vec<LogLine> {
-        let state = self.inner.lock().expect("ring lock poisoned");
-        state
-            .buf
-            .iter()
-            .filter(|l| l.seq >= from_seq && log_filter_matches(filter, l))
-            .cloned()
-            .collect()
-    }
-
     /// 从 `from_seq` 取至多 `limit` 行；`truncated` 表示环内还有更大 seq。
-    pub fn snapshot_page(&self, from_seq: u64, limit: usize) -> (Vec<LogLine>, bool) {
+    pub(crate) fn snapshot_page(&self, from_seq: u64, limit: usize) -> (Vec<LogLine>, bool) {
         let state = self.inner.lock().expect("ring lock poisoned");
         let lines: Vec<LogLine> = state
             .buf
@@ -98,27 +87,30 @@ impl RingBuffer {
     }
 
     /// 清空缓冲（用户清空 / 设备切换 / 掉线）。
-    pub fn clear(&self) {
+    pub(crate) fn clear(&self) {
         let mut state = self.inner.lock().expect("ring lock poisoned");
         state.buf.clear();
         // seq 不回退：防止旧批次/旧回补被误判为新数据
     }
 
-    pub fn len(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
         self.inner.lock().expect("ring lock poisoned").buf.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// 当前已分配的最大 seq（UI 判断滞后量的参考）。
-    pub fn last_seq(&self) -> u64 {
+    pub(crate) fn last_seq(&self) -> u64 {
         let state = self.inner.lock().expect("ring lock poisoned");
         state.next_seq.saturating_sub(1)
     }
 
-    pub fn capacity(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> usize {
         self.inner.lock().expect("ring lock poisoned").capacity
     }
 }
@@ -161,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_from_seq_and_filter() {
+    fn snapshot_from_seq_and_page() {
         let ring = RingBuffer::new(10);
         for _ in 0..5 {
             ring.push(line(0));
@@ -169,11 +161,6 @@ mod tests {
         let from_two = ring.snapshot(2, 10);
         assert_eq!(from_two.len(), 3);
 
-        let filter = LogFilter {
-            scope: yohu_protocol::LogScope::Pid { pid: 1 },
-            ..Default::default()
-        };
-        assert_eq!(ring.snapshot_filtered(0, &filter).len(), 5);
         let (page, truncated) = ring.snapshot_page(0, 2);
         assert_eq!(page.len(), 2);
         assert!(truncated);
@@ -185,7 +172,6 @@ mod tests {
         ring.push(line(0));
         ring.clear();
         assert!(ring.is_empty());
-        // 清空后 seq 继续递增，不回退
         assert_eq!(ring.push(line(0)), 1);
     }
 

@@ -11,14 +11,19 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_protocol::{AppEvent, LogBatch, LogBatchPayload, LogLine};
 
+/// ADR-v6-007：定时 100–200ms 内取 150ms。
+pub(crate) const BATCH_FLUSH_INTERVAL: Duration = Duration::from_millis(150);
+pub(crate) const BATCH_MAX_LINES: usize = 1000;
+pub(crate) const BATCH_MAX_BYTES: usize = 512 * 1024;
+
 /// 批量器句柄（feed 行）。
-pub struct Batcher {
+pub(crate) struct Batcher {
     line_tx: mpsc::Sender<LogLine>,
 }
 
 impl Batcher {
     /// 启动聚合循环；返回句柄与 JoinHandle。
-    pub fn spawn(
+    pub(crate) fn spawn(
         serial: String,
         sink: mpsc::Sender<AppEvent>,
         flush_interval: Duration,
@@ -40,7 +45,7 @@ impl Batcher {
     }
 
     /// 送入一行（异步背压：聚合环消费快于生产，正常不阻塞）。
-    pub async fn feed(&self, line: LogLine) -> Result<(), mpsc::error::SendError<LogLine>> {
+    pub(crate) async fn feed(&self, line: LogLine) -> Result<(), mpsc::error::SendError<LogLine>> {
         self.line_tx.send(line).await
     }
 }
@@ -164,8 +169,8 @@ mod tests {
             "s1".into(),
             sink,
             Duration::from_millis(10),
-            1000,
-            512 * 1024,
+            BATCH_MAX_LINES,
+            BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
         batcher.feed(line(0)).await.unwrap();
@@ -194,7 +199,7 @@ mod tests {
             sink,
             Duration::from_secs(60),
             3, // 阈值 3 行
-            512 * 1024,
+            BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
         for i in 0..3 {
@@ -221,7 +226,7 @@ mod tests {
             sink,
             Duration::from_millis(10),
             2,
-            512 * 1024,
+            BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
         // 喂 6 行 → 3 批；下游只取 1 批 → 2 批溢出
@@ -253,15 +258,14 @@ mod tests {
     /// 零丢行且聚合耗时满足 ADR-v6-007 批量预算（16ms/批；debug 构建留 2.5x 余量）。
     #[tokio::test]
     async fn perf_50k_lines_within_batch_budget() {
-        const BATCH_LINES: usize = 1000;
         const TOTAL: u64 = 50_000;
         let (sink, mut sink_rx) = mpsc::channel::<AppEvent>(64);
         let (batcher, handle) = Batcher::spawn(
             "s1".into(),
             sink,
-            Duration::from_millis(150),
-            BATCH_LINES,
-            512 * 1024,
+            BATCH_FLUSH_INTERVAL,
+            BATCH_MAX_LINES,
+            BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
         let started = std::time::Instant::now();
@@ -280,7 +284,11 @@ mod tests {
                 lines += batch.lines.len();
             }
         }
-        assert_eq!(batches, 50, "50k 行应恰好 50 批（每批 1000 行）");
+        assert_eq!(
+            batches,
+            (TOTAL as usize / BATCH_MAX_LINES) as u32,
+            "50k 行应恰好按 BATCH_MAX_LINES 切批"
+        );
         assert_eq!(lines, TOTAL as usize, "零丢行");
         assert!(
             elapsed.as_millis() < 2000,

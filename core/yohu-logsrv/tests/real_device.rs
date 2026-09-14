@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, LogFilter};
+use yohu_protocol::{AppEvent, LogFilter, ReplayRequest};
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -32,6 +32,16 @@ async fn online_device(client: &AdbClient) -> Option<String> {
         .into_iter()
         .find(|d| d.state == yohu_protocol::DeviceState::Online)
         .map(|d| d.serial)
+}
+
+fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
+    service
+        .replay(ReplayRequest {
+            serial: serial.to_string(),
+            from_seq: 0,
+            limit: 50_000,
+        })
+        .lines
 }
 
 async fn collect_events(
@@ -77,13 +87,13 @@ async fn real_capture_stream_batch_and_ring() {
     // 真实设备通常持续输出日志；等待批量事件（解析+聚合+推送全链路）
     let lines = collect_events(&mut rx, 5, Duration::from_secs(30)).await;
     assert!(!lines.is_empty(), "真实 logcat 应产出日志行");
-    let ring = service.ring(&serial);
-    assert!(ring.len() >= lines.len(), "环形缓冲应含全部批次行");
+    let ring_lines = replay_lines(&service, &serial);
+    assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次行");
     let sample = &lines[0];
     eprintln!(
         "[真机] 采集 {} 行（缓冲 {}），样例: {} pid={} level={} tag={}",
         lines.len(),
-        ring.len(),
+        ring_lines.len(),
         sample.ts,
         sample.pid,
         sample.level,
@@ -110,7 +120,10 @@ async fn real_capture_stream_batch_and_ring() {
         .await
         .expect("stop 应在杀进程树后返回");
     assert!(!service.is_capturing(&serial));
-    assert!(!ring.is_empty(), "停止后缓冲保留");
+    assert!(
+        !replay_lines(&service, &serial).is_empty(),
+        "停止后缓冲保留"
+    );
 }
 
 #[tokio::test]
@@ -144,7 +157,10 @@ async fn real_capture_with_clear_device() {
         .await
         .expect("stop 应在杀进程树后返回");
     service.clear(&serial);
-    assert!(service.ring(&serial).is_empty(), "clear 后缓冲为空");
+    assert!(
+        replay_lines(&service, &serial).is_empty(),
+        "clear 后缓冲为空"
+    );
 }
 
 #[tokio::test]
@@ -172,7 +188,7 @@ async fn real_detach_clears_ring() {
         .expect("detach 应在杀进程树后返回，不能握着 logcat 管道死等");
     assert!(!service.is_capturing(&serial));
     assert!(
-        service.ring(&serial).is_empty(),
+        replay_lines(&service, &serial).is_empty(),
         "切换/掉线清缓冲（防串设备）"
     );
 }

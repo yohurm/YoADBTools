@@ -1,11 +1,11 @@
 //! 从设备环导出过滤后的 txt（需求：仅用户操作落盘，导出=过滤后缓冲快照）。
+//! 过滤走 domain `log_filter_matches`；环本身不过滤。
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
-use yohu_domain::format_log_line;
+use yohu_domain::{format_log_line, log_filter_matches};
 use yohu_protocol::{ExportResult, LogFilter};
 
 use crate::capture::{CaptureService, LogError};
@@ -13,14 +13,19 @@ use crate::capture::{CaptureService, LogError};
 impl CaptureService {
     /// 把 `seq >= from_seq` 且匹配 filter 的环快照写成一份 txt。
     pub fn export(
-        self: &Arc<Self>,
+        &self,
         serial: &str,
         from_seq: u64,
         filter: &LogFilter,
         dest: Option<&Path>,
         default_dir: Option<&Path>,
     ) -> Result<ExportResult, LogError> {
-        let lines = self.ring(serial).snapshot_filtered(from_seq, filter);
+        let lines: Vec<_> = self
+            .ring(serial)
+            .snapshot(from_seq, usize::MAX)
+            .into_iter()
+            .filter(|line| log_filter_matches(filter, line))
+            .collect();
         let path = resolve_dest(dest, default_dir, serial)?;
         let mut body = String::new();
         for line in &lines {
@@ -39,7 +44,7 @@ fn resolve_dest(
     dest: Option<&Path>,
     default_dir: Option<&Path>,
     serial: &str,
-) -> io::Result<PathBuf> {
+) -> Result<PathBuf, LogError> {
     match dest {
         Some(p) if !p.as_os_str().is_empty() => {
             if let Some(parent) = p.parent() {
@@ -64,24 +69,26 @@ fn resolve_dest(
                     }
                 })
                 .collect();
-            Ok(dir.join(format!("logcat-{safe}-{}.txt", stamp())))
+            Ok(dir.join(format!("logcat-{safe}-{}.txt", stamp()?)))
         }
     }
 }
 
-fn stamp() -> String {
-    let now = time::OffsetDateTime::now_local()
-        .map(|t| {
-            t.format(&time::format_description::well_known::Rfc3339)
-                .unwrap_or_default()
-        })
-        .unwrap_or_default();
-    now.replace([':', '+'], "-")
+fn stamp() -> Result<String, LogError> {
+    let now = time::OffsetDateTime::now_local().map_err(|_| LogError::ExportStamp)?;
+    let formatted = now
+        .format(&time::format_description::well_known::Rfc3339)
+        .map_err(|_| LogError::ExportStamp)?;
+    if formatted.is_empty() {
+        return Err(LogError::ExportStamp);
+    }
+    Ok(formatted.replace([':', '+'], "-"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_util::sync::CancellationToken;
     use yohu_adb::{AdbClient, ToolResolver};
@@ -131,6 +138,45 @@ mod tests {
         assert!(text.contains("keep"));
         assert!(text.contains("also"));
         assert!(!text.contains("drop"));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[test]
+    fn stamp_is_nonempty_filename_fragment() {
+        let value = stamp().expect("本机应能取本地时间");
+        assert!(!value.is_empty());
+        assert!(!value.contains(':'));
+    }
+
+    #[test]
+    fn export_default_name_includes_timestamp() {
+        let scratch = std::env::temp_dir().join(format!(
+            "yohu-export-stamp-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let (tx, _rx) = mpsc::channel::<AppEvent>(8);
+        let adb = Arc::new(AdbClient::new(
+            ToolResolver::new(None, scratch.join("res"), scratch.join("data")),
+            1,
+        ));
+        let svc = CaptureService::new(adb, tx, 100, CancellationToken::new());
+        svc.ring("S1").push(line(1, "keep"));
+
+        let result = svc
+            .export("S1", 0, &LogFilter::default(), None, Some(&scratch))
+            .expect("export");
+        let name = Path::new(&result.path)
+            .file_name()
+            .expect("file name")
+            .to_string_lossy();
+        assert!(name.starts_with("logcat-S1-"));
+        assert!(name.ends_with(".txt"));
+        let stamp_part = name
+            .strip_prefix("logcat-S1-")
+            .and_then(|s| s.strip_suffix(".txt"))
+            .expect("stamp");
+        assert!(!stamp_part.is_empty(), "禁止空串时间戳文件名");
         let _ = fs::remove_dir_all(&scratch);
     }
 }

@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::AppEvent;
+use yohu_protocol::{AppEvent, ReplayRequest};
 
 /// 定位 fake-adb：workspace member 的明文 bin 位于
 /// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
@@ -70,9 +70,19 @@ const THREE_LINES_SCRIPT: &str = r#"{
     "logcat_delay_ms": 5
 }"#;
 
+fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
+    service
+        .replay(ReplayRequest {
+            serial: serial.to_string(),
+            from_seq: 0,
+            limit: 10_000,
+        })
+        .lines
+}
+
 async fn wait_ring_lines(service: &Arc<CaptureService>, serial: &str, want: usize) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
-    while service.ring(serial).len() < want && tokio::time::Instant::now() < deadline {
+    while replay_lines(service, serial).len() < want && tokio::time::Instant::now() < deadline {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
 }
@@ -110,9 +120,9 @@ async fn capture_streams_parses_and_batches() {
     assert_eq!(lines[2].pid, 9999);
 
     // 流自然结束 → 环形缓冲保留全部行
-    let ring = service.ring("R58M1234A");
-    assert_eq!(ring.len(), 3);
-    assert_eq!(ring.last_seq(), 2);
+    let kept = replay_lines(&service, "R58M1234A");
+    assert_eq!(kept.len(), 3);
+    assert_eq!(service.status("R58M1234A").last_seq, 2);
 
     service.stop("R58M1234A").await;
 }
@@ -126,11 +136,11 @@ async fn stop_keeps_ring_and_clear_empties() {
     service.stop("R58M1234A").await;
     assert!(!service.is_capturing("R58M1234A"));
 
-    let ring = service.ring("R58M1234A");
-    assert!(!ring.is_empty(), "停止后缓冲保留（可继续过滤重放）");
+    let kept = replay_lines(&service, "R58M1234A");
+    assert!(!kept.is_empty(), "停止后缓冲保留（可继续过滤重放）");
 
     service.clear("R58M1234A");
-    assert!(ring.is_empty());
+    assert!(replay_lines(&service, "R58M1234A").is_empty());
 }
 
 #[tokio::test]
@@ -344,7 +354,7 @@ async fn device_offline_stream_ends_with_state_stopped() {
     );
 
     // 缓冲保留（掉线由 app 层决定是否清空）
-    assert!(!service.ring("R58M1234A").is_empty());
+    assert!(!replay_lines(&service, "R58M1234A").is_empty());
     service.stop("R58M1234A").await;
 }
 
@@ -366,7 +376,7 @@ async fn cancel_stops_long_running_stream() {
 
     service.stop("R58M1234A").await;
     assert!(!service.is_capturing("R58M1234A"), "取消后采集应停止");
-    assert!(!service.ring("R58M1234A").is_empty());
+    assert!(!replay_lines(&service, "R58M1234A").is_empty());
 }
 
 #[tokio::test]
@@ -378,7 +388,7 @@ async fn detach_device_stops_and_clears() {
     service.detach_device("R58M1234A").await;
     assert!(!service.is_capturing("R58M1234A"));
     assert!(
-        service.ring("R58M1234A").is_empty(),
+        replay_lines(&service, "R58M1234A").is_empty(),
         "切换/掉线清缓冲（防串设备）"
     );
 }
@@ -411,17 +421,20 @@ async fn package_snapshot_reads_pm_list() {
 }
 
 #[tokio::test]
-async fn adb_client_devices_parse_via_fake() {
-    let exe = isolated_fake_adb(
-        r#"{ "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1", "Z9X unauthorized"] }"#,
-    );
-    let client = AdbClient::new(tool(exe), 4);
-    let devices = client
-        .devices(CancellationToken::new())
+async fn start_clear_device_fails_when_logcat_c_unavailable() {
+    let (tx, _rx) = mpsc::channel::<AppEvent>(8);
+    let client = Arc::new(AdbClient::new(
+        tool(PathBuf::from("definitely-missing-adb")),
+        4,
+    ));
+    let service = CaptureService::new(client, tx, 1000, CancellationToken::new());
+    let err = service
+        .start("R58M1234A", true)
         .await
-        .expect("扫描");
-    assert_eq!(devices.len(), 2);
-    assert_eq!(devices[0].model.as_deref(), Some("Yohu Phone"));
-    assert_eq!(devices[0].state, yohu_protocol::DeviceState::Online);
-    assert_eq!(devices[1].state, yohu_protocol::DeviceState::Unauthorized);
+        .expect_err("logcat -c 失败必须失败返回");
+    assert!(!service.is_capturing("R58M1234A"));
+    match err {
+        yohu_logsrv::LogError::Adb(_) | yohu_logsrv::LogError::Cancelled => {}
+        other => panic!("unexpected error: {other}"),
+    }
 }

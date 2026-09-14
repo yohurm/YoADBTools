@@ -1,71 +1,36 @@
-//! 设备级采集：跟流、环形缓冲、进程索引。
+//! 设备级采集槽位编排：Empty → Starting(gen) → Live(gen) → Stopping(gen) → Empty。
 //!
-//! 状态机（每 serial）：空 → Starting(gen) → Live(gen) → Stopping(gen) → 空。
 //! start 仅对 Live **adopt**；Starting/Stopping 等待后再决定。新流才 `ring.clear()`。
 //! 控制面 `CaptureState` 带 generation 且 `send().await` 必达；批次仍 `try_send`。
+//! 跟流泵、任务 join、进程索引分别在 `follow` / `task` / `index`。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use tokio::sync::{mpsc, Notify};
 use tokio_util::sync::CancellationToken;
 
-use crate::batch::Batcher;
-use crate::parse::parse_threadtime;
+use crate::batch::{Batcher, BATCH_FLUSH_INTERVAL, BATCH_MAX_BYTES, BATCH_MAX_LINES};
+use crate::follow::run_follow;
+use crate::index::ProcessIndexService;
 use crate::ring::RingBuffer;
-use yohu_adb::{AdbClient, AdbError};
+use crate::task::join_or_abort;
+use yohu_adb::AdbClient;
 use yohu_protocol::{
     AppEvent, CaptureStart, CaptureState, CaptureStatus, LogBatch, ProcessEntry, ReplayRequest,
 };
-
-const LOGCAT_FORMAT: &str = "threadtime,uid,year";
-const INDEX_INTERVAL: Duration = Duration::from_millis(2500);
-/// 取消后等跟流任务收敛的上限。超时则 abort，禁止握着 logcat 管道死等。
-const STOP_JOIN: Duration = Duration::from_secs(3);
-
-async fn join_or_abort<T>(mut handle: tokio::task::JoinHandle<T>) {
-    tokio::select! {
-        _ = &mut handle => {}
-        _ = tokio::time::sleep(STOP_JOIN) => {
-            handle.abort();
-            let _ = handle.await;
-        }
-    }
-}
-
-/// 外层任务被 abort 时连带取消内部 spawn，避免 logcat 读任务脱离后死等管道。
-struct AbortOnDrop<T>(Option<tokio::task::JoinHandle<T>>);
-
-impl<T> AbortOnDrop<T> {
-    fn new(handle: tokio::task::JoinHandle<T>) -> Self {
-        Self(Some(handle))
-    }
-
-    async fn join(mut self) {
-        if let Some(handle) = self.0.take() {
-            join_or_abort(handle).await;
-        }
-    }
-}
-
-impl<T> Drop for AbortOnDrop<T> {
-    fn drop(&mut self) {
-        if let Some(handle) = self.0.take() {
-            handle.abort();
-        }
-    }
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogError {
     #[error("采集已取消")]
     Cancelled,
     #[error("采集失败: {0}")]
-    Adb(#[from] AdbError),
+    Adb(#[from] yohu_adb::AdbError),
     #[error("导出失败: {0}")]
     Io(#[from] std::io::Error),
+    #[error("无法生成导出时间戳")]
+    ExportStamp,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -109,6 +74,7 @@ fn remember_and_remove(inner: &mut Inner, serial: &str) -> Option<CaptureSlot> {
 
 pub struct CaptureService {
     adb: Arc<AdbClient>,
+    index: ProcessIndexService,
     sink: mpsc::Sender<AppEvent>,
     ring_capacity: AtomicUsize,
     inner: Mutex<Inner>,
@@ -118,47 +84,6 @@ pub struct CaptureService {
     root_cancel: CancellationToken,
 }
 
-fn follow_argv() -> Vec<String> {
-    vec!["logcat".into(), "-v".into(), LOGCAT_FORMAT.into()]
-}
-
-fn parse_logcat_line(raw: &str) -> Option<yohu_protocol::LogLine> {
-    if raw.trim().is_empty() || raw.trim_start().starts_with("---------") {
-        return None;
-    }
-    Some(parse_threadtime(raw))
-}
-
-async fn run_follow(
-    adb: Arc<AdbClient>,
-    serial: String,
-    ring: Arc<RingBuffer>,
-    batcher: Batcher,
-    cancel: CancellationToken,
-) {
-    let (line_tx, mut line_rx) = mpsc::channel::<String>(1024);
-    let pump = AbortOnDrop::new(tokio::spawn(async move {
-        while let Some(raw) = line_rx.recv().await {
-            let Some(mut line) = parse_logcat_line(&raw) else {
-                continue;
-            };
-            // 单调 seq 由环分配：让送入批量器/推送链路的行也带上同一 seq，
-            // 否则 UI 的 seq 去重/回补锚点全为 0（数据被误判为重复而丢弃）。
-            line.seq = ring.push(line.clone());
-            if batcher.feed(line).await.is_err() {
-                break;
-            }
-        }
-    }));
-
-    let _ = adb
-        .stream_lines(&serial, &follow_argv(), cancel.clone(), line_tx.clone())
-        .await;
-
-    drop(line_tx);
-    pump.join().await;
-}
-
 impl CaptureService {
     pub fn new(
         adb: Arc<AdbClient>,
@@ -166,8 +91,10 @@ impl CaptureService {
         ring_capacity: usize,
         root_cancel: CancellationToken,
     ) -> Arc<Self> {
+        let index = ProcessIndexService::new(Arc::clone(&adb), sink.clone());
         Arc::new(Self {
             adb,
+            index,
             sink,
             ring_capacity: AtomicUsize::new(ring_capacity.max(1)),
             inner: Mutex::new(Inner {
@@ -185,7 +112,7 @@ impl CaptureService {
         self.ring_capacity.store(capacity.max(1), Ordering::Relaxed);
     }
 
-    pub fn ring(self: &Arc<Self>, serial: &str) -> Arc<RingBuffer> {
+    pub(crate) fn ring(&self, serial: &str) -> Arc<RingBuffer> {
         let cap = self.ring_capacity.load(Ordering::Relaxed);
         let mut inner = self.inner.lock().expect("capture lock poisoned");
         inner
@@ -195,7 +122,7 @@ impl CaptureService {
             .clone()
     }
 
-    pub fn replay(self: &Arc<Self>, req: ReplayRequest) -> LogBatch {
+    pub fn replay(&self, req: ReplayRequest) -> LogBatch {
         let ring = self.ring(&req.serial);
         let (lines, truncated) = ring.snapshot_page(req.from_seq, req.limit as usize);
         let from_seq = lines.first().map(|l| l.seq).unwrap_or(req.from_seq);
@@ -295,7 +222,12 @@ impl CaptureService {
 
         if clear_device {
             if let Err(e) = self.adb.clear_log(serial, cancel.clone()).await {
-                tracing::warn!("logcat -c 失败，继续采集: {e}");
+                self.abandon_starting(serial, my_generation).await;
+                return if cancel.is_cancelled() {
+                    Err(LogError::Cancelled)
+                } else {
+                    Err(e.into())
+                };
             }
         }
         if cancel.is_cancelled() {
@@ -309,9 +241,9 @@ impl CaptureService {
         let (batcher, _batch_handle) = Batcher::spawn(
             serial.to_string(),
             self.sink.clone(),
-            Duration::from_millis(150),
-            1000,
-            512 * 1024,
+            BATCH_FLUSH_INTERVAL,
+            BATCH_MAX_LINES,
+            BATCH_MAX_BYTES,
             cancel.clone(),
         );
 
@@ -326,13 +258,7 @@ impl CaptureService {
                 .await;
         });
 
-        let index_handle = tokio::spawn(crate::index::run(
-            serial.to_string(),
-            Arc::clone(&self.adb),
-            self.sink.clone(),
-            INDEX_INTERVAL,
-            cancel.clone(),
-        ));
+        let index_handle = self.index.spawn(serial.to_string(), cancel.clone());
 
         let mut capture_handle = Some(capture_handle);
         let mut index_handle = Some(index_handle);
@@ -446,7 +372,9 @@ impl CaptureService {
     }
 
     pub async fn clear_device_buffer(&self, serial: &str) -> Result<(), LogError> {
-        self.adb.clear_log(serial, CancellationToken::new()).await?;
+        self.adb
+            .clear_log(serial, self.root_cancel.child_token())
+            .await?;
         self.clear(serial);
         Ok(())
     }
@@ -457,15 +385,18 @@ impl CaptureService {
     }
 
     pub async fn process_snapshot(&self, serial: &str) -> Result<Vec<ProcessEntry>, LogError> {
-        Ok(self.adb.ps(serial, CancellationToken::new()).await?)
+        self.index
+            .snapshot(serial, self.root_cancel.child_token())
+            .await
+            .map_err(Into::into)
     }
 
     /// 已安装包名（新建日志窗口检索；不是当前 `ps` 进程）。
     pub async fn package_snapshot(&self, serial: &str) -> Result<Vec<String>, LogError> {
-        Ok(self
-            .adb
-            .list_packages(serial, CancellationToken::new())
-            .await?)
+        self.adb
+            .list_packages(serial, self.root_cancel.child_token())
+            .await
+            .map_err(Into::into)
     }
 
     async fn emit_state(&self, serial: &str, generation: u64, state: CaptureState) {
@@ -521,46 +452,5 @@ impl CaptureService {
             tracing::info!(serial, generation, "采集流结束");
             self.changed.notify_waiters();
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ingest_raw_lines(
-        ring: &RingBuffer,
-        raw_lines: impl IntoIterator<Item = impl AsRef<str>>,
-    ) -> u64 {
-        let mut added = 0u64;
-        for raw in raw_lines {
-            if let Some(line) = parse_logcat_line(raw.as_ref()) {
-                ring.push(line);
-                added += 1;
-            }
-        }
-        added
-    }
-
-    #[test]
-    fn ingest_skips_headers_and_parses_threadtime() {
-        let ring = RingBuffer::new(16);
-        let added = ingest_raw_lines(
-            &ring,
-            [
-                "--------- beginning of main",
-                "",
-                "2026-01-02 03:04:05.678  1234  5678 I TestTag: hello",
-                "2026-01-02 03:04:05.779  1000  1234  5678 W TestTag: uid-col",
-            ],
-        );
-        assert_eq!(added, 2);
-        assert_eq!(ring.len(), 2);
-        let snap = ring.snapshot(0, 10);
-        assert_eq!(snap[0].pid, 1234);
-        assert_eq!(snap[0].uid, None);
-        assert_eq!(snap[1].pid, 1234);
-        assert_eq!(snap[1].uid.as_deref(), Some("1000"));
-        assert_eq!(snap[1].level, 'W');
     }
 }
