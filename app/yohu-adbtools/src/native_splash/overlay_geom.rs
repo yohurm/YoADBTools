@@ -1,4 +1,5 @@
-//! 启动 overlay 客户区里的 dest。不是 HWND 布局，不是投屏占用盒。
+//! 启动 overlay 客户区里的 dest 与 brand 姿态。不是 HWND 布局，不是投屏占用盒。
+//! clip 矩形与这里同一套 dest；半径来自 `BootSurface::shared_clip` / `exit_clip`。
 
 use windows::Win32::Foundation::RECT;
 

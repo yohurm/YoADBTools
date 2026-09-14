@@ -46,7 +46,7 @@ pub fn canvas_color(dark: bool) -> Color {
     }
 }
 
-/// DXGI / GDI DIB 用 B8G8R8A8。启动 overlay 填色只走这里，禁止从快照角点猜。
+/// DXGI / GDI DIB 用 B8G8R8A8。启动 overlay 填色只走这里，禁止从 frame 角点猜。
 pub fn canvas_bgra(dark: bool) -> [u8; 4] {
     let Color(r, g, b, a) = canvas_color(dark);
     [b, g, r, a]

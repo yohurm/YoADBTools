@@ -1,4 +1,4 @@
-//! L4：hydrate 之后消费本模块交接配方。
+//! L4：hydrate 之后消费本模块交接表面。
 //! 主窗 HWND 一次落到最终矩形。禁止插值 HWND 宽高。
 //! 主窗内容只在 overlay 铺满（同屏）或出场结束（异屏）之后才变为可见。
 
@@ -13,13 +13,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::window_boot::{elapsed_ms, MAIN_DEFAULT_H, MAIN_DEFAULT_W};
 
 use super::geometry::{
-    boot_dark, center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height,
-    rect_width, xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
+    center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height, rect_width,
+    xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
 };
-use crate::window_boot::canvas_bgra;
-use super::overlay;
 use super::recipe;
-use super::window::{splash_hwnd, splash_window_rect};
+use super::surface::BootSurface;
+use super::window::{frame_snapshot, splash_hwnd, splash_window_rect};
 
 const IDLE: u8 = 0;
 const BUSY: u8 = 1;
@@ -51,12 +50,12 @@ pub fn to_main(main: HWND) -> bool {
             .unwrap_or_else(|| xywh(0, 0, LOGICAL_W, LOGICAL_H))
     });
     let main_rect = window_rect(main).unwrap_or(splash_rect);
-    let Some(work) = last_geometry().map(|g| g.work()) else {
+    let Some(placement) = last_geometry() else {
         show_main_at_target(main, target_on_splash_work(main_rect));
         finish();
         return true;
     };
-    let kind = classify_handover(splash_rect, main_rect, work);
+    let kind = classify_handover(splash_rect, main_rect, placement.work());
     let target = target_on_splash_work(main_rect);
 
     if !yohu_motion::motion_allowed() {
@@ -73,12 +72,23 @@ pub fn to_main(main: HWND) -> bool {
         splash_h = rect_height(splash_rect),
         target_w = rect_width(target),
         target_h = rect_height(target),
+        splash_r = placement.corner,
+        host_r = placement.host_corner(),
+        clip_to = match kind {
+            HandoverKind::SameScreen => 0,
+            HandoverKind::CrossScreen => placement.corner,
+        },
         "启动交接几何"
     );
 
     place_main_at_target(main, target);
-    let canvas = canvas_bgra(boot_dark());
-    let snap = overlay::capture(splash, splash_rect, canvas);
+    let Some(frame) = frame_snapshot() else {
+        tracing::info!(ms = elapsed_ms(), "启动交接：无表面，瞬时");
+        show_main_at_target(main, target);
+        finish();
+        return true;
+    };
+    let surface = BootSurface::lock(placement, frame);
     let cover = || {
         tracing::info!(ms = elapsed_ms(), "启动交接：overlay 已盖住，藏小窗");
         super::hide();
@@ -88,19 +98,14 @@ pub fn to_main(main: HWND) -> bool {
         present_main(main);
     };
 
-    match (kind, snap) {
-        (HandoverKind::SameScreen, Some(snap)) => {
+    match kind {
+        HandoverKind::SameScreen => {
             tracing::info!(ms = elapsed_ms(), "启动交接：同屏共享容器");
-            recipe::same_screen(snap, splash_rect, target, main, canvas, cover, present);
+            recipe::same_screen(surface, splash_rect, target, splash, cover, present);
         }
-        (HandoverKind::CrossScreen, Some(snap)) => {
+        HandoverKind::CrossScreen => {
             tracing::info!(ms = elapsed_ms(), "启动交接：异屏出场");
-            recipe::cross_screen(snap, splash_rect, main, canvas, cover, present);
-        }
-        _ => {
-            tracing::info!(ms = elapsed_ms(), "启动交接：无快照，瞬时");
-            cover();
-            show_main_at_target(main, target);
+            recipe::cross_screen(surface, splash_rect, splash, cover, present);
         }
     }
     finish();

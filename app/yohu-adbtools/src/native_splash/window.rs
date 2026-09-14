@@ -1,11 +1,16 @@
-//! 启动小窗 HWND：注册类、创建、圆角、消息泵、销毁。
+//! 启动小窗 HWND：注册类、创建、显示 clip、消息泵、销毁。
+//! 像素来自 `PaintData` 的矩形 frame。`SetWindowRgn` 只裁用户看见的外形，不进入交接表面。
 
+use std::ffi::c_void;
 use std::sync::Mutex;
 
 use tauri::window::Color;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+};
 use windows::Win32::Graphics::Gdi::{
     CreateRoundRectRgn, DeleteObject, GetDC, InvalidateRect, ReleaseDC, SetWindowRgn, UpdateWindow,
 };
@@ -21,11 +26,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use yohu_protocol::DISPLAY_NAME;
 
 use super::geometry::{
-    primary_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, CORNER_LOGICAL,
-    FONT_LOGICAL, ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
+    primary_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, FONT_LOGICAL,
+    ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
 };
 use super::icon::{create_bitmap, load_icon, scale_bitmap};
-use super::paint::{paint, PaintData};
+use super::paint::{present, PaintData, PaintSpec};
+use super::surface::BootFrame;
 use crate::window_boot::{canvas_color, elapsed_ms};
 
 const CLASS: PCWSTR = w!("YohuBootSplash");
@@ -71,6 +77,17 @@ pub fn splash_window_rect() -> Option<RECT> {
         let mut r = RECT::default();
         GetWindowRect(hwnd, &mut r).ok()?;
         Some(r)
+    }
+}
+
+pub fn frame_snapshot() -> Option<BootFrame> {
+    let hwnd = splash_hwnd()?;
+    unsafe {
+        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const PaintData;
+        if ptr.is_null() {
+            return None;
+        }
+        (*ptr).copy_frame()
     }
 }
 
@@ -134,7 +151,6 @@ fn show_inner(dark: bool) -> Result<(), String> {
             dark,
         );
         store_geometry(placement);
-        let radius = scale_px(CORNER_LOGICAL, dpi);
         let _ = SetWindowPos(
             hwnd,
             Some(HWND_TOPMOST),
@@ -150,10 +166,17 @@ fn show_inner(dark: bool) -> Result<(), String> {
             0,
             placement.width + 1,
             placement.height + 1,
-            radius,
-            radius,
+            placement.gdi_ellipse(),
+            placement.gdi_ellipse(),
         );
         let _ = SetWindowRgn(hwnd, Some(rgn), true);
+        let pref = DWMWCP_DONOTROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &pref as *const _ as *const c_void,
+            std::mem::size_of_val(&pref) as u32,
+        );
 
         let full = create_bitmap(screen_dc, &icon)?;
         let icon_px = scale_px(ICON_LOGICAL, dpi);
@@ -166,16 +189,17 @@ fn show_inner(dark: bool) -> Result<(), String> {
             icon_px,
         )?;
         let _ = DeleteObject(full.into());
-        ReleaseDC(None, screen_dc);
-
-        let data = Box::new(PaintData {
+        let data = PaintData::create(
+            screen_dc,
             bitmap,
-            image_w: icon_px,
-            image_h: icon_px,
-            icon_px,
-            gap_px: scale_px(BRAND_GAP_LOGICAL, dpi),
-            font_px: scale_px(FONT_LOGICAL, dpi),
-        });
+            PaintSpec::from_placement(
+                placement,
+                icon_px,
+                scale_px(BRAND_GAP_LOGICAL, dpi),
+                scale_px(FONT_LOGICAL, dpi),
+            ),
+        )?;
+        ReleaseDC(None, screen_dc);
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(data) as isize);
 
         let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
@@ -197,7 +221,7 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_ERASEBKGND => LRESULT(1),
         WM_PAINT => {
-            paint(hwnd);
+            present(hwnd);
             LRESULT(0)
         }
         WM_CLOSE | WM_DESTROY => {
@@ -205,8 +229,7 @@ unsafe extern "system" fn wnd_proc(
                 let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PaintData;
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
                 if !ptr.is_null() {
-                    let data = Box::from_raw(ptr);
-                    let _ = DeleteObject(data.bitmap.into());
+                    Box::from_raw(ptr).destroy();
                 }
                 if msg == WM_CLOSE {
                     let _ = DestroyWindow(hwnd);

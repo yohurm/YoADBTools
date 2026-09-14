@@ -1,8 +1,12 @@
-//! L2：冻结 HWND 快照，作为 DComp Visual 的 content。
-//! overlay HWND 外框固定；运动只改 Offset / Scale / Opacity。禁止 UpdateLayeredWindow，禁止改 HWND 尺寸。
-//! Shared fill 与快照底只消费启动画布 BGRA，禁止从快照角点猜色。
+//! DComp overlay：fill（画布 token）+ brand（BootFrame）+ root clip。
+//! overlay HWND 外框固定；运动只改 Offset / Scale / Opacity / clip。
+//! 同屏铺满 clip 终点是 0：目标 HWND 每个像素不透明。主窗 DWM 圆角揭窗后才出现。
+//! 禁止 UpdateLayeredWindow，禁止改 HWND 尺寸，禁止从 HWND 抓像素。
+//! `NOREDIRECTIONBITMAP` 窗：DONOTROUND + 整窗 extend frame；禁止再交给 DWM 圆角。
 
-use windows::core::{w, Interface};
+use std::ffi::c_void;
+
+use windows::core::{w, Interface, BOOL};
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
@@ -14,7 +18,12 @@ use windows::Win32::Graphics::Direct3D11::{
 };
 use windows::Win32::Graphics::DirectComposition::{
     DCompositionCreateDevice, IDCompositionDevice, IDCompositionEffectGroup,
-    IDCompositionScaleTransform, IDCompositionTarget, IDCompositionVisual,
+    IDCompositionRectangleClip, IDCompositionScaleTransform, IDCompositionTarget,
+    IDCompositionVisual,
+};
+use windows::Win32::Graphics::Dwm::{
+    DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED,
+    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
 };
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
@@ -23,33 +32,24 @@ use windows::Win32::Graphics::Dxgi::{
     IDXGIAdapter, IDXGIDevice, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_SCALING_STRETCH,
     DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, DXGI_USAGE_RENDER_TARGET_OUTPUT,
 };
-use windows::Win32::Graphics::Gdi::{
-    BitBlt, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC,
-    SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, RGBQUAD, SRCCOPY,
-};
+use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, ShowWindow, CS_HREDRAW,
-    CS_VREDRAW, SW_SHOWNOACTIVATE, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CS_VREDRAW, SW_SHOWNOACTIVATE, WM_ERASEBKGND, WM_PAINT, WNDCLASSEXW, WS_EX_NOACTIVATE,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 use super::overlay_geom::{center_offset, visual_pose};
+use super::surface::{fill_tile, BootSurface, FILL_CONTENT};
 use yohu_motion::{eased_anim, rect_height, rect_width};
 
 const CLASS: windows::core::PCWSTR = w!("YohuMotionOverlay");
-/// DComp Scale 原点在内容左上。2×2 色块放大成画布，不是 HWND 尺寸。
-const FILL_CONTENT: i32 = 2;
 
 pub enum OverlayKind {
     Shared,
     Exit,
-}
-
-pub struct Snapshot {
-    pixels: Vec<u8>,
-    pub w: i32,
-    pub h: i32,
 }
 
 pub struct Overlay {
@@ -65,11 +65,14 @@ pub struct Overlay {
     fill_scale: Option<IDCompositionScaleTransform>,
     brand: Option<IDCompositionVisual>,
     brand_scale: Option<IDCompositionScaleTransform>,
+    clip: Option<IDCompositionRectangleClip>,
     effect: Option<IDCompositionEffectGroup>,
     w: i32,
     h: i32,
     content_w: i32,
     content_h: i32,
+    radius_from: f32,
+    radius_to: f32,
 }
 
 impl Drop for Overlay {
@@ -78,6 +81,7 @@ impl Drop for Overlay {
         self.brand.take();
         self.fill_scale.take();
         self.fill.take();
+        self.clip.take();
         self.effect.take();
         self.root.take();
         self.target.take();
@@ -112,9 +116,9 @@ impl Overlay {
         }
     }
 
-    /// 异屏：只播品牌快照（无 fill 层）。
     pub fn pose_exit(&self, dest: RECT, opacity: f32) {
         self.pose_brand_scaled(dest);
+        self.pose_clip(dest, self.radius_from);
         self.set_opacity(opacity);
     }
 
@@ -128,28 +132,25 @@ impl Overlay {
         ease: fn(f64) -> f64,
     ) {
         self.morph_brand_scaled(from, to, ms, ease);
+        self.morph_clip(from, to, self.radius_from, self.radius_to, ms, ease);
         self.morph_opacity(opacity_from, opacity_to, ms, ease);
     }
 
-    /// 同屏共享容器：画布色块放大，品牌快照 1:1 钉在中心。
     pub fn pose_shared(&self, dest: RECT, opacity: f32) {
         self.pose_fill(dest);
         self.pose_brand_centered(dest);
+        self.pose_clip(dest, self.radius_from);
         self.set_opacity(opacity);
     }
 
-    pub fn morph_shared(
-        &self,
-        from: RECT,
-        to: RECT,
-        opacity_from: f32,
-        opacity_to: f32,
-        ms: u64,
-        ease: fn(f64) -> f64,
-    ) {
+    pub fn morph_shared(&self, from: RECT, to: RECT, ms: u64, ease: fn(f64) -> f64) {
         self.morph_fill(from, to, ms, ease);
         self.morph_brand_centered(from, to, ms, ease);
-        self.morph_opacity(opacity_from, opacity_to, ms, ease);
+        self.morph_clip(from, to, self.radius_from, self.radius_to, ms, ease);
+    }
+
+    pub fn fade_out(&self, ms: u64, ease: fn(f64) -> f64) {
+        self.morph_opacity(1.0, 0.0, ms, ease);
     }
 
     fn pose_fill(&self, dest: RECT) {
@@ -200,6 +201,20 @@ impl Overlay {
             let _ = scale.SetScaleX2(1.0);
             let _ = scale.SetScaleY2(1.0);
         }
+        self.commit();
+    }
+
+    fn pose_clip(&self, dest: RECT, radius: f32) {
+        let Some(clip) = self.clip.as_ref() else {
+            return;
+        };
+        unsafe {
+            let _ = clip.SetLeft2(dest.left as f32);
+            let _ = clip.SetTop2(dest.top as f32);
+            let _ = clip.SetRight2(dest.right as f32);
+            let _ = clip.SetBottom2(dest.bottom as f32);
+        }
+        apply_clip_radius(clip, radius);
         self.commit();
     }
 
@@ -275,6 +290,67 @@ impl Overlay {
         self.commit();
     }
 
+    fn morph_clip(
+        &self,
+        from: RECT,
+        to: RECT,
+        radius_from: f32,
+        radius_to: f32,
+        ms: u64,
+        ease: fn(f64) -> f64,
+    ) {
+        let Some(device) = self.device.as_ref() else {
+            return;
+        };
+        let Some(clip) = self.clip.as_ref() else {
+            return;
+        };
+        let edges = [
+            (from.left as f32, to.left as f32),
+            (from.top as f32, to.top as f32),
+            (from.right as f32, to.right as f32),
+            (from.bottom as f32, to.bottom as f32),
+        ];
+        let edge_anims: [_; 4] =
+            std::array::from_fn(|i| eased_anim(device, edges[i].0, edges[i].1, ms, ease));
+        let radius = eased_anim(device, radius_from, radius_to, ms, ease);
+        unsafe {
+            if let Some(a) = edge_anims[0].as_ref() {
+                let _ = clip.SetLeft(a);
+            } else {
+                let _ = clip.SetLeft2(to.left as f32);
+            }
+            if let Some(a) = edge_anims[1].as_ref() {
+                let _ = clip.SetTop(a);
+            } else {
+                let _ = clip.SetTop2(to.top as f32);
+            }
+            if let Some(a) = edge_anims[2].as_ref() {
+                let _ = clip.SetRight(a);
+            } else {
+                let _ = clip.SetRight2(to.right as f32);
+            }
+            if let Some(a) = edge_anims[3].as_ref() {
+                let _ = clip.SetBottom(a);
+            } else {
+                let _ = clip.SetBottom2(to.bottom as f32);
+            }
+            if let Some(a) = radius.as_ref() {
+                let _ = clip.SetTopLeftRadiusX(a);
+                let _ = clip.SetTopLeftRadiusY(a);
+                let _ = clip.SetTopRightRadiusX(a);
+                let _ = clip.SetTopRightRadiusY(a);
+                let _ = clip.SetBottomLeftRadiusX(a);
+                let _ = clip.SetBottomLeftRadiusY(a);
+                let _ = clip.SetBottomRightRadiusX(a);
+                let _ = clip.SetBottomRightRadiusY(a);
+            } else {
+                apply_clip_radius(clip, radius_to);
+            }
+        }
+        self.commit();
+    }
+
     fn set_opacity(&self, opacity: f32) {
         let Some(effect) = self.effect.as_ref() else {
             return;
@@ -315,39 +391,11 @@ impl Overlay {
     }
 }
 
-pub fn capture(hwnd: HWND, rect: RECT, canvas: [u8; 4]) -> Option<Snapshot> {
-    let w = rect_width(rect).max(1);
-    let h = rect_height(rect).max(1);
-    unsafe {
-        let (dc, bmp, old, bits) = dib(w, h)?;
-        fill_dib(bits, w, h, canvas);
-        let client_dc = GetDC(Some(hwnd));
-        if client_dc.is_invalid() {
-            SelectObject(dc, old);
-            let _ = DeleteObject(bmp.into());
-            let _ = DeleteDC(dc);
-            return None;
-        }
-        let _ = BitBlt(dc, 0, 0, w, h, Some(client_dc), 0, 0, SRCCOPY);
-        ReleaseDC(Some(hwnd), client_dc);
-        opaque_alpha(bits, w, h);
-        let n = (w as usize) * (h as usize) * 4;
-        let mut pixels = vec![0u8; n];
-        if !bits.is_null() {
-            std::ptr::copy_nonoverlapping(bits, pixels.as_mut_ptr(), n);
-        }
-        SelectObject(dc, old);
-        let _ = DeleteObject(bmp.into());
-        let _ = DeleteDC(dc);
-        Some(Snapshot { pixels, w, h })
-    }
-}
-
-pub fn open(screen: RECT, snap: &Snapshot, kind: OverlayKind, canvas: [u8; 4]) -> Option<Overlay> {
+pub fn open(screen: RECT, surface: &BootSurface, kind: OverlayKind) -> Option<Overlay> {
     let w = rect_width(screen).max(1);
     let h = rect_height(screen).max(1);
     let hwnd = create_hwnd(screen.left, screen.top, w, h)?;
-    match attach(hwnd, w, h, snap, kind, canvas) {
+    match attach(hwnd, w, h, surface, kind) {
         Some(overlay) => Some(overlay),
         None => {
             unsafe {
@@ -358,16 +406,14 @@ pub fn open(screen: RECT, snap: &Snapshot, kind: OverlayKind, canvas: [u8; 4]) -
     }
 }
 
-fn attach(
-    hwnd: HWND,
-    w: i32,
-    h: i32,
-    snap: &Snapshot,
-    kind: OverlayKind,
-    canvas: [u8; 4],
-) -> Option<Overlay> {
+fn attach(hwnd: HWND, w: i32, h: i32, surface: &BootSurface, kind: OverlayKind) -> Option<Overlay> {
+    let snap = &surface.frame;
     let content_w = snap.w.max(1);
     let content_h = snap.h.max(1);
+    let (radius_from, radius_to) = match kind {
+        OverlayKind::Shared => surface.shared_clip(),
+        OverlayKind::Exit => surface.exit_clip(),
+    };
     let (d3d, context) = create_device()?;
     let dxgi: IDXGIDevice = d3d.cast().ok()?;
     let adapter: IDXGIAdapter = unsafe { dxgi.GetAdapter().ok()? };
@@ -378,6 +424,7 @@ fn attach(
     let root = unsafe { device.CreateVisual().ok()? };
     let brand = unsafe { device.CreateVisual().ok()? };
     let brand_scale = unsafe { device.CreateScaleTransform().ok()? };
+    let clip = unsafe { device.CreateRectangleClip().ok()? };
     let effect = unsafe { device.CreateEffectGroup().ok()? };
     let (fill_chain, fill, fill_scale) = match kind {
         OverlayKind::Shared => {
@@ -387,7 +434,7 @@ fn attach(
                 &factory,
                 FILL_CONTENT,
                 FILL_CONTENT,
-                &fill_tile(canvas),
+                &fill_tile(surface.canvas),
             )?;
             let fill = unsafe { device.CreateVisual().ok()? };
             let fill_scale = unsafe { device.CreateScaleTransform().ok()? };
@@ -402,6 +449,7 @@ fn attach(
     unsafe {
         brand.SetContent(&brand_chain).ok()?;
         brand.SetTransform(&brand_scale).ok()?;
+        root.SetClip(&clip).ok()?;
         root.SetEffect(&effect).ok()?;
         if let (Some(fill), Some(_)) = (fill.as_ref(), fill_scale.as_ref()) {
             root.AddVisual(fill, false, None).ok()?;
@@ -425,11 +473,14 @@ fn attach(
         fill_scale,
         brand: Some(brand),
         brand_scale: Some(brand_scale),
+        clip: Some(clip),
         effect: Some(effect),
         w,
         h,
         content_w,
         content_h,
+        radius_from,
+        radius_to,
     })
 }
 
@@ -445,7 +496,7 @@ fn create_hwnd(x: i32, y: i32, w: i32, h: i32) -> Option<HWND> {
             ..Default::default()
         };
         let _ = RegisterClassExW(&wc);
-        CreateWindowExW(
+        let hwnd = CreateWindowExW(
             WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             CLASS,
             w!(""),
@@ -459,7 +510,48 @@ fn create_hwnd(x: i32, y: i32, w: i32, h: i32) -> Option<HWND> {
             Some(hinstance.into()),
             None,
         )
-        .ok()
+        .ok()?;
+        configure_overlay_hwnd(hwnd);
+        Some(hwnd)
+    }
+}
+
+fn configure_overlay_hwnd(hwnd: HWND) {
+    unsafe {
+        let pref = DWMWCP_DONOTROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &pref as *const _ as *const c_void,
+            std::mem::size_of_val(&pref) as u32,
+        );
+        let disable = BOOL(1);
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            &disable as *const _ as *const c_void,
+            std::mem::size_of_val(&disable) as u32,
+        );
+        let glass = MARGINS {
+            cxLeftWidth: -1,
+            cxRightWidth: -1,
+            cyTopHeight: -1,
+            cyBottomHeight: -1,
+        };
+        let _ = DwmExtendFrameIntoClientArea(hwnd, &glass);
+    }
+}
+
+fn apply_clip_radius(clip: &IDCompositionRectangleClip, r: f32) {
+    unsafe {
+        let _ = clip.SetTopLeftRadiusX2(r);
+        let _ = clip.SetTopLeftRadiusY2(r);
+        let _ = clip.SetTopRightRadiusX2(r);
+        let _ = clip.SetTopRightRadiusY2(r);
+        let _ = clip.SetBottomLeftRadiusX2(r);
+        let _ = clip.SetBottomLeftRadiusY2(r);
+        let _ = clip.SetBottomRightRadiusX2(r);
+        let _ = clip.SetBottomRightRadiusY2(r);
     }
 }
 
@@ -550,26 +642,6 @@ fn present_bits(
     Some(swapchain)
 }
 
-fn fill_tile(canvas: [u8; 4]) -> [u8; 16] {
-    let mut out = [0u8; 16];
-    for i in 0..4 {
-        out[i * 4..i * 4 + 4].copy_from_slice(&canvas);
-    }
-    out
-}
-
-fn fill_dib(bits: *mut u8, w: i32, h: i32, canvas: [u8; 4]) {
-    if bits.is_null() {
-        return;
-    }
-    let n = (w as usize) * (h as usize);
-    unsafe {
-        for i in 0..n {
-            std::ptr::copy_nonoverlapping(canvas.as_ptr(), bits.add(i * 4), 4);
-        }
-    }
-}
-
 fn apply_pose_anim(
     device: &IDCompositionDevice,
     visual: &IDCompositionVisual,
@@ -609,72 +681,20 @@ fn apply_pose_anim(
     }
 }
 
-fn dib(
-    w: i32,
-    h: i32,
-) -> Option<(
-    windows::Win32::Graphics::Gdi::HDC,
-    windows::Win32::Graphics::Gdi::HBITMAP,
-    windows::Win32::Graphics::Gdi::HGDIOBJ,
-    *mut u8,
-)> {
-    unsafe {
-        let dc = CreateCompatibleDC(None);
-        if dc.is_invalid() {
-            return None;
-        }
-        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-        let info = BITMAPINFO {
-            bmiHeader: BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: w,
-                biHeight: -h,
-                biPlanes: 1,
-                biBitCount: 32,
-                biCompression: BI_RGB.0,
-                ..Default::default()
-            },
-            bmiColors: [RGBQUAD::default()],
-        };
-        let bmp = CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0).ok()?;
-        let old = SelectObject(dc, bmp.into());
-        Some((dc, bmp, old, bits.cast()))
-    }
-}
-
-fn opaque_alpha(bits: *mut u8, w: i32, h: i32) {
-    if bits.is_null() {
-        return;
-    }
-    let n = (w as usize) * (h as usize);
-    unsafe {
-        for i in 0..n {
-            *bits.add(i * 4 + 3) = 255;
-        }
-    }
-}
-
 unsafe extern "system" fn wnd_proc(
     hwnd: HWND,
     msg: u32,
     wparam: windows::Win32::Foundation::WPARAM,
     lparam: windows::Win32::Foundation::LPARAM,
 ) -> windows::Win32::Foundation::LRESULT {
-    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::window_boot::canvas_bgra;
-
-    #[test]
-    fn shared_fill_is_boot_canvas_not_snapshot_corner() {
-        let light = fill_tile(canvas_bgra(false));
-        assert_eq!(&light[0..4], &[0xF5, 0xF3, 0xF1, 255]);
-        assert_eq!(&light[12..16], &[0xF5, 0xF3, 0xF1, 255]);
-        assert_ne!(&light[0..4], &[0, 0, 0, 255]);
-        let dark = fill_tile(canvas_bgra(true));
-        assert_eq!(&dark[0..4], &[0x1C, 0x1A, 0x19, 255]);
+    match msg {
+        WM_ERASEBKGND => windows::Win32::Foundation::LRESULT(1),
+        WM_PAINT => unsafe {
+            let mut ps = PAINTSTRUCT::default();
+            let _ = BeginPaint(hwnd, &mut ps);
+            let _ = EndPaint(hwnd, &ps);
+            windows::Win32::Foundation::LRESULT(0)
+        },
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }

@@ -15,13 +15,16 @@ pub const LOGICAL_H: i32 = 300;
 pub const ICON_LOGICAL: i32 = 72;
 pub const BRAND_GAP_LOGICAL: i32 = 16;
 pub const FONT_LOGICAL: i32 = 18;
+/// 与 `@yohu/ui` `Radius.Md` 同值。小窗外形 / overlay 起势 clip。
 pub const CORNER_LOGICAL: i32 = 16;
+/// 与 `@yohu/ui` `Radius.Sm` 同值。Win11 主窗外框 DWM round ≈ 8vp。
+pub const HOST_CORNER_LOGICAL: i32 = 8;
 pub const USER_DEFAULT_SCREEN_DPI: u32 = 96;
 /// GetMonitorInfo 失败时的假工作区。不是 `Layout.WindowDefaultW/H`。
 const FALLBACK_WORK_W: i32 = 1920;
 const FALLBACK_WORK_H: i32 = 1080;
 
-/// 启动会话：主屏工作区 + 主题。小窗、主窗、overlay 填色只读这一份。
+/// 启动会话：几何 + 主题 + 圆角半径。小窗 / 主窗 / overlay 只读这一份。
 #[derive(Clone, Copy, Debug)]
 pub struct SplashPlacement {
     pub x: i32,
@@ -30,6 +33,8 @@ pub struct SplashPlacement {
     pub height: i32,
     pub dpi: u32,
     pub dark: bool,
+    /// 物理像素。由 `CORNER_LOGICAL` × DPI 锁定，不是绘制后再量。
+    pub corner: i32,
     pub work_left: i32,
     pub work_top: i32,
     pub work_right: i32,
@@ -46,6 +51,7 @@ impl SplashPlacement {
             height,
             dpi,
             dark,
+            corner: scale_px(CORNER_LOGICAL, dpi),
             work_left: work.left,
             work_top: work.top,
             work_right: work.right,
@@ -64,6 +70,15 @@ impl SplashPlacement {
 
     pub fn rect(&self) -> RECT {
         xywh(self.x, self.y, self.width, self.height)
+    }
+
+    pub fn host_corner(&self) -> i32 {
+        scale_px(HOST_CORNER_LOGICAL, self.dpi)
+    }
+
+    /// GDI `CreateRoundRectRgn` 的椭圆宽高是直径，不是半径。
+    pub fn gdi_ellipse(&self) -> i32 {
+        self.corner.saturating_mul(2).max(1)
     }
 }
 
@@ -285,5 +300,28 @@ mod tests {
         assert!(!boot_dark());
         store_geometry(SplashPlacement::from_work(work, 480, 300, 96, true));
         assert!(boot_dark());
+    }
+
+    #[test]
+    fn corner_tokens_match_youi_radius() {
+        assert_eq!(CORNER_LOGICAL, 16);
+        assert_eq!(HOST_CORNER_LOGICAL, 8);
+    }
+
+    #[test]
+    fn placement_locks_corner_with_dpi() {
+        let work = RECT {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
+        let splash = SplashPlacement::from_work(work, 480, 300, 96, false);
+        assert_eq!(splash.corner, 16);
+        assert_eq!(splash.host_corner(), 8);
+        assert_eq!(splash.gdi_ellipse(), 32);
+        let scaled = SplashPlacement::from_work(work, 840, 525, 168, false);
+        assert_eq!(scaled.corner, 28);
+        assert_eq!(scaled.host_corner(), 14);
     }
 }
