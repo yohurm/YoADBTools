@@ -82,6 +82,7 @@ export type LogScope =
 export interface LogFilter {
   /** 精确级别字母；缺省/空 = 不限（含 `?`）。不是最低含以上。 */
   levels?: string[];
+  /** 逗号 / 分号 / `|` 分隔多个针，任一忽略大小写精确命中；空 = 不限。无正则。 */
   tag_contains?: string;
   message_contains?: string;
   scope: LogScope;

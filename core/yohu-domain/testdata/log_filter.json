@@ -25,7 +25,7 @@
     "expect": true
   },
   {
-    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "OkHttp-Async", "msg": "request Timeout" },
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "OkHttp", "msg": "request Timeout" },
     "filter": { "tag_contains": "okhttp", "message_contains": "timeout", "scope": { "kind": "all" } },
     "expect": true
   },
@@ -73,5 +73,50 @@
     "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "?", "tag": "T", "msg": "m" },
     "filter": { "levels": ["V"], "scope": { "kind": "all" } },
     "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "HfLooper", "msg": "m" },
+    "filter": { "tag_contains": "HfLooper, adbd", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "adbd", "msg": "m" },
+    "filter": { "tag_contains": "HfLooper, adbd", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "Other", "msg": "m" },
+    "filter": { "tag_contains": "HfLooper, adbd", "scope": { "kind": "all" } },
+    "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "libcomposer_ext", "msg": "m" },
+    "filter": { "tag_contains": "libc", "scope": { "kind": "all" } },
+    "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "libc", "msg": "m" },
+    "filter": { "tag_contains": "libc,", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "wdt_dump_cntcv CPU", "msg": "m" },
+    "filter": { "tag_contains": "wdt_dump_cntcv CPU, HfLooper", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "OkHttp", "msg": "m" },
+    "filter": { "tag_contains": "okhttp,", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "binder", "msg": "m" },
+    "filter": { "tag_contains": "hfl|binder；adbd", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "Other", "msg": "m" },
+    "filter": { "tag_contains": " , ， ", "scope": { "kind": "all" } },
+    "expect": true
   }
 ]

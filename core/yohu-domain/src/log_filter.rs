@@ -1,6 +1,7 @@
 //! 日志过滤匹配（ADR-v6-006）：wire [`LogFilter`] 的领域语义。
 //!
 //! protocol 只持有结构；导出与 UI `matchesWireFilter` 共用本层 + testdata/log_filter.json。回补读环不过滤。
+//! Tag：`tag_contains` 按逗号 / 分号 / `|` 拆多针，任一 OrdinalIgnoreCase **精确**命中；空或仅分隔符 = 不限。
 
 use yohu_protocol::{LogFilter, LogLine, LogScope};
 
@@ -17,7 +18,7 @@ pub fn level_rank(level: char) -> u8 {
     }
 }
 
-/// ASCII 忽略大小写的子串匹配（ADR-v6-006：Tag/关键字 = OrdinalIgnoreCase）。
+/// ASCII 忽略大小写的子串匹配（ADR-v6-006：关键字 = OrdinalIgnoreCase 包含）。
 /// 用字节级 `eq_ignore_ascii_case`，避免 Unicode `to_lowercase()` 对非 ASCII 的语义偏差。
 fn contains_ascii_ignore_case(haystack: &str, needle: &str) -> bool {
     let h = haystack.as_bytes();
@@ -40,14 +41,42 @@ fn level_in_set(levels: &[char], line: char) -> bool {
     levels.iter().any(|item| item.to_ascii_uppercase() == needle)
 }
 
+fn is_tag_needle_sep(c: char) -> bool {
+    matches!(c, ',' | '，' | '、' | ';' | '；' | '|')
+}
+
+/// 拆 `tag_contains`；空段丢掉。空结果 = 不限 Tag。空白留在针内。
+fn tag_needles(spec: &str) -> impl Iterator<Item = &str> {
+    spec.split(is_tag_needle_sep)
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+}
+
+fn equals_ascii_ignore_case(a: &str, b: &str) -> bool {
+    a.len() == b.len()
+        && a.as_bytes()
+            .iter()
+            .zip(b.as_bytes())
+            .all(|(x, y)| x.eq_ignore_ascii_case(y))
+}
+
+fn tag_allowed(line_tag: &str, spec: &str) -> bool {
+    let mut needles = tag_needles(spec).peekable();
+    if needles.peek().is_none() {
+        return true;
+    }
+    needles.any(|needle| equals_ascii_ignore_case(line_tag, needle))
+}
+
 /// 单行匹配。`Package { pids: [] }` 不命中任何行。
 /// 级别：`levels` 空则不限；非空则精确属于该集合（不是最低含以上）。
+/// Tag：多针 OR；关键字仍是整段包含。
 pub fn log_filter_matches(filter: &LogFilter, line: &LogLine) -> bool {
     if !level_in_set(&filter.levels, line.level) {
         return false;
     }
     if let Some(tag) = &filter.tag_contains {
-        if !contains_ascii_ignore_case(&line.tag, tag) {
+        if !tag_allowed(&line.tag, tag) {
             return false;
         }
     }
