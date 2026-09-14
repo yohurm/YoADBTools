@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "process", "io-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "process", "io-util"] }
 tokio-util = "0.7"
 thiserror.workspace = true
 tracing.workspace = true

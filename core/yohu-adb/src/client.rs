@@ -1,34 +1,32 @@
 //! ADB 客户端门面：组合 ToolResolver / ProcessRunner / 解析器。
 //!
 //! 职责边界：本层只做「调用 adb + 解析输出」，**不判定成败**（ADR-v6-009）。
+//! 自愈扫描在 `scan`；`readlink -f` 解析在 [`crate::parse::readlink`]。
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use std::time::Instant;
 
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 use crate::error::AdbError;
 use crate::parse::{
-    devices as devices_parse, ls as ls_parse, packages as packages_parse, ps as ps_parse,
-    status as status_parse,
+    ls as ls_parse, packages as packages_parse, ps as ps_parse, readlink as readlink_parse,
+    status as status_parse, uimode as uimode_parse,
 };
 use crate::tool::ToolResolver;
-use yohu_protocol::{DeviceInfo, ExecOutcome, ProcessEntry, RemoteEntry};
+use yohu_protocol::{ExecOutcome, ProcessEntry, RemoteEntry};
 use yohu_runtime::{ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
 
 /// 各 ADB 短命令超时（ms）——单源，避免业务分支散落魔法数。
 const CLEAR_LOG_TIMEOUT_MS: u64 = 10_000;
+const LIST_LS_TIMEOUT_MS: u64 = 15_000;
 const LIST_PS_TIMEOUT_MS: u64 = 15_000;
 const LIST_PACKAGES_TIMEOUT_MS: u64 = 15_000;
 const READLINK_TIMEOUT_MS: u64 = 10_000;
 const UI_MODE_TIMEOUT_MS: u64 = 8_000;
 const STATUS_SAMPLE_TIMEOUT_MS: u64 = 8_000;
 const STATUS_PROPS_TIMEOUT_MS: u64 = 5_000;
-const START_SERVER_TIMEOUT_MS: u64 = 20_000;
-const DEVICES_LIST_TIMEOUT_MS: u64 = 10_000;
 
 /// ADB 客户端。
 pub struct AdbClient {
@@ -46,6 +44,14 @@ impl AdbClient {
             runner: ProcessRunner,
             limit: Arc::new(Semaphore::new(max_concurrency.max(1))),
         }
+    }
+
+    pub(crate) fn tool(&self) -> &ToolResolver {
+        &self.tool
+    }
+
+    pub(crate) fn runner(&self) -> &ProcessRunner {
+        &self.runner
     }
 
     /// 更新用户自定义 adb 路径（设置立即生效）。
@@ -120,120 +126,6 @@ impl AdbClient {
         }
     }
 
-    /// 对指定 adb 二进制执行 `start-server`。失败不中断，由随后的 `devices -l` 判定该候选。
-    async fn start_server_at(&self, adb: &std::path::Path, cancel: CancellationToken) {
-        let t = Instant::now();
-        tracing::info!(adb = %adb.display(), "adb start-server 开始");
-        let result = self
-            .runner
-            .run_capture(
-                adb,
-                &["start-server".into()],
-                Some(Duration::from_millis(START_SERVER_TIMEOUT_MS)),
-                cancel,
-            )
-            .await;
-        let ms = t.elapsed().as_millis();
-        match result {
-            Ok(out) if out.exit_code == 0 => {
-                tracing::info!(ms, adb = %adb.display(), "adb start-server 完成");
-            }
-            Ok(out) => {
-                tracing::warn!(
-                    ms,
-                    adb = %adb.display(),
-                    exit = out.exit_code,
-                    stderr = %out.stderr.trim(),
-                    "adb start-server 非零退出，仍尝试 devices -l"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    ms,
-                    adb = %adb.display(),
-                    error = %e,
-                    "adb start-server 失败，仍尝试 devices -l"
-                );
-            }
-        }
-    }
-
-    /// 扫描设备。
-    pub async fn devices(&self, cancel: CancellationToken) -> Result<Vec<DeviceInfo>, AdbError> {
-        let (devices, _used) = self.devices_resilient(cancel).await?;
-        Ok(devices)
-    }
-
-    /// 自愈式设备扫描：按候选顺序尝试不同 adb（用户设置 → DataRoot 解压副本）。
-    ///
-    /// 每个候选先 `start-server` 再 `devices -l`，同一二进制，禁止两份 sidecar 抢 5037。
-    /// 任一候选「进程可启动且退出码 0」即采信其结果；失败的候选仅记录并尝试下一个。
-    /// 全部失败时返回带明细的错误。返回 (设备列表, 实际使用的 adb 路径)。
-    pub async fn devices_resilient(
-        &self,
-        cancel: CancellationToken,
-    ) -> Result<(Vec<DeviceInfo>, PathBuf), AdbError> {
-        let candidates = self.tool.candidates();
-        if candidates.is_empty() {
-            return Err(AdbError::ToolUnavailable(self.tool.unavailable_hint()));
-        }
-        let mut failures: Vec<String> = Vec::new();
-        tracing::info!(
-            candidates = candidates.len(),
-            first = %candidates[0].display(),
-            "adb devices -l 开始"
-        );
-        for adb in &candidates {
-            if cancel.is_cancelled() {
-                return Err(AdbError::Cancelled);
-            }
-            self.start_server_at(adb, cancel.clone()).await;
-            let t = Instant::now();
-            let result = self
-                .runner
-                .run_capture(
-                    adb,
-                    &["devices".into(), "-l".into()],
-                    Some(Duration::from_millis(DEVICES_LIST_TIMEOUT_MS)),
-                    cancel.clone(),
-                )
-                .await;
-            let ms = t.elapsed().as_millis();
-            match result {
-                Ok(out) if out.exit_code == 0 => {
-                    tracing::info!(
-                        adb = %adb.display(),
-                        ms,
-                        "adb devices -l 成功"
-                    );
-                    self.tool.set_preferred(adb.clone());
-                    return Ok((devices_parse::parse_devices_list(&out.stdout), adb.clone()));
-                }
-                Ok(out) => {
-                    failures.push(format!("{} (退出码 {})", out.stderr.trim(), out.exit_code));
-                    tracing::warn!(
-                        adb = %adb.display(),
-                        ms,
-                        "adb 候选失败 {}",
-                        failures.last().unwrap_or(&String::new())
-                    );
-                }
-                Err(e) => {
-                    failures.push(e.to_string());
-                    tracing::warn!(adb = %adb.display(), ms, "adb 候选不可用 {e}");
-                }
-            }
-        }
-        Err(AdbError::BadExit {
-            exit_code: -1,
-            stderr: format!(
-                "全部 adb 候选扫描失败（{} 个）: {}",
-                candidates.len(),
-                failures.join("；")
-            ),
-        })
-    }
-
     /// 清设备日志缓冲（`logcat -c`）。
     pub async fn clear_log(&self, serial: &str, cancel: CancellationToken) -> Result<(), AdbError> {
         let out = self
@@ -269,7 +161,7 @@ impl AdbClient {
                     "-lla".into(),
                     crate::shell_quote(path),
                 ],
-                Some(LIST_PS_TIMEOUT_MS),
+                Some(LIST_LS_TIMEOUT_MS),
                 cancel,
             )
             .await?;
@@ -284,16 +176,14 @@ impl AdbClient {
 
     /// 解析设备侧路径的规范路径（`adb shell readlink -f`）。用于符号链接逃逸守卫（ADR-v6-013）。
     ///
-    /// 返回 `Ok(Some(canonical))` 当且仅当命令成功（退出码 0）且输出一条规范绝对路径；
-    /// 返回 `Ok(None)` 表示「无法解析」：目标不存在、`readlink` 命令不可用、或输出为空。
-    /// 调用方应把 `Ok(None)` 当作**保守放行**（词典校验已过，且 `/sdcard` 本身常为 symlink，
-    /// 不能因解析不成功就阻断合法操作）。真正的执行层错误（设备掉线/超时）仍以 `Err` 返回。
+    /// 超时只在本层 `READLINK_TIMEOUT_MS`。结果为 `ReadlinkF`：Canonical / Missing / Unparseable。
+    /// 运输错误（掉线/超时/取消）为 `Err`。禁止把无法解析当成放行。
     pub async fn readlink_f(
         &self,
         serial: &str,
         path: &str,
         cancel: CancellationToken,
-    ) -> Result<Option<String>, AdbError> {
+    ) -> Result<readlink_parse::ReadlinkF, AdbError> {
         let out = self
             .run(
                 serial,
@@ -307,11 +197,11 @@ impl AdbClient {
                 cancel,
             )
             .await?;
-        if out.exit_code != 0 {
-            tracing::debug!(path = %path, stderr = %out.stderr, "readlink -f 未解析到规范路径");
-            return Ok(None);
+        let result = readlink_parse::interpret_readlink_f(out.exit_code, &out.stdout, &out.stderr);
+        if matches!(result, readlink_parse::ReadlinkF::Unparseable) {
+            tracing::debug!(path = %path, exit = out.exit_code, stderr = %out.stderr, "readlink -f 无法解析");
         }
-        Ok(parse_readlink_f(&out.stdout))
+        Ok(result)
     }
 
     /// 进程索引。
@@ -415,7 +305,7 @@ impl AdbClient {
             )
             .await?;
         if out.exit_code != 0 {
-            let fallback = if night { "2" } else { "1" };
+            let fallback = uimode_parse::settings_night_mode_value(night).to_string();
             let put = self
                 .run(
                     serial,
@@ -425,7 +315,7 @@ impl AdbClient {
                         "put".into(),
                         "secure".into(),
                         "ui_night_mode".into(),
-                        fallback.into(),
+                        fallback,
                     ],
                     Some(UI_MODE_TIMEOUT_MS),
                     cancel.clone(),
@@ -522,18 +412,6 @@ fn is_device_offline(stderr: &str) -> bool {
     .any(|k| lower.contains(k))
 }
 
-/// 解析 `readlink -f` 的 stdout 为规范路径。
-///
-/// 成功时输出单条绝对路径；空输出 / 非绝对路径首行视为「无法解析」，返回 `None`。
-/// 纯函数（无 IO），便于对解析/接受逻辑做单元测试。
-pub fn parse_readlink_f(stdout: &str) -> Option<String> {
-    stdout
-        .lines()
-        .map(str::trim)
-        .find(|l| !l.is_empty() && l.starts_with('/'))
-        .map(str::to_string)
-}
-
 /// 实现 domain 执行端口（依赖倒置：适配层映射错误类型）。
 impl yohu_domain::Runner for AdbClient {
     async fn run(
@@ -546,39 +424,5 @@ impl yohu_domain::Runner for AdbClient {
         self.run(serial, &argv, timeout_ms, cancel)
             .await
             .map_err(Into::into)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_readlink_f;
-
-    #[test]
-    fn readlink_f_parses_canonical_absolute_path() {
-        assert_eq!(
-            parse_readlink_f("/storage/emulated/0/DCIM\n"),
-            Some("/storage/emulated/0/DCIM".into())
-        );
-        assert_eq!(
-            parse_readlink_f("/storage/self/primary/DCIM\n"),
-            Some("/storage/self/primary/DCIM".into())
-        );
-    }
-
-    #[test]
-    fn readlink_f_returns_none_for_empty_or_non_absolute_output() {
-        assert_eq!(parse_readlink_f(""), None);
-        assert_eq!(parse_readlink_f("\n\n"), None);
-        assert_eq!(parse_readlink_f("relative/path\n"), None);
-        // 目标不存在时 readlink 无 stdout（错误在 stderr）
-        assert_eq!(parse_readlink_f(""), None);
-    }
-
-    #[test]
-    fn readlink_f_skips_leading_blank_lines() {
-        assert_eq!(
-            parse_readlink_f("\n/data/local/tmp/foo\n"),
-            Some("/data/local/tmp/foo".into())
-        );
     }
 }

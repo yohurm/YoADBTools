@@ -2,23 +2,64 @@
 
 use super::uimode::{parse_cmd_night, parse_dumpsys_uimode};
 
-pub const MARK_UIMODE: &str = "__YOHU_UIMODE__";
-pub const MARK_CMDNIGHT: &str = "__YOHU_CMDNIGHT__";
-pub const MARK_BATTERY: &str = "__YOHU_BATTERY__";
-pub const MARK_POWER: &str = "__YOHU_POWER__";
-pub const MARK_PROPS: &str = "__YOHU_PROPS__";
+macro_rules! mark_uimode {
+    () => {
+        "__YOHU_UIMODE__"
+    };
+}
+macro_rules! mark_cmdnight {
+    () => {
+        "__YOHU_CMDNIGHT__"
+    };
+}
+macro_rules! mark_battery {
+    () => {
+        "__YOHU_BATTERY__"
+    };
+}
+macro_rules! mark_power {
+    () => {
+        "__YOHU_POWER__"
+    };
+}
+macro_rules! mark_props {
+    () => {
+        "__YOHU_PROPS__"
+    };
+}
+macro_rules! props_script {
+    () => {
+        "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.brand"
+    };
+}
+
+pub const MARK_UIMODE: &str = mark_uimode!();
+pub const MARK_CMDNIGHT: &str = mark_cmdnight!();
+pub const MARK_BATTERY: &str = mark_battery!();
+pub const MARK_POWER: &str = mark_power!();
+pub const MARK_PROPS: &str = mark_props!();
 
 /// 快路径：只读版本/品牌（毫秒级）。首采先推这一段，不必等 dumpsys。
-pub const PROPS_SCRIPT: &str =
-    "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.brand";
+pub const PROPS_SCRIPT: &str = props_script!();
 
 /// 单次采样脚本（常量，无用户输入）。分段标记供 [`parse_status_bundle`] 切开。
 pub const SAMPLE_SCRIPT: &str = concat!(
-    "echo __YOHU_UIMODE__; dumpsys uimode; ",
-    "echo __YOHU_CMDNIGHT__; cmd uimode night; ",
-    "echo __YOHU_BATTERY__; dumpsys battery; ",
-    "echo __YOHU_POWER__; dumpsys power | grep mWakefulness; dumpsys display | grep mScreenState; ",
-    "echo __YOHU_PROPS__; getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.brand",
+    "echo ",
+    mark_uimode!(),
+    "; dumpsys uimode; ",
+    "echo ",
+    mark_cmdnight!(),
+    "; cmd uimode night; ",
+    "echo ",
+    mark_battery!(),
+    "; dumpsys battery; ",
+    "echo ",
+    mark_power!(),
+    "; dumpsys power | grep mWakefulness; dumpsys display | grep mScreenState; ",
+    "echo ",
+    mark_props!(),
+    "; ",
+    props_script!(),
 );
 
 /// dumpsys/getprop 解析结果（尚无 serial / generation）。
@@ -195,6 +236,20 @@ fn strip_key<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sample_script_is_marks_plus_props() {
+        assert!(SAMPLE_SCRIPT.contains(MARK_UIMODE));
+        assert!(SAMPLE_SCRIPT.contains(MARK_CMDNIGHT));
+        assert!(SAMPLE_SCRIPT.contains(MARK_BATTERY));
+        assert!(SAMPLE_SCRIPT.contains(MARK_POWER));
+        assert!(SAMPLE_SCRIPT.contains(MARK_PROPS));
+        assert!(
+            SAMPLE_SCRIPT.ends_with(PROPS_SCRIPT),
+            "SAMPLE_SCRIPT must reuse PROPS_SCRIPT, got {SAMPLE_SCRIPT}"
+        );
+        assert_eq!(SAMPLE_SCRIPT.matches(PROPS_SCRIPT).count(), 1);
+    }
 
     const BUNDLE: &str = "\
 __YOHU_UIMODE__

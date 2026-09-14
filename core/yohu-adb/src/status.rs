@@ -101,7 +101,7 @@ impl DeviceStatusHub {
     }
 
     /// 写设备深浅色后再采一次，更新缓存并推事件。读只信 [`AdbClient::sample_status`]。
-    /// 采样失败时保留上次运行时字段，只覆盖本次写入的 night；槽已撤则视为掉线。
+    /// 无 Online 槽不写设备。采样失败时保留上次运行时字段，只覆盖本次写入的 night。
     pub async fn set_night(
         &self,
         serial: &str,
@@ -113,13 +113,16 @@ impl DeviceStatusHub {
             .lock()
             .expect("status slots lock poisoned")
             .get(serial)
-            .map(|s| s.cancel.clone());
-        let cancel = slot_cancel.unwrap_or(cancel);
+            .map(|s| s.cancel.clone())
+            .ok_or_else(|| crate::AdbError::DeviceOffline(serial.to_string()))?;
+        if cancel.is_cancelled() {
+            return Err(crate::AdbError::Cancelled);
+        }
         self.client
-            .set_night_mode(serial, night, cancel.clone())
+            .set_night_mode(serial, night, slot_cancel.clone())
             .await?;
         let previous = self.snapshot(serial);
-        let sampled = match self.client.sample_status(serial, cancel).await {
+        let sampled = match self.client.sample_status(serial, slot_cancel).await {
             Ok(fields) => Some(fields),
             Err(e) => {
                 tracing::debug!(serial = %serial, error = %e, "写深浅色后采样失败，保留上次快照");
@@ -165,13 +168,25 @@ impl DeviceStatusHub {
             brand: fields.brand,
         };
         if let Some(prev) = slot.status.as_ref() {
-            if prev.same_runtime(&next) {
+            if same_runtime(prev, &next) {
                 return Some((prev.clone(), false));
             }
         }
         slot.status = Some(next.clone());
         Some((next, true))
     }
+}
+
+/// 运行时字段是否相同（忽略 generation）。比较留在 Hub，不依赖 protocol 辅助方法。
+fn same_runtime(a: &DeviceStatus, b: &DeviceStatus) -> bool {
+    a.serial == b.serial
+        && a.night == b.night
+        && a.battery_pct == b.battery_pct
+        && a.charging == b.charging
+        && a.sdk == b.sdk
+        && a.release == b.release
+        && a.screen_on == b.screen_on
+        && a.brand == b.brand
 }
 
 fn fields_from_status(status: &DeviceStatus) -> DeviceStatusFields {
@@ -281,6 +296,8 @@ async fn poll_loop(hub: Arc<DeviceStatusHub>, serial: String, cancel: Cancellati
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tool::ToolResolver;
+    use std::path::PathBuf;
 
     fn status(night: bool, battery: Option<u8>) -> DeviceStatus {
         DeviceStatus {
@@ -348,5 +365,31 @@ mod tests {
         assert_eq!(fields.release.as_deref(), Some("16"));
         assert_eq!(fields.night, Some(true));
         assert_eq!(fields.battery_pct, Some(87));
+    }
+
+    #[test]
+    fn same_runtime_ignores_generation() {
+        let a = status(true, Some(80));
+        let mut b = a.clone();
+        b.generation = 99;
+        assert!(same_runtime(&a, &b));
+        b.night = Some(false);
+        assert!(!same_runtime(&a, &b));
+    }
+
+    #[tokio::test]
+    async fn set_night_without_online_slot_does_not_write() {
+        let tool = ToolResolver::new(None, PathBuf::from("."), PathBuf::from("."));
+        let client = Arc::new(AdbClient::new(tool, 1));
+        let (tx, _rx) = mpsc::channel(4);
+        let hub = DeviceStatusHub::new(client, tx, CancellationToken::new());
+        let err = hub
+            .set_night("ABSENT", true, CancellationToken::new())
+            .await
+            .expect_err("无 Online 槽不得写设备");
+        assert!(
+            matches!(err, crate::AdbError::DeviceOffline(ref s) if s == "ABSENT"),
+            "无槽应直接 DeviceOffline，不得落到 ToolUnavailable: {err}"
+        );
     }
 }

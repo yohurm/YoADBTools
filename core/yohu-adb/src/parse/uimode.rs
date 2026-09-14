@@ -1,11 +1,28 @@
 //! 设备深浅色：`cmd uimode night` 与 `dumpsys uimode`。
 //!
 //! 操作栏要的是**当前界面**（解析后），不是 auto 偏好。优先 `mCurUiMode` 的 night 位。
+//! `settings put secure ui_night_mode` 与 `dumpsys` 的 `mNightMode` 共用同一套整数。
 
 /// Configuration.UI_MODE_NIGHT_MASK
 const UI_MODE_NIGHT_MASK: u32 = 0x30;
 /// Configuration.UI_MODE_NIGHT_YES
 const UI_MODE_NIGHT_YES: u32 = 0x20;
+
+/// `UiModeManager.MODE_NIGHT_AUTO` / `settings ui_night_mode` 0。
+pub const MODE_NIGHT_AUTO: i32 = 0;
+/// `UiModeManager.MODE_NIGHT_NO` / `settings ui_night_mode` 1。
+pub const MODE_NIGHT_NO: i32 = 1;
+/// `UiModeManager.MODE_NIGHT_YES` / `settings ui_night_mode` 2。
+pub const MODE_NIGHT_YES: i32 = 2;
+
+/// 写 `settings put secure ui_night_mode` 的整数值（与 [`MODE_NIGHT_NO`] / [`MODE_NIGHT_YES`] 同一套）。
+pub fn settings_night_mode_value(night: bool) -> i32 {
+    if night {
+        MODE_NIGHT_YES
+    } else {
+        MODE_NIGHT_NO
+    }
+}
 
 /// 从 `cmd uimode night` 输出读偏好。`auto` / `custom_*` 无法确定当前界面，返回 `None`。
 pub fn parse_cmd_night(output: &str) -> Option<bool> {
@@ -52,9 +69,9 @@ pub fn parse_dumpsys_uimode(output: &str) -> Option<bool> {
         }
     }
     match pref {
-        Some(2) => return Some(true),
-        Some(1) => return Some(false),
-        Some(0) => return computed,
+        Some(MODE_NIGHT_YES) => return Some(true),
+        Some(MODE_NIGHT_NO) => return Some(false),
+        Some(MODE_NIGHT_AUTO) => return computed,
         _ => {}
     }
     computed
@@ -129,5 +146,17 @@ Current UI Mode Service state:
     fn dumpsys_auto_uses_computed() {
         let dump = "mNightMode=0 mComputedNightMode=true\n";
         assert_eq!(parse_dumpsys_uimode(dump), Some(true));
+    }
+
+    #[test]
+    fn settings_write_values_match_dumpsys_pref() {
+        assert_eq!(MODE_NIGHT_NO, 1);
+        assert_eq!(MODE_NIGHT_YES, 2);
+        assert_eq!(settings_night_mode_value(false), MODE_NIGHT_NO);
+        assert_eq!(settings_night_mode_value(true), MODE_NIGHT_YES);
+        let yes = format!("mNightMode={MODE_NIGHT_YES}\n");
+        let no = format!("mNightMode={MODE_NIGHT_NO}\n");
+        assert_eq!(parse_dumpsys_uimode(&yes), Some(true));
+        assert_eq!(parse_dumpsys_uimode(&no), Some(false));
     }
 }

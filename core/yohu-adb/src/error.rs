@@ -8,8 +8,6 @@ pub enum AdbError {
     ToolUnavailable(String),
     #[error("设备掉线: {0}")]
     DeviceOffline(String),
-    #[error("设备未授权")]
-    Unauthorized,
     #[error("执行超时")]
     Timeout,
     #[error("任务已取消")]
@@ -18,8 +16,6 @@ pub enum AdbError {
     BadExit { exit_code: i32, stderr: String },
     #[error("IO 错误: {0}")]
     Io(#[from] std::io::Error),
-    #[error("输出解析失败: {0}")]
-    Parse(String),
 }
 
 impl From<ProcessError> for AdbError {
@@ -29,6 +25,7 @@ impl From<ProcessError> for AdbError {
             ProcessError::Cancelled => AdbError::Cancelled,
             ProcessError::Io(err) => AdbError::Io(err),
             ProcessError::BadExit { exit_code, stderr } => AdbError::BadExit { exit_code, stderr },
+            ProcessError::Truncated => AdbError::Io(std::io::Error::other("输出超过捕获预算")),
         }
     }
 }
@@ -38,7 +35,6 @@ impl From<AdbError> for yohu_domain::RunError {
     fn from(e: AdbError) -> Self {
         match e {
             AdbError::DeviceOffline(s) => yohu_domain::RunError::DeviceOffline(s),
-            AdbError::Unauthorized => yohu_domain::RunError::Unauthorized,
             AdbError::Timeout => yohu_domain::RunError::Timeout,
             AdbError::Cancelled => yohu_domain::RunError::Cancelled,
             other => yohu_domain::RunError::Adb(other.to_string()),

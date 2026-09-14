@@ -223,7 +223,10 @@ mod tests {
         }
         let tool = ToolResolver::new(None, resource.clone(), data.clone());
         tool.ensure_extracted().unwrap();
-        assert_eq!(fs::read_to_string(data.join(adb_file_name())).unwrap(), "v1");
+        assert_eq!(
+            fs::read_to_string(data.join(adb_file_name())).unwrap(),
+            "v1"
+        );
 
         for name in ADB_FILES {
             fs::write(resource.join(name), b"v2-longer").unwrap();
