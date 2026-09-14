@@ -37,36 +37,36 @@ pub fn ensure_executable(path: &Path) -> std::io::Result<()> {
 ///
 /// Windows：`%LOCALAPPDATA%\<name>`。macOS：`~/Library/Application Support/<name>`。
 /// 其它 Unix：`$XDG_DATA_HOME/<name>` 或 `~/.local/share/<name>`。
-pub fn app_data_root(product_dir_name: &str) -> PathBuf {
+/// 缺环境变量或值为空时返回 `Err`，不回落到当前工作目录。
+pub fn app_data_root(product_dir_name: &str) -> std::io::Result<PathBuf> {
     #[cfg(windows)]
     {
-        let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(base).join(product_dir_name)
+        Ok(env_dir("LOCALAPPDATA")?.join(product_dir_name))
     }
     #[cfg(target_os = "macos")]
     {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home)
+        Ok(env_dir("HOME")?
             .join("Library")
             .join("Application Support")
-            .join(product_dir_name)
+            .join(product_dir_name))
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-            if !xdg.trim().is_empty() {
-                return PathBuf::from(xdg).join(product_dir_name);
-            }
+        if let Some(xdg) = optional_env_dir("XDG_DATA_HOME")? {
+            return Ok(xdg.join(product_dir_name));
         }
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home)
+        Ok(env_dir("HOME")?
             .join(".local")
             .join("share")
-            .join(product_dir_name)
+            .join(product_dir_name))
     }
     #[cfg(not(any(windows, unix)))]
     {
-        PathBuf::from(".").join(product_dir_name)
+        let _ = product_dir_name;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "app_data_root: unsupported OS",
+        ))
     }
 }
 
@@ -74,15 +74,17 @@ pub fn app_data_root(product_dir_name: &str) -> PathBuf {
 ///
 /// Windows：`%LOCALAPPDATA%\Programs\<name>`（VS Code User / Known Folder 约定）。
 /// macOS：`/Applications/<name>.app`。其它 Unix：与 [`app_data_root`] 相同（产品不交付）。
-pub fn app_install_root(product_dir_name: &str) -> PathBuf {
+/// Windows 缺 `LOCALAPPDATA` 时返回 `Err`，不回落到当前工作目录。
+pub fn app_install_root(product_dir_name: &str) -> std::io::Result<PathBuf> {
     #[cfg(windows)]
     {
-        let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(base).join("Programs").join(product_dir_name)
+        Ok(env_dir("LOCALAPPDATA")?
+            .join("Programs")
+            .join(product_dir_name))
     }
     #[cfg(target_os = "macos")]
     {
-        PathBuf::from("/Applications").join(format!("{product_dir_name}.app"))
+        Ok(PathBuf::from("/Applications").join(format!("{product_dir_name}.app")))
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
@@ -90,7 +92,44 @@ pub fn app_install_root(product_dir_name: &str) -> PathBuf {
     }
     #[cfg(not(any(windows, unix)))]
     {
-        PathBuf::from(".").join(product_dir_name)
+        let _ = product_dir_name;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "app_install_root: unsupported OS",
+        ))
+    }
+}
+
+fn env_dir(name: &str) -> std::io::Result<PathBuf> {
+    require_env_dir(name, std::env::var(name))
+}
+
+fn require_env_dir(
+    name: &str,
+    value: Result<String, std::env::VarError>,
+) -> std::io::Result<PathBuf> {
+    match value {
+        Ok(raw) if !raw.is_empty() => Ok(PathBuf::from(raw)),
+        Ok(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{name} is empty"),
+        )),
+        Err(err) => Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{name}: {err}"),
+        )),
+    }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn optional_env_dir(name: &str) -> std::io::Result<Option<PathBuf>> {
+    match std::env::var(name) {
+        Ok(raw) if !raw.is_empty() => Ok(Some(PathBuf::from(raw))),
+        Ok(_) | Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(err) => Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{name}: {err}"),
+        )),
     }
 }
 
@@ -162,14 +201,14 @@ mod tests {
 
     #[test]
     fn app_data_root_joins_product_name() {
-        let p = app_data_root("YohuAdbTools");
+        let p = app_data_root("YohuAdbTools").expect("os app data root");
         assert!(p.ends_with("YohuAdbTools"));
     }
 
     #[test]
     fn app_install_root_is_not_data_root_on_windows() {
-        let data = app_data_root("YohuAdbTools");
-        let install = app_install_root("YohuAdbTools");
+        let data = app_data_root("YohuAdbTools").expect("os app data root");
+        let install = app_install_root("YohuAdbTools").expect("os install root");
         assert!(install.ends_with("YohuAdbTools"));
         #[cfg(windows)]
         {
@@ -184,6 +223,46 @@ mod tests {
             assert!(install.to_string_lossy().contains("YohuAdbTools.app"));
             assert_ne!(data, install);
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn app_data_root_uses_localappdata() {
+        let local = std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA");
+        let p = app_data_root("YohuAdbTools").expect("os app data root");
+        assert_eq!(p, PathBuf::from(local).join("YohuAdbTools"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn app_install_root_uses_localappdata_programs() {
+        let local = std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA");
+        let p = app_install_root("YohuAdbTools").expect("os install root");
+        assert_eq!(
+            p,
+            PathBuf::from(local).join("Programs").join("YohuAdbTools")
+        );
+    }
+
+    #[test]
+    fn require_env_dir_fails_when_missing() {
+        let err = require_env_dir("LOCALAPPDATA", Err(std::env::VarError::NotPresent)).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert!(err.to_string().contains("LOCALAPPDATA"));
+    }
+
+    #[test]
+    fn require_env_dir_fails_when_empty() {
+        let err = require_env_dir("HOME", Ok(String::new())).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert!(err.to_string().contains("HOME"));
+    }
+
+    #[test]
+    fn require_env_dir_keeps_nonempty_value() {
+        let p = require_env_dir("LOCALAPPDATA", Ok(r"C:\Users\me\AppData\Local".into()))
+            .expect("non-empty env");
+        assert_eq!(p, PathBuf::from(r"C:\Users\me\AppData\Local"));
     }
 
     #[test]
