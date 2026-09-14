@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { LEVELS, RingMirror, collapseStack, matchesLine } from "./pipeline";
-import type { SessionFilter } from "./pipeline";
+import { LEVELS, matchesLine, type SessionFilter } from "./filter";
+import { RingMirror } from "./mirror";
+import { collapseStack } from "./stack";
 
 const line = (seq: number): LogLine => ({
   seq,

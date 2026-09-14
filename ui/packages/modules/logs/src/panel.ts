@@ -8,12 +8,8 @@
 
 import type { LogLine } from "@yohu/api";
 
-import {
-  collapseStack,
-  matchesLine,
-  type SessionFilter,
-  type ViewRow,
-} from "./pipeline";
+import { matchesLine, type SessionFilter } from "./filter";
+import { collapseStack, type ViewRow } from "./stack";
 
 /** 订阅起点之前的游标；fromSeq 为负表示从未开始。 */
 export function seqBefore(fromSeq: number): number {

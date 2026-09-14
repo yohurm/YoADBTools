@@ -19,7 +19,8 @@ import {
   trimRows,
   viewCeiling,
 } from "./panel";
-import { collapseStack, type SessionFilter } from "./pipeline";
+import type { SessionFilter } from "./filter";
+import { collapseStack } from "./stack";
 
 const line = (seq: number, over: Partial<LogLine> = {}): LogLine => ({
   seq,

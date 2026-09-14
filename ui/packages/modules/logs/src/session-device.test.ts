@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DeviceInfo, DeviceStatus } from "@yohu/api";
 
-import { formatSessionDevice } from "./session-device";
+import { devicePickerLabel, formatSessionDevice, shortSerial } from "./session-device";
 
 const device = (serial: string, model?: string): DeviceInfo => ({
   serial,
@@ -14,6 +14,21 @@ const device = (serial: string, model?: string): DeviceInfo => ({
 const status = (partial: Partial<DeviceStatus> & { serial: string }): DeviceStatus => ({
   generation: 1,
   ...partial,
+});
+
+describe("shortSerial", () => {
+  it("空为空白；长号取末 4 位", () => {
+    expect(shortSerial(null)).toBe("");
+    expect(shortSerial("abc")).toBe("abc");
+    expect(shortSerial("ABCDEFGH")).toBe("EFGH");
+  });
+});
+
+describe("devicePickerLabel", () => {
+  it("有型号则拼短号，无名则整串 serial", () => {
+    expect(devicePickerLabel(device("ABCDEFGH", "edge"))).toBe("edge · EFGH");
+    expect(devicePickerLabel(device("S1"))).toBe("S1");
+  });
 });
 
 describe("formatSessionDevice", () => {

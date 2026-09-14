@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { ALL_LOG_DISPLAY_COLUMNS, formatLogLine } from "./format";
+import { formatLogLine } from "./format";
 import {
   clipPadField,
   defaultLogDocLayout,
@@ -19,7 +19,7 @@ import {
   splitDocField,
   splitLevelGlyph,
 } from "./doc";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultLogColWidths } from "./layout";
+import { ALL_LOG_DISPLAY_COLUMNS, DEFAULT_LOG_DISPLAY_COLUMNS, defaultLogColWidths } from "./layout";
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -176,9 +176,10 @@ describe("formatLogDoc", () => {
 });
 
 describe("measureChPx", () => {
-  it("探针是行内 ch-probe，不套通栏 row class", () => {
+  it("探针是行内 ch-probe，不套通栏 row class，不夹取 4–20", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "doc.ts"), "utf-8");
     expect(src).toContain('className = "yohu-logs__ch-probe"');
     expect(src).not.toMatch(/measureChPx[\s\S]*yohu-logs__row/);
+    expect(src).not.toMatch(/width < 4 \|\| width > 20/);
   });
 });

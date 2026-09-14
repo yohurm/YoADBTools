@@ -23,18 +23,9 @@ import {
   signalCountOf,
   trimRows,
 } from "./panel";
-import {
-  copyBinding,
-  emptyBinding,
-  matchesLine,
-  normalizeLevels,
-  rebindPids,
-  toSessionFilter,
-  type LevelLetter,
-  type PidBinding,
-  type SessionScope,
-  type ViewRow,
-} from "./pipeline";
+import { copyBinding, emptyBinding, rebindPids, type PidBinding } from "./binding";
+import { matchesLine, normalizeLevels, toSessionFilter, type LevelLetter, type SessionScope } from "./filter";
+import type { ViewRow } from "./stack";
 import type { LogColWidths } from "./layout";
 import type { MirrorBank } from "./mirror";
 

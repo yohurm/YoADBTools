@@ -7,6 +7,7 @@
  * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
  * 清空可见区走 discardView（推进 fromSeq）。清设备缓冲清环与镜像并 flush 面板。
  * 掉线只停采集、清镜像；已画出的行保留。
+ * 订阅可 dispose；测试与生产同一条链。
  */
 
 import type { SetStoreFunction } from "solid-js/store";
@@ -14,7 +15,6 @@ import {
   logCaptureStart,
   logCaptureStatus,
   logCaptureStop,
-  logClear,
   logClearDevice,
   logExport,
   logPackageSnapshot,
@@ -50,7 +50,6 @@ export type CaptureApi = {
   stopCapture: () => Promise<void>;
   clearVisible: (id: number) => Promise<void>;
   clearDevice: () => Promise<void>;
-  clearShared: () => Promise<void>;
   refreshProcesses: (serial?: string | null) => Promise<void>;
   refreshPackages: (serial?: string | null) => Promise<void>;
   exportSession: (path?: string) => Promise<string | null>;
@@ -59,6 +58,7 @@ export type CaptureApi = {
   resumeFollow: (id: number) => void;
   serial: () => string | null;
   bufferCapacity: () => number;
+  dispose: () => void;
 };
 
 export function createCapture(
@@ -71,6 +71,7 @@ export function createCapture(
   let bindGen = 0;
   const gates = new Map<string, Promise<void>>();
   const lastStoppedGen = new Map<string, number>();
+  const pending: Promise<() => void>[] = [];
 
   function runExclusive(serial: string, fn: () => Promise<void>): Promise<void> {
     const prev = gates.get(serial) ?? Promise.resolve();
@@ -350,21 +351,6 @@ export function createCapture(
     });
   }
 
-  async function clearShared(): Promise<void> {
-    const current = activeSession()?.serial ?? state.serial;
-    if (!current) return;
-    await logClear(current);
-    mirrors.clear(current);
-    workspace.flushDevicePanels(current);
-    state.sessions.forEach((session, i) => {
-      if (session.serial !== current) return;
-      if (session.capturing) {
-        const fromSeq = Math.max(0, mirrors.of(current).lastSeqNumber() + 1);
-        setState("sessions", i, { fromSeq, following: true, frozenThroughSeq: null });
-      }
-    });
-  }
-
   async function refreshProcesses(target?: string | null): Promise<void> {
     const current = target ?? activeSession()?.serial ?? state.serial;
     if (!current) return;
@@ -436,32 +422,46 @@ export function createCapture(
     stopWindowsOn(device);
   }
 
-  void onSettingsChanged((e) => {
-    if (e.key === "buffer_capacity") {
-      setBufferCapacity(e.settings.buffer_capacity);
+  const onUiResume = (): void => {
+    if (document.hidden) return;
+    const serials = new Set(
+      state.sessions.filter((s) => s.capturing && s.serial).map((s) => s.serial!),
+    );
+    for (const device of serials) {
+      void pullSnapshot(device);
     }
-  });
-  void onLogBatch((e) => ingest.onBatch(e.batch));
-  void onLogOverflow((e) => void onOverflow(e.serial));
-  void onProcessIndex((e) => onIndex(e));
-  void onCaptureState((e) => {
-    applyEvent(e.serial, e.generation, e.state === "running");
-  });
-  void onDeviceOffline((e) => onOffline(e.serial));
+  };
 
-  const inVitest = Boolean((import.meta as ImportMeta & { vitest?: unknown }).vitest);
-  if (typeof document !== "undefined" && !inVitest) {
-    const onUiResume = (): void => {
-      if (document.hidden) return;
-      const serials = new Set(
-        state.sessions.filter((s) => s.capturing && s.serial).map((s) => s.serial!),
-      );
-      for (const device of serials) {
-        void pullSnapshot(device);
+  const watch = (job: Promise<() => void>): void => {
+    pending.push(job);
+  };
+
+  watch(
+    onSettingsChanged((e) => {
+      if (e.key === "buffer_capacity") {
+        setBufferCapacity(e.settings.buffer_capacity);
       }
-    };
-    document.addEventListener("visibilitychange", onUiResume);
-    window.addEventListener("focus", onUiResume);
+    }),
+  );
+  watch(onLogBatch((e) => ingest.onBatch(e.batch)));
+  watch(onLogOverflow((e) => void onOverflow(e.serial)));
+  watch(onProcessIndex((e) => onIndex(e)));
+  watch(
+    onCaptureState((e) => {
+      applyEvent(e.serial, e.generation, e.state === "running");
+    }),
+  );
+  watch(onDeviceOffline((e) => onOffline(e.serial)));
+  document.addEventListener("visibilitychange", onUiResume);
+  window.addEventListener("focus", onUiResume);
+
+  function dispose(): void {
+    document.removeEventListener("visibilitychange", onUiResume);
+    window.removeEventListener("focus", onUiResume);
+    for (const job of pending) {
+      void job.then((stop) => stop());
+    }
+    pending.length = 0;
   }
 
   return {
@@ -471,7 +471,6 @@ export function createCapture(
     stopCapture,
     clearVisible,
     clearDevice,
-    clearShared,
     refreshProcesses,
     refreshPackages,
     exportSession,
@@ -486,5 +485,6 @@ export function createCapture(
     },
     serial,
     bufferCapacity,
+    dispose,
   };
 }

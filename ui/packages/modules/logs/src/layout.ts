@@ -14,7 +14,7 @@ import {
   type LogLine,
   type TerminalTimeFormat,
 } from "@yohu/api";
-import { defaultColWidths } from "@yohu/ui";
+import { Density, defaultColWidths, getDensity, type DensityName } from "@yohu/ui";
 
 export type LogMetaColKey = keyof LogDisplayColumns;
 export type LogColKey = LogMetaColKey | "msg";
@@ -36,6 +36,29 @@ export const DEFAULT_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
   ...APP_SETTINGS_DEFAULT.log_display_columns,
 };
 
+/** 完整文档列（testdata / 清单默认尺），不是应用默认显示列。 */
+export const ALL_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
+  ts: true,
+  uid: true,
+  pid: true,
+  tid: true,
+  level: true,
+  tag: true,
+};
+
+/** 新建窗口：设备行 + 分段 + 检索 + 列表。 */
+export const NEW_SESSION_DIALOG_HEIGHT = 520;
+
+const CONTROL_HEIGHT: Record<DensityName, number> = {
+  compact: Density.Compact.controlHeight,
+  comfortable: Density.Comfortable.controlHeight,
+};
+
+/** 包名/PID 清单行高跟随当前密度。 */
+export function controlRowHeight(): number {
+  return CONTROL_HEIGHT[getDensity()];
+}
+
 /** 设计尺：1 字段字符 = 8px。默认列宽按内容字符换，不跟 measureChPx 走。 */
 export const LOG_CH_PX = 8;
 
@@ -48,6 +71,11 @@ export const LOG_FIELD_CHARS: Record<LogMetaColKey, number> = {
   level: 1,
   tag: 10,
 };
+
+/** Tag 默认比字段载荷宽，容纳常见组件名。 */
+export const LOG_TAG_DEFAULT_CHARS = 24;
+export const LOG_MSG_DEFAULT_CHARS = 12;
+export const LOG_MSG_MIN_CHARS = 10;
 
 /** 表头在文档 ch 尺上的宽度。CJK 全角 2ch（等宽「级别」= 4，不是 2）。 */
 export function headerLabelChars(header: string): number {
@@ -83,9 +111,9 @@ export const LOG_COLUMNS: readonly LogColumnSpec[] = [
   { key: "uid", header: "UID", resizeLabel: "调节 UID 列宽", defaultWidth: metaColPx("uid", "UID"), minWidth: metaColPx("uid", "UID"), flex: false, align: "end" },
   { key: "pid", header: "PID", resizeLabel: "调节 PID 列宽", defaultWidth: metaColPx("pid", "PID"), minWidth: metaColPx("pid", "PID"), flex: false, align: "end" },
   { key: "tid", header: "TID", resizeLabel: "调节 TID 列宽", defaultWidth: metaColPx("tid", "TID"), minWidth: metaColPx("tid", "TID"), flex: false, align: "end" },
-  { key: "tag", header: "Tag", resizeLabel: "调节 Tag 列宽", defaultWidth: 192, minWidth: metaColPx("tag", "Tag"), flex: false },
+  { key: "tag", header: "Tag", resizeLabel: "调节 Tag 列宽", defaultWidth: fieldPx(LOG_TAG_DEFAULT_CHARS), minWidth: metaColPx("tag", "Tag"), flex: false },
   { key: "level", header: "级别", resizeLabel: "调节级别列宽", defaultWidth: metaColPx("level", "级别"), minWidth: metaColPx("level", "级别"), flex: false },
-  { key: "msg", header: "消息", resizeLabel: "调节消息列宽", defaultWidth: 96, minWidth: 80, flex: true },
+  { key: "msg", header: "消息", resizeLabel: "调节消息列宽", defaultWidth: fieldPx(LOG_MSG_DEFAULT_CHARS), minWidth: fieldPx(LOG_MSG_MIN_CHARS), flex: true },
 ];
 
 export function defaultLogColWidths(): LogColWidths {

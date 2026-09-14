@@ -154,20 +154,25 @@ describe("日志显示列", () => {
   });
 
   it("表头 For 遍历稳定规格，拖条写字段 px", () => {
-    const candidates = [
-      resolve(process.cwd(), "src/LogAnalyzerView.tsx"),
-      resolve(process.cwd(), "packages/modules/logs/src/LogAnalyzerView.tsx"),
-    ];
-    const view =
-      candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
+    const load = (name: string): string => {
+      const candidates = [
+        resolve(process.cwd(), `src/${name}`),
+        resolve(process.cwd(), `packages/modules/logs/src/${name}`),
+      ];
+      return candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
+    };
+    const view = load("LogAnalyzerView.tsx");
+    const filter = load("LogFilterBar.tsx");
+    const doc = load("LogDocView.tsx");
     expect(view).toContain("visibleLogColumns(displayColumns())");
-    expect(view).toContain("YoListPresence");
-    expect(view).toContain('recipe="chip"');
+    expect(filter).toContain("YoListPresence");
+    expect(filter).toContain('recipe="chip"');
     expect(view).not.toContain("logDocColumns(docLayout())");
     expect(view).not.toContain("logDocTrackPx");
     expect(view).toContain("width={logStore.state.colWidths[col.key]}");
     expect(view).toContain("align={col.align}");
-    expect(view).toContain("layout={docLayout}");
+    expect(view).toContain("layout: docLayout");
+    expect(doc).toContain("layout={bind.layout}");
     expect(view).not.toContain("layout={docLayout()}");
   });
 });
@@ -186,9 +191,11 @@ describe("日志级别色单源", () => {
     expect(logsCss).not.toContain(".yohu-logs__level--");
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");
-    expect(logsCss).toContain("--yohu-log-fill: color-mix(in srgb, var(--yohu-log-ink) 20%, var(--yohu-surface))");
+    expect(logsCss).not.toContain("color-mix");
     expect(logsCss).toContain("--yohu-button-ink: var(--yohu-log-ink)");
-    expect(logsCss).toContain("--yohu-button-fill: var(--yohu-log-fill)");
+    expect(logsCss).toContain("--yohu-button-fill: var(--yohu-state-hover)");
+    expect(logsCss).not.toMatch(/z-index:\s*1/);
+    expect(logsCss).toContain("z-index: var(--yohu-z-overlay)");
     expect(logsCss).not.toContain(".yohu-button");
     expect(logsCss).not.toContain(".yohu-text-field");
     expect(logsCss).not.toContain("[aria-pressed]");

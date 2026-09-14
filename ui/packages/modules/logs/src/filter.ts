@@ -40,12 +40,6 @@ export function levelKey(level: string): LevelKey | null {
   return letter ? (letter.toLowerCase() as LevelKey) : null;
 }
 
-/** 级别序：未知=0，V=1 … F=6（与 yohu-domain::level_rank 对齐；只给着色/契约，不参与筛选）。 */
-export function levelRank(level: string): number {
-  const idx = levelIndex(level);
-  return idx < 0 ? 0 : idx + 1;
-}
-
 /** 只保留 LEVELS 中的字母，去重并按 V→F 排序。空 = 不限级别。 */
 export function normalizeLevels(input: readonly string[]): LevelLetter[] {
   const seen = new Set<LevelLetter>();
@@ -161,12 +155,16 @@ export function tagAllowed(lineTag: string, spec: string): boolean {
   return false;
 }
 
-/** ASCII 忽略大小写子串（与 domain `contains_ascii_ignore_case` 对齐）。 */
-export function containsAsciiIgnoreCase(haystack: string, needle: string): boolean {
-  if (needle.length === 0) return true;
-  if (needle.length > haystack.length) return false;
+/** ASCII 仅 A–Z 折叠后的子串起点；空针同 `String.indexOf`。与 domain `contains_ascii_ignore_case` 同一规则。 */
+export function indexOfAsciiIgnoreCase(haystack: string, needle: string, from = 0): number {
+  if (needle.length === 0) {
+    if (from < 0) return 0;
+    return from <= haystack.length ? from : haystack.length;
+  }
+  const start = from < 0 ? 0 : from;
   const n = needle.length;
-  outer: for (let i = 0; i <= haystack.length - n; i++) {
+  const last = haystack.length - n;
+  outer: for (let i = start; i <= last; i++) {
     for (let j = 0; j < n; j++) {
       const a = haystack.charCodeAt(i + j);
       const b = needle.charCodeAt(j);
@@ -175,9 +173,14 @@ export function containsAsciiIgnoreCase(haystack: string, needle: string): boole
       const bl = b >= 65 && b <= 90 ? b + 32 : b;
       if (al !== bl) continue outer;
     }
-    return true;
+    return i;
   }
-  return false;
+  return -1;
+}
+
+/** ASCII 忽略大小写子串（与 domain `contains_ascii_ignore_case` 对齐）。 */
+export function containsAsciiIgnoreCase(haystack: string, needle: string): boolean {
+  return indexOfAsciiIgnoreCase(haystack, needle) >= 0;
 }
 
 const SCOPE_ALL: LogFilter["scope"] = { kind: "all" };

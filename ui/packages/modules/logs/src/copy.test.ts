@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
@@ -14,7 +17,7 @@ import {
   textOffsetInDoc,
 } from "./copy";
 import { defaultLogDocLayout, formatLogDoc, formatLogDocParts } from "./doc";
-import { ALL_LOG_DISPLAY_COLUMNS } from "./format";
+import { ALL_LOG_DISPLAY_COLUMNS } from "./layout";
 
 const layout = defaultLogDocLayout(ALL_LOG_DISPLAY_COLUMNS);
 
@@ -228,6 +231,15 @@ describe("seqFromTarget", () => {
     root.append(rowEl);
     expect(seqFromTarget(rowEl.firstChild)).toBe(7);
     expect(seqFromTarget(root)).toBeNull();
+  });
+});
+
+describe("rangeHitsNode", () => {
+  it("产品文件只用 Range 边界比较，没有 intersectsNode / jsdom catch", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy.ts"), "utf-8");
+    expect(src).toContain("compareBoundaryPoints");
+    expect(src).not.toContain("intersectsNode");
+    expect(src).not.toContain("jsdom");
   });
 });
 

@@ -1,9 +1,9 @@
 /**
  * 日志 store 测试：窗口生命周期 + 每设备引用计数 + 批量事件管线。
- * @yohu/api 全量 mock；事件订阅处理器以数组捕获，测试取最后一个（对应新建实例）。
+ * @yohu/api 全量 mock；订阅返回 unlisten；测试取最后一个（当前实例）。
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LogBatch, LogLine } from "@yohu/api";
 
@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   logCaptureStart: vi.fn(),
   logCaptureStop: vi.fn(),
   logCaptureStatus: vi.fn(),
-  logClear: vi.fn(),
   logClearDevice: vi.fn(),
   logReplay: vi.fn(),
   logExport: vi.fn(),
@@ -33,6 +32,10 @@ vi.mock("@yohu/api", () => {
   });
   return {
     APP_SETTINGS_DEFAULT: { buffer_capacity: 10_000 },
+    DATETIME_DISPLAY_LEN: 23,
+    TIME_DISPLAY_LEN: 8,
+    clockDisplayLen: (format: string) =>
+      format === "time" || format === "time_millis" ? 8 : 23,
     deviceRefresh: notConfigured,
     deviceList: notConfigured,
     systemInfo: notConfigured,
@@ -56,36 +59,63 @@ vi.mock("@yohu/api", () => {
     logCaptureStart: (...a: unknown[]) => mocks.logCaptureStart(...a),
     logCaptureStop: (...a: unknown[]) => mocks.logCaptureStop(...a),
     logCaptureStatus: (...a: unknown[]) => mocks.logCaptureStatus(...a),
-    logClear: (...a: unknown[]) => mocks.logClear(...a),
     logClearDevice: (...a: unknown[]) => mocks.logClearDevice(...a),
     logReplay: (...a: unknown[]) => mocks.logReplay(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
     logPackageSnapshot: (...a: unknown[]) => mocks.logPackageSnapshot(...a),
-    onDevicesChanged: (h: (e: { devices: unknown[] }) => void): void => {
+    onDevicesChanged: (h: (e: { devices: unknown[] }) => void): Promise<() => void> => {
       mocks.devicesChangedHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.devicesChangedHandlers.indexOf(h);
+        if (i >= 0) mocks.devicesChangedHandlers.splice(i, 1);
+      });
     },
-    onDeviceOffline: (h: (e: { serial: string }) => void): void => {
+    onDeviceOffline: (h: (e: { serial: string }) => void): Promise<() => void> => {
       mocks.deviceOfflineHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.deviceOfflineHandlers.indexOf(h);
+        if (i >= 0) mocks.deviceOfflineHandlers.splice(i, 1);
+      });
     },
-    onLogBatch: (h: (e: { batch: LogBatch }) => void): void => {
+    onLogBatch: (h: (e: { batch: LogBatch }) => void): Promise<() => void> => {
       mocks.logBatchHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.logBatchHandlers.indexOf(h);
+        if (i >= 0) mocks.logBatchHandlers.splice(i, 1);
+      });
     },
-    onLogOverflow: (h: (e: { serial: string }) => void): void => {
+    onLogOverflow: (h: (e: { serial: string }) => void): Promise<() => void> => {
       mocks.logOverflowHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.logOverflowHandlers.indexOf(h);
+        if (i >= 0) mocks.logOverflowHandlers.splice(i, 1);
+      });
     },
-    onProcessIndex: (h: (e: unknown) => void): void => {
+    onProcessIndex: (h: (e: unknown) => void): Promise<() => void> => {
       mocks.processIndexHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.processIndexHandlers.indexOf(h);
+        if (i >= 0) mocks.processIndexHandlers.splice(i, 1);
+      });
     },
-    onCaptureState: (h: (e: { serial: string; generation: number; state: string }) => void): void => {
+    onCaptureState: (h: (e: { serial: string; generation: number; state: string }) => void): Promise<() => void> => {
       mocks.captureStateHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.captureStateHandlers.indexOf(h);
+        if (i >= 0) mocks.captureStateHandlers.splice(i, 1);
+      });
     },
     onTransferProgress: noop,
-    onNativeDragDrop: noop,
+    onNativeDragDrop: (): Promise<() => void> => Promise.resolve(() => undefined),
     onGroupProgress: noop,
     onTaskSummary: noop,
-    onSettingsChanged: (h: (e: { key: string; settings: { buffer_capacity: number } }) => void): void => {
+    onSettingsChanged: (h: (e: { key: string; settings: { buffer_capacity: number } }) => void): Promise<() => void> => {
       mocks.settingsChangedHandlers.push(h);
+      return Promise.resolve(() => {
+        const i = mocks.settingsChangedHandlers.indexOf(h);
+        if (i >= 0) mocks.settingsChangedHandlers.splice(i, 1);
+      });
     },
     EVENT_NAMES: {
       devicesChanged: "devices/changed",
@@ -102,9 +132,11 @@ vi.mock("@yohu/api", () => {
   };
 });
 
-import { pidSetOf } from "./pipeline";
+import { pidSetOf } from "./binding";
 import { createLogStore, SYSTEM_SESSION_TITLE } from "./store";
 import type { LogStoreApi } from "./store";
+
+const liveStores: LogStoreApi[] = [];
 
 const mk = (seq: number, over: Partial<LogLine> = {}): LogLine => ({
   seq,
@@ -124,8 +156,13 @@ const batch = (serial: string, lines: LogLine[]): LogBatch => ({
   truncated: false,
 });
 
+function track(store: LogStoreApi): LogStoreApi {
+  liveStores.push(store);
+  return store;
+}
+
 function wiredStore(): LogStoreApi {
-  const store = createLogStore();
+  const store = track(createLogStore());
   void store.bindSerial("S1");
   store.ensureSession();
   return store;
@@ -152,6 +189,11 @@ async function liveStore(): Promise<LogStoreApi> {
 const push = (serial: string, lines: LogLine[]): void => {
   mocks.logBatchHandlers.at(-1)?.({ batch: batch(serial, lines) });
 };
+
+afterEach(() => {
+  for (const store of liveStores) store.dispose();
+  liveStores.length = 0;
+});
 
 beforeEach(() => {
   mocks.logCaptureStart.mockReset();
@@ -559,7 +601,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
         release = () => resolve({ serial: "S1", generation: 1, adopted: false });
       }),
     );
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     const a = store.startCapture();
@@ -578,7 +620,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   });
 
   it("同设备 bindSerial 不 stop、不改窗口 capturing", async () => {
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     await store.startCapture();
@@ -596,7 +638,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   });
 
   it("start 失败则窗口不订阅", async () => {
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     mocks.logCaptureStart.mockRejectedValueOnce(new Error("ipc"));
@@ -606,7 +648,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   });
 
   it("start 成功后若 status 世代已结束则纠正窗口 capturing", async () => {
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     mocks.logCaptureStatus.mockResolvedValueOnce({
@@ -647,7 +689,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
         releaseStart = resolve;
       }),
     );
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     const starting = store.startCapture();
@@ -664,7 +706,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   });
 
   it("start 失败且 status 未采集时 capturing 保持 false", async () => {
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     mocks.logCaptureStart.mockRejectedValueOnce(new Error("offline"));
@@ -674,7 +716,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
   });
 
   it("Stop 入队后再 Start：先停后开，不会吞掉第二次 Start", async () => {
-    const store = createLogStore();
+    const store = track(createLogStore());
     await store.bindSerial("S1");
     store.ensureSession();
     await store.startCapture();
@@ -1091,5 +1133,16 @@ describe("logStore 设置联动", () => {
     expect(store.state.colWidths.tag).toBe(220);
     store.setColWidth("msg", 200);
     expect(store.state.colWidths.msg).toBe(96);
+  });
+
+  it("dispose 卸掉本实例订阅，不再吃后续批次", async () => {
+    const store = wiredStore();
+    store.dispose();
+    const before = mocks.logBatchHandlers.length;
+    await Promise.resolve();
+    expect(mocks.logBatchHandlers.length).toBeLessThan(before);
+    const leftover = mocks.logBatchHandlers.at(-1);
+    leftover?.({ batch: batch("S1", [mk(99)]) });
+    expect(store.state.sessions[0]?.visible ?? []).toHaveLength(0);
   });
 });

@@ -106,13 +106,6 @@ export function logSelectionInList(listRoot: ParentNode | null, selection: Selec
 }
 
 function rangeHitsNode(range: Range, node: Node): boolean {
-  if (typeof range.intersectsNode === "function") {
-    try {
-      return range.intersectsNode(node);
-    } catch {
-      // jsdom 部分实现会抛；退回边界比较。
-    }
-  }
   const probe = document.createRange();
   probe.selectNodeContents(node);
   return range.compareBoundaryPoints(Range.END_TO_START, probe) < 0 && range.compareBoundaryPoints(Range.START_TO_END, probe) > 0;

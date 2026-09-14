@@ -130,7 +130,7 @@ export function measureChPx(host: HTMLElement): number {
   host.append(probe);
   const width = probe.getBoundingClientRect().width / 10;
   probe.remove();
-  if (!(width > 0) || width < 4 || width > 20) {
+  if (!(width > 0)) {
     return DEFAULT_CH_PX;
   }
   return width;

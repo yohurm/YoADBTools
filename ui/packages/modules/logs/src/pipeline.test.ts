@@ -5,31 +5,27 @@ import { fileURLToPath } from "node:url";
 
 import type { LogFilter, LogLine } from "@yohu/api";
 
+import { emptyBinding, pidSetOf, rebindPids } from "./binding";
 import {
-  RingMirror,
-  SessionFilter,
-  collapseStack,
-  emptyBinding,
   LEVELS,
-  levelInkStyle,
+  joinTagInput,
   levelKey,
-  levelPaint,
   levelLabel,
-  levelRank,
   matchesLine,
   matchesWireFilter,
   normalizeLevels,
   parseTagNeedles,
-  pidSetOf,
-  rebindPids,
   removeTagNeedle,
-  scanSignal,
   splitTagInput,
-  joinTagInput,
   tagFilterActive,
   toggleLevel,
   toWireFilter,
-} from "./pipeline";
+  type SessionFilter,
+} from "./filter";
+import { levelInkStyle, levelPaint } from "./level-paint";
+import { RingMirror } from "./mirror";
+import { scanSignal } from "./signals";
+import { collapseStack } from "./stack";
 
 const line = (over: Partial<LogLine>): LogLine => ({
   seq: 0,
@@ -49,15 +45,6 @@ const filter = (over: Partial<SessionFilter>): SessionFilter => ({
   scope: { kind: "all" },
   pidSet: [],
   ...over,
-});
-
-describe("levelRank", () => {
-  it("级别序与未知", () => {
-    expect(levelRank("V")).toBeLessThan(levelRank("D"));
-    expect(levelRank("W")).toBeLessThan(levelRank("E"));
-    expect(levelRank("F")).toBe(6);
-    expect(levelRank("?")).toBe(0);
-  });
 });
 
 describe("levelPaint（反色 / 消息同色，色相仍走 --yohu-level-*）", () => {
@@ -84,21 +71,6 @@ describe("levelKey（着色键，与 --yohu-level-* / data-level 对齐）", () 
     expect(levelKey("?")).toBeNull();
     expect(levelKey("")).toBeNull();
     expect(levelKey("X")).toBeNull();
-  });
-});
-
-describe("levelRank（与 domain testdata/level_rank.json 同一套向量）", () => {
-  const testdata = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../core/yohu-domain/testdata/level_rank.json",
-  );
-  const fixture: { level: string; rank: number }[] = JSON.parse(readFileSync(testdata, "utf8")) as {
-    level: string;
-    rank: number;
-  }[];
-
-  it.each(fixture)("level=$level -> $rank", (c) => {
-    expect(levelRank(c.level)).toBe(c.rank);
   });
 });
 

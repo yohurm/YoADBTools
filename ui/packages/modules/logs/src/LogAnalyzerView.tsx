@@ -1,25 +1,21 @@
 /**
- * 日志分析主视图：绑定壳注入的 DeviceSession（设备 + 设置）；对话框与本机选路留在视图层。
- * 显示列 / 导出走注入的 DeviceSession.settings。
- * 行是 formatLogDoc 文档；表头铬层可拖宽。选区走原生 Selection（槽位回收后不跨原点保留；复制走 copy.ts）。
+ * 日志分析页壳：设备绑定、页眉、Tab、列表框、导出与对话框。
+ * 行文档 / 过滤条 / 复制手势分文件。
  */
 
-import { For, Show, createContext, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, useContext, type Accessor, type JSX } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
-import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
+import { dialogSaveFile, errorText, ipcErrorCode, ModuleTitle, systemOpenPath } from "@yohu/api";
 import {
-  Icon,
   YoBadge,
   YoButton,
-  YoChip,
   YoChrome,
   YoColFrame,
   YoColHeader,
   YoColRow,
   YoDialog,
   YoEmptyState,
-  YoListPresence,
   YoLoading,
   YoPage,
   YoPanel,
@@ -30,35 +26,27 @@ import {
   attachPanelKeys,
   closeContextMenu,
   createToaster,
-  isEditableTarget,
   openContextMenu,
+  type YoTextFieldControl,
 } from "@yohu/ui";
 
 import {
-  applyCopyEvent,
   copyHasPayload,
   LOG_COPY_ALL,
   LOG_COPY_NONE,
-  logSelectionInList,
   serializeLogCopy,
   type LogCopyScope,
 } from "./copy";
-import {
-  DEFAULT_CH_PX,
-  formatLogDocParts,
-  joinLogDoc,
-  logDocTrackTemplate,
-  measureChPx,
-  splitDocField,
-  splitLevelGlyph,
-  type LogDocLayout,
-} from "./doc";
-import { highlightMessage } from "./highlight";
+import { attachLogCopyGestures } from "./copy-gesture";
+import { DEFAULT_CH_PX, logDocTrackTemplate, measureChPx, type LogDocLayout } from "./doc";
+import { tagFilterActive } from "./filter";
+import { suggestedExportPath } from "./host-path";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
 import { DEFAULT_LOG_DISPLAY_COLUMNS, tsFieldPx, visibleLogColumns } from "./layout";
+import { LogListBind, LogRow, rowKey } from "./LogDocView";
+import { LogFilterBar } from "./LogFilterBar";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
-import { LEVELS, joinTagInput, levelInkStyle, levelKey, levelLabel, levelPaint, removeTagNeedle, splitTagInput, tagFilterActive, toggleLevel, type ViewRow } from "./pipeline";
 import {
   sessionCaptureLabel,
   sessionCapturePhase,
@@ -66,7 +54,8 @@ import {
   sessionIsLive,
   sessionTabDot,
 } from "./session-chrome";
-import { formatSessionDevice } from "./session-device";
+import { formatSessionDevice, shortSerial } from "./session-device";
+import type { ViewRow } from "./stack";
 import { deviceSlice, logStore } from "./store";
 import type { LogSessionState } from "./workspace";
 import "./logs.css";
@@ -78,10 +67,7 @@ function errorMessage(e: unknown): string {
 }
 
 function isCancelled(e: unknown): boolean {
-  if (e && typeof e === "object" && "code" in e && (e as { code: unknown }).code === "cancelled") {
-    return true;
-  }
-  return errorMessage(e).includes("采集已取消");
+  return ipcErrorCode(e) === "cancelled";
 }
 
 const beginCapture = (): void => {
@@ -91,111 +77,6 @@ const beginCapture = (): void => {
   });
 };
 
-const rowKey = (row: ViewRow): string => `${row.line.seq}-${row.line.pid}`;
-
-function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<LogDocLayout> }) {
-  const line = (): ViewRow["line"] => props.row.line;
-  const parts = createMemo(
-    () => formatLogDocParts(line(), props.layout()),
-    [],
-    { equals: (prev, next) => joinLogDoc(prev) === joinLogDoc(next) },
-  );
-  return (
-    <>
-      <For each={parts()}>
-        {(part) => {
-          if (part.kind === "level") {
-            const glyph = splitLevelGlyph(part.text);
-            return (
-              <>
-                <Show when={glyph.lead}>
-                  <span data-log-pad>{glyph.lead}</span>
-                </Show>
-                <span class="yohu-logs__row-level yohu-tone">{glyph.letter}</span>
-                <Show when={glyph.pad}>
-                  <span data-log-pad>{glyph.pad}</span>
-                </Show>
-              </>
-            );
-          }
-          if (part.kind === "msg") {
-            const key = levelKey(line().level);
-            return (
-              <span
-                class="yohu-logs__row-msg"
-                classList={{ "yohu-tone": key ? levelPaint(key).tintMessage : false }}
-              >
-                <Show when={props.keyword} keyed fallback={part.text}>
-                  {(keyword) => (
-                    <For each={highlightMessage(part.text, keyword)}>
-                      {(chunk) =>
-                        typeof chunk === "string" ? chunk : <mark class="yohu-logs__mark yohu-tone">{chunk.mark}</mark>
-                      }
-                    </For>
-                  )}
-                </Show>
-              </span>
-            );
-          }
-          const field = splitDocField(part.text);
-          const cell = (
-            <span
-              class={`yohu-logs__row-${part.kind}`}
-              classList={{ "yohu-tone": part.kind === "tag" }}
-            >
-              <Show when={field.lead}>
-                <span data-log-pad>{field.lead}</span>
-              </Show>
-              {field.body}
-              <Show when={field.trail}>
-                <span data-log-pad>{field.trail}</span>
-              </Show>
-            </span>
-          );
-          return cell;
-        }}
-      </For>
-      <Show when={props.row.collapsedAfter}>
-        <span class="yohu-logs__row-fold" data-log-chrome>
-          …{props.row.collapsedAfter} 帧折叠
-        </span>
-      </Show>
-    </>
-  );
-}
-
-const LogListBind = createContext<{
-  keyword: Accessor<string>;
-  layout: Accessor<LogDocLayout>;
-  pickAll: Accessor<boolean>;
-}>();
-
-function LogRow(props: { item: ViewRow; index: number }) {
-  const bind = useContext(LogListBind)!;
-  const key = (): ReturnType<typeof levelKey> => levelKey(props.item.line.level);
-  const paint = () => {
-    const letter = key();
-    return letter ? levelPaint(letter) : null;
-  };
-  return (
-    <div
-      class="yohu-logs__cols yohu-logs__row"
-      data-seq={String(props.item.line.seq)}
-      data-level={key() ?? undefined}
-      data-paint={paint()?.invert ? "invert" : undefined}
-      data-tint-msg={paint()?.tintMessage ? "" : undefined}
-      style={key() ? (levelInkStyle(key()!) as JSX.CSSProperties) : undefined}
-      classList={{
-        "yohu-logs__row--signal": props.item.signal !== undefined,
-        "yohu-logs__row--raw": props.item.line.level === "?",
-        "yohu-logs__row--picked": bind.pickAll(),
-      }}
-    >
-      <LogLineDoc row={props.item} keyword={bind.keyword()} layout={bind.layout} />
-    </div>
-  );
-}
-
 function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumns {
   return {
     ...DEFAULT_LOG_DISPLAY_COLUMNS,
@@ -203,59 +84,9 @@ function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumn
   };
 }
 
-function shortSerial(serial: string | null): string {
-  if (!serial) return "";
-  return serial.length > 6 ? serial.slice(-4) : serial;
-}
-
 function tabTitle(session: LogSessionState): string {
   const short = shortSerial(session.serial);
   return short ? `${session.title} · ${short}` : session.title;
-}
-
-function TagFilterField(props: { session: LogSessionState }) {
-  const parsed = (): ReturnType<typeof splitTagInput> => splitTagInput(props.session.tagContains);
-  const write = (raw: string): void => {
-    logStore.patchFilter(props.session.id, { tagContains: raw });
-  };
-  return (
-    <YoTextField
-      block
-      ariaLabel="Tag，逗号分隔，精确匹配"
-      placeholder={parsed().committed.length > 0 ? "" : "Tag，逗号分隔"}
-      value={parsed().draft}
-      tokens={
-        parsed().committed.length > 0 ? (
-          <YoListPresence each={parsed().committed} key={(tag) => tag} recipe="chip">
-            {(tag) => (
-              <YoChip
-                text={tag}
-                onDismiss={() => write(removeTagNeedle(props.session.tagContains, tag))}
-              />
-            )}
-          </YoListPresence>
-        ) : undefined
-      }
-      clearable
-      active={tagFilterActive(props.session.tagContains)}
-      onInput={(v) => {
-        const { committed } = parsed();
-        const typed = splitTagInput(v);
-        write(joinTagInput([...committed, ...typed.committed], typed.draft));
-      }}
-      onKeyDown={(event) => {
-        const { committed, draft } = parsed();
-        if (event.key === "Backspace" && draft.length === 0 && committed.length > 0) {
-          event.preventDefault();
-          write(joinTagInput(committed.slice(0, -1), ""));
-        }
-        if (event.key === "Enter" && draft.length > 0) {
-          event.preventDefault();
-          write(joinTagInput([...committed, draft], ""));
-        }
-      }}
-    />
-  );
 }
 
 function SessionEmpty(props: { session: LogSessionState }) {
@@ -289,12 +120,6 @@ function SessionEmpty(props: { session: LogSessionState }) {
   );
 }
 
-function scopeLabel(session: { scope: { kind: string; pkg?: string; pid?: number } }): string {
-  if (session.scope.kind === "package") return `包名: ${session.scope.pkg}`;
-  if (session.scope.kind === "pid") return `PID: ${session.scope.pid}`;
-  return "System";
-}
-
 export function LogAnalyzerView(props: DeviceSession) {
   const [newOpen, setNewOpen] = createSignal(false);
   const [contextLine, setContextLine] = createSignal<ViewRow["line"] | null>(null);
@@ -304,7 +129,7 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
 
-  let keywordRef: HTMLInputElement | undefined;
+  let keywordRef: YoTextFieldControl | undefined;
 
   createEffect(() => {
     const serial = props.selectedSerials[0] ?? null;
@@ -444,45 +269,21 @@ export function LogAnalyzerView(props: DeviceSession) {
   };
 
   onMount(() => {
-    const stop = attachPanelKeys(window, {
+    const stopKeys = attachPanelKeys(window, {
       ownership: "host",
       listSelector: LOGS_LIST_SELECTOR,
       bindings: LOGS_KEY_BINDINGS,
       onAction: onKeyAction,
     });
-    const onCopy = (event: ClipboardEvent): void => {
-      if (isEditableTarget(event.target)) return;
-      const root = listEl();
-      const selection = window.getSelection();
-      const inList = Boolean(
-        root &&
-          ((event.target instanceof Node && root.contains(event.target)) || logSelectionInList(root, selection)),
-      );
-      if (!inList && pick().kind !== "all") return;
-      applyCopyEvent(event, copyText());
-    };
-    const onPointerDown = (event: PointerEvent): void => {
-      const root = listEl();
-      if (!root || !(event.target instanceof Node) || !root.contains(event.target)) return;
-      if (event.button !== 0) return;
-      if (pick().kind !== "none") setPick(LOG_COPY_NONE);
-      const id = logStore.state.activeSessionId;
-      const rows = visibleRows();
-      if (id !== null && rows.length > 0) logStore.detachFollow(id);
-    };
-    const onSelectionChange = (): void => {
-      if (logSelectionInList(listEl(), window.getSelection())) {
-        setPick(LOG_COPY_NONE);
-      }
-    };
-    document.addEventListener("copy", onCopy);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("selectionchange", onSelectionChange);
+    const stopCopy = attachLogCopyGestures({
+      listRoot: listEl,
+      pick,
+      setPick,
+      copyText: () => copyText(),
+    });
     onCleanup(() => {
-      stop();
-      document.removeEventListener("copy", onCopy);
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("selectionchange", onSelectionChange);
+      stopKeys();
+      stopCopy();
       closeContextMenu();
     });
   });
@@ -495,10 +296,9 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
     try {
       if (props.settings.export_ask_every_time) {
-        const defaultPath = props.settings.export_default_path;
         const picked = await dialogSaveFile({
           title: "导出日志",
-          defaultPath: defaultPath ? `${defaultPath}\\logcat-export.txt` : "logcat-export.txt",
+          defaultPath: suggestedExportPath(props.settings.export_default_path),
           filters: [{ name: "文本", extensions: ["txt"] }],
         });
         if (typeof picked !== "string") return;
@@ -615,61 +415,12 @@ export function LogAnalyzerView(props: DeviceSession) {
         <Show when={active()} keyed>
           {(session) => (
             <YoPanel variant="pane">
-              <div class="yohu-logs__filter">
-                <div class="yohu-logs__levels" role="group" aria-label="级别">
-                  <For each={LEVELS}>
-                    {(letter) => {
-                      const pressed = (): boolean => session.levels.includes(letter);
-                      const key = levelKey(letter);
-                      return (
-                        <span
-                          class="yohu-logs__level-slot yohu-tone"
-                          data-level={key ?? undefined}
-                          style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
-                        >
-                          <YoButton
-                            variant="ghost"
-                            tone="neutral"
-                            size="md"
-                            ink
-                            flush
-                            aria-label={levelLabel(letter)}
-                            aria-pressed={pressed()}
-                            onClick={() =>
-                              logStore.patchFilter(session.id, {
-                                levels: toggleLevel(session.levels, letter),
-                              })
-                            }
-                          >
-                            {letter}
-                          </YoButton>
-                        </span>
-                      );
-                    }}
-                  </For>
-                </div>
-                <span class="yohu-logs__field yohu-logs__field--tag">
-                  <TagFilterField session={session} />
-                </span>
-                <span class="yohu-logs__search yohu-logs__field">
-                  <YoTextField
-                    block
-                    prefix="search"
-                    ariaLabel="关键字"
-                    placeholder="检索消息"
-                    value={session.keyword}
-                    clearable
-                    active={session.keyword.length > 0}
-                    inputRef={(el) => {
-                      keywordRef = el;
-                    }}
-                    onInput={(v) => logStore.patchFilter(session.id, { keyword: v })}
-                  />
-                </span>
-                <span class="yohu-logs__scope">
-                  <YoBadge text={scopeLabel(session)} tone="accent" />
-                </span>
-              </div>
+              <LogFilterBar
+                session={session}
+                keywordRef={(el) => {
+                  keywordRef = el;
+                }}
+              />
 
               <YoColFrame
                 class="yohu-logs__list"
@@ -702,16 +453,16 @@ export function LogAnalyzerView(props: DeviceSession) {
                       pickAll: () => pick().kind === "all",
                     }}
                   >
-                  <YoVirtualList<ViewRow>
-                    items={() => logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? []}
-                    getItemKey={rowKey}
-                    autoScrollToBottom={() => session.following && !session.paused}
-                    onAtBottomChange={(atBottom) => {
-                      const rows =
-                        logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? [];
-                      if (atBottom) logStore.resumeFollow(session.id);
-                      else if (rows.length > 0) logStore.detachFollow(session.id);
-                    }}
+                    <YoVirtualList<ViewRow>
+                      items={() => logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? []}
+                      getItemKey={rowKey}
+                      autoScrollToBottom={() => session.following && !session.paused}
+                      onAtBottomChange={(atBottom) => {
+                        const rows =
+                          logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? [];
+                        if (atBottom) logStore.resumeFollow(session.id);
+                        else if (rows.length > 0) logStore.detachFollow(session.id);
+                      }}
                       ariaLabel="日志列表"
                       onRowContextMenu={(row, _key, event) => {
                         setContextLine(row.line);
@@ -734,13 +485,13 @@ export function LogAnalyzerView(props: DeviceSession) {
                       renderRow={LogRow}
                     />
                   </LogListBind.Provider>
-                    <Show
-                      when={
-                        (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0
-                      }
-                    >
-                      <SessionEmpty session={session} />
-                    </Show>
+                  <Show
+                    when={
+                      (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0
+                    }
+                  >
+                    <SessionEmpty session={session} />
+                  </Show>
                 </div>
                 <Show when={session.pendingCount > 0}>
                   <div class="yohu-logs__pending">

@@ -58,9 +58,8 @@
 .yohu-logs__level-slot {
   display: inline-flex;
   height: 100%;
-  --yohu-log-fill: color-mix(in srgb, var(--yohu-log-ink) 20%, var(--yohu-surface));
   --yohu-button-ink: var(--yohu-log-ink);
-  --yohu-button-fill: var(--yohu-log-fill);
+  --yohu-button-fill: var(--yohu-state-hover);
 }
 
 .yohu-logs__level-slot:not(:last-child) {
@@ -119,7 +118,7 @@
   position: absolute;
   right: var(--yohu-space-md);
   bottom: var(--yohu-space-md);
-  z-index: 1;
+  z-index: var(--yohu-z-overlay);
 }
 
 /* 量 ch 只用行内探针，禁止套 .yohu-logs__row（那是通栏 block）。 */
@@ -287,7 +286,7 @@
 .yohu-logs__empty {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--yohu-z-overlay);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -302,23 +301,6 @@
   flex: 1;
   min-height: 0;
   gap: var(--yohu-space-sm);
-}
-
-.yohu-logs__new-row {
-  display: grid;
-  grid-template-columns: calc(var(--yohu-space-xl) * 1.5) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  flex-shrink: 0;
-}
-
-.yohu-logs__label {
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-2);
-}
-
-.yohu-logs__new-device {
-  min-width: 0;
 }
 
 .yohu-logs__new-seg {
@@ -345,16 +327,11 @@
   align-items: center;
   gap: var(--yohu-space-sm);
   width: 100%;
-  min-height: var(--yohu-control-height);
+  height: 100%;
   padding: 0 var(--yohu-space-sm);
-  border: 0;
-  background: transparent;
-  color: var(--yohu-fg);
+  box-sizing: border-box;
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
-  text-align: left;
-  cursor: pointer;
-  box-sizing: border-box;
 }
 
 .yohu-logs__new-item-name {

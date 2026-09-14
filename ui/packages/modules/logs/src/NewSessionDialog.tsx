@@ -1,34 +1,44 @@
 /**
  * 新建日志窗口：设备 + 划分（包名/PID）。
  * 包名列表来自已安装应用（`log.packageSnapshot`）；PID 列表来自当前进程（`ps`）。
- * 检索框同时是过滤和创建值，避免「下拉 + 再输入」叠层。
+ * 检索框同时是过滤和创建值。清单走 YoVirtualList；设备行走 YoFormRow。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { Show, createContext, createEffect, createMemo, createSignal, untrack, useContext } from "solid-js";
 
-import { deviceDisplayName, type DeviceInfo } from "@yohu/api";
+import type { DeviceInfo } from "@yohu/api";
 import {
   YoButton,
   YoCheckbox,
   YoDialog,
+  YoFormRow,
   YoIndicator,
   YoSegmentedButton,
   YoSelect,
   YoTextField,
+  YoVirtualList,
 } from "@yohu/ui";
 
-import type { SessionScope } from "./pipeline";
+import type { SessionScope } from "./filter";
+import { controlRowHeight, NEW_SESSION_DIALOG_HEIGHT } from "./layout";
+import { devicePickerLabel } from "./session-device";
 import { logStore } from "./store";
 
-function deviceSelectLabel(device: DeviceInfo): string {
-  const name = deviceDisplayName(device);
-  if (name === device.serial) return device.serial;
-  const short = device.serial.length > 6 ? device.serial.slice(-4) : device.serial;
-  return `${name} · ${short}`;
-}
+type PickerItem = { key: string; name: string; pid?: number };
 
-/** 新建会话对话框高度（px）。 */
-const NEW_SESSION_DIALOG_HEIGHT = 520;
+const NewSessionActivate = createContext<(item: PickerItem) => void>();
+
+function NewSessionRow(props: { item: PickerItem; index: number }) {
+  const activate = useContext(NewSessionActivate);
+  return (
+    <div class="yohu-logs__new-item" onDblClick={() => activate?.(props.item)}>
+      <span class="yohu-logs__new-item-name">{props.item.name}</span>
+      <Show when={props.item.pid != null}>
+        <span class="yohu-logs__new-item-pid">{props.item.pid}</span>
+      </Show>
+    </div>
+  );
+}
 
 export function NewSessionDialog(props: {
   open: () => boolean;
@@ -103,28 +113,34 @@ export function NewSessionDialog(props: {
     return mode() === "pid" ? slice.indexDegraded === true : slice.packagesDegraded === true;
   });
 
-  const filteredPackages = createMemo(() => {
+  const pickerItems = createMemo((): PickerItem[] => {
     const q = query().trim().toLowerCase();
-    const names = packageNames();
-    if (!q) return names;
-    return names.filter((n) => n.toLowerCase().includes(q));
-  });
-
-  const filteredPids = createMemo(() => {
-    const q = query().trim().toLowerCase();
+    if (mode() === "package") {
+      const names = packageNames();
+      const filtered = q ? names.filter((n) => n.toLowerCase().includes(q)) : names;
+      return filtered.map((name) => ({ key: name, name }));
+    }
     const entries = [...processEntries()].sort(
       (a, b) => a.name.localeCompare(b.name) || a.pid - b.pid,
     );
-    if (!q) return entries;
-    return entries.filter((e) => e.name.toLowerCase().includes(q) || String(e.pid).includes(q));
+    const filtered = q
+      ? entries.filter((e) => e.name.toLowerCase().includes(q) || String(e.pid).includes(q))
+      : entries;
+    return filtered.map((e) => ({ key: String(e.pid), name: e.name, pid: e.pid }));
   });
 
   const deviceOptions = createMemo(() =>
     devices().map((device) => ({
       value: device.serial,
-      label: deviceSelectLabel(device),
+      label: devicePickerLabel(device),
     })),
   );
+
+  const selectedKey = (): string | null => {
+    const q = query().trim();
+    if (!q) return null;
+    return pickerItems().some((item) => item.key === q) ? q : null;
+  };
 
   const parsedPid = (): number => Number.parseInt(query().trim(), 10);
 
@@ -164,14 +180,20 @@ export function NewSessionDialog(props: {
     props.onClose();
   };
 
-  const pickPackage = (name: string): void => {
-    setQuery(name);
+  const pickItem = (item: PickerItem): void => {
+    setQuery(item.key);
     setError("");
   };
 
-  const pickPid = (pid: number): void => {
-    setQuery(String(pid));
-    setError("");
+  const emptyHint = (): string => {
+    if (mode() === "package") {
+      if (loading()) return "正在读取已安装应用…";
+      if (query().trim()) return "无匹配应用，将使用上方输入创建";
+      return "应用列表为空，可手动输入包名";
+    }
+    if (loading()) return "正在读取进程…";
+    if (query().trim()) return "无匹配进程，将使用上方 PID 创建";
+    return "进程列表为空，可手动输入 PID";
   };
 
   return (
@@ -193,23 +215,19 @@ export function NewSessionDialog(props: {
       }
     >
       <div class="yohu-logs__new">
-        <div class="yohu-logs__new-row">
-          <span class="yohu-logs__label">设备</span>
-          <Show
-            when={devices().length > 0}
-            fallback={<p class="yohu-logs__new-hint">没有在线设备，请先在左侧设备栏连接。</p>}
-          >
-            <div class="yohu-logs__new-device">
-              <YoSelect
-                block
-                options={deviceOptions()}
-                value={deviceSerial()}
-                placeholder="选择设备"
-                onChange={loadDevice}
-              />
-            </div>
+        <YoFormRow
+          title="设备"
+          description={devices().length === 0 ? "没有在线设备，请先在左侧设备栏连接。" : undefined}
+        >
+          <Show when={devices().length > 0}>
+            <YoSelect
+              options={deviceOptions()}
+              value={deviceSerial()}
+              placeholder="选择设备"
+              onChange={loadDevice}
+            />
           </Show>
-        </div>
+        </YoFormRow>
 
         <div class="yohu-logs__new-seg">
           <YoSegmentedButton
@@ -248,70 +266,29 @@ export function NewSessionDialog(props: {
           />
         </div>
 
-        <div class="yohu-logs__new-list" role="listbox" aria-label={mode() === "package" ? "包名列表" : "进程列表"}>
+        <div class="yohu-logs__new-list">
           <YoIndicator follow={query().trim() || undefined} variant="fill" />
-          <Show when={mode() === "package"}>
-            <Show
-              when={filteredPackages().length > 0}
-              fallback={
-                <p class="yohu-logs__new-empty">
-                  {loading()
-                    ? "正在读取已安装应用…"
-                    : query().trim()
-                      ? "无匹配应用，将使用上方输入创建"
-                      : "应用列表为空，可手动输入包名"}
-                </p>
-              }
+          <Show
+            when={pickerItems().length > 0}
+            fallback={<p class="yohu-logs__new-empty">{emptyHint()}</p>}
+          >
+            <NewSessionActivate.Provider
+              value={(item) => {
+                pickItem(item);
+                create();
+              }}
             >
-              <For each={filteredPackages()}>
-                {(name) => (
-                  <button
-                    type="button"
-                    class="yohu-logs__new-item yohu-interactive"
-                    classList={{ "yohu-interactive--selected": query().trim() === name }}
-                    role="option"
-                    aria-selected={query().trim() === name}
-                    onClick={() => pickPackage(name)}
-                    onDblClick={() => {
-                      pickPackage(name);
-                      create();
-                    }}
-                  >
-                    <span class="yohu-logs__new-item-name">{name}</span>
-                  </button>
-                )}
-              </For>
-            </Show>
-          </Show>
-          <Show when={mode() === "pid"}>
-            <Show
-              when={filteredPids().length > 0}
-              fallback={
-                <p class="yohu-logs__new-empty">
-                  {loading() ? "正在读取进程…" : query().trim() ? "无匹配进程，将使用上方 PID 创建" : "进程列表为空，可手动输入 PID"}
-                </p>
-              }
-            >
-              <For each={filteredPids()}>
-                {(entry) => (
-                  <button
-                    type="button"
-                    class="yohu-logs__new-item yohu-interactive"
-                    classList={{ "yohu-interactive--selected": query().trim() === String(entry.pid) }}
-                    role="option"
-                    aria-selected={query().trim() === String(entry.pid)}
-                    onClick={() => pickPid(entry.pid)}
-                    onDblClick={() => {
-                      pickPid(entry.pid);
-                      create();
-                    }}
-                  >
-                    <span class="yohu-logs__new-item-name">{entry.name}</span>
-                    <span class="yohu-logs__new-item-pid">{entry.pid}</span>
-                  </button>
-                )}
-              </For>
-            </Show>
+              <YoVirtualList<PickerItem>
+                items={pickerItems}
+                itemHeight={controlRowHeight()}
+                tone="list"
+                getItemKey={(item) => item.key}
+                selectedKey={selectedKey}
+                onSelectRow={(item) => pickItem(item)}
+                ariaLabel={mode() === "package" ? "包名列表" : "进程列表"}
+                renderRow={NewSessionRow}
+              />
+            </NewSessionActivate.Provider>
           </Show>
         </div>
 
