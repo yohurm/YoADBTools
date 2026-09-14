@@ -10,11 +10,7 @@ let revealOnce: Promise<void> | null = null;
 
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => resolve());
-    } else {
-      setTimeout(resolve, 0);
-    }
+    requestAnimationFrame(() => resolve());
   });
 }
 
@@ -24,15 +20,11 @@ export async function waitForNextPaint(): Promise<void> {
   await nextFrame();
 }
 
-/** 揭主窗。多次调用共用同一次揭幕。 */
+/** 揭主窗。多次调用共用同一次揭幕。失败上抛，不假装成功。 */
 export function revealMainWindow(): Promise<void> {
   revealOnce ??= (async () => {
     await waitForNextPaint();
-    try {
-      await windowShow();
-    } catch (e) {
-      YoLog.warn("shell", `揭窗失败，等待壳超时兜底 ${String(e)}`);
-    }
+    await windowShow();
   })();
   return revealOnce;
 }
@@ -51,14 +43,16 @@ export async function runBootPipeline(opts: {
   load: () => Promise<void>;
   refresh: () => void;
 }): Promise<void> {
-  const loading = opts.load().catch((e: unknown) => {
-    YoLog.error("shell", `启动加载失败 ${String(e)}`);
-  });
-  await loading;
+  await opts.load();
   await waitForNextPaint();
   await dismissBootOverlay();
   YoLog.info("shell", "工作台已就绪，揭主窗口");
-  await revealMainWindow();
+  try {
+    await revealMainWindow();
+  } catch (e) {
+    YoLog.error("shell", `揭窗失败 ${String(e)}`);
+    throw e;
+  }
   opts.refresh();
 }
 

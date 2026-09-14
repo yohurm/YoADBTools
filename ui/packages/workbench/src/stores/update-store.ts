@@ -10,52 +10,39 @@ import {
   updateCancel,
   updateCheck,
   updateDownload,
-  updateInfo,
   updateInstall,
   updateOpen,
 } from "@yohu/api";
-import type { RemoteUpdate, UpdateChannelInfo, UpdateProgress } from "@yohu/api";
+import type { IpcError, RemoteUpdate, UpdateProgress } from "@yohu/api";
 
 export type UpdateApplyPhase = "idle" | "downloading" | "ready" | "applying";
-
-function isInstallerUrl(url: string): boolean {
-  const path = url.trim().split(/[?#]/, 1)[0] ?? "";
-  return /\.(exe|dmg)$/i.test(path);
-}
 
 export function createUpdateStore() {
   const [checking, setChecking] = createSignal(false);
   const [pending, setPending] = createSignal<RemoteUpdate | null>(null);
-  const [channel, setChannel] = createSignal<UpdateChannelInfo | null>(null);
   const [phase, setPhase] = createSignal<UpdateApplyPhase>("idle");
   const [progress, setProgress] = createSignal<UpdateProgress | null>(null);
   const [installerPath, setInstallerPath] = createSignal<string | null>(null);
 
-  void onUpdateProgress((e) => {
-    setProgress({
-      version: e.version,
-      stage: e.stage,
-      received_bytes: e.received_bytes,
-      total_bytes: e.total_bytes,
-    });
-    if (e.stage === "applying") {
-      setPhase("applying");
-      return;
-    }
-    if (e.stage === "downloading" || e.stage === "verifying") {
-      const current = phase();
-      if (current !== "applying" && current !== "ready") {
-        setPhase("downloading");
+  function bindIpc(): void {
+    void onUpdateProgress((e) => {
+      setProgress({
+        version: e.version,
+        stage: e.stage,
+        received_bytes: e.received_bytes,
+        total_bytes: e.total_bytes,
+      });
+      if (e.stage === "applying") {
+        setPhase("applying");
+        return;
       }
-    }
-  });
-
-  async function refresh(): Promise<void> {
-    try {
-      setChannel(await updateInfo());
-    } catch {
-      setChannel(null);
-    }
+      if (e.stage === "downloading" || e.stage === "verifying") {
+        const current = phase();
+        if (current !== "applying" && current !== "ready") {
+          setPhase("downloading");
+        }
+      }
+    });
   }
 
   async function check(): Promise<RemoteUpdate> {
@@ -81,7 +68,7 @@ export function createUpdateStore() {
 
   function canApply(): boolean {
     const update = pending();
-    return !!update && isInstallerUrl(update.download_url);
+    return !!update?.installer_url;
   }
 
   function percent(): number {
@@ -92,12 +79,16 @@ export function createUpdateStore() {
 
   async function download(): Promise<void> {
     const update = pending();
-    if (!update || !isInstallerUrl(update.download_url)) return;
+    const installerUrl = update?.installer_url;
+    if (!update || !installerUrl) {
+      const error: IpcError = { code: "invalid_args", message: "没有可下载的安装包" };
+      throw error;
+    }
     if (phase() === "downloading" || phase() === "applying") return;
     setPhase("downloading");
     try {
       const downloaded = await updateDownload({
-        url: update.download_url,
+        url: installerUrl,
         sha256: update.sha256,
         size_bytes: update.size_bytes,
         version: update.version,
@@ -114,7 +105,10 @@ export function createUpdateStore() {
 
   async function install(): Promise<void> {
     const path = installerPath();
-    if (!path) return;
+    if (!path) {
+      const error: IpcError = { code: "invalid_args", message: "没有可安装的安装包" };
+      throw error;
+    }
     setPhase("applying");
     try {
       await updateInstall(path);
@@ -127,7 +121,7 @@ export function createUpdateStore() {
   async function openDownload(): Promise<void> {
     const update = pending();
     if (!update) return;
-    await updateOpen(update.download_url);
+    await updateOpen(update.page_url);
     setPending(null);
     setPhase("idle");
     setProgress(null);
@@ -148,18 +142,17 @@ export function createUpdateStore() {
   return {
     checking,
     pending,
-    channel,
     phase,
     progress,
     installerPath,
     percent,
     canApply,
-    refresh,
     check,
     download,
     install,
     openDownload,
     dismiss,
+    bindIpc,
   };
 }
 

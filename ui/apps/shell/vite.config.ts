@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 
@@ -22,11 +25,30 @@ function deferWorkbenchCss(): Plugin {
   };
 }
 
-// Tauri dev 约定：固定端口 1420（tauri.conf.json devUrl 对齐）
+/** Vite 端口唯一来源：`app/yohu-adbtools/tauri.conf.json` 的 `build.devUrl`。 */
+function tauriDevPort(): number {
+  const confPath = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../app/yohu-adbtools/tauri.conf.json",
+  );
+  const conf = JSON.parse(readFileSync(confPath, "utf8")) as {
+    build?: { devUrl?: string };
+  };
+  const devUrl = conf.build?.devUrl;
+  if (!devUrl) {
+    throw new Error(`tauri.conf.json 缺少 build.devUrl: ${confPath}`);
+  }
+  const port = Number(new URL(devUrl).port);
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error(`无法从 Tauri devUrl 解析端口: ${devUrl}`);
+  }
+  return port;
+}
+
 export default defineConfig({
   plugins: [solid(), deferWorkbenchCss()],
   server: {
-    port: 1420,
+    port: tauriDevPort(),
     strictPort: true,
     host: false,
   },

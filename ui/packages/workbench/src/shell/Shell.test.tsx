@@ -2,7 +2,7 @@
  * 壳组件测试（Phase C，UI设计系统-v6.md §3/§4.4）：
  * DeviceRail 卡片语义/键盘选择、NavList 键盘导航、StatusBar 任务明细、
  * SettingsView 生效徽章/浏览/密度切换/toast。
- * @yohu/api 全量 mock（模块 store 单例在 import 期订阅事件）。
+ * @yohu/api 全量 mock（device/task/update 在 App onMount bindIpc）。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   updateInstall: vi.fn(),
   updateCancel: vi.fn(),
   windowShow: vi.fn(async () => undefined),
+  mirrorPresentSetActive: vi.fn(async (..._args: unknown[]) => undefined),
   taskHandler: null as null | ((e: unknown) => void),
 }));
 
@@ -87,13 +88,13 @@ vi.mock("@yohu/api", async (importOriginal) => {
     onProcessIndex: noop,
     onCaptureState: noop,
     onTransferProgress: noop,
-    onNativeDragDrop: noop,
+    onNativeDragDrop: (): Promise<() => void> => Promise.resolve(() => undefined),
     onGroupProgress: noop,
     onSettingsChanged: noop,
     onTaskSummary: (h: (e: unknown) => void): void => {
       mocks.taskHandler = h;
     },
-    mirrorPresentSetActive: vi.fn(async () => undefined),
+    mirrorPresentSetActive: (...a: unknown[]) => mocks.mirrorPresentSetActive(...a),
     mirrorLayout: vi.fn(async () => undefined),
     windowMinimize: vi.fn(async () => undefined),
     windowToggleMaximize: vi.fn(async () => undefined),
@@ -124,8 +125,9 @@ import { SettingsView } from "../settings/SettingsView";
 import { App } from "../App";
 import { resetMainWindowRevealForTests } from "../boot";
 import { registerModule } from "../registry";
-import { deviceStore, settingsStore, updateStore } from "../stores";
+import { deviceStore, navStore, settingsStore, taskStore, updateStore } from "../stores";
 import { APP_IDENTITY, APP_SETTINGS_DEFAULT, ModuleId, ModuleTitle, type DeviceSession } from "@yohu/api";
+import { Layout } from "@yohu/ui";
 
 /** 探测壳注入的页眉设备名；用于断言切设备不依赖切模块。 */
 const SessionProbe: Component<DeviceSession> = (props) => (
@@ -147,7 +149,7 @@ registerModule({
   selectionMode: "singleRequired",
   Component: SessionProbe,
 });
-// Settings 由 App.tsx 在 import 时注册，测试不再重复登记。
+// Settings 由 register.ts 在 App import 时登记，测试不再重复登记。
 registerModule({
   id: ModuleId.Mirror,
   title: ModuleTitle.Mirror,
@@ -155,6 +157,14 @@ registerModule({
   selectionMode: "singleRequired",
   Component: () => null,
   Status: () => <span>12 fps</span>,
+});
+registerModule({
+  id: "planned-demo",
+  title: "占位模块",
+  icon: "list",
+  selectionMode: "none",
+  isPlanned: true,
+  Component: () => null,
 });
 
 const DEFAULT_SETTINGS = { ...APP_SETTINGS_DEFAULT, theme: "light" as const };
@@ -209,11 +219,9 @@ beforeEach(() => {
   mocks.updateCheck.mockResolvedValue({
     has_new_version: false,
     version: "0.1.0",
-    version_code: 0,
     description: "",
-    download_url: "",
-    force_update: false,
-    md5: "",
+    installer_url: null,
+    page_url: "https://github.com/yohurm/Windows-YoADBTools",
     sha256: "",
     size_bytes: 0,
   });
@@ -225,8 +233,10 @@ beforeEach(() => {
 
 afterEach(() => {
   updateStore.dismiss();
+  navStore.navigate(ModuleId.Terminal);
   resetMainWindowRevealForTests();
   mocks.windowShow.mockClear();
+  mocks.mirrorPresentSetActive.mockClear();
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-density");
 });
@@ -274,11 +284,14 @@ describe("DeviceRail（§3 设备卡片）", () => {
   it("空态：错误明细与重试按钮（诊断文案直接可见）", async () => {
     mocks.deviceRefresh.mockResolvedValueOnce([]); // 先清空单例 store 残留
     await deviceStore.refresh();
-    mocks.deviceRefresh.mockRejectedValue("adb 未找到");
+    mocks.deviceRefresh.mockRejectedValue({ code: "adb_error", message: "adb 未找到" });
     await deviceStore.refresh();
     const { container } = render(() => <DeviceRail />);
     expect(screen.getByText("无设备")).toBeTruthy();
-    expect(container.querySelector(".yohu-device-rail__empty-error")?.textContent).toContain("adb 未找到");
+    expect(deviceStore.state.lastError).toBe(`adb 未找到；adb: ${RESOLVED_ADB}`);
+    expect(container.querySelector(".yohu-empty-state")?.textContent).toContain(
+      `adb 未找到；adb: ${RESOLVED_ADB}`,
+    );
     expect(screen.getByText("重试扫描")).toBeTruthy();
   });
 
@@ -309,6 +322,9 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(deviceStore.state.statuses.A1?.battery_pct).toBe(87);
     render(() => <DeviceRail />);
     expect(screen.getByText("Android 15 · 87% 充电")).toBeTruthy();
+    expect(document.querySelector('[role="option"]')?.getAttribute("title")).toBe(
+      "Android 15 · 87% 充电",
+    );
   });
 
   it("两台在线时执行目标仅为焦点，不广播全部在线设备", async () => {
@@ -379,6 +395,8 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(decls("yohu-device-rail__list")).not.toMatch(/overflow:\s*auto/);
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-x:\s*hidden/);
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-y:\s*auto/);
+    expect(decls("yohu-device-rail")).toMatch(/max-height:\s*var\(--yohu-layout-device-rail-max\)/);
+    expect(css).not.toMatch(/max-height:\s*42%/);
     expect(css).not.toContain(".yohu-collapse__inner");
   });
 
@@ -419,13 +437,21 @@ describe("NavList（§3 模块导航）", () => {
     expect(items.length).toBeGreaterThanOrEqual(4);
     items.forEach((item) => {
       expect(item.querySelector("svg.yohu-icon")).toBeTruthy();
+      expect(item.querySelector("svg.yohu-icon")?.getAttribute("width")).toBe(String(Layout.IconSm));
     });
+  });
+
+  it("占位模块「开发中」走 YoBadge", () => {
+    render(() => <NavList activeId={ModuleId.Terminal} onNavigate={() => undefined} />);
+    const badge = screen.getByText("开发中");
+    expect(badge.classList.contains("yohu-badge") || badge.closest(".yohu-badge")).toBeTruthy();
   });
 
   it("投屏模块不再显示「开发中」徽章", () => {
     render(() => <NavList activeId={ModuleId.Mirror} onNavigate={() => undefined} />);
-    expect(screen.queryByText("开发中")).toBeNull();
-    expect(screen.getByText(ModuleTitle.Mirror)).toBeTruthy();
+    const mirror = screen.getByText(ModuleTitle.Mirror).closest(".yohu-nav__item");
+    expect(mirror?.textContent).not.toContain("开发中");
+    expect(screen.getByText("开发中")).toBeTruthy();
   });
 
   it("设置钉在侧栏底部，与模块用横线隔开", () => {
@@ -450,6 +476,7 @@ describe("NavList（§3 模块导航）", () => {
 
 describe("StatusBar（§3 状态栏）", () => {
   it("任务项明细走 aria-label，不画气泡", async () => {
+    taskStore.bindIpc();
     expect(mocks.taskHandler).not.toBeNull();
     mocks.taskHandler?.({
       tasks: [
@@ -489,6 +516,10 @@ describe("StatusBar（§3 状态栏）", () => {
 });
 
 describe("SettingsView（§4.4 设置分组卡片）", () => {
+  beforeEach(async () => {
+    await settingsStore.load();
+  });
+
   it("生效说明徽章齐备（立即/重启/下次采集）", () => {
     render(() => <SettingsView />);
     expect(screen.getAllByText("立即生效").length).toBeGreaterThan(0);
@@ -551,23 +582,17 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
-  it("三项文件位置统一：绝对路径展示框 + 浏览；数据目录走选文件夹", async () => {
-    const { container } = render(() => <SettingsView />);
-    await waitFor(() => {
-      expect(container.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
-    });
-    const boxes = container.querySelectorAll(".yohu-settings__path");
-    expect(boxes).toHaveLength(4);
-    expect(boxes[0]?.getAttribute("title")).toBeNull();
-    expect(boxes[0]?.closest(".yohu-tooltip__anchor")).toBeNull();
-    expect(boxes[0]?.querySelector(".yohu-settings__path-tail")?.textContent).toBe("adb.exe");
-    expect(boxes[1]?.closest(".yohu-tooltip__anchor")).toBeNull();
-    expect(boxes[2]?.closest(".yohu-tooltip__anchor")).toBeNull();
-    expect(boxes[3]?.closest(".yohu-tooltip__anchor")).toBeNull();
+  it("三项文件位置统一：只读 YoTextField + 浏览；数据目录走选文件夹", async () => {
+    render(() => <SettingsView />);
+    const adb = await waitFor(() => screen.getByLabelText("ADB 路径") as HTMLInputElement);
+    expect(adb.readOnly).toBe(true);
+    expect(adb.value).toContain("adb.exe");
+    expect(document.querySelectorAll(".yohu-settings__path")).toHaveLength(0);
+    expect(document.querySelectorAll(".yohu-text-field[data-readonly]")).toHaveLength(4);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
     for (const title of ["ADB 路径", "数据目录"]) {
-      const heading = [...container.querySelectorAll(".yohu-form-row__title")].find(
+      const heading = [...document.querySelectorAll(".yohu-form-row__title")].find(
         (el) => el.textContent === title,
       );
       expect(heading?.closest(".yohu-form-row")?.querySelector(".yohu-form-row__description")).toBeNull();
@@ -616,13 +641,53 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   });
 
   it("保存失败弹错误 toast", async () => {
-    mocks.settingsSet.mockRejectedValueOnce("disk full");
+    mocks.settingsSet.mockRejectedValueOnce({ code: "internal", message: "disk full" });
     render(() => <SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: /浅色|跟随系统|深色/ }));
     fireEvent.click(screen.getByText("深色"));
     await waitFor(() => {
       expect(screen.getByText(/保存失败/)).toBeTruthy();
     });
+  });
+
+  it("非法数字不在 View 吞掉，走 settings.set", async () => {
+    mocks.settingsSet.mockRejectedValueOnce({
+      code: "invalid_args",
+      message: "buffer_capacity 必须大于 0",
+    });
+    render(() => <SettingsView />);
+    fireEvent.change(screen.getByLabelText("缓冲最大行数"), { target: { value: "0" } });
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("buffer_capacity", 0);
+      expect(screen.getByText(/保存失败/)).toBeTruthy();
+    });
+  });
+
+  it("小数串不截成整数，原样进 settings.set", async () => {
+    mocks.settingsSet.mockRejectedValueOnce({
+      code: "invalid_args",
+      message: "buffer_capacity 必须是非负整数",
+    });
+    render(() => <SettingsView />);
+    fireEvent.change(screen.getByLabelText("缓冲最大行数"), { target: { value: "1.5" } });
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("buffer_capacity", "1.5");
+      expect(screen.getByText(/必须是非负整数/)).toBeTruthy();
+    });
+  });
+
+  it("设置页不再二次 settingsStore.load", async () => {
+    mocks.systemInfo.mockClear();
+    render(() => <SettingsView />);
+    await Promise.resolve();
+    expect(mocks.systemInfo).not.toHaveBeenCalled();
+  });
+
+  it("进入设置不打 update.info", async () => {
+    mocks.updateInfo.mockClear();
+    render(() => <SettingsView />);
+    await Promise.resolve();
+    expect(mocks.updateInfo).not.toHaveBeenCalled();
   });
 
   it("启用项为 YoSwitch，无「启用」字样", () => {
@@ -657,6 +722,9 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.queryByText("配置目录")).toBeNull();
     expect(screen.queryByText("缓存")).toBeNull();
     expect(screen.getByText("应用日志")).toBeTruthy();
+    const aboutIcon = document.querySelector(".yohu-settings__about-icon");
+    expect(aboutIcon?.getAttribute("width")).toBe(String(Layout.TitlebarCaption));
+    expect(aboutIcon?.getAttribute("height")).toBe(String(Layout.TitlebarCaption));
     const openButtons = screen.getAllByRole("button", { name: "打开" });
     expect(openButtons.length).toBe(1);
     fireEvent.click(openButtons[0] as HTMLButtonElement);
@@ -682,11 +750,9 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     mocks.updateCheck.mockResolvedValueOnce({
       has_new_version: true,
       version: "1.2.0",
-      version_code: 12,
       description: "修复若干问题",
-      download_url: "https://example.com/setup.exe",
-      force_update: false,
-      md5: "",
+      installer_url: "https://example.com/setup.exe",
+      page_url: "https://github.com/yohurm/Windows-YoADBTools",
       sha256: "",
       size_bytes: 0,
     });
@@ -716,7 +782,8 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
 
 describe("AppLayout 窗口铬", () => {
   it("渲染标题栏且三键为最小化、最大化、关闭", () => {
-    render(() => <AppLayout activeModuleId={() => ModuleId.Terminal} onNavigate={() => undefined} />);
+    navStore.navigate(ModuleId.Terminal);
+    render(() => <AppLayout />);
     expect(screen.getByText("Yohu ADB Tools")).toBeTruthy();
     const bar = document.querySelector(".yohu-titlebar");
     const buttons = bar?.querySelectorAll(".yohu-titlebar__caption") ?? [];
@@ -726,14 +793,16 @@ describe("AppLayout 窗口铬", () => {
   });
 
   it("模块标题与功能栏在右侧内容区，不进窗口标题栏", () => {
-    render(() => <AppLayout activeModuleId={() => ModuleId.Settings} onNavigate={() => undefined} />);
+    navStore.navigate(ModuleId.Settings);
+    render(() => <AppLayout />);
     const titlebar = document.querySelector(".yohu-titlebar");
     expect(titlebar?.textContent).not.toContain("设置");
     expect(document.querySelector(".yohu-layout__content .yohu-chrome__title")?.textContent).toContain("设置");
   });
 
   it("主题钮在展开侧栏按钮左侧，点击即切深浅并落盘", async () => {
-    render(() => <AppLayout activeModuleId={() => ModuleId.Terminal} onNavigate={() => undefined} />);
+    navStore.navigate(ModuleId.Terminal);
+    render(() => <AppLayout />);
     const actions = document.querySelectorAll(".yohu-titlebar__actions .yohu-icon-button");
     expect(actions[0]?.getAttribute("aria-label")).toBe("切换到深色模式");
     expect(actions[1]?.getAttribute("aria-label")).toBe("收起侧栏");
@@ -745,7 +814,8 @@ describe("AppLayout 窗口铬", () => {
   });
 
   it("侧栏可收起为抽屉", () => {
-    render(() => <AppLayout activeModuleId={() => ModuleId.Terminal} onNavigate={() => undefined} />);
+    navStore.navigate(ModuleId.Terminal);
+    render(() => <AppLayout />);
     fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
     expect(document.querySelector(".yohu-layout--rail-collapsed")).toBeTruthy();
     expect(document.querySelector(".yohu-recipe-rail")).toBeTruthy();
@@ -764,11 +834,21 @@ describe("AppLayout 窗口铬", () => {
       { serial: "B2", model: "Moto Y", state: "online", connection: "usb" },
     ]);
     await deviceStore.refresh();
-    render(() => <AppLayout activeModuleId={() => ModuleId.Files} onNavigate={() => undefined} />);
+    navStore.navigate(ModuleId.Files);
+    render(() => <AppLayout />);
     expect(screen.getByTestId("session-probe").textContent).toBe("Moto X");
     const items = Array.from(document.querySelectorAll('[role="option"]'));
     fireEvent.click(items[1] as HTMLElement);
     expect(screen.getByTestId("session-probe").textContent).toBe("Moto Y");
+  });
+
+  it("切到投屏时 store 打开 HWND", async () => {
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Mirror);
+    render(() => <AppLayout />);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+    });
   });
 });
 
@@ -802,5 +882,32 @@ describe("App 启动编排", () => {
     const refreshOrder = mocks.deviceRefresh.mock.invocationCallOrder[0]!;
     expect(showOrder).toBeLessThan(refreshOrder);
     unmount();
+  });
+});
+
+describe("View 不越级 IPC", () => {
+  it("壳 View 不 import dialog/openPath/present/窗口三键", () => {
+    const roots = [
+      resolve(process.cwd(), "src"),
+      resolve(process.cwd(), "packages/workbench/src"),
+    ];
+    const root = roots.find((path) => existsSync(path));
+    expect(root).toBeTruthy();
+    const banned =
+      /dialogOpen(?:File|Directory)|systemOpenPath|mirrorPresentSetActive|windowMinimize|windowToggleMaximize|windowClose|windowShow/;
+    for (const rel of [
+      "App.tsx",
+      "settings/SettingsView.tsx",
+      "settings/SettingsForm.tsx",
+      "settings/PathChrome.tsx",
+      "settings/UpdateDialogs.tsx",
+      "shell/AppLayout.tsx",
+      "shell/DeviceRail.tsx",
+      "shell/NavList.tsx",
+      "shell/StatusBar.tsx",
+    ]) {
+      const src = readFileSync(resolve(root!, rel), "utf-8");
+      expect(src, rel).not.toMatch(banned);
+    }
   });
 });

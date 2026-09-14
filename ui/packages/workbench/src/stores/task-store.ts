@@ -14,11 +14,13 @@ export interface TaskStore {
 export function createTaskStore() {
   const [state, setState] = createStore<TaskStore>({ tasks: [] });
 
-  void onTaskSummary((e) => {
-    setState("tasks", e.tasks);
-  });
+  function bindIpc(): void {
+    void onTaskSummary((e) => {
+      setState("tasks", e.tasks);
+    });
+  }
 
-  return { state };
+  return { state, bindIpc };
 }
 
 export type TaskStoreApi = ReturnType<typeof createTaskStore>;

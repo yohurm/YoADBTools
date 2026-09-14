@@ -133,10 +133,10 @@ export function createDeviceStore() {
       let adbHint = "";
       try {
         const info = await systemInfo();
-        const used = info.adb_path ?? "";
+        const used = info.adb_path;
         adbHint = used ? `；adb: ${used}` : "；adb 未解析";
-      } catch {
-        adbHint = "";
+      } catch (hintErr) {
+        YoLog.warn("device", `读取 adb 路径失败 ${errorText(hintErr)}`);
       }
       setState("lastError", `${detail}${adbHint}`);
       setState("statusText", "设备扫描失败");
@@ -193,21 +193,21 @@ export function createDeviceStore() {
     return lookupSelectedDevices(selectedSerials(moduleId, mode), state.devices);
   }
 
-  void onDevicesChanged((e) => {
-    setState("lastError", "");
-    applyDevices(e.devices);
-    void pullStatuses();
-  });
+  function bindIpc(): void {
+    void onDevicesChanged((e) => {
+      setState("lastError", "");
+      applyDevices(e.devices);
+      void pullStatuses();
+    });
+    void onDeviceOffline((e) => {
+      setState("statuses", e.serial, undefined!);
+    });
+    void onDeviceStatus((e) => {
+      applyStatus(e.status);
+    });
+  }
 
-  void onDeviceOffline((e) => {
-    setState("statuses", e.serial, undefined!);
-  });
-
-  void onDeviceStatus((e) => {
-    applyStatus(e.status);
-  });
-
-  return { state, load, refresh, setFocus, selectDevice, selectedSerials, selectedDevices };
+  return { state, load, refresh, setFocus, selectDevice, selectedSerials, selectedDevices, bindIpc };
 }
 
 export type DeviceStoreApi = ReturnType<typeof createDeviceStore>;

@@ -13,13 +13,25 @@ import {
   APP_SETTINGS_DEFAULT,
   APP_IDENTITY,
   EMPTY_PATH_CATALOG,
+  dialogOpenDirectory,
+  dialogOpenFile,
   onSettingsChanged,
   settingsSet,
   systemInfo,
+  systemOpenPath,
   YoLog,
 } from "@yohu/api";
-import type { AppIdentity, AppPathCatalog, AppSettings, SettingKey, SettingValue } from "@yohu/api";
+import type {
+  AppIdentity,
+  AppPathCatalog,
+  AppSettings,
+  DialogFilter,
+  SettingKey,
+  SettingValue,
+} from "@yohu/api";
 import { setDensity, setTheme } from "@yohu/ui";
+
+import { wireSettingValue } from "./settings-wire";
 
 const EMPTY_RESOLVED = {
   adb_path: "",
@@ -43,12 +55,15 @@ export function createSettingsStore() {
   async function load(): Promise<void> {
     try {
       const info = await systemInfo();
+      if (info.os == null || info.adb_path == null) {
+        throw new Error("system.info 缺少 os 或 adb_path");
+      }
       setState(info.settings);
       setIdentity(info.identity);
       setPaths(info.paths);
-      setOs(info.os ?? "");
+      setOs(info.os);
       setResolved({
-        adb_path: info.adb_path ?? "",
+        adb_path: info.adb_path,
         data_root: info.paths.data_root,
         export_default_path: info.paths.exports_dir,
       });
@@ -64,9 +79,7 @@ export function createSettingsStore() {
 
   async function set(key: SettingKey, value: unknown): Promise<void> {
     try {
-      // 本 store 是设置页的通用分发器（key/value 在 UI 侧本身松散），
-      // 类型精确性收敛在 @yohu/api 的 settingsSet<K>(key, SettingValue<K>)。在此显式断言。
-      const updated = await settingsSet(key, value as SettingValue<SettingKey>);
+      const updated = await settingsSet(key, wireSettingValue(key, value) as SettingValue<SettingKey>);
       setState(updated);
       applyAppearance(updated);
       YoLog.info("settings", "已保存", { key, value });
@@ -76,13 +89,64 @@ export function createSettingsStore() {
     }
   }
 
+  async function browseFile(
+    key: SettingKey,
+    title: string,
+    filters?: DialogFilter[],
+  ): Promise<string | null> {
+    const selected = await dialogOpenFile({ title, filters });
+    if (typeof selected !== "string") return null;
+    await set(key, selected);
+    return selected;
+  }
+
+  async function browseDirectory(key: SettingKey, title: string): Promise<string | null> {
+    const selected = await dialogOpenDirectory({ title });
+    if (typeof selected !== "string") return null;
+    await set(key, selected);
+    return selected;
+  }
+
+  function browseAdbPath(): Promise<string | null> {
+    const windows = os() === "windows";
+    return browseFile(
+      "adb_path",
+      windows ? "选择 adb.exe" : "选择 adb",
+      windows ? [{ name: "adb 可执行文件", extensions: ["exe"] }] : [],
+    );
+  }
+
+  function browseDataRoot(): Promise<string | null> {
+    return browseDirectory("data_root", "选择数据目录");
+  }
+
+  function browseExportPath(): Promise<string | null> {
+    return browseDirectory("export_default_path", "选择日志导出目录");
+  }
+
+  async function openLogsDir(): Promise<void> {
+    await systemOpenPath(paths.logs_dir);
+  }
+
   // 模块也可 settings.set（IPC）；壳投影必须跟 settings/changed，禁止出现双份真相。
   void onSettingsChanged((e) => {
     setState(e.settings);
     applyAppearance(e.settings);
   });
 
-  return { state, resolved, identity, paths, os, load, set };
+  return {
+    state,
+    resolved,
+    identity,
+    paths,
+    os,
+    load,
+    set,
+    browseAdbPath,
+    browseDataRoot,
+    browseExportPath,
+    openLogsDir,
+  };
 }
 
 export type SettingsStoreApi = ReturnType<typeof createSettingsStore>;

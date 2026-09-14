@@ -7,7 +7,7 @@
 
 import { Component, For, Show } from "solid-js";
 
-import { Icon, YoIndicator } from "@yohu/ui";
+import { Icon, Layout, YoBadge, YoIndicator } from "@yohu/ui";
 
 import { systemModules, workspaceModules, type ModuleDescriptor } from "../registry";
 
@@ -38,10 +38,12 @@ const NavItem: Component<{
         onKeyDown={onItemKeyDown}
       >
         <span class="yohu-nav__icon">
-          <Icon name={props.mod.icon} size={16} />
+          <Icon name={props.mod.icon} size={Layout.IconSm} />
         </span>
         <span class="yohu-nav__title">{props.mod.title}</span>
-        {props.mod.isPlanned && <span class="yohu-nav__planned">开发中</span>}
+        <Show when={props.mod.isPlanned}>
+          <YoBadge text="开发中" tone="neutral" />
+        </Show>
       </button>
     </li>
   );

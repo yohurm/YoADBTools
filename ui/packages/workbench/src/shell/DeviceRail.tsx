@@ -10,12 +10,12 @@
 
 import { Component, Show, createSignal } from "solid-js";
 
-import { YoBadge, YoButton, YoCollapse, YoIconButton, YoIndicator, YoListPresence } from "@yohu/ui";
+import { YoBadge, YoButton, YoCollapse, YoEmptyState, YoIconButton, YoIndicator, YoListPresence } from "@yohu/ui";
 import { deviceDisplayName } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
 import { deviceStore } from "../stores";
-import { formatDeviceStatusMeta } from "./device-status-format";
+import { formatDeviceStatusHint, formatDeviceStatusMeta } from "./device-status-format";
 
 export const DeviceRail: Component<{
   moduleId?: string;
@@ -76,74 +76,81 @@ export const DeviceRail: Component<{
       </div>
       <YoCollapse open={expanded()} recipe="fill">
         <div class="yohu-device-rail__body">
-        <div
-          class="yohu-device-rail__list"
-          role="listbox"
-          aria-label="设备列表"
-          aria-multiselectable={multi() || undefined}
-        >
-          <YoIndicator follow={indicatorFollow()} variant="fill" />
-          <div class="yohu-device-rail__scroller">
-            <YoListPresence each={deviceStore.state.devices} key={(device) => device.serial}>
-              {(device) => {
-                const focused = () => deviceStore.state.focusSerial === device.serial;
-                const runtime = () => deviceStore.state.statuses[device.serial];
-                const meta = () => formatDeviceStatusMeta(runtime());
-                const first = () => deviceStore.state.devices[0]?.serial === device.serial;
-                return (
-                  <div
-                    class="yohu-device-rail__item yohu-interactive yohu-focus-ring"
-                    classList={{
-                      "yohu-interactive--selected": isSelected(device.serial),
-                    }}
-                    role="option"
-                    aria-selected={isSelected(device.serial)}
-                    tabIndex={focused() || (deviceStore.state.focusSerial === null && first()) ? 0 : -1}
-                    onClick={(event) => select(device.serial, event)}
-                    onKeyDown={(event) => onItemKeyDown(device.serial, event)}
+          <Show
+            when={deviceStore.state.devices.length > 0}
+            fallback={
+              <YoEmptyState
+                title="无设备"
+                description={
+                  deviceStore.state.lastError ||
+                  "请用 USB 连接设备并确认已授权（adb devices 可见）"
+                }
+                action={
+                  <YoButton
+                    size="sm"
+                    variant="outlined"
+                    tone="neutral"
+                    onClick={() => void deviceStore.refresh()}
                   >
-                    <span
-                      class="yohu-device-rail__dot"
-                      classList={{
-                        "yohu-device-rail__dot--online": device.state === "online",
-                        "yohu-device-rail__dot--off": device.state !== "online",
-                      }}
-                      aria-hidden="true"
-                    />
-                    <span class="yohu-device-rail__info">
-                      <span class="yohu-device-rail__model">{deviceDisplayName(device)}</span>
-                      <span class="yohu-device-rail__serial">{device.serial}</span>
-                      <Show when={meta()}>
-                        <span class="yohu-device-rail__meta">{meta()}</span>
-                      </Show>
-                    </span>
-                    <Show when={device.state === "unauthorized"}>
-                      <YoBadge text="未授权" tone="warning" />
-                    </Show>
-                  </div>
-                );
-              }}
-            </YoListPresence>
-          </div>
-        </div>
-        <Show when={deviceStore.state.devices.length === 0}>
-          <div class="yohu-device-rail__empty">
-            <div class="yohu-device-rail__empty-title">无设备</div>
-            <Show when={deviceStore.state.lastError}>
-              <div class="yohu-device-rail__empty-error" role="status">
-                {deviceStore.state.lastError}
+                    重试扫描
+                  </YoButton>
+                }
+              />
+            }
+          >
+            <div
+              class="yohu-device-rail__list"
+              role="listbox"
+              aria-label="设备列表"
+              aria-multiselectable={multi() || undefined}
+            >
+              <YoIndicator follow={indicatorFollow()} variant="fill" />
+              <div class="yohu-device-rail__scroller">
+                <YoListPresence each={deviceStore.state.devices} key={(device) => device.serial}>
+                  {(device) => {
+                    const focused = () => deviceStore.state.focusSerial === device.serial;
+                    const runtime = () => deviceStore.state.statuses[device.serial];
+                    const meta = () => formatDeviceStatusMeta(runtime());
+                    const hint = () => formatDeviceStatusHint(runtime());
+                    const first = () => deviceStore.state.devices[0]?.serial === device.serial;
+                    return (
+                      <div
+                        class="yohu-device-rail__item yohu-interactive yohu-focus-ring"
+                        classList={{
+                          "yohu-interactive--selected": isSelected(device.serial),
+                        }}
+                        role="option"
+                        aria-selected={isSelected(device.serial)}
+                        title={hint() || undefined}
+                        tabIndex={focused() || (deviceStore.state.focusSerial === null && first()) ? 0 : -1}
+                        onClick={(event) => select(device.serial, event)}
+                        onKeyDown={(event) => onItemKeyDown(device.serial, event)}
+                      >
+                        <span
+                          class="yohu-device-rail__dot"
+                          classList={{
+                            "yohu-device-rail__dot--online": device.state === "online",
+                            "yohu-device-rail__dot--off": device.state !== "online",
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span class="yohu-device-rail__info">
+                          <span class="yohu-device-rail__model">{deviceDisplayName(device)}</span>
+                          <span class="yohu-device-rail__serial">{device.serial}</span>
+                          <Show when={meta()}>
+                            <span class="yohu-device-rail__meta">{meta()}</span>
+                          </Show>
+                        </span>
+                        <Show when={device.state === "unauthorized"}>
+                          <YoBadge text="未授权" tone="warning" />
+                        </Show>
+                      </div>
+                    );
+                  }}
+                </YoListPresence>
               </div>
-            </Show>
-            <Show when={!deviceStore.state.lastError}>
-              <div class="yohu-device-rail__empty-hint">
-                请用 USB 连接设备并确认已授权（adb devices 可见）
-              </div>
-            </Show>
-            <YoButton size="sm" variant="outlined" tone="neutral" onClick={() => void deviceStore.refresh()}>
-              重试扫描
-            </YoButton>
-          </div>
-        </Show>
+            </div>
+          </Show>
         </div>
       </YoCollapse>
     </div>
