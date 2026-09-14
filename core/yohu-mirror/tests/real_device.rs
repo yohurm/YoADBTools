@@ -78,6 +78,10 @@ fn start_req(serial: &str, control: bool, force_forward: bool) -> MirrorSessionR
     }
 }
 
+fn service(client: Arc<AdbClient>, tx: mpsc::Sender<AppEvent>, jar: PathBuf) -> Arc<MirrorService> {
+    MirrorService::new(client, tx, jar, CancellationToken::new())
+}
+
 struct LiveStream {
     packets: usize,
     config: bool,
@@ -215,7 +219,7 @@ async fn real_mirror_video_only_live_packets() {
     eprintln!("[真机] 投屏设备 {serial}");
 
     let (tx, mut rx) = mpsc::channel::<AppEvent>(4096);
-    let service = MirrorService::new(client, tx, server_jar());
+    let service = service(client, tx, server_jar());
     let started = service
         .start(start_req(&serial, false, false))
         .await
@@ -287,7 +291,7 @@ async fn real_mirror_force_forward_live() {
         return;
     };
     let (tx, mut rx) = mpsc::channel::<AppEvent>(4096);
-    let service = MirrorService::new(client, tx, server_jar());
+    let service = service(client, tx, server_jar());
     let started = service
         .start(start_req(&serial, false, true))
         .await
@@ -328,7 +332,7 @@ async fn real_mirror_control_force_forward_live() {
         return;
     };
     let (tx, mut rx) = mpsc::channel::<AppEvent>(4096);
-    let service = MirrorService::new(client, tx, server_jar());
+    let service = service(client, tx, server_jar());
     let started = service
         .start(start_req(&serial, true, true))
         .await
@@ -369,7 +373,7 @@ async fn real_mirror_control_inject() {
         return;
     };
     let (tx, mut rx) = mpsc::channel::<AppEvent>(4096);
-    let service = MirrorService::new(client, tx, server_jar());
+    let service = service(client, tx, server_jar());
     let started = service
         .start(start_req(&serial, true, false))
         .await
@@ -408,7 +412,7 @@ async fn real_mirror_missing_server_errors() {
         return;
     };
     let (tx, mut rx) = mpsc::channel::<AppEvent>(16);
-    let service = MirrorService::new(
+    let service = service(
         client,
         tx,
         PathBuf::from("Z:/definitely-missing-scrcpy-server"),

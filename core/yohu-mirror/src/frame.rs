@@ -6,8 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::Notify;
 
-pub const CODEC_H264: u8 = 0;
-pub const CODEC_H265: u8 = 1;
 const QUEUE_CAP: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,17 +145,10 @@ fn evict_for(
     false
 }
 
-pub fn codec_id(name: &str) -> u8 {
-    if name.eq_ignore_ascii_case("h265") || name.eq_ignore_ascii_case("hevc") {
-        CODEC_H265
-    } else {
-        CODEC_H264
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codec::PIPE_H264;
 
     fn frame(config: bool, keyframe: bool, pts: u64) -> EncodedFrame {
         EncodedFrame {
@@ -167,7 +158,7 @@ mod tests {
             config,
             keyframe,
             pts,
-            codec: CODEC_H264,
+            codec: PIPE_H264,
             payload: vec![pts as u8],
             dropped: 0,
         }
@@ -239,12 +230,5 @@ mod tests {
         assert!(pipe.try_recv().expect("config").config);
         assert!(pipe.try_recv().expect("idr").keyframe);
         assert!(pipe.try_recv().is_none());
-    }
-
-    #[test]
-    fn codec_id_maps_hevc() {
-        assert_eq!(codec_id("h265"), CODEC_H265);
-        assert_eq!(codec_id("HEVC"), CODEC_H265);
-        assert_eq!(codec_id("h264"), CODEC_H264);
     }
 }

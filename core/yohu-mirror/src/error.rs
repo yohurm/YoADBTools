@@ -10,6 +10,8 @@ pub enum MirrorError {
     ServerMissing(String),
     #[error("投屏协议错误: {0}")]
     Protocol(String),
+    #[error("投屏编码错误: {0}")]
+    Codec(String),
     #[error("设备端 server 失败: {0}")]
     ServerFailed(String),
     #[error("当前会话为只读，无法注入控制")]
