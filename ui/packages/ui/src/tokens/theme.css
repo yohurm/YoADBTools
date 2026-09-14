@@ -76,6 +76,7 @@
   --yohu-state-pressed: #00000019;
   --yohu-state-selected: var(--yohu-accent);
   --yohu-state-selected-fg: var(--yohu-fg-on);
+  --yohu-state-reorder-source: 0.32;
   --yohu-font-caption-m: 10px;
   --yohu-font-caption: 12px;
   --yohu-font-body: 14px;
@@ -151,6 +152,7 @@
   --yohu-layout-icon-sm: 16px;
   --yohu-layout-icon-md: 20px;
   --yohu-layout-icon-lg: 40px;
+  --yohu-layout-icon-preview: 48px;
   --yohu-layout-window-default-w: 1200px;
   --yohu-layout-window-default-h: 800px;
   --yohu-layout-window-min-w: 1024px;
@@ -175,6 +177,7 @@
   --yohu-layout-titlebar-blur: 32px;
   --yohu-layout-gutter: 16px;
   --yohu-layout-grid-max: 2220px;
+  --yohu-layout-device-rail-max: 42%;
   --yohu-z-dialog: 1000;
   --yohu-z-overlay: 1050;
   --yohu-z-toast: 1100;

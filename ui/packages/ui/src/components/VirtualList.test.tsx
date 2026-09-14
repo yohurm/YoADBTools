@@ -13,6 +13,16 @@ Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
   writable: true,
   configurable: true,
 });
+Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+  value: () => undefined,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+  value: () => undefined,
+  writable: true,
+  configurable: true,
+});
 
 const TestRow: Component<{ item: string; index: number }> = (props) => (
   <span data-text={props.item}>{props.item}</span>
@@ -94,10 +104,10 @@ describe("YoVirtualList", () => {
     );
     expect(css).toMatch(/\[data-tone="list"\] \.yohu-virtual-list__row \{\s*border-bottom:/);
     expect(css).toMatch(
-      /\[data-tone="document"\]:not\(\[role="listbox"\]\) \{\s*user-select: text;\s*cursor: text;\s*\}/,
+      /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
     expect(css).toMatch(
-      /\[data-tone="document"\]:not\(\[role="listbox"\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
+      /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
     expect(css).toMatch(/\[role="listbox"\][\s\S]*user-select: none;/);
     expect(css).toMatch(/\[role="listbox"\] \.yohu-virtual-list__row\.yohu-interactive \{\s*position:\s*absolute;\s*isolation:\s*auto;/);
@@ -112,6 +122,9 @@ describe("YoVirtualList", () => {
     expect(css.match(/\.yohu-virtual-list__inner\s*\{[^}]*\}/)?.[0] ?? "").not.toContain("overflow");
     expect(css).not.toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*auto;/);
     expect(css).not.toContain("yohu-virtual-list__scroll");
+    expect(css).not.toContain("--yohu-motion-spatial-small");
+    expect(css).not.toContain("--yohu-state-reorder-source");
+    expect(css).not.toContain("cursor: grabbing");
   });
 
   it("槽位行 inline 绝对定位，Y 走 translate3d", () => {
@@ -396,6 +409,13 @@ describe("YoVirtualList", () => {
     expect(bar?.hasAttribute("data-open")).toBe(false);
     firePointer(window, "pointermove", 60);
     expect(bar?.hasAttribute("data-open")).toBe(true);
+    expect(row.style.transform).toBe("translate3d(0, 0px, 0)");
+    expect((container.querySelector('[data-key="b"]') as HTMLElement).style.transform).toBe(
+      "translate3d(0, 0px, 0)",
+    );
+    expect((container.querySelector('[data-key="c"]') as HTMLElement).style.transform).toBe(
+      "translate3d(0, 22px, 0)",
+    );
     firePointer(window, "pointerup", 60);
     expect(onReorder).toHaveBeenCalledWith(0, 2);
     expect(host.hasAttribute("data-reordering")).toBe(false);

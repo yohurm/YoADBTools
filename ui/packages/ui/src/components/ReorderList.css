@@ -1,0 +1,16 @@
+.yohu-reorder-list {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.yohu-reorder-list__inner {
+  position: relative;
+  width: 100%;
+}
+
+.yohu-reorder-list__row {
+  position: relative;
+  box-sizing: border-box;
+}

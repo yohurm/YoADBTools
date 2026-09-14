@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { Radius, RadiusShape } from "./radius";
 import { Spacing } from "./spacing";
 import { Density } from "./density";
-import { FocusRing, Layout, Stroke } from "./layout";
+import { FocusRing, Layout, LayoutLimits, Stroke } from "./layout";
 import { Ripple } from "./state";
 
 function loadThemeCss(): string {
@@ -100,5 +100,10 @@ describe("圆角 / 间距 / 布局 token 契约", () => {
     expect(cssVarValue("--yohu-layout-icon-tiny")).toBe(`${Layout.IconTiny}px`);
     expect(cssVarValue("--yohu-layout-icon-inline")).toBe(`${Layout.IconInline}px`);
     expect(cssVarValue("--yohu-layout-icon-sm")).toBe(`${Layout.IconSm}px`);
+    expect(cssVarValue("--yohu-layout-icon-preview")).toBe(`${Layout.IconPreview}px`);
+    expect(LayoutLimits.DeviceRailMaxPercent).toBe(42);
+    expect(cssVarValue("--yohu-layout-device-rail-max")).toBe(
+      `${LayoutLimits.DeviceRailMaxPercent}%`,
+    );
   });
 });

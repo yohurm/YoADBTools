@@ -332,6 +332,7 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-layout-chrome-pad: 8px");
     expect(themeCss).toContain("--yohu-layout-rail-inset: 8px");
     expect(themeCss).toContain("--yohu-layout-settings-control-max: 360px");
+    expect(themeCss).toContain("--yohu-layout-device-rail-max: 42%");
     expect(themeCss).toContain("--yohu-layout-switch-w: 36px");
     expect(themeCss).toContain("--yohu-z-dialog: 1000");
     expect(themeCss).toContain("--yohu-z-overlay: 1050");
@@ -342,6 +343,7 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("color-scheme: dark");
     expect(themeCss).toContain("--yohu-state-selected: var(--yohu-accent)");
     expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg-on)");
+    expect(themeCss).toContain("--yohu-state-reorder-source: 0.32");
     expect(themeCss).not.toContain("--yohu-state-selected-rule:");
     expect(themeCss).toContain("--yohu-text-sel:");
     expect(themeCss).toContain("--yohu-text-sel-fg:");

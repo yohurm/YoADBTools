@@ -1,21 +1,23 @@
 /**
- * YoColHeader —— 表头列格。
+ * YoColHeader —— 表头列格（L4 视图）。
+ * 对齐 / 排序缺省由 col-header-model 决定；本文件只绑属性与槽位。
  * 标题默认靠左并带列内边距（HarmonyOS PC / Finder 列表）。align 只覆盖 center/end。
  * 库包文案槽；有 onSort 时库内渲染 interactive + __label + chevron。
  * 排序字色走宿主 aria-sort（ascending/descending = fg + semibold），禁止页面点内部铬。
  * 列缝铬只走 YoColResizer，本组件不画分割线。
  */
-import { createSignal, type JSX } from "solid-js";
+import { createMemo, createSignal, type JSX } from "solid-js";
 import { Show } from "solid-js";
 
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
+import type { YoColHeaderAlign, YoColHeaderSort } from "./col-header-model";
+import { colHeaderHostAttrs } from "./col-header-policy";
 import type { ColResizePhase } from "./col-model";
 import { YoColResizer } from "./ColResizer";
 import "./ColHeader.css";
 
-export type YoColHeaderAlign = "start" | "end" | "center";
-export type YoColHeaderSort = "ascending" | "descending" | "none";
+export type { YoColHeaderAlign, YoColHeaderSort };
 
 export interface YoColHeaderProps {
   /** 标题对齐；默认 start。单元格对齐由模块自己管。 */
@@ -84,8 +86,16 @@ function ColHeaderBody(props: {
  */
 export function YoColHeader(props: YoColHeaderProps): JSX.Element {
   const [resizing, setResizing] = createSignal(false);
-  const align = (): YoColHeaderAlign => props.align ?? "start";
-  const sort = (): YoColHeaderSort => props.ariaSort ?? "none";
+  const host = createMemo(() =>
+    colHeaderHostAttrs({
+      align: props.align,
+      ariaSort: props.ariaSort,
+      resizable: props.resizable,
+      width: props.width,
+      onWidthChange: props.onWidthChange,
+      resizing: resizing(),
+    }),
+  );
 
   const onWidthChange = (width: number, phase: ColResizePhase): void => {
     setResizing(phase === "start" || phase === "move");
@@ -95,17 +105,17 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
   return (
     <div
       class="yohu-col-header"
-      data-align={align()}
+      data-align={host()["data-align"]}
       role="columnheader"
-      aria-sort={sort()}
-      data-resizing={resizing() ? "" : undefined}
+      aria-sort={host()["aria-sort"]}
+      data-resizing={host()["data-resizing"]}
     >
       <div class="yohu-col-header__content">
-        <ColHeaderBody sort={sort()} onSort={props.onSort}>
+        <ColHeaderBody sort={host()["aria-sort"]} onSort={props.onSort}>
           {props.children}
         </ColHeaderBody>
       </div>
-      <Show when={props.resizable && props.onWidthChange !== undefined && props.width !== undefined}>
+      <Show when={host().resizable}>
         <YoColResizer
           width={props.width ?? 0}
           minWidth={props.minWidth ?? 0}

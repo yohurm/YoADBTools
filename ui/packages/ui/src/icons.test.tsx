@@ -1,7 +1,8 @@
 import { For } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { render } from "@solidjs/testing-library";
-import { ICON_NAMES, Icon, type IconName } from "./icons";
+import { ICON_NAMES, Icon, isIconName, type IconName } from "./icons";
+import { Layout } from "./tokens/layout";
 
 describe("Icon", () => {
   it("同一图标可同时出现多份（工厂函数，不共享 DOM）", () => {
@@ -84,5 +85,18 @@ describe("Icon", () => {
     );
     const { container } = render(() => <Icon name="send" />);
     expect(container.querySelector('svg[data-icon="send"] path')?.getAttribute("d") ?? "").toContain("M3.714");
+  });
+
+  it("isIconName 只认清单内字符串", () => {
+    expect(isIconName("folder")).toBe(true);
+    expect(isIconName("not-an-icon")).toBe(false);
+    expect(isIconName(undefined)).toBe(false);
+  });
+
+  it("缺省尺寸走 Layout.IconSm", () => {
+    const { container } = render(() => <Icon name="folder" />);
+    const svg = container.querySelector("svg.yohu-icon");
+    expect(svg?.getAttribute("width")).toBe(String(Layout.IconSm));
+    expect(svg?.getAttribute("height")).toBe(String(Layout.IconSm));
   });
 });

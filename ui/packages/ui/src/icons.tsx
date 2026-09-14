@@ -6,6 +6,7 @@
  */
 import type { JSX } from "solid-js";
 import { HARMONY_GLYPHS, HARMONY_VIEWBOX, type HarmonyIconName } from "./harmony-glyphs";
+import { Layout } from "./tokens/layout";
 import "./icons.css";
 
 /** 图标名（组件库图标集，模块注册表只允许使用这些名字） */
@@ -43,7 +44,7 @@ export type IconName =
 export interface IconProps {
   /** 图标名 */
   name: IconName;
-  /** 尺寸（px），默认 16 */
+  /** 尺寸（px），默认 Layout.IconSm */
   size?: number;
 }
 
@@ -203,12 +204,17 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
 /** 图标名清单（注册表/测试用，与 ICON_GLYPHS 对齐）。 */
 export const ICON_NAMES = Object.keys(ICON_GLYPHS) as IconName[];
 
+/** Chip / TextField 前导与盒内缀：字符串且在清单内才当图标名。 */
+export function isIconName(value: unknown): value is IconName {
+  return typeof value === "string" && (ICON_NAMES as readonly string[]).includes(value);
+}
+
 /**
  * 图标组件：按名字渲染自绘 SVG。
  * play/pause 与鸿蒙符号为实心（fill），其余为描边（stroke）；颜色走 currentColor。
  */
 export function Icon(props: IconProps): JSX.Element {
-  const size = () => props.size ?? 16;
+  const size = () => props.size ?? Layout.IconSm;
   const harmony = () => props.name in HARMONY_GLYPHS;
   const filled = () => FILLED.has(props.name) || harmony();
   return (

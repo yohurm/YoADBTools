@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyReorderKey,
   beginReorderSession,
   canReorderList,
   commitReorderSession,
@@ -11,6 +12,7 @@ import {
   reorderOverlayAttrs,
   resolveReorderKeyDelta,
   shouldAcceptReorderPointer,
+  shouldBeginReorderFromTarget,
   shouldCancelReorder,
 } from "./reorder-policy";
 
@@ -48,5 +50,23 @@ describe("reorder-policy", () => {
     expect(resolveReorderKeyDelta("ArrowDown", true)).toBe(1);
     expect(shouldCancelReorder("Escape")).toBe(true);
     expect(shouldCancelReorder("ArrowUp")).toBe(false);
+  });
+
+  it("applyReorderKey 夹取两端，一项不换", () => {
+    expect(applyReorderKey("ArrowDown", false, 0, 3)).toBeNull();
+    expect(applyReorderKey("ArrowUp", true, 0, 3)).toBe("noop");
+    expect(applyReorderKey("ArrowDown", true, 2, 3)).toBe("noop");
+    expect(applyReorderKey("ArrowDown", true, 0, 1)).toBe("noop");
+    expect(applyReorderKey("ArrowDown", true, 0, 3)).toEqual({ from: 0, to: 1 });
+    expect(applyReorderKey("ArrowUp", true, 2, 3)).toEqual({ from: 2, to: 1 });
+  });
+
+  it("行内输入/按钮不开始换位", () => {
+    const input = document.createElement("input");
+    const button = document.createElement("button");
+    const row = document.createElement("div");
+    expect(shouldBeginReorderFromTarget(row)).toBe(true);
+    expect(shouldBeginReorderFromTarget(input)).toBe(false);
+    expect(shouldBeginReorderFromTarget(button)).toBe(false);
   });
 });

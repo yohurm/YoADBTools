@@ -3,15 +3,17 @@ import { describe, expect, it } from "vitest";
 import { Spacing } from "../tokens/spacing";
 import {
   REORDER_ARM_DISTANCE,
-  dropIndexFromCenters,
   insertIndexFromPointerY,
+  insertIndexFromRowBoxes,
   isReorderArmed,
   moveIndexFromInsert,
   moveItemTo,
   overlayOffset,
+  pointerContentY,
   reorderBarOffset,
-  rowReorderShift,
+  reorderBarOffsetFromBoxes,
   shiftForReorder,
+  shiftPxForReorder,
 } from "./reorder-model";
 
 describe("reorder-model", () => {
@@ -35,11 +37,14 @@ describe("reorder-model", () => {
     expect(moveIndexFromInsert(2, 0)).toBe(0);
   });
 
-  it("dropIndexFromCenters / shiftForReorder / 源行跟 dest", () => {
-    expect(dropIndexFromCenters([10, 30, 50], 9)).toBe(0);
+  it("shiftForReorder 只让邻行，源行恒 0", () => {
+    expect(shiftForReorder(0, 0, 2)).toBe(0);
     expect(shiftForReorder(1, 0, 2)).toBe(-1);
-    expect(rowReorderShift(0, 0, 2)).toBe(2);
-    expect(rowReorderShift(1, 0, 2)).toBe(-1);
+    expect(shiftForReorder(2, 0, 2)).toBe(-1);
+    expect(shiftForReorder(3, 0, 2)).toBe(0);
+    expect(shiftForReorder(2, 2, 0)).toBe(0);
+    expect(shiftForReorder(0, 2, 0)).toBe(1);
+    expect(shiftForReorder(1, 2, 0)).toBe(1);
   });
 
   it("armed 距离走 Spacing.Sm；条钉缝；浮层夹在视口", () => {
@@ -48,5 +53,24 @@ describe("reorder-model", () => {
     expect(reorderBarOffset(2, 32)).toBe(64);
     expect(overlayOffset(80, 10, 8, 32, 100)).toBe(62);
     expect(overlayOffset(0, 10, 8, 32, 100)).toBe(0);
+  });
+
+  it("变高行盒按中线插缝，条钉累计高", () => {
+    const boxes = [
+      { top: 0, height: 40 },
+      { top: 40, height: 80 },
+      { top: 120, height: 24 },
+    ];
+    expect(insertIndexFromRowBoxes(boxes, 10)).toBe(0);
+    expect(insertIndexFromRowBoxes(boxes, 90)).toBe(2);
+    expect(insertIndexFromRowBoxes(boxes, 200)).toBe(3);
+    expect(reorderBarOffsetFromBoxes(boxes, 0)).toBe(0);
+    expect(reorderBarOffsetFromBoxes(boxes, 2)).toBe(120);
+    expect(shiftPxForReorder(0, 0, 2, 40)).toBe(0);
+    expect(shiftPxForReorder(1, 0, 2, 40)).toBe(-40);
+    expect(shiftPxForReorder(2, 0, 2, 40)).toBe(-40);
+    expect(shiftPxForReorder(2, 2, 0, 24)).toBe(0);
+    expect(shiftPxForReorder(0, 2, 0, 24)).toBe(24);
+    expect(pointerContentY(10, 8, 30)).toBe(28);
   });
 });

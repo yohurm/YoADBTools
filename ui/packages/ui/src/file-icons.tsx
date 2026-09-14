@@ -6,6 +6,7 @@
 import type { JSX } from "solid-js";
 import "./file-icons.css";
 import { fileGlyphFor, type FileGlyph, type FileIconKind } from "./file-glyph";
+import { Layout } from "./tokens/layout";
 
 const GLYPHS: Record<FileGlyph, () => JSX.Element> = {
   folder: () => (
@@ -91,7 +92,7 @@ export interface YoFileIconProps {
 
 export function YoFileIcon(props: YoFileIconProps): JSX.Element {
   const glyph = () => fileGlyphFor(props.name, props.kind);
-  const size = () => props.size ?? 16;
+  const size = () => props.size ?? Layout.IconSm;
   return (
     <svg
       class="yohu-file-icon"

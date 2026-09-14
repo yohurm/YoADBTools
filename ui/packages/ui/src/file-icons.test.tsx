@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "@solidjs/testing-library";
 import { YoFileIcon } from "./file-icons";
 import { fileGlyphFor } from "./file-glyph";
+import { Layout } from "./tokens/layout";
 
 describe("fileGlyphFor", () => {
   it("目录与常见扩展名", () => {
@@ -54,5 +55,12 @@ describe("YoFileIcon", () => {
       expect(node.getAttribute("fill")).toBeNull();
     }
     expect(container.innerHTML).not.toMatch(/fill="#/);
+  });
+
+  it("缺省尺寸走 Layout.IconSm", () => {
+    const { container } = render(() => <YoFileIcon name="a.bin" kind="file" />);
+    const svg = container.querySelector("svg.yohu-file-icon");
+    expect(svg?.getAttribute("width")).toBe(String(Layout.IconSm));
+    expect(svg?.getAttribute("height")).toBe(String(Layout.IconSm));
   });
 });

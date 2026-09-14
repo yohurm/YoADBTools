@@ -18,6 +18,11 @@ export const DarkStateFill = {
   SelectedFg: "var(--yohu-fg-on)",
 } as const;
 
+/** 换位源行占位。L1 换位行铬消费 `--yohu-state-reorder-source`。 */
+export const StateOpacity = {
+  ReorderSource: "0.32",
+} as const;
+
 /**
  * 选中片几何。铺满行盒；距背板由容器 padding 承担，禁止行内再缩。
  */

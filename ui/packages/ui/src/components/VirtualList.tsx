@@ -35,26 +35,15 @@ import { YoIndicator } from "../motion/indicator";
 import type { IndicatorBox } from "../motion/indicator-layout";
 import { ReorderBar } from "./ReorderBar";
 import { ReorderOverlay } from "./ReorderOverlay";
+import { createReorderBinder } from "./reorder-binder";
 import {
   insertIndexFromPointerY,
-  isReorderArmed,
   overlayOffset,
   reorderBarOffset,
-  rowReorderShift,
   rowTopInViewport,
-  type ReorderSession,
+  shiftForReorder,
 } from "./reorder-model";
-import {
-  beginReorderSession,
-  canReorderList,
-  commitReorderSession,
-  isHomeInsert,
-  moveReorderSession,
-  previewDest,
-  resolveReorderKeyDelta,
-  shouldAcceptReorderPointer,
-  shouldCancelReorder,
-} from "./reorder-policy";
+import { applyReorderKey, previewDest } from "./reorder-policy";
 import {
   VIRTUAL_DEFAULT_ITEM_HEIGHT,
   VIRTUAL_DEFAULT_OVERSCAN,
@@ -142,9 +131,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   const [viewportHeight, setViewportHeight] = createSignal(0);
   const [focusTick, setFocusTick] = createSignal(0);
   const [focusKey, setFocusKey] = createSignal<string | number | null>(null);
-  const [session, setSession] = createSignal<ReorderSession | null>(null);
-  const [barY, setBarY] = createSignal(0);
-  const [overlayY, setOverlayY] = createSignal(0);
   const [barReady, setBarReady] = createSignal(false);
   let container: HTMLDivElement | undefined;
   let pendingFocusKey: string | number | null = null;
@@ -152,11 +138,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   let isAutoScrolling = false;
   let autoScrollReset = 0;
   let lastAtBottom = true;
-  let pendingReorder:
-    | { pointerId: number; from: number; key: string | number; startY: number }
-    | null = null;
-  let grabOffset = 0;
-  let suppressClick = false;
   let slotCache: number[] = [];
 
   const selectable = (): boolean =>
@@ -270,122 +251,55 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     });
   };
 
+  const reorder = createReorderBinder({
+    enabled: () => props.onReorder !== undefined,
+    count: () => props.items().length,
+    captureEl: () => container,
+    layout: (from) => {
+      const el = container;
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      const height = itemHeight();
+      return {
+        listTop: box.top,
+        scrollTop: el.scrollTop,
+        viewportHeight: el.clientHeight,
+        sourceTop: rowTopInViewport(box.top, el.scrollTop, from, height),
+        sourceHeight: height,
+        insertIndex: (clientY) =>
+          insertIndexFromPointerY(box.top, el.scrollTop, height, props.items().length, clientY),
+        barOffset: (insert) => reorderBarOffset(insert, height),
+      };
+    },
+    overlayOffset,
+    onCommit: (from, to) => props.onReorder?.(from, to),
+    onArmed: (from, key) => {
+      if (!props.onSelectRow) return;
+      const item = props.items()[from];
+      if (item === undefined) return;
+      setFocusKey(key);
+      props.onSelectRow(item, key);
+    },
+  });
+
   const handleRowClick = (index: number, event: MouseEvent): void => {
-    if (suppressClick) {
-      suppressClick = false;
-      return;
-    }
+    if (reorder.consumeClick()) return;
     if (!selectable()) return;
     pendingFocusKey = null;
     selectAt(index, event);
   };
 
-  const unbindReorderPointer = (): void => {
-    window.removeEventListener("pointermove", onReorderPointerMove);
-    window.removeEventListener("pointerup", onReorderPointerUp);
-    window.removeEventListener("pointercancel", onReorderPointerUp);
-    window.removeEventListener("keydown", onReorderKeyDown, true);
-  };
-
-  const applyReorderGeometry = (current: ReorderSession, clientY: number): void => {
-    if (!container) return;
-    const box = container.getBoundingClientRect();
-    const height = itemHeight();
-    const insert = insertIndexFromPointerY(
-      box.top,
-      container.scrollTop,
-      height,
-      props.items().length,
-      clientY,
-    );
-    const moved = moveReorderSession(current, insert);
-    setSession(moved);
-    setBarY(reorderBarOffset(moved.insert, height));
-    setOverlayY(overlayOffset(clientY, box.top, grabOffset, height, container.clientHeight));
-  };
-
-  const endReorder = (commit: boolean): void => {
-    const current = session();
-    const pending = pendingReorder;
-    pendingReorder = null;
-    setSession(null);
-    unbindReorderPointer();
-    if (container && pending && typeof container.releasePointerCapture === "function") {
-      try {
-        container.releasePointerCapture(pending.pointerId);
-      } catch {
-        /* jsdom */
-      }
-    }
-    if (!commit || !current || !props.onReorder) return;
-    const result = commitReorderSession(current);
-    if (result) props.onReorder(result.from, result.to);
-  };
-
-  const onReorderPointerMove = (event: PointerEvent): void => {
-    const pending = pendingReorder;
-    if (!pending || event.pointerId !== pending.pointerId) return;
-    let current = session();
-    if (!current) {
-      if (!isReorderArmed(pending.startY, event.clientY)) return;
-      if (container && typeof container.setPointerCapture === "function") {
-        try {
-          container.setPointerCapture(event.pointerId);
-        } catch {
-          /* jsdom */
-        }
-      }
-      if (container) {
-        grabOffset =
-          pending.startY -
-          rowTopInViewport(container.getBoundingClientRect().top, container.scrollTop, pending.from, itemHeight());
-      }
-      current = beginReorderSession(pending.from, pending.key);
-      setSession(current);
-      suppressClick = true;
-      if (props.onSelectRow) {
-        const item = props.items()[pending.from];
-        if (item !== undefined) {
-          setFocusKey(pending.key);
-          props.onSelectRow(item, pending.key);
-        }
-      }
-    }
-    applyReorderGeometry(current, event.clientY);
-  };
-
-  const onReorderPointerUp = (event: PointerEvent): void => {
-    const pending = pendingReorder;
-    if (!pending || event.pointerId !== pending.pointerId) return;
-    endReorder(true);
-  };
-
-  const onReorderKeyDown = (event: KeyboardEvent): void => {
-    if (!session() || !shouldCancelReorder(event.key)) return;
-    event.preventDefault();
-    endReorder(false);
-  };
-
   const handleRowPointerDown = (index: number, key: string | number, event: PointerEvent): void => {
-    if (!props.onReorder) return;
-    if (!shouldAcceptReorderPointer(event.button, props.items().length)) return;
-    pendingReorder = { pointerId: event.pointerId, from: index, key, startY: event.clientY };
-    window.addEventListener("pointermove", onReorderPointerMove);
-    window.addEventListener("pointerup", onReorderPointerUp);
-    window.addEventListener("pointercancel", onReorderPointerUp);
-    window.addEventListener("keydown", onReorderKeyDown, true);
+    reorder.onPointerDown(index, key, event);
   };
 
   const handleRowKeyDown = (index: number, event: KeyboardEvent): void => {
     if (props.onReorder) {
-      const delta = resolveReorderKeyDelta(event.key, event.ctrlKey || event.metaKey);
-      if (delta !== null) {
-        const count = props.items().length;
-        if (!canReorderList(count)) return;
-        const to = Math.max(0, Math.min(count - 1, index + delta));
-        if (to === index) return;
+      const moved = applyReorderKey(event.key, event.ctrlKey || event.metaKey, index, props.items().length);
+      if (moved === "noop") return;
+      if (moved) {
         event.preventDefault();
-        props.onReorder(index, to);
+        props.onReorder(moved.from, moved.to);
         return;
       }
     }
@@ -480,8 +394,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       }
     }
     onCleanup(() => {
-      unbindReorderPointer();
-      pendingReorder = null;
+      reorder.destroy();
       if (autoScrollReset !== 0 && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(autoScrollReset);
       }
@@ -507,7 +420,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       multi: multi(),
       tone: props.tone,
       ariaLabel: props.ariaLabel,
-      reordering: session() !== null,
+      reordering: reorder.session() !== null,
     });
 
   type BoundRow = { index: number; item: T; key: string | number };
@@ -542,13 +455,13 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
         }}
         style={(() => {
           const current = bound();
-          const drag = session();
+          const drag = reorder.session();
           const shift =
-            drag && current ? rowReorderShift(current.index, drag.from, previewDest(drag)) : 0;
+            drag && current ? shiftForReorder(current.index, drag.from, previewDest(drag)) : 0;
           return virtualRowBoxStyle(current?.index ?? 0, itemHeight(), shift, current != null);
         })()}
         data-key={attrs()["data-key"]}
-        data-reorder={session()?.key === bound()?.key ? "source" : undefined}
+        data-reorder={reorder.session()?.key === bound()?.key ? "source" : undefined}
         role={attrs().role}
         aria-selected={attrs()["aria-selected"]}
         tabIndex={attrs().tabIndex}
@@ -591,20 +504,20 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       class="yohu-virtual-list"
       data-tone={host()["data-tone"]}
       data-reordering={host()["data-reordering"]}
-      data-indicator={followKey() != null && session() === null ? "fill" : undefined}
+      data-indicator={followKey() != null && reorder.session() === null ? "fill" : undefined}
       role={host().role}
       aria-label={host()["aria-label"]}
       aria-multiselectable={host()["aria-multiselectable"]}
       onScroll={handleScroll}
     >
       <div class="yohu-virtual-list__inner" style={{ height: `${totalHeight()}px` }}>
-        <Show when={followKey() != null && session() === null}>
+        <Show when={followKey() != null && reorder.session() === null}>
           <YoIndicator decorate={false} follow={followKey()} variant="fill" anchor={indicatorAnchor} />
         </Show>
         <Show when={props.onReorder}>
           <ReorderBar
-            open={session() !== null && !isHomeInsert(session()!)}
-            y={barY()}
+            open={reorder.session() !== null && !reorder.isHome()}
+            y={reorder.barY()}
             ready={barReady()}
           />
         </Show>
@@ -621,7 +534,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           }}
         </For>
       </div>
-      <Show when={session()}>
+      <Show when={reorder.session()}>
         {(current) => {
           const item = (): T | undefined => props.items()[current().from];
           return (
@@ -630,8 +543,8 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
                 <ReorderOverlay
                   open
                   ready={barReady()}
-                  y={overlayY()}
-                  height={itemHeight()}
+                  y={reorder.overlayY()}
+                  height={reorder.overlayHeight()}
                 >
                   <Dynamic
                     component={props.renderRow}

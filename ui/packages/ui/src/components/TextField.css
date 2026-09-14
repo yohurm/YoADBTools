@@ -142,12 +142,28 @@
 }
 
 /*
- * 复用 __input 的 textarea：Chromium 从盒顶起笔，caret 跟 leading。
- * 行高仍走 leading-ui，上下垫把第一行推到写入盒中线。
+ * 多行：Chromium textarea 从盒顶起笔，caret 跟 leading。
+ * 行高走 leading-ui，上下垫把第一行推到写入盒中线。
+ * 禁止用元素选择器给 textarea 另开后门。
  */
-textarea.yohu-text-field__input {
+.yohu-text-field[data-multiline] .yohu-text-field__control {
+  height: auto;
+  min-height: var(--yohu-control-height);
+  align-items: flex-start;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__input {
+  height: auto;
+  min-height: var(--yohu-text-field-line);
   line-height: var(--yohu-font-leading-ui);
   padding-block: calc((var(--yohu-text-field-line) - 1em * var(--yohu-font-leading-ui)) / 2);
+  overflow: auto;
+  resize: none;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__affix,
+.yohu-text-field[data-multiline] .yohu-text-field__clear {
+  margin-block-start: calc((var(--yohu-text-field-line) - var(--yohu-layout-icon-inline)) / 2);
 }
 
 /* 数字：去掉 UA 步进钮；值贴尾缘，避免短数字在槽里看起来居中。 */
@@ -199,4 +215,8 @@ textarea.yohu-text-field__input {
 .yohu-text-field[data-disabled] .yohu-text-field__affix {
   color: var(--yohu-disabled);
   cursor: not-allowed;
+}
+
+.yohu-text-field[data-readonly] .yohu-text-field__input {
+  cursor: default;
 }

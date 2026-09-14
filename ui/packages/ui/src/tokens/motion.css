@@ -633,6 +633,24 @@ html[data-theme-transition] *::after {
   transition: none !important;
 }
 
+/*
+ * 配方换位行铬：抓手、邻行让位、源行淡化。
+ * 宿主挂 data-reordering；源行挂 data-reorder=source。两 L4 只挂 data-*。
+ */
+[data-reordering],
+[data-reordering] > * > [data-key] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+[data-reordering] > * > [data-key]:not([data-reorder="source"]) {
+  transition: transform var(--yohu-motion-spatial-small);
+}
+
+[data-reordering] [data-reorder="source"] {
+  opacity: var(--yohu-state-reorder-source);
+}
+
 /* —— reduced-motion：配方统一降级；循环指示改为静止 —— */
 
 @media (prefers-reduced-motion: reduce) {
@@ -651,7 +669,8 @@ html[data-theme-transition] *::after {
   .yohu-recipe-reorder-bar[data-ready],
   .yohu-recipe-reorder-overlay[data-ready],
   .yohu-recipe-indicator[data-ready],
-  .yohu-virtual-list[data-reordering] .yohu-virtual-list__row,
+  [data-reordering] > * > [data-key]:not([data-reorder="source"]),
+  .yohu-chip[data-dismiss="hover"] .yohu-chip__remove,
   .yohu-tabs__tab,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,

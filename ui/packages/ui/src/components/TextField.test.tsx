@@ -45,10 +45,21 @@ describe("YoTextField", () => {
   });
 
   it("disabled 时禁用输入框且不显示清除", () => {
-    render(() => <YoTextField label="只读" value="x" disabled clearable />);
-    const host = screen.getByLabelText("只读").closest(".yohu-text-field");
-    expect((screen.getByLabelText("只读") as HTMLInputElement).disabled).toBe(true);
+    render(() => <YoTextField label="禁用" value="x" disabled clearable />);
+    const host = screen.getByLabelText("禁用").closest(".yohu-text-field");
+    expect((screen.getByLabelText("禁用") as HTMLInputElement).disabled).toBe(true);
     expect(host?.getAttribute("data-disabled")).toBe("true");
+    expect(screen.queryByRole("button", { name: "清除" })).toBeNull();
+  });
+
+  it("readOnly 可点选、不灰、不显示清除", () => {
+    render(() => <YoTextField label="路径" value="C:\\adb.exe" readOnly clearable />);
+    const input = screen.getByLabelText("路径") as HTMLInputElement;
+    const host = input.closest(".yohu-text-field");
+    expect(input.readOnly).toBe(true);
+    expect(input.disabled).toBe(false);
+    expect(host?.getAttribute("data-readonly")).toBe("true");
+    expect(host?.getAttribute("data-disabled")).toBeNull();
     expect(screen.queryByRole("button", { name: "清除" })).toBeNull();
   });
 
@@ -119,9 +130,11 @@ describe("YoTextField", () => {
     expect(inputRule).toContain("line-height: var(--yohu-text-field-line)");
     expect(inputRule).not.toContain("height: 100%");
     expect(inputRule).not.toContain("--yohu-font-leading-ui");
-    const areaRule = css.slice(css.indexOf("textarea.yohu-text-field__input"));
+    expect(css).not.toContain("textarea.yohu-text-field__input");
+    const areaRule = css.slice(css.indexOf("[data-multiline] .yohu-text-field__input"));
     expect(areaRule).toContain("line-height: var(--yohu-font-leading-ui)");
     expect(areaRule).toContain("padding-block:");
+    expect(areaRule).toContain("resize: none");
   });
 
   it("内容区重置 UA 盒模型，数字去掉原生步进", () => {
@@ -202,7 +215,8 @@ describe("YoTextField", () => {
     expect(controlRule).toContain("overflow: hidden");
     expect(controlRule).not.toContain("overflow: auto");
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
-    expect(css).not.toMatch(/overflow:\s*(auto|scroll)/);
+    const multilineInput = css.slice(css.indexOf(".yohu-text-field[data-multiline] .yohu-text-field__input"));
+    expect(multilineInput).toContain("overflow: auto");
 
     const tokensMin = css.slice(css.indexOf(".yohu-text-field[data-tokens] .yohu-text-field__input"));
     const tokensMinRule = tokensMin.slice(0, tokensMin.indexOf("}") + 1);
@@ -223,5 +237,29 @@ describe("YoTextField", () => {
     expect(control).toBeTruthy();
     fireEvent.mouseDown(control as HTMLElement, { button: 0 });
     expect(document.activeElement).toBe(input);
+  });
+
+  it("multiline 画 textarea，不走元素选择器后门", () => {
+    const onInput = vi.fn();
+    let forwarded: HTMLTextAreaElement | undefined;
+    render(() => (
+      <YoTextField
+        ariaLabel="命令"
+        multiline
+        rows={1}
+        value="adb"
+        onInput={onInput}
+        inputRef={(el) => {
+          if (el instanceof HTMLTextAreaElement) forwarded = el;
+        }}
+      />
+    ));
+    const area = screen.getByLabelText("命令") as HTMLTextAreaElement;
+    expect(area.tagName).toBe("TEXTAREA");
+    expect(area.rows).toBe(1);
+    expect(area.closest(".yohu-text-field")?.getAttribute("data-multiline")).toBe("true");
+    expect(forwarded).toBe(area);
+    fireEvent.input(area, { target: { value: "shell" } });
+    expect(onInput).toHaveBeenCalledWith("shell", expect.anything());
   });
 });

@@ -38,6 +38,8 @@ export const Layout = {
   IconMd: 20,
   /** 空态/大图标档。 */
   IconLg: 40,
+  /** 详情预览档（鸿蒙 1:1 预览图 48vp）。 */
+  IconPreview: 48,
   /** 电脑窗口默认 1200×800vp */
   WindowDefaultW: 1200,
   WindowDefaultH: 800,
@@ -91,7 +93,7 @@ export const Layout = {
   GridMax: 2220,
 } as const;
 
-/** 数量约束（不是 CSS px，禁止塞进 Layout）。 */
+/** 数量约束（不是 CSS px，禁止塞进 Layout）。百分比帽由 emit-theme 写成 `%` 变量。 */
 export const LayoutLimits = {
   /** 电脑标题栏右侧图标最多 3 个（含菜单） */
   TitlebarMaxActions: 3,
@@ -99,6 +101,8 @@ export const LayoutLimits = {
   ToolbarMaxIcons: 6,
   /** 侧边栏宽度 ≤ 窗口宽 40% */
   SidebarMaxPercent: 40,
+  /** 设备栏在侧栏内的高度帽 */
+  DeviceRailMaxPercent: 42,
 } as const;
 
 /** 描边宽度（结构线 / 强调条）。 */

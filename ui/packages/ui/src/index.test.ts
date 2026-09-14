@@ -17,12 +17,14 @@ const YO_PUBLIC = [
   "YoCheckbox",
   "YoSwitch",
   "YoBadge",
+  "YoChip",
   "YoProgressBar",
   // 导航
   "YoToolbar",
   "YoTabs",
   "YoTree",
   "YoVirtualList",
+  "YoReorderList",
   "YoColResizer",
   "YoColHeader",
   "YoColFrame",
@@ -86,6 +88,9 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("ContextMenuSession");
     expect(index).not.toContain("ToastItem");
     expect(index).not.toContain("ColResizePhase");
+    expect(index).not.toContain("ReorderBinder");
+    expect(index).not.toContain("createReorderBinder");
+    expect(index).not.toContain("dropIndexFromCenters");
   });
 
   it("公开 Controller / Toaster 只有模块契约字段", () => {

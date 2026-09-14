@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   MotionDuration,
   MotionEasing,
@@ -8,6 +9,8 @@ import {
   MotionSpring,
   motionDurationMs,
   motionSpecMs,
+  type MotionEasingName,
+  type MotionSpecName,
 } from "./motion";
 
 /**
@@ -29,9 +32,33 @@ function loadThemeCss(): string {
 
 const themeCss = loadThemeCss();
 
+type SpecRow = {
+  durationMs: number;
+  easing: MotionEasingName;
+  controlPoints: [number, number, number, number];
+};
+
+const specFixture = JSON.parse(
+  readFileSync(
+    resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../core/yohu-motion/testdata/motion_spec.json",
+    ),
+    "utf-8",
+  ),
+) as Record<string, SpecRow>;
+
 /** camelCase 键名 → CSS 变量 kebab-case（loopSlow → loop-slow）。 */
 function kebab(name: string): string {
   return name.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
+}
+
+function parseCubic(css: string): number[] | undefined {
+  const match = /^cubic-bezier\(\s*([^)]+)\)$/.exec(css);
+  if (!match) {
+    return undefined;
+  }
+  return match[1].split(",").map((part) => Number.parseFloat(part.trim()));
 }
 
 /** 提取 CSS 变量定义值（仅匹配变量定义行，不匹配 var() 引用）。 */
@@ -82,11 +109,18 @@ describe("动效 token 单一事实源契约", () => {
     expect(MotionDuration.toast).toBe("3s");
   });
 
-  it("标准/减速/加速/强调曲线符合规范值", () => {
-    expect(MotionEasing.standard).toBe("cubic-bezier(0.4, 0, 0.2, 1)");
-    expect(MotionEasing.decel).toBe("cubic-bezier(0, 0, 0.4, 1)");
-    expect(MotionEasing.accel).toBe("cubic-bezier(0.4, 0, 1, 1)");
-    expect(MotionEasing.emphasized).toBe("cubic-bezier(0.2, 0, 0, 1)");
+  it("标准/减速/加速/强调曲线与 testdata 控制点对齐", () => {
+    const seen = new Set<string>();
+    for (const [name, row] of Object.entries(specFixture)) {
+      if (row.easing === "spring" || row.easing === "springSoft") {
+        continue;
+      }
+      if (seen.has(row.easing)) {
+        continue;
+      }
+      seen.add(row.easing);
+      expect(parseCubic(MotionEasing[row.easing]), name).toEqual(row.controlPoints);
+    }
   });
 
   it("跟手弹簧写入 theme.css，且曲线过冲后回到 1", () => {
@@ -133,13 +167,15 @@ describe("动效 token 单一事实源契约", () => {
     expect(motionDurationMs("loopSlow")).toBe(1200);
   });
 
-  it("motionSpecMs 与 MotionSpec.duration 对齐", () => {
-    expect(motionSpecMs("effectsFast")).toBe(100);
-    expect(motionSpecMs("spatialSmall")).toBe(150);
-    expect(motionSpecMs("effectsEnter")).toBe(160);
-    expect(motionSpecMs("spatialLocal")).toBe(200);
-    expect(motionSpecMs("spatialPanel")).toBe(300);
-    expect(motionSpecMs("spatialEnter")).toBe(350);
-    expect(motionSpecMs("spatialExit")).toBe(200);
+  it("MotionSpec 与 yohu-motion testdata 同名同值", () => {
+    const names = Object.keys(MotionSpec) as MotionSpecName[];
+    expect(Object.keys(specFixture).sort()).toEqual([...names].sort());
+    for (const name of names) {
+      const row = specFixture[name];
+      const spec = MotionSpec[name];
+      expect(motionSpecMs(name), name).toBe(row.durationMs);
+      expect(spec.easing, name).toBe(row.easing);
+      expect(motionDurationMs(spec.duration), name).toBe(row.durationMs);
+    }
   });
 });

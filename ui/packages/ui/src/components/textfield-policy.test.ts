@@ -5,6 +5,7 @@ describe("textfield-policy", () => {
   it("默认可改、不显示清除、status=none", () => {
     expect(resolveTextFieldInteractive({})).toEqual({
       disabled: false,
+      readOnly: false,
       showClear: false,
       status: "none",
     });
@@ -19,7 +20,7 @@ describe("textfield-policy", () => {
   it("disabled 关掉输入并隐藏清除", () => {
     expect(
       resolveTextFieldInteractive({ disabled: true, clearable: true, value: "x" }),
-    ).toEqual({ disabled: true, showClear: false, status: "none" });
+    ).toEqual({ disabled: true, readOnly: false, showClear: false, status: "none" });
   });
 
   it("缺省宿主属性是中性涂装", () => {
@@ -34,9 +35,13 @@ describe("textfield-policy", () => {
       "data-tokens": undefined,
       "data-clearable": undefined,
       "data-disabled": undefined,
+      "data-readonly": undefined,
       "data-active": undefined,
+      "data-multiline": undefined,
       disabled: false,
+      readOnly: false,
       "aria-invalid": undefined,
+      rows: 1,
     });
   });
 
@@ -62,6 +67,15 @@ describe("textfield-policy", () => {
     expect(attrs["data-paint"]).toBe("error");
   });
 
+  it("readOnly 写入 data-readonly，不灰、隐藏清除", () => {
+    const attrs = textFieldHostAttrs({ readOnly: true, clearable: true, value: "C:\\adb.exe" });
+    expect(attrs.readOnly).toBe(true);
+    expect(attrs.disabled).toBe(false);
+    expect(attrs["data-readonly"]).toBe(true);
+    expect(attrs["data-disabled"]).toBeUndefined();
+    expect(attrs["data-clearable"]).toBeUndefined();
+  });
+
   it("宽度只写 data-width：number / fill / hug", () => {
     expect(textFieldHostAttrs({ type: "number" })["data-width"]).toBe("number");
     expect(textFieldHostAttrs({ type: "number", block: true })["data-width"]).toBe("fill");
@@ -81,5 +95,14 @@ describe("textfield-policy", () => {
     expect(attrs["data-active"]).toBe(true);
     expect(attrs["data-paint"]).toBe("warning");
     expect(attrs["data-status"]).toBe("warning");
+  });
+
+  it("multiline 写 data-multiline 与 rows", () => {
+    expect(textFieldHostAttrs({})["data-multiline"]).toBeUndefined();
+    expect(textFieldHostAttrs({}).rows).toBe(1);
+    const attrs = textFieldHostAttrs({ multiline: true, rows: 1 });
+    expect(attrs["data-multiline"]).toBe(true);
+    expect(attrs.rows).toBe(1);
+    expect(textFieldHostAttrs({ multiline: true, type: "number" })["data-width"]).toBe("hug");
   });
 });

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { Density } from "../tokens/density";
 import { Stroke } from "../tokens/layout";
 import {
+  DEFAULT_TEXT_FIELD_ROWS,
   DEFAULT_TEXT_FIELD_STATUS,
   TEXT_FIELD_CONTROL_OVERFLOW,
   hasTextFieldSlot,
   resolveTextFieldActive,
+  resolveTextFieldMultiline,
+  resolveTextFieldRows,
   resolveTextFieldSpec,
   resolveTextFieldStatus,
   resolveTextFieldWidthKind,
@@ -20,6 +23,8 @@ describe("textfield-model", () => {
       slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "hug",
       active: false,
+      multiline: false,
+      rows: 1,
     });
     expect(textFieldPaintKind("none")).toBe("neutral");
   });
@@ -91,7 +96,25 @@ describe("textfield-model", () => {
       slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "hug",
       active: true,
+      multiline: false,
+      rows: 1,
     });
     expect(textFieldPaintKind(resolveTextFieldSpec({ active: true }).status)).toBe("neutral");
+  });
+
+  it("multiline 同一门面：缺省 2 行，不当数字槽", () => {
+    expect(resolveTextFieldMultiline()).toBe(false);
+    expect(resolveTextFieldRows({})).toBe(1);
+    expect(resolveTextFieldRows({ multiline: true })).toBe(DEFAULT_TEXT_FIELD_ROWS);
+    expect(resolveTextFieldRows({ multiline: true, rows: 1 })).toBe(1);
+    expect(resolveTextFieldWidthKind({ type: "number", multiline: true })).toBe("hug");
+    expect(resolveTextFieldSpec({ multiline: true, block: true })).toEqual({
+      status: DEFAULT_TEXT_FIELD_STATUS,
+      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
+      width: "fill",
+      active: false,
+      multiline: true,
+      rows: 2,
+    });
   });
 });

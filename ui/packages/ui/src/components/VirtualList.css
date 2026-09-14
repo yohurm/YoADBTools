@@ -9,13 +9,13 @@
   box-sizing: border-box;
 }
 
-.yohu-virtual-list[data-tone="document"]:not([role="listbox"]) {
+.yohu-virtual-list[data-tone="document"]:not([role="listbox"]):not([data-reordering]) {
   user-select: text;
   cursor: text;
 }
 
-.yohu-virtual-list[role="listbox"],
-.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row {
+.yohu-virtual-list[role="listbox"]:not([data-reordering]),
+.yohu-virtual-list[role="listbox"]:not([data-reordering]) .yohu-virtual-list__row {
   user-select: none;
   cursor: default;
 }
@@ -60,7 +60,7 @@
   overflow: hidden;
 }
 
-.yohu-virtual-list[data-tone="document"]:not([role="listbox"]) .yohu-virtual-list__row {
+.yohu-virtual-list[data-tone="document"]:not([role="listbox"]):not([data-reordering]) .yohu-virtual-list__row {
   user-select: text;
   cursor: text;
 }
@@ -131,18 +131,4 @@
 .yohu-virtual-list[role="listbox"][data-indicator="fill"] .yohu-virtual-list__row.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"]),
 .yohu-virtual-list[role="listbox"][data-indicator="fill"] .yohu-virtual-list__row.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"]) {
   background-color: transparent;
-}
-
-.yohu-virtual-list[data-reordering],
-.yohu-virtual-list[data-reordering] .yohu-virtual-list__row {
-  cursor: grabbing;
-  user-select: none;
-}
-
-.yohu-virtual-list[data-reordering] .yohu-virtual-list__row:not([data-reorder="source"]) {
-  transition: transform var(--yohu-motion-spatial-small);
-}
-
-.yohu-virtual-list__row[data-reorder="source"] {
-  opacity: 0.32;
 }

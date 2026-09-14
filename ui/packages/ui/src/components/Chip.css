@@ -23,6 +23,17 @@
   padding-inline-end: 0;
 }
 
+.yohu-chip[data-leading] {
+  padding-inline-start: var(--yohu-space-xs);
+}
+
+.yohu-chip__leading {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
 .yohu-chip[data-tone="neutral"] {
   background-color: var(--yohu-surface-2);
   border-color: var(--yohu-border);
@@ -75,4 +86,20 @@
 .yohu-chip__remove:hover {
   background-color: var(--yohu-state-hover);
   color: var(--yohu-fg);
+}
+
+.yohu-chip[data-dismiss="hover"] .yohu-chip__remove {
+  opacity: 0;
+  transition: opacity var(--yohu-motion-effects-fast);
+}
+
+.yohu-chip[data-dismiss="hover"]:hover .yohu-chip__remove,
+.yohu-chip[data-dismiss="hover"]:focus-within .yohu-chip__remove {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .yohu-chip[data-dismiss="hover"] .yohu-chip__remove {
+    opacity: 1;
+  }
 }

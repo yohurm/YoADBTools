@@ -122,4 +122,26 @@ describe("motion recipes", () => {
     expect(untilIndicator).toContain("rotate(0deg)");
     expect(untilIndicator).not.toMatch(/\b\d+ms\b/);
   });
+
+  it("换位行铬在 L1，reduce 覆盖邻行让位与 Chip hover 关闭", () => {
+    const css = loadMotionCss();
+    const chrome = css.slice(css.indexOf("配方换位行铬"));
+    const untilReduce = chrome.slice(0, chrome.indexOf("reduced-motion"));
+    expect(untilReduce).toContain("[data-reordering]");
+    expect(untilReduce).toContain("[data-reorder=\"source\"]");
+    expect(untilReduce).toContain("[data-reordering] > * > [data-key]:not([data-reorder=\"source\"])");
+    expect(untilReduce).toContain("--yohu-motion-spatial-small");
+    expect(untilReduce).toContain("--yohu-state-reorder-source");
+    expect(untilReduce).not.toContain(".yohu-virtual-list");
+    expect(untilReduce).not.toContain(".yohu-reorder-list");
+    expect(untilReduce).not.toContain(".yohu-chip");
+
+    const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduce).toContain("[data-reordering] > * > [data-key]:not([data-reorder=\"source\"])");
+    expect(reduce).toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
+    expect(reduce).toContain(".yohu-recipe-reorder-bar[data-ready]");
+    expect(reduce).toContain(".yohu-recipe-reorder-overlay[data-ready]");
+    expect(reduce).not.toContain(".yohu-virtual-list[data-reordering] .yohu-virtual-list__row");
+    expect(reduce).not.toContain(".yohu-reorder-list[data-reordering] .yohu-reorder-list__row");
+  });
 });

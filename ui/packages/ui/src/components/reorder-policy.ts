@@ -3,6 +3,7 @@
  * 不写色值、不画铬、不碰 JSX。
  */
 
+import { isActionableTarget, isEditableTarget } from "../keymap/target";
 import { moveIndexFromInsert, type ReorderSession } from "./reorder-model";
 
 export function canReorderList(count: number): boolean {
@@ -11,6 +12,13 @@ export function canReorderList(count: number): boolean {
 
 export function shouldAcceptReorderPointer(button: number, count: number): boolean {
   return button === 0 && canReorderList(count);
+}
+
+/** 变高列表行内可编辑/可激活控件不抢换位；定高 VirtualList 不走此过滤。 */
+export function shouldBeginReorderFromTarget(target: EventTarget | null): boolean {
+  if (isEditableTarget(target) || isActionableTarget(target)) return false;
+  const el = target instanceof Element ? target : null;
+  return el === null || el.closest("[data-no-reorder]") === null;
 }
 
 export function beginReorderSession(from: number, key: string | number): ReorderSession {
@@ -62,6 +70,24 @@ export function resolveReorderKeyDelta(key: string, withReorderMod: boolean): nu
   if (key === "ArrowUp") return -1;
   if (key === "ArrowDown") return 1;
   return null;
+}
+
+/**
+ * 键盘换位入口。两 L4 共用。
+ * 非换位键 null；换位键但夹在两端 / 一项不够则 "noop"；否则 from→to。
+ */
+export function applyReorderKey(
+  key: string,
+  withReorderMod: boolean,
+  index: number,
+  count: number,
+): { from: number; to: number } | "noop" | null {
+  const delta = resolveReorderKeyDelta(key, withReorderMod);
+  if (delta === null) return null;
+  if (!canReorderList(count)) return "noop";
+  const to = Math.max(0, Math.min(count - 1, index + delta));
+  if (to === index) return "noop";
+  return { from: index, to };
 }
 
 export function shouldCancelReorder(key: string): boolean {

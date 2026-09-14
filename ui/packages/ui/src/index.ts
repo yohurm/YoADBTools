@@ -85,7 +85,7 @@ export { YoThemeToggle } from "./components/ThemeToggle";
 export type { YoThemeToggleProps } from "./components/ThemeToggle";
 
 export { YoTextField } from "./components/TextField";
-export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix } from "./components/TextField";
+export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix, YoTextFieldControl } from "./components/TextField";
 
 export { YoSelect } from "./components/Select";
 export type { YoSelectProps, YoSelectOption } from "./components/Select";
@@ -99,7 +99,7 @@ export type { YoSwitchProps } from "./components/Switch";
 export { YoBadge } from "./components/Badge";
 export type { YoBadgeProps, YoBadgeTone } from "./components/Badge";
 export { YoChip } from "./components/Chip";
-export type { YoChipProps, YoChipTone } from "./components/Chip";
+export type { YoChipProps, YoChipTone, YoChipDismiss, YoChipLeading } from "./components/Chip";
 
 export { YoProgressBar } from "./components/ProgressBar";
 export type { YoProgressBarProps } from "./components/ProgressBar";
@@ -117,9 +117,12 @@ export type { YoTreeProps, TreeNode } from "./components/Tree";
 export { YoVirtualList } from "./components/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./components/VirtualList";
 
+export { YoReorderList } from "./components/ReorderList";
+export type { YoReorderListProps } from "./components/ReorderList";
+
 export {
-  dropIndexFromCenters,
   insertIndexFromPointerY,
+  insertIndexFromRowBoxes,
   moveIndexFromInsert,
   moveItemTo,
   shiftForReorder,

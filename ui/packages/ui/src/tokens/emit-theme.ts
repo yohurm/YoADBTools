@@ -6,11 +6,11 @@ import { Colors, DarkColors, FileIconDark, FileIconLight, LogLevelDark, LogLevel
 import { Density } from "./density";
 import { DarkElevation, Elevation } from "./elevation";
 import { ZIndex } from "./z-index";
-import { FocusRing, Layout, Stroke } from "./layout";
+import { FocusRing, Layout, LayoutLimits, Stroke } from "./layout";
 import { MotionDuration, MotionEasing, MotionSpec } from "./motion";
 import { Radius, RadiusShape } from "./radius";
 import { Spacing } from "./spacing";
-import { DarkStateFill, Ripple, StateFill } from "./state";
+import { DarkStateFill, Ripple, StateFill, StateOpacity } from "./state";
 import { FontFamilies, FontLeading, FontSizes, FontSizesCompact, FontWeights } from "./typography";
 
 function kebab(name: string): string {
@@ -72,6 +72,10 @@ export function emitThemeCss(): string {
   const layout: Array<[string, string]> = (Object.entries(Layout) as Array<[string, number]>).map(
     ([name, value]) => [`--yohu-layout-${kebab(name)}`, `${value}px`],
   );
+  layout.push([
+    "--yohu-layout-device-rail-max",
+    `${LayoutLimits.DeviceRailMaxPercent}%`,
+  ]);
   const zIndex: Array<[string, string]> = Object.entries(ZIndex).map(([name, value]) => [
     `--yohu-z-${kebab(name)}`,
     String(value),
@@ -104,6 +108,7 @@ export function emitThemeCss(): string {
     ["--yohu-state-pressed", StateFill.Pressed],
     ["--yohu-state-selected", StateFill.Selected],
     ["--yohu-state-selected-fg", StateFill.SelectedFg],
+    ["--yohu-state-reorder-source", StateOpacity.ReorderSource],
     ...fontSizeVars(FontSizes),
     ...leadingVars(FontLeading),
     ["--yohu-font-sans", FontFamilies.Sans],
