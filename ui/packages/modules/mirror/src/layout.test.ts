@@ -6,7 +6,7 @@ vi.mock("@yohu/api", () => ({
 
 import { MIRROR_MIN_LAYOUT_PX } from "@yohu/api";
 
-import { clientZoneRect, layoutIsPresentable, workbenchDark } from "./layout";
+import { clientZoneRect, assembleMirrorLayout, layoutInsetKey, layoutIsPresentable, shouldReportLayout, workbenchDark } from "./layout";
 
 describe("clientZoneRect", () => {
   it("把 CSS 盒乘 DPR，不加屏幕原点", () => {
@@ -59,5 +59,86 @@ describe("workbenchDark", () => {
     expect(workbenchDark(document)).toBe(false);
     if (prev === null) document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", prev);
+  });
+});
+
+describe("assembleMirrorLayout", () => {
+  const avail = {
+    x: 10,
+    y: 20,
+    width: 300,
+    height: 600,
+    visible: true,
+    dpr: 1.5,
+    dark: true,
+  };
+  const flags = {
+    serial: "S1",
+    fullscreen: true,
+    paused: true,
+    control: false,
+    hasDevice: true,
+    failed: false,
+    error: "",
+  };
+
+  it("avail 与会话旗标合成 MirrorLayout，不含 contain / 编码尺寸", () => {
+    const layout = assembleMirrorLayout(avail, flags);
+    expect(layout).toEqual({
+      serial: "S1",
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 600,
+      visible: true,
+      dpr: 1.5,
+      fullscreen: true,
+      paused: true,
+      control: false,
+      has_device: true,
+      failed: false,
+      error: "",
+      dark: true,
+    });
+    expect(layout).not.toHaveProperty("video_width");
+    expect(layout).not.toHaveProperty("stroke_px");
+    expect(layout).not.toHaveProperty("epoch");
+  });
+
+  it("inset key 覆盖占用与会话旗标", () => {
+    const layout = assembleMirrorLayout(avail, flags);
+    expect(layoutInsetKey(layout)).toBe(
+      "S1,10,20,300x600,v=true,dpr=1.5,f=true,p=true,c=false,dev=true,fail=false,e=,dark=true",
+    );
+  });
+});
+
+describe("shouldReportLayout", () => {
+  it("隐藏即使小于最小像素也上报", () => {
+    expect(
+      shouldReportLayout({
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        visible: false,
+        dpr: 1,
+        dark: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("可见且低于最小像素不上报", () => {
+    expect(
+      shouldReportLayout({
+        x: 0,
+        y: 0,
+        width: 63,
+        height: 64,
+        visible: true,
+        dpr: 1,
+        dark: false,
+      }),
+    ).toBe(false);
   });
 });

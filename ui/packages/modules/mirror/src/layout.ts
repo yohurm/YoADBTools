@@ -1,6 +1,6 @@
-/** 可用区几何：View 量 `.yohu-mirror__avail` 后经 `clientZoneRect` 上报。 */
+/** 可用区几何：View 量 `.yohu-mirror__avail`；store 组装 `MirrorLayout`。 */
 
-import { MIRROR_MIN_LAYOUT_PX } from "@yohu/api";
+import { MIRROR_MIN_LAYOUT_PX, type MirrorLayout } from "@yohu/api";
 
 export interface CssRect {
   left: number;
@@ -19,6 +19,24 @@ export interface PhysicalRect {
 export interface ViewportOffset {
   left: number;
   top: number;
+}
+
+/** View 交出的可用区：物理矩形 + 可见/dpr/工作台主题。会话旗标不在这里。 */
+export interface AvailZone extends PhysicalRect {
+  visible: boolean;
+  dpr: number;
+  dark: boolean;
+}
+
+/** store 会话旗标（不含 avail）。 */
+export interface LayoutFlags {
+  serial: string;
+  fullscreen: boolean;
+  paused: boolean;
+  control: boolean;
+  hasDevice: boolean;
+  failed: boolean;
+  error: string;
 }
 
 /**
@@ -43,6 +61,34 @@ export function clientZoneRect(
 
 export function layoutIsPresentable(width: number, height: number): boolean {
   return width >= MIRROR_MIN_LAYOUT_PX && height >= MIRROR_MIN_LAYOUT_PX;
+}
+
+/** 隐藏必须上报；可见时低于最小物理像素不 Present。 */
+export function shouldReportLayout(avail: AvailZone): boolean {
+  return !avail.visible || layoutIsPresentable(avail.width, avail.height);
+}
+
+export function assembleMirrorLayout(avail: AvailZone, flags: LayoutFlags): MirrorLayout {
+  return {
+    serial: flags.serial,
+    x: avail.x,
+    y: avail.y,
+    width: avail.width,
+    height: avail.height,
+    visible: avail.visible,
+    dpr: avail.dpr,
+    fullscreen: flags.fullscreen,
+    paused: flags.paused,
+    control: flags.control,
+    has_device: flags.hasDevice,
+    failed: flags.failed,
+    error: flags.error,
+    dark: avail.dark,
+  };
+}
+
+export function layoutInsetKey(layout: MirrorLayout): string {
+  return `${layout.serial},${layout.x},${layout.y},${layout.width}x${layout.height},v=${layout.visible},dpr=${layout.dpr},f=${layout.fullscreen},p=${layout.paused},c=${layout.control},dev=${layout.has_device},fail=${layout.failed},e=${layout.error},dark=${layout.dark}`;
 }
 
 /** HWND chrome / letterbox 跟工作台主题，不是设备夜览。 */

@@ -1,5 +1,6 @@
 /**
  * 投屏模块状态：控制面走 mirror/state；出画以 mirror/painted 为准；画面在壳 HWND。
+ * View 只报 avail；本层组装 MirrorLayout 并 invoke。
  */
 
 import { createStore } from "solid-js/store";
@@ -20,12 +21,18 @@ import {
   settingsSet,
   type AppSettings,
   type MirrorControlMessage,
-  type MirrorLayout,
   type MirrorProtocol,
   type MirrorSessionState,
   type SettingKey,
   YoLog,
 } from "@yohu/api";
+
+import {
+  assembleMirrorLayout,
+  layoutInsetKey,
+  shouldReportLayout,
+  type AvailZone,
+} from "./layout";
 
 export type MirrorPhase = "idle" | "starting" | "live" | "failed";
 
@@ -48,6 +55,9 @@ export interface MirrorUiState {
   maxFps: number;
   protocol: MirrorProtocol;
   paintedFps: number;
+  nightHub: boolean | null;
+  nightPending: boolean | null;
+  night: boolean | null;
 }
 
 function phaseOf(state: MirrorSessionState): MirrorPhase {
@@ -72,6 +82,37 @@ function settingsSlice(settings: Pick<
   };
 }
 
+function idleAfterUnbind(): Pick<
+  MirrorUiState,
+  | "phase"
+  | "generation"
+  | "codec"
+  | "control"
+  | "error"
+  | "hasFrame"
+  | "paused"
+  | "fullscreen"
+  | "paintedFps"
+  | "nightHub"
+  | "nightPending"
+  | "night"
+> {
+  return {
+    phase: "idle",
+    generation: 0,
+    codec: "",
+    control: false,
+    error: null,
+    hasFrame: false,
+    paused: false,
+    fullscreen: false,
+    paintedFps: 0,
+    nightHub: null,
+    nightPending: null,
+    night: null,
+  };
+}
+
 export function createMirrorStore() {
   const [state, setState] = createStore<MirrorUiState>({
     serial: null,
@@ -92,11 +133,15 @@ export function createMirrorStore() {
     maxFps: APP_SETTINGS_DEFAULT.mirror_max_fps,
     protocol: APP_SETTINGS_DEFAULT.mirror_protocol,
     paintedFps: 0,
+    nightHub: null,
+    nightPending: null,
+    night: null,
   });
 
   let gate: Promise<void> = Promise.resolve();
   let sessionQualityTouched = false;
-  let lastLayoutLog = { key: "" };
+  let lastAvail: AvailZone | null = null;
+  let lastInsetKey = "";
   const unlistens: Promise<() => void>[] = [];
 
   function runExclusive(fn: () => Promise<void>): Promise<void> {
@@ -106,6 +151,34 @@ export function createMirrorStore() {
       () => undefined,
     );
     return run;
+  }
+
+  function sessionFlags() {
+    const live = state.phase === "live";
+    return {
+      serial: state.serial ?? "",
+      fullscreen: state.fullscreen,
+      paused: state.paused,
+      control: live && state.hasFrame && !state.readOnly && state.control,
+      hasDevice: Boolean(state.serial),
+      failed: state.phase === "failed",
+      error: state.error ?? "",
+    };
+  }
+
+  function flushLayout(): void {
+    if (!lastAvail || !shouldReportLayout(lastAvail)) return;
+    const payload = assembleMirrorLayout(lastAvail, sessionFlags());
+    const key = layoutInsetKey(payload);
+    if (key === lastInsetKey) return;
+    lastInsetKey = key;
+    YoLog.info("mirror", "layout", payload);
+    void mirrorLayout(payload);
+  }
+
+  function reportAvail(avail: AvailZone): void {
+    lastAvail = avail;
+    flushLayout();
   }
 
   /** 质量来自壳注入的 DeviceSession.settings，不另订 settings/changed。 */
@@ -125,35 +198,31 @@ export function createMirrorStore() {
     setState("connection", connection || "usb");
   }
 
+  function bindNight(hub: boolean | null): void {
+    const pending = state.nightPending;
+    const nextPending = pending !== null && hub === pending ? null : pending;
+    setState({
+      nightHub: hub,
+      nightPending: nextPending,
+      night: nextPending ?? hub,
+    });
+  }
+
   async function bindSerial(next: string | null): Promise<void> {
     const prev = state.serial;
     if (prev === next) return;
-    if (
-      next === null &&
-      prev &&
-      (state.phase === "live" || state.phase === "starting")
-    ) {
-      YoLog.warn("mirror", "忽略空 serial 绑定（会话进行中）", { serial: prev, phase: state.phase });
-      return;
-    }
     if (prev && (state.phase === "live" || state.phase === "starting")) {
       await runExclusive(async () => {
+        YoLog.info("mirror", "解绑停止", prev);
         await mirrorStop(prev);
       });
     }
     sessionQualityTouched = false;
     setState({
       serial: next,
-      phase: "idle",
-      generation: 0,
-      codec: "",
-      control: false,
-      error: null,
-      hasFrame: false,
-      paused: false,
-      fullscreen: false,
-      paintedFps: 0,
+      ...idleAfterUnbind(),
     });
+    flushLayout();
   }
 
   async function start(): Promise<void> {
@@ -161,6 +230,7 @@ export function createMirrorStore() {
     if (!serial) return;
     await runExclusive(async () => {
       setState({ phase: "starting", error: null, hasFrame: false, paintedFps: 0 });
+      flushLayout();
       YoLog.info("mirror", "开始", {
         serial,
         connection: state.connection,
@@ -184,6 +254,7 @@ export function createMirrorStore() {
           error,
           hasFrame: false,
         });
+        flushLayout();
       }
     });
   }
@@ -202,6 +273,7 @@ export function createMirrorStore() {
         fullscreen: false,
         paintedFps: 0,
       });
+      flushLayout();
     });
   }
 
@@ -216,11 +288,13 @@ export function createMirrorStore() {
     const serial = state.serial;
     if (!serial || state.phase !== "live") {
       setState("readOnly", next);
+      flushLayout();
       return;
     }
     if (next) {
       await mirrorCloseControl(serial);
       setState({ readOnly: true, control: false });
+      flushLayout();
       return;
     }
     setState("readOnly", false);
@@ -229,7 +303,14 @@ export function createMirrorStore() {
   }
 
   async function setDeviceNight(serial: string, night: boolean): Promise<void> {
-    await deviceSetNightMode(serial, night);
+    setState({ nightPending: night, night });
+    try {
+      await deviceSetNightMode(serial, night);
+    } catch (e) {
+      const hub = state.nightHub;
+      setState({ nightPending: null, night: hub });
+      throw e;
+    }
   }
 
   async function persistQuality(
@@ -242,13 +323,9 @@ export function createMirrorStore() {
     >,
     value: number | MirrorProtocol,
   ): Promise<void> {
+    const updated = await settingsSet(key, value as never);
+    applySettings(updated);
     sessionQualityTouched = true;
-    try {
-      const updated = await settingsSet(key, value as never);
-      applySettings(updated);
-    } catch (e) {
-      YoLog.error("mirror", "质量写入失败", { key, error: String(e) });
-    }
   }
 
   async function saveScreenshot(): Promise<void> {
@@ -263,30 +340,16 @@ export function createMirrorStore() {
     await mirrorScreenshot({ serial, path });
   }
 
-  function syncLayout(rect: Omit<MirrorLayout, "serial"> & { serial?: string }): void {
-    const serial = rect.serial ?? state.serial ?? "";
-    const payload: MirrorLayout = {
-      serial,
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
-      visible: rect.visible,
-      dpr: rect.dpr,
-      fullscreen: rect.fullscreen,
-      paused: rect.paused,
-      control: rect.control,
-      has_device: rect.has_device,
-      failed: rect.failed,
-      error: rect.error,
-      dark: rect.dark,
-    };
-    const key = `${payload.serial},${payload.x},${payload.y},${payload.width}x${payload.height},v=${payload.visible},dpr=${payload.dpr},f=${payload.fullscreen},p=${payload.paused},c=${payload.control},dev=${payload.has_device},fail=${payload.failed},e=${payload.error},dark=${payload.dark}`;
-    if (key !== lastLayoutLog.key) {
-      lastLayoutLog.key = key;
-      YoLog.info("mirror", "layout", payload);
-    }
-    void mirrorLayout(payload);
+  function setPaused(paused: boolean): void {
+    if (paused === state.paused) return;
+    setState("paused", paused);
+    flushLayout();
+  }
+
+  function setFullscreen(fullscreen: boolean): void {
+    if (fullscreen === state.fullscreen) return;
+    setState("fullscreen", fullscreen);
+    flushLayout();
   }
 
   unlistens.push(
@@ -312,6 +375,7 @@ export function createMirrorStore() {
       if (e.state === "stopped" || e.state === "failed") {
         setState({ paused: false, fullscreen: false, hasFrame: false, paintedFps: 0 });
       }
+      flushLayout();
     }),
   );
   unlistens.push(
@@ -329,6 +393,7 @@ export function createMirrorStore() {
         hasFrame: true,
         paintedFps: e.painted_fps,
       });
+      flushLayout();
     }),
   );
   unlistens.push(
@@ -343,6 +408,7 @@ export function createMirrorStore() {
         control: false,
         paintedFps: 0,
       });
+      flushLayout();
     }),
   );
 
@@ -355,6 +421,7 @@ export function createMirrorStore() {
     state,
     bindSerial,
     bindConnection,
+    bindNight,
     applySettings,
     start,
     stop,
@@ -363,9 +430,9 @@ export function createMirrorStore() {
     persistQuality,
     saveScreenshot,
     setDeviceNight,
-    syncLayout,
-    setPaused: (paused: boolean) => setState("paused", paused),
-    setFullscreen: (fullscreen: boolean) => setState("fullscreen", fullscreen),
+    reportAvail,
+    setPaused,
+    setFullscreen,
   };
 }
 

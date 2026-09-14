@@ -1,13 +1,14 @@
 /**
- * 投屏主视图：可用区只量盒；画面在壳 HWND 上。
+ * 投屏主视图：只量 `.yohu-mirror__avail`；会话旗标与 invoke 在 store。
  */
 
-import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
-import { errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
+import { For, createEffect, onCleanup, onMount } from "solid-js";
+import { AndroidKey, errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
   YoChrome,
+  YoFormRow,
   YoIconButton,
   YoPage,
   YoPanel,
@@ -17,41 +18,21 @@ import {
   type IconName,
 } from "@yohu/ui";
 
-import { AndroidKey } from "./keys";
-import { clientZoneRect, layoutIsPresentable, workbenchDark } from "./layout";
+import { clientZoneRect, workbenchDark } from "./layout";
+import {
+  FPS_OPTIONS,
+  PROTOCOL_OPTIONS,
+  RATE_OPTIONS,
+  SIZE_OPTIONS,
+  fpsLabel,
+  rateLabel,
+  sizeLabel,
+  withCurrentOption,
+} from "./quality";
 import { mirrorStore } from "./store";
 import "./mirror.css";
 
 const toaster = createToaster();
-
-const SIZE_OPTIONS = [
-  { value: "0", label: "原始" },
-  { value: "640", label: "640" },
-  { value: "1024", label: "1024" },
-  { value: "1280", label: "1280" },
-  { value: "1920", label: "1920" },
-];
-
-const RATE_OPTIONS = [
-  { value: "1000000", label: "1 Mbps" },
-  { value: "2000000", label: "2 Mbps" },
-  { value: "4000000", label: "4 Mbps" },
-  { value: "8000000", label: "8 Mbps" },
-  { value: "16000000", label: "16 Mbps" },
-];
-
-const FPS_OPTIONS = [
-  { value: "0", label: "不限" },
-  { value: "15", label: "15 fps" },
-  { value: "30", label: "30 fps" },
-  { value: "60", label: "60 fps" },
-  { value: "120", label: "120 fps" },
-];
-
-const PROTOCOL_OPTIONS = [
-  { value: "usb", label: "USB" },
-  { value: "wifi", label: "无线" },
-];
 
 type DeviceOp = { icon: IconName; title: string; keycode: number };
 
@@ -69,36 +50,13 @@ const BRIGHTNESS_OPS: DeviceOp[] = [
   { icon: "brightness-up", title: "亮度+", keycode: AndroidKey.BrightnessUp },
 ];
 
-function withCurrentOption(
-  options: { value: string; label: string }[],
-  current: number,
-  labelOf: (n: number) => string,
-): { value: string; label: string }[] {
-  const value = String(current);
-  if (options.some((item) => item.value === value)) return options;
-  return [{ value, label: labelOf(current) }, ...options];
-}
-
-function ipcMessage(error: unknown): string {
-  return errorText(error);
-}
-
 export function MirrorView(props: DeviceSession) {
   let avail: HTMLDivElement | undefined;
   let zoneObserver: ResizeObserver | undefined;
   let themeObserver: MutationObserver | undefined;
   let layoutRaf = 0;
-  let layoutVisible: boolean | undefined;
-  let lastInsetKey = "";
-  const [pendingNight, setPendingNight] = createSignal<boolean | null>(null);
-  const sessionNight = (): boolean | null => {
-    const serial = props.selectedSerials[0];
-    if (!serial) return null;
-    return props.deviceStatuses[serial]?.night ?? null;
-  };
-  const deviceNight = (): boolean | null => pendingNight() ?? sessionNight();
-  function pushLayout(visible?: boolean): void {
-    if (visible !== undefined) layoutVisible = visible;
+
+  function pushLayout(): void {
     if (layoutRaf !== 0) return;
     layoutRaf = window.requestAnimationFrame(() => {
       layoutRaf = 0;
@@ -107,35 +65,11 @@ export function MirrorView(props: DeviceSession) {
       const vv = window.visualViewport;
       const dpr = window.devicePixelRatio || 1;
       const rect = clientZoneRect(zone, dpr, { left: vv?.offsetLeft ?? 0, top: vv?.offsetTop ?? 0 });
-      const hiding = layoutVisible === false;
-      if (!hiding && !layoutIsPresentable(rect.width, rect.height)) {
-        return;
-      }
-      const phase = mirrorStore.state.phase;
-      const live = phase === "live";
-      const hasFrame = mirrorStore.state.hasFrame;
-      const visibleNow = layoutVisible !== false && document.visibilityState === "visible";
-      const control = live && hasFrame && !mirrorStore.state.readOnly && mirrorStore.state.control;
-      const hasDevice = props.selectedSerials.length > 0;
-      const failed = phase === "failed";
-      const error = mirrorStore.state.error ?? "";
-      const dark = workbenchDark(document);
-      const fullscreen = mirrorStore.state.fullscreen;
-      const paused = mirrorStore.state.paused;
-      const insetKey = `${props.selectedSerials[0] ?? ""},${rect.x},${rect.y},${rect.width}x${rect.height},v=${visibleNow},dpr=${dpr},f=${fullscreen},p=${paused},c=${control},dev=${hasDevice},fail=${failed},e=${error},dark=${dark}`;
-      if (insetKey === lastInsetKey) return;
-      lastInsetKey = insetKey;
-      void mirrorStore.syncLayout({
+      mirrorStore.reportAvail({
         ...rect,
-        visible: visibleNow,
+        visible: document.visibilityState === "visible",
         dpr,
-        fullscreen,
-        paused,
-        control,
-        has_device: hasDevice,
-        failed,
-        error,
-        dark,
+        dark: workbenchDark(document),
       });
     });
   }
@@ -149,7 +83,6 @@ export function MirrorView(props: DeviceSession) {
       zoneObserver.observe(avail);
     }
     themeObserver = new MutationObserver(() => {
-      lastInsetKey = "";
       pushLayout();
     });
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -170,7 +103,7 @@ export function MirrorView(props: DeviceSession) {
     pushLayout();
   }
   function onVis(): void {
-    pushLayout(document.visibilityState === "visible");
+    pushLayout();
   }
   function onEsc(e: KeyboardEvent): void {
     if (e.key !== "Escape" || !mirrorStore.state.fullscreen) return;
@@ -185,42 +118,22 @@ export function MirrorView(props: DeviceSession) {
   });
 
   createEffect(() => {
-    void props.selectedSerials[0];
-    setPendingNight(null);
-  });
-
-  createEffect(() => {
-    const hub = sessionNight();
-    const pending = pendingNight();
-    if (pending !== null && hub === pending) setPendingNight(null);
+    const serial = props.selectedSerials[0];
+    if (!serial) {
+      mirrorStore.bindNight(null);
+      return;
+    }
+    mirrorStore.bindNight(props.deviceStatuses[serial]?.night ?? null);
   });
 
   createEffect(() => {
     mirrorStore.applySettings(props.settings);
   });
 
-  createEffect(() => {
-    const _phase = mirrorStore.state.phase;
-    const _paused = mirrorStore.state.paused;
-    const _full = mirrorStore.state.fullscreen;
-    const _has = mirrorStore.state.hasFrame;
-    const _ro = mirrorStore.state.readOnly;
-    const _ctrl = mirrorStore.state.control;
-    const _err = mirrorStore.state.error;
-    const _serial = props.selectedSerials[0];
-    void _phase;
-    void _paused;
-    void _full;
-    void _has;
-    void _ro;
-    void _ctrl;
-    void _err;
-    void _serial;
-    pushLayout(document.visibilityState === "visible");
-  });
-
   const live = () => mirrorStore.state.phase === "live";
   const canControl = () => live() && mirrorStore.state.hasFrame && !mirrorStore.state.readOnly && mirrorStore.state.control;
+  const starting = () => mirrorStore.state.phase === "starting";
+  const qualityDisabled = () => starting();
 
   async function tapKey(keycode: number): Promise<void> {
     await mirrorStore.inject({ kind: "key", keycode, down: true });
@@ -233,15 +146,12 @@ export function MirrorView(props: DeviceSession) {
 
   async function toggleDeviceNight(): Promise<void> {
     const serial = props.selectedSerials[0];
-    const current = deviceNight();
+    const current = mirrorStore.state.night;
     if (!serial || current === null) return;
-    const next = !current;
-    setPendingNight(next);
     try {
-      await mirrorStore.setDeviceNight(serial, next);
+      await mirrorStore.setDeviceNight(serial, !current);
     } catch (e) {
-      setPendingNight(null);
-      toaster.show(`切换设备深浅色失败: ${ipcMessage(e)}`, "error");
+      toaster.show(`切换设备深浅色失败: ${errorText(e)}`, "error");
     }
   }
 
@@ -250,7 +160,18 @@ export function MirrorView(props: DeviceSession) {
       await mirrorStore.saveScreenshot();
       toaster.show("截图已保存", "success");
     } catch (e) {
-      toaster.show(`保存失败: ${ipcMessage(e)}`, "error");
+      toaster.show(`保存失败: ${errorText(e)}`, "error");
+    }
+  }
+
+  async function persistQuality(
+    key: "mirror_protocol" | "mirror_max_size" | "mirror_video_bit_rate" | "mirror_max_fps",
+    value: "usb" | "wifi" | number,
+  ): Promise<void> {
+    try {
+      await mirrorStore.persistQuality(key, value);
+    } catch (e) {
+      toaster.show(`质量写入失败: ${errorText(e)}`, "error");
     }
   }
 
@@ -260,8 +181,8 @@ export function MirrorView(props: DeviceSession) {
         <YoButton
           size="sm"
           variant="solid"
-          disabled={!props.selectedSerials[0] || mirrorStore.state.phase === "starting"}
-          loading={mirrorStore.state.phase === "starting"}
+          disabled={!props.selectedSerials[0] || starting()}
+          loading={starting()}
           onClick={() => {
             if (live()) void mirrorStore.stop();
             else void mirrorStore.start();
@@ -292,7 +213,7 @@ export function MirrorView(props: DeviceSession) {
           variant={mirrorStore.state.readOnly ? "solid" : "outlined"}
           tone={mirrorStore.state.readOnly ? "accent" : "neutral"}
           aria-pressed={mirrorStore.state.readOnly}
-          disabled={!props.selectedSerials[0] || mirrorStore.state.phase === "starting"}
+          disabled={!props.selectedSerials[0] || starting()}
           onClick={() => void mirrorStore.setReadOnly(!mirrorStore.state.readOnly)}
         >
           仅显示
@@ -333,13 +254,17 @@ export function MirrorView(props: DeviceSession) {
             )}
           </For>
           <YoIconButton
-            icon={deviceNight() === true ? "display-off" : "display-on"}
+            icon={mirrorStore.state.night === true ? "display-off" : "display-on"}
             title={
-              deviceNight() === null ? "设备深浅色" : deviceNight() === true ? "设备深色" : "设备浅色"
+              mirrorStore.state.night === null
+                ? "设备深浅色"
+                : mirrorStore.state.night === true
+                  ? "设备深色"
+                  : "设备浅色"
             }
             size="md"
-            pressed={deviceNight() === true}
-            disabled={!props.selectedSerials[0] || deviceNight() === null}
+            pressed={mirrorStore.state.night === true}
+            disabled={!props.selectedSerials[0] || mirrorStore.state.night === null}
             onClick={() => void toggleDeviceNight()}
           />
           <For each={BRIGHTNESS_OPS}>
@@ -360,52 +285,42 @@ export function MirrorView(props: DeviceSession) {
             质量
             <YoBadge text="下次开始生效" tone="neutral" />
           </div>
-          <label class="yohu-mirror__field">
-            <span class="yohu-mirror__field-name">投屏协议</span>
+          <YoFormRow title="投屏协议">
             <YoSelect
               block
               options={PROTOCOL_OPTIONS}
               value={mirrorStore.state.protocol}
-              disabled={mirrorStore.state.phase === "starting"}
-              onChange={(v) => void mirrorStore.persistQuality("mirror_protocol", v as "usb" | "wifi")}
+              disabled={qualityDisabled()}
+              onChange={(v) => void persistQuality("mirror_protocol", v as "usb" | "wifi")}
             />
-          </label>
-          <label class="yohu-mirror__field">
-            <span class="yohu-mirror__field-name">长边</span>
+          </YoFormRow>
+          <YoFormRow title="长边">
             <YoSelect
               block
-              options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, (n) =>
-                n === 0 ? "原始" : String(n),
-              )}
+              options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, sizeLabel)}
               value={String(mirrorStore.state.maxSize)}
-              disabled={mirrorStore.state.phase === "starting"}
-              onChange={(v) => void mirrorStore.persistQuality("mirror_max_size", Number.parseInt(v, 10))}
+              disabled={qualityDisabled()}
+              onChange={(v) => void persistQuality("mirror_max_size", Number.parseInt(v, 10))}
             />
-          </label>
-          <label class="yohu-mirror__field">
-            <span class="yohu-mirror__field-name">码率</span>
+          </YoFormRow>
+          <YoFormRow title="码率">
             <YoSelect
               block
-              options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, (n) =>
-                n >= 1_000_000 ? `${n / 1_000_000} Mbps` : `${n} bps`,
-              )}
+              options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, rateLabel)}
               value={String(mirrorStore.state.videoBitRate)}
-              disabled={mirrorStore.state.phase === "starting"}
-              onChange={(v) => void mirrorStore.persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
+              disabled={qualityDisabled()}
+              onChange={(v) => void persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
             />
-          </label>
-          <label class="yohu-mirror__field">
-            <span class="yohu-mirror__field-name">帧率</span>
+          </YoFormRow>
+          <YoFormRow title="帧率">
             <YoSelect
               block
-              options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, (n) =>
-                n === 0 ? "不限" : `${n} fps`,
-              )}
+              options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, fpsLabel)}
               value={String(mirrorStore.state.maxFps)}
-              disabled={mirrorStore.state.phase === "starting"}
-              onChange={(v) => void mirrorStore.persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
+              disabled={qualityDisabled()}
+              onChange={(v) => void persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
             />
-          </label>
+          </YoFormRow>
         </YoPanel>
       </div>
       <YoToaster toaster={toaster} />

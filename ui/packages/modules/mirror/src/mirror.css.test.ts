@@ -15,10 +15,15 @@ describe("mirror.css", () => {
     expect(css).not.toContain(".yohu-panel__body");
   });
 
-  it("质量字段拉满栏宽，不靠组容器均分高度", () => {
-    expect(css).toMatch(/\.yohu-mirror__field\s*\{[^}]*width:\s*100%/);
+  it("质量字段走 YoFormRow，不自写 caption 皮", () => {
+    expect(css).not.toContain("yohu-mirror__field");
     expect(css).not.toMatch(/\.yohu-mirror__group\s*\{/);
     expect(css).not.toContain("justify-content: space-between");
+    expect(view).toContain("YoFormRow");
+    expect(view).toContain("reportAvail");
+    expect(view).not.toContain("fitContain");
+    expect(view).not.toContain("ipcMessage");
+    expect(view).not.toContain("lastInsetKey");
     expect(view).toContain('YoBadge text="下次开始生效"');
     expect(view).not.toContain("YoTooltip");
   });

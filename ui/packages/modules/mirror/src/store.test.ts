@@ -32,6 +32,7 @@ vi.mock("@yohu/api", () => ({
     mirror_protocol: "usb",
     mirror_force_forward: false,
   },
+  MIRROR_MIN_LAYOUT_PX: 64,
   errorText: (e: unknown) => String(e),
   mirrorStart: (...a: unknown[]) => mocks.mirrorStart(...a),
   mirrorStop: (...a: unknown[]) => mocks.mirrorStop(...a),
@@ -184,6 +185,22 @@ describe("mirror store", () => {
     });
   });
 
+  it("persistQuality 失败不立旗并上抛", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    await store.bindSerial("S1");
+    mocks.settingsSet.mockRejectedValueOnce(new Error("write fail"));
+    await expect(store.persistQuality("mirror_max_size", 1280)).rejects.toThrow("write fail");
+    mocks.mirrorStart.mockResolvedValue({ serial: "S1", generation: 1, adopted: false });
+    await store.start();
+    expect(mocks.mirrorStart.mock.calls[0]?.[0]).toEqual({
+      serial: "S1",
+      control: true,
+      connection: "usb",
+      session_quality_touched: false,
+    });
+  });
+
   it("tcp 连接自动 wifi 档并默认 forward", async () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
@@ -209,7 +226,7 @@ describe("mirror store", () => {
     expect(mocks.mirrorStart).toHaveBeenCalledTimes(1);
   });
 
-  it("会话进行中忽略空 serial，避免误停", async () => {
+  it("会话进行中 bindSerial(null) 显式 stop 并解绑", async () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
     await store.bindSerial("S1");
@@ -222,10 +239,11 @@ describe("mirror store", () => {
       codec: "h265",
       control: false,
     });
+    mocks.mirrorStop.mockResolvedValue(undefined);
     await store.bindSerial(null);
-    expect(mocks.mirrorStop).not.toHaveBeenCalled();
-    expect(store.state.serial).toBe("S1");
-    expect(store.state.phase).toBe("live");
+    expect(mocks.mirrorStop).toHaveBeenCalledWith("S1");
+    expect(store.state.serial).toBeNull();
+    expect(store.state.phase).toBe("idle");
   });
 
   it("saveScreenshot 走 dialog 再 mirror.screenshot", async () => {
@@ -292,23 +310,17 @@ describe("mirror store", () => {
     expect(store.state.readOnly).toBe(false);
   });
 
-  it("idle 仍上报 layout", async () => {
+  it("idle 仍上报 layout：View 只交 avail，store 组装旗标", async () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
     await store.bindSerial("S1");
-    store.syncLayout({
+    store.reportAvail({
       x: 10,
       y: 20,
       width: 300,
       height: 600,
       visible: true,
       dpr: 1,
-      fullscreen: false,
-      paused: false,
-      control: false,
-      has_device: true,
-      failed: false,
-      error: "",
       dark: false,
     });
     expect(mocks.mirrorLayout.mock.calls[0]?.[0]).toMatchObject({
@@ -332,19 +344,15 @@ describe("mirror store", () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
     await store.bindSerial("S1");
-    store.syncLayout({
+    store.setFullscreen(true);
+    store.setPaused(true);
+    store.reportAvail({
       x: 10,
       y: 20,
       width: 300,
       height: 600,
       visible: true,
       dpr: 1.5,
-      fullscreen: true,
-      paused: true,
-      control: false,
-      has_device: true,
-      failed: false,
-      error: "",
       dark: true,
     });
     expect(mocks.mirrorLayout.mock.calls[0]?.[0]).toMatchObject({
@@ -363,12 +371,79 @@ describe("mirror store", () => {
     expect(mocks.mirrorLayout.mock.calls[0]?.[0]).not.toHaveProperty("corner_radius");
   });
 
-  it("setDeviceNight 走 device.setNightMode", async () => {
+  it("同 avail 不重复 invoke；暂停只由 store 重组装", async () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
+    await store.bindSerial("S1");
+    const avail = {
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 600,
+      visible: true,
+      dpr: 1,
+      dark: false,
+    };
+    store.reportAvail(avail);
+    store.reportAvail(avail);
+    expect(mocks.mirrorLayout).toHaveBeenCalledTimes(1);
+    mocks.mirrorLayout.mockClear();
+    store.setPaused(true);
+    expect(mocks.mirrorLayout.mock.calls[0]?.[0]).toMatchObject({
+      serial: "S1",
+      paused: true,
+      width: 300,
+      height: 600,
+    });
+  });
+
+  it("可见且小于最小像素不上报；隐藏仍上报", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    await store.bindSerial("S1");
+    store.reportAvail({
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      visible: true,
+      dpr: 1,
+      dark: false,
+    });
+    expect(mocks.mirrorLayout).not.toHaveBeenCalled();
+    store.reportAvail({
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      visible: false,
+      dpr: 1,
+      dark: false,
+    });
+    expect(mocks.mirrorLayout.mock.calls[0]?.[0]).toMatchObject({
+      serial: "S1",
+      visible: false,
+      width: 10,
+      height: 10,
+    });
+  });
+
+  it("setDeviceNight 先乐观再 IPC；失败回到 hub", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    store.bindNight(false);
+    expect(store.state.night).toBe(false);
     mocks.deviceSetNightMode.mockResolvedValue({ serial: "S1", night: true });
-    await store.setDeviceNight("S1", true);
+    const pending = store.setDeviceNight("S1", true);
+    expect(store.state.night).toBe(true);
+    await pending;
     expect(mocks.deviceSetNightMode).toHaveBeenCalledWith("S1", true);
+    store.bindNight(true);
+    expect(store.state.nightPending).toBeNull();
+    expect(store.state.night).toBe(true);
+    mocks.deviceSetNightMode.mockRejectedValueOnce(new Error("fail"));
+    await expect(store.setDeviceNight("S1", false)).rejects.toThrow("fail");
+    expect(store.state.night).toBe(true);
   });
 
   it("停止保留编码尺寸", async () => {

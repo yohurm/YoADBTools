@@ -55,18 +55,13 @@
   line-height: var(--yohu-font-leading-tight);
 }
 
-.yohu-mirror__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-2xs);
-  min-width: 0;
+.yohu-mirror__func .yohu-form-row {
   width: 100%;
 }
 
-.yohu-mirror__field-name {
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-3);
-  line-height: var(--yohu-font-leading-tight);
+.yohu-mirror__func .yohu-form-row__control {
+  flex: 1 1 100%;
+  margin-inline-start: 0;
 }
 
 .yohu-mirror--full .yohu-mirror__ops,
