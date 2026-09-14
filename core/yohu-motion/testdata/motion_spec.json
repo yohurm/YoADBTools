@@ -1,0 +1,47 @@
+{
+  "effectsFast": {
+    "durationMs": 100,
+    "easing": "standard",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
+  "effectsEnter": {
+    "durationMs": 160,
+    "easing": "decel",
+    "controlPoints": [0.0, 0.0, 0.4, 1.0]
+  },
+  "effectsExit": {
+    "durationMs": 200,
+    "easing": "accel",
+    "controlPoints": [0.4, 0.0, 1.0, 1.0]
+  },
+  "spatialSmall": {
+    "durationMs": 150,
+    "easing": "spring",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
+  "spatialStretch": {
+    "durationMs": 200,
+    "easing": "springSoft",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
+  "spatialLocal": {
+    "durationMs": 200,
+    "easing": "emphasized",
+    "controlPoints": [0.2, 0.0, 0.0, 1.0]
+  },
+  "spatialPanel": {
+    "durationMs": 300,
+    "easing": "standard",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
+  "spatialEnter": {
+    "durationMs": 350,
+    "easing": "decel",
+    "controlPoints": [0.0, 0.0, 0.4, 1.0]
+  },
+  "spatialExit": {
+    "durationMs": 200,
+    "easing": "accel",
+    "controlPoints": [0.4, 0.0, 1.0, 1.0]
+  }
+}

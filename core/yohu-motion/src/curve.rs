@@ -20,7 +20,7 @@ pub(crate) fn ease_emphasized(t: f64) -> f64 {
     cubic_bezier(0.2, 0.0, 0.0, 1.0, t.clamp(0.0, 1.0))
 }
 
-fn cubic_bezier(x1: f64, y1: f64, x2: f64, y2: f64, x: f64) -> f64 {
+pub(crate) fn cubic_bezier(x1: f64, y1: f64, x2: f64, y2: f64, x: f64) -> f64 {
     let mut t = x;
     for _ in 0..8 {
         let x_est = sample_curve(t, x1, x2);

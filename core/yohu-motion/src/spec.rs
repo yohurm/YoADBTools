@@ -1,5 +1,5 @@
 //! L1 MotionSpec —— 与 `@yohu/ui` `tokens/motion.ts` 同名同值。
-//! 产品层只点规格名，禁止再写 300 / 自造贝塞尔。
+//! 产品层只点规格名，禁止再写 300 / 自造贝塞尔。数值由 testdata/motion_spec.json 锁死。
 
 use crate::curve::{ease_accel, ease_decel, ease_emphasized, ease_standard};
 
@@ -55,18 +55,68 @@ impl MotionSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::curve::cubic_bezier;
+    use std::collections::HashMap;
+
+    #[derive(serde::Deserialize)]
+    struct SpecRow {
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+        easing: String,
+        #[serde(rename = "controlPoints")]
+        control_points: [f64; 4],
+    }
+
+    fn fixture() -> HashMap<String, SpecRow> {
+        serde_json::from_str(include_str!("../testdata/motion_spec.json")).expect("fixture")
+    }
+
+    fn spec_by_name(name: &str) -> MotionSpec {
+        match name {
+            "effectsFast" => MotionSpec::EffectsFast,
+            "effectsEnter" => MotionSpec::EffectsEnter,
+            "effectsExit" => MotionSpec::EffectsExit,
+            "spatialSmall" => MotionSpec::SpatialSmall,
+            "spatialStretch" => MotionSpec::SpatialStretch,
+            "spatialLocal" => MotionSpec::SpatialLocal,
+            "spatialPanel" => MotionSpec::SpatialPanel,
+            "spatialEnter" => MotionSpec::SpatialEnter,
+            "spatialExit" => MotionSpec::SpatialExit,
+            other => panic!("unknown MotionSpec name {other}"),
+        }
+    }
+
+    const ALL_NAMES: &[&str] = &[
+        "effectsFast",
+        "effectsEnter",
+        "effectsExit",
+        "spatialSmall",
+        "spatialStretch",
+        "spatialLocal",
+        "spatialPanel",
+        "spatialEnter",
+        "spatialExit",
+    ];
 
     #[test]
-    fn durations_match_youi_motion_spec() {
-        assert_eq!(MotionSpec::EffectsFast.duration_ms(), 100);
-        assert_eq!(MotionSpec::SpatialSmall.duration_ms(), 150);
-        assert_eq!(MotionSpec::EffectsEnter.duration_ms(), 160);
-        assert_eq!(MotionSpec::EffectsExit.duration_ms(), 200);
-        assert_eq!(MotionSpec::SpatialStretch.duration_ms(), 200);
-        assert_eq!(MotionSpec::SpatialLocal.duration_ms(), 200);
-        assert_eq!(MotionSpec::SpatialPanel.duration_ms(), 300);
-        assert_eq!(MotionSpec::SpatialEnter.duration_ms(), 350);
-        assert_eq!(MotionSpec::SpatialExit.duration_ms(), 200);
+    fn specs_match_shared_testdata() {
+        let rows = fixture();
+        assert_eq!(rows.len(), ALL_NAMES.len());
+        for name in ALL_NAMES {
+            let row = rows.get(*name).unwrap_or_else(|| panic!("missing {name}"));
+            let spec = spec_by_name(name);
+            assert_eq!(spec.duration_ms(), row.duration_ms, "{name} duration");
+            assert!(!row.easing.is_empty(), "{name} easing");
+            let [x1, y1, x2, y2] = row.control_points;
+            for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                let expected = cubic_bezier(x1, y1, x2, y2, t);
+                let got = spec.ease()(t);
+                assert!(
+                    (got - expected).abs() < 1e-5,
+                    "{name} ease({t}): {got} != {expected}"
+                );
+            }
+        }
     }
 
     #[test]
