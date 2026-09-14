@@ -2,6 +2,7 @@
 
 use tauri::{AppHandle, State};
 
+use crate::commands::{ipc_eval, ipc_group};
 use crate::state::AppState;
 use yohu_protocol::{
     BlockRunRequest, GroupRunRequest, IpcError, SerialEvalResult, TerminalEvalRequest,
@@ -15,7 +16,9 @@ pub async fn terminal_eval(
     req: TerminalEvalRequest,
 ) -> Result<Vec<SerialEvalResult>, IpcError> {
     state.require_online_many(&req.serials)?;
-    crate::terminal_eval::eval(&state, req).await
+    crate::terminal_eval::eval(&state, req)
+        .await
+        .map_err(ipc_eval)
 }
 
 /// `terminal.exec`：自定义命令行，对 serials 并行执行。
@@ -25,7 +28,9 @@ pub async fn terminal_exec(
     req: TerminalExecRequest,
 ) -> Result<Vec<SerialEvalResult>, IpcError> {
     state.require_online_many(&req.serials)?;
-    crate::terminal_eval::exec(&state, req).await
+    crate::terminal_eval::exec(&state, req)
+        .await
+        .map_err(ipc_eval)
 }
 
 /// `group.run`：命令组编排（多设备并行 / 组内串行，跑完全部命令）。
@@ -36,7 +41,7 @@ pub fn group_run(
     req: GroupRunRequest,
 ) -> Result<u32, IpcError> {
     state.require_online_many(&req.serials)?;
-    crate::group_runs::start(app, &state, req)
+    crate::group_runs::start(app, &state, req).map_err(ipc_group)
 }
 
 /// `block.run`：命令块编排（多设备并行 / 块内串行 + 间隔）。
@@ -47,11 +52,11 @@ pub fn block_run(
     req: BlockRunRequest,
 ) -> Result<u32, IpcError> {
     state.require_online_many(&req.serials)?;
-    crate::group_runs::start_block(app, &state, req)
+    crate::group_runs::start_block(app, &state, req).map_err(ipc_group)
 }
 
 /// `group.cancel`：取消命令组或命令块运行。
 #[tauri::command(rename = "group.cancel")]
 pub fn group_cancel(state: State<'_, AppState>, run_id: u32) -> Result<(), IpcError> {
-    crate::group_runs::cancel(&state, run_id)
+    crate::group_runs::cancel(&state, run_id).map_err(ipc_group)
 }

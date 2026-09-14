@@ -6,7 +6,7 @@
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use windows::Win32::Foundation::HWND;
@@ -21,9 +21,10 @@ use super::gpu::Gpu;
 use super::host::{self, Host};
 use super::mf::DecodedPicture;
 use super::window;
+use crate::limits::{
+    PRESENT_BEAT, PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP,
+};
 use crate::mirror_present::backend::Cmd;
-
-const PRESENT_IDLE: Duration = Duration::from_millis(4);
 
 pub fn spawn_surface(
     serial: String,
@@ -71,7 +72,8 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
     window::register_class()?;
     let hwnd = window::create_child(HWND(owner as *mut _))?;
     geom.register(&serial, hwnd.0 as isize);
-    let gpu = Gpu::new(hwnd, 16, 16).map_err(|e| e.to_string())?;
+    let gpu =
+        Gpu::new(hwnd, PRESENT_BOOTSTRAP_PX, PRESENT_BOOTSTRAP_PX).map_err(|e| e.to_string())?;
     host::install(
         hwnd,
         Host::new(serial, gpu, mirror, event_tx, Arc::clone(&geom)),
@@ -96,12 +98,12 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
             tick_decode(hwnd, bind);
         }
         host::with_host(hwnd, |h| h.sync_host_size(hwnd));
-        if host::loading(hwnd) && spin_at.elapsed() >= Duration::from_millis(50) {
+        if host::loading(hwnd) && spin_at.elapsed() >= PRESENT_SPIN_STEP {
             spin_at = Instant::now();
-            spin = (spin + 0.28) % (std::f32::consts::PI * 2.0);
+            spin = (spin + PRESENT_SPIN_DELTA) % (std::f32::consts::PI * 2.0);
         }
         host::present_chrome(hwnd, spin);
-        if beat.elapsed() >= Duration::from_secs(1) {
+        if beat.elapsed() >= PRESENT_BEAT {
             if let Some(bind) = decode.as_mut() {
                 bind.tick.log_beat();
             }
@@ -148,8 +150,9 @@ fn dispatch(hwnd: HWND, cmd: Cmd, decode: &mut Option<DecodeBind>) {
             }
         }
         Cmd::Screenshot { path, reply } => {
-            let result = host::with_host(hwnd, |h| h.screenshot(&path))
-                .unwrap_or_else(|| Err("呈现已关闭".into()));
+            let result = crate::mirror_present::screenshot_host_reply(host::with_host(hwnd, |h| {
+                h.screenshot(&path)
+            }));
             let _ = reply.send(result);
         }
         Cmd::Shutdown => {}

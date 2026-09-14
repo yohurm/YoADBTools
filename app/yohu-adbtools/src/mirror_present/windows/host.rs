@@ -5,7 +5,7 @@
 #![cfg(windows)]
 
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use windows::Win32::Foundation::{HWND, RECT};
@@ -32,6 +32,7 @@ pub enum PointerWatch {
 }
 use crate::mirror_present::scale::map_client_to_video;
 use crate::mirror_present::stage::Stage;
+use crate::mirror_present::{screenshot_from_pixels, PresentError};
 
 pub struct Host {
     pub stage: Stage,
@@ -183,27 +184,14 @@ impl Host {
         }
     }
 
-    pub fn screenshot(&mut self, path: &str) -> Result<(), String> {
-        let (w, h, bgra) = self
-            .gpu
-            .as_mut()
-            .ok_or_else(|| "尚无画面".to_string())?
+    pub fn screenshot(&mut self, path: &str) -> Result<(), PresentError> {
+        let Some(gpu) = self.gpu.as_mut() else {
+            return screenshot_from_pixels(path, None);
+        };
+        let pixels = gpu
             .screenshot_bgra()
-            .map_err(|e| e.to_string())?;
-        let mut rgba = vec![0u8; bgra.len()];
-        for (i, chunk) in bgra.chunks_exact(4).enumerate() {
-            rgba[i * 4] = chunk[2];
-            rgba[i * 4 + 1] = chunk[1];
-            rgba[i * 4 + 2] = chunk[0];
-            rgba[i * 4 + 3] = 255;
-        }
-        let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
-        let mut encoder = png::Encoder::new(file, w, h);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
-        writer.write_image_data(&rgba).map_err(|e| e.to_string())?;
-        Ok(())
+            .map_err(|e| PresentError::Internal(e.to_string()))?;
+        screenshot_from_pixels(path, pixels)
     }
 
     pub fn hit_test(&self, x: i32, y: i32) -> bool {
@@ -290,6 +278,7 @@ impl Host {
         let Some(gpu) = self.gpu.as_mut() else {
             return;
         };
+        let animate = animate && yohu_motion::motion_allowed();
         match gpu.set_occupancy_clip(cx, cy, cw, ch, radius, animate) {
             Ok(true) if animate => tracing::info!(
                 serial = %self.stage.serial,
@@ -379,7 +368,7 @@ impl Host {
                 generation: self.stage.generation,
                 painted_fps: 1,
             });
-        } else if now.duration_since(self.fps_at) >= Duration::from_secs(1) {
+        } else if now.duration_since(self.fps_at) >= crate::limits::PRESENT_BEAT {
             let fps = self.painted;
             self.painted = 0;
             self.fps_at = now;

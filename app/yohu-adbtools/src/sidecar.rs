@@ -44,7 +44,7 @@ pub fn resolve_resource_dir(app: &App) -> PathBuf {
     let fallback = dirs
         .into_iter()
         .next()
-        .unwrap_or_else(|| PathBuf::from("."));
+        .expect("sidecar 候选至少含仓库 tools/");
     tracing::warn!(
         "未找到内置 {}，将使用: {}",
         adb_file_name(),

@@ -10,9 +10,9 @@ use objc2_app_kit::{
     NSDraggingSource,
 };
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSString, NSURL};
-use yohu_protocol::{IpcError, IpcErrorCode};
+use yohu_files::FileError;
 
-use crate::commands::ipc_code;
+use super::DndError;
 
 define_class!(
     #[unsafe(super(NSObject))]
@@ -41,22 +41,15 @@ impl FileDragSource {
     }
 }
 
-pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), IpcError> {
-    let mtm = MainThreadMarker::new()
-        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "拖出必须在主线程启动"))?;
+pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), DndError> {
+    let mtm = MainThreadMarker::new().ok_or(DndError::NeedMainThread)?;
     if paths.is_empty() {
-        return Err(ipc_code(IpcErrorCode::InvalidArgs, "没有可拖出的项目"));
+        return Err(FileError::EmptyTree(String::new()).into());
     }
     let app = NSApplication::sharedApplication(mtm);
-    let event = app
-        .currentEvent()
-        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "没有可用的拖动手势"))?;
-    let window = app
-        .keyWindow()
-        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "没有可用的主窗口"))?;
-    let view = window
-        .contentView()
-        .ok_or_else(|| ipc_code(IpcErrorCode::Internal, "主窗口没有 contentView"))?;
+    let event = app.currentEvent().ok_or(DndError::NoGesture)?;
+    let window = app.keyWindow().ok_or(DndError::NoWindow)?;
+    let view = window.contentView().ok_or(DndError::NoContentView)?;
     let mut items: Vec<Retained<NSDraggingItem>> = Vec::with_capacity(paths.len());
     for path in paths {
         if !path.exists() {
@@ -68,20 +61,22 @@ pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), IpcError> {
             ProtocolObject::from_ref(&*url),
         );
         let loc = event.locationInWindow();
+        let inset = f64::from(crate::tokens::SPACE_LG);
+        let preview = f64::from(crate::tokens::ICON_SM);
         item.setDraggingFrame(NSRect {
             origin: NSPoint {
-                x: loc.x - 16.0,
-                y: loc.y - 16.0,
+                x: loc.x - inset,
+                y: loc.y - inset,
             },
             size: NSSize {
-                width: 32.0,
-                height: 32.0,
+                width: preview,
+                height: preview,
             },
         });
         items.push(item);
     }
     if items.is_empty() {
-        return Err(ipc_code(IpcErrorCode::Internal, "拖出文件尚未就绪"));
+        return Err(DndError::NotReady);
     }
     let array = NSArray::from_retained_slice(&items);
     let source = FileDragSource::new(mtm);

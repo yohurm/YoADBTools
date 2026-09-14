@@ -27,8 +27,8 @@ use windows::Win32::Graphics::Dxgi::{IDXGISurface, IDXGISwapChain1};
 use windows_numerics::Vector2;
 use yohu_protocol::MirrorStageMode;
 
-use crate::mirror_present::stage::argb_to_rgba;
 pub use crate::mirror_present::stage::ChromeSpec;
+use crate::mirror_present::stage::{argb_to_rgba, chrome_stack};
 
 pub struct ChromePainter {
     d2d: ID2D1Factory,
@@ -142,23 +142,18 @@ fn draw(
     let icon = spec.icon_px as f32;
     let title_px = spec.title_px as f32;
     let body_px = spec.body_px as f32;
-    let gap = (title_px * 0.75).max(8.0);
-    let block = icon + gap + title_px + gap * 0.5 + body_px;
+    let stack = chrome_stack(icon, title_px, body_px);
+    let gap = stack.gap;
+    let block = stack.block;
     let mut y = ((h - block) * 0.5).max(0.0);
     let cx = w * 0.5;
     let cy = y + icon * 0.5;
     draw_icon_well(rt, cx, cy, icon * 0.56, &well_c)?;
 
     match spec.mode {
-        MirrorStageMode::Loading => draw_spinner(
-            rt,
-            cx,
-            cy,
-            icon * 0.42,
-            spec.spin,
-            &icon_c,
-            &body_c,
-        )?,
+        MirrorStageMode::Loading => {
+            draw_spinner(rt, cx, cy, icon * 0.42, spec.spin, &icon_c, &body_c)?
+        }
         _ => draw_mirror_icon(rt, cx, y, icon, &icon_c)?,
     }
     y += icon + gap;
@@ -170,19 +165,20 @@ fn draw(
     let title = spec.title;
     let desc = spec.description;
 
+    let title_min = stack.row_min.max(1.0);
     let title_rect = D2D_RECT_F {
-        left: 16.0,
+        left: stack.title_inset,
         top: y,
-        right: (w - 16.0).max(17.0),
-        bottom: y + title_px * 1.4,
+        right: (w - stack.title_inset).max(stack.title_inset + title_min),
+        bottom: y + stack.title_box,
     };
     draw_text(rt, title, &title_fmt, &title_rect, &title_brush)?;
-    y = title_rect.bottom + gap * 0.35;
+    y = title_rect.bottom + stack.after_title;
     let desc_rect = D2D_RECT_F {
-        left: 24.0,
+        left: stack.body_inset,
         top: y,
-        right: (w - 24.0).max(25.0),
-        bottom: y + body_px * 2.6,
+        right: (w - stack.body_inset).max(stack.body_inset + title_min),
+        bottom: y + stack.body_box,
     };
     draw_text(rt, desc, &body_fmt, &desc_rect, &body_brush)?;
     Ok(())
@@ -229,7 +225,7 @@ fn text_format(dwrite: &IDWriteFactory, size: f32, medium: bool) -> WinResult<ID
     };
     let fmt = unsafe {
         dwrite.CreateTextFormat(
-            windows::core::w!("Segoe UI"),
+            &windows::core::HSTRING::from(crate::tokens::FONT_SANS),
             None,
             weight,
             DWRITE_FONT_STYLE_NORMAL,

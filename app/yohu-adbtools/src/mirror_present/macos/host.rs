@@ -1,16 +1,45 @@
 //! Stage 宿主：占用 / chrome / 输入 / 截图。解码管道不在这里。
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
 use yohu_protocol::{AppEvent, MirrorControlMessage, MirrorLayout};
 
-use super::super::pointer::{PointerGesture, PointerKind, TouchOut, TOUCH_DOWN, TOUCH_MOVE, TOUCH_UP};
-use super::super::scale::map_client_to_video;
-use super::super::stage::Stage;
+use super::super::pointer::{
+    PointerGesture, PointerKind, TouchOut, TOUCH_DOWN, TOUCH_MOVE, TOUCH_UP,
+};
+use super::super::scale::{map_client_to_video, Letterbox};
+use super::super::stage::{stage_copy, stage_palette, stage_type_px, Stage};
 use super::vt::Picture;
+use crate::mirror_present::{screenshot_from_pixels, PresentError};
+
+pub struct LayoutSnap {
+    pub avail_x: i32,
+    pub avail_y: i32,
+    pub avail_w: u32,
+    pub avail_h: u32,
+    pub dpr: f32,
+    pub host_h: u32,
+    pub occ: (i32, i32, u32, u32),
+    pub dest: Letterbox,
+    pub radius: f32,
+    pub stroke: f32,
+    pub border: u32,
+    pub canvas: u32,
+    pub title_argb: u32,
+    pub body_argb: u32,
+    pub dark: bool,
+    pub chrome: bool,
+    pub video: bool,
+    pub loading: bool,
+    pub title: &'static str,
+    pub description: String,
+    pub icon_px: u32,
+    pub title_px: u32,
+    pub body_px: u32,
+}
 
 pub struct Host {
     pub stage: Stage,
@@ -107,13 +136,56 @@ impl Host {
         true
     }
 
-    pub fn screenshot(&self, path: &str) -> Result<(), String> {
-        let pic = self
-            .last_pic
-            .as_ref()
-            .ok_or_else(|| "尚无画面".to_string())?;
-        let bgra = pic.copy_bgra()?;
-        write_bgra_png(path, pic.width, pic.height, &bgra)
+    pub fn screenshot(&self, path: &str) -> Result<(), PresentError> {
+        let Some(pic) = self.last_pic.as_ref() else {
+            return screenshot_from_pixels(path, None);
+        };
+        let bgra = pic.copy_bgra().map_err(PresentError::Internal)?;
+        screenshot_from_pixels(path, Some((pic.width, pic.height, bgra)))
+    }
+
+    pub fn layout_snap(&self) -> LayoutSnap {
+        let (title, description) = stage_copy(
+            self.stage.mode(),
+            self.stage.has_device(),
+            self.stage.failed(),
+            self.stage.error(),
+            {
+                let (w, h) = self.stage.video_size();
+                w > 0 && h > 0
+            },
+        );
+        let (icon_px, title_px, body_px) = stage_type_px(self.stage.dpr());
+        let (host_w, host_h) = self.stage.host_size();
+        let _ = host_w;
+        let pal = stage_palette(self.stage.dark());
+        let (stroke, border) = self.stage.panel_stroke();
+        let (avail_x, avail_y, avail_w, avail_h) = self.stage.avail();
+        LayoutSnap {
+            avail_x,
+            avail_y,
+            avail_w,
+            avail_h,
+            dpr: self.stage.dpr(),
+            host_h,
+            occ: self.stage.occupancy(),
+            dest: self.stage.dest(),
+            radius: self.stage.corner_radius() as f32,
+            stroke,
+            border,
+            canvas: pal.canvas_argb,
+            title_argb: pal.title_argb,
+            body_argb: pal.body_argb,
+            dark: self.stage.dark(),
+            chrome: self.stage.shows_chrome(),
+            video: self.stage.shows_video(),
+            loading: self.stage.mode() == yohu_protocol::MirrorStageMode::Loading,
+            title,
+            description,
+            icon_px,
+            title_px,
+            body_px,
+        }
     }
 
     pub fn handle_pointer(&mut self, action: u8, x: i32, y: i32) {
@@ -188,7 +260,7 @@ impl Host {
                 generation: self.stage.generation,
                 painted_fps: 1,
             });
-        } else if now.duration_since(self.fps_at) >= Duration::from_secs(1) {
+        } else if now.duration_since(self.fps_at) >= crate::limits::PRESENT_BEAT {
             let fps = self.painted;
             self.painted = 0;
             self.fps_at = now;
@@ -200,23 +272,6 @@ impl Host {
         }
         self.stage.visible() && self.stage.shows_video()
     }
-}
-
-pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), String> {
-    let mut rgba = vec![0u8; bgra.len()];
-    for (i, chunk) in bgra.as_chunks::<4>().0.iter().enumerate() {
-        rgba[i * 4] = chunk[2];
-        rgba[i * 4 + 1] = chunk[1];
-        rgba[i * 4 + 2] = chunk[0];
-        rgba[i * 4 + 3] = 255;
-    }
-    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
-    let mut encoder = png::Encoder::new(file, w, h);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
-    writer.write_image_data(&rgba).map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 pub const fn touch_down() -> u8 {

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use yohu_mirror::{EncodedFrame, FramePipe};
+use yohu_mirror::{EncodedFrame, FramePipe, PIPE_H265};
 
 use super::super::annexb::{access_unit, select_live_frames};
 use super::super::backend::AnnexBDecoder;
@@ -121,7 +121,7 @@ impl DecodeTick {
             return None;
         }
         if self.decoder.is_none() && !self.failed && frame.width > 0 && frame.height > 0 {
-            let hevc = frame.codec == 1;
+            let hevc = frame.codec == PIPE_H265;
             match VideoToolboxDecoder::open(hevc, frame.width, frame.height, None) {
                 Ok(dec) => self.decoder = Some(dec),
                 Err(e) => {

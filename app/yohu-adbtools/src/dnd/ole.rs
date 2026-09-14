@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Once};
 
-use tokio_util::sync::CancellationToken;
 use windows::core::{w, Error, Result as WinResult, HSTRING, PCWSTR};
 use windows::Win32::Foundation::{
     GlobalFree, DRAGDROP_S_CANCEL, DRAGDROP_S_DROP, DRAGDROP_S_USEDEFAULTCURSORS, DV_E_FORMATETC,
@@ -35,11 +34,9 @@ use windows::Win32::UI::Shell::{
 };
 use windows_core::{implement, BOOL};
 
-use yohu_files::{TransferSpec, TreeEntry};
-use yohu_protocol::{Direction, IpcError, IpcErrorCode};
+use yohu_files::TreeEntry;
 
-use super::DragPayload;
-use crate::commands::ipc_code;
+use super::{DndError, DragPayload};
 
 fn clip(name: PCWSTR) -> u16 {
     unsafe { RegisterClipboardFormatW(name) as u16 }
@@ -227,36 +224,9 @@ impl VirtualFiles {
         if let Some(parent) = local.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error::new(E_FAIL, e.to_string()))?;
         }
-        let id = self.payload.transfer_next.fetch_add(1, Ordering::Relaxed) + 1;
-        let cancel = CancellationToken::new();
         self.payload
-            .transfer_cancels
-            .lock()
-            .expect("transfer lock")
-            .insert(id, cancel.clone());
-        let task_id = self.payload.tasks.register(
-            format!("拖出: {}", item.relative),
-            format!("{} → {}", item.remote, local.display()),
-        );
-        let spec = TransferSpec {
-            id,
-            serial: self.payload.serial.clone(),
-            direction: Direction::Pull,
-            local: local.to_string_lossy().into_owned(),
-            remote: item.remote.clone(),
-        };
-        let run = self.payload.rt.block_on(self.payload.transfers.run(
-            spec,
-            cancel,
-            self.payload.event_tx.clone(),
-        ));
-        self.payload
-            .transfer_cancels
-            .lock()
-            .expect("transfer lock")
-            .remove(&id);
-        self.payload.tasks.finish(task_id);
-        run.map_err(|e| Error::new(E_FAIL, e.to_string()))?;
+            .pull(&local, &item.remote)
+            .map_err(|e| Error::new(E_FAIL, e.to_string()))?;
         self.inner
             .lock()
             .expect("dnd lock")
@@ -440,7 +410,7 @@ impl IDataObjectAsyncCapability_Impl for VirtualFiles_Impl {
     }
 }
 
-pub(super) fn do_drag_drop(payload: DragPayload) -> Result<(), IpcError> {
+pub(super) fn do_drag_drop(payload: DragPayload) -> Result<(), DndError> {
     static OLE_INIT: Once = Once::new();
     OLE_INIT.call_once(|| {
         let _ = unsafe { OleInitialize(None) };
@@ -468,9 +438,6 @@ pub(super) fn do_drag_drop(payload: DragPayload) -> Result<(), IpcError> {
     if hr == DRAGDROP_S_DROP || hr == DRAGDROP_S_CANCEL || hr == S_OK {
         Ok(())
     } else {
-        Err(ipc_code(
-            IpcErrorCode::Internal,
-            format!("DoDragDrop 失败: {hr:?}"),
-        ))
+        Err(DndError::OleFailed(format!("{hr:?}")))
     }
 }

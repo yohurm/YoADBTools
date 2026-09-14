@@ -165,10 +165,7 @@ mod tests {
     }
 
     fn canvas_light() -> (u8, u8, u8) {
-        use crate::window_boot::CANVAS_LIGHT;
-        use tauri::window::Color;
-        let Color(r, g, b, _) = CANVAS_LIGHT;
-        (r, g, b)
+        crate::tokens::CANVAS_LIGHT_RGB
     }
 
     #[test]
@@ -200,10 +197,8 @@ mod tests {
 
     #[test]
     fn splash_icon_light_canvas_has_no_black_corners() {
-        use crate::window_boot::CANVAS_LIGHT;
-        use tauri::window::Color;
         let icon = load_icon().expect("128x128.png");
-        let Color(r, g, b, _) = CANVAS_LIGHT;
+        let (r, g, b) = crate::tokens::CANVAS_LIGHT_RGB;
         assert_eq!(icon.data[3], 0);
         assert_eq!(&icon.data[0..3], [0, 0, 0]);
         let painted = icon.onto_canvas(r, g, b);
@@ -215,10 +210,8 @@ mod tests {
 
     #[test]
     fn splash_icon_dark_canvas_corners_match_base() {
-        use crate::window_boot::CANVAS_DARK;
-        use tauri::window::Color;
         let icon = load_icon().expect("128x128.png");
-        let Color(r, g, b, _) = CANVAS_DARK;
+        let (r, g, b) = crate::tokens::CANVAS_DARK_RGB;
         let painted = icon.onto_canvas(r, g, b);
         assert_eq!(&painted.data[0..4], [r, g, b, 255]);
         assert!(painted.data.chunks_exact(4).all(|px| px[3] == 255));

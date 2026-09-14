@@ -4,18 +4,32 @@
 //! 时序（同屏）：cover → morph 铺满（clip 半径 Md→0）→ present 主窗 → fade。
 //! 时序（异屏）：cover → scale+fade → present。
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{HWND, RECT};
 
-use yohu_motion::{wait, MotionSpec};
+use yohu_motion::{pump, vsync, MotionSpec};
 
 use super::overlay::{self, OverlayKind};
 use super::overlay_geom::{scale_rect_about_center, screen_to_client};
 use super::surface::BootSurface;
 
 /// 鸿蒙窗口进出场默认 scale 0.7（`WindowAnimationConfig`）。
-const SHRINK_SCALE: f64 = 0.7;
+const SHRINK_SCALE: f64 = crate::tokens::WINDOW_EXIT_SCALE;
+
+/// overlay 与 splash 同一时段都要泵；不能连续 `wait` 两次。
+fn wait_overlay_and_splash(spec: MotionSpec, overlay: HWND, splash: HWND) {
+    let duration = Duration::from_millis(spec.duration_ms());
+    let start = Instant::now();
+    loop {
+        pump(overlay);
+        pump(splash);
+        if start.elapsed() >= duration {
+            break;
+        }
+        vsync();
+    }
+}
 
 pub fn same_screen(
     surface: BootSurface,
@@ -36,20 +50,12 @@ pub fn same_screen(
     overlay.reveal();
     on_covered();
     let morph = MotionSpec::SpatialPanel;
-    overlay.morph_shared(from, to, morph.duration_ms(), morph.ease());
-    wait(
-        Duration::from_millis(morph.duration_ms()),
-        overlay.hwnd(),
-        overlay_pump,
-    );
+    overlay.morph_shared(from, to, morph);
+    wait_overlay_and_splash(morph, overlay.hwnd(), overlay_pump);
     on_present();
     let fade = MotionSpec::EffectsFast;
-    overlay.fade_out(fade.duration_ms(), fade.ease());
-    wait(
-        Duration::from_millis(fade.duration_ms()),
-        overlay.hwnd(),
-        overlay_pump,
-    );
+    overlay.fade_out(fade);
+    wait_overlay_and_splash(fade, overlay.hwnd(), overlay_pump);
 }
 
 pub fn cross_screen(
@@ -70,11 +76,7 @@ pub fn cross_screen(
     overlay.reveal();
     on_covered();
     let exit = MotionSpec::SpatialExit;
-    overlay.morph_exit(from, to, 1.0, 0.0, exit.duration_ms(), exit.ease());
-    wait(
-        Duration::from_millis(exit.duration_ms()),
-        overlay.hwnd(),
-        overlay_pump,
-    );
+    overlay.morph_exit(from, to, 1.0, 0.0, exit);
+    wait_overlay_and_splash(exit, overlay.hwnd(), overlay_pump);
     on_present();
 }

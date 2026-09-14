@@ -7,25 +7,11 @@ use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
 
 use super::scale::{contain_in_zone, fit_letterbox, Letterbox};
 
-const LIGHT_SURFACE: u32 = 0xFFFFFFFF;
-const LIGHT_SURFACE_2: u32 = 0xFFE5E5EA;
-const LIGHT_FG: u32 = 0xE5000000;
-const LIGHT_FG2: u32 = 0x99000000;
-const LIGHT_BORDER: u32 = 0x66000000;
-const DARK_SURFACE: u32 = 0xFF202224;
-const DARK_SURFACE_2: u32 = 0xFF2E3033;
-const DARK_FG: u32 = 0xE5FFFFFF;
-const DARK_FG2: u32 = 0x99FFFFFF;
-const DARK_BORDER: u32 = 0x66FFFFFF;
-
-pub struct StagePalette {
-    pub canvas_argb: u32,
-    pub title_argb: u32,
-    pub body_argb: u32,
-    pub icon_argb: u32,
-    pub well_argb: u32,
-    pub border_argb: u32,
-}
+pub use super::stage_copy::stage_copy;
+pub use super::stage_palette::{
+    argb_to_rgba, host_corner_radius, stage_border_argb, stage_palette, stage_stroke_px,
+    stage_type_px,
+};
 
 pub struct ChromeSpec<'a> {
     pub mode: MirrorStageMode,
@@ -73,6 +59,40 @@ impl ChromeDraw {
             body_px: self.body_px,
             spin,
         }
+    }
+}
+
+/// 铬垂直栈与行盒：Win D2D 与 macOS AppKit 共用。
+pub struct ChromeStack {
+    pub gap: f32,
+    pub block: f32,
+    pub title_inset: f32,
+    pub body_inset: f32,
+    pub title_box: f32,
+    pub body_box: f32,
+    pub after_title: f32,
+    /// 行宽 / 行高下限，对齐 `tokens::SPACE_SM`。
+    pub row_min: f32,
+}
+
+const TITLE_LEADING: f32 = 1.4;
+const BODY_LEADING: f32 = 2.6;
+const AFTER_TITLE: f32 = 0.35;
+
+pub fn chrome_stack(icon: f32, title: f32, body: f32) -> ChromeStack {
+    let gap = (title * 0.75).max(crate::tokens::SPACE_SM as f32);
+    let title_box = title * TITLE_LEADING;
+    let body_box = body * BODY_LEADING;
+    let after_title = gap * AFTER_TITLE;
+    ChromeStack {
+        gap,
+        block: icon + gap + title_box + after_title + body_box,
+        title_inset: crate::tokens::SPACE_LG as f32,
+        body_inset: crate::tokens::SPACE_XL as f32,
+        title_box,
+        body_box,
+        after_title,
+        row_min: crate::tokens::SPACE_SM as f32,
     }
 }
 
@@ -346,94 +366,6 @@ pub fn stage_mode(paused: bool, bound: bool, has_frame: bool) -> MirrorStageMode
     }
 }
 
-pub fn stage_copy(
-    mode: MirrorStageMode,
-    has_device: bool,
-    failed: bool,
-    error: &str,
-    has_video_size: bool,
-) -> (&'static str, String) {
-    match mode {
-        MirrorStageMode::Video => ("", String::new()),
-        MirrorStageMode::Paused => ("已暂停", "画面已隐藏，点击继续".into()),
-        MirrorStageMode::Loading => {
-            if has_video_size {
-                ("等待画面", "设备正在准备编码器，画面到达前请稍候".into())
-            } else {
-                ("启动中", "正在推送 server 并建立隧道".into())
-            }
-        }
-        MirrorStageMode::Empty => empty_copy(has_device, failed, error),
-    }
-}
-
-fn empty_copy(has_device: bool, failed: bool, error: &str) -> (&'static str, String) {
-    if !has_device {
-        ("未选择设备", "在左侧设备栏选择一台在线设备".into())
-    } else if !error.is_empty() {
-        let title = if failed { "启动失败" } else { "已停止" };
-        (title, error.to_string())
-    } else {
-        ("未开始", "点击开始将画面嵌在此面板内".into())
-    }
-}
-
-pub fn stage_palette(dark: bool) -> StagePalette {
-    if dark {
-        StagePalette {
-            canvas_argb: DARK_SURFACE,
-            title_argb: DARK_FG,
-            body_argb: DARK_FG2,
-            icon_argb: DARK_FG,
-            well_argb: DARK_SURFACE_2,
-            border_argb: DARK_BORDER,
-        }
-    } else {
-        StagePalette {
-            canvas_argb: LIGHT_SURFACE,
-            title_argb: LIGHT_FG,
-            body_argb: LIGHT_FG2,
-            icon_argb: LIGHT_FG,
-            well_argb: LIGHT_SURFACE_2,
-            border_argb: LIGHT_BORDER,
-        }
-    }
-}
-
-/// HWND 无 XS 阴影；描边走 `--yohu-border-strong`，避免浅色白卡吃掉 hairline。
-pub fn stage_border_argb(dark: bool) -> u32 {
-    stage_palette(dark).border_argb
-}
-
-pub fn stage_stroke_px(dpr: f32) -> f32 {
-    let d = if dpr > 0.0 { dpr } else { 1.0 };
-    d.max(1.0)
-}
-
-pub fn argb_to_rgba(c: u32) -> [f32; 4] {
-    [
-        ((c >> 16) & 0xFF) as f32 / 255.0,
-        ((c >> 8) & 0xFF) as f32 / 255.0,
-        (c & 0xFF) as f32 / 255.0,
-        ((c >> 24) & 0xFF) as f32 / 255.0,
-    ]
-}
-
-pub fn stage_type_px(dpr: f32) -> (u32, u32, u32) {
-    let d = if dpr > 0.0 { dpr } else { 1.0 };
-    let px = |n: f32| (n * d).round().max(1.0) as u32;
-    (px(40.0), px(16.0), px(14.0))
-}
-
-pub fn host_corner_radius(fullscreen: bool, dpr: f32) -> u32 {
-    if fullscreen {
-        0
-    } else {
-        let d = if dpr > 0.0 { dpr } else { 1.0 };
-        (16.0 * d).round().max(0.0) as u32
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455,6 +387,28 @@ mod tests {
             error: String::new(),
             dark: true,
         }
+    }
+
+    #[test]
+    fn chrome_stack_gap_and_block() {
+        let s = chrome_stack(40.0, 16.0, 14.0);
+        let gap = (16.0_f32 * 0.75).max(crate::tokens::SPACE_SM as f32);
+        assert_eq!(s.gap, gap);
+        assert_eq!(
+            s.block,
+            40.0 + gap + s.title_box + s.after_title + s.body_box
+        );
+        assert_eq!(s.block, 40.0 + gap + 16.0 * 1.4 + gap * 0.35 + 14.0 * 2.6);
+        assert_eq!(s.title_inset, crate::tokens::SPACE_LG as f32);
+        assert_eq!(s.body_inset, crate::tokens::SPACE_XL as f32);
+        assert_eq!(s.title_box, 16.0 * 1.4);
+        assert_eq!(s.body_box, 14.0 * 2.6);
+        assert_eq!(s.after_title, gap * 0.35);
+        assert_eq!(s.row_min, crate::tokens::SPACE_SM as f32);
+        assert_eq!(
+            chrome_stack(40.0, 8.0, 14.0).gap,
+            crate::tokens::SPACE_SM as f32
+        );
     }
 
     #[test]

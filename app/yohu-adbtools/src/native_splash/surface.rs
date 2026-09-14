@@ -1,7 +1,7 @@
 //! 启动表面：像素与 clip 契约。
 //!
 //! ```text
-//! window_boot::canvas_bgra(dark)
+//! theme_spec::canvas_bgra(dark)
 //!   → BootFrame（不透明矩形 BGRA）
 //!     → 小窗 GDI 只 blit 这份 frame（RGN 是显示 clip）
 //!     → overlay brand 用同一份 frame
@@ -15,7 +15,7 @@
 //! 禁止 `yohu-motion` 持画布色。
 
 use super::geometry::SplashPlacement;
-use crate::window_boot::canvas_bgra;
+use crate::theme_spec::canvas_bgra;
 
 /// DComp Scale 原点在内容左上。2×2 色块放大成画布，不是 HWND 尺寸。
 pub const FILL_CONTENT: i32 = 2;
@@ -93,7 +93,7 @@ pub fn fill_canvas(pixels: &mut [u8], canvas: [u8; 4]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::window_boot::canvas_bgra;
+    use crate::theme_spec::canvas_bgra;
     use windows::Win32::Foundation::RECT;
 
     use super::super::geometry::SplashPlacement;

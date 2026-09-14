@@ -1,23 +1,26 @@
-//! 命令库落盘：校验由 domain 完成；本层只做原子写、损坏备份与 schema 2→3 一次性迁移。
+//! 命令库落盘：采纳只走 domain `from_dto`；
+//! 本层只做原子写、损坏备份与 schema 2→3 一次性线形迁移。
+//! 磁盘与 IPC 共用 [`CommandLibraryDto`]；加载成功后只认 schema 3。
 
 use std::fs;
 use std::path::Path;
 
 use serde::Deserialize;
-use yohu_domain::{
-    CommandDefinition, CommandGroup, CommandLibrary, LibraryEntry,
-};
+use yohu_domain::CommandLibrary;
+use yohu_protocol::{CommandDto, CommandGroupDto, CommandLibraryDto, LibraryEntryDto};
 use yohu_runtime::{atomic_write, backup_corrupt};
 
-/// 加载命令库（缺失 → 默认库；schema 2 → 迁到 3；其余不匹配 → 备份后写默认库）。
+/// 加载命令库（缺失 → 默认库；schema 2 → 迁到 3；其余不匹配或校验失败 → 备份后写默认库）。
 pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
     match fs::read_to_string(file) {
         Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
             Ok(value) => match value.get("schema_version").and_then(|v| v.as_u64()) {
-                Some(3) => match serde_json::from_str::<CommandLibrary>(&text) {
-                    Ok(lib) => Ok(lib),
-                    Err(_) => restore_default(file, &text, "JSON 解析失败"),
-                },
+                Some(version) if version == u64::from(CommandLibrary::SCHEMA_VERSION) => {
+                    match serde_json::from_str::<CommandLibraryDto>(&text) {
+                        Ok(dto) => adopt_or_restore(file, &text, dto),
+                        Err(_) => restore_default(file, &text, "JSON 解析失败"),
+                    }
+                }
                 Some(2) => migrate_v2(file, &text),
                 _ => restore_default(file, &text, "schema 不受支持"),
             },
@@ -28,13 +31,25 @@ pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
     }
 }
 
-/// 全量原子提交。调用方先 `validate`。
+/// 全量原子提交。调用方先经 `from_dto`。
 pub fn save(file: &Path, library: &CommandLibrary) -> Result<(), String> {
+    let dto = library.to_dto();
     atomic_write(
         file,
-        serde_json::to_string_pretty(library).map_err(|e| e.to_string())?,
+        serde_json::to_string_pretty(&dto).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())
+}
+
+fn adopt_or_restore(
+    file: &Path,
+    text: &str,
+    dto: CommandLibraryDto,
+) -> Result<CommandLibrary, String> {
+    match CommandLibrary::from_dto(&dto) {
+        Ok(lib) => Ok(lib),
+        Err(_) => restore_default(file, text, "校验失败"),
+    }
 }
 
 fn restore_default(file: &Path, text: &str, reason: &str) -> Result<CommandLibrary, String> {
@@ -48,19 +63,19 @@ fn migrate_v2(file: &Path, text: &str) -> Result<CommandLibrary, String> {
         Ok(v2) => v2,
         Err(_) => return restore_default(file, text, "schema 2 无法解析"),
     };
-    let library = CommandLibrary {
+    let dto = CommandLibraryDto {
         schema_version: CommandLibrary::SCHEMA_VERSION,
         groups: v2
             .groups
             .into_iter()
-            .map(|g| CommandGroup {
+            .map(|g| CommandGroupDto {
                 id: g.id,
                 name: g.name,
                 entries: g
                     .commands
                     .into_iter()
                     .map(|c| {
-                        LibraryEntry::Command(CommandDefinition {
+                        LibraryEntryDto::Command(CommandDto {
                             id: c.id,
                             name: c.name,
                             template: c.template,
@@ -71,9 +86,17 @@ fn migrate_v2(file: &Path, text: &str) -> Result<CommandLibrary, String> {
             })
             .collect(),
     };
-    save(file, &library)?;
-    tracing::info!("命令库已从 schema 2 迁到 {}", CommandLibrary::SCHEMA_VERSION);
-    Ok(library)
+    match CommandLibrary::from_dto(&dto) {
+        Ok(library) => {
+            save(file, &library)?;
+            tracing::info!(
+                "命令库已从 schema 2 迁到 {}",
+                CommandLibrary::SCHEMA_VERSION
+            );
+            Ok(library)
+        }
+        Err(_) => restore_default(file, text, "校验失败"),
+    }
 }
 
 fn write_default(file: &Path) -> Result<CommandLibrary, String> {
@@ -114,6 +137,13 @@ mod tests {
         dir.join("library.json")
     }
 
+    fn has_corrupt_backup(parent: &Path) -> bool {
+        fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .any(|e| e.file_name().to_string_lossy().contains("corrupt-"))
+    }
+
     #[test]
     fn missing_file_writes_default() {
         let file = temp_file("missing");
@@ -130,12 +160,7 @@ mod tests {
         let lib = load_or_default(&file).unwrap();
         assert_eq!(lib.schema_version, CommandLibrary::SCHEMA_VERSION);
         let parent = file.parent().unwrap();
-        let backups: Vec<_> = fs::read_dir(parent)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().contains("corrupt-"))
-            .collect();
-        assert!(!backups.is_empty());
+        assert!(has_corrupt_backup(parent));
         let _ = fs::remove_dir_all(parent);
     }
 
@@ -150,11 +175,56 @@ mod tests {
         let lib = load_or_default(&file).unwrap();
         assert_eq!(lib.schema_version, 3);
         assert_eq!(lib.groups[0].entries.len(), 1);
-        assert_eq!(lib.command("c1").map(|c| c.template.as_str()), Some("shell getprop"));
+        assert_eq!(
+            lib.command("c1").map(|c| c.template.as_str()),
+            Some("shell getprop")
+        );
         let saved = fs::read_to_string(&file).unwrap();
         assert!(saved.contains("\"schema_version\": 3"));
         assert!(saved.contains("\"kind\": \"command\""));
         assert!(!saved.contains("\"commands\""));
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn schema_3_invalid_restores_default() {
+        let file = temp_file("v3-bad");
+        fs::write(
+            &file,
+            r#"{"schema_version":3,"groups":[{"id":"g1","name":"g","entries":[{"kind":"command","id":"c1","name":"空","template":"  "}]}]}"#,
+        )
+        .unwrap();
+        let lib = load_or_default(&file).unwrap();
+        assert_eq!(lib, yohu_domain::default_library());
+        assert!(has_corrupt_backup(file.parent().unwrap()));
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn schema_3_invalid_block_gap_restores_default() {
+        let file = temp_file("v3-gap");
+        fs::write(
+            &file,
+            r#"{"schema_version":3,"groups":[{"id":"g1","name":"g","entries":[{"kind":"block","id":"b1","name":"自检","gap_ms":300,"steps":[{"template":"echo 1"}]}]}]}"#,
+        )
+        .unwrap();
+        let lib = load_or_default(&file).unwrap();
+        assert_eq!(lib, yohu_domain::default_library());
+        assert!(has_corrupt_backup(file.parent().unwrap()));
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
+    fn schema_2_invalid_restores_default() {
+        let file = temp_file("v2-bad");
+        fs::write(
+            &file,
+            r#"{"schema_version":2,"groups":[{"id":"g1","name":"g","commands":[{"id":"c1","name":"空","template":"  "}]}]}"#,
+        )
+        .unwrap();
+        let lib = load_or_default(&file).unwrap();
+        assert_eq!(lib, yohu_domain::default_library());
+        assert!(has_corrupt_backup(file.parent().unwrap()));
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 }

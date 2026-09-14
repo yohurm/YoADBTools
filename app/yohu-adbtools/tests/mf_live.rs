@@ -70,7 +70,7 @@ async fn real_hevc_mf_keeps_emitting_nv12() {
     assert!(jar.is_file(), "缺少 tools/scrcpy-server");
 
     let (tx, _rx) = mpsc::channel::<AppEvent>(256);
-    let service = MirrorService::new(client, tx, jar);
+    let service = MirrorService::new(client, tx, jar, CancellationToken::new());
     let started = service
         .start(MirrorSessionRequest {
             serial: serial.clone(),

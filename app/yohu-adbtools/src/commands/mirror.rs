@@ -1,76 +1,23 @@
-//! 投屏模块命令：薄转发 MirrorService + 壳内 Present（ADR-v6-024）。
+//! 投屏模块命令：薄转发 Present / MirrorService。
 
 use tauri::State;
 
-use crate::commands::{ipc, ipc_code};
+use crate::commands::{ipc_mirror, ipc_present};
 use crate::state::AppState;
-use yohu_mirror::MirrorError;
 use yohu_protocol::{
-    IpcError, IpcErrorCode, MirrorInjectRequest, MirrorLayout, MirrorScreenshotRequest,
-    MirrorStart, MirrorStartRequest,
+    IpcError, MirrorInjectRequest, MirrorLayout, MirrorScreenshotRequest, MirrorStart,
+    MirrorStartRequest,
 };
-
-fn ipc_mirror(e: MirrorError) -> IpcError {
-    match e {
-        MirrorError::Cancelled => ipc_code(IpcErrorCode::Cancelled, e.to_string()),
-        MirrorError::NotLive | MirrorError::NoControl | MirrorError::Protocol(_) => {
-            ipc_code(IpcErrorCode::InvalidArgs, e.to_string())
-        }
-        MirrorError::ServerMissing(_) | MirrorError::ServerFailed(_) => {
-            ipc_code(IpcErrorCode::AdbError, e.to_string())
-        }
-        MirrorError::Adb(adb) => crate::commands::ipc_adb(adb),
-        MirrorError::Io(_) => ipc(e),
-    }
-}
 
 #[tauri::command(rename = "mirror.start")]
 pub async fn mirror_start(
     state: State<'_, AppState>,
     req: MirrorStartRequest,
 ) -> Result<MirrorStart, IpcError> {
-    start_session(&state, req).await
-}
-
-async fn start_session(state: &AppState, req: MirrorStartRequest) -> Result<MirrorStart, IpcError> {
     state.require_online(&req.serial)?;
-    let plan =
-        crate::mirror_plan::plan_start(&state.settings.snapshot(), req, state.present.hevc_ok());
-    tracing::info!(
-        serial = %plan.serial,
-        control = plan.control,
-        force_forward = plan.force_forward,
-        codec = %plan.video_codec,
-        max_size = plan.max_size,
-        bit_rate = plan.video_bit_rate,
-        max_fps = plan.max_fps,
-        "mirror.start"
-    );
-    let serial = plan.serial.clone();
-    let result = state.mirror.start(plan).await.map_err(|e| {
-        tracing::error!(serial = %serial, error = %e, "mirror.start 失败");
-        ipc_mirror(e)
-    })?;
-    tracing::info!(
-        serial = %result.serial,
-        generation = result.generation,
-        adopted = result.adopted,
-        "mirror.start 返回"
-    );
-    if !result.adopted {
-        let task_id = state
-            .tasks
-            .register(format!("投屏: {}", serial), format!("设备 {}", serial));
-        state
-            .mirror_tasks
-            .lock()
-            .expect("mirror task lock poisoned")
-            .insert(serial.clone(), task_id);
-    }
-    if let Some(pipe) = state.mirror.frame_pipe(&serial) {
-        state.present.attach(&serial, result.generation, pipe);
-    }
-    Ok(result)
+    crate::mirror_sessions::start(&state, req)
+        .await
+        .map_err(ipc_mirror)
 }
 
 #[tauri::command(rename = "mirror.stop")]
@@ -115,10 +62,5 @@ pub fn mirror_screenshot(
     state: State<'_, AppState>,
     req: MirrorScreenshotRequest,
 ) -> Result<(), IpcError> {
-    state
-        .present
-        .screenshot(&req.serial, &req.path)
-        .map_err(|e| ipc_code(IpcErrorCode::Internal, e))?;
-    state.app_log.info(format!("投屏截图已保存: {}", req.path));
-    Ok(())
+    crate::mirror_sessions::screenshot(&state, &req.serial, &req.path).map_err(ipc_present)
 }

@@ -10,9 +10,12 @@ mod backend;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+mod png;
 mod pointer;
 mod scale;
 mod stage;
+mod stage_copy;
+mod stage_palette;
 #[cfg(windows)]
 mod windows;
 
@@ -33,6 +36,21 @@ use backend::Cmd;
 #[cfg(windows)]
 use windows::GeomHost;
 
+/// 呈现侧可映射错误。IPC 码由 `ipc_present` 按变体判定，禁止扫字符串。
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum PresentError {
+    #[error("当前没有投屏画面")]
+    Empty,
+    #[error("截图设备与当前舞台不一致")]
+    SerialMismatch,
+    #[error("呈现线程已退出")]
+    Exited,
+    #[error("截图超时")]
+    Timeout,
+    #[error("{0}")]
+    Internal(String),
+}
+
 pub struct PresentHost {
     hevc_ok: AtomicBool,
     event_tx: tokio_mpsc::Sender<AppEvent>,
@@ -46,8 +64,11 @@ struct Inner {
     owner: isize,
     /// 主窗至多一块舞台表面（本期否决多设备同时投屏）。
     surface: Option<Sender<Cmd>>,
+    /// 当前舞台 serial；与 `screenshot` 参数对账。
+    stage_serial: Option<String>,
     /// 仅工作台在 `screen-mirror` 为当前模块时为 true。淡出中的 View 报 layout 也不得建窗。
     active: bool,
+    pending: Option<(String, u64, Arc<FramePipe>)>,
 }
 
 pub fn probe() -> Caps {
@@ -87,7 +108,9 @@ impl PresentHost {
             inner: Mutex::new(Inner {
                 owner: 0,
                 surface: None,
+                stage_serial: None,
                 active: false,
+                pending: None,
             }),
             #[cfg(windows)]
             geom,
@@ -115,14 +138,16 @@ impl PresentHost {
         self.geom.set_owner(owner);
     }
 
-    /// 绑定解码管道。已有舞台则只换管道，禁止拆表面。
+    /// 绑定解码管道。未 active 只 stash；建窗只走 `setActive(true)` 之后的 `layout`。
     pub fn attach(&self, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
-        if !self.ensure_surface(serial) {
-            return;
-        }
         let tx = {
-            let inner = self.inner.lock().expect("present lock poisoned");
-            inner.surface.clone()
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            if let Some(tx) = inner.surface.clone() {
+                Some(tx)
+            } else {
+                inner.pending = Some((serial.to_string(), generation, pipe.clone()));
+                None
+            }
         };
         if let Some(tx) = tx {
             let _ = tx.send(Cmd::BindPipe {
@@ -133,9 +158,10 @@ impl PresentHost {
         }
     }
 
-    /// 停解码、舞台改画 chrome。表面仍在。
+    /// 停解码、舞台改画 chrome。表面仍在。同 serial 的 pending 丢掉；异 serial 保留。
     pub fn unbind(&self, serial: &str) {
-        let inner = self.inner.lock().expect("present lock poisoned");
+        let mut inner = self.inner.lock().expect("present lock poisoned");
+        apply_pending_unbind(&mut inner.pending, serial);
         if let Some(tx) = inner.surface.as_ref() {
             let _ = tx.send(Cmd::UnbindPipe {
                 serial: serial.to_string(),
@@ -184,8 +210,10 @@ impl PresentHost {
         if !self.ensure_surface(&layout.serial) {
             return;
         }
+        self.flush_pending();
         let tx = {
-            let inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            inner.stage_serial = Some(layout.serial.clone());
             inner.surface.clone()
         };
         if let Some(tx) = tx {
@@ -193,35 +221,32 @@ impl PresentHost {
         }
     }
 
-    pub fn screenshot(&self, serial: &str, path: &str) -> Result<(), String> {
+    pub fn screenshot(&self, serial: &str, path: &str) -> Result<(), PresentError> {
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
         {
             let inner = self.inner.lock().expect("present lock poisoned");
-            let tx = inner
-                .surface
-                .as_ref()
-                .ok_or_else(|| "当前没有投屏画面".to_string())?;
+            assert_screenshot_serial(inner.stage_serial.as_deref(), serial)?;
+            let tx = inner.surface.as_ref().ok_or(PresentError::Empty)?;
             tx.send(Cmd::Screenshot {
                 path: path.to_string(),
                 reply: reply_tx,
             })
-            .map_err(|_| "呈现线程已退出".to_string())?;
+            .map_err(|_| PresentError::Exited)?;
         }
-        let _ = serial;
         reply_rx
-            .recv_timeout(std::time::Duration::from_secs(5))
-            .map_err(|_| "截图超时".to_string())?
+            .recv_timeout(crate::limits::SCREENSHOT_TIMEOUT)
+            .map_err(|_| PresentError::Timeout)?
     }
 
     /// 拆表面。只用于离开投屏页或进程退出，禁止跟 `mirror.stop` 绑在一起。
     pub fn shutdown(&self) {
-        if let Some(tx) = self
-            .inner
-            .lock()
-            .expect("present lock poisoned")
-            .surface
-            .take()
-        {
+        let tx = {
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            apply_pending_shutdown(&mut inner.pending);
+            inner.stage_serial = None;
+            inner.surface.take()
+        };
+        if let Some(tx) = tx {
             let _ = tx.send(Cmd::Shutdown);
         }
     }
@@ -249,6 +274,57 @@ impl PresentHost {
         self.inner.lock().expect("present lock poisoned").surface = Some(tx);
         true
     }
+
+    fn flush_pending(&self) {
+        let pending = {
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let tx = inner.surface.clone();
+            tx.and_then(|tx| inner.pending.take().map(|p| (tx, p)))
+        };
+        if let Some((tx, (serial, generation, pipe))) = pending {
+            let _ = tx.send(Cmd::BindPipe {
+                serial,
+                generation,
+                pipe,
+            });
+        }
+    }
+}
+
+fn assert_screenshot_serial(current: Option<&str>, requested: &str) -> Result<(), PresentError> {
+    match current {
+        Some(serial) if serial == requested => Ok(()),
+        Some(_) => Err(PresentError::SerialMismatch),
+        None => Err(PresentError::Empty),
+    }
+}
+
+/// 无像素 → Empty；写盘失败 → Internal。Host 截图与单测共用，禁止再包一层 Internal。
+pub(crate) fn screenshot_from_pixels(
+    path: &str,
+    pixels: Option<(u32, u32, Vec<u8>)>,
+) -> Result<(), PresentError> {
+    let (w, h, bgra) = pixels.ok_or(PresentError::Empty)?;
+    png::write_bgra_png(path, w, h, &bgra).map_err(PresentError::Internal)
+}
+
+/// `with_host` 空：线程已拆 → Exited，不是 Empty。
+pub(crate) fn screenshot_host_reply<T>(
+    host: Option<Result<T, PresentError>>,
+) -> Result<T, PresentError> {
+    host.unwrap_or(Err(PresentError::Exited))
+}
+
+/// `unbind(serial)`：同 serial 丢掉 pending；异 serial 保留。只看 serial。
+fn apply_pending_unbind<P, G>(pending: &mut Option<(String, P, G)>, serial: &str) {
+    if pending.as_ref().is_some_and(|(s, ..)| s == serial) {
+        pending.take();
+    }
+}
+
+/// `shutdown`：pending 与表面同一寿命，一律清空。
+fn apply_pending_shutdown<T>(pending: &mut Option<T>) {
+    *pending = None;
 }
 
 fn spawn_backend_surface(
@@ -279,7 +355,71 @@ fn spawn_backend_surface(
 
 #[cfg(test)]
 mod tests {
-    use super::probe;
+    use super::{
+        apply_pending_shutdown, apply_pending_unbind, assert_screenshot_serial, probe,
+        screenshot_from_pixels, screenshot_host_reply, PresentError,
+    };
+
+    #[test]
+    fn screenshot_rejects_mismatched_serial() {
+        assert!(assert_screenshot_serial(Some("A"), "A").is_ok());
+        let mismatch = assert_screenshot_serial(Some("A"), "B").unwrap_err();
+        assert_eq!(mismatch, PresentError::SerialMismatch);
+        assert_eq!(mismatch.to_string(), "截图设备与当前舞台不一致");
+        let empty = assert_screenshot_serial(None, "A").unwrap_err();
+        assert_eq!(empty, PresentError::Empty);
+        assert_eq!(empty.to_string(), "当前没有投屏画面");
+    }
+
+    #[test]
+    fn screenshot_without_frame_is_empty_not_internal() {
+        let err = screenshot_from_pixels("/unused.png", None).unwrap_err();
+        assert_eq!(err, PresentError::Empty);
+        assert_eq!(err.to_string(), "当前没有投屏画面");
+        assert!(!matches!(err, PresentError::Internal(_)));
+    }
+
+    #[test]
+    fn screenshot_write_fail_is_internal() {
+        let dir = std::env::temp_dir();
+        let path = dir.to_str().expect("temp utf8");
+        let err = screenshot_from_pixels(path, Some((1, 1, vec![0, 0, 0, 255]))).unwrap_err();
+        assert!(matches!(err, PresentError::Internal(_)));
+        assert_ne!(err, PresentError::Empty);
+    }
+
+    #[test]
+    fn screenshot_host_gone_is_exited_not_empty() {
+        let err = screenshot_host_reply(None::<Result<(), PresentError>>).unwrap_err();
+        assert_eq!(err, PresentError::Exited);
+        assert_ne!(err, PresentError::Empty);
+        let empty = screenshot_host_reply(Some(Err::<(), _>(PresentError::Empty))).unwrap_err();
+        assert_eq!(empty, PresentError::Empty);
+    }
+
+    #[test]
+    fn unbind_clears_same_serial_pending() {
+        let mut pending = Some(("A".to_string(), 1u64, ()));
+        apply_pending_unbind(&mut pending, "A");
+        assert!(pending.is_none());
+    }
+
+    #[test]
+    fn unbind_keeps_other_serial_pending() {
+        let mut pending = Some(("A".to_string(), 1u64, ()));
+        apply_pending_unbind(&mut pending, "B");
+        assert_eq!(pending.as_ref().map(|(s, ..)| s.as_str()), Some("A"));
+    }
+
+    #[test]
+    fn shutdown_clears_pending() {
+        let mut pending = Some(("A".to_string(), 1u64, ()));
+        apply_pending_shutdown(&mut pending);
+        assert!(pending.is_none());
+        let mut empty: Option<(String, u64, ())> = None;
+        apply_pending_shutdown(&mut empty);
+        assert!(empty.is_none());
+    }
 
     #[test]
     fn probe_id_is_stable() {

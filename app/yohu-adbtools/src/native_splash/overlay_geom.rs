@@ -3,7 +3,7 @@
 
 use windows::Win32::Foundation::RECT;
 
-use yohu_motion::{rect_center, rect_height, rect_width, xywh};
+use super::geometry::{rect_center, rect_height, rect_width, xywh};
 
 pub fn scale_rect_about_center(r: RECT, scale: f64) -> RECT {
     let (cx, cy) = rect_center(r);

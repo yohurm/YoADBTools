@@ -5,7 +5,7 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
 /// 在可用区内按画面宽高比 contain，返回贴合盒相对区原点的偏移与尺寸。
-/// 公式与 UI `fitContain` 相同（先 min 再 round），无画面尺寸时铺满。
+/// 无画面尺寸时铺满。
 pub fn contain_in_zone(
     zone_w: u32,
     zone_h: u32,
@@ -215,6 +215,13 @@ mod tests {
 
     #[test]
     fn occupancy_duration_is_spatial_panel() {
-        assert_eq!(yohu_motion::MotionSpec::SpatialPanel.duration_ms(), 300);
+        let rows: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../core/yohu-motion/testdata/motion_spec.json"
+        ))
+        .expect("fixture");
+        let ms = rows["spatialPanel"]["durationMs"]
+            .as_u64()
+            .expect("spatialPanel.durationMs");
+        assert_eq!(yohu_motion::MotionSpec::SpatialPanel.duration_ms(), ms);
     }
 }

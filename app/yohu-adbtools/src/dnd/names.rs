@@ -40,7 +40,12 @@ fn unix_file_name_ok(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains('\0') && !name.contains('/')
 }
 
-/// 拖出相对路径（core 用 `\` 分段）在当前 OS 可落盘。
+/// POSIX 相对路径（files 树展开）→ Explorer FILEDESCRIPTOR 的 `\` 分段。
+pub fn posix_to_win_relative(relative: &str) -> String {
+    relative.replace('/', "\\")
+}
+
+/// 拖出相对路径（`\` 分段）在当前 OS 可落盘。
 pub fn relative_ok(relative: &str) -> bool {
     #[cfg(windows)]
     {
@@ -75,6 +80,16 @@ mod tests {
         assert!(!windows_relative_ok("DCIM\\con.txt"));
         assert!(!windows_relative_ok(&"a".repeat(260)));
         assert!(windows_relative_ok(&"测".repeat(80)));
+    }
+
+    #[test]
+    fn posix_to_win_relative_joins_backslash() {
+        assert_eq!(posix_to_win_relative("DCIM"), "DCIM");
+        assert_eq!(posix_to_win_relative("DCIM/a.jpg"), "DCIM\\a.jpg");
+        assert_eq!(
+            posix_to_win_relative("DCIM/Camera/x.png"),
+            "DCIM\\Camera\\x.png"
+        );
     }
 
     #[test]

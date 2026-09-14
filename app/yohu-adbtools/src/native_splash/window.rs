@@ -4,7 +4,6 @@
 use std::ffi::c_void;
 use std::sync::Mutex;
 
-use tauri::window::Color;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -32,7 +31,8 @@ use super::geometry::{
 use super::icon::{create_bitmap, load_icon, scale_bitmap};
 use super::paint::{present, PaintData, PaintSpec};
 use super::surface::BootFrame;
-use crate::window_boot::{canvas_color, elapsed_ms};
+use crate::theme_spec::canvas_rgb;
+use crate::window_boot::elapsed_ms;
 
 const CLASS: PCWSTR = w!("YohuBootSplash");
 
@@ -93,7 +93,7 @@ pub fn frame_snapshot() -> Option<BootFrame> {
 
 fn show_inner(dark: bool) -> Result<(), String> {
     let icon = load_icon().ok_or_else(|| "解码启动图标失败".to_string())?;
-    let Color(cr, cg, cb, _) = canvas_color(dark);
+    let (cr, cg, cb) = canvas_rgb(dark);
     let icon = icon.onto_canvas(cr, cg, cb);
     unsafe {
         let hinstance = GetModuleHandleW(None).map_err(|e| e.to_string())?;

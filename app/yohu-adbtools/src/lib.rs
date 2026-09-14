@@ -5,32 +5,42 @@
 //! - `commands/` 是薄命令层：参数反序列化 → core API → 结果序列化，**禁止业务逻辑**；
 //! - 所有业务能力在 core crates（domain/adb/logsrv/files/update）。
 
+mod browse_runs;
+mod capture_runs;
 mod commands;
 mod device_catalog;
 mod dnd;
 mod events;
 mod group_runs;
+mod ipc_map;
 mod library_store;
+mod limits;
 mod mirror_plan;
 mod mirror_present;
+mod mirror_sessions;
 #[cfg(windows)]
 pub use mirror_present::MfDecoder;
 #[cfg(windows)]
 mod native_splash;
 mod panic_hook;
 mod paths;
+mod settings_apply;
 mod settings_store;
 mod sidecar;
 mod state;
 mod tasks;
 mod terminal_eval;
+mod theme_spec;
+mod tokens;
+mod transfer_runs;
+mod update_runs;
 mod window_boot;
 mod yolog;
 
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, WebviewEvent};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -52,7 +62,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 原生小窗必须在 WebView2 / tracing 之前画出（AS / IntelliJ / keyhop）。
     #[cfg(windows)]
     {
-        let pref = SettingsStore::load(AppPaths::probe_settings_file())
+        let pref = SettingsStore::load(AppPaths::probe_settings_file()?)?
             .snapshot()
             .theme;
         crate::native_splash::show(pref);
@@ -67,13 +77,13 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     #[cfg(windows)]
     if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_none() {
-        let webview = AppPaths::default_webview_dir();
+        let webview = AppPaths::default_webview_dir()?;
         let _ = std::fs::create_dir_all(&webview);
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview);
     }
     // 诊断日志：release（windows_subsystem）无控制台 → 落盘 logs/app.log（滚动 1MB×3）
     // 与设备日志严格分离（ADR-v6-010）；AppLog 内存环仍不落盘。
-    let logs_dir = AppPaths::default_logs_dir();
+    let logs_dir = AppPaths::default_logs_dir()?;
     let file_appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
         .max_log_files(7)
@@ -116,6 +126,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root_cancel = CancellationToken::new();
 
     let builder = tauri::Builder::default()
+        .on_webview_event(|webview, event| {
+            if let WebviewEvent::DragDrop(drag) = event {
+                crate::dnd::emit_native_drag(webview.app_handle(), webview.label(), drag);
+            }
+        })
         .on_page_load(|webview, payload| {
             let event = payload.event();
             let started = matches!(event, tauri::webview::PageLoadEvent::Started);
@@ -143,15 +158,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             let handle = app.handle().clone();
 
             // 1) 设置（先探针读取，确定 data_root 冻结快照；设置根不随数据目录迁移）
-            let probe_file = AppPaths::probe_settings_file();
-            let settings = SettingsStore::load(probe_file);
+            let probe_file = AppPaths::probe_settings_file()?;
+            let settings = SettingsStore::load(probe_file)?;
             let snapshot = settings.snapshot();
             // 先铺画布色。主窗保持隐藏，直到工作台 hydrate 完成再揭（关掉原生小窗）。
             if let Some(win) = app.get_webview_window("main") {
                 crate::window_boot::prepare_main_window(&win, snapshot.theme);
-                crate::window_boot::spawn_reveal_fallback(win);
             }
-            let paths = AppPaths::resolve(&snapshot.data_root);
+            let paths = AppPaths::resolve(&snapshot.data_root)?;
             if let Err(e) = paths.ensure_home() {
                 tracing::warn!("创建产品家园失败: {e}");
             }
@@ -179,7 +193,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             ));
             let client = std::sync::Arc::new(AdbClient::new((*tool).clone(), 8));
 
-            let (event_tx, event_rx) = mpsc::channel::<AppEvent>(8192);
+            let (event_tx, event_rx) = mpsc::channel::<AppEvent>(crate::limits::EVENT_CHANNEL_CAP);
             events::spawn_dispatcher(event_rx, handle.clone());
 
             let capture = CaptureService::new(
@@ -190,7 +204,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             );
             let status =
                 DeviceStatusHub::new(client.clone(), event_tx.clone(), root_cancel.clone());
-            let mirror = MirrorService::new(client.clone(), event_tx.clone(), server_jar);
+            let mirror = MirrorService::new(
+                client.clone(),
+                event_tx.clone(),
+                server_jar,
+                root_cancel.clone(),
+            );
             let present = PresentHost::new(event_tx.clone(), std::sync::Arc::clone(&mirror));
             tracing::info!(ms = crate::window_boot::elapsed_ms(), "投屏宿主已创建");
 
@@ -206,22 +225,18 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 transfers: TransferRunner::new(client.clone()),
                 settings,
                 paths: paths.clone(),
-                app_log: AppLog::new(500),
+                app_log: AppLog::new(crate::limits::APP_LOG_CAP),
                 tasks: std::sync::Arc::new(TaskCenter::new(event_tx.clone())),
                 event_tx: event_tx.clone(),
                 root_cancel: root_cancel.clone(),
                 last_devices: std::sync::Mutex::new(Vec::new()),
-                group_runs: std::sync::Mutex::new(std::collections::HashMap::new()),
-                group_next: std::sync::atomic::AtomicU32::new(0),
+                group_runs: crate::group_runs::GroupRuns::new(),
                 library: std::sync::Mutex::new(yohu_domain::CommandLibrary::empty()),
-                capture_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
-                mirror_tasks: std::sync::Mutex::new(std::collections::HashMap::new()),
-                transfer_cancels: std::sync::Arc::new(std::sync::Mutex::new(
-                    std::collections::HashMap::new(),
-                )),
-                transfer_next: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
-                browse_cancel: std::sync::Mutex::new(CancellationToken::new()),
-                update_download_cancel: std::sync::Mutex::new(None),
+                capture_runs: crate::capture_runs::CaptureRuns::new(),
+                mirror_sessions: crate::mirror_sessions::MirrorSessions::new(),
+                transfer_runs: crate::transfer_runs::TransferRuns::new(),
+                update_runs: crate::update_runs::UpdateRuns::new(),
+                browse_runs: crate::browse_runs::BrowseRuns::new(),
                 catalog_gate: tokio::sync::Mutex::new(None),
             };
             app.manage(state);
@@ -347,7 +362,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::system::system_open_path,
             commands::system::system_report_error,
             commands::system::system_log,
-            crate::window_boot::boot_show_main,
+            commands::boot::boot_show_main,
             commands::update::update_check,
             commands::update::update_info,
             commands::update::update_download,

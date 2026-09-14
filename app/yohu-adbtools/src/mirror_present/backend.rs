@@ -8,6 +8,8 @@ use std::sync::mpsc::Sender;
 use yohu_mirror::FramePipe;
 use yohu_protocol::MirrorLayout;
 
+use super::PresentError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Caps {
     pub id: &'static str,
@@ -26,7 +28,7 @@ pub enum Cmd {
     },
     Screenshot {
         path: String,
-        reply: Sender<Result<(), String>>,
+        reply: Sender<Result<(), PresentError>>,
     },
     Shutdown,
 }
@@ -50,21 +52,56 @@ pub trait AnnexBDecoder: Sized {
     fn drain(&mut self) -> Result<Option<Self::Picture>, String>;
 }
 
-#[cfg(not(windows))]
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn unimplemented_screenshot_err(id: &'static str) -> PresentError {
+    PresentError::Internal(format!(
+        "{id} 投屏后端未实现：预留系统硬解，禁止用 FFmpeg 填坑"
+    ))
+}
+
+#[cfg_attr(windows, allow(dead_code))]
 pub fn spawn_unimplemented(id: &'static str, serial: &str) -> Sender<Cmd> {
     let (tx, rx) = std::sync::mpsc::channel();
     let label = format!("mirror-present-{id}-{serial}");
     let _ = std::thread::Builder::new().name(label).spawn(move || loop {
         match rx.recv() {
             Ok(Cmd::Screenshot { reply, .. }) => {
-                let _ = reply.send(Err(format!(
-                    "{id} 投屏后端未实现：预留系统硬解，禁止用 FFmpeg 填坑"
-                )));
+                let _ = reply.send(Err(unimplemented_screenshot_err(id)));
             }
             Ok(Cmd::Shutdown) | Err(_) => break,
             Ok(_) => {}
         }
     });
     tx
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{unimplemented_screenshot_err, Cmd};
+    use crate::mirror_present::PresentError;
+
+    #[test]
+    fn unimplemented_screenshot_is_internal_not_empty() {
+        let err = unimplemented_screenshot_err("none");
+        assert!(matches!(err, PresentError::Internal(_)));
+        assert_ne!(err, PresentError::Empty);
+        assert_eq!(
+            err.to_string(),
+            "none 投屏后端未实现：预留系统硬解，禁止用 FFmpeg 填坑"
+        );
+
+        let tx = super::spawn_unimplemented("none", "S1");
+        let (reply_tx, reply_rx) = std::sync::mpsc::channel();
+        tx.send(Cmd::Screenshot {
+            path: String::new(),
+            reply: reply_tx,
+        })
+        .expect("unimplemented thread");
+        let reply = reply_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("screenshot reply");
+        let err = reply.expect_err("unimplemented must fail");
+        assert!(matches!(err, PresentError::Internal(_)));
+        assert_ne!(err, PresentError::Empty);
+        let _ = tx.send(Cmd::Shutdown);
+    }
 }

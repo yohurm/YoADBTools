@@ -29,36 +29,36 @@ pub struct AppPaths {
 }
 
 impl AppPaths {
-    pub fn local_root() -> PathBuf {
+    pub fn local_root() -> std::io::Result<PathBuf> {
         app_data_root(DATA_DIR_NAME)
     }
 
-    pub fn install_dir() -> PathBuf {
+    pub fn install_dir() -> std::io::Result<PathBuf> {
         app_install_root(DATA_DIR_NAME)
     }
 
-    pub fn default_logs_dir() -> PathBuf {
-        Self::local_root().join(dir::LOGS)
+    pub fn default_logs_dir() -> std::io::Result<PathBuf> {
+        Ok(Self::local_root()?.join(dir::LOGS))
     }
 
-    pub fn default_cache_dir() -> PathBuf {
-        Self::local_root().join(dir::CACHE)
+    pub fn default_cache_dir() -> std::io::Result<PathBuf> {
+        Ok(Self::local_root()?.join(dir::CACHE))
     }
 
-    pub fn default_webview_dir() -> PathBuf {
-        Self::default_cache_dir().join(dir::WEBVIEW)
+    pub fn default_webview_dir() -> std::io::Result<PathBuf> {
+        Ok(Self::default_cache_dir()?.join(dir::WEBVIEW))
     }
 
     /// 设置文件（探针用：与 data.root 无关）。
-    pub fn probe_settings_file() -> PathBuf {
-        Self::local_root()
+    pub fn probe_settings_file() -> std::io::Result<PathBuf> {
+        Ok(Self::local_root()?
             .join(dir::CONFIG)
-            .join(dir::SETTINGS_FILE)
+            .join(dir::SETTINGS_FILE))
     }
 
     /// 解析路径集；`settings_data_root` 为空时用默认数据根。
-    pub fn resolve(settings_data_root: &str) -> Self {
-        let local_root = Self::local_root();
+    pub fn resolve(settings_data_root: &str) -> std::io::Result<Self> {
+        let local_root = Self::local_root()?;
         let config_dir = local_root.join(dir::CONFIG);
         let cache_dir = local_root.join(dir::CACHE);
         let data_root = if settings_data_root.trim().is_empty() {
@@ -66,15 +66,15 @@ impl AppPaths {
         } else {
             PathBuf::from(settings_data_root)
         };
-        Self {
+        Ok(Self {
             local_root: local_root.clone(),
-            install_dir: Self::install_dir(),
+            install_dir: Self::install_dir()?,
             data_root,
             config_dir: config_dir.clone(),
             settings_file: config_dir.join(dir::SETTINGS_FILE),
             logs_dir: local_root.join(dir::LOGS),
             cache_dir,
-        }
+        })
     }
 
     /// 首次启动即铺好家园骨架，关于页「打开」不必等第一次落盘。
@@ -149,14 +149,24 @@ mod tests {
 
     #[test]
     fn empty_data_root_uses_local_default() {
-        let p = AppPaths::resolve("");
-        assert_eq!(p.data_root, AppPaths::local_root().join(dir::DATA));
-        assert_eq!(p.logs_dir, AppPaths::default_logs_dir());
-        assert_eq!(p.settings_file, AppPaths::probe_settings_file());
-        assert_eq!(p.local_root, AppPaths::local_root());
+        let p = AppPaths::resolve("").expect("os app data root");
+        let local = AppPaths::local_root().expect("os app data root");
+        assert_eq!(p.data_root, local.join(dir::DATA));
+        assert_eq!(
+            p.logs_dir,
+            AppPaths::default_logs_dir().expect("os app data root")
+        );
+        assert_eq!(
+            p.settings_file,
+            AppPaths::probe_settings_file().expect("os app data root")
+        );
+        assert_eq!(p.local_root, local);
         assert_eq!(p.config_dir, p.local_root.join(dir::CONFIG));
         assert_eq!(p.cache_dir, p.local_root.join(dir::CACHE));
-        assert_eq!(p.install_dir, AppPaths::install_dir());
+        assert_eq!(
+            p.install_dir,
+            AppPaths::install_dir().expect("os install root")
+        );
         #[cfg(windows)]
         assert_ne!(p.install_dir, p.local_root);
     }
@@ -189,18 +199,22 @@ mod tests {
     #[test]
     fn custom_data_root_does_not_move_config_logs_or_cache() {
         let custom = PathBuf::from("D:\\YohuData");
-        let p = AppPaths::resolve(custom.to_str().expect("utf-8"));
+        let p = AppPaths::resolve(custom.to_str().expect("utf-8")).expect("os app data root");
+        let local = AppPaths::local_root().expect("os app data root");
         assert_eq!(p.data_root, custom);
-        assert_eq!(p.logs_dir, AppPaths::local_root().join(dir::LOGS));
-        assert_eq!(p.config_dir, AppPaths::local_root().join(dir::CONFIG));
-        assert_eq!(p.cache_dir, AppPaths::local_root().join(dir::CACHE));
-        assert_eq!(p.settings_file, AppPaths::probe_settings_file());
+        assert_eq!(p.logs_dir, local.join(dir::LOGS));
+        assert_eq!(p.config_dir, local.join(dir::CONFIG));
+        assert_eq!(p.cache_dir, local.join(dir::CACHE));
+        assert_eq!(
+            p.settings_file,
+            AppPaths::probe_settings_file().expect("os app data root")
+        );
         assert_eq!(p.drag_out_dir(), p.cache_dir.join(dir::DRAG_OUT));
     }
 
     #[test]
     fn module_layout_matches_architecture() {
-        let p = AppPaths::resolve(r"X:\data");
+        let p = AppPaths::resolve(r"X:\data").expect("os app data root");
         let root = PathBuf::from(r"X:\data");
         assert_eq!(
             p.library_file(),
@@ -219,6 +233,7 @@ mod tests {
         assert_eq!(
             p.devices_catalog_file(),
             AppPaths::local_root()
+                .expect("os app data root")
                 .join(dir::CONFIG)
                 .join(dir::DEVICES_CATALOG)
         );
@@ -226,7 +241,7 @@ mod tests {
 
     #[test]
     fn catalog_strings_are_absolute_or_custom() {
-        let p = AppPaths::resolve("");
+        let p = AppPaths::resolve("").expect("os app data root");
         let c = p.catalog();
         assert_eq!(c.data_root, path_string(&p.data_root));
         assert_eq!(c.library_file, path_string(&p.library_file()));

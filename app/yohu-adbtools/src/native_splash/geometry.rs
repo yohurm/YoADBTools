@@ -8,17 +8,36 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 
-pub(crate) use yohu_motion::{rect_center, rect_height, rect_width, xywh};
+pub fn xywh(x: i32, y: i32, w: i32, h: i32) -> RECT {
+    RECT {
+        left: x,
+        top: y,
+        right: x + w,
+        bottom: y + h,
+    }
+}
+
+pub fn rect_width(r: RECT) -> i32 {
+    r.right - r.left
+}
+
+pub fn rect_height(r: RECT) -> i32 {
+    r.bottom - r.top
+}
+
+pub fn rect_center(r: RECT) -> (i32, i32) {
+    (r.left + rect_width(r) / 2, r.top + rect_height(r) / 2)
+}
 
 pub const LOGICAL_W: i32 = 480;
 pub const LOGICAL_H: i32 = 300;
 pub const ICON_LOGICAL: i32 = 72;
-pub const BRAND_GAP_LOGICAL: i32 = 16;
-pub const FONT_LOGICAL: i32 = 18;
+pub const BRAND_GAP_LOGICAL: i32 = crate::tokens::SPACE_LG;
+pub const FONT_LOGICAL: i32 = crate::tokens::FONT_PAGE_TITLE;
 /// 与 `@yohu/ui` `Radius.Md` 同值。小窗外形 / overlay 起势 clip。
-pub const CORNER_LOGICAL: i32 = 16;
+pub const CORNER_LOGICAL: i32 = crate::tokens::RADIUS_MD;
 /// 与 `@yohu/ui` `Radius.Sm` 同值。Win11 主窗外框 DWM round ≈ 8vp。
-pub const HOST_CORNER_LOGICAL: i32 = 8;
+pub const HOST_CORNER_LOGICAL: i32 = crate::tokens::RADIUS_SM;
 pub const USER_DEFAULT_SCREEN_DPI: u32 = 96;
 /// GetMonitorInfo 失败时的假工作区。不是 `Layout.WindowDefaultW/H`。
 const FALLBACK_WORK_W: i32 = 1920;
@@ -94,8 +113,8 @@ pub fn point_in_rect(x: i32, y: i32, r: RECT) -> bool {
 }
 
 /// 与 `@yohu/ui` `Layout.WindowMinW/H` 同值。
-pub const WINDOW_MIN_W: i32 = 1024;
-pub const WINDOW_MIN_H: i32 = 768;
+pub const WINDOW_MIN_W: i32 = crate::tokens::WINDOW_MIN_W;
+pub const WINDOW_MIN_H: i32 = crate::tokens::WINDOW_MIN_H;
 
 pub fn clamp_rect_min(r: RECT, min_w: i32, min_h: i32) -> RECT {
     let (cx, cy) = rect_center(r);
@@ -191,6 +210,14 @@ pub(super) fn store_geometry(placement: SplashPlacement) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn center_is_midpoint() {
+        let r = xywh(100, 50, 480, 300);
+        assert_eq!(rect_center(r), (340, 200));
+        assert_eq!(rect_width(r), 480);
+        assert_eq!(rect_height(r), 300);
+    }
 
     #[test]
     fn splash_is_smaller_than_main() {
@@ -306,6 +333,7 @@ mod tests {
     fn corner_tokens_match_youi_radius() {
         assert_eq!(CORNER_LOGICAL, 16);
         assert_eq!(HOST_CORNER_LOGICAL, 8);
+        assert_eq!(BRAND_GAP_LOGICAL, crate::tokens::SPACE_LG);
     }
 
     #[test]

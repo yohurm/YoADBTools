@@ -19,9 +19,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_NCDESTROY, WM_WINDOWPOSCHANGING,
 };
 
+use yohu_protocol::MIRROR_MIN_LAYOUT_PX;
+
 const SUBCLASS_ID: usize = 0x594F4855;
 const WM_LAYOUT: u32 = WM_APP + 0x4D;
-const MIN_LAYOUT_PX: u32 = 64;
 
 #[derive(Clone, Copy)]
 struct Slot {
@@ -239,7 +240,7 @@ fn target_rect(slot: &Slot, client_w: u32, client_h: u32) -> Option<(i32, i32, u
     let zone_h = client_h
         .saturating_sub(slot.inset_t.max(0) as u32)
         .saturating_sub(slot.inset_b.max(0) as u32);
-    if zone_w < MIN_LAYOUT_PX || zone_h < MIN_LAYOUT_PX {
+    if zone_w < MIRROR_MIN_LAYOUT_PX || zone_h < MIRROR_MIN_LAYOUT_PX {
         return None;
     }
     Some((slot.inset_l, slot.inset_t, zone_w, zone_h))

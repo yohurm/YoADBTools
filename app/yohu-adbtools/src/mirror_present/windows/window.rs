@@ -10,9 +10,7 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Graphics::Gdi::{ScreenToClient, UpdateWindow, ValidateRect};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
-};
+use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, LoadCursorW, PeekMessageW, RegisterClassExW,
     SetCursor, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HTTRANSPARENT,
@@ -21,6 +19,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_RBUTTONUP, WM_SETCURSOR, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_EX_NOACTIVATE,
     WS_EX_NOREDIRECTIONBITMAP,
 };
+
+use crate::limits::{PRESENT_BOOTSTRAP_PX, PRESENT_PUMP_BATCH};
 
 use super::host;
 use super::host::PointerWatch;
@@ -78,8 +78,8 @@ pub fn create_child(owner: HWND) -> Result<HWND, String> {
             WS_CHILD | WS_CLIPSIBLINGS,
             0,
             0,
-            16,
-            16,
+            PRESENT_BOOTSTRAP_PX as i32,
+            PRESENT_BOOTSTRAP_PX as i32,
             Some(owner),
             None,
             Some(hinstance.into()),
@@ -109,7 +109,7 @@ pub fn pump_messages(hwnd: HWND) {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
             n += 1;
-            if n >= 32 {
+            if n >= PRESENT_PUMP_BATCH {
                 break;
             }
         }

@@ -7,6 +7,7 @@ mod host;
 mod surface;
 mod view;
 mod vt;
+mod watch;
 
 use std::sync::mpsc::Sender;
 use std::sync::Arc;

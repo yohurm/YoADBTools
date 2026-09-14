@@ -16,12 +16,10 @@ pub fn commandlib_load(state: State<'_, AppState>) -> Result<CommandLibraryDto, 
     Ok(library.to_dto())
 }
 
-/// `commandlib.save`：校验 → 全量提交。取消零污染由 UI 深拷贝保证。
+/// `commandlib.save`：`from_dto` 后全量提交。取消零污染由 UI 深拷贝保证。
 #[tauri::command(rename = "commandlib.save")]
 pub fn commandlib_save(state: State<'_, AppState>, dto: CommandLibraryDto) -> Result<(), IpcError> {
-    let library = CommandLibrary::from_dto(&dto);
-    library
-        .validate()
+    let library = CommandLibrary::from_dto(&dto)
         .map_err(|e| ipc_code(IpcErrorCode::InvalidArgs, e.to_string()))?;
     crate::library_store::save(&state.paths.library_file(), &library).map_err(ipc)?;
     *state.library.lock().expect("library lock poisoned") = library;

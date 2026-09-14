@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use windows::Win32::Media::MediaFoundation::IMFDXGIDeviceManager;
-use yohu_mirror::{EncodedFrame, FramePipe};
+use yohu_mirror::{EncodedFrame, FramePipe, PIPE_H265};
 
 use super::mf::{DecodedPicture, MfDecoder};
 use crate::mirror_present::annexb::{access_unit, select_live_frames};
@@ -125,7 +125,7 @@ impl DecodeTick {
             self.failed = false;
         }
         if self.decoder.is_none() && !self.failed && frame.width > 0 && frame.height > 0 {
-            let hevc = frame.codec == 1;
+            let hevc = frame.codec == PIPE_H265;
             match MfDecoder::open_with(hevc, frame.width, frame.height, manager) {
                 Ok(dec) => {
                     tracing::info!(
@@ -144,7 +144,7 @@ impl DecodeTick {
                         error = %e,
                         width = frame.width,
                         height = frame.height,
-                        hevc = frame.codec == 1,
+                        hevc = frame.codec == PIPE_H265,
                         "MF 解码器启动失败，本会话不再重试"
                     );
                     self.failed = true;

@@ -9,6 +9,9 @@ mod handover;
 mod icon;
 mod overlay;
 mod overlay_geom;
+mod overlay_swapchain;
+mod overlay_tree;
+mod overlay_window;
 mod paint;
 mod recipe;
 mod surface;
@@ -24,7 +27,7 @@ use windows::Win32::UI::HiDpi::{
 
 use yohu_protocol::Theme;
 
-use crate::window_boot::resolve_dark;
+use crate::theme_spec::resolve_dark;
 
 pub use geometry::{boot_dark, center_on_splash_work, last_geometry};
 pub use handover::to_main;

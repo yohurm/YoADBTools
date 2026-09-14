@@ -6,6 +6,7 @@ pub mod follow;
 pub mod gpu;
 mod host;
 pub mod mf;
+mod occupancy;
 pub mod surface;
 mod window;
 

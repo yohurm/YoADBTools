@@ -23,8 +23,9 @@ pub fn spawn_dispatcher(
                 ..
             } = &event
             {
+                // 采集结束是任务中心收口的唯一入口（commands / 掉线只 stop，不另调 finish）。
                 if let Some(app_state) = app.try_state::<AppState>() {
-                    app_state.finish_capture_task(serial);
+                    crate::capture_runs::finish(&app_state, serial);
                 }
             }
             if let AppEvent::MirrorState {
@@ -36,7 +37,7 @@ pub fn spawn_dispatcher(
                 // 会话结束是解绑解码的唯一入口（commands/掉线只 stop，不另调 unbind）。
                 if let Some(app_state) = app.try_state::<AppState>() {
                     app_state.present.unbind(serial);
-                    app_state.finish_mirror_task(serial);
+                    crate::mirror_sessions::finish(&app_state, serial);
                 }
             }
             let name = event.name();

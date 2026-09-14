@@ -2,7 +2,7 @@
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
@@ -13,7 +13,7 @@ use super::decode::DecodeBind;
 use super::host::Host;
 use super::view;
 
-const PRESENT_IDLE: Duration = Duration::from_millis(4);
+use crate::limits::{PRESENT_BEAT, PRESENT_IDLE};
 
 pub fn spawn_surface(
     serial: String,
@@ -66,7 +66,7 @@ fn run_loop(
             sync_view(&host);
             need_sync = false;
         }
-        if beat.elapsed() >= Duration::from_secs(1) {
+        if beat.elapsed() >= PRESENT_BEAT {
             if let Some(bind) = decode.as_mut() {
                 bind.tick.log_beat();
             }

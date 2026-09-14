@@ -6,29 +6,36 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::commands::{ipc_code, ipc_library, ipc_run};
 use crate::state::AppState;
 use yohu_adb::AdbClient;
-use yohu_domain::{run_command, run_line, CommandDefinition};
-use yohu_protocol::{
-    EvalResult, IpcError, IpcErrorCode, SerialEvalResult, TerminalEvalRequest, TerminalExecRequest,
-};
+use yohu_domain::{run_command, run_line, CommandDefinition, LibraryError, RunError};
+use yohu_protocol::{EvalResult, SerialEvalResult, TerminalEvalRequest, TerminalExecRequest};
+
+#[derive(Debug, thiserror::Error)]
+pub enum TerminalEvalError {
+    #[error("命令不存在: {0}")]
+    CommandNotFound(String),
+    #[error("命令行为空")]
+    EmptyCommand,
+    #[error("{0}")]
+    Library(#[from] LibraryError),
+    #[error("{0}")]
+    Join(String),
+}
 
 /// 查库、填充占位符、对 `serials` 并行执行。
 pub async fn eval(
     state: &AppState,
     req: TerminalEvalRequest,
-) -> Result<Vec<SerialEvalResult>, IpcError> {
+) -> Result<Vec<SerialEvalResult>, TerminalEvalError> {
     let definition = {
         let library = state.library.lock().expect("library lock poisoned");
-        library.command(&req.command_id).cloned().ok_or_else(|| {
-            ipc_code(
-                IpcErrorCode::NotFound,
-                format!("命令不存在: {}", req.command_id),
-            )
-        })?
+        library
+            .command(&req.command_id)
+            .cloned()
+            .ok_or_else(|| TerminalEvalError::CommandNotFound(req.command_id.clone()))?
     };
-    let filled = definition.fill(&req.values).map_err(ipc_library)?;
+    let filled = definition.fill(&req.values)?;
     run_definition(state.client.clone(), filled, req.serials).await
 }
 
@@ -36,10 +43,10 @@ pub async fn eval(
 pub async fn exec(
     state: &AppState,
     req: TerminalExecRequest,
-) -> Result<Vec<SerialEvalResult>, IpcError> {
+) -> Result<Vec<SerialEvalResult>, TerminalEvalError> {
     let command = req.command.trim().to_string();
     if command.is_empty() {
-        return Err(ipc_code(IpcErrorCode::InvalidArgs, "命令行为空"));
+        return Err(TerminalEvalError::EmptyCommand);
     }
     run_raw(state.client.clone(), command, req.serials).await
 }
@@ -48,14 +55,13 @@ async fn run_definition(
     client: Arc<AdbClient>,
     definition: CommandDefinition,
     serials: Vec<String>,
-) -> Result<Vec<SerialEvalResult>, IpcError> {
+) -> Result<Vec<SerialEvalResult>, TerminalEvalError> {
     let mut handles = Vec::with_capacity(serials.len());
     for serial in serials {
         let client = client.clone();
         let command = definition.clone();
         handles.push(tokio::spawn(async move {
-            match run_command(client.as_ref(), &serial, &command, CancellationToken::new()).await
-            {
+            match run_command(client.as_ref(), &serial, &command, CancellationToken::new()).await {
                 Ok(run) => from_eval(&serial, run.into_eval_result()),
                 Err(error) => from_run_error(serial, error),
             }
@@ -68,7 +74,7 @@ async fn run_raw(
     client: Arc<AdbClient>,
     line: String,
     serials: Vec<String>,
-) -> Result<Vec<SerialEvalResult>, IpcError> {
+) -> Result<Vec<SerialEvalResult>, TerminalEvalError> {
     let mut handles = Vec::with_capacity(serials.len());
     for serial in serials {
         let client = client.clone();
@@ -85,13 +91,13 @@ async fn run_raw(
 
 async fn join_results(
     handles: Vec<tokio::task::JoinHandle<SerialEvalResult>>,
-) -> Result<Vec<SerialEvalResult>, IpcError> {
+) -> Result<Vec<SerialEvalResult>, TerminalEvalError> {
     let mut results = Vec::with_capacity(handles.len());
     for handle in handles {
         results.push(
             handle
                 .await
-                .map_err(|e| ipc_code(IpcErrorCode::Internal, e.to_string()))?,
+                .map_err(|e| TerminalEvalError::Join(e.to_string()))?,
         );
     }
     Ok(results)
@@ -109,8 +115,8 @@ fn from_eval(serial: &str, result: EvalResult) -> SerialEvalResult {
     }
 }
 
-fn from_run_error(serial: String, error: yohu_domain::RunError) -> SerialEvalResult {
-    let mapped = ipc_run(error);
+fn from_run_error(serial: String, error: RunError) -> SerialEvalResult {
+    let mapped = crate::ipc_map::ipc_run(error);
     SerialEvalResult {
         serial,
         ok: false,

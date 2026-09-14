@@ -2,15 +2,14 @@
 //! 主窗 HWND 一次落到最终矩形。禁止插值 HWND 宽高。
 //! 主窗内容只在 overlay 铺满（同屏）或出场结束（异屏）之后才变为可见。
 
-use std::sync::atomic::{AtomicU8, Ordering};
-
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowRect, IsWindowVisible, SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE,
     SWP_NOZORDER, SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
 };
 
-use crate::window_boot::{elapsed_ms, MAIN_DEFAULT_H, MAIN_DEFAULT_W};
+use crate::tokens::{WINDOW_DEFAULT_H, WINDOW_DEFAULT_W};
+use crate::window_boot::elapsed_ms;
 
 use super::geometry::{
     center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height, rect_width,
@@ -20,29 +19,17 @@ use super::recipe;
 use super::surface::BootSurface;
 use super::window::{frame_snapshot, splash_hwnd, splash_window_rect};
 
-const IDLE: u8 = 0;
-const BUSY: u8 = 1;
-const DONE: u8 = 2;
-
-/// 只允许一路交接（hydrate 与超时不能各播一次）。
-static STATE: AtomicU8 = AtomicU8::new(IDLE);
-
-/// 返回是否应由调用方同步 Tao 可见性。`false` 表示另一路正在播，禁止抢先 `show`。
-pub fn to_main(main: HWND) -> bool {
+/// 揭窗单一入口调用。已可见则关小窗返回。
+pub fn to_main(main: HWND) {
     if is_window_visible(main) {
         super::close();
-        return true;
-    }
-    match STATE.compare_exchange(IDLE, BUSY, Ordering::SeqCst, Ordering::SeqCst) {
-        Ok(_) => {}
-        Err(BUSY) => return false,
-        Err(_) => return true,
+        return;
     }
 
     let Some(splash) = splash_hwnd() else {
         show_main_at_target(main, fallback_target(main));
         finish();
-        return true;
+        return;
     };
     let splash_rect = splash_window_rect().unwrap_or_else(|| {
         last_geometry()
@@ -53,7 +40,7 @@ pub fn to_main(main: HWND) -> bool {
     let Some(placement) = last_geometry() else {
         show_main_at_target(main, target_on_splash_work(main_rect));
         finish();
-        return true;
+        return;
     };
     let kind = classify_handover(splash_rect, main_rect, placement.work());
     let target = target_on_splash_work(main_rect);
@@ -62,7 +49,7 @@ pub fn to_main(main: HWND) -> bool {
         tracing::info!(ms = elapsed_ms(), ?kind, "系统关闭窗口动画，瞬时交接");
         show_main_at_target(main, target);
         finish();
-        return true;
+        return;
     }
 
     tracing::info!(
@@ -86,7 +73,7 @@ pub fn to_main(main: HWND) -> bool {
         tracing::info!(ms = elapsed_ms(), "启动交接：无表面，瞬时");
         show_main_at_target(main, target);
         finish();
-        return true;
+        return;
     };
     let surface = BootSurface::lock(placement, frame);
     let cover = || {
@@ -109,12 +96,10 @@ pub fn to_main(main: HWND) -> bool {
         }
     }
     finish();
-    true
 }
 
 fn finish() {
     super::close();
-    STATE.store(DONE, Ordering::SeqCst);
 }
 
 fn target_on_splash_work(main_size_src: RECT) -> RECT {
@@ -133,7 +118,7 @@ fn target_on_splash_work(main_size_src: RECT) -> RECT {
 fn fallback_target(main: HWND) -> RECT {
     window_rect(main)
         .map(target_on_splash_work)
-        .unwrap_or_else(|| xywh(0, 0, MAIN_DEFAULT_W as i32, MAIN_DEFAULT_H as i32))
+        .unwrap_or_else(|| xywh(0, 0, WINDOW_DEFAULT_W as i32, WINDOW_DEFAULT_H as i32))
 }
 
 fn place_main_at_target(main: HWND, target: RECT) {

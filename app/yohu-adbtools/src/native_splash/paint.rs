@@ -2,21 +2,20 @@
 //! 底色只写 `canvas_bgra`；GDI 只画图标和标题，禁止 `FillRect` 整框（会把 BGRA 写成 RGBA）。
 //! 本层不 `SetWindowRgn`、不采样 HWND DC。圆角由窗口显示 clip / overlay DComp clip 负责。
 
-use tauri::window::Color;
 use windows::Win32::Foundation::{COLORREF, HWND, RECT};
 use windows::Win32::Graphics::Gdi::{
     BeginPaint, BitBlt, CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject,
     DrawTextW, EndPaint, GetTextMetricsW, SelectObject, SetBkMode, SetTextColor, BITMAPINFO,
-    BITMAPINFOHEADER, BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_QUALITY, DIB_RGB_COLORS,
-    DT_CENTER, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, FF_DONTCARE, FW_SEMIBOLD, HBITMAP, HDC,
-    OUT_DEFAULT_PRECIS, PAINTSTRUCT, RGBQUAD, SRCCOPY, TEXTMETRICW, TRANSPARENT,
+    BITMAPINFOHEADER, BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_QUALITY,
+    DIB_RGB_COLORS, DT_CENTER, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, FF_DONTCARE, FW_SEMIBOLD,
+    HBITMAP, HDC, OUT_DEFAULT_PRECIS, PAINTSTRUCT, RGBQUAD, SRCCOPY, TEXTMETRICW, TRANSPARENT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW, GWLP_USERDATA};
 use yohu_protocol::DISPLAY_NAME;
 
 use super::geometry::SplashPlacement;
 use super::surface::{fill_canvas, force_opaque, BootFrame};
-use crate::window_boot::brand_text_color;
+use crate::theme_spec::{brand_text_rgb, canvas_bgra};
 
 /// 一次绘制会话：尺寸与主题来自 `SplashPlacement`，铬尺寸已按 DPI 缩放。
 pub struct PaintSpec {
@@ -68,7 +67,7 @@ impl PaintData {
         let n = (frame_w as usize) * (frame_h as usize) * 4;
         fill_canvas(
             std::slice::from_raw_parts_mut(frame_bits, n),
-            crate::window_boot::canvas_bgra(spec.dark),
+            canvas_bgra(spec.dark),
         );
         let data = Box::new(Self {
             bitmap: icon,
@@ -121,7 +120,7 @@ impl PaintData {
             CLIP_DEFAULT_PRECIS,
             DEFAULT_QUALITY,
             FF_DONTCARE.0 as u32,
-            windows::core::w!("Segoe UI"),
+            &windows::core::HSTRING::from(crate::tokens::FONT_SANS),
         );
         let old_font = SelectObject(mem, font.into());
         SetBkMode(mem, TRANSPARENT);
@@ -143,7 +142,7 @@ impl PaintData {
         );
         SelectObject(icon_dc, old_icon);
         let _ = DeleteDC(icon_dc);
-        SetTextColor(mem, to_colorref(brand_text_color(self.dark)));
+        SetTextColor(mem, to_colorref(brand_text_rgb(self.dark)));
         let mut text_rect = RECT {
             left: 0,
             top: icon_y + icon + gap,
@@ -180,7 +179,7 @@ pub fn brand_origin(client_w: i32, client_h: i32, icon: i32, gap: i32, text_h: i
     (x.max(0), y.max(0))
 }
 
-fn to_colorref(Color(r, g, b, _): Color) -> COLORREF {
+fn to_colorref((r, g, b): (u8, u8, u8)) -> COLORREF {
     COLORREF(u32::from(b) | (u32::from(g) << 8) | (u32::from(r) << 16))
 }
 
@@ -254,14 +253,14 @@ mod tests {
     #[test]
     fn light_composed_frame_corners_are_canvas() {
         use super::super::icon::{create_bitmap, load_icon};
-        use crate::window_boot::canvas_bgra;
+        use crate::theme_spec::{canvas_bgra, canvas_rgb};
         use windows::Win32::Graphics::Gdi::{GetDC, ReleaseDC};
 
         unsafe {
             let hdc = GetDC(None);
             assert!(!hdc.is_invalid());
             let icon = load_icon().expect("128x128.png");
-            let Color(r, g, b, _) = crate::window_boot::canvas_color(false);
+            let (r, g, b) = canvas_rgb(false);
             let icon = icon.onto_canvas(r, g, b);
             let bmp = create_bitmap(hdc, &icon).expect("icon dib");
             let data = PaintData::create(
