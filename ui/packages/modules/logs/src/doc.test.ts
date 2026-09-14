@@ -16,6 +16,7 @@ import {
   logDocColumns,
   logDocTrackPx,
   logDocTrackTemplate,
+  splitDocField,
   splitLevelGlyph,
 } from "./doc";
 import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultLogColWidths } from "./layout";
@@ -52,6 +53,17 @@ describe("clipPadField / fieldChars", () => {
     expect(fieldChars(192, 10)).toBe(24);
     expect(fieldChars(40, 10)).toBe(10);
     expect(fieldChars(184, 23)).toBe(23);
+  });
+
+  it("拆字段时正文不含列垫，拼回等于文档", () => {
+    const padded = clipPadField("Yohu", 10, "start");
+    const split = splitDocField(`  ${padded} `);
+    expect(split.body).toBe("Yohu");
+    expect(split.lead.startsWith(" ")).toBe(true);
+    expect(split.trail.endsWith(" ")).toBe(true);
+    expect(`${split.lead}${split.body}${split.trail}`).toBe(`  ${padded} `);
+    expect(splitDocField("  wdt_dump_cntcv CPU   ").body).toBe("wdt_dump_cntcv CPU");
+    expect(splitDocField("     ").body).toBe("");
   });
 });
 

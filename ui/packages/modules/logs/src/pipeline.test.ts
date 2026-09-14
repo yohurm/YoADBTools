@@ -19,9 +19,14 @@ import {
   matchesLine,
   matchesWireFilter,
   normalizeLevels,
+  parseTagNeedles,
   pidSetOf,
   rebindPids,
+  removeTagNeedle,
   scanSignal,
+  splitTagInput,
+  joinTagInput,
+  tagFilterActive,
   toggleLevel,
   toWireFilter,
 } from "./pipeline";
@@ -147,10 +152,26 @@ describe("matchesLine", () => {
     expect(matchesLine(line({ level: "?" }), filter({ levels: ["V"] }))).toBe(false);
   });
 
-  it("Tag/关键字包含（忽略大小写）", () => {
+  it("Tag 精确命中（忽略大小写），不是子串", () => {
     expect(matchesLine(line({ tag: "OkHttp" }), filter({ tagContains: "okhttp" }))).toBe(true);
+    expect(matchesLine(line({ tag: "libcomposer_ext" }), filter({ tagContains: "libc" }))).toBe(false);
+    expect(matchesLine(line({ tag: "libc" }), filter({ tagContains: "libc," }))).toBe(true);
     expect(matchesLine(line({ msg: "Request Timeout" }), filter({ keyword: "timeout" }))).toBe(true);
     expect(matchesLine(line({ msg: "ok" }), filter({ keyword: "timeout" }))).toBe(false);
+  });
+
+  it("Tag 多针逗号分隔，任一精确命中", () => {
+    const f = filter({ tagContains: "HfLooper, adbd" });
+    expect(matchesLine(line({ tag: "HfLooper" }), f)).toBe(true);
+    expect(matchesLine(line({ tag: "adbd" }), f)).toBe(true);
+    expect(matchesLine(line({ tag: "Other" }), f)).toBe(false);
+  });
+
+  it("Tag 针内空白保留，仅分隔符等于不限", () => {
+    expect(matchesLine(line({ tag: "wdt_dump_cntcv CPU" }), filter({ tagContains: "wdt_dump_cntcv CPU, x" }))).toBe(
+      true,
+    );
+    expect(matchesLine(line({ tag: "Other" }), filter({ tagContains: " , ， " }))).toBe(true);
   });
 
   it("Scope=Pid 精确相等", () => {
@@ -163,6 +184,31 @@ describe("matchesLine", () => {
     const f = filter({ scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [1, 2] });
     expect(matchesLine(line({ pid: 2 }), f)).toBe(true);
     expect(matchesLine(line({ pid: 3 }), f)).toBe(false);
+  });
+});
+
+describe("parseTagNeedles", () => {
+  it("逗号 / 分号 / 竖线拆针，去空段，空白留在针内", () => {
+    expect(parseTagNeedles("")).toEqual([]);
+    expect(parseTagNeedles("  ")).toEqual([]);
+    expect(parseTagNeedles("okhttp")).toEqual(["okhttp"]);
+    expect(parseTagNeedles("hfl, adbd")).toEqual(["hfl", "adbd"]);
+    expect(parseTagNeedles("hfl，adbd、binder")).toEqual(["hfl", "adbd", "binder"]);
+    expect(parseTagNeedles("hfl; adbd|binder")).toEqual(["hfl", "adbd", "binder"]);
+    expect(parseTagNeedles("okhttp,")).toEqual(["okhttp"]);
+    expect(parseTagNeedles("wdt_dump_cntcv CPU, HfLooper")).toEqual(["wdt_dump_cntcv CPU", "HfLooper"]);
+    expect(tagFilterActive(" , ")).toBe(false);
+    expect(tagFilterActive("okhttp,")).toBe(true);
+  });
+
+  it("逗号提交成气泡；草稿与已提交可还原", () => {
+    expect(splitTagInput("libc")).toEqual({ committed: [], draft: "libc" });
+    expect(splitTagInput("libc,")).toEqual({ committed: ["libc"], draft: "" });
+    expect(splitTagInput("libc, adbd")).toEqual({ committed: ["libc"], draft: "adbd" });
+    expect(splitTagInput("libc, adbd,")).toEqual({ committed: ["libc", "adbd"], draft: "" });
+    expect(joinTagInput(["libc", "Libc"], "")).toBe("libc, ");
+    expect(joinTagInput(["libc"], "adbd")).toBe("libc, adbd");
+    expect(removeTagNeedle("libc, adbd,", "libc")).toBe("adbd, ");
   });
 });
 
@@ -243,6 +289,24 @@ describe("PidBinding 包名重绑（含历史集）", () => {
         binding: emptyBinding(),
       }).scope,
     ).toEqual({ kind: "pid", pid: 42 });
+    expect(
+      toWireFilter({
+        levels: [],
+        tagContains: " , ， ",
+        keyword: "",
+        scope: { kind: "all" },
+        binding: emptyBinding(),
+      }).tag_contains,
+    ).toBeUndefined();
+    expect(
+      toWireFilter({
+        levels: [],
+        tagContains: "hfl, adbd",
+        keyword: "",
+        scope: { kind: "all" },
+        binding: emptyBinding(),
+      }).tag_contains,
+    ).toBe("hfl, adbd");
   });
 });
 

@@ -1,10 +1,10 @@
 /**
  * 日志分析主视图：绑定壳注入的 DeviceSession（设备 + 设置）；对话框与本机选路留在视图层。
  * 显示列 / 导出走注入的 DeviceSession.settings。
- * 行是 formatLogDoc 文档；表头铬层可拖宽。选区走原生 Selection。
+ * 行是 formatLogDoc 文档；表头铬层可拖宽。选区走原生 Selection（槽位回收后不跨原点保留；复制走 copy.ts）。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, type Accessor, type JSX } from "solid-js";
+import { For, Show, createContext, createEffect, createMemo, createSignal, onCleanup, onMount, untrack, useContext, type Accessor, type JSX } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
 import { dialogSaveFile, errorText, ModuleTitle, systemOpenPath } from "@yohu/api";
@@ -12,12 +12,14 @@ import {
   Icon,
   YoBadge,
   YoButton,
+  YoChip,
   YoChrome,
   YoColFrame,
   YoColHeader,
   YoColRow,
   YoDialog,
   YoEmptyState,
+  YoListPresence,
   YoLoading,
   YoPage,
   YoPanel,
@@ -47,6 +49,7 @@ import {
   joinLogDoc,
   logDocTrackTemplate,
   measureChPx,
+  splitDocField,
   splitLevelGlyph,
   type LogDocLayout,
 } from "./doc";
@@ -55,7 +58,7 @@ import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./key
 import { DEFAULT_LOG_DISPLAY_COLUMNS, tsFieldPx, visibleLogColumns } from "./layout";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
-import { LEVELS, levelInkStyle, levelKey, levelLabel, levelPaint, toggleLevel, type ViewRow } from "./pipeline";
+import { LEVELS, joinTagInput, levelInkStyle, levelKey, levelLabel, levelPaint, removeTagNeedle, splitTagInput, tagFilterActive, toggleLevel, type ViewRow } from "./pipeline";
 import {
   sessionCaptureLabel,
   sessionCapturePhase,
@@ -105,9 +108,13 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<Log
             const glyph = splitLevelGlyph(part.text);
             return (
               <>
-                {glyph.lead}
+                <Show when={glyph.lead}>
+                  <span data-log-pad>{glyph.lead}</span>
+                </Show>
                 <span class="yohu-logs__row-level yohu-tone">{glyph.letter}</span>
-                {glyph.pad}
+                <Show when={glyph.pad}>
+                  <span data-log-pad>{glyph.pad}</span>
+                </Show>
               </>
             );
           }
@@ -130,12 +137,19 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<Log
               </span>
             );
           }
+          const field = splitDocField(part.text);
           const cell = (
             <span
               class={`yohu-logs__row-${part.kind}`}
               classList={{ "yohu-tone": part.kind === "tag" }}
             >
-              {part.text}
+              <Show when={field.lead}>
+                <span data-log-pad>{field.lead}</span>
+              </Show>
+              {field.body}
+              <Show when={field.trail}>
+                <span data-log-pad>{field.trail}</span>
+              </Show>
             </span>
           );
           return cell;
@@ -147,6 +161,38 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<Log
         </span>
       </Show>
     </>
+  );
+}
+
+const LogListBind = createContext<{
+  keyword: Accessor<string>;
+  layout: Accessor<LogDocLayout>;
+  pickAll: Accessor<boolean>;
+}>();
+
+function LogRow(props: { item: ViewRow; index: number }) {
+  const bind = useContext(LogListBind)!;
+  const key = (): ReturnType<typeof levelKey> => levelKey(props.item.line.level);
+  const paint = () => {
+    const letter = key();
+    return letter ? levelPaint(letter) : null;
+  };
+  return (
+    <div
+      class="yohu-logs__cols yohu-logs__row"
+      data-seq={String(props.item.line.seq)}
+      data-level={key() ?? undefined}
+      data-paint={paint()?.invert ? "invert" : undefined}
+      data-tint-msg={paint()?.tintMessage ? "" : undefined}
+      style={key() ? (levelInkStyle(key()!) as JSX.CSSProperties) : undefined}
+      classList={{
+        "yohu-logs__row--signal": props.item.signal !== undefined,
+        "yohu-logs__row--raw": props.item.line.level === "?",
+        "yohu-logs__row--picked": bind.pickAll(),
+      }}
+    >
+      <LogLineDoc row={props.item} keyword={bind.keyword()} layout={bind.layout} />
+    </div>
   );
 }
 
@@ -167,9 +213,54 @@ function tabTitle(session: LogSessionState): string {
   return short ? `${session.title} · ${short}` : session.title;
 }
 
+function TagFilterField(props: { session: LogSessionState }) {
+  const parsed = (): ReturnType<typeof splitTagInput> => splitTagInput(props.session.tagContains);
+  const write = (raw: string): void => {
+    logStore.patchFilter(props.session.id, { tagContains: raw });
+  };
+  return (
+    <YoTextField
+      block
+      ariaLabel="Tag，逗号分隔，精确匹配"
+      placeholder={parsed().committed.length > 0 ? "" : "Tag，逗号分隔"}
+      value={parsed().draft}
+      tokens={
+        parsed().committed.length > 0 ? (
+          <YoListPresence each={parsed().committed} key={(tag) => tag} recipe="chip">
+            {(tag) => (
+              <YoChip
+                text={tag}
+                onDismiss={() => write(removeTagNeedle(props.session.tagContains, tag))}
+              />
+            )}
+          </YoListPresence>
+        ) : undefined
+      }
+      clearable
+      active={tagFilterActive(props.session.tagContains)}
+      onInput={(v) => {
+        const { committed } = parsed();
+        const typed = splitTagInput(v);
+        write(joinTagInput([...committed, ...typed.committed], typed.draft));
+      }}
+      onKeyDown={(event) => {
+        const { committed, draft } = parsed();
+        if (event.key === "Backspace" && draft.length === 0 && committed.length > 0) {
+          event.preventDefault();
+          write(joinTagInput(committed.slice(0, -1), ""));
+        }
+        if (event.key === "Enter" && draft.length > 0) {
+          event.preventDefault();
+          write(joinTagInput([...committed, draft], ""));
+        }
+      }}
+    />
+  );
+}
+
 function SessionEmpty(props: { session: LogSessionState }) {
   const filterActive = (): boolean =>
-    props.session.levels.length > 0 || props.session.tagContains.length > 0 || props.session.keyword.length > 0;
+    props.session.levels.length > 0 || tagFilterActive(props.session.tagContains) || props.session.keyword.length > 0;
   const phase = (): ReturnType<typeof sessionCapturePhase> => sessionCapturePhase(props.session);
   const idle = (): boolean => phase() === "stopped" && !filterActive();
   return (
@@ -557,15 +648,8 @@ export function LogAnalyzerView(props: DeviceSession) {
                     }}
                   </For>
                 </div>
-                <span class="yohu-logs__field">
-                  <YoTextField
-                    block
-                    ariaLabel="Tag"
-                    placeholder="Tag"
-                    value={session.tagContains}
-                    clearable
-                    onInput={(v) => logStore.patchFilter(session.id, { tagContains: v })}
-                  />
+                <span class="yohu-logs__field yohu-logs__field--tag">
+                  <TagFilterField session={session} />
                 </span>
                 <span class="yohu-logs__search yohu-logs__field">
                   <YoTextField
@@ -611,6 +695,13 @@ export function LogAnalyzerView(props: DeviceSession) {
                   class="yohu-logs__list-body"
                   ref={(el) => { setListEl(el); }}
                 >
+                  <LogListBind.Provider
+                    value={{
+                      keyword: () => session.keyword,
+                      layout: docLayout,
+                      pickAll: () => pick().kind === "all",
+                    }}
+                  >
                   <YoVirtualList<ViewRow>
                     items={() => logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? []}
                     getItemKey={rowKey}
@@ -640,28 +731,9 @@ export function LogAnalyzerView(props: DeviceSession) {
                           },
                         });
                       }}
-                      renderRow={(row) => {
-                        const key = levelKey(row.line.level);
-                        const paint = key ? levelPaint(key) : null;
-                        return (
-                        <div
-                          class="yohu-logs__cols yohu-logs__row"
-                          data-seq={String(row.line.seq)}
-                          data-level={key ?? undefined}
-                          data-paint={paint?.invert ? "invert" : undefined}
-                          data-tint-msg={paint?.tintMessage ? "" : undefined}
-                          style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
-                          classList={{
-                            "yohu-logs__row--signal": row.signal !== undefined,
-                            "yohu-logs__row--raw": row.line.level === "?",
-                            "yohu-logs__row--picked": pick().kind === "all",
-                          }}
-                        >
-                          <LogLineDoc row={row} keyword={session.keyword} layout={docLayout} />
-                        </div>
-                        );
-                      }}
+                      renderRow={LogRow}
                     />
+                  </LogListBind.Provider>
                     <Show
                       when={
                         (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0

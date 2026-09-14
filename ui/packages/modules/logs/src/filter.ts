@@ -1,5 +1,5 @@
 /**
- * 日志过滤（纯函数，ADR-v6-006 消费端）：级别精确集合 / Tag·关键字包含 / Scope。
+ * 日志过滤（纯函数，ADR-v6-006 消费端）：级别精确集合 / Tag 多针 OR 精确命中·关键字包含 / Scope。
  * 与 yohu-domain::log_filter_matches 同一套 testdata/log_filter.json。
  * 级别字母单源：testdata/log_levels.json ↔ LEVELS；着色键 LevelKey = Lowercase<LevelLetter>。
  */
@@ -84,6 +84,83 @@ export interface SessionFilter {
   pidSet: number[];
 }
 
+/** Tag 针分隔：逗号 / 分号 / `|`。空白留在针内（内核 Tag 可含空格）。无正则。 */
+const TAG_NEEDLE_SEP = /[,，、;；|]/;
+
+/** 拆 `tagContains` 为多个针；空段丢掉。空结果 = 不限 Tag。 */
+export function parseTagNeedles(raw: string): string[] {
+  if (!raw) return [];
+  const needles: string[] = [];
+  for (const part of raw.split(TAG_NEEDLE_SEP)) {
+    const needle = part.trim();
+    if (needle) needles.push(needle);
+  }
+  return needles;
+}
+
+export function tagFilterActive(raw: string): boolean {
+  return parseTagNeedles(raw).length > 0;
+}
+
+/** ASCII 忽略大小写精确等价（Tag 针，不是子串；避免 libc 命中 libcomposer_ext）。 */
+export function equalsAsciiIgnoreCase(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a.charCodeAt(i);
+    const y = b.charCodeAt(i);
+    if (x === y) continue;
+    const xl = x >= 65 && x <= 90 ? x + 32 : x;
+    const yl = y >= 65 && y <= 90 ? y + 32 : y;
+    if (xl !== yl) return false;
+  }
+  return true;
+}
+
+const TAG_TRAILING_SEP = /[,，、;；|]\s*$/;
+
+/** 已提交的针（气泡）与正在输入的草稿。尾部分隔符 = 全部已提交。 */
+export function splitTagInput(raw: string): { committed: string[]; draft: string } {
+  const needles = parseTagNeedles(raw);
+  if (needles.length === 0) return { committed: [], draft: "" };
+  if (TAG_TRAILING_SEP.test(raw)) return { committed: needles, draft: "" };
+  return { committed: needles.slice(0, -1), draft: needles[needles.length - 1]! };
+}
+
+export function joinTagInput(committed: readonly string[], draft: string): string {
+  const tags = uniqueTagNeedles(committed);
+  if (tags.length === 0) return draft;
+  const head = tags.join(", ");
+  return draft ? `${head}, ${draft}` : `${head}, `;
+}
+
+export function uniqueTagNeedles(tags: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const tag of tags) {
+    if (!tag) continue;
+    if (out.some((item) => equalsAsciiIgnoreCase(item, tag))) continue;
+    out.push(tag);
+  }
+  return out;
+}
+
+export function removeTagNeedle(raw: string, tag: string): string {
+  const { committed, draft } = splitTagInput(raw);
+  return joinTagInput(
+    committed.filter((item) => !equalsAsciiIgnoreCase(item, tag)),
+    draft,
+  );
+}
+
+/** 空针不限；非空则任一针 ASCII 忽略大小写精确命中。 */
+export function tagAllowed(lineTag: string, spec: string): boolean {
+  const needles = parseTagNeedles(spec);
+  if (needles.length === 0) return true;
+  for (const needle of needles) {
+    if (equalsAsciiIgnoreCase(lineTag, needle)) return true;
+  }
+  return false;
+}
+
 /** ASCII 忽略大小写子串（与 domain `contains_ascii_ignore_case` 对齐）。 */
 export function containsAsciiIgnoreCase(haystack: string, needle: string): boolean {
   if (needle.length === 0) return true;
@@ -128,7 +205,7 @@ function matchCore(
   scope: LogFilter["scope"],
 ): boolean {
   if (!levelAllowed(line.level, levels)) return false;
-  if (tag && !containsAsciiIgnoreCase(line.tag, tag)) return false;
+  if (!tagAllowed(line.tag, tag)) return false;
   if (message && !containsAsciiIgnoreCase(line.msg, message)) return false;
   switch (scope.kind) {
     case "all":
@@ -142,7 +219,7 @@ function matchCore(
 
 function sessionFilterToWire(f: SessionFilter): LogFilter {
   const levels = normalizeLevels(f.levels);
-  const tag_contains = f.tagContains || undefined;
+  const tag_contains = tagFilterActive(f.tagContains) ? f.tagContains : undefined;
   const message_contains = f.keyword || undefined;
   const base = {
     ...(levels.length > 0 ? { levels } : {}),

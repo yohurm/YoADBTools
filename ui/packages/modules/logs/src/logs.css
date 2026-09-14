@@ -3,12 +3,13 @@
  * 表头是铬层：YoColFrame cellPad=list + ch 轨道（logDocTrackTemplate）。
  * 列垫在尺里（padLeftChars = space-md），标题与文档同一起笔，禁止 cellPad=none 贴边。
  * 行是一份 white-space:pre 文档。表头与行共用 logDocColumns 一把尺。
- * 列间空白是 formatLogDoc 的 pad 空格。选区走原生 ::selection（--yohu-text-sel）。
+ * 选区走原生 ::selection（--yohu-text-sel / --yohu-text-sel-fg）。
+ * 列间空白是 formatLogDoc 的 pad 空格。
+ * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
  * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
- * Ctrl+A 同色铺底。禁止 accent-soft / 列表选中片冒充选字。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -30,6 +31,13 @@
   width: calc(var(--yohu-space-xl) * 7);
   flex: 0 0 auto;
   min-width: 0;
+}
+
+/* 多 Tag 比单针长；可吃剩余，不挤掉检索框 */
+.yohu-logs__field--tag {
+  width: calc(var(--yohu-space-xl) * 10);
+  flex: 1 1 auto;
+  max-width: calc(var(--yohu-space-xl) * 14);
 }
 
 .yohu-logs__levels {
@@ -90,9 +98,20 @@
   overflow: hidden;
 }
 
-/* Ctrl+A 未挂载行：与拖选同一 --yohu-text-sel，不是徽章软底。 */
+/* Ctrl+A 未挂载行：与拖选同一选字对，不是徽章软底。 */
 .yohu-logs__row--picked {
   background-color: var(--yohu-text-sel);
+  color: var(--yohu-text-sel-fg);
+  --yohu-log-ink: var(--yohu-text-sel-fg);
+}
+
+.yohu-logs__row--picked .yohu-logs__row-ts,
+.yohu-logs__row--picked .yohu-logs__row-uid,
+.yohu-logs__row--picked .yohu-logs__row-pid,
+.yohu-logs__row--picked .yohu-logs__row-tid,
+.yohu-logs__row--picked .yohu-logs__row-msg,
+.yohu-logs__row--picked .yohu-logs__row-fold {
+  color: var(--yohu-text-sel-fg);
 }
 
 /* 离开底部：只计数不跟滚（Entangle jump-to-bottom / Qovery new-logs） */
@@ -151,8 +170,14 @@
   border-left-color: var(--yohu-log-ink);
 }
 
+/* 列垫空格不是字段正文。禁止进双击选词，仍占文档宽度。 */
+.yohu-logs__row [data-log-pad] {
+  user-select: none;
+}
+
 .yohu-logs__list ::selection {
   background-color: var(--yohu-text-sel);
+  color: var(--yohu-text-sel-fg);
 }
 
 /* ink 由 View 写入 --yohu-log-ink。 */
@@ -165,6 +190,7 @@
 
 .yohu-logs__row--signal.yohu-logs__row--picked {
   background-color: var(--yohu-text-sel);
+  color: var(--yohu-text-sel-fg);
 }
 
 .yohu-logs__row-ts {

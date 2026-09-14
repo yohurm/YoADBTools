@@ -163,6 +163,27 @@ export function clipPadField(text: string, width: number, align: "start" | "end"
   return align === "end" ? body.padStart(n) : body.padEnd(n);
 }
 
+/**
+ * 把字段文档拆成「列垫 / 正文 / 尾垫」。
+ * 文档字符串不变；DOM 里尾垫 `user-select: none`，双击只落到正文。
+ * 中间空白属于正文（内核 Tag 可含空格）。
+ */
+export function splitDocField(text: string): { lead: string; body: string; trail: string } {
+  const body = text.trim();
+  if (!body) {
+    return { lead: text, body: "", trail: "" };
+  }
+  const start = text.indexOf(body);
+  if (start < 0) {
+    return { lead: text, body: "", trail: "" };
+  }
+  return {
+    lead: text.slice(0, start),
+    body,
+    trail: text.slice(start + body.length),
+  };
+}
+
 function alignOf(key: LogColKey): "start" | "end" {
   return LOG_COLUMNS.find((col) => col.key === key)?.align === "end" ? "end" : "start";
 }

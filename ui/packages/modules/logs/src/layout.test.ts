@@ -42,11 +42,15 @@ describe("日志表头布局契约", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
+    expect(logsCss).toMatch(/\[data-log-pad\]\s*\{[^}]*user-select:\s*none/);
     expect(logsCss).not.toContain("::highlight(yohu-log-sel)");
     expect(logsCss).not.toContain("yohu-logs__sel-layer");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s+\.yohu-col-cell/);
     expect(logsCss).toContain("var(--yohu-text-sel)");
-    expect(logsCss).toMatch(/\.yohu-logs__list ::selection\s*\{\s*background-color:\s*var\(--yohu-text-sel\)/);
+    expect(logsCss).toContain("var(--yohu-text-sel-fg)");
+    expect(logsCss).toMatch(
+      /\.yohu-logs__list ::selection\s*\{\s*background-color:\s*var\(--yohu-text-sel\);\s*color:\s*var\(--yohu-text-sel-fg\)/,
+    );
     expect(logsCss).not.toMatch(/\.yohu-logs__list ::selection\s*\{\s*background:\s*transparent/);
     expect(logsCss).not.toContain('[data-select="cell"]');
     expect(logsCss).not.toContain(".yohu-logs__cell");
@@ -157,6 +161,8 @@ describe("日志显示列", () => {
     const view =
       candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
     expect(view).toContain("visibleLogColumns(displayColumns())");
+    expect(view).toContain("YoListPresence");
+    expect(view).toContain('recipe="chip"');
     expect(view).not.toContain("logDocColumns(docLayout())");
     expect(view).not.toContain("logDocTrackPx");
     expect(view).toContain("width={logStore.state.colWidths[col.key]}");
