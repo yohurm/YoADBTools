@@ -93,6 +93,7 @@ pub enum LogScope {
 /// 日志过滤条件（会话过滤 / 导出共用；回补读环不过滤）。
 ///
 /// `levels` 空 = 不限级别（含解析失败的 `?`）；非空 = 精确字母集合，不是最低含以上。
+/// `tag_contains`：逗号 / 分号 / `|` 分隔多个针，任一 OrdinalIgnoreCase 精确命中；空或仅分隔符 = 不限。无正则。子串会误伤 `libc`/`libcomposer`。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LogFilter {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
