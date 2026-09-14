@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.73（2026-09-14，启动 overlay 铺满不挖透明角）
+> **状态：** v2.74（2026-09-14，HTML 首帧画布跟 token）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.74 变更（HTML 首帧画布跟 token）：** `#yohu-boot` / `html,body,#root` 深色不再铺 OLED `#000000`。内联只写 `background-color: var(--yohu-canvas, Colors.BgBase | DarkColors.BgBase)`，与 `window_boot::CANVAS_DARK` `#191A1C` 同值。选择器不得压过 token。`boot-theme.js` 去掉空 catch。Vite 端口读 `tauri.conf.json` `devUrl`。boot z-index 由契约锁死。见 [workbench.md](workbench.md)。
 > **v2.73 变更（启动 overlay 铺满不挖透明角）：** 同屏 Shared overlay clip 从 splash `Radius.Md` 收到 **0**，铺满后目标 HWND 每个像素都是不透明画布。`host_radius`（`Radius.Sm`）只描述主窗 DWM 圆角，揭窗后才出现，不进 overlay clip。overlay HWND `DWMWCP_DONOTROUND` + 整窗 `DwmExtendFrameIntoClientArea`；小窗 RGN 同样 DONOTROUND。禁止铺满时 clip 出透明四角（Win11 会合成黑）。见 [workbench.md](workbench.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v2.72 变更（虚拟列表槽位几何 inline）：** 槽位行 `position:absolute` + `translate3d` 由 L2 `virtualRowBoxStyle` 写进 inline。壳最后载入 `states.css`，`.yohu-interactive { position: relative }` 会盖掉等特异的 CSS absolute，行高与位移叠成双倍间距。listbox 行 CSS 同样写出 `position: absolute`。见 [youi.md](youi.md)。
 > **v2.71 变更（虚拟列表槽位就地换绑）：** `YoVirtualList` 只按槽位 `0..poolSize-1` 做 `For` 身份。行 Y 走 `translate3d`，禁止 `top` 跳动。`renderRow` 是 `Component<{item, index}>`，槽位回收只换 props，禁止函数快照返回新 JSX。listbox 行关掉 `isolation` / `::before`，多选底画在行上。document 槽位回收后原生 Selection 不跨原点保留。见 [youi.md](youi.md)。
@@ -486,7 +487,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ```
 
 - **设备栏**：标题行 = 折叠钮 +「设备」+ 数量徽章（徽章紧跟标题，不推到最右）+ 刷新（`YoIconButton loading` 旋转）；设备行（型号一行 + serial 等宽一行 + 可选运行时次行 Android/电量，主次上下间隔 2vp + 在线点 + 未授权徽章，无白卡片）；空态给引导文案；选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）。单选实底由 `YoIndicator` fill 在 list 宿主内滑动，宿主 `overflow: hidden` 裁切弹簧过冲；项滚动在 `__scroller`（横向 hidden、纵向 auto）。禁止把 `overflow: auto` 写在滑块宿主上。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
-- **导航**：图标 16px（`<Icon>` 单源，currentColor）+ 标题；激活只加 `.yohu-interactive--selected`；Planned 项「开发中」胶囊徽章。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏可整栏收起（标题栏 `sidebar` 抽屉钮）。
+- **导航**：图标 `Layout.IconSm`（`<Icon>` 单源，currentColor）+ 标题；激活只加 `.yohu-interactive--selected`；Planned 项「开发中」走 `YoBadge`。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏可整栏收起（标题栏 `sidebar` 抽屉钮）。设备栏高度帽 `--yohu-layout-device-rail-max`（`LayoutLimits.DeviceRailMaxPercent`）。
 - **模块页眉**：在右侧内容区顶部（`YoChrome`）。左侧为功能标题区（Subtitle Bold）+ 选中设备名（`deviceLabel` 中性徽章，文案来自 `DeviceSession.selectedLabel`），右侧为功能栏；与窗口标题栏分离，不挤进中区。无操作的模块（设置）只显示标题，但标题行高度仍是 `--yohu-control-height`（与有按钮的页同一占位）。底垫 `--yohu-layout-chrome-pad`。页眉是页壳的第一子节点（`flex: 0 0 auto`），禁止与内容区作为 fragment 兄弟交给模块转场。
 - **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点一律 `YoPage`（`.yohu-page`：`padding: page-inset`、`gap: page-gap`）。`YoChrome` 是第一子节点。内容进 `YoPanel`（`variant=pane` 撑满）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。设置页分组走 `YoPanel` 默认 card，边距仍是 `page-margin`。
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏展开时与内容区之间画 hairline。模块分区 = `YoPanel`（surface + radius-md + hairline 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行、对话框头尾、输入类控件。路径栏与清单靠 canvas 分层，不另拉线。
@@ -546,7 +547,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 页壳不滚动；`YoChrome` 钉在内容区顶部。分组卡片放进 `.yohu-settings__body` 滚动；`YoPanel` 不裁切表单项。
 - 页眉与卡片左缘共用 `--yohu-layout-page-margin`（PC 40vp）；页宽 `--yohu-layout-settings-max` 只约束滚动列，不把标题挤进 920 列。
 - 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug 贴尾；两列 `align-items: center`。开关 / 数字 / 下拉 / 多选复选进右侧槽。路径框与「浏览」同一右簇、中间只有行内 gap，禁止把右槽 stretch 出空档。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex 或给 `YoTextField` 写 width。
-- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：只读展示框显示绝对路径 + 「浏览」；展示框宽 ≤ `--yohu-layout-settings-control-max`，超长折叠中间（目录头 ellipsis、末段完整）。空值显示 `system.info` 解析路径。数字走 `YoTextField type=number`（槽宽 `--yohu-layout-settings-number-w`），下拉走 `YoSelect`。
+- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：`YoTextField readOnly` 显示绝对路径 + 「浏览」；槽宽 ≤ `--yohu-layout-settings-control-max`。空值显示 `system.info` 解析路径。禁止自绘第二套 control 皮。数字走 `YoTextField type=number`（槽宽 `--yohu-layout-settings-number-w`），下拉走 `YoSelect`。非法数字不在 View 吞掉，走 `settingsStore` → `settings.set` → domain。
 - 投屏协议 / 长边 / 码率 / 帧率只在投屏显示页。设置页「投屏显示」仅保留强制 ADB forward。
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。

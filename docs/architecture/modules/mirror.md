@@ -40,6 +40,61 @@ core 零 Tauri：`FramePipe` 在 `yohu-mirror`；解码 / 窗体 / GPU 只在 `y
 - 截图：`mirror.screenshot` 按视频分辨率从 last NV12 纹理导出（不是交换链 letterbox）
 - 实测 fps：1s 窗口已 Present 帧，进状态栏右槽，不盖画面
 
+### 设计前（舞台铬）
+
+```text
+Win chrome.rs / mac view.rs 各写
+  gap = (title * 0.75).max(8)
+  block = icon + gap + title + gap * 0.5 + body
+  行盒 title*1.4 / body*2.6 / gap*0.35
+  inset 16 / 24
+Gpu::new letterbox_argb = 0xFFFFFFFF
+tokens::STAGE_LIGHT_SURFACE = 0xFFFFFFFF
+```
+
+问题：同一公式两份；行盒与 inset 仍在各端；浅色 letterbox 与 token 双写。
+
+### 设计后（舞台铬）
+
+```text
+Stage.chrome_stack(icon, title, body)
+  gap = (title * 0.75).max(Spacing.Sm)
+  title_box = title * 1.4
+  body_box = body * 2.6
+  after_title = gap * 0.35
+  title_inset = Spacing.Lg
+  body_inset = Spacing.Xl
+  block = icon + gap + title + gap * 0.5 + body
+Win chrome.rs / mac view.rs 只消费栈字段
+  D2D 画框 / AppKit setFrame 不写 16/24/1.4/2.6/0.35
+
+Gpu::new letterbox = tokens::STAGE_LIGHT_SURFACE
+Host 运行时写入 stage.letterbox_argb()（浅色即同一 token）
+```
+
+不做什么：不在 gpu 再写一份 ARGB；不在各端复制行盒。
+
+### 设计前（截图 PNG）
+
+```text
+windows/host.rs screenshot：BGRA→RGBA + png::Encoder
+macos/host.rs write_bgra_png：同一套 BGRA→RGBA + png::Encoder
+```
+
+问题：编码各写一份。
+
+### 设计后（截图 PNG）
+
+```text
+Host 只提供 BGRA + 路径
+  Win：Gpu.screenshot_bgra
+  mac：Picture.copy_bgra
+  → mirror_present::png::write_bgra_png
+    BGRA→RGBA + png::Encoder
+```
+
+不做什么：不在 windows/host 与 macos/host 各写一份编码器。
+
 ## UI
 
 `@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏；月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。操作栏 / 功能栏是 `YoPanel` pane，内容区排布走库的 align / gap / overflow，模块 CSS 只锁栏宽。状态采样见 [device.md](device.md)。

@@ -41,7 +41,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 | `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、实现 `Runner` | 日志会话、文件浏览用例、投屏 demux |
 | `yohu-files` / `logsrv` / `mirror` | 各自用例 | capability 互引；绕过 SafetyRoot |
 | `yohu-update` | 更新检查 / 下载 / 覆盖安装（GitHub Releases） | 依赖 adb |
-| `yohu-adbtools` | 组合根、IPC 映射、任务中心、OLE / Finder 拖出；Windows 启动 overlay 与投屏 HWND | 业务判定、路径校验；禁止自写时长/曲线 |
+| `yohu-adbtools` | 组合根、IPC 映射、任务中心、OLE / Finder 拖出；壳服务 `update_runs` / `transfer_runs` / `browse_runs` / `GroupRuns` / `mirror_sessions` / `settings_apply` / `capture_runs`；Windows 启动 overlay（窗口/swapchain/DComp）与投屏 HWND | 业务判定、路径校验；禁止自写时长/曲线；commands 只转发 |
 
 `yohu-adb → yohu-domain` 是 DIP：`AdbClient` 实现 `Runner`。不要拆。
 
@@ -55,7 +55,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 
 ## `yohu-motion`
 
-与 runtime / protocol 并列，互不依赖。公开面是 `MotionSpec`（与 `@yohu/ui` `tokens/motion.ts` 同名同值）：`duration_ms()` + `ease()`。Windows 另含 DWM 时钟、消息泵、`IDCompositionAnimation` 采样。弹簧物理只在 CSS 采样；原生弹簧槽位回退标准贝塞尔。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只点规格名，禁止再写散落毫秒。
+与 runtime / protocol 并列，互不依赖。公开面是 `MotionSpec`（与 `@yohu/ui` `tokens/motion.ts` 同名同值，`testdata/motion_spec.json` 锁死名→ms+控制点）：`duration_ms()` + `ease()`。Windows 另含 DWM 时钟、单 HWND 消息泵、`IDCompositionAnimation` 采样（入口收 `MotionSpec`）。屏幕 RECT 算术在壳 `native_splash/geometry`，不进本 crate。弹簧物理只在 CSS 采样；原生弹簧槽位回退标准贝塞尔。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只点规格名，禁止再写散落毫秒。
 
 ## 仓库布局
 

@@ -10,6 +10,28 @@
 - 不使用 `tauri-plugin-updater`
 - UI 不单独成模块：设置「关于」版本行绑 `update.*`；YoUI 零 IPC，不进 `@yohu/ui` / `modules/*`
 
+### 设计前（更新查询）
+
+```text
+invoke update.check → commands/update 拼 PlatformInfo → check_configured
+invoke update.info → commands/update → describe_channel
+invoke update.download/install/cancel/open → update_runs
+```
+
+问题：check/info 在门面拼平台并直调 core，与 download/install 不对称。
+
+### 设计后（更新查询）
+
+```text
+invoke update.check → commands/update rename → update_runs::check
+  → PlatformInfo::from_identity(CARGO_PKG_VERSION) → check_configured
+invoke update.info → commands/update rename → update_runs::info
+  → describe_channel
+invoke update.download/install/cancel/open → commands/update rename → update_runs
+```
+
+不做什么：不在 commands 拼 PlatformInfo；不改 core；不改 UI。
+
 ## 覆盖安装
 
 1. `update.download` 把当前平台安装包下到产品家园 `cache/update/`（Windows NSIS `*-setup.exe`，macOS `*.dmg`），流式 SHA-256（GitHub `digest` 有则校验）；Windows 安装成功后删除 setup
