@@ -32,9 +32,49 @@ pub mod scrcpy {
     pub const SERVER_VERSION: &str = "4.1";
     pub const DEVICE_SERVER_PATH: &str = "/data/local/tmp/scrcpy-server.jar";
     pub const DEVICE_NAME_FIELD_LENGTH: usize = 64;
+    pub const VIDEO_PACKET_HEADER_LENGTH: usize = 12;
     pub const CODEC_H264: u32 = 0x6832_3634;
     pub const CODEC_H265: u32 = 0x6832_3635;
     pub const CODEC_AV1: u32 = 0x0061_7631;
+    /// 设备元数据：视频流关闭（scrcpy dummy fourcc）。
+    pub const CODEC_DUMMY_OFF: u32 = 0;
+    /// 设备元数据：编码器配置失败（scrcpy dummy fourcc）。
+    pub const CODEC_DUMMY_ERROR: u32 = 1;
+
+    pub const PACKET_FLAG_SESSION: u64 = 1 << 63;
+    pub const PACKET_FLAG_CONFIG: u64 = 1 << 62;
+    pub const PACKET_FLAG_KEY_FRAME: u64 = 1 << 61;
+    pub const PACKET_PTS_MASK: u64 = PACKET_FLAG_KEY_FRAME - 1;
+    pub const MAX_PACKET_SIZE: u32 = 10 * 1024 * 1024;
+
+    pub const CTRL_INJECT_KEYCODE: u8 = 0;
+    pub const CTRL_INJECT_TOUCH: u8 = 2;
+    pub const CTRL_BACK_OR_SCREEN_ON: u8 = 4;
+    pub const CTRL_EXPAND_NOTIFICATION: u8 = 5;
+    pub const CTRL_EXPAND_SETTINGS: u8 = 6;
+    pub const CTRL_COLLAPSE_PANELS: u8 = 7;
+    pub const CTRL_SET_DISPLAY_POWER: u8 = 10;
+    pub const CTRL_ROTATE_DEVICE: u8 = 11;
+
+    pub const ACTION_DOWN: u8 = 0;
+    pub const ACTION_UP: u8 = 1;
+    pub const ACTION_MOVE: u8 = 2;
+    pub const BUTTON_PRIMARY: i32 = 1;
+    pub const POINTER_ID_MOUSE: i64 = -1;
+    pub const TOUCH_PRESSURE_MAX: u16 = 0xFFFF;
+}
+
+/// Android KeyEvent keycode（投屏注入；与 `@yohu/api` `AndroidKey` 对齐）。
+pub mod android_key {
+    pub const HOME: u32 = 3;
+    pub const BACK: u32 = 4;
+    pub const VOLUME_UP: u32 = 24;
+    pub const VOLUME_DOWN: u32 = 25;
+    pub const POWER: u32 = 26;
+    pub const APP_SWITCH: u32 = 187;
+    pub const BRIGHTNESS_DOWN: u32 = 220;
+    pub const BRIGHTNESS_UP: u32 = 221;
+    pub const WAKEUP: u32 = 224;
 }
 
 /// 模块 id（与 UI `ModuleDescriptor.id`、数据目录 `modules/<id>/` 一致）。
@@ -168,6 +208,24 @@ mod tests {
         assert_eq!(module_title::MIRROR, "投屏显示");
         assert_eq!(module_title::SETTINGS, "设置");
         assert_eq!(scrcpy::SERVER_VERSION, "4.1");
+        assert_eq!(scrcpy::CODEC_H264, 0x6832_3634);
+        assert_eq!(scrcpy::CODEC_DUMMY_OFF, 0);
+        assert_eq!(scrcpy::CODEC_DUMMY_ERROR, 1);
+        assert_eq!(scrcpy::VIDEO_PACKET_HEADER_LENGTH, 12);
+        assert_eq!(scrcpy::PACKET_FLAG_SESSION, 1 << 63);
+        assert_eq!(scrcpy::PACKET_FLAG_CONFIG, 1 << 62);
+        assert_eq!(scrcpy::CTRL_SET_DISPLAY_POWER, 10);
+        assert_eq!(scrcpy::POINTER_ID_MOUSE, -1);
+        assert_eq!(scrcpy::TOUCH_PRESSURE_MAX, 0xFFFF);
+        assert_eq!(android_key::HOME, 3);
+        assert_eq!(android_key::BACK, 4);
+        assert_eq!(android_key::VOLUME_UP, 24);
+        assert_eq!(android_key::VOLUME_DOWN, 25);
+        assert_eq!(android_key::POWER, 26);
+        assert_eq!(android_key::APP_SWITCH, 187);
+        assert_eq!(android_key::BRIGHTNESS_DOWN, 220);
+        assert_eq!(android_key::BRIGHTNESS_UP, 221);
+        assert_eq!(android_key::WAKEUP, 224);
         assert_eq!(dir::SCRCPY_SERVER, "scrcpy-server");
         assert_eq!(dir::CONFIG, "config");
         assert_eq!(dir::CACHE, "cache");

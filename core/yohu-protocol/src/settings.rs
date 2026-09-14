@@ -149,17 +149,17 @@ fn default_export_ask() -> bool {
 }
 
 /// 投屏默认长边（USB 协议；0 = 设备原始）。
-pub fn default_mirror_max_size() -> u32 {
+pub const fn default_mirror_max_size() -> u32 {
     0
 }
 
 /// 投屏默认码率 16 Mbps（USB 原分辨率）。
-pub fn default_mirror_video_bit_rate() -> u32 {
+pub const fn default_mirror_video_bit_rate() -> u32 {
     16_000_000
 }
 
 /// 投屏默认帧率上限；0 = 不限制。
-pub fn default_mirror_max_fps() -> u32 {
+pub const fn default_mirror_max_fps() -> u32 {
     0
 }
 

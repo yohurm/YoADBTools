@@ -116,6 +116,8 @@ pub mod event_names {
     pub const MIRROR_STATE: &str = "mirror/state";
     pub const MIRROR_PAINTED: &str = "mirror/painted";
     pub const UPDATE_PROGRESS: &str = "update/progress";
+    /// 壳把 wry 拖放收成 CSS 点后发出；不是 [`AppEvent`]。
+    pub const WINDOW_DRAG: &str = "window/drag";
 }
 
 impl AppEvent {
@@ -281,6 +283,7 @@ mod tests {
             event_names::MIRROR_STATE,
             event_names::MIRROR_PAINTED,
             event_names::UPDATE_PROGRESS,
+            event_names::WINDOW_DRAG,
         ] {
             assert!(
                 name.chars()

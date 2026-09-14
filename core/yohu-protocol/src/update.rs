@@ -3,20 +3,18 @@
 use serde::{Deserialize, Serialize};
 
 /// 远程更新信息（`update.check` 响应）。
+///
+/// `installer_url` 仅在有当前平台安装包附件时存在；Release 页只进 `page_url`。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RemoteUpdate {
     pub has_new_version: bool,
     pub version: String,
     #[serde(default)]
-    pub version_code: u32,
-    #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub download_url: String,
+    pub installer_url: Option<String>,
     #[serde(default)]
-    pub force_update: bool,
-    #[serde(default)]
-    pub md5: String,
+    pub page_url: String,
     #[serde(default)]
     pub sha256: String,
     #[serde(default)]
@@ -61,14 +59,6 @@ pub struct UpdateProgress {
     pub total_bytes: u64,
 }
 
-impl RemoteUpdate {
-    pub fn with_download_url(&self, download_url: impl Into<String>) -> Self {
-        let mut next = self.clone();
-        next.download_url = download_url.into();
-        next
-    }
-}
-
 /// 当前更新通道摘要（`update.info`；不含密钥）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateChannelInfo {
@@ -87,20 +77,37 @@ mod tests {
         let v = serde_json::to_value(RemoteUpdate {
             has_new_version: true,
             version: "1.2.0".into(),
-            version_code: 12,
             description: "fix".into(),
-            download_url: "https://example.com/setup.exe".into(),
-            force_update: false,
-            md5: "m".into(),
+            installer_url: Some("https://example.com/setup.exe".into()),
+            page_url: "https://github.com/o/r/releases/tag/v1.2.0".into(),
             sha256: "s".into(),
             size_bytes: 100,
         })
         .unwrap();
         assert_eq!(v["has_new_version"], true);
-        assert_eq!(v["version_code"], 12);
-        assert_eq!(v["download_url"], "https://example.com/setup.exe");
-        assert_eq!(v["force_update"], false);
+        assert_eq!(v["installer_url"], "https://example.com/setup.exe");
+        assert_eq!(v["page_url"], "https://github.com/o/r/releases/tag/v1.2.0");
         assert_eq!(v["size_bytes"], 100);
+        assert!(v.get("download_url").is_none());
+        assert!(v.get("version_code").is_none());
+        assert!(v.get("force_update").is_none());
+        assert!(v.get("md5").is_none());
+    }
+
+    #[test]
+    fn remote_update_no_asset_keeps_page_only() {
+        let v = serde_json::to_value(RemoteUpdate {
+            has_new_version: true,
+            version: "1.2.0".into(),
+            description: String::new(),
+            installer_url: None,
+            page_url: "https://github.com/o/r/releases/tag/v1.2.0".into(),
+            sha256: String::new(),
+            size_bytes: 0,
+        })
+        .unwrap();
+        assert_eq!(v["installer_url"], serde_json::Value::Null);
+        assert_eq!(v["page_url"], "https://github.com/o/r/releases/tag/v1.2.0");
     }
 
     #[test]

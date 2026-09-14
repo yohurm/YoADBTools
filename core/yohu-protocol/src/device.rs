@@ -53,20 +53,6 @@ pub struct DeviceStatus {
     pub brand: Option<String>,
 }
 
-impl DeviceStatus {
-    /// 运行时字段是否相同（忽略 generation）。
-    pub fn same_runtime(&self, other: &Self) -> bool {
-        self.serial == other.serial
-            && self.night == other.night
-            && self.battery_pct == other.battery_pct
-            && self.charging == other.charging
-            && self.sdk == other.sdk
-            && self.release == other.release
-            && self.screen_on == other.screen_on
-            && self.brand == other.brand
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,25 +103,5 @@ mod tests {
                 "night": false,
             })
         );
-    }
-
-    #[test]
-    fn same_runtime_ignores_generation() {
-        let a = DeviceStatus {
-            serial: "S".into(),
-            generation: 1,
-            night: Some(true),
-            battery_pct: None,
-            charging: None,
-            sdk: None,
-            release: None,
-            screen_on: None,
-            brand: None,
-        };
-        let mut b = a.clone();
-        b.generation = 9;
-        assert!(a.same_runtime(&b));
-        b.night = Some(false);
-        assert!(!a.same_runtime(&b));
     }
 }
