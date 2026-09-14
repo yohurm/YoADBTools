@@ -3,25 +3,34 @@
  * HarmonyOS 对照：长列表虚拟化；背板透明贴合 canvas，行选中走 --yohu-state-*。
  * 受控 API：items / selectedKey / onSelectRow / itemHeight / overscan。
  *
- * 泛型组件：外层滚动容器占满父高，内部以总高度撑起滚动区，
- * 仅绝对定位渲染可见行（含 overscan 缓冲），底部自动跟随滚动。
- * For 按 getItemKey 的原始值做身份（对照 Solid 文档：For 按 value identity）。
- * 禁止把每次新建的 {index,item,key} 包装对象交给 For，否则行重挂、原生 Selection 被清掉。
+ * 泛型组件：`.yohu-virtual-list` 自己纵滚（overflow-x hidden + overflow-y auto），
+ * 与 YoColFrame 表头共用 scrollbar-gutter；`__inner` 只撑总高。
+ * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
+ *（absolute + translate3d）。states.css 后载入，.yohu-interactive 的 relative
+ * 会盖掉等特异 CSS absolute，行高与位移叠成双倍间距。
+ * 滚动改 transform / data-key / 行 props，不拆行节点。
+ * renderRow 是 Component<{item, index}>：同一组件实例就地换绑。禁止函数快照返回新 JSX
+ *（Solid 会当新树卸载，文件行 ColTrack 整行重挂，WebView2 闪白）。
+ * 禁止按文件名 / seq 把进出窗口的行交给 For。
  *
  * 选择模式：传入 `selectedKey` + `onSelectRow` 时开启单选——
  * roving tabindex、↑/↓/Home/End 移动、Enter/Space 选中、目标行滚入视野并聚焦、
  * `role=listbox/option` + `aria-selected`（对齐 UI设计系统-v6.md §5）。
  * 多选（`selectedKeys`）时按邻接关系挂 `--sel-start/mid/end`，连续选中合成一块圆角。
- * 单选高亮由 YoIndicator 按下标滑动（行本身无 transition）；多选 ≥2 退回每项 ::before。
+ * 单选高亮由 YoIndicator 按下标滑动（行本身无 transition）；多选 ≥2 行底 --yohu-state-selected。
+ * listbox 行禁止 isolation / ::before（每行一层合成，多选快滑闪白）。
+ * fill 滑块 decorate=false，用 top/left 落在 inner 内容坐标；禁止把 yohu-indicator-host
+ * 打在滚轴或超高 inner 上（fill 宿主 overflow:hidden 会吃掉纵滚 / 撑出合成层）。
  * `onReorder` 开启整行按住拖动换位：过臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 from/to。
- * 未开启选择模式时行不参与焦点序列（日志列表性能优先）。
+ * 未开启选择模式时行不参与焦点序列（日志列表性能优先）。槽位回收时原生 Selection 不跨原点保留。
  * 行铬 `tone` 默认 document（无分割线）；文件清单显式 list。
  *
  * 注意：`itemHeight` / `overscan` / `rowHeight` 为功能性配置项（非主题 token），
  * 由调用方指定，仅用于定位计算；所有配色/字号/间距仍走 tokens。
  */
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import type { Accessor, JSX } from "solid-js";
+import type { Accessor, Component, JSX } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { YoIndicator } from "../motion/indicator";
 import type { IndicatorBox } from "../motion/indicator-layout";
 import { ReorderBar } from "./ReorderBar";
@@ -55,16 +64,19 @@ import {
   isVirtualRowSelected,
   isVirtualSelectable,
   isVirtualSelectionEmpty,
+  virtualActiveKey,
   virtualAdjacentSelected,
   virtualIndicatorAnchor,
   virtualIndicatorFollow,
   virtualIndexOfKey,
-  virtualRange,
+  virtualPoolIndex,
+  virtualPoolOrigin,
+  virtualPoolSize,
+  virtualPoolSlots,
+  virtualRowBoxStyle,
   virtualRowKey,
   virtualRowTop,
   virtualTotalHeight,
-  virtualVisibleKeys,
-  virtualVisibleRows,
 } from "./virtuallist-model";
 import {
   isPendingFocusAdopted,
@@ -86,8 +98,8 @@ export interface YoVirtualListProps<T> {
   overscan?: number;
   /** 行 key（用于稳定定位与测试），默认取 index */
   getItemKey?: (item: T, index: number) => string | number;
-  /** 行渲染函数 */
-  renderRow: (item: T, index: number) => JSX.Element;
+  /** 行视图。必须是稳定身份的 Component，读 props.item 就地更新。禁止 (item) => JSX 快照。 */
+  renderRow: Component<{ item: T; index: number }>;
   /** 是否自动跟随滚动到底部（响应式访问器） */
   autoScrollToBottom?: Accessor<boolean>;
   /**
@@ -129,6 +141,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   const [scrollTop, setScrollTop] = createSignal(0);
   const [viewportHeight, setViewportHeight] = createSignal(0);
   const [focusTick, setFocusTick] = createSignal(0);
+  const [focusKey, setFocusKey] = createSignal<string | number | null>(null);
   const [session, setSession] = createSignal<ReorderSession | null>(null);
   const [barY, setBarY] = createSignal(0);
   const [overlayY, setOverlayY] = createSignal(0);
@@ -144,6 +157,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     | null = null;
   let grabOffset = 0;
   let suppressClick = false;
+  let slotCache: number[] = [];
 
   const selectable = (): boolean =>
     isVirtualSelectable(
@@ -156,6 +170,8 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const selectedKeys = (): ReadonlySet<string | number> | undefined => props.selectedKeys?.();
   const selectedKey = (): string | number | null | undefined => props.selectedKey?.();
+
+  const activeKey = createMemo(() => virtualActiveKey(selectedKeys(), selectedKey(), focusKey()));
 
   const measureAtBottom = (): boolean => {
     if (!container) return true;
@@ -188,20 +204,20 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const totalHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
 
-  const visibleRows = () => {
-    const items = props.items();
-    const range = virtualRange(scrollTop(), viewportHeight(), itemHeight(), items.length, overscan());
-    return virtualVisibleRows(items, range.start, range.end, props.getItemKey);
-  };
+  const poolSize = createMemo(() =>
+    virtualPoolSize(viewportHeight(), itemHeight(), overscan(), props.items().length),
+  );
 
-  const visibleKeys = createMemo(() => virtualVisibleKeys(visibleRows()));
-  const rowByKey = createMemo(() => {
-    const map = new Map<string | number, ReturnType<typeof visibleRows>[number]>();
-    for (const row of visibleRows()) {
-      map.set(row.key, row);
-    }
-    return map;
+  const slots = createMemo(() => {
+    const size = poolSize();
+    if (slotCache.length === size) return slotCache;
+    slotCache = virtualPoolSlots(size);
+    return slotCache;
   });
+
+  const origin = createMemo(() =>
+    virtualPoolOrigin(scrollTop(), itemHeight(), overscan(), props.items().length, poolSize()),
+  );
 
   const findRowElement = (key: string | number): HTMLElement | null => {
     if (!container) return null;
@@ -214,14 +230,22 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   const selectAt = (index: number, event?: MouseEvent | KeyboardEvent): void => {
     const item = props.items()[index];
     if (item === undefined || !props.onSelectRow) return;
-    props.onSelectRow(item, virtualRowKey(item, index, props.getItemKey), event);
+    const key = virtualRowKey(item, index, props.getItemKey);
+    setFocusKey(key);
+    props.onSelectRow(item, key, event);
   };
 
   const followKey = (): string | undefined =>
     virtualIndicatorFollow(selectable(), selectedKeys(), selectedKey());
 
   const indicatorAnchor = (): IndicatorBox | null =>
-    virtualIndicatorAnchor(props.items(), followKey(), itemHeight(), container?.clientWidth ?? 0, props.getItemKey);
+    virtualIndicatorAnchor(
+      props.items(),
+      followKey(),
+      itemHeight(),
+      container?.clientWidth ?? 0,
+      props.getItemKey,
+    );
 
   const rowSnapshot = (row: { index: number; key: string | number }) => {
     const items = props.items();
@@ -234,15 +258,15 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       selectedKey(),
       props.getItemKey,
     );
-    const first = visibleRows()[0];
     return virtualRowAttrs({
       key: row.key,
       selectable: selectable(),
       selected,
+      active: activeKey() === row.key,
       prevSelected: adjacent.prev,
       nextSelected: adjacent.next,
       selectionEmpty: isVirtualSelectionEmpty(selectedKeys(), selectedKey()),
-      isFirstVisible: first?.key === row.key,
+      isFirstVisible: row.index === origin(),
     });
   };
 
@@ -321,7 +345,10 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       suppressClick = true;
       if (props.onSelectRow) {
         const item = props.items()[pending.from];
-        if (item !== undefined) props.onSelectRow(item, pending.key);
+        if (item !== undefined) {
+          setFocusKey(pending.key);
+          props.onSelectRow(item, pending.key);
+        }
       }
     }
     applyReorderGeometry(current, event.clientY);
@@ -407,6 +434,27 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     pendingFocusKey = null;
   });
 
+  createEffect(() => {
+    void scrollTop();
+    void origin();
+    if (!selectable() || !container) return;
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement) || !container.contains(focused)) return;
+    if (!focused.classList.contains("yohu-virtual-list__row")) return;
+    const active = activeKey();
+    const key = focused.dataset.key;
+    if (active != null && key === String(active)) return;
+    if (active == null && focused.tabIndex === 0) return;
+    if (active != null) {
+      const next = findRowElement(active);
+      if (next) {
+        next.focus({ preventScroll: true });
+        return;
+      }
+    }
+    focused.blur();
+  });
+
   const handleScroll = (): void => {
     if (!container) return;
     setScrollTop(container.scrollTop);
@@ -462,20 +510,96 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       reordering: session() !== null,
     });
 
+  type BoundRow = { index: number; item: T; key: string | number };
+
+  const RowView = (rowProps: { bound: Accessor<BoundRow | undefined> }) => {
+    const bound = (): BoundRow | undefined => rowProps.bound();
+    const attrs = () => {
+      const current = bound();
+      return current
+        ? rowSnapshot(current)
+        : virtualRowAttrs({
+            key: "slot",
+            selectable: false,
+            selected: false,
+            active: false,
+            prevSelected: false,
+            nextSelected: false,
+            selectionEmpty: true,
+            isFirstVisible: false,
+          });
+    };
+    return (
+      <div
+        class="yohu-virtual-list__row"
+        classList={{
+          "yohu-interactive": attrs().interactive,
+          "yohu-interactive--selected": attrs().selected,
+          "yohu-interactive--sel-start": attrs().selStart,
+          "yohu-interactive--sel-mid": attrs().selMid,
+          "yohu-interactive--sel-end": attrs().selEnd,
+          "yohu-focus-ring--inset": attrs().interactive,
+        }}
+        style={(() => {
+          const current = bound();
+          const drag = session();
+          const shift =
+            drag && current ? rowReorderShift(current.index, drag.from, previewDest(drag)) : 0;
+          return virtualRowBoxStyle(current?.index ?? 0, itemHeight(), shift, current != null);
+        })()}
+        data-key={attrs()["data-key"]}
+        data-reorder={session()?.key === bound()?.key ? "source" : undefined}
+        role={attrs().role}
+        aria-selected={attrs()["aria-selected"]}
+        tabIndex={attrs().tabIndex}
+        onPointerDown={(event) => {
+          const current = bound();
+          if (current) handleRowPointerDown(current.index, current.key, event);
+        }}
+        onClick={(event) => {
+          const current = bound();
+          if (current) handleRowClick(current.index, event);
+        }}
+        onContextMenu={(event) => {
+          const current = bound();
+          if (!current || !props.onRowContextMenu) return;
+          event.preventDefault();
+          event.stopPropagation();
+          props.onRowContextMenu(current.item, current.key, event);
+        }}
+        onKeyDown={(event) => {
+          const current = bound();
+          if (current) handleRowKeyDown(current.index, event);
+        }}
+      >
+        <Show when={bound()}>
+          {(current) => (
+            <Dynamic
+              component={props.renderRow}
+              item={current().item}
+              index={current().index}
+            />
+          )}
+        </Show>
+      </div>
+    );
+  };
+
   return (
     <div
       ref={(el) => (container = el)}
       class="yohu-virtual-list"
       data-tone={host()["data-tone"]}
       data-reordering={host()["data-reordering"]}
+      data-indicator={followKey() != null && session() === null ? "fill" : undefined}
       role={host().role}
       aria-label={host()["aria-label"]}
       aria-multiselectable={host()["aria-multiselectable"]}
       onScroll={handleScroll}
     >
       <div class="yohu-virtual-list__inner" style={{ height: `${totalHeight()}px` }}>
-        <Show when={selectable() && session() === null}>
-          <YoIndicator follow={followKey()} variant="fill" anchor={indicatorAnchor} />
+        <Show when={followKey() != null && session() === null}>
+          <YoIndicator decorate={false} follow={followKey()} variant="fill" anchor={indicatorAnchor} />
         </Show>
         <Show when={props.onReorder}>
           <ReorderBar
@@ -484,68 +608,16 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
             ready={barReady()}
           />
         </Show>
-        <For each={visibleKeys()}>
-          {(key) => {
-            const row = createMemo(() => rowByKey().get(key));
-            const attrs = () => {
-              const current = row();
-              return current ? rowSnapshot(current) : rowSnapshot({ index: 0, key });
-            };
-            return (
-              <div
-                class="yohu-virtual-list__row"
-                classList={{
-                  "yohu-interactive": attrs().interactive,
-                  "yohu-interactive--selected": attrs().selected,
-                  "yohu-interactive--sel-start": attrs().selStart,
-                  "yohu-interactive--sel-mid": attrs().selMid,
-                  "yohu-interactive--sel-end": attrs().selEnd,
-                  "yohu-focus-ring--inset": attrs().interactive,
-                }}
-                style={{
-                  position: "absolute",
-                  top: `${virtualRowTop(row()?.index ?? 0, itemHeight())}px`,
-                  left: "0",
-                  right: "0",
-                  height: `${itemHeight()}px`,
-                  transform: (() => {
-                    const current = session();
-                    const index = row()?.index ?? 0;
-                    if (!current) return undefined;
-                    const shift = rowReorderShift(index, current.from, previewDest(current));
-                    return shift === 0 ? undefined : `translateY(${shift * itemHeight()}px)`;
-                  })(),
-                }}
-                data-key={attrs()["data-key"]}
-                data-reorder={session()?.key === key ? "source" : undefined}
-                role={attrs().role}
-                aria-selected={attrs()["aria-selected"]}
-                tabIndex={attrs().tabIndex}
-                onPointerDown={(event) => {
-                  const current = row();
-                  if (current) handleRowPointerDown(current.index, current.key, event);
-                }}
-                onClick={(event) => {
-                  const current = row();
-                  if (current) handleRowClick(current.index, event);
-                }}
-                onContextMenu={(event) => {
-                  const current = row();
-                  if (!current || !props.onRowContextMenu) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  props.onRowContextMenu(current.item, current.key, event);
-                }}
-                onKeyDown={(event) => {
-                  const current = row();
-                  if (current) handleRowKeyDown(current.index, event);
-                }}
-              >
-                <Show when={row()?.item} keyed>
-                  {(item) => props.renderRow(item, row()!.index)}
-                </Show>
-              </div>
-            );
+        <For each={slots()}>
+          {(slot) => {
+            const bound = createMemo(() => {
+              const items = props.items();
+              const index = virtualPoolIndex(origin(), slot);
+              const item = items[index];
+              if (item === undefined) return undefined;
+              return { index, item, key: virtualRowKey(item, index, props.getItemKey) };
+            });
+            return <RowView bound={bound} />;
           }}
         </For>
       </div>
@@ -561,7 +633,11 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
                   y={overlayY()}
                   height={itemHeight()}
                 >
-                  {props.renderRow(dragged(), current().from)}
+                  <Dynamic
+                    component={props.renderRow}
+                    item={dragged()}
+                    index={current().from}
+                  />
                 </ReorderOverlay>
               )}
             </Show>

@@ -2,7 +2,6 @@
   position: relative;
   width: 100%;
   height: 100%;
-  /* 与设备栏 scroller 同契约：双轴 auto 会在 Windows 画出横竖条并互相锁死。 */
   overflow-x: hidden;
   overflow-y: auto;
   background-color: transparent;
@@ -26,8 +25,37 @@
   width: 100%;
 }
 
-/* 默认 document：无行铬。list 才画 Family B 行间线。 */
+/* 单选 fill 在 inner 用 top/left 定位；隔离叠层让 z-index:-1 滑块垫在行下。禁止 overflow。 */
+.yohu-virtual-list[data-indicator="fill"] .yohu-virtual-list__inner {
+  isolation: isolate;
+}
+
+.yohu-virtual-list[data-indicator="fill"] .yohu-interactive--selected::before,
+.yohu-virtual-list[data-indicator="fill"] .yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])::before,
+.yohu-virtual-list[data-indicator="fill"] .yohu-interactive--selected.yohu-interactive--active::before,
+.yohu-virtual-list[data-indicator="fill"] .yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])::before {
+  opacity: 0;
+}
+
+.yohu-virtual-list[data-indicator="fill"]:has(.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
+  background: var(--yohu-accent-hover);
+}
+
+.yohu-virtual-list[data-indicator="fill"]:has(.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
+  background: var(--yohu-accent-pressed);
+}
+
+.yohu-virtual-list[data-indicator="fill"] .yohu-interactive {
+  transition: color var(--yohu-motion-effects-fast);
+}
+
+/* 槽位行几何。position 必须也能在 CSS 里赢过后载入的 .yohu-interactive { position: relative }。
+ * 行 Y 的权威值仍是 L4 inline virtualRowBoxStyle（transform），禁止只用 top 跳动。 */
 .yohu-virtual-list__row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -43,6 +71,66 @@
 
 .yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected {
   border-bottom-color: transparent;
+}
+
+/*
+ * listbox 行自绘底，关掉 isolation + ::before。
+ * 槽位回收时每行一层合成层会让 WebView2 闪白；Tree / Nav 仍走 states.css。
+ */
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive {
+  position: absolute;
+  isolation: auto;
+  border-radius: var(--yohu-ripple-radius);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive::before {
+  content: none;
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive > * {
+  position: static;
+  z-index: auto;
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive:hover:not(:disabled):not([aria-disabled="true"]):not(.yohu-interactive--selected) {
+  background-color: var(--yohu-state-hover);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive:active:not(:disabled):not([aria-disabled="true"]):not(.yohu-interactive--selected) {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected {
+  background-color: var(--yohu-state-selected);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--yohu-accent-hover);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--yohu-accent-pressed);
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid {
+  border-radius: 0;
+}
+
+.yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-end {
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* 单选 fill 自己画片，行底必须让开。 */
+.yohu-virtual-list[role="listbox"][data-indicator="fill"] .yohu-virtual-list__row.yohu-interactive--selected,
+.yohu-virtual-list[role="listbox"][data-indicator="fill"] .yohu-virtual-list__row.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"]),
+.yohu-virtual-list[role="listbox"][data-indicator="fill"] .yohu-virtual-list__row.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"]) {
+  background-color: transparent;
 }
 
 .yohu-virtual-list[data-reordering],

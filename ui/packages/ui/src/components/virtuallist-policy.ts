@@ -60,6 +60,7 @@ export function virtualRowAttrs(input: {
   key: string | number;
   selectable: boolean;
   selected: boolean;
+  active: boolean;
   prevSelected: boolean;
   nextSelected: boolean;
   selectionEmpty: boolean;
@@ -72,7 +73,7 @@ export function virtualRowAttrs(input: {
     "aria-selected": input.selectable ? input.selected : undefined,
     tabIndex: virtualRowTabIndex({
       selectable: input.selectable,
-      selected: input.selected,
+      active: input.active,
       selectionEmpty: input.selectionEmpty,
       isFirstVisible: input.isFirstVisible,
     }),

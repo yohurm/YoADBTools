@@ -39,6 +39,7 @@ describe("virtuallist-policy", () => {
         key: "row-1",
         selectable: true,
         selected: true,
+        active: true,
         prevSelected: false,
         nextSelected: true,
         selectionEmpty: false,
@@ -60,6 +61,7 @@ describe("virtuallist-policy", () => {
         key: "row-0",
         selectable: false,
         selected: false,
+        active: false,
         prevSelected: false,
         nextSelected: false,
         selectionEmpty: true,
@@ -76,6 +78,18 @@ describe("virtuallist-policy", () => {
       selMid: false,
       selEnd: false,
     });
+    expect(
+      virtualRowAttrs({
+        key: "row-2",
+        selectable: true,
+        selected: true,
+        active: false,
+        prevSelected: true,
+        nextSelected: false,
+        selectionEmpty: false,
+        isFirstVisible: false,
+      }).tabIndex,
+    ).toBe(-1);
   });
 
   it("宿主 attrs：可选才 listbox；默认 data-tone=document", () => {

@@ -7,17 +7,25 @@ import {
   isVirtualRowSelected,
   isVirtualSelectable,
   isVirtualSelectionEmpty,
+  virtualActiveKey,
   virtualAdjacentSelected,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
   virtualIndexOfKey,
   virtualKeyIntent,
+  virtualPoolIndex,
+  virtualPoolOrigin,
+  virtualPoolSize,
+  virtualPoolSlots,
   virtualRange,
   virtualRowJoin,
   virtualRowKey,
+  virtualRowBoxStyle,
+  virtualRowOffsetY,
   virtualRowTabIndex,
   virtualRowTop,
+  virtualRowTransform,
   virtualTotalHeight,
   virtualVisibleKeys,
   virtualVisibleRows,
@@ -32,6 +40,21 @@ describe("virtuallist-model", () => {
     expect(virtualRange(0, 100, 20, 50, 2)).toEqual({ start: 0, end: 7 });
     expect(virtualRange(200, 100, 20, 50, 2)).toEqual({ start: 8, end: 17 });
     expect(virtualRange(0, 100, 20, 3, 10)).toEqual({ start: 0, end: 3 });
+  });
+
+  it("槽位池大小随视口稳定，原点夹在数据范围内", () => {
+    expect(virtualPoolSize(100, 20, 2, 50)).toBe(10);
+    expect(virtualPoolSize(0, 20, 10, 100)).toBe(21);
+    expect(virtualPoolSize(100, 20, 10, 3)).toBe(3);
+    expect(virtualPoolSize(100, 20, 2, 0)).toBe(0);
+    expect(virtualPoolOrigin(0, 20, 2, 50, 10)).toBe(0);
+    expect(virtualPoolOrigin(200, 20, 2, 50, 10)).toBe(8);
+    expect(virtualPoolOrigin(800, 20, 2, 50, 10)).toBe(38);
+    expect(virtualPoolOrigin(840, 20, 2, 50, 10)).toBe(40);
+    expect(virtualPoolIndex(8, 0)).toBe(8);
+    expect(virtualPoolIndex(8, 9)).toBe(17);
+    expect(virtualPoolSlots(3)).toEqual([0, 1, 2]);
+    expect(virtualPoolSlots(0)).toEqual([]);
   });
 
   it("贴底阈值", () => {
@@ -70,6 +93,16 @@ describe("virtuallist-model", () => {
     expect(isVirtualSelectionEmpty(new Set(["a"]), null)).toBe(false);
   });
 
+  it("活动行：多选焦点锚在集内才用，否则第一项；空选 null", () => {
+    expect(virtualActiveKey(undefined, "a", null)).toBe("a");
+    expect(virtualActiveKey(undefined, null, "a")).toBeNull();
+    expect(virtualActiveKey(new Set(), null, "a")).toBeNull();
+    expect(virtualActiveKey(new Set(["only"]), null, null)).toBe("only");
+    expect(virtualActiveKey(new Set(["a", "b"]), null, "b")).toBe("b");
+    expect(virtualActiveKey(new Set(["a", "b"]), null, "z")).toBe("a");
+    expect(virtualActiveKey(new Set(["a", "b"]), null, null)).toBe("a");
+  });
+
   it("邻接布尔交给 adjacentJoin：连续块与孤立", () => {
     const items = ["a", "b", "c", "d"];
     const keys = new Set<string | number>(["b", "c"]);
@@ -84,12 +117,25 @@ describe("virtuallist-model", () => {
     expect(virtualRowJoin(false, false, false)).toBeNull();
   });
 
-  it("roving tabindex：选中=0；空选首可视=0；否则 -1；不可选 undefined", () => {
-    expect(virtualRowTabIndex({ selectable: false, selected: true, selectionEmpty: true, isFirstVisible: true })).toBeUndefined();
-    expect(virtualRowTabIndex({ selectable: true, selected: true, selectionEmpty: false, isFirstVisible: false })).toBe(0);
-    expect(virtualRowTabIndex({ selectable: true, selected: false, selectionEmpty: true, isFirstVisible: true })).toBe(0);
-    expect(virtualRowTabIndex({ selectable: true, selected: false, selectionEmpty: true, isFirstVisible: false })).toBe(-1);
-    expect(virtualRowTabIndex({ selectable: true, selected: false, selectionEmpty: false, isFirstVisible: true })).toBe(-1);
+  it("roving tabindex：活动行=0；空选首可视=0；否则 -1；不可选 undefined", () => {
+    expect(
+      virtualRowTabIndex({ selectable: false, active: true, selectionEmpty: true, isFirstVisible: true }),
+    ).toBeUndefined();
+    expect(
+      virtualRowTabIndex({ selectable: true, active: true, selectionEmpty: false, isFirstVisible: false }),
+    ).toBe(0);
+    expect(
+      virtualRowTabIndex({ selectable: true, active: false, selectionEmpty: false, isFirstVisible: false }),
+    ).toBe(-1);
+    expect(
+      virtualRowTabIndex({ selectable: true, active: false, selectionEmpty: true, isFirstVisible: true }),
+    ).toBe(0);
+    expect(
+      virtualRowTabIndex({ selectable: true, active: false, selectionEmpty: true, isFirstVisible: false }),
+    ).toBe(-1);
+    expect(
+      virtualRowTabIndex({ selectable: true, active: false, selectionEmpty: false, isFirstVisible: true }),
+    ).toBe(-1);
   });
 
   it("indicator follow：多选仅 1 个 key；0 或 ≥2 为 undefined", () => {
@@ -103,6 +149,19 @@ describe("virtuallist-model", () => {
 
   it("indicator 几何 = index × itemHeight，宽度由调用方传入", () => {
     expect(virtualRowTop(3, 22)).toBe(66);
+    expect(virtualRowOffsetY(3, 22)).toBe(66);
+    expect(virtualRowOffsetY(3, 22, 1)).toBe(88);
+    expect(virtualRowTransform(3, 22)).toBe("translate3d(0, 66px, 0)");
+    expect(virtualRowTransform(3, 22, -1)).toBe("translate3d(0, 44px, 0)");
+    expect(virtualRowBoxStyle(3, 22)).toEqual({
+      position: "absolute",
+      top: "0px",
+      left: "0px",
+      right: "0px",
+      height: "22px",
+      transform: "translate3d(0, 66px, 0)",
+    });
+    expect(virtualRowBoxStyle(1, 28, 0, false).visibility).toBe("hidden");
     expect(virtualIndicatorBox(3, 22, 400)).toEqual({ x: 0, y: 66, width: 400, height: 22 });
     expect(virtualIndicatorAnchor(["a", "b", "c"], "1", 22, 320)).toEqual({
       x: 0,
