@@ -4,7 +4,7 @@
  * 整行按住拖动换位走 YoVirtualList onReorder（拖起时收成单选该条）。
  */
 
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 
 import {
   Density,
@@ -18,6 +18,17 @@ import {
 
 import type { DraftEntry } from "../draft";
 import type { CommandManagerStore } from "./store";
+
+function EntryRow(props: { item: DraftEntry; index: number }) {
+  return (
+    <div class="yohu-cm__row">
+      <span class="yohu-cm__row-name">{props.item.name || "（未命名）"}</span>
+      <Show when={props.item.kind === "block"}>
+        <YoBadge text="块" tone="neutral" />
+      </Show>
+    </div>
+  );
+}
 
 export function EntryColumn(props: {
   store: CommandManagerStore;
@@ -50,14 +61,7 @@ export function EntryColumn(props: {
           onRowContextMenu={(entry, _key, event) => {
             props.onContextMenu(entry, event);
           }}
-          renderRow={(entry) => (
-            <div class="yohu-cm__row">
-              <span class="yohu-cm__row-name">{entry.name || "（未命名）"}</span>
-              <Show when={entry.kind === "block"}>
-                <YoBadge text="块" tone="neutral" />
-              </Show>
-            </div>
-          )}
+          renderRow={EntryRow}
         />
       </div>
     </YoPanel>

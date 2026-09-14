@@ -9,6 +9,15 @@ import { Density, YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } fro
 import type { DraftGroup } from "../draft";
 import type { CommandManagerStore } from "./store";
 
+function GroupRow(props: { item: DraftGroup; index: number }) {
+  return (
+    <div class="yohu-cm__row">
+      <span class="yohu-cm__row-name">{props.item.name || "（未命名）"}</span>
+      <YoBadge text={String(props.item.entries.length)} tone="neutral" />
+    </div>
+  );
+}
+
 export function GroupColumn(props: { store: CommandManagerStore }) {
   const groups = (): DraftGroup[] => props.store.draft.groups;
   const rowHeight = Density.Comfortable.controlHeight;
@@ -30,12 +39,7 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
           selectedKey={() => props.store.ui.selectedGroupId}
           onSelectRow={(group) => props.store.selectGroup(group.id)}
           onReorder={(from, to) => props.store.moveGroupTo(from, to)}
-          renderRow={(group) => (
-            <div class="yohu-cm__row">
-              <span class="yohu-cm__row-name">{group.name || "（未命名）"}</span>
-              <YoBadge text={String(group.entries.length)} tone="neutral" />
-            </div>
-          )}
+          renderRow={GroupRow}
         />
       </div>
     </YoPanel>
