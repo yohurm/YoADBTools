@@ -1,11 +1,17 @@
 /**
  * YoPresence —— 进场挂载、出场播完再卸载（动画系统-v6.md L2）。
- * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list 改为 grid 裁切高度）。
+ * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip 改为 grid 裁切）。
  */
 import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { motionDurationMs } from "../tokens/motion";
-import { PRESENCE_EXIT_DURATION, PRESENCE_EXIT_SAFETY_MS, type PresenceRecipe } from "./recipes";
+import {
+  PRESENCE_EXIT_DURATION,
+  PRESENCE_EXIT_SAFETY_MS,
+  presenceClipProperty,
+  presenceUsesClip,
+  type PresenceRecipe,
+} from "./recipes";
 import { shouldSkipMotion } from "./reduced";
 
 export type { PresenceRecipe };
@@ -41,7 +47,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
       const gen = ++exitGen;
       setExiting(false);
       setPresent(true);
-      if (recipe === "list" && !shouldSkipMotion()) {
+      if (presenceUsesClip(recipe) && !shouldSkipMotion()) {
         setState("closed");
         let raf2 = 0;
         const raf1 = window.requestAnimationFrame(() => {
@@ -76,7 +82,8 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
     };
     const onTransitionEnd = (event: TransitionEvent): void => {
       if (event.target !== host) return;
-      if (event.propertyName !== "grid-template-rows") return;
+      const clip = presenceClipProperty(recipe);
+      if (!clip || event.propertyName !== clip) return;
       window.clearTimeout(timer);
       finishExit(gen);
     };
@@ -103,7 +110,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
         data-exiting={exiting() ? "" : undefined}
         data-first={props.first ? "" : undefined}
       >
-        {recipe() === "list" ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
+        {presenceUsesClip(recipe()) ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
       </div>
     </Show>
   );

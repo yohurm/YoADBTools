@@ -212,5 +212,10 @@ body,
   font-variant-numeric: tabular-nums;
   line-height: var(--yohu-font-leading-data);
 }
+
+::selection {
+  background-color: var(--yohu-text-sel);
+  color: var(--yohu-text-sel-fg);
+}
 `;
 }

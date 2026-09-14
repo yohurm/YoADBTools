@@ -52,8 +52,6 @@ export const Harmony = {
   compBackgroundSecondary: { light: fromArgb("#19000000"), dark: fromArgb("#19ffffff") },
   compEmphasizeSecondary: { light: fromArgb("#330a59f7"), dark: fromArgb("#33317af7") },
   compEmphasizeTertiary: { light: fromArgb("#190a59f7"), dark: fromArgb("#19317af7") },
-  /** 文档选字底。20% 是徽章；100% 是列表选中片；选字取品牌 45%。 */
-  compTextSelection: { light: fromArgb("#730a59f7"), dark: fromArgb("#73317af7") },
   compDivider: { light: fromArgb("#33000000"), dark: fromArgb("#33ffffff") },
   iconSubEmphasize: { light: fromArgb("#660a59f7"), dark: fromArgb("#66317af7") },
 
@@ -123,8 +121,12 @@ export const Colors = {
   ErrorPressed: brandOverlay(Harmony.warning.light, "#000000", 10),
   Offline: Harmony.fontTertiary.light,
   FocusRing: Harmony.iconSubEmphasize.light,
-  /** Family A 文档选区。禁止用 accent-soft / state-selected 冒充。 */
-  TextSel: Harmony.compTextSelection.light,
+  /**
+   * 文档选字底。禁止 20%/45% 品牌：叠到画布 < 3:1，级别 ink 更不可读。
+   * 官方强调对：background_emphasize + font_on_primary。
+   */
+  TextSel: Harmony.backgroundEmphasize.light,
+  TextSelFg: Harmony.fontOnPrimary.light,
   Tag: Harmony.alert.light,
   Splitter: Harmony.compDivider.light,
   SplitterHover: Harmony.fontSecondary.light,
@@ -170,7 +172,8 @@ export const DarkColors: Record<SemanticColorName, string> = {
   ErrorPressed: brandOverlay(Harmony.warning.dark, "#FFFFFF", 10),
   Offline: Harmony.fontTertiary.dark,
   FocusRing: Harmony.iconSubEmphasize.dark,
-  TextSel: Harmony.compTextSelection.dark,
+  TextSel: Harmony.backgroundEmphasize.dark,
+  TextSelFg: Harmony.fontOnPrimary.dark,
   Tag: Harmony.alert.dark,
   Splitter: Harmony.compDivider.dark,
   SplitterHover: Harmony.fontSecondary.dark,

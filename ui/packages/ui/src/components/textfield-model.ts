@@ -1,7 +1,10 @@
 /**
  * 输入框领域模型（L2）。
- * 盒内缀 / 盒外缀 / status / active 是不变式；涂装名给视图当 data-paint。active 不进涂装。
+ * 盒内缀 / 盒外缀 / Token / status / active 是不变式；涂装名给视图当 data-paint。active 不进涂装。
  * 写入盒由控件铬高减两侧 hairline 得出；不碰 DOM、不判定 disabled / 清除显隐。
+ *
+ * Token 与 input 同属写入盒主轴，不是嵌套滚动口。溢出只由控件 clip。
+ * input 吃剩余宽（flex 1 1 0% / width auto），禁止 width:100% 把气泡挤出 Windows 横条。
  */
 
 import { Stroke } from "../tokens/layout";
@@ -21,6 +24,7 @@ export interface TextFieldSlotInput {
   suffix?: unknown;
   addonBefore?: unknown;
   addonAfter?: unknown;
+  tokens?: unknown;
 }
 
 export interface TextFieldSlots {
@@ -28,7 +32,12 @@ export interface TextFieldSlots {
   suffix: boolean;
   addonBefore: boolean;
   addonAfter: boolean;
+  /** 写入盒内、input 之前。气泡是主轴 flex 子项，槽本身无盒。 */
+  tokens: boolean;
 }
+
+/** 写入盒溢出：只 clip。铬高控件装不下系统横条。 */
+export const TEXT_FIELD_CONTROL_OVERFLOW = "hidden" as const;
 
 export interface TextFieldSpec {
   status: YoTextFieldStatus;
@@ -51,6 +60,7 @@ export function resolveTextFieldSlots(input: TextFieldSlotInput): TextFieldSlots
     suffix: hasTextFieldSlot(input.suffix),
     addonBefore: hasTextFieldSlot(input.addonBefore),
     addonAfter: hasTextFieldSlot(input.addonAfter),
+    tokens: hasTextFieldSlot(input.tokens),
   };
 }
 

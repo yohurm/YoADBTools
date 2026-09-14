@@ -48,6 +48,19 @@ describe("YoIndicator", () => {
     expect(container.querySelector(".track")?.hasAttribute("data-indicator-ready")).toBe(false);
   });
 
+  it("decorate=false 不把父级标成 indicator-host", () => {
+    const { container } = render(() => (
+      <div class="track">
+        <YoIndicator decorate={false} follow="a" variant="fill" />
+        <button class="yohu-interactive yohu-interactive--selected" type="button">
+          A
+        </button>
+      </div>
+    ));
+    expect(container.querySelector(".track")?.classList.contains("yohu-indicator-host")).toBe(false);
+    expect(container.querySelector(".yohu-recipe-indicator--fill")).toBeTruthy();
+  });
+
   it("follow 变化仍保持同一滑块节点", () => {
     const [follow, setFollow] = createSignal("a");
     const { container } = render(() => (

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { MotionSpec, motionDurationMs } from "../tokens/motion";
-import { DISMISS_HOLD_DURATION, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION } from "./recipes";
+import { DISMISS_HOLD_DURATION, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, presenceClipProperty, presenceUsesClip } from "./recipes";
 
 function loadMotionCss(): string {
   const candidates = [
@@ -31,6 +31,7 @@ describe("motion recipes", () => {
     expect(PRESENCE_EXIT_DURATION.dialog).toBe(MotionSpec.spatialExit.duration);
     expect(PRESENCE_EXIT_DURATION.rise).toBe(MotionSpec.effectsExit.duration);
     expect(PRESENCE_EXIT_DURATION.list).toBe(MotionSpec.spatialLocal.duration);
+    expect(PRESENCE_EXIT_DURATION.chip).toBe(MotionSpec.spatialLocal.duration);
     expect(motionDurationMs(PRESENCE_EXIT_DURATION.rise)).toBe(200);
   });
 
@@ -38,10 +39,23 @@ describe("motion recipes", () => {
     const css = loadMotionCss();
     expect(css).toContain(".yohu-presence[data-recipe=\"list\"] .yohu-presence__clip");
     const listBlock = css.slice(css.indexOf("配方 list"));
-    const untilFold = listBlock.slice(0, listBlock.indexOf("配方 inline-end"));
+    const untilFold = listBlock.slice(0, listBlock.indexOf("配方 chip"));
     expect(untilFold).not.toContain("yohu-rise-in");
     expect(untilFold).toContain("--yohu-space-xs");
     expect(untilFold).toContain("--yohu-motion-spatial-local");
+  });
+
+  it("chip 横向裁切宽度，不改铬高", () => {
+    expect(presenceUsesClip("chip")).toBe(true);
+    expect(presenceClipProperty("chip")).toBe("grid-template-columns");
+    expect(presenceClipProperty("list")).toBe("grid-template-rows");
+    const css = loadMotionCss();
+    const chipBlock = css.slice(css.indexOf("配方 chip"));
+    const untilInline = chipBlock.slice(0, chipBlock.indexOf("配方 inline-end"));
+    expect(untilInline).toContain("grid-template-columns");
+    expect(untilInline).not.toContain("grid-template-rows");
+    expect(untilInline).toContain("scale(0.96)");
+    expect(untilInline).toContain("--yohu-motion-spatial-local");
   });
 
   it("主题切换配方关闭默认淡出并按方向叠层", () => {

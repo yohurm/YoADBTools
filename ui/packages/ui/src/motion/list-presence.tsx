@@ -9,12 +9,15 @@ import { createStore, produce } from "solid-js/store";
 import { firstPresentSlotKey, type ListPresenceSlot } from "./list-presence-model";
 import { listPresenceHostAttrs } from "./list-presence-policy";
 import { YoPresence } from "./presence";
+import type { PresenceRecipe } from "./recipes";
 
 export interface YoListPresenceProps<T> {
   each: readonly T[];
   key: (item: T) => string | number;
   /** 移除时播出场。false = 直切卸载。默认 true。 */
   exit?: boolean;
+  /** 默认 list（纵向高度）。写入盒 Token 用 chip（横向宽度，不撑铬高）。 */
+  recipe?: Extract<PresenceRecipe, "list" | "chip">;
   children: (item: T) => JSX.Element;
 }
 
@@ -72,7 +75,7 @@ export function YoListPresence<T>(props: YoListPresenceProps<T>): JSX.Element {
       {(slot) => (
         <YoPresence
           when={slot.present}
-          recipe="list"
+          recipe={props.recipe ?? "list"}
           first={listPresenceHostAttrs(firstKey(), slot.key).first}
           onExitComplete={() => {
             setSlots(

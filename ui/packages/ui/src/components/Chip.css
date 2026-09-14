@@ -1,0 +1,78 @@
+.yohu-chip {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  padding-block: 0;
+  padding-inline: var(--yohu-space-sm);
+  overflow: hidden;
+  border: var(--yohu-stroke-hairline) solid transparent;
+  border-radius: var(--yohu-radius-pill);
+  font-family: var(--yohu-font-sans);
+  font-size: var(--yohu-font-caption);
+  font-weight: var(--yohu-font-weight-semibold);
+  line-height: var(--yohu-font-leading-tight);
+  white-space: nowrap;
+}
+
+.yohu-chip[data-dismiss] {
+  padding-inline-end: 0;
+}
+
+.yohu-chip[data-tone="neutral"] {
+  background-color: var(--yohu-surface-2);
+  border-color: var(--yohu-border);
+  color: var(--yohu-fg-2);
+}
+
+.yohu-chip[data-tone="accent"] {
+  background-color: var(--yohu-accent-soft);
+  border-color: var(--yohu-accent);
+  color: var(--yohu-accent);
+}
+
+.yohu-chip[data-tone="success"] {
+  background-color: var(--yohu-success-bg);
+  color: var(--yohu-success);
+}
+
+.yohu-chip[data-tone="warning"] {
+  background-color: var(--yohu-warn-bg);
+  color: var(--yohu-warn);
+}
+
+.yohu-chip[data-tone="danger"] {
+  background-color: var(--yohu-signal-bg);
+  color: var(--yohu-error);
+}
+
+.yohu-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yohu-chip__remove {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  align-self: flex-start;
+  justify-content: center;
+  width: var(--yohu-space-lg);
+  height: var(--yohu-space-lg);
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.yohu-chip__remove:hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}

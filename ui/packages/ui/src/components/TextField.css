@@ -83,6 +83,7 @@
   min-width: 0;
   height: var(--yohu-control-height);
   padding: 0 var(--yohu-space-sm);
+  /* 只 clip。禁止 auto/scroll：铬高装不下系统横条。 */
   overflow: hidden;
   border: var(--yohu-stroke-hairline) solid var(--yohu-text-field-edge);
   border-radius: var(--yohu-radius-sm);
@@ -112,10 +113,15 @@
   color: var(--yohu-fg-3);
 }
 
+/* 无盒。气泡提升为写入盒 flex 子项，与 input 抢同一行。禁止本槽再做滚动口。 */
+.yohu-text-field__tokens {
+  display: contents;
+}
+
 .yohu-text-field__input {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   min-width: 0;
-  width: 100%;
+  width: auto;
   height: var(--yohu-text-field-line);
   margin: 0;
   padding: 0;
@@ -129,6 +135,10 @@
   font-size: var(--yohu-font-body);
   /* 与写入盒同高：Chromium 单行 input 才把字/caret 垂直居中。 */
   line-height: var(--yohu-text-field-line);
+}
+
+.yohu-text-field[data-tokens] .yohu-text-field__input {
+  min-width: calc(var(--yohu-space-xl) * 2);
 }
 
 /*

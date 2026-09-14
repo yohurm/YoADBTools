@@ -31,6 +31,7 @@ describe("textfield-policy", () => {
       "data-suffix": undefined,
       "data-addon-before": undefined,
       "data-addon-after": undefined,
+      "data-tokens": undefined,
       "data-clearable": undefined,
       "data-disabled": undefined,
       "data-active": undefined,
@@ -65,6 +66,11 @@ describe("textfield-policy", () => {
     expect(textFieldHostAttrs({ type: "number" })["data-width"]).toBe("number");
     expect(textFieldHostAttrs({ type: "number", block: true })["data-width"]).toBe("fill");
     expect(textFieldHostAttrs({})["data-width"]).toBe("hug");
+  });
+
+  it("tokens 写 data-tokens", () => {
+    expect(textFieldHostAttrs({})["data-tokens"]).toBeUndefined();
+    expect(textFieldHostAttrs({ tokens: true })["data-tokens"]).toBe(true);
   });
 
   it("active 只写 data-active，不改涂装", () => {

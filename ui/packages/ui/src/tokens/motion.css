@@ -252,6 +252,48 @@
 }
 
 /*
+ * 配方 chip：写入盒 Token。横向 0fr↔1fr，不改铬高。
+ * 内容 scale + fade；时长 spatial-local。禁止套 list 把控件撑高。
+ */
+.yohu-presence[data-recipe="chip"] {
+  display: grid;
+  flex: 0 1 auto;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns var(--yohu-motion-spatial-local);
+}
+
+.yohu-presence[data-recipe="chip"][data-state="open"] {
+  grid-template-columns: 1fr;
+}
+
+.yohu-presence[data-recipe="chip"] .yohu-presence__clip {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  contain: layout;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-presence[data-recipe="chip"] .yohu-presence__clip > * {
+  min-width: min-content;
+}
+
+.yohu-presence[data-recipe="chip"][data-state="open"] .yohu-presence__clip {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity var(--yohu-motion-spatial-local),
+    transform var(--yohu-motion-spatial-local);
+}
+
+/*
  * 配方 inline-end：贴 inline-end 的双轴裁切（与 YoSwap / collapse 同构）。
  * 宽 compact↔100%；高 0fr↔1fr。闭合不占列高，把手溢出到上一行。
  * 1fr 兄弟（居中空态、结果流）被挤位时靠布局插值跟随。
@@ -423,12 +465,13 @@
 }
 
 /*
- * fill 滑块宽高走软弹簧过冲。绝对定位盒在 (0,0) 的未变换边框 ∪ 变换后的视觉盒
- * 会撑大宿主 scrollWidth / scrollHeight。只写 overflow-x:hidden 时，CSS Overflow
- * 会把另一轴 visible 算成 auto（https://www.w3.org/TR/css-overflow-3/），Windows
- * 在过冲瞬间画出右侧纵条（命令管理组切换同症）。两轴一律 hidden：裁切、不画条。
- * 真正纵滚留给祖先 scroller（VirtualList / 设备栏 __scroller），禁止写在滑块宿主。
- * underline / thumb 不走这条：Tabs 要横向滚，分段钮要露出阴影。
+ * fill 滑块宽高走软弹簧过冲。fill / thumb 用 top/left 定位（虚拟列表 inner 不能
+ * 再靠 transform 把未变换边框钉在 (0,0) 再平移，否则会撑大 scrollHeight）。
+ * 设备栏等 decorate 宿主仍两轴 hidden：裁切过冲、不画条。
+ * 只写 overflow-x:hidden 时，CSS Overflow 会把另一轴 visible 算成 auto
+ * （https://www.w3.org/TR/css-overflow-3/），Windows 在过冲瞬间画出右侧纵条
+ * （命令管理组切换同症）。underline / thumb 不走这条：Tabs 要横向滚，分段钮要露出阴影。
+ * 真正纵滚留给祖先 scroller（VirtualList 自己滚 / 设备栏 __scroller），禁止写在滑块宿主。
  */
 .yohu-indicator-host[data-indicator-variant="fill"] {
   overflow: hidden;
@@ -453,6 +496,8 @@
 .yohu-recipe-indicator[data-ready][data-moving] {
   transition:
     transform var(--yohu-indicator-dur, var(--yohu-dur-small)) var(--yohu-ease-spring),
+    top var(--yohu-indicator-dur, var(--yohu-dur-small)) var(--yohu-ease-spring),
+    left var(--yohu-motion-spatial-stretch),
     width var(--yohu-motion-spatial-stretch),
     height var(--yohu-motion-spatial-stretch),
     background-color var(--yohu-motion-effects-fast),
@@ -599,6 +644,8 @@ html[data-theme-transition] *::after {
   .yohu-collapse[data-recipe="panel"] .yohu-collapse__inner,
   .yohu-presence[data-recipe="list"],
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
+  .yohu-presence[data-recipe="chip"],
+  .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
   .yohu-switch,
   .yohu-switch__thumb,
   .yohu-recipe-reorder-bar[data-ready],
@@ -630,6 +677,7 @@ html[data-theme-transition] *::after {
   .yohu-presence[data-recipe="fade"],
   .yohu-presence[data-recipe="rise"],
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
+  .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
   .yohu-recipe-dismiss-fade {
     animation: none !important;
   }

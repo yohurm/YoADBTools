@@ -48,6 +48,7 @@ export interface TextFieldHostAttrs {
   "data-suffix": true | undefined;
   "data-addon-before": true | undefined;
   "data-addon-after": true | undefined;
+  "data-tokens": true | undefined;
   "data-clearable": true | undefined;
   "data-disabled": true | undefined;
   "data-active": true | undefined;
@@ -68,6 +69,7 @@ export function textFieldHostAttrs(
     "data-suffix": spec.slots.suffix ? true : undefined,
     "data-addon-before": spec.slots.addonBefore ? true : undefined,
     "data-addon-after": spec.slots.addonAfter ? true : undefined,
+    "data-tokens": spec.slots.tokens ? true : undefined,
     "data-clearable": interactive.showClear ? true : undefined,
     "data-disabled": interactive.disabled ? true : undefined,
     "data-active": spec.active ? true : undefined,

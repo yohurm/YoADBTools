@@ -29,7 +29,8 @@
   --yohu-error-pressed: color-mix(in srgb, #000000 10%, #E84026);
   --yohu-offline: #00000066;
   --yohu-focus-ring: #0A59F766;
-  --yohu-text-sel: #0A59F773;
+  --yohu-text-sel: #0A59F7;
+  --yohu-text-sel-fg: #FFFFFF;
   --yohu-tag: #ED6F21;
   --yohu-splitter-hover: #00000099;
   --yohu-disabled: #D1D1D6;
@@ -235,7 +236,8 @@
   --yohu-error-pressed: color-mix(in srgb, #FFFFFF 10%, #D94838);
   --yohu-offline: #FFFFFF66;
   --yohu-focus-ring: #317AF766;
-  --yohu-text-sel: #317AF773;
+  --yohu-text-sel: #317AF7;
+  --yohu-text-sel-fg: #FFFFFF;
   --yohu-tag: #DB6B42;
   --yohu-splitter-hover: #FFFFFF99;
   --yohu-disabled: #2E3033;
@@ -344,4 +346,9 @@ body,
   font-family: var(--yohu-font-mono);
   font-variant-numeric: tabular-nums;
   line-height: var(--yohu-font-leading-data);
+}
+
+::selection {
+  background-color: var(--yohu-text-sel);
+  color: var(--yohu-text-sel-fg);
 }

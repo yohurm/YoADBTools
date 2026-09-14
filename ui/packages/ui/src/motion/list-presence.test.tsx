@@ -7,6 +7,16 @@ import { listPresenceHostAttrs } from "./list-presence-policy";
 import { YoListPresence } from "./list-presence";
 
 describe("YoListPresence", () => {
+  it("recipe 可换成 chip", () => {
+    render(() => (
+      <YoListPresence each={[{ id: 1, text: "tag" }]} key={(item) => item.id} recipe="chip">
+        {(item) => <div>{item.text}</div>}
+      </YoListPresence>
+    ));
+    expect(document.querySelectorAll('.yohu-presence[data-recipe="chip"]').length).toBe(1);
+    expect(document.querySelectorAll('.yohu-presence[data-recipe="list"]').length).toBe(0);
+  });
+
   it("按 each 挂载项", () => {
     render(() => (
       <YoListPresence

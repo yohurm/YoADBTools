@@ -85,7 +85,9 @@
 | `interactive_hover` | 黑 @ **5%** | 白 @ **5%** | 悬浮态 |
 | `interactive_pressed` / `interactive_click` | 黑 @ **10%** | 白 @ **10%** | 按压/点击态 |
 | `interactive_focus` / `interactive_active` | `#0A59F7` | `#317AF7` | 获焦/激活态 |
-| `interactive_select` | `#0A59F7` @ 20% | `#317AF7` @ 20% | 选中态 |
+| `interactive_select` | `#0A59F7` @ 20% | `#317AF7` @ 20% | 选中态（徽章/芯片软底；**不是**文档选字） |
+
+文档选字走 `background_emphasize` + `font_on_primary`（实底宇宙蓝 + 反白）。`interactive_select` 20% 叠到画布 < 3:1，级别 ink 更不可读。
 
 > 交互事件色命名规范：`hover`（悬浮）/ `pressed`（按压）/ `focus`（获焦）/ `disable`（禁用）/ `select`（选中）/ `active`（激活）。
 

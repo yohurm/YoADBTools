@@ -39,7 +39,8 @@ const EXPECTED_LIGHT: Record<string, string> = {
   Error: "#E84026",
   Offline: "#00000066",
   SwitchOff: "#00000019",
-  TextSel: "#0A59F773",
+  TextSel: "#0A59F7",
+  TextSelFg: "#FFFFFF",
   Scrim: "#00000019",
 };
 
@@ -53,7 +54,8 @@ const EXPECTED_DARK: Record<string, string> = {
   Warn: "#DB6B42",
   Error: "#D94838",
   SwitchOff: "#FFFFFF19",
-  TextSel: "#317AF773",
+  TextSel: "#317AF7",
+  TextSelFg: "#FFFFFF",
   Scrim: "#00000066",
 };
 
@@ -191,6 +193,17 @@ describe("HarmonyOS 对比度门禁（§1.6）", () => {
     expect(contrast(Colors.FgOn, Colors.Error)).toBeGreaterThanOrEqual(3);
     expect(contrast(DarkColors.FgOn, DarkColors.Accent)).toBeGreaterThanOrEqual(3);
     expect(contrast(DarkColors.FgOn, DarkColors.Error)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("选字实底对画布 ≥ 3:1，反白字对选字底达标", () => {
+    expect(Colors.TextSel).toBe(Colors.Accent);
+    expect(Colors.TextSelFg).toBe(Colors.FgOn);
+    expect(DarkColors.TextSel).toBe(DarkColors.Accent);
+    expect(DarkColors.TextSelFg).toBe(DarkColors.FgOn);
+    expect(contrast(Colors.TextSel, Colors.Surface)).toBeGreaterThanOrEqual(3);
+    expect(contrast(Colors.TextSelFg, Colors.TextSel)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(DarkColors.TextSel, DarkColors.Surface)).toBeGreaterThanOrEqual(3);
+    expect(contrast(DarkColors.TextSelFg, DarkColors.TextSel)).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -331,6 +344,8 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg-on)");
     expect(themeCss).not.toContain("--yohu-state-selected-rule:");
     expect(themeCss).toContain("--yohu-text-sel:");
+    expect(themeCss).toContain("--yohu-text-sel-fg:");
+    expect(themeCss).toContain("::selection");
     expect(themeCss).toContain("--yohu-ripple-inset: 0");
     expect(themeCss).toContain("--yohu-space-3xl: 40px");
   });

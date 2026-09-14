@@ -98,6 +98,8 @@ export type { YoSwitchProps } from "./components/Switch";
 
 export { YoBadge } from "./components/Badge";
 export type { YoBadgeProps, YoBadgeTone } from "./components/Badge";
+export { YoChip } from "./components/Chip";
+export type { YoChipProps, YoChipTone } from "./components/Chip";
 
 export { YoProgressBar } from "./components/ProgressBar";
 export type { YoProgressBarProps } from "./components/ProgressBar";

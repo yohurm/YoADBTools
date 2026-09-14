@@ -37,6 +37,8 @@ export interface YoTextFieldProps {
   prefix?: YoTextFieldAffix;
   /** 盒内后缀（图标名或节点） */
   suffix?: YoTextFieldAffix;
+  /** 写入盒内、输入前的 Token 槽（过滤气泡）。 */
+  tokens?: JSX.Element;
   /** 盒外前附加 */
   addonBefore?: JSX.Element;
   /** 盒外后附加 */
@@ -49,6 +51,8 @@ export interface YoTextFieldProps {
   block?: boolean;
   /** 转发内部 input，供宿主快捷键聚焦。不进模型。 */
   inputRef?: (el: HTMLInputElement) => void;
+  /** 转发内部 input 的 keydown（Token 退格删泡等）。 */
+  onKeyDown?: (event: KeyboardEvent) => void;
 }
 
 function isIconName(value: unknown): value is IconName {
@@ -65,7 +69,7 @@ function TextFieldAffix(props: { value: YoTextFieldAffix | undefined }): JSX.Ele
   );
 }
 
-/** 渲染输入。内容区 = 盒内缀 + input + 清除，圆角内裁剪。 */
+/** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input + 清除；写入盒只 clip。 */
 export function YoTextField(props: YoTextFieldProps): JSX.Element {
   const id = createUniqueId();
   let inputRef: HTMLInputElement | undefined;
@@ -100,6 +104,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-suffix={host()["data-suffix"]}
       data-addon-before={host()["data-addon-before"]}
       data-addon-after={host()["data-addon-after"]}
+      data-tokens={host()["data-tokens"]}
       data-width={host()["data-width"]}
       data-clearable={host()["data-clearable"]}
       data-disabled={host()["data-disabled"]}
@@ -116,11 +121,25 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             {props.addonBefore}
           </span>
         </Show>
-        <div class="yohu-text-field__control yohu-focus-host">
+        <div
+          class="yohu-text-field__control yohu-focus-host"
+          onMouseDown={(event) => {
+            if (!inputRef || event.button !== 0) return;
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest("button, a, [data-no-focus]")) return;
+            if (target === inputRef || inputRef.contains(target)) return;
+            event.preventDefault();
+            inputRef.focus();
+          }}
+        >
           <Show when={host()["data-prefix"]}>
             <span class="yohu-text-field__affix" data-edge="start">
               <TextFieldAffix value={props.prefix} />
             </span>
+          </Show>
+          <Show when={host()["data-tokens"]}>
+            <span class="yohu-text-field__tokens">{props.tokens}</span>
           </Show>
           <input
             ref={(el) => {
@@ -138,6 +157,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             disabled={host().disabled}
             onInput={handleInput}
             onChange={handleChange}
+            onKeyDown={(event) => props.onKeyDown?.(event)}
           />
           <Show when={host()["data-suffix"]}>
             <span class="yohu-text-field__affix" data-edge="end">

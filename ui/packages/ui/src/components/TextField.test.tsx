@@ -180,4 +180,48 @@ describe("YoTextField", () => {
     const idle = render(() => <YoTextField ariaLabel="Tag" />);
     expect(idle.container.querySelector(".yohu-text-field")?.hasAttribute("data-active")).toBe(false);
   });
+
+  it("tokens 写 data-tokens；槽无盒，不嵌套滚动口", () => {
+    const { container } = render(() => (
+      <YoTextField ariaLabel="Tag" tokens={<span data-testid="chip">HfLooper</span>} />
+    ));
+    const host = container.querySelector(".yohu-text-field");
+    const control = host?.querySelector(".yohu-text-field__control");
+    const tokens = host?.querySelector(".yohu-text-field__tokens");
+    expect(host?.getAttribute("data-tokens")).toBe("true");
+    expect(tokens).toBeTruthy();
+    expect(control?.contains(screen.getByTestId("chip"))).toBe(true);
+
+    const tokensBlock = css.slice(css.indexOf(".yohu-text-field__tokens {"));
+    const tokensRule = tokensBlock.slice(0, tokensBlock.indexOf("}") + 1);
+    expect(tokensRule).toContain("display: contents");
+    expect(tokensRule).not.toContain("overflow");
+
+    const controlBlock = css.slice(css.indexOf(".yohu-text-field__control {"));
+    const controlRule = controlBlock.slice(0, controlBlock.indexOf("}") + 1);
+    expect(controlRule).toContain("overflow: hidden");
+    expect(controlRule).not.toContain("overflow: auto");
+    expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
+    expect(css).not.toMatch(/overflow:\s*(auto|scroll)/);
+
+    const tokensMin = css.slice(css.indexOf(".yohu-text-field[data-tokens] .yohu-text-field__input"));
+    const tokensMinRule = tokensMin.slice(0, tokensMin.indexOf("}") + 1);
+    expect(tokensMinRule).toContain("min-width: calc(var(--yohu-space-xl) * 2)");
+    expect(tokensMinRule).not.toContain("width: 100%");
+
+    const inputBlock = css.slice(css.indexOf(".yohu-text-field__input {"));
+    const inputRule = inputBlock.slice(0, inputBlock.indexOf("}") + 1);
+    expect(inputRule).toContain("flex: 1 1 0%");
+    expect(inputRule).toContain("width: auto");
+    expect(inputRule).not.toContain("width: 100%");
+  });
+
+  it("点写入盒空白聚焦 input，不点按钮", () => {
+    const { container } = render(() => <YoTextField ariaLabel="Tag" tokens={<span>HfLooper</span>} />);
+    const input = screen.getByLabelText("Tag") as HTMLInputElement;
+    const control = container.querySelector(".yohu-text-field__control");
+    expect(control).toBeTruthy();
+    fireEvent.mouseDown(control as HTMLElement, { button: 0 });
+    expect(document.activeElement).toBe(input);
+  });
 });

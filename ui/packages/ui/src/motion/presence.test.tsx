@@ -31,6 +31,17 @@ describe("YoPresence", () => {
     expect(onExitComplete).toHaveBeenCalledTimes(1);
   });
 
+  it("recipe=chip 用 clip 包一层，横向配方", () => {
+    render(() => (
+      <YoPresence when recipe="chip">
+        <span>HfLooper</span>
+      </YoPresence>
+    ));
+    const host = document.querySelector(".yohu-presence");
+    expect(host?.getAttribute("data-recipe")).toBe("chip");
+    expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("HfLooper");
+  });
+
   it("recipe=list 用 clip 包一层，skip motion 时直接 open", () => {
     render(() => (
       <YoPresence when recipe="list">

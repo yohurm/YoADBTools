@@ -1,6 +1,7 @@
 /**
  * YoIndicator —— 选中态在项与项之间滑动（动画系统-v6.md 配方 indicator）。
- * 必须作为 track 的子节点；track 由本组件挂 `yohu-indicator-host`。
+ * 必须作为 track 的子节点。默认给 track 挂 `yohu-indicator-host`；
+ * `decorate={false}` 时不挂（虚拟列表滚轴自己纵滚）。
  * 单选表面用 fill / underline / thumb；多选块（≥2）与「行级」虚拟列表过渡不要用；
  * 虚拟列表单选走 `anchor`（按下标定位，不测未渲染行）。
  */
@@ -28,6 +29,11 @@ export interface YoIndicatorProps {
   selector?: string;
   /** 显式几何（虚拟列表 index×行高）。提供则不再测 DOM。 */
   anchor?: () => IndicatorBox | null;
+  /**
+   * 默认给父级挂 `yohu-indicator-host`（fill 会 overflow:hidden 裁切过冲）。
+   * 虚拟列表滚轴自己纵滚，禁止把宿主 overflow 打在 scroller / 超高 inner 上。
+   */
+  decorate?: boolean;
 }
 
 const DEFAULT_SELECTOR = ".yohu-interactive--selected";
@@ -48,7 +54,8 @@ function indicatorStyle(
   return {
     width: `${box.width}px`,
     height: `${box.height}px`,
-    transform: `translate3d(${box.x}px, ${box.y}px, 0)`,
+    top: `${box.y}px`,
+    left: `${box.x}px`,
     ...travel,
   };
 }
@@ -129,8 +136,10 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
     }
   };
 
+  const shouldDecorate = (): boolean => props.decorate !== false;
+
   const decorate = (track: HTMLElement | undefined): void => {
-    if (!track) return;
+    if (!track || !shouldDecorate()) return;
     track.classList.add("yohu-indicator-host");
     track.setAttribute("data-indicator-variant", variant());
     if (ready()) {
@@ -228,9 +237,11 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
       track.removeEventListener("transitionend", onTransition, true);
       trackRo?.disconnect();
       stopMoving();
-      track.classList.remove("yohu-indicator-host");
-      track.removeAttribute("data-indicator-variant");
-      track.removeAttribute("data-indicator-ready");
+      if (shouldDecorate()) {
+        track.classList.remove("yohu-indicator-host");
+        track.removeAttribute("data-indicator-variant");
+        track.removeAttribute("data-indicator-ready");
+      }
     });
   });
 

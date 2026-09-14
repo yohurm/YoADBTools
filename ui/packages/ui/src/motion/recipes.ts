@@ -1,7 +1,22 @@
 import { MotionSpec, type MotionDurationName } from "../tokens/motion";
 
 /** Presence 配方名（与 motion.css data-recipe 对齐）。 */
-export type PresenceRecipe = "dialog" | "toast" | "popover" | "fade" | "rise" | "list";
+export type PresenceRecipe = "dialog" | "toast" | "popover" | "fade" | "rise" | "list" | "chip";
+
+/** 用 clip 层裁切进场的配方。list 裁高度，chip 裁宽度。 */
+export const PRESENCE_CLIP_RECIPES: readonly PresenceRecipe[] = ["list", "chip"];
+
+export function presenceUsesClip(recipe: PresenceRecipe): boolean {
+  return recipe === "list" || recipe === "chip";
+}
+
+export function presenceClipProperty(
+  recipe: PresenceRecipe,
+): "grid-template-rows" | "grid-template-columns" | null {
+  if (recipe === "list") return "grid-template-rows";
+  if (recipe === "chip") return "grid-template-columns";
+  return null;
+}
 
 /** Collapse 配方名（与 motion.css data-recipe 对齐）。 */
 export type CollapseRecipe = "collapse" | "panel" | "fill";
@@ -17,6 +32,7 @@ export const PRESENCE_EXIT_DURATION: Record<PresenceRecipe, MotionDurationName> 
   fade: MotionSpec.effectsExit.duration,
   rise: MotionSpec.effectsExit.duration,
   list: MotionSpec.spatialLocal.duration,
+  chip: MotionSpec.spatialLocal.duration,
 };
 
 /**

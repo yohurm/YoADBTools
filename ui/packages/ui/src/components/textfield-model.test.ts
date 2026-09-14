@@ -3,6 +3,7 @@ import { Density } from "../tokens/density";
 import { Stroke } from "../tokens/layout";
 import {
   DEFAULT_TEXT_FIELD_STATUS,
+  TEXT_FIELD_CONTROL_OVERFLOW,
   hasTextFieldSlot,
   resolveTextFieldActive,
   resolveTextFieldSpec,
@@ -16,7 +17,7 @@ describe("textfield-model", () => {
   it("缺省 status 是 none，涂装 neutral", () => {
     expect(resolveTextFieldSpec({})).toEqual({
       status: DEFAULT_TEXT_FIELD_STATUS,
-      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false },
+      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "hug",
       active: false,
     });
@@ -36,6 +37,12 @@ describe("textfield-model", () => {
     expect(resolveTextFieldStatus(undefined)).toBe("none");
   });
 
+  it("写入盒只 clip，Token 算占槽", () => {
+    expect(TEXT_FIELD_CONTROL_OVERFLOW).toBe("hidden");
+    expect(resolveTextFieldSpec({ tokens: true }).slots.tokens).toBe(true);
+    expect(hasTextFieldSlot({})).toBe(true);
+  });
+
   it("空槽不算占位，非空缀与附加算占位", () => {
     expect(hasTextFieldSlot(undefined)).toBe(false);
     expect(hasTextFieldSlot(null)).toBe(false);
@@ -52,7 +59,7 @@ describe("textfield-model", () => {
         addonAfter: false,
         status: "error",
       }).slots,
-    ).toEqual({ prefix: true, suffix: false, addonBefore: true, addonAfter: false });
+    ).toEqual({ prefix: true, suffix: false, addonBefore: true, addonAfter: false, tokens: false });
   });
 
   it("宽度：默认 hug，number 次之，block 优先", () => {
@@ -81,7 +88,7 @@ describe("textfield-model", () => {
     expect(resolveTextFieldSpec({ active: true }).active).toBe(true);
     expect(resolveTextFieldSpec({ active: true, status: "error" })).toEqual({
       status: "error",
-      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false },
+      slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "hug",
       active: true,
     });
