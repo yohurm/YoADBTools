@@ -8,7 +8,10 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION, DEFAULT_BROWSE_ROOT, MIRROR_MIN_LAYOUT_PX, ModuleId, ModuleTitle, SAFETY_ROOTS, commandBlockGapLabel } from "./identity";
+import { NATIVE_DRAG_EVENT } from "./drag";
+import { DEFAULT_BROWSE_ROOT, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./identity";
+import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION } from "./library";
+import { AndroidKey, MIRROR_MIN_LAYOUT_PX } from "./scrcpy";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
 import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type Theme, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
@@ -294,6 +297,17 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(MIRROR_MIN_LAYOUT_PX).toBe(64);
   });
 
+  it("AndroidKey 与 yohu-protocol::android_key 对齐", () => {
+    expect(AndroidKey.Home).toBe(3);
+    expect(AndroidKey.Back).toBe(4);
+    expect(AndroidKey.VolumeUp).toBe(24);
+    expect(AndroidKey.VolumeDown).toBe(25);
+    expect(AndroidKey.Power).toBe(26);
+    expect(AndroidKey.AppSwitch).toBe(187);
+    expect(AndroidKey.BrightnessDown).toBe(220);
+    expect(AndroidKey.BrightnessUp).toBe(221);
+  });
+
   it("ModuleId / ModuleTitle 与 yohu-protocol 对齐", () => {
     expect(ModuleId.Terminal).toBe("adb-terminal");
     expect(ModuleTitle.Terminal).toBe("命令终端");
@@ -335,11 +349,9 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     const update: RemoteUpdate = {
       has_new_version: true,
       version: "1.2.0",
-      version_code: 12,
       description: "fix",
-      download_url: "https://example.com/setup.exe",
-      force_update: false,
-      md5: "m",
+      installer_url: "https://example.com/setup.exe",
+      page_url: "https://github.com/o/r/releases/tag/v1.2.0",
       sha256: "s",
       size_bytes: 100,
     };
@@ -380,9 +392,6 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(APP_SETTINGS_DEFAULT).toEqual(fixture);
     expect(COMMAND_LIBRARY_SCHEMA_VERSION).toBe(3);
     expect([...COMMAND_BLOCK_GAPS_MS]).toEqual([0, 200, 500, 1000, 2000, 5000]);
-    expect(commandBlockGapLabel(0)).toBe("无");
-    expect(commandBlockGapLabel(200)).toBe("200 毫秒");
-    expect(commandBlockGapLabel(1000)).toBe("1 秒");
     expect(DEFAULT_BROWSE_ROOT).toBe(SAFETY_ROOTS[0]);
   });
 
@@ -401,6 +410,8 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(EVENT_NAMES.devicesChanged).toBe("devices/changed");
     expect(EVENT_NAMES.deviceStatus).toBe("device/status");
     expect(EVENT_NAMES.updateProgress).toBe("update/progress");
+    expect(NATIVE_DRAG_EVENT).toBe("window/drag");
+    expect(NATIVE_DRAG_EVENT).not.toContain(".");
   });
 });
 

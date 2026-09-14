@@ -96,14 +96,11 @@ export function clockDisplayLen(format: TerminalTimeFormat): number {
   }
 }
 
-/** 把规范化墙钟 `YYYY-MM-DD HH:mm:ss.SSS` 投影成显示形状。解析失败回原文。 */
+/** 把规范化墙钟 `YYYY-MM-DD HH:mm:ss.SSS` 投影成显示形状。解析失败给空串，不回脏原文。 */
 export function formatLogTs(ts: string, format: TerminalTimeFormat): string {
-  if (format === "datetime_millis" && ts.length === DATETIME_DISPLAY_LEN) {
-    return ts;
-  }
   const parsed = parseParts(ts);
-  if (!parsed) return ts;
-  return formatClock(parsed[0], parsed[1], parsed[2], parsed[3], parsed[4], parsed[5], parsed[6], format) ?? ts;
+  if (!parsed) return "";
+  return formatClock(parsed[0], parsed[1], parsed[2], parsed[3], parsed[4], parsed[5], parsed[6], format) ?? "";
 }
 
 /** 本地墙钟按终端显示形状投影。 */

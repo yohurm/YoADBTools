@@ -151,7 +151,7 @@ export const mirrorScreenshot = (req: MirrorScreenshotRequest) =>
 
 // ===== settings =====
 
-/** 返回全量快照。壳 settingsStore.set 回写后经 DeviceSession.settings 注入模块。 */
+/** 返回全量快照。壳 settingsStore.set 回写后经会话 settings 注入模块。 */
 export const settingsSet = <K extends SettingKey>(key: K, value: SettingValue<K>) =>
   invoke<AppSettings>("settings.set", { key, value });
 

@@ -80,6 +80,6 @@ describe("datetime（与 domain testdata/datetime.json 同一套向量）", () =
     expect(formatLogTs(ts, "time")).toBe("16:45:07");
     expect(clockDisplayLen("datetime_millis")).toBe(DATETIME_DISPLAY_LEN);
     expect(clockDisplayLen("time_millis")).toBe(TIME_MILLIS_DISPLAY_LEN);
-    expect(formatLogTs("raw", "time")).toBe("raw");
+    expect(formatLogTs("raw", "time")).toBe("");
   });
 });

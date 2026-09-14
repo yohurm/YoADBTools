@@ -1,24 +1,45 @@
-/**
- * @yohu/api — IPC/未知错误转可读文案的统一单源。
- * 壳与各模块共用，避免各处重复实现且边界不一致（错误可能是字符串或 {code,message}）。
+﻿/**
+ * @yohu/api — invoke 失败一次解码为 IpcError { code, message }。
+ * 壳 Result<T, IpcError> 到前端就是这个对象，不再嗅 string / {message}。
  */
-export function ipcErrorCode(e: unknown): string | undefined {
-  if (e && typeof e === "object") {
-    const rec = e as { code?: unknown };
-    if (typeof rec.code === "string" && rec.code.length > 0) return rec.code;
+
+import type { IpcError, IpcErrorCode } from "./types";
+
+const CODES: ReadonlySet<IpcErrorCode> = new Set([
+  "invalid_args",
+  "device_offline",
+  "unauthorized",
+  "adb_error",
+  "not_found",
+  "cancelled",
+  "internal",
+]);
+
+function isIpcErrorCode(code: string): code is IpcErrorCode {
+  return CODES.has(code as IpcErrorCode);
+}
+
+function readIpcError(e: unknown): IpcError | undefined {
+  if (!e || typeof e !== "object") return undefined;
+  const { code, message } = e as { code?: unknown; message?: unknown };
+  if (typeof code !== "string" || typeof message !== "string" || !isIpcErrorCode(code)) {
+    return undefined;
   }
-  return undefined;
+  return { code, message };
+}
+
+export function decodeIpcError(e: unknown): IpcError {
+  const rec = readIpcError(e);
+  if (!rec) {
+    throw new TypeError("IPC 错误不是 IpcError { code, message }");
+  }
+  return rec;
+}
+
+export function ipcErrorCode(e: unknown): IpcErrorCode | undefined {
+  return readIpcError(e)?.code;
 }
 
 export function errorText(e: unknown): string {
-  if (typeof e === "string") return e;
-  if (e && typeof e === "object") {
-    const rec = e as { message?: unknown };
-    if (typeof rec.message === "string" && rec.message.length > 0) return rec.message;
-  }
-  try {
-    return JSON.stringify(e);
-  } catch {
-    return String(e);
-  }
+  return decodeIpcError(e).message;
 }

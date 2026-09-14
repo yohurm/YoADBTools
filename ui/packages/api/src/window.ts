@@ -21,7 +21,7 @@ export async function windowIsMaximized(): Promise<boolean> {
   return getCurrentWindow().isMaximized();
 }
 
-/** 揭主窗并关掉原生启动小窗。失败由壳 2.5s 超时兜底，不另开 JS show。 */
+/** 揭主窗并关掉原生启动小窗。只走 boot.showMain，不另开 JS show。 */
 export async function windowShow(): Promise<void> {
   await invoke("boot.showMain");
 }

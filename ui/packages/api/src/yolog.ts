@@ -23,9 +23,7 @@ function write(level: YoLogLevel, module: string, message: string, extra?: unkno
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
   else console.info(line);
-  void systemLog(level, module, text).catch(() => {
-    /* 启动早期或非 Tauri 环境：控制台已有一份 */
-  });
+  void systemLog(level, module, text);
 }
 
 /** 关键路径打点：终端 / 文件 / 日志 / 投屏 / 壳。 */
