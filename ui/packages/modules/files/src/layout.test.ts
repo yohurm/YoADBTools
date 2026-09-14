@@ -133,3 +133,60 @@ describe("传输面板开合契约", () => {
     expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
   });
 });
+
+function loadFileView(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/FileView.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/FileView.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const fileView = loadFileView();
+
+function loadDeleteTargets(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/DeleteTargets.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/DeleteTargets.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const deleteTargets = loadDeleteTargets();
+
+describe("确认删除多文件契约", () => {
+  it("弹窗走 DeleteTargets，不把文件名拼成一段", () => {
+    expect(fileView).toContain("DeleteTargets");
+    expect(fileView).toContain('bodyOverflow="hidden"');
+    expect(fileView).not.toContain('join("、")');
+  });
+
+  it("超出预览走一层 YoCollapse panel", () => {
+    expect(deleteTargets).toContain("YoCollapse");
+    expect(deleteTargets).toContain('recipe="panel"');
+    expect(deleteTargets.match(/<YoCollapse /g)?.length).toBe(1);
+  });
+
+  it("芯片网格行列排布，关闭钮默认隐藏悬停显现", () => {
+    expect(filesCss).toMatch(
+      /\.yohu-files__delete-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit/,
+    );
+    expect(filesCss).toContain(".yohu-files__delete-chip-remove");
+    expect(filesCss).toMatch(/\.yohu-files__delete-chip-remove\s*\{[^}]*opacity:\s*0/);
+    expect(filesCss).toMatch(
+      /\.yohu-files__delete-chip:hover \.yohu-files__delete-chip-remove/,
+    );
+    expect(filesCss).toContain(".yohu-files__delete-scroller");
+    expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
+  });
+});

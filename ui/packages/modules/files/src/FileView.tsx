@@ -21,9 +21,11 @@ import {
   openContextMenu,
 } from "@yohu/ui";
 
+import { DeleteTargets } from "./DeleteTargets";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
 import { TransferPanel } from "./TransferPanel";
+import { DELETE_PREVIEW_LIMIT, dropDeleteName } from "./delete-targets";
 import { type DropHit, localBaseName, resolveDropHit } from "./drop";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
 import { filesListMenu } from "./menu";
@@ -39,6 +41,7 @@ const toaster = createToaster();
 
 export function FileView(props: DeviceSession) {
   const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
+  const [deleteExpanded, setDeleteExpanded] = createSignal(false);
   const [createKind, setCreateKind] = createSignal<CreateKind | null>(null);
   const [createName, setCreateName] = createSignal("");
   const [createError, setCreateError] = createSignal("");
@@ -96,15 +99,27 @@ export function FileView(props: DeviceSession) {
     if (typeof dest === "string") void fileStore.pull(file.name, dest);
   };
 
+  const closeDelete = (): void => {
+    setDeleteNames([]);
+    setDeleteExpanded(false);
+  };
+
   const askDelete = (names: string[]): void => {
     if (names.length === 0) return;
     closeContextMenu();
+    setDeleteExpanded(false);
     setDeleteNames(names);
+  };
+
+  const dropFromDelete = (name: string): void => {
+    const next = dropDeleteName(deleteNames(), name);
+    setDeleteNames(next);
+    if (next.length <= DELETE_PREVIEW_LIMIT) setDeleteExpanded(false);
   };
 
   const confirmDelete = (): void => {
     const names = deleteNames();
-    setDeleteNames([]);
+    closeDelete();
     void fileStore.removeMany(names);
   };
 
@@ -284,10 +299,11 @@ export function FileView(props: DeviceSession) {
         <YoDialog
           open={() => deleteNames().length > 0}
           title="确认删除"
-          onClose={() => setDeleteNames([])}
+          bodyOverflow="hidden"
+          onClose={closeDelete}
           footer={
             <>
-              <YoButton variant="ghost" tone="neutral" onClick={() => setDeleteNames([])}>
+              <YoButton variant="ghost" tone="neutral" onClick={closeDelete}>
                 取消
               </YoButton>
               <YoButton tone="danger" onClick={confirmDelete}>
@@ -296,9 +312,12 @@ export function FileView(props: DeviceSession) {
             </>
           }
         >
-          <p class="yohu-files__confirm">
-            确定删除 <strong>{deleteNames().join("、")}</strong> 吗？该操作不可恢复。
-          </p>
+          <DeleteTargets
+            names={deleteNames()}
+            expanded={deleteExpanded()}
+            onExpandedChange={setDeleteExpanded}
+            onRemove={dropFromDelete}
+          />
         </YoDialog>
 
         <YoDialog

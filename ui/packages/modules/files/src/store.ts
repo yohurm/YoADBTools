@@ -430,7 +430,14 @@ export function createFileStore() {
     setUi("transfersOpen", (v) => !v);
   }
 
-  const selectedSet = (): Set<string> => new Set(selection.names);
+  let selectedCache: { names: string[]; set: Set<string> } | null = null;
+  const selectedSet = (): Set<string> => {
+    const names = selection.names;
+    if (selectedCache && selectedCache.names === names) return selectedCache.set;
+    const set = new Set(names);
+    selectedCache = { names, set };
+    return set;
+  };
 
   const selectedEntries = (): RemoteEntry[] => entries.filter((e) => selection.names.includes(e.name));
 

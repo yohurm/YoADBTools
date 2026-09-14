@@ -1,9 +1,10 @@
 /**
  * 文件表（View）：列规格来自 model.FILE_COLUMNS，状态全在 fileStore。
  * 轨道走 YoColFrame；表头 YoColRow / YoColHeader；行 YoColTrack / YoColCell。
+ * FileRow 必须是模块级组件：槽位回收时就地换绑 props.item，禁止在 FileTable 内新建函数当 renderRow。
  */
 
-import { For, Show } from "solid-js";
+import { For, Show, createContext, useContext, type Accessor } from "solid-js";
 
 import {
   YoColCell,
@@ -30,6 +31,10 @@ import {
 /** 文件列表行高（px，功能配置；YoVirtualList 行高）。 */
 const FILE_ROW_HEIGHT = 28;
 import { fileStore } from "./store";
+
+const FILE_COLUMN_LIST = [...FILE_COLUMNS];
+
+const FileTableBind = createContext<{ dropDirName: Accessor<string | null | undefined> }>();
 
 function ColHead(props: { col: FileColumnSpec }) {
   const ariaSort = (): "ascending" | "descending" | "none" => {
@@ -73,6 +78,30 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
   }
 }
 
+function FileRow(props: { item: RemoteEntry; index: number }) {
+  const bind = useContext(FileTableBind);
+  const entry = (): RemoteEntry => props.item;
+  return (
+    <YoColTrack
+      class="yohu-files__cols yohu-files__row"
+      classList={{ "yohu-files__row--drop": bind?.dropDirName() === entry().name }}
+      data-kind={entry().kind}
+      draggable="true"
+      onDragStart={(event) => {
+        event.preventDefault();
+        if (!fileStore.selectedSet().has(entry().name)) fileStore.select(entry().name, "replace");
+        void fileStore.dragOut(entry().name);
+      }}
+      onDblClick={() => {
+        const current = entry();
+        if (current.kind === "dir" || current.kind === "symlink") void fileStore.enterDirectory(current.name);
+      }}
+    >
+      <For each={FILE_COLUMN_LIST}>{(col) => <FileCell entry={entry()} col={col} />}</For>
+    </YoColTrack>
+  );
+}
+
 export function FileTable(props: { onContextMenu: (x: number, y: number) => void; dropDirName?: string | null }) {
   const colTemplate = (): string => fileColTemplate(fileStore.ui.colWidths);
   const entries = (): RemoteEntry[] => fileStore.entries;
@@ -80,7 +109,7 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
   return (
     <YoColFrame class="yohu-files__table" template={colTemplate()}>
       <YoColRow class="yohu-files__cols yohu-files__cols--head">
-        <For each={[...FILE_COLUMNS]}>{(col) => <ColHead col={col} />}</For>
+        <For each={FILE_COLUMN_LIST}>{(col) => <ColHead col={col} />}</For>
       </YoColRow>
       <div
         class="yohu-files__table-list"
@@ -101,39 +130,24 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
             </Show>
           }
         >
-          <YoVirtualList<RemoteEntry>
-            items={entries}
-            itemHeight={FILE_ROW_HEIGHT}
-            tone="list"
-            getItemKey={(entry) => entry.name}
-            ariaLabel="文件列表"
-            selectedKeys={fileStore.selectedSet}
-            onSelectRow={(entry, _key, event) => {
-              fileStore.select(entry.name, pointerSelectMode(event));
-            }}
-            onRowContextMenu={(entry, _key, event) => {
-              if (!fileStore.selectedSet().has(entry.name)) fileStore.select(entry.name, "replace");
-              props.onContextMenu(event.clientX, event.clientY);
-            }}
-            renderRow={(entry) => (
-              <YoColTrack
-                class="yohu-files__cols yohu-files__row"
-                classList={{ "yohu-files__row--drop": props.dropDirName === entry.name }}
-                data-kind={entry.kind}
-                draggable="true"
-                onDragStart={(event) => {
-                  event.preventDefault();
-                  if (!fileStore.selectedSet().has(entry.name)) fileStore.select(entry.name, "replace");
-                  void fileStore.dragOut(entry.name);
-                }}
-                onDblClick={() => {
-                  if (entry.kind === "dir" || entry.kind === "symlink") void fileStore.enterDirectory(entry.name);
-                }}
-              >
-                <For each={[...FILE_COLUMNS]}>{(col) => <FileCell entry={entry} col={col} />}</For>
-              </YoColTrack>
-            )}
-          />
+          <FileTableBind.Provider value={{ dropDirName: () => props.dropDirName }}>
+            <YoVirtualList<RemoteEntry>
+              items={entries}
+              itemHeight={FILE_ROW_HEIGHT}
+              tone="list"
+              getItemKey={(entry) => entry.name}
+              ariaLabel="文件列表"
+              selectedKeys={fileStore.selectedSet}
+              onSelectRow={(entry, _key, event) => {
+                fileStore.select(entry.name, pointerSelectMode(event));
+              }}
+              onRowContextMenu={(entry, _key, event) => {
+                if (!fileStore.selectedSet().has(entry.name)) fileStore.select(entry.name, "replace");
+                props.onContextMenu(event.clientX, event.clientY);
+              }}
+              renderRow={FileRow}
+            />
+          </FileTableBind.Provider>
         </Show>
       </div>
     </YoColFrame>
