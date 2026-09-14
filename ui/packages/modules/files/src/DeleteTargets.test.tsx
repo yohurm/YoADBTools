@@ -10,7 +10,7 @@ function manyNames(count: number): string[] {
 }
 
 function visibleChips(): Element[] {
-  return [...document.querySelectorAll(".yohu-files__delete-chip")].filter(
+  return [...document.querySelectorAll(".yohu-chip")].filter(
     (el) => el.closest("[aria-hidden='true']") == null,
   );
 }
@@ -55,7 +55,7 @@ describe("DeleteTargets", () => {
     expect(document.body.textContent).toContain("收起");
   });
 
-  it("关闭按钮按名移除", () => {
+  it("YoChip dismiss 按名移除", () => {
     const removed: string[] = [];
     render(() => (
       <DeleteTargets
@@ -65,7 +65,7 @@ describe("DeleteTargets", () => {
         onRemove={(name) => removed.push(name)}
       />
     ));
-    const close = document.querySelector('[aria-label="从删除列表移除 drop.png"]');
+    const close = document.querySelector('[aria-label="移除 drop.png"]');
     expect(close).toBeTruthy();
     fireEvent.click(close!);
     expect(removed).toEqual(["drop.png"]);

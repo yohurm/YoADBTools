@@ -2,6 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { Density, setDensity } from "@yohu/ui";
+
+import { controlRowHeight } from "./layout";
+
 function loadFilesCss(): string {
   const candidates = [
     resolve(process.cwd(), "src/files.css"),
@@ -37,6 +41,10 @@ describe("文件表头布局契约", () => {
       "";
     expect(table).not.toContain("yohu-virtual-list__row");
     expect(table).not.toContain("yohu-col-header__label");
+    expect(table).toContain("controlRowHeight()");
+    expect(table).not.toContain("FILE_ROW_HEIGHT");
+    expect(table).toContain("Layout.IconSm");
+    expect(table).not.toMatch(/size=\{16\}/);
     expect(filesCss).not.toMatch(/\.yohu-files__name\s*\{[^}]*padding-left/);
   });
 
@@ -102,6 +110,36 @@ describe("文件表头布局契约", () => {
   });
 });
 
+describe("文件清单行高", () => {
+  it("与日志 controlRowHeight 同池", () => {
+    setDensity("compact");
+    expect(controlRowHeight()).toBe(Density.Compact.controlHeight);
+    setDensity("comfortable");
+    expect(controlRowHeight()).toBe(Density.Comfortable.controlHeight);
+  });
+});
+
+function loadAddressSlot(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/AddressSlot.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/AddressSlot.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+describe("地址铬 clip 时长", () => {
+  it("只消费 spatialLocal，不加 50", () => {
+    const slot = loadAddressSlot();
+    expect(slot).toContain('motionSpecMs("spatialLocal")');
+    expect(slot).not.toMatch(/spatialLocal"\)\s*\+\s*50/);
+  });
+});
+
 function loadTransferPanel(): string {
   const candidates = [
     resolve(process.cwd(), "src/TransferPanel.tsx"),
@@ -131,6 +169,28 @@ describe("传输面板开合契约", () => {
     expect(filesCss).not.toMatch(/animation\s*:/);
     expect(filesCss).toContain(".yohu-files__transfer-bar");
     expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
+  });
+});
+
+function loadPreviewPane(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/PreviewPane.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/PreviewPane.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const previewPane = loadPreviewPane();
+
+describe("预览图标尺寸", () => {
+  it("只消费 Layout.IconPreview，不写死 48", () => {
+    expect(previewPane).toContain("Layout.IconPreview");
+    expect(previewPane).not.toMatch(/size=\{48\}/);
   });
 });
 
@@ -177,15 +237,15 @@ describe("确认删除多文件契约", () => {
     expect(deleteTargets.match(/<YoCollapse /g)?.length).toBe(1);
   });
 
-  it("芯片网格行列排布，关闭钮默认隐藏悬停显现", () => {
+  it("芯片网格走 YoChip leading + dismiss，不自造关闭钮", () => {
     expect(filesCss).toMatch(
       /\.yohu-files__delete-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit/,
     );
-    expect(filesCss).toContain(".yohu-files__delete-chip-remove");
-    expect(filesCss).toMatch(/\.yohu-files__delete-chip-remove\s*\{[^}]*opacity:\s*0/);
-    expect(filesCss).toMatch(
-      /\.yohu-files__delete-chip:hover \.yohu-files__delete-chip-remove/,
-    );
+    expect(deleteTargets).toContain("YoChip");
+    expect(deleteTargets).toContain('dismiss="hover"');
+    expect(deleteTargets).toContain("YoFileIcon");
+    expect(deleteTargets).not.toContain("yohu-files__delete-chip-remove");
+    expect(filesCss).not.toContain(".yohu-files__delete-chip-remove");
     expect(filesCss).toContain(".yohu-files__delete-scroller");
     expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
   });

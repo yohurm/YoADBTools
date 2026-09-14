@@ -2,6 +2,10 @@
  * 文件模块 store：会话由壳注入；IPC 只走 @yohu/api。
  * 传输卡停留时长消费 @yohu/ui 配方常量（与 dismiss-fade 对齐）。
  * 浏览世代令牌丢弃过期 list；危险路径/空名在 childPath 拦截，core 再强制。
+ *
+ * 设计后链路（路径函数进口）：
+ *   View / keys / 测试 → model.ts（joinPath / validateEntryName / formatSize / SortKey / SortDir …）
+ *   store 只从 model import 自用，禁止再导出。
  */
 
 import { createStore } from "solid-js/store";
@@ -29,14 +33,12 @@ import {
 } from "@yohu/ui";
 
 import { localBaseName, namesForDrag } from "./drop";
-import { filesFaultText } from "./fault";
+import { filesFaultText, isCancelledError, isNotFoundError } from "./fault";
 import {
   DEFAULT_SORT_DIR,
   FILE_COLUMNS,
   defaultFileColWidths,
   childPath,
-  isCancelledError,
-  isNotFoundError,
   parentWithinSafety,
   sortEntries,
   validateEntryName,
@@ -45,19 +47,6 @@ import {
 } from "./model";
 import { resolveRemotePath } from "./path-resolve";
 import { shouldAcceptProgress } from "./progress";
-
-export type { SortDir, SortKey } from "./model";
-export {
-  DEFAULT_SORT_DIR,
-  fileCategory,
-  fileTypeLabel,
-  formatSize,
-  joinPath,
-  parentOf,
-  sortEntries,
-  splitPath,
-  validateEntryName,
-} from "./model";
 
 export interface UiTransfer {
   id: number;

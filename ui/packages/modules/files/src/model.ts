@@ -1,12 +1,13 @@
 /**
- * 文件模块纯函数（View / store 之外，零 IPC / 零壳依赖）。
+ * 文件模块纯函数（View / store 之外）：路径 / 列 / 分类。
+ * 零 IPC。错码与文案只在 fault.ts。
  */
 
 import type { RemoteEntry } from "@yohu/api";
-import { errorText, SAFETY_ROOTS } from "@yohu/api";
+import { SAFETY_ROOTS } from "@yohu/api";
 import { colTrackTemplate, defaultColWidths, type YoColWidths } from "@yohu/ui";
 
-export { errorText, SAFETY_ROOTS };
+import { isWithinSafety } from "./path-guard";
 
 export function joinPath(dir: string, name: string): string {
   if (dir === "/") return `/${name}`;
@@ -25,8 +26,7 @@ export function parentOf(path: string): string | null {
 export function parentWithinSafety(path: string, roots: readonly string[] = SAFETY_ROOTS): string | null {
   const parent = parentOf(path);
   if (parent === null || parent === "/") return null;
-  if (roots.some((root) => parent === root || parent.startsWith(`${root}/`))) return parent;
-  return null;
+  return isWithinSafety(parent, roots) ? parent : null;
 }
 
 export function splitPath(path: string): string[] {
@@ -183,18 +183,4 @@ export function fileTypeLabel(entry: RemoteEntry): string {
   const ext = entry.name.split(".").pop();
   if (ext && ext !== entry.name) return ext.toUpperCase();
   return "文件";
-}
-
-export function isCancelledError(e: unknown): boolean {
-  const text = errorText(e).toLowerCase();
-  return text.includes("cancel") || text.includes("取消");
-}
-
-export function isNotFoundError(e: unknown): boolean {
-  if (e && typeof e === "object") {
-    const rec = e as { code?: unknown };
-    if (rec.code === "not_found") return true;
-  }
-  const text = errorText(e);
-  return text.includes("不存在") || text.toLowerCase().includes("not found");
 }

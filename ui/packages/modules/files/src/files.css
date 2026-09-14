@@ -467,62 +467,9 @@
   padding-top: var(--yohu-space-xs);
 }
 
-.yohu-files__delete-chip {
-  position: relative;
+.yohu-files__delete-item {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: var(--yohu-space-xs);
-  min-width: 0;
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  border-radius: var(--yohu-radius-sm);
-  background: var(--yohu-surface-2);
-  color: var(--yohu-fg);
-  box-sizing: border-box;
-}
-
-.yohu-files__delete-chip-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--yohu-font-caption);
-}
-
-.yohu-files__delete-chip-remove {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
-  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: var(--yohu-radius-xs);
-  background: var(--yohu-surface-2);
-  color: var(--yohu-fg-3);
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity var(--yohu-motion-effects-fast),
-    color var(--yohu-motion-effects-fast);
-}
-
-.yohu-files__delete-chip:hover .yohu-files__delete-chip-remove,
-.yohu-files__delete-chip:focus-within .yohu-files__delete-chip-remove {
-  opacity: 1;
-}
-
-.yohu-files__delete-chip-remove:hover {
-  color: var(--yohu-error);
-}
-
-@media (hover: none) {
-  .yohu-files__delete-chip-remove {
-    opacity: 1;
-  }
 }
 
 /* 仅对话框内校验，路径错误走 YoToast，禁止再做页内错误条。 */

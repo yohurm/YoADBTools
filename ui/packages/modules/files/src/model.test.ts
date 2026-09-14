@@ -24,3 +24,14 @@ describe("validateEntryName（与 domain testdata/entry_name.json 同一套向�
     expect(validateEntryName(c.name) === null).toBe(c.valid);
   });
 });
+
+describe("model 零 IPC", () => {
+  it("不认错码、不转导出 errorText", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "model.ts"), "utf8");
+    expect(src).not.toContain("errorText");
+    expect(src).not.toContain("ipcErrorCode");
+    expect(src).not.toContain("isCancelledError");
+    expect(src).not.toContain("isNotFoundError");
+    expect(src).toContain("isWithinSafety");
+  });
+});

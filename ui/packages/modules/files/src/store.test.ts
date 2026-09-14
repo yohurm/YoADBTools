@@ -24,7 +24,6 @@ import {
   sortEntries,
   splitPath,
   validateEntryName,
-  isNotFoundError,
 } from "./model";
 import { createFileStore } from "./store";
 
@@ -194,14 +193,6 @@ describe("fileTypeLabel（类型列）", () => {
 describe("fileColTemplate", () => {
   it("前三列定宽，日期列吃剩余", () => {
     expect(fileColTemplate(defaultFileColWidths())).toBe("240px 72px 80px minmax(168px, 1fr)");
-  });
-});
-
-describe("isNotFoundError", () => {
-  it("识别 not_found 与「不存在」文案", () => {
-    expect(isNotFoundError({ code: "not_found", message: "传输不存在: 3" })).toBe(true);
-    expect(isNotFoundError("not found")).toBe(true);
-    expect(isNotFoundError(new Error("其它错误"))).toBe(false);
   });
 });
 

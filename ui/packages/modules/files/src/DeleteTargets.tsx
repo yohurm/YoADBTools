@@ -1,11 +1,11 @@
 /**
- * 确认删除对象列表：折叠预览 / 行列芯片 / 悬停移除。
+ * 确认删除对象列表：折叠预览 / YoChip 行列 / dismiss 移除。
  * 超出预览的项走 YoCollapse panel（高度 + 淡入上移），禁止瞬时切名单。
  */
 
 import { For, Show, createMemo } from "solid-js";
 
-import { Icon, Layout, YoButton, YoCollapse, YoFileIcon, type YoFileIconProps } from "@yohu/ui";
+import { Layout, YoButton, YoChip, YoCollapse, YoFileIcon, type YoFileIconProps } from "@yohu/ui";
 
 import { DELETE_PREVIEW_LIMIT, visibleDeleteNames } from "./delete-targets";
 import { fileStore } from "./store";
@@ -23,22 +23,14 @@ function entryKind(name: string): YoFileIconProps["kind"] {
 
 function DeleteChip(props: { name: string; onRemove: (name: string) => void }) {
   return (
-    <li class="yohu-files__delete-chip">
-      <YoFileIcon name={props.name} kind={entryKind(props.name)} size={Layout.IconSm} />
-      <span class="yohu-files__delete-chip-name" title={props.name}>
-        {props.name}
-      </span>
-      <button
-        type="button"
-        class="yohu-files__delete-chip-remove yohu-focus-ring"
-        aria-label={`从删除列表移除 ${props.name}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onRemove(props.name);
-        }}
-      >
-        <Icon name="close" size={Layout.IconTiny} />
-      </button>
+    <li class="yohu-files__delete-item">
+      <YoChip
+        tone="neutral"
+        text={props.name}
+        leading={<YoFileIcon name={props.name} kind={entryKind(props.name)} size={Layout.IconSm} />}
+        dismiss="hover"
+        onDismiss={() => props.onRemove(props.name)}
+      />
     </li>
   );
 }

@@ -7,6 +7,7 @@
 import { For, Show, createContext, useContext, type Accessor } from "solid-js";
 
 import {
+  Layout,
   YoColCell,
   YoColFrame,
   YoColHeader,
@@ -20,6 +21,7 @@ import {
 } from "@yohu/ui";
 import type { RemoteEntry } from "@yohu/api";
 
+import { controlRowHeight } from "./layout";
 import {
   FILE_COLUMNS,
   fileColTemplate,
@@ -27,9 +29,6 @@ import {
   formatSize,
   type FileColumnSpec,
 } from "./model";
-
-/** 文件列表行高（px，功能配置；YoVirtualList 行高）。 */
-const FILE_ROW_HEIGHT = 28;
 import { fileStore } from "./store";
 
 const FILE_COLUMN_LIST = [...FILE_COLUMNS];
@@ -65,7 +64,7 @@ function FileCell(props: { entry: RemoteEntry; col: FileColumnSpec }) {
     case "name":
       return (
         <YoColCell class="yohu-files__name">
-          <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={16} />
+          <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={Layout.IconSm} />
           <span class="yohu-files__name-text">{props.entry.name}</span>
         </YoColCell>
       );
@@ -133,7 +132,7 @@ export function FileTable(props: { onContextMenu: (x: number, y: number) => void
           <FileTableBind.Provider value={{ dropDirName: () => props.dropDirName }}>
             <YoVirtualList<RemoteEntry>
               items={entries}
-              itemHeight={FILE_ROW_HEIGHT}
+              itemHeight={controlRowHeight()}
               tone="list"
               getItemKey={(entry) => entry.name}
               ariaLabel="文件列表"

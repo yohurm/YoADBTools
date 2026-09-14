@@ -24,7 +24,7 @@ export type AddressSlotApi = {
   open: () => void;
 };
 
-const CLIP_MS = motionSpecMs("spatialLocal") + 50;
+const CLIP_MS = motionSpecMs("spatialLocal");
 
 export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
   const [open, setOpen] = createSignal(false);

@@ -4,7 +4,7 @@
 
 import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
-import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, type DeviceSession } from "@yohu/api";
+import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, YoLog, type DeviceSession } from "@yohu/api";
 import {
   YoButton,
   YoChrome,
@@ -200,7 +200,7 @@ export function FileView(props: DeviceSession) {
     });
     let stopDrag: (() => void) | undefined;
     let cancelled = false;
-    void Promise.resolve(onNativeDragDrop((event) => {
+    void onNativeDragDrop((event) => {
       if (event.type === "leave") {
         setDropHit({ accept: false });
         return;
@@ -212,11 +212,15 @@ export function FileView(props: DeviceSession) {
         return;
       }
       setDropHit(hit);
-    })).then((unlisten) => {
-      if (typeof unlisten !== "function") return;
-      if (cancelled) unlisten();
-      else stopDrag = unlisten;
-    });
+    }).then(
+      (unlisten) => {
+        if (cancelled) unlisten();
+        else stopDrag = unlisten;
+      },
+      (error: unknown) => {
+        YoLog.error("files", "订阅 window/drag 失败", error);
+      },
+    );
     onCleanup(() => {
       cancelled = true;
       stopKeys();
