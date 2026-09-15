@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TOOLTIP_DELAY, DEFAULT_TOOLTIP_HIDE_DELAY, tooltipDomId, tooltipIsEmpty } from "./tooltip-model";
+import {
+  DEFAULT_TOOLTIP_DELAY,
+  DEFAULT_TOOLTIP_HIDE_DELAY,
+  tooltipDomId,
+  tooltipIsEmpty,
+  tooltipPlaceDiscrete,
+} from "./tooltip-model";
 
 describe("tooltip-model", () => {
   it("缺省延迟是 MotionSpec 名，不是裸 ms", () => {
@@ -17,5 +23,9 @@ describe("tooltip-model", () => {
 
   it("稳定 tooltip id", () => {
     expect(tooltipDomId("t1")).toBe("yohu-tooltip-t1");
+  });
+
+  it("落点离散，不是滑块轨道", () => {
+    expect(tooltipPlaceDiscrete()).toBe(true);
   });
 });

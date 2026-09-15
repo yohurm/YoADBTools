@@ -15,6 +15,7 @@ export interface ChipHostAttrs {
   "data-tone": YoChipTone;
   "data-dismiss": YoChipDismiss | undefined;
   "data-leading": true | undefined;
+  "data-block": true | undefined;
   "aria-label": string;
 }
 
@@ -24,6 +25,7 @@ export function chipHostAttrs(input: ChipInput & { dismissible?: boolean }): Chi
     "data-tone": spec.tone,
     "data-dismiss": spec.dismiss ?? undefined,
     "data-leading": spec.leading ? true : undefined,
+    "data-block": spec.block ? true : undefined,
     "aria-label": spec.text,
   };
 }

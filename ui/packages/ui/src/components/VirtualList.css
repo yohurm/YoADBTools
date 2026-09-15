@@ -69,10 +69,6 @@
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
-.yohu-virtual-list[data-tone="list"] .yohu-virtual-list__row.yohu-interactive--selected {
-  border-bottom-color: transparent;
-}
-
 /*
  * listbox 行自绘底，关掉 isolation + ::before。
  * 槽位回收时每行一层合成层会让 WebView2 闪白；Tree / Nav 仍走 states.css。

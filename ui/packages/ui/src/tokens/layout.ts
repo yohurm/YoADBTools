@@ -66,8 +66,16 @@ export const Layout = {
   BreakpointSide: 840,
   /** 按钮最大宽 448vp */
   ButtonMax: 448,
-  /** 弹出框最大宽 400vp */
+  /** 弹出框最大宽 400vp；指向型气泡同帽 */
   DialogMax: 400,
+  /** 气泡距视口边缘最小 6vp（鸿蒙指向型） */
+  TooltipEdge: 6,
+  /** 箭头旋转方块边长；尖伸出一半 */
+  TooltipArrow: 8,
+  /** 箭头中心距气泡边缘默认 20vp */
+  TooltipArrowInset: 20,
+  /** 箭头尖到锚点的空隙 */
+  TooltipGap: Spacing.Xs,
   /** 电脑菜单默认最小宽 224vp */
   MenuMin: 224,
   /** 侧栏内容距背板（设备/导航同一槽，选中片不再二次内缩） */

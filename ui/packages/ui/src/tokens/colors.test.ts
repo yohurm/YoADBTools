@@ -139,6 +139,18 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     expect(luminance(DarkColors.Surface)).toBeLessThan(luminance(DarkColors.Surface2));
   });
 
+  it("指向气泡跟主题抬一层：浅色卡片白，深色 surface-2", () => {
+    expect(Colors.TooltipBg).toBe(Colors.Surface);
+    expect(Colors.TooltipFg).toBe(Colors.Fg);
+    expect(Colors.TooltipBorder).toBe(Colors.Border);
+    expect(DarkColors.TooltipBg).toBe(DarkColors.Surface2);
+    expect(DarkColors.TooltipFg).toBe(DarkColors.Fg);
+    expect(DarkColors.TooltipBorder).toBe(DarkColors.Border);
+    expect(DarkColors.TooltipBg).not.toBe(DarkColors.Surface);
+    expect(contrast(Colors.TooltipFg, Colors.TooltipBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(DarkColors.TooltipFg, DarkColors.TooltipBg)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("遮罩浅/深都是压暗黑，不是深色白雾", () => {
     expect(Colors.Scrim).toBe("#00000019");
     expect(DarkColors.Scrim).toBe("#00000066");
@@ -348,6 +360,10 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-layout-switch-w: 36px");
     expect(themeCss).toContain("--yohu-z-dialog: 1000");
     expect(themeCss).toContain("--yohu-z-overlay: 1050");
+    expect(themeCss).toContain("--yohu-layout-tooltip-edge: 6px");
+    expect(themeCss).toContain("--yohu-layout-tooltip-arrow: 8px");
+    expect(themeCss).toContain("--yohu-shadow-overlay-drop:");
+    expect(themeCss).toContain("--yohu-tooltip-bg:");
     expect(themeCss).toContain("--yohu-z-toast: 1100");
     expect(themeCss).toContain("--yohu-title-bar-height: 40px");
     expect(themeCss).toContain("--yohu-canvas: var(--yohu-bg-base)");

@@ -10,7 +10,7 @@ const css = readFileSync(resolve(here, "Chip.css"), "utf8");
 const motionCss = readFileSync(resolve(here, "../tokens/motion.css"), "utf8");
 
 describe("YoChip", () => {
-  it("默认 accent，删除钮流内右上", () => {
+  it("默认 accent，删除钮流内右侧", () => {
     const onDismiss = vi.fn();
     const { container } = render(() => <YoChip text="HfLooper" onDismiss={onDismiss} />);
     const host = container.querySelector(".yohu-chip");
@@ -21,6 +21,17 @@ describe("YoChip", () => {
     expect(host?.contains(remove)).toBe(true);
     fireEvent.click(remove);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(remove.hasAttribute("data-dialog-skip")).toBe(true);
+  });
+
+  it("block 铺满父格，文案吃中间、关闭贴盒尾", () => {
+    const { container } = render(() => <YoChip text="app.apk" block onDismiss={() => undefined} />);
+    expect(container.querySelector(".yohu-chip")?.hasAttribute("data-block")).toBe(true);
+    expect(css).toContain(".yohu-chip[data-block]");
+    expect(css).toContain("width: 100%");
+    const blockLabel = css.slice(css.indexOf(".yohu-chip[data-block] .yohu-chip__label"));
+    expect(blockLabel.slice(0, blockLabel.indexOf("}") + 1)).toContain("flex: 1 1 auto");
+    expect(css).not.toContain("position: absolute");
   });
 
   it("无 onDismiss 不画删除", () => {
@@ -45,13 +56,14 @@ describe("YoChip", () => {
     expect(chipRule).toContain("flex: 0 1 auto");
     expect(chipRule).toContain("min-width: 0");
     expect(chipRule).toContain("overflow: hidden");
+    expect(chipRule).toContain("align-items: center");
     expect(chipRule).not.toContain("overflow: visible");
     expect(chipRule).not.toContain("position: relative");
 
     const removeBlock = css.slice(css.indexOf(".yohu-chip__remove {"));
     const removeRule = removeBlock.slice(0, removeBlock.indexOf("}") + 1);
-    expect(removeRule).toContain("align-self: flex-start");
     expect(removeRule).toContain("flex: 0 0 auto");
+    expect(removeRule).not.toContain("align-self");
     expect(removeRule).not.toContain("position: absolute");
 
     const leadingBlock = css.slice(css.indexOf(".yohu-chip__leading {"));

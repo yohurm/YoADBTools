@@ -1,6 +1,7 @@
 /**
- * YoTooltip —— 无可见文案铬的气泡（L4 视图 / L5 门面）。
- * 只绑 Presence + 内容区；定位走 tooltip-place → popover-place。
+ * YoTooltip —— 无可见文案铬的指向气泡（L4 视图 / L5 门面）。
+ * 只绑 Presence + 内容区 + 箭头；定位走 tooltip-place（不是菜单 placePopover）。
+ * 落点离散写入，禁止 top/left 过渡；未 placed 先透明，进场只在落点后播。
  * 密集提示共享一个 popup（YoTooltipHost）。无 Host 时不画。
  * 内容区绑 paint 槽（活槽或上次非空槽），禁止 `session()?.content ?? ""`：
  * Unique 卸了 Presence 还在播，空铬会再走一遍 popover 渐入渐出。
@@ -11,13 +12,9 @@ import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoPresence } from "../motion/presence";
 import type { MotionSpecName } from "../tokens/motion";
-import {
-  applyPopoverBox,
-  popoverLayerStyle,
-  type PopoverPlacement,
-} from "./popover-place";
+import type { PopoverPlacement } from "./popover-place";
 import { allocTooltipId, tooltipDomId } from "./tooltip-model";
-import { placeTooltip, readTooltipTrigger } from "./tooltip-place";
+import { applyTooltipBox, placeTooltip, readTooltipTrigger, tooltipLayerStyle } from "./tooltip-place";
 import {
   bindTooltipInputModality,
   resolveTooltipDelay,
@@ -82,7 +79,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
   const [layerStyle, setLayerStyle] = createSignal<JSX.CSSProperties>({});
   const [held, setHeld] = createSignal<TooltipSession | null>(null);
   let layerRef: HTMLDivElement | undefined;
-  let bubbleRef: HTMLDivElement | undefined;
+  let contentRef: HTMLDivElement | undefined;
 
   const live = createMemo(() => unique().session());
   const paint = createMemo(() => tooltipPaintSession(live(), held()));
@@ -100,19 +97,23 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
   const layout = (): void => {
     const tip = paint();
     const layer = layerRef;
-    if (!tip || !layer) return;
-    const bubble = bubbleRef;
-    const box = placeTooltip(tip.trigger, {
-      width: bubble?.scrollWidth ?? 0,
-      height: bubble?.scrollHeight ?? 0,
-    });
-    applyPopoverBox(layer, box);
+    const content = contentRef;
+    if (!tip || !layer || !content) return;
+    const width = Math.max(content.offsetWidth, content.scrollWidth, content.getBoundingClientRect().width);
+    const height = Math.max(content.offsetHeight, content.scrollHeight, content.getBoundingClientRect().height);
+    if (width <= 0 || height <= 0) {
+      requestAnimationFrame(layout);
+      return;
+    }
+    const box = placeTooltip(tip.trigger, { width, height });
+    applyTooltipBox(layer, box);
     setPlacement(box.placement);
-    setLayerStyle(popoverLayerStyle(box) as JSX.CSSProperties);
+    setLayerStyle(tooltipLayerStyle(box) as JSX.CSSProperties);
   };
 
   createEffect(() => {
     if (!open()) return;
+    paint();
     layout();
   });
 
@@ -137,16 +138,21 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
             style={layerStyle()}
           >
             <div
-              ref={(el) => {
-                bubbleRef = el;
-                if (el) layout();
-              }}
               id={paintId()}
               class="yohu-tooltip"
               data-placement={placement()}
               role="tooltip"
             >
-              <div class="yohu-tooltip__content">{paint()?.content ?? ""}</div>
+              <div
+                ref={(el) => {
+                  contentRef = el;
+                  if (el) layout();
+                }}
+                class="yohu-tooltip__content"
+              >
+                {paint()?.content ?? ""}
+              </div>
+              <span class="yohu-tooltip__arrow" aria-hidden="true" />
             </div>
           </div>
         </YoPresence>

@@ -37,6 +37,11 @@
   max-width: calc(100% - var(--yohu-layout-page-margin) * 2);
 }
 
+/* 出场锁：用最后一次打开盒，不再被 90% hug 或子树折叠改高。 */
+.yohu-dialog__panel[data-exit-lock] {
+  max-height: none;
+}
+
 .yohu-dialog__panel:not(:focus-within) {
   box-shadow: var(--yohu-shadow-dialog-unfocused);
 }
@@ -51,11 +56,16 @@
 }
 
 .yohu-dialog__body {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
+}
+
+/* 显式高度：内容区吃 title/footer 之间的剩余，不把 hug 弹窗撑满 90%。 */
+.yohu-dialog__panel[data-fill] .yohu-dialog__body {
+  flex: 1 1 0;
 }
 
 .yohu-dialog__body[data-layout="stack"] {
@@ -69,7 +79,9 @@
 }
 
 .yohu-dialog__body[data-overflow="auto"] {
-  overflow: auto;
+  /* 与 VirtualList / 设备栏 scroller 同契约。禁止双轴 auto：Windows 会因 1px 溢出互锁出纵条。 */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .yohu-dialog__body[data-overflow="hidden"] {

@@ -1,6 +1,7 @@
 /**
  * 气泡提示领域模型（L2）。
- * 内容与延迟规格名；不碰 DOM、不开合。
+ * 内容与延迟规格名；落点是离散结果，不是运动轨道。
+ * 铬/几何在 L0：主题跟随 `TooltipBg/Fg/Border`，指向 `Layout.Tooltip*`。
  */
 
 import type { MotionSpecName } from "../tokens/motion";
@@ -23,6 +24,14 @@ export function tooltipIsEmpty(content: unknown): boolean {
 
 export function tooltipDomId(id: string): string {
   return `yohu-tooltip-${id}`;
+}
+
+/**
+ * 落点 / Unique 换锚禁止插值。
+ * 进出场只走 Presence `yohu-tip-*`；`top/left` 不是滑块。
+ */
+export function tooltipPlaceDiscrete(): boolean {
+  return true;
 }
 
 let nextTipId = 1;

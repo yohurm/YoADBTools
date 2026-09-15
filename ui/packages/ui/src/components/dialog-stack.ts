@@ -12,7 +12,8 @@
  *
  * 视图（YoDialog）只负责 push / pop，不自己挂 keydown。
  */
-import { dialogFocusables, dialogTabTarget } from "./dialog-focus";
+import type { YoDialogInitial } from "./dialog-model";
+import { dialogFocusables, dialogInitialFocus, dialogTabTarget } from "./dialog-focus";
 
 export interface DialogStackEntry {
   /** 面板元素取用器（panel 在 ref 回调后才赋值，取用器保持惰性）。 */
@@ -21,14 +22,15 @@ export interface DialogStackEntry {
   onClose: () => void;
   /** 打开该 Dialog 前的焦点；栈为空时用它还原。 */
   restoreFocus: HTMLElement | null;
+  /** 入场首焦。缺省 auto。 */
+  initial?: YoDialogInitial;
 }
 
 const stack: DialogStackEntry[] = [];
 
-function focusInto(panel: HTMLElement | undefined): void {
+function focusInto(panel: HTMLElement | undefined, initial?: YoDialogInitial): void {
   if (!panel) return;
-  const items = dialogFocusables(panel);
-  (items[0] ?? panel).focus();
+  dialogInitialFocus(panel, initial).focus();
 }
 
 /** 全局唯一 keydown：只处理栈顶（最上层）Dialog。 */
@@ -86,7 +88,7 @@ export function popDialog(entry: DialogStackEntry): void {
     if (restoreInside && entry.restoreFocus) {
       entry.restoreFocus.focus();
     } else {
-      focusInto(panel);
+      focusInto(panel, newTop.initial);
     }
   });
 }

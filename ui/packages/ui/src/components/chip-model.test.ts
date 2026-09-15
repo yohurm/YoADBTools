@@ -9,6 +9,7 @@ describe("chip-model / policy", () => {
       tone: DEFAULT_CHIP_TONE,
       leading: false,
       dismiss: null,
+      block: false,
     });
     expect(DEFAULT_CHIP_TONE).toBe("accent");
     expect(DEFAULT_CHIP_DISMISS).toBe("always");
@@ -26,5 +27,10 @@ describe("chip-model / policy", () => {
   it("leading 写 data-leading", () => {
     expect(chipHostAttrs({ text: "a" })["data-leading"]).toBeUndefined();
     expect(chipHostAttrs({ text: "a", leading: "folder" })["data-leading"]).toBe(true);
+  });
+
+  it("block 写 data-block", () => {
+    expect(chipHostAttrs({ text: "a" })["data-block"]).toBeUndefined();
+    expect(chipHostAttrs({ text: "a", block: true })["data-block"]).toBe(true);
   });
 });

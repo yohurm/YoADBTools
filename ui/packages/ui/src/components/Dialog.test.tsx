@@ -36,8 +36,11 @@ describe("YoDialog", () => {
         确定要删除吗？
       </YoDialog>
     ));
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("确认删除")).toBeTruthy();
+    const dialog = screen.getByRole("dialog");
+    const labelId = dialog.getAttribute("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(dialog.hasAttribute("aria-label")).toBe(false);
+    expect(document.getElementById(labelId!)?.textContent).toBe("确认删除");
     expect(screen.getByText("确定要删除吗？")).toBeTruthy();
   });
 
@@ -108,6 +111,11 @@ describe("YoDialog", () => {
     expect(body.getAttribute("data-layout")).toBe("stack");
     expect(body.getAttribute("data-overflow")).toBe("auto");
     expect(body.getAttribute("data-pad")).toBe("lg");
+    const autoRule =
+      dialogCss.match(/\.yohu-dialog__body\[data-overflow="auto"\]\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(autoRule).toContain("overflow-x: hidden");
+    expect(autoRule).toContain("overflow-y: auto");
+    expect(autoRule).not.toMatch(/(?<!-)overflow:\s*auto/);
   });
 
   it("bodyOverflow=hidden 保持 stack 与 lg 垫", () => {
@@ -152,7 +160,20 @@ describe("YoDialog", () => {
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.style.width).toBe("960px");
     expect(panel.hasAttribute("data-sized")).toBe(true);
+    expect(panel.hasAttribute("data-fill")).toBe(false);
     expect(panel.classList.contains("yohu-dialog__panel--sized")).toBe(false);
+  });
+
+  it("显式高度写 data-fill，内容区才吃剩余高", () => {
+    const { container } = render(() => (
+      <YoDialog open width={960} height={480} onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    expect(panel.hasAttribute("data-fill")).toBe(true);
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-fill] .yohu-dialog__body");
+    expect(dialogCss).toContain("flex: 1 1 auto");
   });
 
   it("open 支持 Accessor 形式（响应式开关）", () => {
@@ -167,6 +188,57 @@ describe("YoDialog", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     setOpen(false);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("关闭后 Presence 卸节点才走 onExitComplete", () => {
+    const onExitComplete = vi.fn();
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <YoDialog open={open} onClose={() => setOpen(false)} onExitComplete={onExitComplete}>
+        内容
+      </YoDialog>
+    ));
+    expect(onExitComplete).not.toHaveBeenCalled();
+    setOpen(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onExitComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("出场锁样式在 CSS，零盒不写 data-exit-lock", () => {
+    const { container } = render(() => (
+      <YoDialog open onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    expect(panel.hasAttribute("data-exit-lock")).toBe(false);
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-exit-lock]");
+    expect(dialogCss).toContain("max-height: none");
+  });
+
+  it("initial=footer 聚焦页脚第一钮，跳过 chip skip", () => {
+    render(() => (
+      <YoDialog
+        open
+        initial="footer"
+        onClose={() => {}}
+        footer={
+          <>
+            <button>取消</button>
+            <button>删除</button>
+          </>
+        }
+      >
+        <button data-dialog-skip>移除 a.png</button>
+        <button>展开其余</button>
+      </YoDialog>
+    ));
+    return new Promise<void>((done) => {
+      queueMicrotask(() => {
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "取消" }));
+        done();
+      });
+    });
   });
 
   it("打开后聚焦面板内首个可聚焦元素（可达性）", () => {

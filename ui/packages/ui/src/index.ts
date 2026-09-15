@@ -211,7 +211,13 @@ export { YoLoading } from "./components/Loading";
 export type { YoLoadingProps } from "./components/Loading";
 
 export { YoDialog } from "./components/Dialog";
-export type { YoDialogProps, YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad } from "./components/Dialog";
+export type {
+  YoDialogProps,
+  YoDialogBodyLayout,
+  YoDialogBodyOverflow,
+  YoDialogBodyPad,
+  YoDialogInitial,
+} from "./components/Dialog";
 
 export { YoTooltip, YoTooltipHost } from "./components/Tooltip";
 export type { YoTooltipProps, YoTooltipHostProps } from "./components/Tooltip";

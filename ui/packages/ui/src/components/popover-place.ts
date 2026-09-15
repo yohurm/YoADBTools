@@ -1,6 +1,7 @@
 /**
  * 浮层定位与叠层政策（L3）。
- * Select / Dialog / Tooltip 共用这一套：铬层只负责落点、夹紧、叠层 token。
+ * Select / Dialog 共用这一套：铬层只负责落点、夹紧、叠层 token。
+ * 指向气泡走 tooltip-place，禁止再把 Tips 锁成菜单宽。
  * 禁止第二套 Trigger，禁止组件私写 z-index 魔法数。
  *
  * 内容 hug 自身。禁止把 width 锁成触发钮宽——
@@ -21,14 +22,13 @@ export interface PlacePopoverInput {
   viewport: { width: number; height: number };
   gap: number;
   maxHeightCap: number;
-  /** 优先展开方向。Select 默认 bottom（hug 触发钮）；Tooltip 默认 top。 */
+  /** 优先展开方向。Select 默认 bottom（hug 触发钮）。 */
   prefer?: PopoverPlacement;
   /**
    * 最小宽。默认 = 触发钮宽（Select hug）。
-   * Tooltip 传 0：内容 hug，不锁成锚点宽。
    */
   minWidth?: number;
-  /** 水平对齐。默认 start（Select）；Tooltip 用 center。 */
+  /** 水平对齐。默认 start（Select）。 */
   align?: "start" | "center";
 }
 

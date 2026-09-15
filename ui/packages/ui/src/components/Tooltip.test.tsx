@@ -163,6 +163,40 @@ describe("YoTooltip", () => {
     );
   });
 
+  it("指向铬走主题抬升 token 与箭头，落点不滑 top/left", () => {
+    expect(css).toContain("--yohu-tooltip-bg");
+    expect(css).toContain("--yohu-tooltip-fg");
+    expect(css).toContain("--yohu-tooltip-border");
+    expect(css).toContain("yohu-tooltip__arrow");
+    expect(css).toContain("--yohu-layout-tooltip-arrow");
+    expect(css).toContain("--yohu-layout-tooltip-edge");
+    expect(css).toContain("yohu-tip-in");
+    expect(css).not.toContain("yohu-rise-in");
+    expect(css).not.toContain("var(--yohu-surface)");
+    expect(css).toContain("--yohu-shadow-overlay-drop");
+    expect(css).toContain(":not([data-placed])");
+    expect(css).toContain("opacity: 0");
+    expect(css).not.toContain("visibility: hidden");
+    expect(css).not.toContain("spatial-small");
+    expect(css).not.toMatch(/transition:\s*[^;]*\b(top|left)\b/);
+  });
+
+  it("Host 画出箭头节点", () => {
+    vi.useFakeTimers();
+    render(() => (
+      <YoTooltipHost>
+        <YoTooltip content="刷新">
+          <button type="button">锚</button>
+        </YoTooltip>
+      </YoTooltipHost>
+    ));
+    enterAnchor("锚");
+    vi.advanceTimersByTime(motionSpecMs("effectsEnter"));
+    const tip = screen.getByRole("tooltip");
+    expect(tip.querySelector(".yohu-tooltip__arrow")).toBeTruthy();
+    expect(tip.querySelector(".yohu-tooltip__content")?.textContent).toBe("刷新");
+  });
+
   it("stretch 写 data-stretch，铺满交叉轴而不改成 block", () => {
     render(() => (
       <YoTooltip content="Verbose" stretch>

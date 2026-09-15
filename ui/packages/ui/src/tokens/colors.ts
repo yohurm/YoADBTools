@@ -137,6 +137,14 @@ export const Colors = {
   SwitchOffPressed: `color-mix(in srgb, ${Harmony.fontPrimary.light} 10%, ${Harmony.compBackgroundSecondary.light})`,
   /** 对话框压暗。浅色 10% 黑（不强遮罩）；禁止用 fg，深色会变成白雾。 */
   Scrim: Harmony.compBackgroundSecondary.light,
+  /**
+   * 指向型气泡：跟主题走，比画布抬一层。
+   * 浅色 = 卡片白（画布是雪域灰）；深色 = surface-2（画布/标题栏是 secondary）。
+   * 禁止反色对、禁止直接点 `--yohu-surface`（深色标题栏会糊）。
+   */
+  TooltipBg: Harmony.compBackgroundPrimary.light,
+  TooltipFg: Harmony.fontPrimary.light,
+  TooltipBorder: Harmony.compDivider.light,
 } as const;
 
 export type SemanticColorName = keyof typeof Colors;
@@ -183,6 +191,10 @@ export const DarkColors: Record<SemanticColorName, string> = {
   SwitchOffPressed: `color-mix(in srgb, ${Harmony.fontPrimary.dark} 10%, ${Harmony.compBackgroundSecondary.dark})`,
   /** 深色压暗用 40% 黑（四级透明度阶梯），画布已抬离纯黑后才能看见。 */
   Scrim: fromArgb("#66000000"),
+  /** 比标题栏 / 卡片 Surface 再抬一层，避免糊进窗控条。 */
+  TooltipBg: Harmony.backgroundFourth.dark,
+  TooltipFg: Harmony.fontPrimary.dark,
+  TooltipBorder: Harmony.compDivider.dark,
 };
 
 /**

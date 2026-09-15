@@ -38,8 +38,12 @@
   --yohu-switch-off-hover: color-mix(in srgb, #000000E5 5%, #00000019);
   --yohu-switch-off-pressed: color-mix(in srgb, #000000E5 10%, #00000019);
   --yohu-scrim: #00000019;
+  --yohu-tooltip-bg: #FFFFFF;
+  --yohu-tooltip-fg: #000000E5;
+  --yohu-tooltip-border: #00000033;
   --yohu-shadow-xs: 0 1px 4px rgba(16, 24, 40, 0.10);
   --yohu-shadow-overlay: 0 4px 16px rgba(16, 24, 40, 0.16);
+  --yohu-shadow-overlay-drop: drop-shadow(0 4px 8px rgba(16, 24, 40, 0.16));
   --yohu-shadow-dialog: 0 8px 32px rgba(16, 24, 40, 0.22);
   --yohu-shadow-dialog-unfocused: 0 2px 8px rgba(16, 24, 40, 0.10);
   --yohu-level-v: #00000099;
@@ -165,6 +169,10 @@
   --yohu-layout-breakpoint-side: 840px;
   --yohu-layout-button-max: 448px;
   --yohu-layout-dialog-max: 400px;
+  --yohu-layout-tooltip-edge: 6px;
+  --yohu-layout-tooltip-arrow: 8px;
+  --yohu-layout-tooltip-arrow-inset: 20px;
+  --yohu-layout-tooltip-gap: 4px;
   --yohu-layout-menu-min: 224px;
   --yohu-layout-rail-inset: 8px;
   --yohu-layout-switch-w: 36px;
@@ -248,8 +256,12 @@
   --yohu-switch-off-hover: color-mix(in srgb, #FFFFFFE5 5%, #FFFFFF19);
   --yohu-switch-off-pressed: color-mix(in srgb, #FFFFFFE5 10%, #FFFFFF19);
   --yohu-scrim: #00000066;
+  --yohu-tooltip-bg: #2E3033;
+  --yohu-tooltip-fg: #FFFFFFE5;
+  --yohu-tooltip-border: #FFFFFF33;
   --yohu-shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.28);
   --yohu-shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.36);
+  --yohu-shadow-overlay-drop: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.36));
   --yohu-shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.40);
   --yohu-shadow-dialog-unfocused: 0 2px 8px rgba(0, 0, 0, 0.22);
   --yohu-level-v: #FFFFFF99;

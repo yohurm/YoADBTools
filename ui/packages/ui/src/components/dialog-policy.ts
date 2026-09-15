@@ -6,10 +6,12 @@
 
 import type { Accessor } from "solid-js";
 
-import { dialogFocusables } from "./dialog-focus";
+import { dialogInitialFocus } from "./dialog-focus";
 import {
   resolveDialogBodySpec,
+  resolveDialogExitLock,
   type DialogBodyInput,
+  type DialogExitLock,
   type YoDialogBodyLayout,
   type YoDialogBodyOverflow,
   type YoDialogBodyPad,
@@ -19,7 +21,7 @@ import { overlayLayerStyle } from "./popover-place";
 import { dismissTooltipOverlay } from "./tooltip-policy";
 
 export type { DialogStackEntry };
-export { dialogFocusables, dialogTabTarget } from "./dialog-focus";
+export { dialogFocusables, dialogInitialFocus, dialogTabTarget } from "./dialog-focus";
 export { popDialog, pushDialog } from "./dialog-stack";
 
 export function resolveDialogOpen(open: boolean | Accessor<boolean>): boolean {
@@ -46,6 +48,12 @@ export function dialogBodyAttrs(input: DialogBodyInput): DialogBodyAttrs {
   };
 }
 
+/** 读面板最后一次打开盒。零盒不锁。 */
+export function dialogExitLock(panel: HTMLElement): DialogExitLock | undefined {
+  const rect = panel.getBoundingClientRect();
+  return resolveDialogExitLock(rect.width, rect.height);
+}
+
 /** 入栈：先卸轻浮层，再在微任务里把焦点送进面板。返回 detach（出栈）。 */
 export function attachDialog(entry: DialogStackEntry): () => void {
   dismissTooltipOverlay();
@@ -53,8 +61,7 @@ export function attachDialog(entry: DialogStackEntry): () => void {
   queueMicrotask(() => {
     const panel = entry.getPanel();
     if (!panel) return;
-    const items = dialogFocusables(panel);
-    (items[0] ?? panel).focus();
+    dialogInitialFocus(panel, entry.initial).focus();
   });
   return () => {
     popDialog(entry);

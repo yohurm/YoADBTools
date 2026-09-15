@@ -124,7 +124,7 @@ describe("placePopover", () => {
     expect(box.top).toBeNull();
   });
 
-  it("Tooltip hug 内容：minWidth=0 且水平居中", () => {
+  it("hug 内容：minWidth 独立于触发钮且可水平居中", () => {
     const box = placePopover({
       trigger: { top: 40, left: 200, bottom: 72, width: 40 },
       menuHeight: 24,

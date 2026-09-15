@@ -24,40 +24,75 @@
   pointer-events: none;
 }
 
+/* 未落点先透明：避免 auto→px 被当成从左滑入。不用 visibility:hidden，以免 hug 测宽为 0。落点禁止 transition。 */
+.yohu-tooltip__layer:not([data-placed]) {
+  opacity: 0;
+}
 
-/* 内容区：文案在圆角内裁剪。铬（阴影/描边）在层上。 */
 .yohu-tooltip {
+  position: relative;
   box-sizing: border-box;
-  max-width: var(--yohu-layout-dialog-max);
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
-  color: var(--yohu-fg);
-  box-shadow: var(--yohu-shadow-overlay);
+  max-width: min(
+    var(--yohu-layout-dialog-max),
+    calc(100vw - 2 * var(--yohu-layout-tooltip-edge))
+  );
+  color: var(--yohu-tooltip-fg);
   font-family: var(--yohu-font-sans);
-  overflow: hidden;
+  filter: var(--yohu-shadow-overlay-drop);
 }
 
 .yohu-tooltip__content {
+  box-sizing: border-box;
   padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  font-size: var(--yohu-font-caption);
-  line-height: var(--yohu-font-leading-tight);
   overflow: hidden;
-  text-overflow: ellipsis;
+  border: var(--yohu-stroke-hairline) solid var(--yohu-tooltip-border);
+  border-radius: var(--yohu-radius-sm);
+  background-color: var(--yohu-tooltip-bg);
+  font-size: var(--yohu-font-caption);
+  font-weight: var(--yohu-font-weight-medium);
+  line-height: var(--yohu-font-leading-tight);
 }
 
-.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-tooltip {
-  animation: yohu-rise-in var(--yohu-motion-spatial-local) both;
+.yohu-tooltip__arrow {
+  position: absolute;
+  left: var(--yohu-tooltip-arrow);
+  box-sizing: border-box;
+  width: var(--yohu-layout-tooltip-arrow);
+  height: var(--yohu-layout-tooltip-arrow);
+  background-color: var(--yohu-tooltip-bg);
+  border: var(--yohu-stroke-hairline) solid var(--yohu-tooltip-border);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.yohu-tooltip[data-placement="bottom"] .yohu-tooltip__arrow {
+  top: calc(-1 * var(--yohu-layout-tooltip-arrow) / 2);
+  border-right: none;
+  border-bottom: none;
+}
+
+.yohu-tooltip[data-placement="top"] .yohu-tooltip__arrow {
+  bottom: calc(-1 * var(--yohu-layout-tooltip-arrow) / 2);
+  border-top: none;
+  border-left: none;
+}
+
+/* 进场只在落点之后播，避免藏着时就把 tip-in 播完。换锚不重播。 */
+.yohu-presence[data-recipe="popover"][data-state="open"]
+  .yohu-tooltip__layer[data-placed]
+  .yohu-tooltip {
+  animation: yohu-tip-in var(--yohu-motion-effects-enter) both;
 }
 
 .yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip {
-  animation: yohu-rise-out var(--yohu-motion-effects-exit) both;
+  animation: yohu-tip-out var(--yohu-motion-effects-exit) both;
 }
 
-.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-tooltip[data-placement="top"] {
-  animation-name: yohu-drop-in;
+.yohu-presence[data-recipe="popover"][data-state="open"]
+  .yohu-tooltip__layer[data-placed]
+  .yohu-tooltip[data-placement="top"] {
+  animation-name: yohu-tip-drop-in;
 }
 
 .yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip[data-placement="top"] {
-  animation-name: yohu-drop-out;
+  animation-name: yohu-tip-drop-out;
 }

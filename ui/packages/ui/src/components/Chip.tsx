@@ -1,7 +1,8 @@
 /**
  * YoChip —— 可关闭气泡（L4 视图）。
- * 语义色 / leading / dismiss 由 chip-model + chip-policy 决定。
- * 删除钮流内右上，计入固有宽。禁止 absolute；禁止原生 title。
+ * 语义色 / leading / dismiss / block 由 chip-model + chip-policy 决定。
+ * 单行气泡；删除钮流内，交叉轴跟宿主居中。
+ * hug 关闭跟文案；block 文案吃中间、关闭贴盒 inline-end。禁止 absolute；禁止原生 title。
  * HarmonyOS 对照：Chip；禁止引进 antd Tag。
  */
 import { Show, createMemo } from "solid-js";
@@ -26,7 +27,9 @@ export interface YoChipProps {
    * always = 常显；hover = 悬停/焦点内显（无悬停能力时仍显）。
    */
   dismiss?: YoChipDismiss;
-  /** 有回调才画流内右上删除。mousedown 阻止默认以免抢走输入焦点。 */
+  /** 铺满父格（对话框名单网格）。默认 hug。block 时关闭贴盒尾，不跟文案。 */
+  block?: boolean;
+  /** 有回调才画流内右侧删除。mousedown 阻止默认以免抢走输入焦点。 */
   onDismiss?: () => void;
 }
 
@@ -46,6 +49,7 @@ export function YoChip(props: YoChipProps): JSX.Element {
       tone: props.tone,
       leading: props.leading,
       dismiss: props.dismiss,
+      block: props.block,
       dismissible: Boolean(props.onDismiss),
     }),
   );
@@ -55,6 +59,7 @@ export function YoChip(props: YoChipProps): JSX.Element {
       data-tone={host()["data-tone"]}
       data-dismiss={host()["data-dismiss"]}
       data-leading={host()["data-leading"]}
+      data-block={host()["data-block"]}
       aria-label={host()["aria-label"]}
     >
       <Show when={host()["data-leading"]}>
@@ -67,6 +72,7 @@ export function YoChip(props: YoChipProps): JSX.Element {
         <button
           type="button"
           class="yohu-chip__remove yohu-focus-ring"
+          data-dialog-skip
           aria-label={`移除 ${props.text}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => {

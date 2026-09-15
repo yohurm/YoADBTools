@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSignal } from "solid-js";
 
 import { motionSpecMs } from "../tokens/motion";
-import { attachDialog, dialogBodyAttrs, dialogLayerStyle, resolveDialogOpen } from "./dialog-policy";
+import {
+  attachDialog,
+  dialogBodyAttrs,
+  dialogExitLock,
+  dialogLayerStyle,
+  resolveDialogOpen,
+} from "./dialog-policy";
 import { tooltipUnique } from "./tooltip-policy";
 
 describe("dialog-policy", () => {
@@ -44,6 +50,23 @@ describe("dialog-policy", () => {
       "data-overflow": "auto",
       "data-pad": "none",
     });
+  });
+
+  it("读面板盒：零盒不锁，正盒锁 px", () => {
+    const panel = document.createElement("div");
+    expect(dialogExitLock(panel)).toBeUndefined();
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 400,
+      bottom: 320,
+      width: 400,
+      height: 320,
+      toJSON: () => ({}),
+    });
+    expect(dialogExitLock(panel)).toEqual({ width: "400px", height: "320px" });
   });
 
   it("入栈立即卸缺省 Tooltip Unique，不把气泡压到模态上", () => {

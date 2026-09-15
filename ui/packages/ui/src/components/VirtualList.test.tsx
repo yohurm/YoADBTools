@@ -103,6 +103,9 @@ describe("YoVirtualList", () => {
       /\.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*box-sizing: border-box;\s*overflow: hidden;\s*\}/,
     );
     expect(css).toMatch(/\[data-tone="list"\] \.yohu-virtual-list__row \{\s*border-bottom:/);
+    expect(css).not.toMatch(
+      /\[data-tone="list"\] \.yohu-virtual-list__row\.yohu-interactive--selected\s*\{[^}]*border-bottom-color:\s*transparent/,
+    );
     expect(css).toMatch(
       /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );

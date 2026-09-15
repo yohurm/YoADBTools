@@ -1,6 +1,8 @@
 /**
  * YoSwap —— 沿轴展开/收缩（动画系统-v6.md 配方 swap，与侧栏/预览栏同一套）。
- * 内层锁在目标文案固有宽；槽位 width 过渡；overflow 裁切。默认贴 inline-end（往左收）。
+ * 一律先换目标文案，再把槽宽从旧固有宽插到新固有宽；overflow 裁切。
+ * 目标宽只认 `__inner` 实盒，禁止探针另测一套。默认贴 inline-end（往左收）。
+ * 禁止收到尽头再换字（最后一帧残字闪成新文案）。
  */
 import { children, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
@@ -17,19 +19,11 @@ export interface YoSwapProps {
   anchor?: "start" | "end";
 }
 
-/** 瞬时探针测固有宽，不挂进可达树（避免按钮文案出现两份）。 */
-function measureWidth(host: HTMLElement, text: string): number {
-  const probe = document.createElement("span");
-  probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none";
-  probe.textContent = text;
-  host.appendChild(probe);
-  const width = probe.getBoundingClientRect().width;
-  probe.remove();
-  return width;
-}
+/** 槽宽已贴目标则不必再插值。禁止第二套容差。 */
+export const SWAP_WIDTH_EPS = 0.5;
 
 /**
- * 按 keys 把槽宽从旧文案插到新文案：变长先换字再拉开，变短先裁再换字。
+ * 按 keys 把槽宽从旧文案插到新文案：先换字，变长露出、变短收掉空白。
  */
 export function YoSwap(props: YoSwapProps): JSX.Element {
   const resolved = children(() => props.children);
@@ -40,9 +34,9 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
 
   let host: HTMLSpanElement | undefined;
   let clip: HTMLSpanElement | undefined;
+  let inner: HTMLSpanElement | undefined;
   let currentKey = "";
   let gen = 0;
-  let pending: JSX.Element | undefined;
 
   createEffect(() => {
     const nextKey = props.keys;
@@ -54,11 +48,9 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
     currentKey = nextKey;
 
     const incomingText = resolveText(incoming);
-    const hostEl = host;
     const clipEl = clip;
-    const skip = !prevKey || shouldSkipMotion() || !hostEl || !clipEl || incomingText === null;
+    const skip = !prevKey || shouldSkipMotion() || !host || !clipEl || incomingText === null;
     if (skip) {
-      pending = undefined;
       setView(() => incoming);
       setClipW(undefined);
       setResizing(false);
@@ -66,28 +58,21 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
     }
 
     const fromW = clipEl.getBoundingClientRect().width;
-    const toW = measureWidth(hostEl, incomingText);
-    if (Math.abs(toW - fromW) < 0.5) {
-      pending = undefined;
-      setView(() => incoming);
-      setClipW(undefined);
-      setResizing(false);
-      return;
-    }
-
-    const shrinking = toW < fromW;
-    pending = shrinking ? incoming : undefined;
+    setView(() => incoming);
     setResizing(false);
     setClipW(fromW);
-    if (!shrinking) {
-      setView(() => incoming);
-    }
 
     const thisGen = ++gen;
     let raf2 = 0;
     const raf1 = window.requestAnimationFrame(() => {
       raf2 = window.requestAnimationFrame(() => {
         if (thisGen !== gen) {
+          return;
+        }
+        const toW = inner?.getBoundingClientRect().width ?? fromW;
+        if (Math.abs(toW - fromW) < SWAP_WIDTH_EPS) {
+          setClipW(undefined);
+          setResizing(false);
           return;
         }
         setResizing(true);
@@ -98,11 +83,6 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
     const finish = (): void => {
       if (thisGen !== gen) {
         return;
-      }
-      if (pending !== undefined) {
-        const node = pending;
-        pending = undefined;
-        setView(() => node);
       }
       setResizing(false);
     };
@@ -137,7 +117,12 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
         class="yohu-swap__clip"
         style={{ width: clipW() === undefined ? undefined : `${clipW()}px` }}
       >
-        <span class="yohu-swap__inner">{visible()}</span>
+        <span
+          ref={(el) => (inner = el)}
+          class="yohu-swap__inner"
+        >
+          {visible()}
+        </span>
       </span>
     </span>
   );

@@ -27,6 +27,16 @@ describe("motion recipes", () => {
     expect(motionDurationMs(INDICATOR_DURATION)).toBe(150);
   });
 
+  it("指向气泡关键帧走 2xs，不复用菜单 sm rise", () => {
+    const css = loadMotionCss();
+    expect(css).toContain("@keyframes yohu-tip-in");
+    expect(css).toContain("@keyframes yohu-tip-drop-in");
+    const tip = css.slice(css.indexOf("@keyframes yohu-tip-in"));
+    const untilSlide = tip.slice(0, tip.indexOf("@keyframes yohu-slide-end-in"));
+    expect(untilSlide).toContain("--yohu-space-2xs");
+    expect(untilSlide).not.toContain("--yohu-space-sm");
+  });
+
   it("Presence 出场时长指向 spatialExit / effectsExit / spatialLocal", () => {
     expect(PRESENCE_EXIT_DURATION.dialog).toBe(MotionSpec.spatialExit.duration);
     expect(PRESENCE_EXIT_DURATION.rise).toBe(MotionSpec.effectsExit.duration);
@@ -79,6 +89,15 @@ describe("motion recipes", () => {
     expect(inner).toContain("overflow: hidden");
     expect(inner).not.toMatch(/\.yohu-collapse__inner\s*>\s*\*/);
     expect(inner).not.toContain("min-height: min-content");
+    const panel = collapse.slice(
+      collapse.indexOf(".yohu-collapse[data-recipe=\"panel\"]"),
+      collapse.indexOf("配方 fill"),
+    );
+    expect(panel).toContain(".yohu-collapse__inner > *");
+    expect(panel).toContain("translateY(var(--yohu-space-xs))");
+    const panelHost = panel.slice(0, panel.indexOf(".yohu-collapse__inner > *"));
+    expect(panelHost).not.toContain("overflow: hidden");
+    expect(panelHost).not.toContain("transform:");
   });
 
   it("fill 内层 column flex，直接子级填满可收缩，高度仍 0fr/1fr", () => {

@@ -67,6 +67,51 @@
   }
 }
 
+/* 指向气泡：PC 以淡入为主，行程只走 2xs，不是菜单的 sm 位移 */
+@keyframes yohu-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-2xs));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-tip-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-2xs));
+  }
+}
+
+@keyframes yohu-tip-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-2xs)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-tip-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-2xs)));
+  }
+}
+
 @keyframes yohu-slide-end-in {
   from {
     opacity: 0;
@@ -399,13 +444,15 @@
  * 配方 panel：Fluent Collapse 双轨（高度空间运动 ∥ 内容淡入上移）。
  * 高度走 spatial-panel（300ms 标准，大行程无弹簧过冲）；内容走 effects 进出场。
  * 两轨同时起步、曲线不对称，可打断；禁止再叠一层 collapse。
+ *
+ * `__inner` 只裁切高度，禁止变换裁切盒：translateY 打在盒子上会进入祖先
+ * scrollable overflow，Windows 展开时右侧纵条闪一下。淡入上移只打直接子级。
  */
 .yohu-collapse[data-recipe="panel"] {
   transition: grid-template-rows var(--yohu-motion-spatial-panel);
 }
 
-.yohu-collapse[data-recipe="panel"] .yohu-collapse__inner {
-  contain: layout;
+.yohu-collapse[data-recipe="panel"] .yohu-collapse__inner > * {
   opacity: 0;
   transform: translateY(var(--yohu-space-xs));
   transition:
@@ -413,7 +460,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-collapse[data-recipe="panel"][data-open="true"] .yohu-collapse__inner {
+.yohu-collapse[data-recipe="panel"][data-open="true"] .yohu-collapse__inner > * {
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -557,7 +604,8 @@
 
 /*
  * 配方 swap：与侧栏/预览栏同一套——锁固有宽、沿轴裁切、width 过渡。
- * 默认贴 inline-end（往左展开/收起）。禁止交叉淡入淡出与 width 补间测按钮铬。
+ * 先换目标文案再插槽宽。默认贴 inline-end（往左展开/收起）。
+ * 禁止交叉淡入淡出、width 补间测按钮铬、收到尽头再换字。
  */
 .yohu-swap {
   position: relative;
@@ -659,7 +707,7 @@ html[data-theme-transition] *::after {
   .yohu-recipe-inline-end > :first-child > *,
   .yohu-recipe-inline-end > :last-child,
   .yohu-collapse,
-  .yohu-collapse[data-recipe="panel"] .yohu-collapse__inner,
+  .yohu-collapse[data-recipe="panel"] .yohu-collapse__inner > *,
   .yohu-presence[data-recipe="list"],
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-presence[data-recipe="chip"],
