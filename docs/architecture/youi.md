@@ -56,7 +56,7 @@ HarmonyOS 对照：Button。外形与语义色是两轴，不是一套 `primary 
   → L3 buttonHostAttrs（disabled∨loading、aria-busy、data-*）
   → L4 Button.tsx 只绑属性；内容区 = spinner + 文案（纯文案走 YoSwap）
   → L4 Button.css 按 data-paint × data-tone 消费 --yohu-*；
-    ink 消费父级 `--yohu-button-ink` / `--yohu-button-fill`；flush 铺交叉轴并自隐边框圆角
+    ink 消费父级 `--yohu-button-ink` / `--yohu-button-fill`（父级 `.yohu-ink` 从 `--yohu-log-ink` 派生）；按下只认 `aria-pressed`，字走 `fg-on`；未选 hover 走 `--yohu-state-hover`；flush 铺交叉轴并自隐边框圆角
   → L0 Accent/Error/Success/Warn 的 hover·pressed（brandOverlay 5%/10%）
 ```
 
