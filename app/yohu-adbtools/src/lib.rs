@@ -139,6 +139,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 tracing::info!(
                     ms = crate::window_boot::elapsed_ms(),
                     label = webview.label(),
+                    url = %payload.url(),
                     "页面开始加载"
                 );
             }
@@ -148,10 +149,15 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             tracing::info!(
                 ms = crate::window_boot::elapsed_ms(),
                 label = webview.label(),
+                url = %payload.url(),
                 "页面加载完成"
             );
             if let Some(win) = webview.app_handle().get_webview_window(webview.label()) {
-                crate::window_boot::on_main_page_finished(webview.label(), &win);
+                crate::window_boot::on_main_page_finished(
+                    webview.label(),
+                    payload.url().as_str(),
+                    &win,
+                );
             }
         })
         .setup(move |app| {

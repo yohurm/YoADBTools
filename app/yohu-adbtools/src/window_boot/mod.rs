@@ -1,5 +1,6 @@
 //! 主窗口启动：画布色对齐 `--yohu-bg-base`；工作台 hydrate 后再揭窗。
-//! 揭窗唯一入口是 `commands::boot::boot_show_main`。禁止超时双轨。
+//! 成功揭窗入口是 `commands::boot::boot_show_main`。
+//! 文档是浏览器错误页时走失败出口，禁止超时双轨冒充成功。
 
 mod colors;
 mod placement;
@@ -99,11 +100,32 @@ pub fn show_if_hidden(win: &WebviewWindow, reason: &'static str) {
     tracing::info!(ms = elapsed_ms(), reason, "揭主窗口");
 }
 
-pub fn on_main_page_finished(label: &str, _win: &WebviewWindow) {
+/// WebView 导航到了错误文档：工作台 JS 不会跑，`boot.showMain` 永远不会来。
+/// 这是失败信号，不是超时。`about:blank` / `http(s)` / `tauri` 应用页不算失败。
+pub fn page_load_failed(url: &str) -> bool {
+    let scheme = url.split_once(':').map(|(s, _)| s).unwrap_or("");
+    matches!(scheme, "chrome-error" | "edge-error" | "chrome")
+        || url.contains("chromewebdata")
+}
+
+pub fn on_main_page_finished(label: &str, url: &str, win: &WebviewWindow) {
     if label != "main" {
         return;
     }
-    tracing::info!(ms = elapsed_ms(), "页面加载完成（主窗仍由启动编排揭开）");
+    if page_load_failed(url) {
+        tracing::error!(
+            ms = elapsed_ms(),
+            url,
+            "工作台文档是错误页，揭窗以免钉死启动小窗"
+        );
+        show_if_hidden(win, "page-failed");
+        return;
+    }
+    tracing::info!(
+        ms = elapsed_ms(),
+        url,
+        "页面加载完成（主窗仍由启动编排揭开）"
+    );
 }
 
 #[cfg(test)]
@@ -124,5 +146,15 @@ mod tests {
         assert!(!prepare_dark(Theme::System, None, false));
         assert!(!prepare_dark(Theme::Light, None, true));
         assert!(prepare_dark(Theme::Dark, None, false));
+    }
+
+    #[test]
+    fn page_load_failed_only_error_documents() {
+        assert!(page_load_failed("chrome-error://chromewebdata/"));
+        assert!(page_load_failed("chrome://network-error/"));
+        assert!(!page_load_failed("about:blank"));
+        assert!(!page_load_failed("http://localhost:1420/"));
+        assert!(!page_load_failed("https://tauri.localhost/"));
+        assert!(!page_load_failed("tauri://localhost/"));
     }
 }
