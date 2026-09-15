@@ -10,6 +10,8 @@ import {
   tooltipCanShow,
   tooltipCanShowOnFocus,
   tooltipNoteInput,
+  tooltipPaintSession,
+  tooltipSessionOpen,
   tooltipUnique,
 } from "./tooltip-policy";
 
@@ -47,6 +49,17 @@ describe("tooltip-policy", () => {
     expect(tooltipCanShow(true, "保存")).toBe(false);
     expect(tooltipCanShow(false, "")).toBe(false);
     expect(tooltipCanShow(false, "保存")).toBe(true);
+    expect(tooltipSessionOpen(null)).toBe(false);
+    expect(tooltipSessionOpen({ id: "a", content: "  ", trigger: BOX })).toBe(false);
+    expect(tooltipSessionOpen({ id: "a", content: "保存", trigger: BOX })).toBe(true);
+  });
+
+  it("出场画上次非空槽，空文案不当槽", () => {
+    const shown = { id: "a", content: "最小化", trigger: BOX };
+    expect(tooltipPaintSession(shown, null)).toBe(shown);
+    expect(tooltipPaintSession(null, shown)?.content).toBe("最小化");
+    expect(tooltipPaintSession({ id: "b", content: "  ", trigger: BOX }, shown)).toBe(shown);
+    expect(tooltipPaintSession(null, { id: "c", content: "", trigger: BOX })).toBeNull();
   });
 
   it("焦点出示只认键盘模态；指针点击后程序首焦不能出示", () => {
@@ -70,6 +83,15 @@ describe("tooltip-policy", () => {
     expect(tooltipUnique.session()?.content).toBe("新增组");
     dismissTooltipOverlay();
     expect(tooltipUnique.session()).toBeNull();
+  });
+
+  it("空文案不进 Unique 槽", () => {
+    vi.useFakeTimers();
+    const unique = createTooltipUnique();
+    unique.requestShow({ id: "a", content: "   ", trigger: BOX }, "effectsFast");
+    vi.advanceTimersByTime(motionSpecMs("effectsFast"));
+    expect(unique.session()).toBeNull();
+    unique.destroy();
   });
 
   it("延迟后才进入 Unique 槽；未到点不画", () => {

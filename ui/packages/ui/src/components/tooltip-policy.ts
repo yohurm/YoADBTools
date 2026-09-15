@@ -58,6 +58,27 @@ export function tooltipCanShow(disabled: boolean | undefined, content: unknown):
   return !disabled && !tooltipIsEmpty(content);
 }
 
+/** Unique 开着且文案非空才挂 Presence。空槽不得进场。 */
+export function tooltipSessionOpen(
+  session: TooltipSession | null,
+): session is TooltipSession {
+  return session !== null && !tooltipIsEmpty(session.content);
+}
+
+/**
+ * 出场画哪份槽：活槽优先；Unique 已卸则用上次非空槽。
+ * Host 不得把 `session()?.content ?? ""` 直接绑到内容区——卸槽后 Presence
+ * 仍在播，空铬会再走一遍 popover 进/出场。
+ */
+export function tooltipPaintSession(
+  live: TooltipSession | null,
+  held: TooltipSession | null,
+): TooltipSession | null {
+  if (tooltipSessionOpen(live)) return live;
+  if (tooltipSessionOpen(held)) return held;
+  return null;
+}
+
 export type TooltipInputModality = "pointer" | "keyboard";
 
 let inputModality: TooltipInputModality = "pointer";
@@ -120,6 +141,7 @@ export function createTooltipUnique(): TooltipUnique {
 
   const requestShow = (tip: TooltipSession, delay?: MotionSpecName): void => {
     if (!requireAlive()) return;
+    if (tooltipIsEmpty(tip.content)) return;
     if (hideTimer !== undefined) {
       clearTimeout(hideTimer);
       hideTimer = undefined;

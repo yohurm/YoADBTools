@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 
+import { PRESENCE_EXIT_SAFETY_MS } from "../motion/recipes";
+import * as reduced from "../motion/reduced";
 import { motionSpecMs } from "../tokens/motion";
 import { YoTooltip, YoTooltipHost } from "./Tooltip";
 import { tooltipNoteInput, tooltipUnique } from "./tooltip-policy";
@@ -175,21 +177,28 @@ describe("YoTooltip", () => {
     expect(css).toContain("align-self: stretch");
   });
 
-  it("离开锚点后延迟卸节点", () => {
+  it("离开锚点后 Unique 已卸，出场仍画原文案，不播空气泡", () => {
     vi.useFakeTimers();
-    render(() => (
-      <YoTooltipHost>
-        <YoTooltip content="保存">
-          <button type="button">锚</button>
-        </YoTooltip>
-      </YoTooltipHost>
-    ));
-    enterAnchor("锚");
-    vi.advanceTimersByTime(motionSpecMs("effectsEnter"));
-    expect(screen.getByRole("tooltip")).toBeTruthy();
-    leaveAnchor("锚");
-    vi.advanceTimersByTime(motionSpecMs("effectsFast"));
-    vi.advanceTimersByTime(motionSpecMs("effectsExit") + 50);
-    expect(screen.queryByRole("tooltip")).toBeNull();
+    const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
+    try {
+      render(() => (
+        <YoTooltipHost>
+          <YoTooltip content="保存">
+            <button type="button">锚</button>
+          </YoTooltip>
+        </YoTooltipHost>
+      ));
+      enterAnchor("锚");
+      vi.advanceTimersByTime(motionSpecMs("effectsEnter"));
+      expect(screen.getByRole("tooltip").textContent).toBe("保存");
+      leaveAnchor("锚");
+      vi.advanceTimersByTime(motionSpecMs("effectsFast"));
+      expect(tooltipUnique.session()).toBeNull();
+      expect(screen.getByRole("tooltip").textContent).toBe("保存");
+      vi.advanceTimersByTime(motionSpecMs("effectsExit") + PRESENCE_EXIT_SAFETY_MS);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally {
+      skip.mockRestore();
+    }
   });
 });

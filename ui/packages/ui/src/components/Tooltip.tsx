@@ -2,6 +2,8 @@
  * YoTooltip —— 无可见文案铬的气泡（L4 视图 / L5 门面）。
  * 只绑 Presence + 内容区；定位走 tooltip-place → popover-place。
  * 密集提示共享一个 popup（YoTooltipHost）。无 Host 时不画。
+ * 内容区绑 paint 槽（活槽或上次非空槽），禁止 `session()?.content ?? ""`：
+ * Unique 卸了 Presence 还在播，空铬会再走一遍 popover 渐入渐出。
  * 禁止包已画出的字；省略号不靠气泡复述。图标钮走 YoIconButton.title。
  */
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext } from "solid-js";
@@ -22,7 +24,10 @@ import {
   tooltipAnchorAttrs,
   tooltipCanShow,
   tooltipCanShowOnFocus,
+  tooltipPaintSession,
+  tooltipSessionOpen,
   tooltipUnique,
+  type TooltipSession,
   type TooltipUnique,
 } from "./tooltip-policy";
 import "./Tooltip.css";
@@ -75,15 +80,29 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
   });
   const [placement, setPlacement] = createSignal<PopoverPlacement>("top");
   const [layerStyle, setLayerStyle] = createSignal<JSX.CSSProperties>({});
+  const [held, setHeld] = createSignal<TooltipSession | null>(null);
   let layerRef: HTMLDivElement | undefined;
   let bubbleRef: HTMLDivElement | undefined;
 
+  const live = createMemo(() => unique().session());
+  const paint = createMemo(() => tooltipPaintSession(live(), held()));
+  const open = createMemo(() => tooltipSessionOpen(live()));
+  const paintId = createMemo(() => {
+    const tip = paint();
+    return tip ? tooltipDomId(tip.id) : undefined;
+  });
+
+  createEffect(() => {
+    const tip = live();
+    if (tooltipSessionOpen(tip)) setHeld(tip);
+  });
+
   const layout = (): void => {
-    const live = unique().session();
+    const tip = paint();
     const layer = layerRef;
-    if (!live || !layer) return;
+    if (!tip || !layer) return;
     const bubble = bubbleRef;
-    const box = placeTooltip(live.trigger, {
+    const box = placeTooltip(tip.trigger, {
       width: bubble?.scrollWidth ?? 0,
       height: bubble?.scrollHeight ?? 0,
     });
@@ -92,11 +111,8 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
     setLayerStyle(popoverLayerStyle(box) as JSX.CSSProperties);
   };
 
-  const session = createMemo(() => unique().session());
-  const open = createMemo(() => session() !== null);
-
   createEffect(() => {
-    if (!session()) return;
+    if (!open()) return;
     layout();
   });
 
@@ -104,7 +120,13 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
     <TooltipUniqueContext.Provider value={unique()}>
       {props.children}
       <Portal mount={document.body}>
-        <YoPresence when={open()} recipe="popover">
+        <YoPresence
+          when={open()}
+          recipe="popover"
+          onExitComplete={() => {
+            if (!live()) setHeld(null);
+          }}
+        >
           <div
             ref={(el) => {
               layerRef = el;
@@ -119,12 +141,12 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
                 bubbleRef = el;
                 if (el) layout();
               }}
-              id={session() ? tooltipDomId(session()!.id) : undefined}
+              id={paintId()}
               class="yohu-tooltip"
               data-placement={placement()}
               role="tooltip"
             >
-              <div class="yohu-tooltip__content">{session()?.content ?? ""}</div>
+              <div class="yohu-tooltip__content">{paint()?.content ?? ""}</div>
             </div>
           </div>
         </YoPresence>
