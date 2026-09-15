@@ -386,22 +386,41 @@ props
 
 HarmonyOS 对照：弹出框。开场 spatial，关闭淡出后卸节点。stack/focus 是策略，视图只 bind。
 
+盒对照 Fluent Dialog（Header/Footer 钉住，Body 才是滚轴）+ 鸿蒙 bindSheet/center popup `FIT_CONTENT`（内容低于帽则 hug，超过用帽；90% 是面板安全顶，不是内容预算）。`0fr/1fr` Collapse 只在高度不确定的流里成立；确定高 flex 剩余轨里 `1fr` = 剩余高，收回会把盒归零。
+
+### 设计前链路
+
+```
+open → Presence
+panel hug + max-height 90%
+body 一律 flex 1 1 auto + overflow auto（唯一滚轴）
+Collapse 0fr/1fr 住在 body 里
+exit-lock 只在关
+```
+
+问题：面板触顶后 body 变成确定高 flex 子；Collapse 的 `1fr` 从「内容高」变成「剩余高」；收回 `0fr` 把盒归零（展开过多，收回就没有了）。展开把整块 body（含收起钮）滚走。
+
+### 设计后链路
+
 ```
 props
-  → L2 dialogPanelPaint / resolveDialogBodySpec / resolveDialogInitial / resolveDialogExitLock / mergeDialogPanelStyle
+  → L2 resolveDialogBox (fit | fill | exit) / resolveDialogBodySpec (含 region plain|split)
+      / resolveDialogInitial / resolveDialogExitLock
   → L3 resolveDialogOpen / attachDialog / dialogLayerStyle / dialogBodyAttrs / dialogExitLock
   → attachDialog = 卸 Tooltip Unique + pushDialog + dialogInitialFocus
-  → L4 只绑 Presence + data-sized / data-fill / data-exit-lock + data-layout / data-overflow / data-pad + 标题 id / 内容区 / 页脚
+  → L4 只绑 Presence + data-box / data-sized + data-layout / data-overflow / data-pad / data-region
+      + 标题 id / lead·main·tail / 页脚
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| L2 | dialog-model.ts | 面板尺寸、内容区排列/溢出/垫、首焦 auto/footer、出场锁盒、style 合并 |
+| L0 | layout.ts | `DialogMax` 宽帽；`DialogBodyMax` hug 滚槽预算 |
+| L2 | dialog-model.ts | 盒 fit/fill/exit、内容区排列/溢出/垫、铬/滚槽分区、首焦 auto/footer |
 | L3 | dialog-stack.ts、dialog-focus.ts、dialog-policy.ts | 单栈 Esc/Tab、可聚焦集合、skip/initial 标记、attach/detach、body data-*、读打开盒 |
-| L4 | Dialog.tsx / Dialog.css | 内容区 = `.yohu-dialog__body`，只认 data；有标题走 `aria-labelledby`；打开时记盒，出场写 `data-exit-lock` |
+| L4 | Dialog.tsx / Dialog.css | 内容区只认 data；有标题走 `aria-labelledby`；fit 不吃 90%；split 只有 `__main` 滚 |
 | L5 | index.ts | YoDialog |
 
-公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `initial` / `onClose` / `onExitComplete` / `footer` / `children`。默认 stack + auto + lg + `initial=auto`。`open` 只是 Presence 开关，不是载荷是否为空。出场锁最后一次打开盒（`data-exit-lock` + inline 宽高，`max-height` 放开），hug 不随 Collapse / 名单卸掉折高。载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。`data-overflow=auto` 是弹窗唯一滚轴，契约与 VirtualList / 设备栏 scroller 相同：横 `hidden`、纵 `auto`。面板 hug 到 `max-height: 90%` 后由内容区纵滚。模块禁止再套第二套 `overflow: auto`。`hidden` 只给自管填充的整页对话框（新建会话；命令管理再加 `bodyPad="none"`）。破坏性确认（文件删除）走缺省 auto + `initial="footer"`，首焦落取消。YoChip 关闭钮写 `data-dialog-skip`，不抢入场焦点，仍在 Tab 序。显式 `height` 才 `data-fill`（内容区吃剩余高）；hug 弹窗内容区 `flex: 1 1 auto`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
+公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `bodyLead` / `bodyTail` / `initial` / `onClose` / `onExitComplete` / `footer` / `children`。默认 stack + auto + lg + `initial=auto` + `region=plain`。`open` 只是 Presence 开关。`data-box`：fit hug、fill 显式高、exit 锁最后打开盒（inline 宽高，`max-height` 放开）。载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。`data-overflow=auto` 是弹窗唯一滚轴（横 hidden、纵 auto）。fit 的滚槽预算是 `--yohu-layout-dialog-body-max`，不是 90% 视口；90% 只做面板安全顶。有 `bodyLead` / `bodyTail` 才 `data-region=split`：铅/尾钉住，只有 `__main` 滚。`YoCollapse` 只许进 main。模块禁止再套第二套 `overflow: auto`。`hidden` 只给自管填充的整页对话框（新建会话；命令管理再加 `bodyPad="none"`）。破坏性确认（文件删除）走缺省 auto + `initial="footer"` + lead/tail，首焦落取消。YoChip 关闭钮写 `data-dialog-skip`，不抢入场焦点，仍在 Tab 序。显式 `height` 才 fill（内容区吃剩余高）；hug 内容区 `flex: 0 1 auto`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `__main` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
 
 ---
 
@@ -489,7 +508,7 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的淡入上移打在 `__inner` 的直接子级上（位移不得进入祖先 scrollable overflow）。禁止给默认 collapse 的 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才在库内给直接子级 `flex:1; min-height:0`；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的淡入上移打在 `__inner` 的直接子级上（位移不得进入祖先 scrollable overflow）。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里只进 `__main`。禁止给默认 collapse 的 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才在库内给直接子级 `flex:1; min-height:0`；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys

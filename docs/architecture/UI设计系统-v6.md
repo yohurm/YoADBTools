@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.86（2026-09-15，气泡落点离散 + 主题抬升铬）
+> **状态：** v2.87（2026-09-15，YoDialog 盒模型 fit/fill/exit + 铬/滚槽）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.87 变更（YoDialog 盒模型）：** 对照 Fluent Dialog（钉铬、只滚 Body）+ 鸿蒙 `FIT_CONTENT`（内容帽不是 90% 视口）。`data-box` = fit / fill / exit。hug 滚槽预算 `--yohu-layout-dialog-body-max`。`bodyLead` / `bodyTail` 钉住确认文案与展开钮；`YoCollapse` 只进 `__main`。删除确认不再把整块 body（含收起）滚走，收回不再把盒归零。见 [youi.md](youi.md)、[modules/files.md](modules/files.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v2.86 变更（气泡落点离散 + 主题抬升铬）：** 落点不是滑块。`tooltipPlaceDiscrete`；层未 `data-placed` 先透明；禁止 `top/left` transition（首帧 `auto→px` 与 Unique 换到关闭键会横滑，有时又没有）。进场 `yohu-tip-*` 只在落点后播。铬跟主题：浅色 `Surface`、深色 `Surface2`，不再反色白块。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v2.85 变更（指向气泡反色 + 箭头）：** `YoTooltip` 不再套 Select 的 `placePopover` / `--yohu-surface`。L0 排出 `TooltipBg/Fg/Border`、`Layout.Tooltip*`、`--yohu-shadow-overlay-drop`。L3 `tooltip-place` hug 内容、贴边 6vp、箭头对锚点。标题栏贴顶翻下。进出场 `yohu-tip-*`。v2.86 撤回 Unique 滑位与反色对。见 [youi.md](youi.md)。
 > **v2.84 变更（YoChip block 关闭贴盒尾）：** `block` 是填格行：`__label` `flex: 1 1 auto` 吃中间，关闭流内贴盒 inline-end。hug（过滤 Token）仍跟文案。禁止 absolute。见 [youi.md](youi.md)。
@@ -401,7 +402,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 
 布局常量（不随密度变）：`--yohu-layout-shell-nav: 232px`、`--yohu-layout-sidebar: 280px`、`--yohu-layout-preview: 240px`、`--yohu-layout-mirror-ops: 48px`、`--yohu-layout-mirror-func: 200px`、`--yohu-layout-settings-max: 920px`、`--yohu-layout-output-max: 260px`、`--yohu-layout-hit-splitter: 6px`、`--yohu-layout-gutter: 16px`、`--yohu-layout-grid-max: 2220px`、`--yohu-layout-page-inset` / `--yohu-layout-page-gap`（数值 = `Spacing.Md` 12vp，经 `YoPage` 消费）、`--yohu-layout-chrome-pad`（数值 = `Spacing.Sm` 8vp，经 `YoChrome` 消费）。
 
-HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、**工作台主窗** `--yohu-layout-window-min-w/h: 1024×768`（与 Tauri `minWidth`/`minHeight` 同值；保证投屏竖屏 contain 短边 ≥280 CSS。鸿蒙对话框/子窗最小 360×240 **不**套主窗）、`--yohu-layout-page-margin: 40px`（PC 左右边距，设置页用）、`--yohu-layout-breakpoint-split: 600`（分栏）、`--yohu-layout-breakpoint-side: 840`（侧边页签）、`--yohu-layout-button-max: 448`、`--yohu-layout-dialog-max: 400`。数量约束 `LayoutLimits`：标题栏右侧 ≤3 图标、C 栏工具栏 ≤6、侧栏 ≤窗口宽 40%。间距补 `space-2xl=32`、`space-3xl=40`（Padding_level16/20）。控件行高仍按 P1 产线密度收敛，不改用手机 48vp 列表行。
+HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、**工作台主窗** `--yohu-layout-window-min-w/h: 1024×768`（与 Tauri `minWidth`/`minHeight` 同值；保证投屏竖屏 contain 短边 ≥280 CSS。鸿蒙对话框/子窗最小 360×240 **不**套主窗）、`--yohu-layout-page-margin: 40px`（PC 左右边距，设置页用）、`--yohu-layout-breakpoint-split: 600`（分栏）、`--yohu-layout-breakpoint-side: 840`（侧边页签）、`--yohu-layout-button-max: 448`、`--yohu-layout-dialog-max: 400`、`--yohu-layout-dialog-body-max: 260`（hug 滚槽预算）。数量约束 `LayoutLimits`：标题栏右侧 ≤3 图标、C 栏工具栏 ≤6、侧栏 ≤窗口宽 40%。间距补 `space-2xl=32`、`space-3xl=40`（Padding_level16/20）。控件行高仍按 P1 产线密度收敛，不改用手机 48vp 列表行。
 
 效率型工作台：内容区从窗口标题栏下方**贴边**排布（`.yohu-layout__content` padding 0）；模块页眉与分区的内边距由 `YoPage` 承担（`page-inset` / `page-gap`）。设置页才用 `page-margin` 40vp。
 
@@ -564,7 +565,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
-- `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400、高 90%；标题 Title_S Bold；电脑小圆角 `radius-sm`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
+- `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400；面板安全顶 90%；hug 滚槽预算 `--yohu-layout-dialog-body-max`。标题 Title_S Bold；电脑小圆角 `radius-sm`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
 - `YoToast`：描边；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。
 
 ---
