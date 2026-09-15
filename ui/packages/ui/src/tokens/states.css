@@ -1,7 +1,9 @@
 /* ============================================================================
  * 交互态单源（UI设计系统-v6.md §2.7）
  * 列表 / 树 / 菜单 / 导航 / 命令库 / 命令管理 只加 .yohu-interactive--selected，禁止再写选中底或选中字色。
- * 语义色逃生：.yohu-badge / .yohu-tone。子树可覆盖 --yohu-ripple-radius / --yohu-ripple-inset，不得另起配方。
+ * 语义色逃生：.yohu-badge / .yohu-tone。
+ * 语义 ink：.yohu-ink（把 --yohu-log-ink 桥到按钮 inherit 的 ink/fill；按下反色在 inherit）。
+ * 子树可覆盖 --yohu-ripple-radius / --yohu-ripple-inset，不得另起配方。
  * ========================================================================== */
 
 .yohu-interactive {
@@ -96,4 +98,10 @@
 .yohu-focus-host--inset:focus-within:has(:focus-visible) {
   outline: var(--yohu-focus-width) solid var(--yohu-focus-ring);
   outline-offset: var(--yohu-focus-offset-inset);
+}
+
+/* 语义 ink → 按钮 inherit。选中只认 aria-pressed；反色不在本层再写一遍。 */
+.yohu-ink {
+  --yohu-button-ink: var(--yohu-log-ink);
+  --yohu-button-fill: var(--yohu-log-ink);
 }

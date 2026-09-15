@@ -20,7 +20,7 @@ export interface YoButtonProps {
   tone?: YoButtonTone;
   /** 尺寸 */
   size?: YoButtonSize;
-  /** 字色与按下填充消费父级 `--yohu-button-ink` / `--yohu-button-fill` */
+  /** 字色 / 按下实底消费父级 `--yohu-button-ink` / `--yohu-button-fill`；按下字走 `fg-on`；未选悬浮走 `--yohu-state-hover` */
   ink?: boolean;
   /** 铺满父级交叉轴，自隐边框与圆角（组内容单元） */
   flush?: boolean;

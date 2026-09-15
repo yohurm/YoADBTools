@@ -7,7 +7,7 @@
 export type YoButtonVariant = "solid" | "outlined" | "ghost";
 export type YoButtonTone = "accent" | "neutral" | "danger" | "success" | "warning";
 export type YoButtonSize = "sm" | "md";
-/** tone = 语义色轴；inherit = 消费父级 `--yohu-button-ink` / `--yohu-button-fill`。 */
+/** tone = 语义色轴；inherit = 消费父级 ink/fill（父级 `.yohu-ink` 从 `--yohu-log-ink` 派生）。按下字走 `fg-on`。 */
 export type ButtonInkSource = "tone" | "inherit";
 
 export const BUTTON_VARIANTS = ["solid", "outlined", "ghost"] as const;

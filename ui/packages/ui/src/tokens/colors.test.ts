@@ -230,6 +230,17 @@ describe("logcat 级别板（复用官方语义色）", () => {
     expect(LogLevelDark.e).toBe(Harmony.warning.dark);
     expect(LogLevelDark.v).toBe(Harmony.fontSecondary.dark);
   });
+
+  it("筛选格选中一律反色：D/E/F 字对 ink 实底 ≥ 3:1", () => {
+    for (const key of ["d", "e", "f"] as const) {
+      expect(contrast(Harmony.fontOnPrimary.light, LogLevelLight[key]), `light ${key}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(Harmony.fontOnPrimary.dark, LogLevelDark[key]), `dark ${key}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("浅色 I 是中明度 confirm，反色对不过 3:1，仍走同一配方", () => {
+    expect(contrast(Harmony.fontOnPrimary.light, LogLevelLight.i)).toBeLessThan(3);
+  });
 });
 
 const FILE_GLYPHS: FileGlyph[] = [
@@ -301,6 +312,7 @@ describe("theme.css 变量", () => {
       expect(themeCss).toContain(`--yohu-level-${name}:`);
     }
     expect(themeCss).not.toContain("--yohu-level-f-bg");
+    expect(themeCss).not.toContain("--yohu-ink-wash-");
   });
 
   it("文件图标板变量齐备（浅色+深色，body/mark）", () => {

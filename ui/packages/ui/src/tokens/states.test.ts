@@ -42,6 +42,16 @@ describe("yohu-interactive 叠层契约", () => {
     expect(statesCss).toContain(".yohu-tone");
   });
 
+  it("语义 ink 只桥 log-ink → 按钮 inherit，不在本层写 invert", () => {
+    expect(statesCss).toContain(".yohu-ink {");
+    expect(statesCss).toContain("--yohu-button-ink: var(--yohu-log-ink)");
+    expect(statesCss).toContain("--yohu-button-fill: var(--yohu-log-ink)");
+    expect(statesCss).not.toContain('.yohu-ink[data-paint');
+    expect(statesCss).not.toContain("color-mix");
+    expect(statesCss).not.toContain("ink-wash");
+    expect(statesCss).not.toContain("--yohu-button-soft");
+  });
+
   it("连续选中削平邻接圆角，不另画项间分割线", () => {
     expect(statesCss).toContain("yohu-interactive--sel-start");
     expect(statesCss).toContain("yohu-interactive--sel-mid");

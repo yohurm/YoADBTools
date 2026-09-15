@@ -177,20 +177,25 @@
   color: var(--yohu-button-ink);
 }
 
-.yohu-button[data-ink="inherit"]:not(:disabled):hover,
+.yohu-button[data-ink="inherit"]:not(:disabled):hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-button-ink);
+}
+
 .yohu-button[data-ink="inherit"]:not(:disabled):active {
+  background-color: var(--yohu-state-pressed);
   color: var(--yohu-button-ink);
 }
 
 .yohu-button[data-ink="inherit"][aria-pressed="true"] {
   background-color: var(--yohu-button-fill);
-  color: var(--yohu-button-ink);
+  color: var(--yohu-fg-on);
 }
 
 .yohu-button[data-ink="inherit"][aria-pressed="true"]:not(:disabled):hover,
 .yohu-button[data-ink="inherit"][aria-pressed="true"]:not(:disabled):active {
   background-color: var(--yohu-button-fill);
-  color: var(--yohu-button-ink);
+  color: var(--yohu-fg-on);
 }
 
 .yohu-button[data-flush] {

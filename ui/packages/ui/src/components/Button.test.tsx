@@ -131,8 +131,12 @@ describe("YoButton", () => {
     expect(css).toContain('[data-ink="inherit"]');
     expect(css).toContain("--yohu-button-ink: inherit");
     expect(css).toContain("--yohu-button-fill: inherit");
+    expect(css).not.toContain("--yohu-button-soft: inherit");
     expect(css).toContain('[data-ink="inherit"][aria-pressed="true"]');
     expect(css).toContain("background-color: var(--yohu-button-fill)");
+    expect(css).toContain("color: var(--yohu-fg-on)");
+    expect(css).toContain("background-color: var(--yohu-state-hover)");
+    expect(css).toContain("background-color: var(--yohu-state-pressed)");
     expect(css).toContain("[data-flush]");
     expect(css).toContain("height: 100%");
     expect(css).toContain("border-radius: var(--yohu-radius-none)");
