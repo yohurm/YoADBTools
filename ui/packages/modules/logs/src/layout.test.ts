@@ -167,6 +167,11 @@ describe("日志显示列", () => {
     expect(view).toContain("visibleLogColumns(displayColumns())");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
+    expect(filter).toContain("yohu-ink");
+    expect(filter).toContain("levelInkStyle");
+    expect(filter).toContain("aria-pressed={pressed()}");
+    expect(filter).not.toContain("data-paint");
+    expect(filter).not.toContain("data-level");
     expect(view).not.toContain("logDocColumns(docLayout())");
     expect(view).not.toContain("logDocTrackPx");
     expect(view).toContain("width={logStore.state.colWidths[col.key]}");
@@ -192,8 +197,8 @@ describe("日志级别色单源", () => {
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");
     expect(logsCss).not.toContain("color-mix");
-    expect(logsCss).toContain("--yohu-button-ink: var(--yohu-log-ink)");
-    expect(logsCss).toContain("--yohu-button-fill: var(--yohu-state-hover)");
+    expect(logsCss).not.toContain("--yohu-button-ink");
+    expect(logsCss).not.toContain("--yohu-button-fill");
     expect(logsCss).not.toMatch(/z-index:\s*1/);
     expect(logsCss).toContain("z-index: var(--yohu-z-overlay)");
     expect(logsCss).not.toContain(".yohu-button");

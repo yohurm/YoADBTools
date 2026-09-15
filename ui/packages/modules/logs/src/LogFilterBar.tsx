@@ -3,6 +3,7 @@
  */
 
 import { For } from "solid-js";
+import type { JSX } from "solid-js";
 
 import {
   YoBadge,
@@ -91,9 +92,8 @@ export function LogFilterBar(props: {
             const key = levelKey(letter);
             return (
               <span
-                class="yohu-logs__level-slot yohu-tone"
-                data-level={key ?? undefined}
-                style={key ? levelInkStyle(key) : undefined}
+                class="yohu-logs__level-slot yohu-ink"
+                style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
               >
                 <YoButton
                   variant="ghost"

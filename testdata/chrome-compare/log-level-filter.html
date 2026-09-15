@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Yohu log level filter contrast</title>
+    <link rel="stylesheet" href="../../ui/packages/ui/src/tokens/theme.css" />
+    <link rel="stylesheet" href="../../ui/packages/ui/src/tokens/states.css" />
+    <link rel="stylesheet" href="../../ui/packages/ui/src/components/Button.css" />
+    <link rel="stylesheet" href="../../ui/packages/modules/logs/src/logs.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: var(--yohu-space-lg);
+        background: var(--yohu-canvas);
+      }
+      h1 {
+        margin: 0 0 var(--yohu-space-md);
+        font-size: var(--yohu-font-subtitle);
+      }
+      section {
+        margin-bottom: var(--yohu-space-xl);
+      }
+      .row-label {
+        margin: 0 0 var(--yohu-space-xs);
+        color: var(--yohu-fg-2);
+        font-size: var(--yohu-font-caption);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>级别筛选选中色 · 浅/深对照</h1>
+    <section data-theme-host="light">
+      <p class="row-label">浅色 · 未选</p>
+      <div class="yohu-logs__filter" data-case="light-idle"></div>
+      <p class="row-label">浅色 · 全选</p>
+      <div class="yohu-logs__filter" data-case="light-on"></div>
+    </section>
+    <section data-theme="dark" style="padding: var(--yohu-space-md); background: var(--yohu-canvas); border-radius: var(--yohu-radius-sm)">
+      <p class="row-label">深色 · 未选</p>
+      <div class="yohu-logs__filter" data-case="dark-idle"></div>
+      <p class="row-label">深色 · 全选</p>
+      <div class="yohu-logs__filter" data-case="dark-on"></div>
+    </section>
+    <script>
+      const LEVELS = [
+        ["V", "v", "Verbose"],
+        ["D", "d", "Debug"],
+        ["I", "i", "Info"],
+        ["W", "w", "Warn"],
+        ["E", "e", "Error"],
+        ["F", "f", "Fatal"],
+      ];
+
+      function mount(root, pressed) {
+        const group = document.createElement("div");
+        group.className = "yohu-logs__levels";
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", "级别");
+        for (const [letter, key, label] of LEVELS) {
+          const slot = document.createElement("span");
+          slot.className = "yohu-logs__level-slot yohu-ink";
+          slot.style.setProperty("--yohu-log-ink", `var(--yohu-level-${key})`);
+          const btn = document.createElement("button");
+          btn.className = "yohu-button";
+          btn.dataset.variant = "ghost";
+          btn.dataset.tone = "neutral";
+          btn.dataset.size = "md";
+          btn.dataset.paint = "ghost-neutral";
+          btn.dataset.ink = "inherit";
+          btn.dataset.flush = "";
+          btn.setAttribute("aria-label", label);
+          btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+          btn.textContent = letter;
+          slot.appendChild(btn);
+          group.appendChild(slot);
+        }
+        root.appendChild(group);
+      }
+
+      function parseRgb(input) {
+        const m = input.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
+        if (!m) return null;
+        return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: m[4] === undefined ? 1 : Number(m[4]) };
+      }
+
+      function srgbToLinear(c) {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      }
+
+      function lum(c) {
+        return 0.2126 * srgbToLinear(c.r) + 0.7152 * srgbToLinear(c.g) + 0.0722 * srgbToLinear(c.b);
+      }
+
+      function contrast(fg, bg) {
+        const [hi, lo] = lum(fg) > lum(bg) ? [lum(fg), lum(bg)] : [lum(bg), lum(fg)];
+        return (hi + 0.05) / (lo + 0.05);
+      }
+
+      for (const [sel, on] of [
+        ["light-idle", false],
+        ["light-on", true],
+        ["dark-idle", false],
+        ["dark-on", true],
+      ]) {
+        mount(document.querySelector(`[data-case="${sel}"]`), on);
+      }
+
+      const rows = [];
+      for (const sel of ["light-on", "dark-on"]) {
+        const host = document.querySelector(`[data-case="${sel}"]`);
+        for (const btn of host.querySelectorAll("button")) {
+          const cs = getComputedStyle(btn);
+          const color = parseRgb(cs.color);
+          const bg = parseRgb(cs.backgroundColor);
+          const ratio = color && bg ? contrast(color, bg) : NaN;
+          rows.push({
+            case: sel,
+            letter: btn.textContent,
+            color: cs.color,
+            background: cs.backgroundColor,
+            contrast: Number(ratio.toFixed(2)),
+          });
+        }
+      }
+      window.__levelContrast = rows;
+    </script>
+  </body>
+</html>

@@ -8,6 +8,7 @@
  * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
+ * 级别筛选格走 L1 .yohu-ink；模块只写 --yohu-log-ink。按下只认 aria-pressed，禁止槽上 data-paint / 模块 --yohu-button-*。
  * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
  * ========================================================================== */
@@ -58,8 +59,6 @@
 .yohu-logs__level-slot {
   display: inline-flex;
   height: 100%;
-  --yohu-button-ink: var(--yohu-log-ink);
-  --yohu-button-fill: var(--yohu-state-hover);
 }
 
 .yohu-logs__level-slot:not(:last-child) {
