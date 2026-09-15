@@ -21,11 +21,11 @@ import {
   openContextMenu,
 } from "@yohu/ui";
 
-import { DeleteTargets } from "./DeleteTargets";
+import { DeleteConfirm, DeleteExpand, DeleteTargetList } from "./DeleteTargets";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
 import { TransferPanel } from "./TransferPanel";
-import { DELETE_PREVIEW_LIMIT, dropDeleteName } from "./delete-targets";
+import { DELETE_PREVIEW_LIMIT, canToggleDelete, dropDeleteName } from "./delete-targets";
 import { type DropHit, localBaseName, resolveDropHit } from "./drop";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
 import { filesListMenu } from "./menu";
@@ -314,6 +314,16 @@ export function FileView(props: DeviceSession) {
           open={deleteOpen}
           title="确认删除"
           initial="footer"
+          bodyLead={<DeleteConfirm count={deleteNames().length} />}
+          bodyTail={
+            canToggleDelete(deleteNames()) ? (
+              <DeleteExpand
+                names={deleteNames()}
+                expanded={deleteExpanded()}
+                onExpandedChange={setDeleteExpanded}
+              />
+            ) : undefined
+          }
           onClose={closeDelete}
           onExitComplete={finishDelete}
           footer={
@@ -327,10 +337,9 @@ export function FileView(props: DeviceSession) {
             </>
           }
         >
-          <DeleteTargets
+          <DeleteTargetList
             names={deleteNames()}
             expanded={deleteExpanded()}
-            onExpandedChange={setDeleteExpanded}
             onRemove={dropFromDelete}
           />
         </YoDialog>

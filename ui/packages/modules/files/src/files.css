@@ -429,18 +429,8 @@
 
 .yohu-files__confirm {
   margin: 0;
-  flex-shrink: 0;
   font-size: var(--yohu-font-body);
   color: var(--yohu-fg);
-}
-
-.yohu-files__delete {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--yohu-space-md);
-  width: 100%;
-  min-height: 0;
 }
 
 .yohu-files__delete-grid {
@@ -464,10 +454,6 @@
 .yohu-files__delete-item {
   min-width: 0;
   display: flex;
-}
-
-.yohu-files__delete > .yohu-button {
-  align-self: flex-start;
 }
 
 /* 仅对话框内校验，路径错误走 YoToast，禁止再做页内错误条。 */

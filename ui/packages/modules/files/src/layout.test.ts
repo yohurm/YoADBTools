@@ -225,8 +225,12 @@ function loadDeleteTargets(): string {
 const deleteTargets = loadDeleteTargets();
 
 describe("确认删除多文件契约", () => {
-  it("弹窗走 DeleteTargets，不把文件名拼成一段", () => {
-    expect(fileView).toContain("DeleteTargets");
+  it("弹窗走 Dialog lead/main/tail，不把文件名拼成一段", () => {
+    expect(fileView).toContain("DeleteConfirm");
+    expect(fileView).toContain("DeleteTargetList");
+    expect(fileView).toContain("DeleteExpand");
+    expect(fileView).toContain("bodyLead");
+    expect(fileView).toContain("bodyTail");
     expect(fileView).not.toContain('bodyOverflow="hidden"');
     expect(fileView).toContain('initial="footer"');
     expect(fileView).not.toContain('join("、")');
@@ -236,7 +240,8 @@ describe("确认删除多文件契约", () => {
     expect(fileView).toContain("deleteOpen");
     expect(fileView).toContain("onExitComplete");
     expect(fileView).toContain("finishDelete");
-    expect(fileView).not.toContain("deleteNames().length");
+    expect(fileView).toContain("open={deleteOpen}");
+    expect(fileView).not.toContain("open={() => deleteNames().length");
     const closeBlock = fileView.slice(fileView.indexOf("const closeDelete"), fileView.indexOf("const finishDelete"));
     expect(closeBlock).toContain("setDeleteOpen(false)");
     expect(closeBlock).not.toContain("setDeleteNames");
@@ -266,9 +271,9 @@ describe("确认删除多文件契约", () => {
     expect(filesCss).not.toContain(".yohu-files__delete-chip-remove");
     expect(deleteTargets).not.toContain("delete-scroller");
     expect(filesCss).not.toContain(".yohu-files__delete-scroller");
-    const deleteBlock = filesCss.slice(filesCss.indexOf(".yohu-files__delete {"));
+    expect(filesCss).not.toContain(".yohu-files__delete {");
+    const deleteBlock = filesCss.slice(filesCss.indexOf(".yohu-files__confirm {"));
     expect(deleteBlock).not.toMatch(/overflow:\s*auto/);
     expect(deleteBlock).not.toMatch(/overflow-y:\s*auto/);
-    expect(deleteBlock).not.toMatch(/flex:\s*1 1 auto/);
   });
 });

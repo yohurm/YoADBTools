@@ -1,24 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { DELETE_PREVIEW_LIMIT, dropDeleteName, visibleDeleteNames } from "./delete-targets";
+import { DELETE_PREVIEW_LIMIT, canToggleDelete, dropDeleteName } from "./delete-targets";
 
-describe("visibleDeleteNames", () => {
-  it("未超上限时全量露出", () => {
-    const names = ["a.png", "b.png"];
-    expect(visibleDeleteNames(names, false)).toEqual({ shown: names, hidden: 0 });
-  });
-
-  it("折叠时只露前几项并回报隐藏数", () => {
-    const names = Array.from({ length: DELETE_PREVIEW_LIMIT + 3 }, (_, i) => `f${i}.png`);
-    expect(visibleDeleteNames(names, false)).toEqual({
-      shown: names.slice(0, DELETE_PREVIEW_LIMIT),
-      hidden: 3,
-    });
-  });
-
-  it("展开后全量露出", () => {
-    const names = Array.from({ length: DELETE_PREVIEW_LIMIT + 2 }, (_, i) => `f${i}.png`);
-    expect(visibleDeleteNames(names, true)).toEqual({ shown: names, hidden: 0 });
+describe("canToggleDelete", () => {
+  it("只有超出预览才给展开/收起", () => {
+    expect(canToggleDelete(["a.png"])).toBe(false);
+    expect(canToggleDelete(Array.from({ length: DELETE_PREVIEW_LIMIT }, (_, i) => `f${i}.png`))).toBe(
+      false,
+    );
+    expect(
+      canToggleDelete(Array.from({ length: DELETE_PREVIEW_LIMIT + 1 }, (_, i) => `f${i}.png`)),
+    ).toBe(true);
   });
 });
 
