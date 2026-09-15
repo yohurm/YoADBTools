@@ -112,6 +112,24 @@ impl FramePipe {
     pub fn try_recv(&self) -> Option<EncodedFrame> {
         self.pop()
     }
+
+    /// 会话级 SPS/PPS 快照。新解码座入座时读取，不走一次性 pending。
+    pub fn sticky_config(&self) -> Option<EncodedFrame> {
+        self.last_config
+            .lock()
+            .expect("frame pipe lock poisoned")
+            .clone()
+    }
+
+    /// 同代下一 attempt 入队前清空内容。不关管道、不改 dropped。
+    pub fn reset_content(&self) {
+        *self.last_config.lock().expect("frame pipe lock poisoned") = None;
+        self.pending_config.store(false, Ordering::SeqCst);
+        self.queue
+            .lock()
+            .expect("frame pipe lock poisoned")
+            .clear();
+    }
 }
 
 fn evict_for(
@@ -230,5 +248,29 @@ mod tests {
         assert!(pipe.try_recv().expect("config").config);
         assert!(pipe.try_recv().expect("idr").keyframe);
         assert!(pipe.try_recv().is_none());
+    }
+
+    #[test]
+    fn sticky_config_survives_consume() {
+        let pipe = FramePipe::new();
+        pipe.push(frame(true, false, 3));
+        assert_eq!(pipe.try_recv().expect("pending config").pts, 3);
+        assert!(pipe.try_recv().is_none());
+        let sticky = pipe.sticky_config().expect("snapshot");
+        assert!(sticky.config);
+        assert_eq!(sticky.pts, 3);
+        assert!(pipe.try_recv().is_none());
+    }
+
+    #[test]
+    fn reset_content_clears_sticky_and_queue_without_close() {
+        let pipe = FramePipe::new();
+        pipe.push(frame(true, false, 0));
+        pipe.push(frame(false, true, 1));
+        pipe.reset_content();
+        assert!(pipe.sticky_config().is_none());
+        assert!(pipe.try_recv().is_none());
+        pipe.push(frame(true, false, 9));
+        assert_eq!(pipe.try_recv().expect("new attempt config").pts, 9);
     }
 }

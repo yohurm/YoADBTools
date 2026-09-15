@@ -2,7 +2,7 @@
 
 use yohu_protocol::scrcpy;
 
-use crate::consts::VIDEO_CODEC_OPTIONS;
+use crate::consts::{IGNORE_VIDEO_ENCODER_CONSTRAINTS, VIDEO_CODEC_OPTIONS};
 use crate::session::MirrorSessionRequest;
 
 pub fn server_argv(req: &MirrorSessionRequest, scid: u32, forward: bool) -> Vec<String> {
@@ -17,6 +17,7 @@ pub fn server_argv(req: &MirrorSessionRequest, scid: u32, forward: bool) -> Vec<
         format!("video_bit_rate={}", req.video_bit_rate),
         "cleanup=false".into(),
         "power_on=true".into(),
+        IGNORE_VIDEO_ENCODER_CONSTRAINTS.into(),
         format!("video_codec_options={VIDEO_CODEC_OPTIONS}"),
     ];
     if req.max_fps > 0 {
@@ -58,6 +59,7 @@ mod tests {
         assert!(line.contains("video_codec=h265"));
         assert!(line.contains("power_on=true"));
         assert!(line.contains("max_size=0"));
+        assert!(line.contains("ignore_video_encoder_constraints=true"));
         assert!(line.contains("video_bit_rate=4000000"));
         assert!(!line.contains("max_fps="));
         assert!(!line.contains("tunnel_forward"));

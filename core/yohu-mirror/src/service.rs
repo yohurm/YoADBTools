@@ -292,6 +292,7 @@ impl MirrorService {
                     generation,
                     "HEVC 失败，同会话回退 H.264"
                 );
+                frames.reset_content();
                 req.video_codec = codec::NAME_H264.into();
                 tried_h264 = true;
                 continue;
@@ -657,6 +658,9 @@ mod tests {
                         .is_some_and(|e| hevc_should_fallback(requested_h265, tried_h264, e))
                 {
                     assert!(pipe_open(&frames));
+                    frames.reset_content();
+                    assert!(frames.sticky_config().is_none());
+                    assert!(frames.try_recv().is_none());
                     tried_h264 = true;
                     continue;
                 }

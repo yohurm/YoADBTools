@@ -20,3 +20,5 @@ pub const ADB_PUSH_MS: u64 = 60_000;
 
 pub const LOOPBACK_HOST: &str = "127.0.0.1";
 pub const VIDEO_CODEC_OPTIONS: &str = "i-frame-interval=1";
+/// scrcpy 4.1：按显示尺寸编码，失败再降。`max_size=0` 的本机分辨率契约。
+pub const IGNORE_VIDEO_ENCODER_CONSTRAINTS: &str = "ignore_video_encoder_constraints=true";
