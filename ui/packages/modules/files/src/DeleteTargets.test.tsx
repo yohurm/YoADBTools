@@ -53,6 +53,10 @@ describe("DeleteTargets", () => {
     expect(document.querySelector(".yohu-collapse")?.getAttribute("data-open")).toBe("true");
     expect(visibleChips()).toHaveLength(names.length);
     expect(document.body.textContent).toContain("收起");
+    expect(document.querySelector(".yohu-files__delete-more")).toBeTruthy();
+    expect(
+      document.querySelector(".yohu-files__delete-more .yohu-files__delete-grid"),
+    ).toBeTruthy();
   });
 
   it("YoChip dismiss 按名移除", () => {

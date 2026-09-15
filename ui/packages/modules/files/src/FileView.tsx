@@ -40,6 +40,7 @@ type CreateKind = "file" | "dir";
 const toaster = createToaster();
 
 export function FileView(props: DeviceSession) {
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
   const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
   const [deleteExpanded, setDeleteExpanded] = createSignal(false);
   const [createKind, setCreateKind] = createSignal<CreateKind | null>(null);
@@ -100,6 +101,10 @@ export function FileView(props: DeviceSession) {
   };
 
   const closeDelete = (): void => {
+    setDeleteOpen(false);
+  };
+
+  const finishDelete = (): void => {
     setDeleteNames([]);
     setDeleteExpanded(false);
   };
@@ -109,17 +114,22 @@ export function FileView(props: DeviceSession) {
     closeContextMenu();
     setDeleteExpanded(false);
     setDeleteNames(names);
+    setDeleteOpen(true);
   };
 
   const dropFromDelete = (name: string): void => {
     const next = dropDeleteName(deleteNames(), name);
+    if (next.length === 0) {
+      setDeleteOpen(false);
+      return;
+    }
     setDeleteNames(next);
     if (next.length <= DELETE_PREVIEW_LIMIT) setDeleteExpanded(false);
   };
 
   const confirmDelete = (): void => {
     const names = deleteNames();
-    closeDelete();
+    setDeleteOpen(false);
     void fileStore.removeMany(names);
   };
 
@@ -301,10 +311,11 @@ export function FileView(props: DeviceSession) {
 
       <div data-drop="ignore">
         <YoDialog
-          open={() => deleteNames().length > 0}
+          open={deleteOpen}
           title="确认删除"
-          bodyOverflow="hidden"
+          initial="footer"
           onClose={closeDelete}
+          onExitComplete={finishDelete}
           footer={
             <>
               <YoButton variant="ghost" tone="neutral" onClick={closeDelete}>

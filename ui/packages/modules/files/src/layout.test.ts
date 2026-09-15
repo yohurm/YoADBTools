@@ -227,8 +227,20 @@ const deleteTargets = loadDeleteTargets();
 describe("确认删除多文件契约", () => {
   it("弹窗走 DeleteTargets，不把文件名拼成一段", () => {
     expect(fileView).toContain("DeleteTargets");
-    expect(fileView).toContain('bodyOverflow="hidden"');
+    expect(fileView).not.toContain('bodyOverflow="hidden"');
+    expect(fileView).toContain('initial="footer"');
     expect(fileView).not.toContain('join("、")');
+  });
+
+  it("open 独立于名单，出场后再清载荷", () => {
+    expect(fileView).toContain("deleteOpen");
+    expect(fileView).toContain("onExitComplete");
+    expect(fileView).toContain("finishDelete");
+    expect(fileView).not.toContain("deleteNames().length");
+    const closeBlock = fileView.slice(fileView.indexOf("const closeDelete"), fileView.indexOf("const finishDelete"));
+    expect(closeBlock).toContain("setDeleteOpen(false)");
+    expect(closeBlock).not.toContain("setDeleteNames");
+    expect(closeBlock).not.toContain("setDeleteExpanded");
   });
 
   it("超出预览走一层 YoCollapse panel", () => {
@@ -241,12 +253,22 @@ describe("确认删除多文件契约", () => {
     expect(filesCss).toMatch(
       /\.yohu-files__delete-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit/,
     );
+    expect(deleteTargets).toContain("yohu-files__delete-more");
+    expect(filesCss).toContain("grid-column: 1 / -1");
+    expect(filesCss).toMatch(/\.yohu-files__delete-more\s*\{[^}]*min-height:\s*0/);
+    expect(filesCss).not.toContain("delete-grid--rest");
+    expect(deleteTargets).not.toContain("delete-grid--rest");
     expect(deleteTargets).toContain("YoChip");
+    expect(deleteTargets).toContain("block");
     expect(deleteTargets).toContain('dismiss="hover"');
     expect(deleteTargets).toContain("YoFileIcon");
     expect(deleteTargets).not.toContain("yohu-files__delete-chip-remove");
     expect(filesCss).not.toContain(".yohu-files__delete-chip-remove");
-    expect(filesCss).toContain(".yohu-files__delete-scroller");
-    expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
+    expect(deleteTargets).not.toContain("delete-scroller");
+    expect(filesCss).not.toContain(".yohu-files__delete-scroller");
+    const deleteBlock = filesCss.slice(filesCss.indexOf(".yohu-files__delete {"));
+    expect(deleteBlock).not.toMatch(/overflow:\s*auto/);
+    expect(deleteBlock).not.toMatch(/overflow-y:\s*auto/);
+    expect(deleteBlock).not.toMatch(/flex:\s*1 1 auto/);
   });
 });

@@ -437,19 +437,10 @@
 .yohu-files__delete {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--yohu-space-md);
-  min-height: 0;
-  flex: 1;
-}
-
-.yohu-files__delete-scroller {
-  display: flex;
-  flex-direction: column;
   width: 100%;
   min-height: 0;
-  max-height: var(--yohu-layout-output-max);
-  overflow: auto;
 }
 
 .yohu-files__delete-grid {
@@ -463,13 +454,20 @@
   box-sizing: border-box;
 }
 
-.yohu-files__delete-grid--rest {
-  padding-top: var(--yohu-space-xs);
+/* 其余项占满一行：与预览同一张网格、同一档 gap，禁止再当第二截区块。 */
+.yohu-files__delete-more {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .yohu-files__delete-item {
   min-width: 0;
   display: flex;
+}
+
+.yohu-files__delete > .yohu-button {
+  align-self: flex-start;
 }
 
 /* 仅对话框内校验，路径错误走 YoToast，禁止再做页内错误条。 */

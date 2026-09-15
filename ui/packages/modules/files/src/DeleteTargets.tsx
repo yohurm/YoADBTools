@@ -1,5 +1,6 @@
 /**
  * 确认删除对象列表：折叠预览 / YoChip 行列 / dismiss 移除。
+ * 预览与其余是同一张网格：其余占满一行，折叠只长高，间距跟格子 gap 同一档。
  * 超出预览的项走 YoCollapse panel（高度 + 淡入上移），禁止瞬时切名单。
  */
 
@@ -26,20 +27,13 @@ function DeleteChip(props: { name: string; onRemove: (name: string) => void }) {
     <li class="yohu-files__delete-item">
       <YoChip
         tone="neutral"
+        block
         text={props.name}
         leading={<YoFileIcon name={props.name} kind={entryKind(props.name)} size={Layout.IconSm} />}
         dismiss="hover"
         onDismiss={() => props.onRemove(props.name)}
       />
     </li>
-  );
-}
-
-function DeleteChipGrid(props: { names: string[]; rest?: boolean; onRemove: (name: string) => void }) {
-  return (
-    <ul class="yohu-files__delete-grid" classList={{ "yohu-files__delete-grid--rest": props.rest }}>
-      <For each={props.names}>{(name) => <DeleteChip name={name} onRemove={props.onRemove} />}</For>
-    </ul>
   );
 }
 
@@ -54,14 +48,18 @@ export function DeleteTargets(props: DeleteTargetsProps) {
       <p class="yohu-files__confirm">
         确定删除以下 <strong>{props.names.length}</strong> 项吗？该操作不可恢复。
       </p>
-      <div class="yohu-files__delete-scroller">
-        <DeleteChipGrid names={head()} onRemove={props.onRemove} />
+      <ul class="yohu-files__delete-grid">
+        <For each={head()}>{(name) => <DeleteChip name={name} onRemove={props.onRemove} />}</For>
         <Show when={canToggle()}>
-          <YoCollapse open={props.expanded} recipe="panel">
-            <DeleteChipGrid names={rest()} rest onRemove={props.onRemove} />
-          </YoCollapse>
+          <li class="yohu-files__delete-more">
+            <YoCollapse open={props.expanded} recipe="panel">
+              <ul class="yohu-files__delete-grid">
+                <For each={rest()}>{(name) => <DeleteChip name={name} onRemove={props.onRemove} />}</For>
+              </ul>
+            </YoCollapse>
+          </li>
         </Show>
-      </div>
+      </ul>
       <Show when={canToggle()}>
         <YoButton
           variant="ghost"
