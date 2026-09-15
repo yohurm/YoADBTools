@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v2.77（2026-09-15，级别筛选选中只认 aria-pressed）
+> **状态：** v2.78（2026-09-15，无设备栏 hug）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v2.78 变更（无设备栏 hug）：** 设备栏无设备时 `data-empty` + `YoCollapse` 默认 collapse + `YoEmptyState size=sm`，栏不把 42% 帽当目标高度。引导改短句；有 `lastError` 才出明细和重试。有列表仍 `recipe=fill`。`YoEmptyState` 基态 hug，只有 `fill` 才 `flex:1`。见 [youi.md](youi.md)。
 > **v2.77 变更（级别筛选选中只认 aria-pressed）：** 槽不再写 `data-paint` / `data-level`，也不再设 `--yohu-button-*`。`.yohu-ink` 只桥 `log-ink → ink/fill`。inherit 按下字走 `fg-on`。行 Fatal 反色仍用 `data-paint=invert`。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
 > **v2.76 变更（级别筛选一律反色，去掉 ink 洗度双底）：** 筛选格选中不再分软底/反色。删除 `InkWash` / `--yohu-ink-wash-*`。V–F 按下同一配方。已被 v2.77 收到 inherit `aria-pressed`。
 > **v2.75 变更（级别筛选 ink 洗度收口）：** 选中不再走 `--yohu-state-hover`（六格同灰）。L0 `InkWash` 排出 `--yohu-ink-wash-selected` 20% / `--yohu-ink-wash-hover` 10%。L1 `.yohu-ink-wash` 从 `--yohu-log-ink` 派生 fill/soft。已被 v2.76 删除。
@@ -489,7 +490,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 └────────────────────────────────────────────────────────────┘
 ```
 
-- **设备栏**：标题行 = 折叠钮 +「设备」+ 数量徽章（徽章紧跟标题，不推到最右）+ 刷新（`YoIconButton loading` 旋转）；设备行（型号一行 + serial 等宽一行 + 可选运行时次行 Android/电量，主次上下间隔 2vp + 在线点 + 未授权徽章，无白卡片）；空态给引导文案；选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）。单选实底由 `YoIndicator` fill 在 list 宿主内滑动，宿主 `overflow: hidden` 裁切弹簧过冲；项滚动在 `__scroller`（横向 hidden、纵向 auto）。禁止把 `overflow: auto` 写在滑块宿主上。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
+- **设备栏**：标题行 = 折叠钮 +「设备」+ 数量徽章（徽章紧跟标题，不推到最右）+ 刷新（`YoIconButton loading` 旋转）；设备行（型号一行 + serial 等宽一行 + 可选运行时次行 Android/电量，主次上下间隔 2vp + 在线点 + 未授权徽章，无白卡片）；无设备时栏 hug（`data-empty`，折叠走默认 `collapse`，空态 `YoEmptyState size=sm` 短引导；有错误才出明细和重试），不占满 `--yohu-layout-device-rail-max`；有列表才 `recipe=fill` 在帽下纵滚。选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）。单选实底由 `YoIndicator` fill 在 list 宿主内滑动，宿主 `overflow: hidden` 裁切弹簧过冲；项滚动在 `__scroller`（横向 hidden、纵向 auto）。禁止把 `overflow: auto` 写在滑块宿主上。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
 - **导航**：图标 `Layout.IconSm`（`<Icon>` 单源，currentColor）+ 标题；激活只加 `.yohu-interactive--selected`；Planned 项「开发中」走 `YoBadge`。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏可整栏收起（标题栏 `sidebar` 抽屉钮）。设备栏高度帽 `--yohu-layout-device-rail-max`（`LayoutLimits.DeviceRailMaxPercent`）。
 - **模块页眉**：在右侧内容区顶部（`YoChrome`）。左侧为功能标题区（Subtitle Bold）+ 选中设备名（`deviceLabel` 中性徽章，文案来自 `DeviceSession.selectedLabel`），右侧为功能栏；与窗口标题栏分离，不挤进中区。无操作的模块（设置）只显示标题，但标题行高度仍是 `--yohu-control-height`（与有按钮的页同一占位）。底垫 `--yohu-layout-chrome-pad`。页眉是页壳的第一子节点（`flex: 0 0 auto`），禁止与内容区作为 fragment 兄弟交给模块转场。
 - **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点一律 `YoPage`（`.yohu-page`：`padding: page-inset`、`gap: page-gap`）。`YoChrome` 是第一子节点。内容进 `YoPanel`（`variant=pane` 撑满）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。设置页分组走 `YoPanel` 默认 card，边距仍是 `page-margin`。

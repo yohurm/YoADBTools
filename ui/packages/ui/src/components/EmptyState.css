@@ -1,11 +1,12 @@
-/* 出现/消失直切。被 rail / collapse / inline-end 挤位时靠父级 1fr 插值跟随，禁止本组件写 transition。 */
+/* 出现/消失直切。被 rail / collapse / inline-end 挤位时靠父级 1fr 插值跟随，禁止本组件写 transition。
+ * 默认 hug；只有 data-fill 才参与父级伸缩。禁止基态写 flex:1，否则窄栏空态会把 42% 帽吃满。 */
 .yohu-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--yohu-space-md);
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   padding: var(--yohu-space-xl);
   text-align: center;
@@ -18,6 +19,12 @@
   flex: 1;
   min-height: 0;
   height: 100%;
+}
+
+.yohu-empty-state[data-size="sm"] {
+  align-items: stretch;
+  gap: var(--yohu-space-xs);
+  padding: var(--yohu-space-sm);
 }
 
 .yohu-empty-state__illustration {
@@ -45,4 +52,12 @@
   align-items: center;
   justify-content: center;
   gap: var(--yohu-space-sm);
+}
+
+.yohu-empty-state[data-size="sm"] .yohu-empty-state__title {
+  font-size: var(--yohu-font-body);
+}
+
+.yohu-empty-state[data-size="sm"] .yohu-empty-state__description {
+  font-size: var(--yohu-font-caption);
 }

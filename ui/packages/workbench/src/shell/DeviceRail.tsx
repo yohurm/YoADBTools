@@ -1,7 +1,9 @@
 /**
  * 设备栏（UI设计系统-v6.md §3）：卡片式设备列表。
  * 设备卡片：在线点 + 型号一行 + serial 等宽一行 + 可选运行时次行（Android/电量）+ 未授权徽章；
- * 选中 = `.yohu-interactive--selected`（全表面同一配方）；空态引导 + 错误明细 + 重试。
+ * 选中 = `.yohu-interactive--selected`（全表面同一配方）；
+ * 无设备 hug（`recipe=collapse` + `YoEmptyState size=sm`）；有列表才 `fill` 吃帽下剩余高。
+ * 空态短引导；有 lastError 才出明细和重试。
  * 滑块在 list 宿主内裁切；项滚动走内层 scroller，避免弹簧过冲撑出 Windows 双滚动条。
  * 插拔走 `YoListPresence`（配方 list）；空态/徽章仍直切。
  * 键盘：roving tabindex（焦点行 0）+ Enter/Space 选择，role=listbox/option。
@@ -32,6 +34,9 @@ export const DeviceRail: Component<{
   };
 
   const isSelected = (serial: string): boolean => targets().includes(serial);
+  const empty = (): boolean => deviceStore.state.devices.length === 0;
+  const emptyHint = (): string =>
+    deviceStore.state.lastError || "连接设备并授权后刷新";
   const indicatorFollow = (): string | undefined => {
     const ids = targets();
     return ids.length === 1 ? ids[0] : undefined;
@@ -53,7 +58,7 @@ export const DeviceRail: Component<{
   };
 
   return (
-    <div class="yohu-device-rail">
+    <div class="yohu-device-rail" data-empty={empty() ? true : undefined}>
       <div class="yohu-device-rail__header">
         <YoIconButton
           icon={expanded() ? "chevron-down" : "chevron-right"}
@@ -74,26 +79,26 @@ export const DeviceRail: Component<{
           onClick={() => void deviceStore.refresh()}
         />
       </div>
-      <YoCollapse open={expanded()} recipe="fill">
+      <YoCollapse open={expanded()} recipe={empty() ? "collapse" : "fill"}>
         <div class="yohu-device-rail__body">
           <Show
-            when={deviceStore.state.devices.length > 0}
+            when={!empty()}
             fallback={
               <YoEmptyState
+                size="sm"
                 title="无设备"
-                description={
-                  deviceStore.state.lastError ||
-                  "请用 USB 连接设备并确认已授权（adb devices 可见）"
-                }
+                description={emptyHint()}
                 action={
-                  <YoButton
-                    size="sm"
-                    variant="outlined"
-                    tone="neutral"
-                    onClick={() => void deviceStore.refresh()}
-                  >
-                    重试扫描
-                  </YoButton>
+                  deviceStore.state.lastError ? (
+                    <YoButton
+                      size="sm"
+                      variant="outlined"
+                      tone="neutral"
+                      onClick={() => void deviceStore.refresh()}
+                    >
+                      重试扫描
+                    </YoButton>
+                  ) : undefined
                 }
               />
             }

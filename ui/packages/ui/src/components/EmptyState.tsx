@@ -19,8 +19,10 @@ export interface YoEmptyStateProps {
   description?: string;
   /** 可选 action 槽（按钮等）。不是 Dialog children */
   action?: JSX.Element;
-  /** 在父级剩余空间内伸展并居中。不是盖住下层 */
+  /** 在父级剩余空间内伸展并居中。不是盖住下层。默认 hug */
   fill?: boolean;
+  /** md=页/面板；sm=窄栏 hug（设备栏） */
+  size?: "md" | "sm";
 }
 
 /** 渲染一个居中的空状态占位。内容区 = 插画 + 文案 + action。 */
@@ -32,6 +34,7 @@ export function YoEmptyState(props: YoEmptyStateProps): JSX.Element {
       hasIcon: Boolean(props.icon),
       hasAction: props.action != null,
       fill: props.fill,
+      size: props.size,
     }),
   );
   return (
@@ -40,6 +43,7 @@ export function YoEmptyState(props: YoEmptyStateProps): JSX.Element {
       data-has-icon={host()["data-has-icon"]}
       data-has-action={host()["data-has-action"]}
       data-fill={host()["data-fill"]}
+      data-size={host()["data-size"]}
     >
       <Show when={props.icon}>
         {(icon) => (

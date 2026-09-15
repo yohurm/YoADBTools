@@ -7,6 +7,7 @@ describe("empty-policy", () => {
       "data-has-icon": undefined,
       "data-has-action": undefined,
       "data-fill": undefined,
+      "data-size": undefined,
     });
   });
 
@@ -15,10 +16,15 @@ describe("empty-policy", () => {
       "data-has-icon": true,
       "data-has-action": true,
       "data-fill": undefined,
+      "data-size": undefined,
     });
   });
 
   it("fill 写入 data-fill", () => {
     expect(emptyStateHostAttrs({ title: "空", fill: true })["data-fill"]).toBe(true);
+  });
+
+  it("size=sm 写入 data-size", () => {
+    expect(emptyStateHostAttrs({ title: "空", size: "sm" })["data-size"]).toBe("sm");
   });
 });

@@ -293,6 +293,9 @@ describe("DeviceRail（§3 设备卡片）", () => {
       `adb 未找到；adb: ${RESOLVED_ADB}`,
     );
     expect(screen.getByText("重试扫描")).toBeTruthy();
+    expect(container.querySelector(".yohu-device-rail")?.getAttribute("data-empty")).toBe("true");
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-size")).toBe("sm");
+    expect(container.querySelector(".yohu-collapse")?.getAttribute("data-recipe")).toBe("collapse");
   });
 
   it("扫描空列表即无设备，不保留上次在线", async () => {
@@ -308,7 +311,10 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(deviceStore.state.focusSerial).toBeNull();
     const { container } = render(() => <DeviceRail />);
     expect(screen.getByText("无设备")).toBeTruthy();
+    expect(screen.getByText("连接设备并授权后刷新")).toBeTruthy();
+    expect(screen.queryByText("重试扫描")).toBeNull();
     expect(container.querySelectorAll('[role="option"]').length).toBe(0);
+    expect(container.querySelector(".yohu-device-rail")?.getAttribute("data-empty")).toBe("true");
   });
 
   it("刷新后用 device.status 对账运行时次行（不依赖可丢的 device/status 事件）", async () => {
@@ -396,19 +402,36 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-x:\s*hidden/);
     expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-y:\s*auto/);
     expect(decls("yohu-device-rail")).toMatch(/max-height:\s*var\(--yohu-layout-device-rail-max\)/);
+    expect(css).toMatch(/\.yohu-device-rail\[data-empty\]\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toMatch(/max-height:\s*42%/);
     expect(css).not.toContain(".yohu-collapse__inner");
   });
 
-  it("设备列表折叠走 YoCollapse fill，不穿 __inner", () => {
+  it("无设备折叠 hug；有列表才 fill，不穿 __inner", async () => {
+    mocks.deviceRefresh.mockResolvedValue([]);
+    await deviceStore.refresh();
+    const empty = render(() => <DeviceRail />);
+    const emptyCollapse = empty.container.querySelector(".yohu-collapse");
+    expect(empty.container.querySelector(".yohu-device-rail")?.getAttribute("data-empty")).toBe("true");
+    expect(emptyCollapse?.getAttribute("data-recipe")).toBe("collapse");
+    expect(emptyCollapse?.getAttribute("data-open")).toBe("true");
+    const emptyInner = emptyCollapse?.querySelector(":scope > .yohu-collapse__inner");
+    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
+    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
+    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
+    empty.unmount();
+
+    mocks.deviceRefresh.mockResolvedValue([
+      { serial: "A1", model: "Moto X", state: "online", connection: "usb" },
+    ]);
+    await deviceStore.refresh();
     const { container } = render(() => <DeviceRail />);
     const collapse = container.querySelector(".yohu-collapse");
+    expect(container.querySelector(".yohu-device-rail")?.hasAttribute("data-empty")).toBe(false);
     expect(collapse?.getAttribute("data-recipe")).toBe("fill");
-    expect(collapse?.getAttribute("data-open")).toBe("true");
     const inner = collapse?.querySelector(":scope > .yohu-collapse__inner");
     expect(inner?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
     expect(inner?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
-    expect(inner?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
   });
 });
 

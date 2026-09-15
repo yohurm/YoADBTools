@@ -337,6 +337,15 @@ text / tone / leading? / dismiss? / onDismiss?
 
 插画 + 标题 + 描述 + 可选 `action`。不当 Dialog、不内嵌 Presence、不自写挤位 transition。
 
+```
+props
+  → L2 resolveEmptyStateSpec（fill / size / 插画 / action）
+  → L3 emptyStateHostAttrs（data-fill / data-size / data-has-*）
+  → L4 只绑 data；内容区 = 插画 + 标题 + 描述 + action
+```
+
+公开 API：`title` / `description` / `icon` / `action` / `fill` / `size`。默认 hug（基态 `flex: 0 0 auto`）。`fill` 才参与父级伸缩并居中，不是 cover。`size=sm` 收垫/间隙（设备栏）；`md` 是页/面板。禁止基态写 `flex:1`（窄栏会把 42% 帽吃满）。禁止模块点 `__title` / `__description`。
+
 ---
 
 ## 组件：YoLoading（L0–L5）
@@ -478,7 +487,7 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 默认只裁切高度，禁止给 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail）才在库内给直接子级 `flex:1; min-height:0`；壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 默认只裁切高度，禁止给 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才在库内给直接子级 `flex:1; min-height:0`；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys

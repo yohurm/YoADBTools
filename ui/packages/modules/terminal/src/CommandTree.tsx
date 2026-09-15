@@ -69,7 +69,7 @@ export function CommandTree(props: {
     <Show
       when={treeData().length > 0}
       fallback={
-        <YoEmptyState icon="terminal" title="命令库为空" description="点击「命令管理」添加命令" />
+        <YoEmptyState fill icon="terminal" title="命令库为空" description="点击「命令管理」添加命令" />
       }
     >
       <YoTree

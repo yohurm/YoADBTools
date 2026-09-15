@@ -9,6 +9,7 @@ describe("empty-model", () => {
       hasIcon: false,
       hasAction: false,
       fill: false,
+      size: "md",
     });
   });
 
@@ -25,10 +26,16 @@ describe("empty-model", () => {
       hasIcon: true,
       hasAction: true,
       fill: false,
+      size: "md",
     });
   });
 
   it("fill 是独立开关", () => {
     expect(resolveEmptyStateSpec({ title: "空", fill: true }).fill).toBe(true);
+  });
+
+  it("size 只认 sm，其余回落 md", () => {
+    expect(resolveEmptyStateSpec({ title: "空", size: "sm" }).size).toBe("sm");
+    expect(resolveEmptyStateSpec({ title: "空", size: "md" }).size).toBe("md");
   });
 });

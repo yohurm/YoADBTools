@@ -62,4 +62,14 @@ describe("YoEmptyState", () => {
     expect(css).not.toContain("data-cover");
     expect(css).not.toMatch(/\.yohu-empty-state\[data-fill\][^{]*\{[^}]*position:\s*absolute/);
   });
+
+  it("默认 hug，不在基态写 flex:1；sm 收垫", () => {
+    const css = loadEmptyCss();
+    const base = css.match(/^\.yohu-empty-state\s*\{([^}]*)\}/m)?.[1] ?? "";
+    expect(base).toMatch(/flex:\s*0 0 auto/);
+    expect(base).not.toMatch(/flex:\s*1/);
+    const { container } = render(() => <YoEmptyState title="空" size="sm" />);
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-size")).toBe("sm");
+    expect(css).toMatch(/\[data-size="sm"\]/);
+  });
 });

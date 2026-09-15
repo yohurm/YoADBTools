@@ -91,6 +91,15 @@
   overflow: hidden;
 }
 
+/* 无设备：栏与折叠都 hug，不把 42% 帽当成目标高度。有列表才走 fill。 */
+.yohu-device-rail[data-empty] {
+  flex: 0 0 auto;
+}
+
+.yohu-device-rail[data-empty] .yohu-collapse {
+  flex: 0 0 auto;
+}
+
 /* 折叠根是壳的孩子：排自己的 flex。内层填满走 YoCollapse recipe=fill，禁止再点 __inner。 */
 .yohu-device-rail .yohu-collapse {
   flex: 1 1 auto;
