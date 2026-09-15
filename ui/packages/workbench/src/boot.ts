@@ -14,8 +14,14 @@ function nextFrame(): Promise<void> {
   });
 }
 
-/** 等浏览器把当前帧合成出去（双 rAF）。 */
+/**
+ * 等浏览器把当前帧合成出去（双 rAF）。
+ * 隐藏文档没有合成帧，`requestAnimationFrame` 可能永不回调；此时直接返回。
+ */
 export async function waitForNextPaint(): Promise<void> {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return;
+  }
   await nextFrame();
   await nextFrame();
 }

@@ -69,8 +69,22 @@ describe("启动编排", () => {
       cb(0);
       return 0;
     });
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     await waitForNextPaint();
     expect(frames).toHaveLength(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("隐藏文档不等 rAF，避免启动窗永远不揭", async () => {
+    const frames: number[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      frames.push(1);
+      cb(0);
+      return 0;
+    });
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    await waitForNextPaint();
+    expect(frames).toHaveLength(0);
     vi.unstubAllGlobals();
   });
 
