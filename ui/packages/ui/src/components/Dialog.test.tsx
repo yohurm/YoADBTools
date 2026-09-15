@@ -111,8 +111,11 @@ describe("YoDialog", () => {
     expect(body.getAttribute("data-layout")).toBe("stack");
     expect(body.getAttribute("data-overflow")).toBe("auto");
     expect(body.getAttribute("data-pad")).toBe("lg");
+    expect(body.getAttribute("data-region")).toBe("plain");
     const autoRule =
-      dialogCss.match(/\.yohu-dialog__body\[data-overflow="auto"\]\s*\{[^}]*\}/)?.[0] ?? "";
+      dialogCss.match(
+        /\.yohu-dialog__body\[data-overflow="auto"\]:not\(\[data-region="split"\]\)\s*\{[^}]*\}/,
+      )?.[0] ?? "";
     expect(autoRule).toContain("overflow-x: hidden");
     expect(autoRule).toContain("overflow-y: auto");
     expect(autoRule).not.toMatch(/(?<!-)overflow:\s*auto/);
@@ -149,6 +152,7 @@ describe("YoDialog", () => {
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.style.width).toBe("");
     expect(panel.hasAttribute("data-sized")).toBe(false);
+    expect(panel.getAttribute("data-box")).toBe("fit");
   });
 
   it("显式宽度写入 inline 并覆盖弹出框上限", () => {
@@ -160,20 +164,50 @@ describe("YoDialog", () => {
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.style.width).toBe("960px");
     expect(panel.hasAttribute("data-sized")).toBe(true);
-    expect(panel.hasAttribute("data-fill")).toBe(false);
+    expect(panel.getAttribute("data-box")).toBe("fit");
     expect(panel.classList.contains("yohu-dialog__panel--sized")).toBe(false);
   });
 
-  it("显式高度写 data-fill，内容区才吃剩余高", () => {
+  it("显式高度写 data-box=fill，内容区才吃剩余高", () => {
     const { container } = render(() => (
       <YoDialog open width={960} height={480} onClose={() => {}}>
         内容
       </YoDialog>
     ));
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
-    expect(panel.hasAttribute("data-fill")).toBe(true);
-    expect(dialogCss).toContain(".yohu-dialog__panel[data-fill] .yohu-dialog__body");
-    expect(dialogCss).toContain("flex: 1 1 auto");
+    expect(panel.getAttribute("data-box")).toBe("fill");
+    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body');
+    expect(dialogCss).toContain("flex: 1 1 0");
+    const fitBody = dialogCss.match(/\.yohu-dialog__body\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(fitBody).toContain("flex: 0 1 auto");
+    expect(fitBody).not.toContain("flex: 1 1 auto");
+  });
+
+  it("fit 滚槽预算走 dialog-body-max，不把 90% 当内容帽", () => {
+    expect(dialogCss).toContain("max-height: var(--yohu-layout-dialog-body-max)");
+    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fit"]');
+    expect(dialogCss).toContain('[data-region="split"]');
+    expect(dialogCss).not.toContain("grid-template-rows: auto auto auto");
+    expect(dialogCss).not.toContain("data-exit-lock");
+    expect(dialogCss).not.toContain(".yohu-dialog__panel[data-fill]");
+  });
+
+  it("bodyLead / bodyTail 写成 split，只有 main 滚", () => {
+    const { container } = render(() => (
+      <YoDialog
+        open
+        onClose={() => {}}
+        bodyLead={<p>确定删除吗</p>}
+        bodyTail={<button>展开其余</button>}
+      >
+        名单
+      </YoDialog>
+    ));
+    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    expect(body.getAttribute("data-region")).toBe("split");
+    expect(container.querySelector(".yohu-dialog__lead")?.textContent).toBe("确定删除吗");
+    expect(container.querySelector(".yohu-dialog__main")?.textContent).toBe("名单");
+    expect(container.querySelector(".yohu-dialog__tail")?.textContent).toBe("展开其余");
   });
 
   it("open 支持 Accessor 形式（响应式开关）", () => {
@@ -204,15 +238,15 @@ describe("YoDialog", () => {
     expect(onExitComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("出场锁样式在 CSS，零盒不写 data-exit-lock", () => {
+  it("打开是 fit，出场盒写在 data-box=exit", () => {
     const { container } = render(() => (
       <YoDialog open onClose={() => {}}>
         内容
       </YoDialog>
     ));
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
-    expect(panel.hasAttribute("data-exit-lock")).toBe(false);
-    expect(dialogCss).toContain(".yohu-dialog__panel[data-exit-lock]");
+    expect(panel.getAttribute("data-box")).toBe("fit");
+    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="exit"]');
     expect(dialogCss).toContain("max-height: none");
   });
 

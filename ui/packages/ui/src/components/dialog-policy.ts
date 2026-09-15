@@ -11,7 +11,8 @@ import {
   resolveDialogBodySpec,
   resolveDialogExitLock,
   type DialogBodyInput,
-  type DialogExitLock,
+  type DialogBoxLock,
+  type DialogBodyRegion,
   type YoDialogBodyLayout,
   type YoDialogBodyOverflow,
   type YoDialogBodyPad,
@@ -36,6 +37,7 @@ export interface DialogBodyAttrs {
   "data-layout": YoDialogBodyLayout;
   "data-overflow": YoDialogBodyOverflow;
   "data-pad": YoDialogBodyPad;
+  "data-region": DialogBodyRegion;
 }
 
 /** 内容区契约写成 data-*；CSS 只认这些名字，禁止模块 :has 穿皮。 */
@@ -45,11 +47,12 @@ export function dialogBodyAttrs(input: DialogBodyInput): DialogBodyAttrs {
     "data-layout": spec.layout,
     "data-overflow": spec.overflow,
     "data-pad": spec.pad,
+    "data-region": spec.region,
   };
 }
 
 /** 读面板最后一次打开盒。零盒不锁。 */
-export function dialogExitLock(panel: HTMLElement): DialogExitLock | undefined {
+export function dialogExitLock(panel: HTMLElement): DialogBoxLock | undefined {
   const rect = panel.getBoundingClientRect();
   return resolveDialogExitLock(rect.width, rect.height);
 }

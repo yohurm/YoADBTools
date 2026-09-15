@@ -33,6 +33,7 @@ describe("dialog-policy", () => {
       "data-layout": "stack",
       "data-overflow": "auto",
       "data-pad": "lg",
+      "data-region": "plain",
     });
   });
 
@@ -41,6 +42,7 @@ describe("dialog-policy", () => {
       "data-layout": "stack",
       "data-overflow": "hidden",
       "data-pad": "lg",
+      "data-region": "plain",
     });
   });
 
@@ -49,7 +51,9 @@ describe("dialog-policy", () => {
       "data-layout": "stack",
       "data-overflow": "auto",
       "data-pad": "none",
+      "data-region": "plain",
     });
+    expect(dialogBodyAttrs({ lead: true })["data-region"]).toBe("split");
   });
 
   it("读面板盒：零盒不锁，正盒锁 px", () => {

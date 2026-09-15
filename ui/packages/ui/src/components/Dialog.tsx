@@ -2,9 +2,14 @@
  * YoDialog —— 模态对话框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：弹出框；最大宽 400vp；遮罩 10% 中性，不点遮罩关闭。
  * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
- * `open` 只是 Presence 开关，不是载荷是否为空。出场锁最后一次打开盒，
- * hug 不随 Collapse / 名单卸掉折高；载荷在 `onExitComplete` 再卸。
- * 受控 API：open / title / width / height / bodyLayout / bodyOverflow / bodyPad / initial / onClose / onExitComplete / footer / children。
+ *
+ * 盒：`open` 只是 Presence 开关。fit hug、fill 显式高、exit 锁最后打开盒。
+ * fit + overflow=auto 的滚槽预算是 `--yohu-layout-dialog-body-max`，不是 90% 视口。
+ * split（bodyLead / bodyTail）钉住铬，只有 `__main` 滚；Collapse 只进 main。
+ * 载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。
+ *
+ * 受控 API：open / title / width / height / bodyLayout / bodyOverflow / bodyPad /
+ * bodyLead / bodyTail / initial / onClose / onExitComplete / footer / children。
  *
  * 可达性：
  * - `role=dialog aria-modal`；有标题走 `aria-labelledby`，打开后焦点移入面板
@@ -17,14 +22,13 @@
  *
  * `open` 支持 `boolean` 或响应式 `Accessor<boolean>`。
  */
-import { createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
 import { YoPresence } from "../motion/presence";
 import {
-  dialogPanelPaint,
-  mergeDialogPanelStyle,
+  resolveDialogBox,
   resolveDialogInitial,
-  type DialogExitLock,
+  type DialogBoxLock,
   type YoDialogBodyLayout,
   type YoDialogBodyOverflow,
   type YoDialogBodyPad,
@@ -49,7 +53,7 @@ export interface YoDialogProps {
   title?: string;
   /** 面板宽度（px）。不设则走 `--yohu-layout-dialog-max`（弹出框 400）。显式值用于命令管理等整页对话框。 */
   width?: number;
-  /** 面板高度（px）；不设则随内容，受 max-height 约束 */
+  /** 面板高度（px）；不设则随内容（fit），受 90% 安全顶约束 */
   height?: number;
   /** 内容区排列。默认 stack（纵向 flex）。 */
   bodyLayout?: YoDialogBodyLayout;
@@ -57,6 +61,10 @@ export interface YoDialogProps {
   bodyOverflow?: YoDialogBodyOverflow;
   /** 内容区垫。默认 lg；整页铺满用 none。 */
   bodyPad?: YoDialogBodyPad;
+  /** 滚槽之上的钉住铬（确认文案）。有 lead/tail 才 split。 */
+  bodyLead?: JSX.Element;
+  /** 滚槽之下的钉住铬（展开/收起）。 */
+  bodyTail?: JSX.Element;
   /** 入场首焦。默认 auto；破坏性确认用 footer（取消）。 */
   initial?: YoDialogInitial;
   /** 关闭回调（Esc 触发） */
@@ -76,8 +84,7 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
   const titleId = createUniqueId();
 
   const [panelEl, setPanelEl] = createSignal<HTMLDivElement | undefined>();
-  const [exitLock, setExitLock] = createSignal<DialogExitLock | undefined>();
-  let lastOpenBox: DialogExitLock | undefined;
+  let lastOpenBox: DialogBoxLock | undefined;
 
   createEffect(() => {
     if (!isOpen()) return;
@@ -86,19 +93,15 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
     const entry: DialogStackEntry = {
       getPanel: () => panelEl(),
       onClose: props.onClose,
-      restoreFocus,
       initial: resolveDialogInitial(props.initial),
+      restoreFocus,
     };
     const detach = attachDialog(entry);
     onCleanup(detach);
   });
 
   createEffect(() => {
-    if (!isOpen()) {
-      setExitLock(lastOpenBox);
-      return;
-    }
-    setExitLock(undefined);
+    if (!isOpen()) return;
     const el = panelEl();
     if (!el) return;
     const sync = (): void => {
@@ -112,12 +115,21 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
     onCleanup(() => observer.disconnect());
   });
 
-  const paint = (): ReturnType<typeof dialogPanelPaint> => dialogPanelPaint(props.width, props.height);
-  const body = (): ReturnType<typeof dialogBodyAttrs> =>
+  const box = () =>
+    resolveDialogBox({
+      width: props.width,
+      height: props.height,
+      open: isOpen(),
+      lastOpen: isOpen() ? undefined : lastOpenBox,
+    });
+
+  const body = () =>
     dialogBodyAttrs({
       layout: props.bodyLayout,
       overflow: props.bodyOverflow,
       pad: props.bodyPad,
+      lead: props.bodyLead != null,
+      tail: props.bodyTail != null,
     });
 
   return (
@@ -126,7 +138,6 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
       recipe="dialog"
       onExitComplete={() => {
         lastOpenBox = undefined;
-        setExitLock(undefined);
         props.onExitComplete?.();
       }}
     >
@@ -139,10 +150,9 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
           aria-labelledby={props.title ? titleId : undefined}
           tabindex={-1}
           ref={setPanelEl}
-          data-sized={paint().sized ? "" : undefined}
-          data-fill={paint().fill ? "" : undefined}
-          data-exit-lock={exitLock() ? "" : undefined}
-          style={mergeDialogPanelStyle(paint(), exitLock())}
+          data-box={box().kind}
+          data-sized={box().sized ? "" : undefined}
+          style={box().style}
         >
           {props.title ? (
             <h3 id={titleId} class="yohu-dialog__title">
@@ -154,8 +164,17 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
             data-layout={body()["data-layout"]}
             data-overflow={body()["data-overflow"]}
             data-pad={body()["data-pad"]}
+            data-region={body()["data-region"]}
           >
-            {props.children}
+            <Show when={body()["data-region"] === "split"} fallback={props.children}>
+              <Show when={props.bodyLead != null}>
+                <div class="yohu-dialog__lead">{props.bodyLead}</div>
+              </Show>
+              <div class="yohu-dialog__main">{props.children}</div>
+              <Show when={props.bodyTail != null}>
+                <div class="yohu-dialog__tail">{props.bodyTail}</div>
+              </Show>
+            </Show>
           </div>
           {props.footer ? <div class="yohu-dialog__footer">{props.footer}</div> : null}
         </div>

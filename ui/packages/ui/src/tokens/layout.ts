@@ -68,6 +68,12 @@ export const Layout = {
   ButtonMax: 448,
   /** 弹出框最大宽 400vp；指向型气泡同帽 */
   DialogMax: 400,
+  /**
+   * hug 弹窗滚槽预算（确认名单等）。
+   * 对照鸿蒙 center/popup FIT_CONTENT：内容区自有帽，不是 90% 视口。
+   * 90% 只做面板安全顶；显式 height 的 fill 对话框不吃这档。
+   */
+  DialogBodyMax: 260,
   /** 气泡距视口边缘最小 6vp（鸿蒙指向型） */
   TooltipEdge: 6,
   /** 箭头旋转方块边长；尖伸出一半 */

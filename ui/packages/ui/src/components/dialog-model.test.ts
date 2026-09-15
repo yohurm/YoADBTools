@@ -1,34 +1,64 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  dialogPanelPaint,
-  mergeDialogPanelStyle,
+  resolveDialogBodyRegion,
   resolveDialogBodySpec,
+  resolveDialogBox,
   resolveDialogExitLock,
   resolveDialogInitial,
 } from "./dialog-model";
 
 describe("dialog-model", () => {
-  it("未指定宽高不写 inline，显式宽高才 sized / fill", () => {
-    expect(dialogPanelPaint()).toEqual({ sized: false, fill: false, style: {} });
-    expect(dialogPanelPaint(960)).toEqual({
+  it("打开且无显式高是 fit hug，不写 height", () => {
+    expect(resolveDialogBox({ open: true })).toEqual({ kind: "fit", sized: false, style: {} });
+    expect(resolveDialogBox({ open: true, width: 960 })).toEqual({
+      kind: "fit",
       sized: true,
-      fill: false,
       style: { width: "960px" },
     });
-    expect(dialogPanelPaint(960, 480)).toEqual({
+  });
+
+  it("显式高才 fill", () => {
+    expect(resolveDialogBox({ open: true, width: 960, height: 480 })).toEqual({
+      kind: "fill",
       sized: true,
-      fill: true,
       style: { width: "960px", height: "480px" },
     });
   });
 
-  it("内容区缺省是 stack + auto + lg", () => {
+  it("关闭有最后打开盒才 exit 锁盒，否则回退 props 尺寸", () => {
+    const lock = { width: "400px", height: "320px" };
+    expect(resolveDialogBox({ open: false, lastOpen: lock })).toEqual({
+      kind: "exit",
+      sized: false,
+      style: lock,
+    });
+    expect(resolveDialogBox({ open: false, width: 960, lastOpen: lock })).toEqual({
+      kind: "exit",
+      sized: true,
+      style: lock,
+    });
+    expect(resolveDialogBox({ open: false, width: 960 })).toEqual({
+      kind: "exit",
+      sized: true,
+      style: { width: "960px" },
+    });
+  });
+
+  it("内容区缺省是 stack + auto + lg + plain", () => {
     expect(resolveDialogBodySpec({})).toEqual({
       layout: "stack",
       overflow: "auto",
       pad: "lg",
+      region: "plain",
     });
+  });
+
+  it("有 lead 或 tail 才 split，Collapse 只许进 main", () => {
+    expect(resolveDialogBodyRegion()).toBe("plain");
+    expect(resolveDialogBodyRegion(true, false)).toBe("split");
+    expect(resolveDialogBodyRegion(false, true)).toBe("split");
+    expect(resolveDialogBodySpec({ lead: true }).region).toBe("split");
   });
 
   it("stack + hidden 只改溢出，垫与排列保持缺省", () => {
@@ -36,6 +66,7 @@ describe("dialog-model", () => {
       layout: "stack",
       overflow: "hidden",
       pad: "lg",
+      region: "plain",
     });
   });
 
@@ -44,6 +75,7 @@ describe("dialog-model", () => {
       layout: "stack",
       overflow: "auto",
       pad: "none",
+      region: "plain",
     });
   });
 
@@ -61,12 +93,5 @@ describe("dialog-model", () => {
     expect(resolveDialogExitLock(0, 320)).toBeUndefined();
     expect(resolveDialogExitLock(400, 0)).toBeUndefined();
     expect(resolveDialogExitLock(400, 320)).toEqual({ width: "400px", height: "320px" });
-  });
-
-  it("出场锁盖过 hug 与显式尺寸", () => {
-    const lock = { width: "400px", height: "320px" };
-    expect(mergeDialogPanelStyle(dialogPanelPaint(), lock)).toEqual(lock);
-    expect(mergeDialogPanelStyle(dialogPanelPaint(960, 480), lock)).toEqual(lock);
-    expect(mergeDialogPanelStyle(dialogPanelPaint(960))).toEqual({ width: "960px" });
   });
 });

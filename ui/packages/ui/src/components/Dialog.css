@@ -37,13 +37,18 @@
   max-width: calc(100% - var(--yohu-layout-page-margin) * 2);
 }
 
-/* 出场锁：用最后一次打开盒，不再被 90% hug 或子树折叠改高。 */
-.yohu-dialog__panel[data-exit-lock] {
+/* 出场：用最后一次打开盒，不再被 90% hug 或子树折叠改高。 */
+.yohu-dialog__panel[data-box="exit"] {
   max-height: none;
 }
 
 .yohu-dialog__panel:not(:focus-within) {
   box-shadow: var(--yohu-shadow-dialog-unfocused);
+}
+
+.yohu-dialog__title,
+.yohu-dialog__footer {
+  flex: 0 0 auto;
 }
 
 .yohu-dialog__title {
@@ -55,16 +60,21 @@
   line-height: var(--yohu-font-leading-tight);
 }
 
+/*
+ * fit：内容区 hug，不吃 90% 剩余高。
+ * fill / exit：内容区吃 title/footer 之间的剩余（整页对话框 / 出场锁盒）。
+ */
 .yohu-dialog__body {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   min-height: 0;
+  box-sizing: border-box;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
 }
 
-/* 显式高度：内容区吃 title/footer 之间的剩余，不把 hug 弹窗撑满 90%。 */
-.yohu-dialog__panel[data-fill] .yohu-dialog__body {
+.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body,
+.yohu-dialog__panel[data-box="exit"] .yohu-dialog__body {
   flex: 1 1 0;
 }
 
@@ -78,8 +88,47 @@
   flex-direction: row;
 }
 
-.yohu-dialog__body[data-overflow="auto"] {
-  /* 与 VirtualList / 设备栏 scroller 同契约。禁止双轴 auto：Windows 会因 1px 溢出互锁出纵条。 */
+/*
+ * split：Fluent 钉铬、只滚内容。fit 用纵向 flex hug；
+ * fill/exit 才让 main 吃剩余高。禁止 fit 用 1fr 当滚槽。
+ */
+.yohu-dialog__body[data-region="split"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.yohu-dialog__lead,
+.yohu-dialog__tail {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.yohu-dialog__tail {
+  align-self: flex-start;
+}
+
+.yohu-dialog__main {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body[data-region="split"] .yohu-dialog__main,
+.yohu-dialog__panel[data-box="exit"] .yohu-dialog__body[data-region="split"] .yohu-dialog__main {
+  flex: 1 1 0;
+}
+
+/* 与 VirtualList / 设备栏 scroller 同契约。禁止双轴 auto：Windows 会因 1px 溢出互锁出纵条。 */
+.yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.yohu-dialog__body[data-overflow="auto"][data-region="split"] {
+  overflow: hidden;
+}
+
+.yohu-dialog__body[data-overflow="auto"][data-region="split"] .yohu-dialog__main {
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -88,8 +137,21 @@
   overflow: hidden;
 }
 
+/* hug 滚槽预算。90% 只做面板安全顶，确认名单不得把整窗吃满。 */
+.yohu-dialog__panel[data-box="fit"] .yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) {
+  max-height: var(--yohu-layout-dialog-body-max);
+}
+
+.yohu-dialog__panel[data-box="fit"] .yohu-dialog__body[data-overflow="auto"][data-region="split"] .yohu-dialog__main {
+  max-height: var(--yohu-layout-dialog-body-max);
+}
+
 .yohu-dialog__body[data-pad="lg"] {
   padding: var(--yohu-space-lg);
+}
+
+.yohu-dialog__body[data-region="split"][data-pad="lg"] {
+  gap: var(--yohu-space-md);
 }
 
 .yohu-dialog__body[data-pad="none"] {
