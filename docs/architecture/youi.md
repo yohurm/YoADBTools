@@ -67,7 +67,7 @@ HarmonyOS 对照：Button。外形与语义色是两轴，不是一套 `primary 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
 | L0 | `tokens/colors.ts` → `emit-theme.ts` → `theme.css` | 语义色与实心叠色 | 不写按钮几何 |
-| L1 | `motion/swap`、`.yohu-focus-ring`、`tokens/motion.css` `yohu-spin` | 换牌、焦点环、加载旋转 | 不复制进 Button |
+| L1 | `motion/swap`、`.yohu-focus-ring`、`tokens/motion.css` `yohu-spin` | 换牌（先换目标字再插宽）、焦点环、加载旋转 | 不复制进 Button；禁止收到尽头再换字 |
 | L2 | `button-model.ts` | `variant × tone × size` 不变式；`buttonPaintKind` | 不碰 DOM / disabled |
 | L3 | `button-policy.ts` | 交互：`disabled \|\| loading`；组装 `data-*` | 不写色值、不画铬 |
 | L4 | `Button.tsx` + `Button.css` | 铬 + 内容区（`overflow: hidden` 裁剪文案/spinner） | 不在 TSX 里 if-else 上色 |
@@ -305,24 +305,24 @@ show(text, tone?)
 
 ## 组件：YoChip（L0–L5）
 
-可关闭气泡。语义色与 Badge 同一枚举，默认 `accent`。删除钮流内右上对齐，计入固有宽；`onDismiss` 才画。`dismiss`：`always`（默认）| `hover`（悬停/焦点内显，无悬停能力时仍显）。`leading` 流内前导槽（图标名或节点）。过长标签 `__label` 省略，宿主 `overflow: hidden`。禁止 `position: absolute`，禁止原生 `title`。mousedown 阻止默认，以免抢走输入焦点。禁止引进 antd Tag，禁止模块自写过滤气泡皮。
+可关闭气泡。语义色与 Badge 同一枚举，默认 `accent`。单行（`nowrap` + 固定交叉轴）；交叉轴由宿主 `align-items: center` 统一，关闭钮流内计入固有宽，禁止再写 `align-self`。`onDismiss` 才画。`dismiss`：`always`（默认）| `hover`（悬停/焦点内显，无悬停能力时仍显）。`leading` 流内前导槽（图标名或节点）。`block` 铺满父格（删除名单网格），默认 hug。**hug 关闭跟文案；block 是填格行，`__label` 吃中间，关闭贴盒 inline-end。** 关闭钮写 `data-dialog-skip`，对话框入场焦点跳过它。过长标签 `__label` 省略，宿主 `overflow: hidden`。禁止 `position: absolute`，禁止原生 `title`。mousedown 阻止默认，以免抢走输入焦点。禁止引进 antd Tag，禁止模块自写过滤气泡皮。
 
 ### 设计后链路
 
 ```
-text / tone / leading? / dismiss? / onDismiss?
+text / tone / leading? / dismiss? / block? / onDismiss?
   → L1 isIconName（icons）判 leading 是否图标名
-  → L2 resolveChipSpec（tone 缺省 accent；leading 占槽；dismiss 模式）
-  → L3 chipHostAttrs（data-tone / data-dismiss / data-leading / aria-label）
-  → L4 流内 leading + 文案 + 关闭；ellipsis
+  → L2 resolveChipSpec（tone 缺省 accent；leading 占槽；dismiss 模式；block）
+  → L3 chipHostAttrs（data-tone / data-dismiss / data-leading / data-block / aria-label）
+  → L4 流内 leading + 文案 + 关闭（data-dialog-skip）；ellipsis
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
 | L1 | `icons.tsx` | `isIconName`：前导图标名守卫 |
-| L2 | `chip-model.ts` | 文本；tone 缺省 accent；leading；dismiss 模式 |
-| L3 | `chip-policy.ts` | `data-tone` / `data-dismiss` / `data-leading` / `aria-label` |
-| L4 | `Chip.tsx` + `Chip.css` | 流内关闭与前导；ellipsis；禁止滚动口 |
+| L2 | `chip-model.ts` | 文本；tone 缺省 accent；leading；dismiss 模式；block；单行交叉轴 |
+| L3 | `chip-policy.ts` | `data-tone` / `data-dismiss` / `data-leading` / `data-block` / `aria-label` |
+| L4 | `Chip.tsx` + `Chip.css` | 宿主交叉轴居中；流内关闭与前导；block 文案吃中间；ellipsis；禁止滚动口；关闭钮不写 align-self |
 | L5 | `index.ts` | `YoChip` |
 
 ---
@@ -356,7 +356,7 @@ props
 
 ## 组件：YoSelect（L0–L5）
 
-HarmonyOS 对照：Select。落点对齐 Tooltip：`select-place` → `popover-place`，禁止第二套 Trigger、禁止 L4 内嵌 `placePopover`。选中/按键解码在模型，开合/禁用/提交在政策。
+HarmonyOS 对照：Select。落点走 `select-place` → `popover-place`，禁止第二套 Trigger、禁止 L4 内嵌 `placePopover`。指向气泡另走 `tooltip-place`。选中/按键解码在模型，开合/禁用/提交在政策。
 
 ```
 props
@@ -388,46 +388,48 @@ HarmonyOS 对照：弹出框。开场 spatial，关闭淡出后卸节点。stack
 
 ```
 props
-  → L2 dialogPanelPaint / resolveDialogBodySpec
-  → L3 resolveDialogOpen / attachDialog / dialogLayerStyle / dialogBodyAttrs
-  → attachDialog = 卸 Tooltip Unique + pushDialog + 首焦（dialog-stack / dialog-focus）
-  → L4 只绑 Presence + data-sized + data-layout / data-overflow / data-pad + 标题 / 内容区 / 页脚
+  → L2 dialogPanelPaint / resolveDialogBodySpec / resolveDialogInitial / resolveDialogExitLock / mergeDialogPanelStyle
+  → L3 resolveDialogOpen / attachDialog / dialogLayerStyle / dialogBodyAttrs / dialogExitLock
+  → attachDialog = 卸 Tooltip Unique + pushDialog + dialogInitialFocus
+  → L4 只绑 Presence + data-sized / data-fill / data-exit-lock + data-layout / data-overflow / data-pad + 标题 id / 内容区 / 页脚
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| L2 | dialog-model.ts | 面板尺寸、内容区排列/溢出/垫 |
-| L3 | dialog-stack.ts、dialog-focus.ts、dialog-policy.ts | 单栈 Esc/Tab、可聚焦集合、attach/detach、body data-* |
-| L4 | Dialog.tsx / Dialog.css | 内容区 = `.yohu-dialog__body`，只认 data |
+| L2 | dialog-model.ts | 面板尺寸、内容区排列/溢出/垫、首焦 auto/footer、出场锁盒、style 合并 |
+| L3 | dialog-stack.ts、dialog-focus.ts、dialog-policy.ts | 单栈 Esc/Tab、可聚焦集合、skip/initial 标记、attach/detach、body data-*、读打开盒 |
+| L4 | Dialog.tsx / Dialog.css | 内容区 = `.yohu-dialog__body`，只认 data；有标题走 `aria-labelledby`；打开时记盒，出场写 `data-exit-lock` |
 | L5 | index.ts | YoDialog |
 
-公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `onClose` / `footer` / `children`。默认 stack + auto + lg。新建会话 `bodyOverflow="hidden"`；命令管理再加 `bodyPad="none"`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
+公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `initial` / `onClose` / `onExitComplete` / `footer` / `children`。默认 stack + auto + lg + `initial=auto`。`open` 只是 Presence 开关，不是载荷是否为空。出场锁最后一次打开盒（`data-exit-lock` + inline 宽高，`max-height` 放开），hug 不随 Collapse / 名单卸掉折高。载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。`data-overflow=auto` 是弹窗唯一滚轴，契约与 VirtualList / 设备栏 scroller 相同：横 `hidden`、纵 `auto`。面板 hug 到 `max-height: 90%` 后由内容区纵滚。模块禁止再套第二套 `overflow: auto`。`hidden` 只给自管填充的整页对话框（新建会话；命令管理再加 `bodyPad="none"`）。破坏性确认（文件删除）走缺省 auto + `initial="footer"`，首焦落取消。YoChip 关闭钮写 `data-dialog-skip`，不抢入场焦点，仍在 Tab 序。显式 `height` 才 `data-fill`（内容区吃剩余高）；hug 弹窗内容区 `flex: 1 1 auto`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
 
 ---
 
 ## 组件：YoTooltip（L0–L5）
 
 对照 Ant UniqueProvider：密集提示共享一个 popup。命令式必须挂回 `YoTooltipHost`。
+对照鸿蒙指向型气泡：最大宽 400、距视口 6vp、箭头距边 20vp、电脑描边。铬**跟主题抬一层**：浅色卡片白（画布雪域灰），深色 `surface-2`（画布/标题栏 secondary）。禁止反色对，禁止点 `--yohu-surface`。落点是离散写入，Unique 换锚不滑 `top/left`。
 
 ```
 YoTooltip(content, children, delay?: MotionSpecName)
+  → L0 TooltipBg/Fg/Border + Layout.TooltipEdge/Arrow/ArrowInset/Gap
   → L2 tooltipIsEmpty / DEFAULT_TOOLTIP_DELAY=effectsEnter
   → L3 tooltipCanShow / tooltipNoteInput / tooltipCanShowOnFocus / createTooltipUnique / dismissTooltipOverlay
-  → L3 placeTooltip → popover-place(prefer=top, align=center, hug 内容)
-  → L4 Host 唯一 Portal + YoPresence(popover)；内容区 = `.yohu-tooltip__content`
+  → L3 placeTooltip（hug 内容、prefer 上、贴边夹紧、箭头对锚点中心；禁止 placePopover）
+  → L4 Host 唯一 Portal + YoPresence(popover)；内容区 + `__arrow`；进出场 `yohu-tip-*`（2xs）
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| L1 | popover-place、YoPresence | 定位、进出场 |
-| L2 | tooltip-model.ts | 空文案、id、delay 名 |
-| L3 | tooltip-policy.ts、tooltip-place.ts | Unique 槽、延迟、输入模态、模态卸槽、destroy；测量接到 popover-place |
-| L4 | Tooltip.tsx / Tooltip.css | 只绑 Presence + 内容区 `.yohu-tooltip__content` |
+| L0 | colors / layout / elevation | 主题跟随抬升铬、6/8/20 几何、overlay-drop 跟着箭头 |
+| L2 | tooltip-model.ts | 空文案、id、delay 名；`tooltipPlaceDiscrete` |
+| L3 | tooltip-policy.ts、tooltip-place.ts | Unique 槽、延迟、输入模态、指向落点与箭头 |
+| L4 | Tooltip.tsx / Tooltip.css | Presence + `__content` + `__arrow`；未 placed 先透明；进场只在落点后 |
 | L5 | index.ts | YoTooltip、YoTooltipHost（不导出 Unique 工厂） |
 
 公开 API：`content` / `children` / `delay?: MotionSpecName`（缺省 `effectsEnter`）/ `disabled` / `block`（无文案铬铺满主轴）/ `stretch`（无文案铬铺交叉轴）。无 `Tooltip.show`。无 Host 不画。壳根与 `YoContextMenuHost` 并列挂一份 `YoTooltipHost`。只给无可见文案的铬：`YoIconButton.title`、标题栏窗控、方向图标、空热区。已画出的字（表格格、路径、树标签、Select 值、设备卡、表头）禁止包本组件，省略号不靠气泡复述；多出来的信息画在界面上或只走 `aria-label`。禁止模块再写原生 `title` 冒充提示，禁止点 `__anchor`。`Tree` / `Select` / `ColHeader` 不内包本组件。
 
-出示：悬停，或键盘模态下的焦点（Host 记 pointerdown / keydown）。禁止把点击后的程序 `.focus()`（对话框首焦）当悬停。按下锚点与模态 `attachDialog` 立即卸 Unique，不跟隐藏延迟。L5 不导出 Unique / 模态 / `dismissTooltipOverlay`。
+出示：悬停，或键盘模态下的焦点（Host 记 pointerdown / keydown）。禁止把点击后的程序 `.focus()`（对话框首焦）当悬停。按下锚点与模态 `attachDialog` 立即卸 Unique，不跟隐藏延迟。L5 不导出 Unique / 模态 / `dismissTooltipOverlay`。Presence 仍走 `popover`。落点禁止 `top/left` 过渡（首帧 `auto→px` 会冒充从左滑入，Unique 换到关闭键更明显）。未 `data-placed` 先 `opacity: 0`（不用 `visibility: hidden`，以免 hug 测宽为 0），进场 `yohu-tip-*` 只在落点后播；换锚只改坐标与文案。标题栏贴顶翻下。右缘夹 6vp，箭头跟着锚点。
 
 ---
 
@@ -487,7 +489,7 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 默认只裁切高度，禁止给 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才在库内给直接子级 `flex:1; min-height:0`；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的淡入上移打在 `__inner` 的直接子级上（位移不得进入祖先 scrollable overflow）。禁止给默认 collapse 的 `inner > *` 写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才在库内给直接子级 `flex:1; min-height:0`；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys

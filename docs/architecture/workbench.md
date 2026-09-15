@@ -111,14 +111,15 @@ Vite server.port
 
 禁止 HTML 选择器用裸色值当终态。fallback 只在 `--yohu-canvas` 未定义时生效；变量一旦存在，再特异的 `html[data-theme="dark"] …` 也必须消费 token。禁止空 `catch`。禁止把启动编排塞进 `main.tsx`。
 
-3. `App` `onMount` 先 `deviceStore` / `taskStore` / `updateStore.bindIpc()`（`listen` 已可用；设置变更在 `createSettingsStore` 订 `settings/changed`）再 `settingsStore.load` + `deviceStore.load`（各一次）→ 拆掉 HTML 层 → 双 rAF → `windowShow`（`boot.showMain`）。揭失败上抛，不 `refresh`。壳在 **工作台已画好之后** 才交接，禁止边 hydrate 边播动画。禁止 `@yohu/api` 用延时重试顶订阅时序。
+3. `App` `onMount` 先 `deviceStore` / `taskStore` / `updateStore.bindIpc()`（`listen` 已可用；设置变更在 `createSettingsStore` 订 `settings/changed`）再 `settingsStore.load` + `deviceStore.load`（各一次）→ 拆掉 HTML 层 → 双 rAF → `windowShow`（`boot.showMain`）。**隐藏文档没有合成帧**，`waitForNextPaint` 不得再等 `requestAnimationFrame`（否则揭窗永不发生）。揭失败上抛，不 `refresh`。壳在 **工作台已画好之后** 才交接，禁止边 hydrate 边播动画。禁止 `@yohu/api` 用延时重试顶订阅时序。
+   页面 Finished 且 URL 是 `chrome-error` / `chromewebdata` 时，原生失败出口 `show_if_hidden(page-failed)`，关掉启动小窗；这是导航失败，不是 2.5s 超时双轨。`devUrl` 的 Vite 挂掉会走这条。`about:blank` 与应用页不算失败。
 4. 交接分类（小窗矩形 vs 隐藏主窗矩形是否落在小窗锁定的工作区）：
    - **同屏**：主窗一次落到最终外框（仍隐藏）。Shared overlay 盖住后再藏小窗；fill morph 铺满、clip 半径从 splash `Radius.Md` **收到 0** 之后才 `ShowWindow` 主窗，再 100ms 淡出 overlay。铺满 = 目标 HWND 每个像素都是不透明画布；`host_radius`（`Radius.Sm`）是主窗 DWM 圆角，揭窗后才属于主窗，不进 overlay clip。fill 2×2 与 brand 都来自 `BootSurface`（canvas token + paint `BootFrame`）。overlay HWND `DWMWCP_DONOTROUND` + 整窗 `DwmExtendFrameIntoClientArea`。禁止从 HWND DC 抓像素，禁止把 RGB=0 补成画布。禁止在 morph 期间让工作台从透明区透出。禁止 `SetWindowPos` 插值小窗/主窗尺寸。
    - **异屏**：主窗一次落到小窗锁定的工作区（仍隐藏）。Exit overlay 出场结束后才揭主窗。禁止跨屏共享几何、禁止主窗 HWND 放大。视线留在小窗那块屏。
    - 系统 `SPI_GETCLIENTAREAANIMATION` 关闭时瞬时揭窗。
    - 时长 / 曲线 / 消息泵 / `IDCompositionAnimation` 采样只走 `yohu-motion`。overlay HWND 与配方留在 `native_splash`。禁止 `yohu-motion` 持画布色，禁止引用投屏。投屏 `stage_palette` 是另一条 surface 链，不进本链路。
 5. `device.refresh` 在 `boot.showMain` **返回后**（动画已结束）发起，与 core 预热单飞。
-6. Media Foundation HEVC 探测后置。禁止壳 2.5s / 50ms 超时双轨，禁止 handover 防双播标志位。揭窗只走 hydrate → 双 rAF → `boot.showMain`。
+6. Media Foundation HEVC 探测后置。禁止壳 2.5s / 50ms 超时双轨，禁止 handover 防双播标志位。成功揭窗只走 hydrate → 双 rAF → `boot.showMain`。导航失败（错误页 URL）走 `page-failed`，不是超时。
 
 ## Tauri 壳（`app/yohu-adbtools`）
 

@@ -60,7 +60,7 @@ store 提交路径 → invoke files.list
     → theme.css（与 emitThemeCss() 字节一致）
 ```
 
-清单：`YoVirtualList itemHeight={controlRowHeight()}`。地址铬 clip 只消费 `spatialLocal`。删除名单 `YoChip` leading=`YoFileIcon` + `dismiss=hover`。
+清单：`YoVirtualList itemHeight={controlRowHeight()}`。地址铬 clip 只消费 `spatialLocal`。删除名单 `YoChip` leading=`YoFileIcon` + `dismiss=hover` + `block`（关闭贴盒尾，不跟文件名）。确认框 `YoDialog initial="footer"`，`open` 独立于名单（`deleteOpen`）；关只翻 open，`onExitComplete` 再清名单/展开。内容区走缺省 `bodyOverflow=auto`（弹窗唯一滚轴）；禁止 `hidden` + 模块内第二套 scroller，禁止把入场焦点落到芯片关闭钮。预览与其余同一张网格，其余占满一行（`.yohu-files__delete-more`），间距只认格子 `space-xs`，禁止把两截名单当 `space-md` 区块。
 
 不做什么：不在 UI 扫 stderr；不把 `LocalNotFound` 打成 `not_found`；不自绘传输坞/面包屑第二套折叠；预览不降成 `IconLg=40`。
 
