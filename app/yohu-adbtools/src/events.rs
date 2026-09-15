@@ -30,14 +30,23 @@ pub fn spawn_dispatcher(
             }
             if let AppEvent::MirrorState {
                 serial,
-                state: MirrorSessionState::Stopped | MirrorSessionState::Failed,
+                state,
+                width,
+                height,
                 ..
             } = &event
             {
-                // 会话结束是解绑解码的唯一入口（commands/掉线只 stop，不另调 unbind）。
                 if let Some(app_state) = app.try_state::<AppState>() {
-                    app_state.present.unbind(serial);
-                    crate::mirror_sessions::finish(&app_state, serial);
+                    match state {
+                        MirrorSessionState::Stopped | MirrorSessionState::Failed => {
+                            app_state.present.unbind(serial);
+                            crate::mirror_sessions::finish(&app_state, serial);
+                        }
+                        MirrorSessionState::Live if *width > 0 && *height > 0 => {
+                            app_state.present.adopt_content(serial, *width, *height);
+                        }
+                        _ => {}
+                    }
                 }
             }
             let name = event.name();

@@ -63,6 +63,7 @@ fn h264_available() -> bool {
 const PENDING_CAP: usize = 4;
 
 /// 硬解输出 DXGI 纹理（零拷贝）；软解仍是 packed NV12。
+#[derive(Clone)]
 pub enum DecodedPicture {
     Nv12(Vec<u8>),
     Gpu {
@@ -71,6 +72,10 @@ pub enum DecodedPicture {
         subresource: u32,
     },
 }
+
+// 纹理来自已开 multithread 的共享 D3D 设备；槽跨解码座与呈现线程。
+unsafe impl Send for DecodedPicture {}
+unsafe impl Sync for DecodedPicture {}
 
 pub struct MfDecoder {
     mft: IMFTransform,
@@ -85,6 +90,9 @@ pub struct MfDecoder {
     d3d: bool,
     _d3d_manager: Option<IMFDXGIDeviceManager>,
 }
+
+// 解码座在独立任务里持有 MFT；设备已开 multithread。
+unsafe impl Send for MfDecoder {}
 
 impl MfDecoder {
     pub fn open(hevc: bool, width: u32, height: u32) -> Result<Self, String> {

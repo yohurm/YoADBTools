@@ -16,10 +16,9 @@ pub struct DecodeBind {
 
 impl DecodeBind {
     pub fn new(pipe: Arc<FramePipe>) -> Self {
-        Self {
-            pipe,
-            tick: DecodeTick::new(),
-        }
+        let mut tick = DecodeTick::new();
+        tick.seed_config(pipe.sticky_config());
+        Self { pipe, tick }
     }
 
     pub fn pull(&self) -> Vec<EncodedFrame> {
@@ -41,6 +40,8 @@ pub struct DecodeTick {
     started: Instant,
     fed: u32,
     decoded: u32,
+    last_content_w: u32,
+    last_content_h: u32,
 }
 
 impl DecodeTick {
@@ -55,7 +56,16 @@ impl DecodeTick {
             started: Instant::now(),
             fed: 0,
             decoded: 0,
+            last_content_w: 0,
+            last_content_h: 0,
         }
+    }
+
+    pub fn seed_config(&mut self, frame: Option<EncodedFrame>) {
+        let Some(frame) = frame else {
+            return;
+        };
+        self.last_config = Some(frame.payload);
     }
 
     pub fn ingest(&mut self, frames: Vec<EncodedFrame>) -> Option<Picture> {
@@ -104,11 +114,13 @@ impl DecodeTick {
     }
 
     fn decode(&mut self, frame: EncodedFrame) -> Option<Picture> {
-        if let Some(dec) = self.decoder.as_ref() {
-            if (dec.width(), dec.height()) != (frame.width, frame.height) {
-                self.decoder = None;
-                self.need_keyframe = true;
-            }
+        let size_changed = self.last_content_w > 0
+            && (self.last_content_w, self.last_content_h) != (frame.width, frame.height);
+        self.last_content_w = frame.width;
+        self.last_content_h = frame.height;
+        if size_changed {
+            self.decoder = None;
+            self.need_keyframe = true;
         }
         if frame.dropped > self.seen_dropped {
             self.seen_dropped = frame.dropped;

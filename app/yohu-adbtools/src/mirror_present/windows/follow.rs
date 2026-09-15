@@ -3,7 +3,7 @@
 //! HWND 是主窗的 **WS_CHILD**。拖动主窗由 USER32 带着走。
 //! WebView 舞台是透明洞。可见卡片是 composition clip（圆角 + 描边），不是窗口外框。
 //! `CreateSwapChainForComposition` 强制 `DXGI_SCALING_STRETCH`：禁止用 `SetWindowPos`
-//! 改子窗尺寸冒充占用过渡（DWM 会拉扁上一帧）。fill↔contain 走 `IDCompositionAnimation`。
+//! 改子窗尺寸冒充占用过渡（DWM 会拉扁上一帧）。fill↔dest 走 `IDCompositionAnimation`。
 //! 本模块只在 avail / 主窗尺寸变化时 `SetWindowPos`。禁止 `SWP_NOCOPYBITS`；跨线程 `SWP_ASYNCWINDOWPOS`。
 
 #![cfg(windows)]

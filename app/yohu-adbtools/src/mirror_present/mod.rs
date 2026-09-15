@@ -1,4 +1,4 @@
-//! 壳内投屏呈现：编译期系统硬解（ADR-v6-024/026/027/028/030）。
+//! 壳内投屏呈现：编译期系统硬解（ADR-v6-024/026/027/028/030/032）。
 //!
 //! Windows = Media Foundation → D3D11 YUV → HWND。
 //! macOS = VideoToolbox → NSView。Linux 预留，禁止 FFmpeg。
@@ -34,7 +34,7 @@ use yohu_protocol::{AppEvent, MirrorLayout, MIRROR_MIN_LAYOUT_PX};
 use backend::Cmd;
 
 #[cfg(windows)]
-use windows::GeomHost;
+use windows::{D3dDevice, DecodeSeat, GeomHost, PictureBank};
 
 /// 呈现侧可映射错误。IPC 码由 `ipc_present` 按变体判定，禁止扫字符串。
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -58,6 +58,10 @@ pub struct PresentHost {
     inner: Mutex<Inner>,
     #[cfg(windows)]
     geom: Arc<GeomHost>,
+    #[cfg(windows)]
+    d3d: Mutex<Option<Arc<D3dDevice>>>,
+    #[cfg(windows)]
+    pictures: Arc<PictureBank>,
 }
 
 struct Inner {
@@ -68,7 +72,14 @@ struct Inner {
     stage_serial: Option<String>,
     /// 仅工作台在 `screen-mirror` 为当前模块时为 true。淡出中的 View 报 layout 也不得建窗。
     active: bool,
-    pending: Option<(String, u64, Arc<FramePipe>)>,
+    /// 解码座身份。跟 start/stop，不跟 HWND。
+    live_bind: Option<(String, u64, Arc<FramePipe>)>,
+    /// 舞台可见时最后一次 avail。`setActive(true)` 用它建窗。
+    last_layout: Option<MirrorLayout>,
+    /// 当前会话的 session 内容尺寸。Live 即可记下，不必等首帧。
+    last_content: Option<(String, u32, u32)>,
+    #[cfg(windows)]
+    decode: Option<DecodeSeat>,
 }
 
 pub fn probe() -> Caps {
@@ -110,10 +121,18 @@ impl PresentHost {
                 surface: None,
                 stage_serial: None,
                 active: false,
-                pending: None,
+                live_bind: None,
+                last_layout: None,
+                last_content: None,
+                #[cfg(windows)]
+                decode: None,
             }),
             #[cfg(windows)]
             geom,
+            #[cfg(windows)]
+            d3d: Mutex::new(None),
+            #[cfg(windows)]
+            pictures: Arc::new(PictureBank::new()),
         });
         let probe_host = Arc::clone(&host);
         tauri::async_runtime::spawn(async move {
@@ -138,30 +157,60 @@ impl PresentHost {
         self.geom.set_owner(owner);
     }
 
-    /// 绑定解码管道。未 active 只 stash；建窗只走 `setActive(true)` 之后的 `layout`。
+    /// 入座解码座。未 active 只持座；建窗只走 `setActive(true)` 之后的 `layout`。
     pub fn attach(&self, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
-        let tx = {
+        #[cfg(windows)]
+        let d3d = self.ensure_d3d();
+        let (tx, last) = {
             let mut inner = self.inner.lock().expect("present lock poisoned");
-            if let Some(tx) = inner.surface.clone() {
-                Some(tx)
-            } else {
-                inner.pending = Some((serial.to_string(), generation, pipe.clone()));
-                None
+            #[cfg(windows)]
+            let same = inner
+                .live_bind
+                .as_ref()
+                .is_some_and(|(s, g, _)| s == serial && *g == generation);
+            inner.live_bind = Some((serial.to_string(), generation, pipe.clone()));
+            #[cfg(windows)]
+            if !same {
+                inner.decode = None;
+                if let Some(d3d) = d3d {
+                    inner.decode = Some(DecodeSeat::start(
+                        d3d,
+                        pipe.clone(),
+                        Arc::clone(&self.pictures),
+                        serial.to_string(),
+                        generation,
+                    ));
+                }
             }
+            (inner.surface.clone(), inner.last_content.clone())
         };
         if let Some(tx) = tx {
-            let _ = tx.send(Cmd::BindPipe {
-                serial: serial.to_string(),
-                generation,
-                pipe,
-            });
+            send_bind(&tx, serial, generation, pipe);
+            send_last_content(&tx, &last, serial);
         }
     }
 
-    /// 停解码、舞台改画 chrome。表面仍在。同 serial 的 pending 丢掉；异 serial 保留。
+    /// 停解码座、舞台改画 chrome。表面仍在。同 serial 的 live_bind 丢掉；异 serial 保留。
     pub fn unbind(&self, serial: &str) {
         let mut inner = self.inner.lock().expect("present lock poisoned");
-        apply_pending_unbind(&mut inner.pending, serial);
+        #[cfg(windows)]
+        let drop_seat = inner
+            .live_bind
+            .as_ref()
+            .is_some_and(|(s, ..)| s == serial);
+        apply_pending_unbind(&mut inner.live_bind, serial);
+        if inner
+            .last_content
+            .as_ref()
+            .is_some_and(|(s, ..)| s == serial)
+        {
+            inner.last_content = None;
+        }
+        #[cfg(windows)]
+        if drop_seat {
+            inner.decode = None;
+            self.pictures.clear();
+        }
         if let Some(tx) = inner.surface.as_ref() {
             let _ = tx.send(Cmd::UnbindPipe {
                 serial: serial.to_string(),
@@ -170,13 +219,28 @@ impl PresentHost {
     }
 
     /// 工作台拥有舞台开关。未激活时一切 `mirror.layout`（含 `visible=true`）丢弃。
+    /// 激活时用上次 avail 建窗；解码座继续跑。
     pub fn set_active(&self, active: bool) {
-        {
+        let replay = {
             let mut inner = self.inner.lock().expect("present lock poisoned");
             inner.active = active;
-        }
+            if active {
+                inner.last_layout.clone()
+            } else {
+                None
+            }
+        };
         if active {
             tracing::info!("投屏舞台激活");
+            if let Some(layout) = replay {
+                tracing::info!(
+                    serial = %layout.serial,
+                    w = layout.width,
+                    h = layout.height,
+                    "投屏舞台激活，沿用上次 avail"
+                );
+                self.layout(layout);
+            }
         } else {
             tracing::info!("投屏舞台关闭（模块不是投屏）");
             self.shutdown();
@@ -193,6 +257,10 @@ impl PresentHost {
             );
             return;
         }
+        {
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            inner.last_layout = Some(layout.clone());
+        }
         if !layout.visible
             || layout.width < MIRROR_MIN_LAYOUT_PX
             || layout.height < MIRROR_MIN_LAYOUT_PX
@@ -207,10 +275,11 @@ impl PresentHost {
             self.shutdown();
             return;
         }
-        if !self.ensure_surface(&layout.serial) {
-            return;
+        match self.ensure_surface(&layout.serial) {
+            SurfaceEnsure::Failed => return,
+            SurfaceEnsure::Created => self.flush_live_bind(),
+            SurfaceEnsure::Ready => {}
         }
-        self.flush_pending();
         let tx = {
             let mut inner = self.inner.lock().expect("present lock poisoned");
             inner.stage_serial = Some(layout.serial.clone());
@@ -218,6 +287,26 @@ impl PresentHost {
         };
         if let Some(tx) = tx {
             let _ = tx.send(Cmd::Layout(layout));
+        }
+    }
+
+    /// session 内容宽高写入 Stage。Loading 即可把占用卡片收到设备比例。
+    pub fn adopt_content(&self, serial: &str, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        let tx = {
+            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let live = inner.live_bind.as_ref().is_some_and(|(s, ..)| s == serial);
+            let stage = inner.stage_serial.as_deref() == Some(serial);
+            if inner.live_bind.is_some() && !live && !stage {
+                return;
+            }
+            inner.last_content = Some((serial.to_string(), width, height));
+            inner.surface.clone()
+        };
+        if let Some(tx) = tx {
+            let _ = tx.send(Cmd::AdoptContent { width, height });
         }
     }
 
@@ -239,10 +328,10 @@ impl PresentHost {
     }
 
     /// 拆表面。只用于离开投屏页或进程退出，禁止跟 `mirror.stop` 绑在一起。
+    /// 解码座与上次 avail 留下。
     pub fn shutdown(&self) {
         let tx = {
             let mut inner = self.inner.lock().expect("present lock poisoned");
-            apply_pending_shutdown(&mut inner.pending);
             inner.stage_serial = None;
             inner.surface.take()
         };
@@ -251,18 +340,22 @@ impl PresentHost {
         }
     }
 
-    fn ensure_surface(&self, serial: &str) -> bool {
+    fn ensure_surface(&self, serial: &str) -> SurfaceEnsure {
         {
             let inner = self.inner.lock().expect("present lock poisoned");
             if inner.surface.is_some() {
-                return true;
+                return SurfaceEnsure::Ready;
             }
             if inner.owner == 0 {
                 tracing::error!("投屏表面尚未绑定主窗口");
-                return false;
+                return SurfaceEnsure::Failed;
             }
         }
         let owner = self.inner.lock().expect("present lock poisoned").owner;
+        #[cfg(windows)]
+        let Some(d3d) = self.ensure_d3d() else {
+            return SurfaceEnsure::Failed;
+        };
         let tx = spawn_backend_surface(
             serial.to_string(),
             owner,
@@ -270,24 +363,41 @@ impl PresentHost {
             self.event_tx.clone(),
             #[cfg(windows)]
             Arc::clone(&self.geom),
+            #[cfg(windows)]
+            d3d,
+            #[cfg(windows)]
+            Arc::clone(&self.pictures),
         );
         self.inner.lock().expect("present lock poisoned").surface = Some(tx);
-        true
+        SurfaceEnsure::Created
     }
 
-    fn flush_pending(&self) {
-        let pending = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
-            let tx = inner.surface.clone();
-            tx.and_then(|tx| inner.pending.take().map(|p| (tx, p)))
+    fn flush_live_bind(&self) {
+        let bind = {
+            let inner = self.inner.lock().expect("present lock poisoned");
+            match (inner.surface.clone(), inner.live_bind.clone(), inner.last_content.clone()) {
+                (Some(tx), Some((serial, generation, pipe)), last) => {
+                    Some((tx, serial, generation, pipe, last))
+                }
+                _ => None,
+            }
         };
-        if let Some((tx, (serial, generation, pipe))) = pending {
-            let _ = tx.send(Cmd::BindPipe {
-                serial,
-                generation,
-                pipe,
-            });
+        if let Some((tx, serial, generation, pipe, last)) = bind {
+            tracing::info!(serial = %serial, generation, "投屏表面重建，舞台绑定解码座");
+            send_bind(&tx, &serial, generation, pipe);
+            send_last_content(&tx, &last, &serial);
         }
+    }
+
+    #[cfg(windows)]
+    fn ensure_d3d(&self) -> Option<Arc<D3dDevice>> {
+        let mut slot = self.d3d.lock().expect("present d3d lock poisoned");
+        if let Some(d3d) = slot.as_ref() {
+            return Some(Arc::clone(d3d));
+        }
+        let created = spawn_d3d()?;
+        *slot = Some(Arc::clone(&created));
+        Some(created)
     }
 }
 
@@ -315,16 +425,48 @@ pub(crate) fn screenshot_host_reply<T>(
     host.unwrap_or(Err(PresentError::Exited))
 }
 
-/// `unbind(serial)`：同 serial 丢掉 pending；异 serial 保留。只看 serial。
+enum SurfaceEnsure {
+    Ready,
+    Created,
+    Failed,
+}
+
+fn send_bind(tx: &Sender<Cmd>, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
+    let _ = tx.send(Cmd::BindPipe {
+        serial: serial.to_string(),
+        generation,
+        pipe,
+    });
+}
+
+fn send_last_content(tx: &Sender<Cmd>, last: &Option<(String, u32, u32)>, serial: &str) {
+    let Some((s, width, height)) = last else {
+        return;
+    };
+    if s == serial && *width > 0 && *height > 0 {
+        let _ = tx.send(Cmd::AdoptContent {
+            width: *width,
+            height: *height,
+        });
+    }
+}
+
+#[cfg(windows)]
+fn spawn_d3d() -> Option<Arc<D3dDevice>> {
+    match D3dDevice::create() {
+        Ok(d3d) => Some(d3d),
+        Err(e) => {
+            tracing::error!(error = %e, "投屏 D3D11 设备建立失败");
+            None
+        }
+    }
+}
+
+/// `unbind(serial)`：同 serial 丢掉 live_bind；异 serial 保留。只看 serial。
 fn apply_pending_unbind<P, G>(pending: &mut Option<(String, P, G)>, serial: &str) {
     if pending.as_ref().is_some_and(|(s, ..)| s == serial) {
         pending.take();
     }
-}
-
-/// `shutdown`：pending 与表面同一寿命，一律清空。
-fn apply_pending_shutdown<T>(pending: &mut Option<T>) {
-    *pending = None;
 }
 
 fn spawn_backend_surface(
@@ -333,10 +475,12 @@ fn spawn_backend_surface(
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     #[cfg(windows)] geom: Arc<GeomHost>,
+    #[cfg(windows)] d3d: Arc<D3dDevice>,
+    #[cfg(windows)] pictures: Arc<PictureBank>,
 ) -> Sender<Cmd> {
     #[cfg(windows)]
     {
-        windows::spawn_surface(serial, owner, mirror, event_tx, geom)
+        windows::spawn_surface(serial, owner, mirror, event_tx, geom, d3d, pictures)
     }
     #[cfg(target_os = "macos")]
     {
@@ -356,8 +500,8 @@ fn spawn_backend_surface(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_pending_shutdown, apply_pending_unbind, assert_screenshot_serial, probe,
-        screenshot_from_pixels, screenshot_host_reply, PresentError,
+        apply_pending_unbind, assert_screenshot_serial, probe, screenshot_from_pixels,
+        screenshot_host_reply, PresentError,
     };
 
     #[test]
@@ -412,13 +556,10 @@ mod tests {
     }
 
     #[test]
-    fn shutdown_clears_pending() {
-        let mut pending = Some(("A".to_string(), 1u64, ()));
-        apply_pending_shutdown(&mut pending);
-        assert!(pending.is_none());
-        let mut empty: Option<(String, u64, ())> = None;
-        apply_pending_shutdown(&mut empty);
-        assert!(empty.is_none());
+    fn unbind_does_not_clear_other_and_surface_drop_keeps_bind() {
+        let mut live = Some(("A".to_string(), 1u64, ()));
+        apply_pending_unbind(&mut live, "B");
+        assert_eq!(live.as_ref().map(|(s, ..)| s.as_str()), Some("A"));
     }
 
     #[test]

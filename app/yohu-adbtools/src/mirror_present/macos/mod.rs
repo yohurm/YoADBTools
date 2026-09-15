@@ -4,6 +4,7 @@
 
 mod decode;
 mod host;
+mod scale;
 mod surface;
 mod view;
 mod vt;

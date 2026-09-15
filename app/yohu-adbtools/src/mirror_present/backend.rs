@@ -21,10 +21,17 @@ pub enum Cmd {
     BindPipe {
         serial: String,
         generation: u64,
+        /// macOS 表面仍用此管道建 DecodeBind；Windows 解码座已持有同一 `Arc`。
+        #[allow(dead_code)]
         pipe: std::sync::Arc<FramePipe>,
     },
     UnbindPipe {
         serial: String,
+    },
+    /// session 内容宽高。占用 / 描边 / dest 只认这个，不认硬解纹理。
+    AdoptContent {
+        width: u32,
+        height: u32,
     },
     Screenshot {
         path: String,

@@ -1,46 +1,119 @@
-//! 解码会话：FramePipe + MF。与 HWND 寿命分家；本模块不持窗口。
+//! 解码座：FramePipe + MF。跟 `mirror.start`/`stop`，不持 HWND。
 
 #![cfg(windows)]
 
 use std::sync::Arc;
 use std::time::Instant;
 
+use tokio::sync::oneshot;
 use windows::Win32::Media::MediaFoundation::IMFDXGIDeviceManager;
 use yohu_mirror::{EncodedFrame, FramePipe, PIPE_H265};
 
+use super::d3d::D3dDevice;
 use super::mf::{DecodedPicture, MfDecoder};
+use super::slot::{PictureBank, ReadyFrame};
+use crate::limits::PRESENT_BEAT;
 use crate::mirror_present::annexb::{access_unit, select_live_frames};
 
-pub struct DecodeBind {
-    pub pipe: Arc<FramePipe>,
-    pub tick: DecodeTick,
+/// 解码座句柄。丢弃即取消本代际解码任务。
+pub struct DecodeSeat {
+    _stop: Option<oneshot::Sender<()>>,
 }
 
-impl DecodeBind {
-    pub fn new(pipe: Arc<FramePipe>) -> Self {
+impl DecodeSeat {
+    pub fn start(
+        device: Arc<D3dDevice>,
+        pipe: Arc<FramePipe>,
+        bank: Arc<PictureBank>,
+        serial: String,
+        generation: u64,
+    ) -> Self {
+        let (stop_tx, stop_rx) = oneshot::channel();
+        tracing::info!(serial = %serial, generation, "投屏解码座已启动");
+        tauri::async_runtime::spawn(async move {
+            run_seat(device, pipe, bank, serial, generation, stop_rx).await;
+        });
         Self {
-            pipe,
-            tick: DecodeTick::new(),
+            _stop: Some(stop_tx),
         }
     }
+}
 
-    pub fn pull(&self) -> Vec<EncodedFrame> {
-        let mut frames = Vec::new();
-        while let Some(frame) = self.pipe.try_recv() {
-            frames.push(frame);
-        }
-        frames
+async fn run_seat(
+    device: Arc<D3dDevice>,
+    pipe: Arc<FramePipe>,
+    bank: Arc<PictureBank>,
+    serial: String,
+    generation: u64,
+    mut stop_rx: oneshot::Receiver<()>,
+) {
+    if let Err(e) = super::mf::ensure_startup() {
+        tracing::error!(error = %e, "投屏解码座 MF 启动失败");
+        return;
     }
+    let mut tick = DecodeTick::new();
+    tick.seed_config(pipe.sticky_config());
+    let mut beat = tokio::time::interval(PRESENT_BEAT);
+    loop {
+        tokio::select! {
+            _ = &mut stop_rx => break,
+            _ = beat.tick() => tick.log_beat(),
+            frame = pipe.recv() => {
+                let Some(first) = frame else { break };
+                let mut frames = vec![first];
+                while let Some(next) = pipe.try_recv() {
+                    frames.push(next);
+                }
+                let manager = device.dxgi_manager.clone();
+                if let Some((content_w, content_h, picture_w, picture_h, picture)) =
+                    tick.ingest(manager.as_ref(), frames)
+                {
+                    tick.note_first_nv12(
+                        content_w,
+                        content_h,
+                        picture_w,
+                        picture_h,
+                        matches!(picture, DecodedPicture::Gpu { .. }),
+                    );
+                    bank.publish(ReadyFrame {
+                        serial: serial.clone(),
+                        generation,
+                        content_w,
+                        content_h,
+                        picture_w,
+                        picture_h,
+                        picture,
+                    });
+                }
+                while let Some((content_w, content_h, picture_w, picture_h, picture)) = tick.drain()
+                {
+                    bank.publish(ReadyFrame {
+                        serial: serial.clone(),
+                        generation,
+                        content_w,
+                        content_h,
+                        picture_w,
+                        picture_h,
+                        picture,
+                    });
+                }
+            }
+        }
+    }
+    tracing::info!(serial = %serial, generation, "投屏解码座已停止");
 }
 
 pub struct DecodeTick {
     decoder: Option<MfDecoder>,
     failed: bool,
     last_config: Option<Vec<u8>>,
+    last_codec: Option<u8>,
     first_nv12: bool,
     started: Instant,
     fed: u32,
     decoded: u32,
+    last_content_w: u32,
+    last_content_h: u32,
 }
 
 impl DecodeTick {
@@ -49,39 +122,57 @@ impl DecodeTick {
             decoder: None,
             failed: false,
             last_config: None,
+            last_codec: None,
             first_nv12: false,
             started: Instant::now(),
             fed: 0,
             decoded: 0,
+            last_content_w: 0,
+            last_content_h: 0,
         }
+    }
+
+    pub fn seed_config(&mut self, frame: Option<EncodedFrame>) {
+        let Some(frame) = frame else {
+            return;
+        };
+        self.last_codec = Some(frame.codec);
+        self.last_config = Some(frame.payload);
     }
 
     pub fn ingest(
         &mut self,
         manager: Option<&IMFDXGIDeviceManager>,
         frames: Vec<EncodedFrame>,
-    ) -> Option<(u32, u32, DecodedPicture)> {
+    ) -> Option<(u32, u32, u32, u32, DecodedPicture)> {
         let mut last = None;
-        let mut out_w = 0;
-        let mut out_h = 0;
         for frame in select_live_frames(&mut self.last_config, frames) {
+            let content_w = frame.width;
+            let content_h = frame.height;
             if let Some(pic) = self.decode(manager, frame) {
-                if let Some(dec) = self.decoder.as_ref() {
-                    out_w = dec.width;
-                    out_h = dec.height;
-                }
-                last = Some(pic);
+                let (picture_w, picture_h) = self
+                    .decoder
+                    .as_ref()
+                    .map(|d| (d.width, d.height))
+                    .unwrap_or((content_w, content_h));
+                last = Some((content_w, content_h, picture_w, picture_h, pic));
             }
         }
-        last.map(|pic| (out_w, out_h, pic))
+        last
     }
 
-    pub fn drain(&mut self) -> Option<(u32, u32, DecodedPicture)> {
+    pub fn drain(&mut self) -> Option<(u32, u32, u32, u32, DecodedPicture)> {
         let dec = self.decoder.as_mut()?;
         match dec.drain() {
             Ok(Some(pic)) => {
                 self.decoded += 1;
-                Some((dec.width, dec.height, pic))
+                Some((
+                    self.last_content_w.max(1),
+                    self.last_content_h.max(1),
+                    dec.width,
+                    dec.height,
+                    pic,
+                ))
             }
             Ok(None) => None,
             Err(e) => {
@@ -101,15 +192,24 @@ impl DecodeTick {
         self.decoded = 0;
     }
 
-    pub fn note_first_nv12(&mut self, width: u32, height: u32, gpu: bool) {
+    pub fn note_first_nv12(
+        &mut self,
+        content_w: u32,
+        content_h: u32,
+        picture_w: u32,
+        picture_h: u32,
+        gpu: bool,
+    ) {
         if self.first_nv12 {
             return;
         }
         self.first_nv12 = true;
         tracing::info!(
             elapsed_ms = self.started.elapsed().as_millis() as u64,
-            width,
-            height,
+            content_w,
+            content_h,
+            picture_w,
+            picture_h,
             gpu,
             "MF 首帧"
         );
@@ -120,9 +220,17 @@ impl DecodeTick {
         manager: Option<&IMFDXGIDeviceManager>,
         frame: EncodedFrame,
     ) -> Option<DecodedPicture> {
-        if self.decoder.as_ref().map(|d| (d.width, d.height)) != Some((frame.width, frame.height)) {
+        let size_changed = self.last_content_w > 0
+            && (self.last_content_w, self.last_content_h) != (frame.width, frame.height);
+        self.last_content_w = frame.width;
+        self.last_content_h = frame.height;
+        let codec_changed = self.last_codec.is_some() && self.last_codec != Some(frame.codec);
+        if size_changed || codec_changed {
             self.decoder = None;
             self.failed = false;
+            if codec_changed {
+                self.last_config = None;
+            }
         }
         if self.decoder.is_none() && !self.failed && frame.width > 0 && frame.height > 0 {
             let hevc = frame.codec == PIPE_H265;
@@ -138,6 +246,7 @@ impl DecodeTick {
                         "MF 解码器已启动"
                     );
                     self.decoder = Some(dec);
+                    self.last_codec = Some(frame.codec);
                 }
                 Err(e) => {
                     tracing::error!(

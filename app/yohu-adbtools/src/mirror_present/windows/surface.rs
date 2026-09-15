@@ -1,6 +1,4 @@
-//! 呈现线程：只调度 `Cmd` → Stage / DecodeBind / Gpu。
-//!
-//! 舞台可见性寿命在 HWND + [`super::host::Host`]；解码寿命在本线程的 [`DecodeBind`]。
+//! 呈现线程：只调度 `Cmd` → Stage / Gpu。解码座在 [`super::decode::DecodeSeat`]。
 
 #![cfg(windows)]
 
@@ -13,16 +11,16 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Gdi::InvalidateRect;
 use windows::Win32::UI::WindowsAndMessaging::DestroyWindow;
 use yohu_mirror::MirrorService;
-use yohu_protocol::AppEvent;
+use yohu_protocol::{AppEvent, MIRROR_MIN_LAYOUT_PX};
 
-use super::decode::DecodeBind;
+use super::d3d::D3dDevice;
 use super::follow::GeomHost;
 use super::gpu::Gpu;
 use super::host::{self, Host};
-use super::mf::DecodedPicture;
+use super::slot::PictureBank;
 use super::window;
 use crate::limits::{
-    PRESENT_BEAT, PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP,
+    PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP,
 };
 use crate::mirror_present::backend::Cmd;
 
@@ -32,6 +30,8 @@ pub fn spawn_surface(
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     geom: Arc<GeomHost>,
+    d3d: Arc<D3dDevice>,
+    pictures: Arc<PictureBank>,
 ) -> Sender<Cmd> {
     let (tx, rx) = mpsc::channel::<Cmd>();
     std::thread::Builder::new()
@@ -43,6 +43,8 @@ pub fn spawn_surface(
                 mirror,
                 event_tx,
                 geom,
+                d3d,
+                pictures,
             };
             if let Err(e) = run_loop(ctx, rx) {
                 tracing::error!("投屏呈现退出: {e}");
@@ -58,6 +60,8 @@ struct PresentCtx {
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     geom: Arc<GeomHost>,
+    d3d: Arc<D3dDevice>,
+    pictures: Arc<PictureBank>,
 }
 
 fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
@@ -67,20 +71,21 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
         mirror,
         event_tx,
         geom,
+        d3d,
+        pictures,
     } = ctx;
     super::mf::ensure_startup()?;
     window::register_class()?;
     let hwnd = window::create_child(HWND(owner as *mut _))?;
     geom.register(&serial, hwnd.0 as isize);
-    let gpu =
-        Gpu::new(hwnd, PRESENT_BOOTSTRAP_PX, PRESENT_BOOTSTRAP_PX).map_err(|e| e.to_string())?;
+    let gpu = Gpu::new(&d3d, hwnd, PRESENT_BOOTSTRAP_PX, PRESENT_BOOTSTRAP_PX)
+        .map_err(|e| e.to_string())?;
     host::install(
         hwnd,
         Host::new(serial, gpu, mirror, event_tx, Arc::clone(&geom)),
     );
 
-    let mut decode: Option<DecodeBind> = None;
-    let mut beat = Instant::now();
+    let mut pic_seq = 0_u64;
     let mut spin_at = Instant::now();
     let mut spin = 0.0_f32;
     loop {
@@ -88,30 +93,20 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
         host::with_host(hwnd, |h| h.sync_host_size(hwnd));
         match rx.recv_timeout(PRESENT_IDLE) {
             Ok(Cmd::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
-            Ok(cmd) => dispatch(hwnd, cmd, &mut decode),
+            Ok(cmd) => dispatch(hwnd, cmd, &pictures),
             Err(RecvTimeoutError::Timeout) => {}
         }
-        if !drain_cmds(&rx, hwnd, &mut decode) {
+        if !drain_cmds(&rx, hwnd, &pictures) {
             break;
         }
-        if let Some(bind) = decode.as_mut() {
-            tick_decode(hwnd, bind);
-        }
         host::with_host(hwnd, |h| h.sync_host_size(hwnd));
+        tick_picture(hwnd, &pictures, &mut pic_seq);
         if host::loading(hwnd) && spin_at.elapsed() >= PRESENT_SPIN_STEP {
             spin_at = Instant::now();
             spin = (spin + PRESENT_SPIN_DELTA) % (std::f32::consts::PI * 2.0);
         }
         host::present_chrome(hwnd, spin);
-        if beat.elapsed() >= PRESENT_BEAT {
-            if let Some(bind) = decode.as_mut() {
-                bind.tick.log_beat();
-            }
-            beat = Instant::now();
-        }
     }
-
-    drop(decode);
     let serial = host::uninstall(hwnd).unwrap_or_default();
     geom.unregister(&serial);
     unsafe {
@@ -121,7 +116,7 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
     Ok(())
 }
 
-fn dispatch(hwnd: HWND, cmd: Cmd, decode: &mut Option<DecodeBind>) {
+fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) {
     match cmd {
         Cmd::Layout(layout) => {
             let applied = host::with_host(hwnd, |h| h.apply_layout(hwnd, &layout));
@@ -137,17 +132,20 @@ fn dispatch(hwnd: HWND, cmd: Cmd, decode: &mut Option<DecodeBind>) {
         Cmd::BindPipe {
             serial,
             generation,
-            pipe,
+            pipe: _,
         } => {
-            if host::with_host(hwnd, |h| h.bind(hwnd, serial, generation)).is_some() {
-                *decode = Some(DecodeBind::new(pipe));
-            }
+            host::with_host(hwnd, |h| {
+                h.bind(hwnd, serial, generation);
+                if let Some((_, frame)) = pictures.latest() {
+                    h.adopt_encoded_size(frame.content_w, frame.content_h);
+                }
+            });
         }
         Cmd::UnbindPipe { serial } => {
-            let drop_bind = host::with_host(hwnd, |h| h.unbind(&serial)).unwrap_or(false);
-            if drop_bind {
-                *decode = None;
-            }
+            let _ = host::with_host(hwnd, |h| h.unbind(&serial));
+        }
+        Cmd::AdoptContent { width, height } => {
+            host::with_host(hwnd, |h| h.adopt_encoded_size(width, height));
         }
         Cmd::Screenshot { path, reply } => {
             let result = crate::mirror_present::screenshot_host_reply(host::with_host(hwnd, |h| {
@@ -159,40 +157,47 @@ fn dispatch(hwnd: HWND, cmd: Cmd, decode: &mut Option<DecodeBind>) {
     }
 }
 
-fn drain_cmds(rx: &Receiver<Cmd>, hwnd: HWND, decode: &mut Option<DecodeBind>) -> bool {
+fn drain_cmds(rx: &Receiver<Cmd>, hwnd: HWND, pictures: &PictureBank) -> bool {
     loop {
         match rx.try_recv() {
             Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return false,
             Err(TryRecvError::Empty) => return true,
-            Ok(cmd) => dispatch(hwnd, cmd, decode),
+            Ok(cmd) => dispatch(hwnd, cmd, pictures),
         }
     }
 }
 
-fn tick_decode(hwnd: HWND, bind: &mut DecodeBind) {
-    let frames = bind.pull();
-    if !frames.is_empty() {
-        if let Some(frame) = frames.iter().find(|f| f.width > 0 && f.height > 0) {
-            host::with_host(hwnd, |h| h.adopt_encoded_size(frame.width, frame.height));
-        }
-        let manager = host::with_host(hwnd, |h| h.dxgi_manager()).flatten();
-        if let Some((w, h, pic)) = bind.tick.ingest(manager.as_ref(), frames) {
-            present_decoded(hwnd, bind, w, h, pic);
-        }
+fn tick_picture(hwnd: HWND, pictures: &PictureBank, last_seq: &mut u64) {
+    let sized = host::with_host(hwnd, |h| {
+        let (w, hgt) = h.stage.host_size();
+        w >= MIRROR_MIN_LAYOUT_PX && hgt >= MIRROR_MIN_LAYOUT_PX
+    })
+    .unwrap_or(false);
+    if !sized {
+        return;
     }
-    if let Some((w, h, pic)) = bind.tick.drain() {
-        present_decoded(hwnd, bind, w, h, pic);
+    let Some((seq, frame)) = pictures.latest() else {
+        return;
+    };
+    if seq == *last_seq {
+        return;
     }
-}
-
-fn present_decoded(
-    hwnd: HWND,
-    bind: &mut DecodeBind,
-    width: u32,
-    height: u32,
-    picture: DecodedPicture,
-) {
-    bind.tick
-        .note_first_nv12(width, height, matches!(picture, DecodedPicture::Gpu { .. }));
-    host::present_picture(hwnd, width, height, picture);
+    let matched = host::with_host(hwnd, |h| {
+        h.stage.serial == frame.serial && h.stage.generation == frame.generation
+    })
+    .unwrap_or(false);
+    if !matched {
+        return;
+    }
+    host::with_host(hwnd, |h| h.adopt_encoded_size(frame.content_w, frame.content_h));
+    if host::present_picture(
+        hwnd,
+        frame.content_w,
+        frame.content_h,
+        frame.picture_w,
+        frame.picture_h,
+        frame.picture,
+    ) {
+        *last_seq = seq;
+    }
 }

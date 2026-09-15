@@ -1,6 +1,4 @@
-//! HWND 宿主：GPU + [`Stage`] + 输入。不持有解码管道。
-//!
-//! 解码寿命在线程局部 [`super::decode::DecodeBind`]；本结构跟窗口可见性走。
+//! HWND 宿主：交换链 + [`Stage`] + 输入。不持有解码座。
 
 #![cfg(windows)]
 
@@ -9,7 +7,6 @@ use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use windows::Win32::Foundation::{HWND, RECT};
-use windows::Win32::Media::MediaFoundation::IMFDXGIDeviceManager;
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetWindowLongPtrW, SetWindowLongPtrW, ShowWindow, GWLP_USERDATA,
     SW_SHOWNOACTIVATE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_RBUTTONUP,
@@ -69,10 +66,6 @@ impl Host {
         }
     }
 
-    pub fn dxgi_manager(&self) -> Option<IMFDXGIDeviceManager> {
-        self.gpu.as_ref().and_then(|g| g.dxgi_manager())
-    }
-
     pub fn apply_layout(&mut self, hwnd: HWND, layout: &MirrorLayout) {
         let prev = self.stage.serial.clone();
         self.stage.apply_layout(layout);
@@ -130,15 +123,12 @@ impl Host {
     }
 
     pub fn adopt_encoded_size(&mut self, width: u32, height: u32) {
-        if !self.stage.bound() {
-            return;
-        }
         if self.stage.set_video_size(width, height) {
             tracing::info!(
                 serial = %self.stage.serial,
                 width,
                 height,
-                "投屏在解码前记下编码尺寸"
+                "投屏记下 session 内容尺寸"
             );
             self.place_occupancy();
         }
@@ -307,7 +297,9 @@ impl Host {
         width: u32,
         height: u32,
     ) -> Option<(Gpu, crate::mirror_present::scale::Letterbox, u32)> {
-        let _ = self.stage.set_video_size(width, height);
+        if self.stage.set_video_size(width, height) {
+            self.place_occupancy();
+        }
         if !self.stage.presentable() {
             let (lw, lh) = self.stage.host_size();
             let key = (self.stage.visible(), lw, lh);
@@ -421,31 +413,41 @@ pub fn uninstall(hwnd: HWND) -> Option<String> {
     }
 }
 
-pub fn present_picture(hwnd: HWND, width: u32, height: u32, picture: DecodedPicture) {
-    let prepared = with_host(hwnd, |h| h.prepare_video(width, height)).flatten();
+pub fn present_picture(
+    hwnd: HWND,
+    content_w: u32,
+    content_h: u32,
+    picture_w: u32,
+    picture_h: u32,
+    picture: DecodedPicture,
+) -> bool {
+    let prepared = with_host(hwnd, |h| h.prepare_video(content_w, content_h)).flatten();
     let Some((mut gpu, dest, letterbox)) = prepared else {
-        return;
+        return false;
     };
     gpu.set_letterbox_argb(letterbox);
     let drawn = match &picture {
-        DecodedPicture::Nv12(nv12) => gpu.present_cpu_nv12(width, height, nv12, dest),
+        DecodedPicture::Nv12(nv12) => {
+            gpu.present_cpu_nv12(picture_w, picture_h, content_w, content_h, nv12, dest)
+        }
         DecodedPicture::Gpu {
             texture,
             subresource,
             ..
-        } => gpu.present_gpu_nv12(texture, *subresource, dest),
+        } => gpu.present_gpu_nv12(content_w, content_h, texture, *subresource, dest),
     };
     let presented = drawn.is_ok();
     let mut show = false;
     with_host(hwnd, |h| {
         h.gpu = Some(gpu);
-        show = h.commit_video(width, height, presented, drawn.as_ref().err());
+        show = h.commit_video(content_w, content_h, presented, drawn.as_ref().err());
     });
     if show {
         unsafe {
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
     }
+    presented
 }
 
 pub fn present_chrome(hwnd: HWND, spin: f32) {

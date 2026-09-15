@@ -24,6 +24,8 @@ pub struct LayoutSnap {
     pub host_h: u32,
     pub occ: (i32, i32, u32, u32),
     pub dest: Letterbox,
+    pub content_w: u32,
+    pub content_h: u32,
     pub radius: f32,
     pub stroke: f32,
     pub border: u32,
@@ -111,9 +113,6 @@ impl Host {
     }
 
     pub fn adopt_encoded_size(&mut self, width: u32, height: u32) {
-        if !self.stage.bound() {
-            return;
-        }
         if self.stage.set_video_size(width, height) {
             tracing::info!(
                 serial = %self.stage.serial,
@@ -127,7 +126,6 @@ impl Host {
     pub fn present_picture(&mut self, pic: Picture) -> bool {
         let width = pic.width;
         let height = pic.height;
-        let _ = self.stage.set_video_size(width, height);
         if !self.stage.presentable() || !self.stage.allows_video_present() {
             return false;
         }
@@ -161,6 +159,7 @@ impl Host {
         let pal = stage_palette(self.stage.dark());
         let (stroke, border) = self.stage.panel_stroke();
         let (avail_x, avail_y, avail_w, avail_h) = self.stage.avail();
+        let (content_w, content_h) = self.stage.video_size();
         LayoutSnap {
             avail_x,
             avail_y,
@@ -170,6 +169,8 @@ impl Host {
             host_h,
             occ: self.stage.occupancy(),
             dest: self.stage.dest(),
+            content_w,
+            content_h,
             radius: self.stage.corner_radius() as f32,
             stroke,
             border,

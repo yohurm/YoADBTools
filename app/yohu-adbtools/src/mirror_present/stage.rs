@@ -5,7 +5,7 @@
 
 use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
 
-use super::scale::{contain_in_zone, fit_letterbox, Letterbox};
+use super::scale::{present_dest, Letterbox};
 
 pub use super::stage_copy::stage_copy;
 pub use super::stage_palette::{
@@ -289,26 +289,23 @@ impl Stage {
     }
 
     pub fn occupancy(&self) -> (i32, i32, u32, u32) {
-        if self.bound && self.video_w > 0 && self.video_h > 0 {
-            contain_in_zone(self.host_w, self.host_h, self.video_w, self.video_h)
-        } else {
-            (0, 0, self.host_w.max(1), self.host_h.max(1))
-        }
+        let d = self.dest();
+        (d.x, d.y, d.width, d.height)
     }
 
     pub fn dest(&self) -> Letterbox {
         if self.bound && self.video_w > 0 && self.video_h > 0 {
-            let (x, y, w, h) = self.occupancy();
-            let inner = fit_letterbox(self.video_w, self.video_h, w, h);
-            Letterbox {
-                x: x + inner.x,
-                y: y + inner.y,
-                width: inner.width,
-                height: inner.height,
-                nearest: inner.nearest,
-            }
+            present_dest(self.host_w, self.host_h, self.video_w, self.video_h)
         } else {
-            fit_letterbox(self.video_w, self.video_h, self.host_w, self.host_h)
+            Letterbox {
+                x: 0,
+                y: 0,
+                width: self.host_w.max(1),
+                height: self.host_h.max(1),
+                nearest: false,
+                crop_w: 0,
+                crop_h: 0,
+            }
         }
     }
 
@@ -467,10 +464,33 @@ mod tests {
         assert_eq!(s.mode(), MirrorStageMode::Video);
         assert!(s.shows_video());
         assert!(s.control());
-        let (x, _y, w, h) = s.occupancy();
+        let (x, y, w, h) = s.occupancy();
         assert_eq!(h, 950);
         assert!(w < 900);
         assert!(x > 0);
+        let dest = s.dest();
+        assert_eq!((dest.x, dest.y, dest.width, dest.height), (x, y, w, h));
+        assert!(!dest.nearest);
+        assert_eq!((dest.width, dest.height), (431, 950));
+    }
+
+    #[test]
+    fn dest_is_contain_not_integer_third() {
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        s.set_host_size(1008, 991);
+        s.bind("S1".into(), 1);
+        s.set_video_size(1220, 2712);
+        s.mark_frame();
+        let occ = s.occupancy();
+        let dest = s.dest();
+        assert_eq!(
+            (dest.x, dest.y, dest.width, dest.height),
+            (occ.0, occ.1, occ.2, occ.3)
+        );
+        assert_eq!((dest.width, dest.height), (446, 991));
+        assert_eq!((dest.crop_w, dest.crop_h), (1220, 2712));
+        assert!(!dest.nearest);
     }
 
     #[test]

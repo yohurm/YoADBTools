@@ -1,6 +1,7 @@
-//! 占用缩放：UI 报稳定可用区；表面铺满 avail；可见卡片按画面 contain。
+//! 触控映射、纹理裁切、avail 内显示矩形。
 //!
-//! Windows 占用盒 fill↔contain 走 DirectComposition clip（时长/曲线用 `yohu-motion`）。
+//! dest = contain(avail, 内容)。核种类在这里判定，取样在各端 Scale 模块。
+//! Windows 占用盒 fill↔dest 走 DirectComposition clip（时长/曲线用 `yohu-motion`）。
 //! macOS 走 NSView 卡片 frame + 圆角。禁止 CSS 占用过渡。
 #![cfg_attr(not(windows), allow(dead_code))]
 
@@ -36,69 +37,82 @@ pub struct Letterbox {
     pub y: i32,
     pub width: u32,
     pub height: u32,
+    /// 1:1 或整数倍放大才 nearest。缩小走面积核，此旗为 false。
     pub nearest: bool,
+    pub crop_w: u32,
+    pub crop_h: u32,
 }
 
-fn integer_fit(src_w: u32, src_h: u32, dst_w: u32, dst_h: u32, scale: f64) -> Option<Letterbox> {
-    if scale < 1.0 {
-        return None;
-    }
-    let integer = scale.round();
-    if integer < 1.0 || (scale - integer).abs() / integer >= 0.01 {
-        return None;
-    }
-    let width = src_w.saturating_mul(integer as u32);
-    let height = src_h.saturating_mul(integer as u32);
-    if width == 0 || height == 0 || width > dst_w || height > dst_h {
-        return None;
-    }
-    Some(Letterbox {
-        x: ((dst_w as i32) - width as i32) / 2,
-        y: ((dst_h as i32) - height as i32) / 2,
-        width,
-        height,
-        nearest: true,
-    })
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScaleKernel {
+    /// 1:1 或整数倍放大：点采。
+    Nearest,
+    /// 缩小：每个 dest 像素盖住源足迹。
+    Area,
 }
 
-/// `src` 画进 `dst`。
-///
-/// 壳已按设备宽高比 contain 时 HWND 与画面同比例：填满。
-/// 接近整数倍且结果不超出 dest 时吸附并走最近邻。
-pub fn fit_letterbox(src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> Letterbox {
-    if src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0 {
+/// Fit 只给 dest。核只看 src 与 dest 像素数，不改盒子。
+pub fn scale_kernel(src_w: u32, src_h: u32, dest: Letterbox) -> ScaleKernel {
+    if dest.width < src_w.max(1) || dest.height < src_h.max(1) {
+        ScaleKernel::Area
+    } else {
+        ScaleKernel::Nearest
+    }
+}
+
+/// 内容在 avail 里的唯一显示矩形。占用 = dest。
+pub fn present_dest(avail_w: u32, avail_h: u32, content_w: u32, content_h: u32) -> Letterbox {
+    if content_w == 0 || content_h == 0 || avail_w == 0 || avail_h == 0 {
         return Letterbox {
             x: 0,
             y: 0,
-            width: dst_w.max(1),
-            height: dst_h.max(1),
+            width: avail_w.max(1),
+            height: avail_h.max(1),
             nearest: false,
+            crop_w: content_w,
+            crop_h: content_h,
         };
     }
-    let sx = dst_w as f64 / src_w as f64;
-    let sy = dst_h as f64 / src_h as f64;
-    let scale = sx.min(sy);
-    if let Some(fit) = integer_fit(src_w, src_h, dst_w, dst_h, scale) {
-        return fit;
-    }
-    let pre_fitted = (sx - sy).abs() <= 0.02 * sx.max(sy);
-    if pre_fitted {
+    if content_w <= avail_w && content_h <= avail_h {
+        let k = (avail_w / content_w).min(avail_h / content_h);
+        let (width, height) = if k >= 2 {
+            (content_w * k, content_h * k)
+        } else {
+            (content_w, content_h)
+        };
         return Letterbox {
-            x: 0,
-            y: 0,
-            width: dst_w,
-            height: dst_h,
-            nearest: false,
+            x: (avail_w as i32 - width as i32) / 2,
+            y: (avail_h as i32 - height as i32) / 2,
+            width,
+            height,
+            nearest: true,
+            crop_w: content_w,
+            crop_h: content_h,
         };
     }
-    let (x, y, width, height) = contain_in_zone(dst_w, dst_h, src_w, src_h);
+    let (x, y, width, height) = contain_in_zone(avail_w, avail_h, content_w, content_h);
     Letterbox {
         x,
         y,
         width,
         height,
         nearest: false,
+        crop_w: content_w,
+        crop_h: content_h,
     }
+}
+
+/// 硬解纹理可大于 session：裁到内容矩形（左上对齐）。
+pub fn content_source_size(
+    content_w: u32,
+    content_h: u32,
+    texture_w: u32,
+    texture_h: u32,
+) -> (u32, u32) {
+    (
+        content_w.min(texture_w).max(1),
+        content_h.min(texture_h).max(1),
+    )
 }
 
 pub fn map_client_to_video(
@@ -129,52 +143,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn integer_scale_snaps() {
-        let fit = fit_letterbox(100, 200, 200, 400);
-        assert_eq!(
-            fit,
-            Letterbox {
-                x: 0,
-                y: 0,
-                width: 200,
-                height: 400,
-                nearest: true
-            }
-        );
-    }
-
-    #[test]
-    fn contain_when_not_integer() {
-        let fit = fit_letterbox(1080, 1920, 500, 800);
-        assert!(!fit.nearest);
-        assert!(fit.width <= 500 && fit.height <= 800);
-        let ratio = fit.width as f64 / fit.height as f64;
-        assert!((ratio - 1080.0 / 1920.0).abs() < 0.02);
-    }
-
-    #[test]
-    fn integer_scale_does_not_overflow_dest() {
-        let fit = fit_letterbox(100, 200, 199, 398);
-        assert!(fit.width <= 199 && fit.height <= 398);
-        assert!(!fit.nearest);
-    }
-
-    #[test]
-    fn pre_fitted_hwnd_fills() {
-        let fit = fit_letterbox(1088, 2400, 400, 882);
-        assert_eq!(
-            fit,
-            Letterbox {
-                x: 0,
-                y: 0,
-                width: 400,
-                height: 882,
-                nearest: false
-            }
-        );
-    }
-
-    #[test]
     fn contain_matches_js_portrait() {
         let (x, y, w, h) = contain_in_zone(900, 950, 1088, 2400);
         assert_eq!((x, y, w, h), (234, 0, 431, 950));
@@ -201,6 +169,60 @@ mod tests {
     }
 
     #[test]
+    fn contain_edge60_native_in_avail() {
+        let (x, y, w, h) = contain_in_zone(1008, 991, 1220, 2712);
+        assert_eq!(y, 0);
+        assert_eq!(h, 991);
+        assert!(w < 1008);
+        assert!(x > 0);
+        let ratio = w as f64 / h as f64;
+        assert!((ratio - 1220.0 / 2712.0).abs() < 0.02);
+    }
+
+    #[test]
+    fn dest_uses_contain_pixels_not_integer_third() {
+        let d = present_dest(1008, 991, 1220, 2712);
+        assert_eq!((d.width, d.height), (446, 991));
+        assert_eq!((d.crop_w, d.crop_h), (1220, 2712));
+        assert!(!d.nearest);
+        assert!(d.width > 406);
+    }
+
+    #[test]
+    fn dest_identity_is_nearest() {
+        let d = present_dest(2000, 2800, 1220, 2712);
+        assert_eq!((d.width, d.height), (1220, 2712));
+        assert!(d.nearest);
+    }
+
+    #[test]
+    fn dest_integer_enlarge_is_nearest() {
+        let d = present_dest(400, 800, 100, 200);
+        assert_eq!((d.width, d.height), (400, 800));
+        assert!(d.nearest);
+    }
+
+    #[test]
+    fn shrink_uses_area_kernel() {
+        let d = present_dest(1008, 991, 1220, 2712);
+        assert_eq!(scale_kernel(1220, 2712, d), ScaleKernel::Area);
+    }
+
+    #[test]
+    fn identity_uses_nearest_kernel() {
+        let d = present_dest(2000, 2800, 1220, 2712);
+        assert_eq!(scale_kernel(1220, 2712, d), ScaleKernel::Nearest);
+    }
+
+    #[test]
+    fn content_source_crops_alignment_pad() {
+        assert_eq!(
+            content_source_size(1220, 2712, 1248, 2720),
+            (1220, 2712)
+        );
+    }
+
+    #[test]
     fn maps_inside_letterbox() {
         let box_ = Letterbox {
             x: 10,
@@ -208,6 +230,8 @@ mod tests {
             width: 100,
             height: 200,
             nearest: true,
+            crop_w: 50,
+            crop_h: 100,
         };
         assert_eq!(map_client_to_video(10, 20, box_, 50, 100), Some((0, 0)));
         assert_eq!(map_client_to_video(0, 0, box_, 50, 100), None);

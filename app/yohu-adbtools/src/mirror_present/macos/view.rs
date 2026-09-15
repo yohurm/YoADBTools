@@ -14,6 +14,8 @@ use objc2_app_kit::{
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::{kCAGravityResize, CATransaction};
 
+use super::scale::{apply_default_kernel, apply_layer_kernel};
+
 use yohu_protocol::MIRROR_MIN_LAYOUT_PX;
 
 use super::super::stage::{argb_to_rgba, chrome_stack};
@@ -105,6 +107,7 @@ pub fn attach(owner: isize, host: Arc<Mutex<Host>>) {
         video.setWantsLayer(true);
         if let Some(layer) = video.layer() {
             unsafe { layer.setContentsGravity(kCAGravityResize) };
+            apply_default_kernel(&layer);
             layer.setMasksToBounds(true);
         }
         video.setHidden(true);
@@ -198,6 +201,7 @@ pub fn apply_snap(snap: LayoutSnap) {
                 if let Some(window) = views.root.window() {
                     layer.setContentsScale(window.backingScaleFactor());
                 }
+                apply_layer_kernel(&layer, snap.content_w, snap.content_h, snap.dest);
             }
             views.video.setHidden(!snap.video);
             views.title.setHidden(!snap.chrome);

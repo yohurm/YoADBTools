@@ -102,6 +102,11 @@ fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) 
                 *decode = None;
             }
         }
+        Cmd::AdoptContent { width, height } => {
+            host.lock()
+                .expect("present lock poisoned")
+                .adopt_encoded_size(width, height);
+        }
         Cmd::Screenshot { path, reply } => {
             let result = host
                 .lock()
