@@ -76,6 +76,7 @@ export function MirrorView(props: DeviceSession) {
 
   onMount(() => {
     mirrorStore.applySettings(props.settings);
+    pushLayout();
     if (avail) {
       zoneObserver = new ResizeObserver(() => {
         pushLayout();

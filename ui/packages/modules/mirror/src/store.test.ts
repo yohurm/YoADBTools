@@ -397,6 +397,24 @@ describe("mirror store", () => {
     });
   });
 
+  it("同 avail 去重，不因再入座重报", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    await store.bindSerial("S1");
+    const avail = {
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 600,
+      visible: true,
+      dpr: 1,
+      dark: false,
+    };
+    store.reportAvail(avail);
+    store.reportAvail(avail);
+    expect(mocks.mirrorLayout).toHaveBeenCalledTimes(1);
+  });
+
   it("可见且小于最小像素不上报；隐藏仍上报", async () => {
     const { createMirrorStore } = await import("./store");
     const store = createMirrorStore();
