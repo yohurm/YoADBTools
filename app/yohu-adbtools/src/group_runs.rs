@@ -134,7 +134,7 @@ fn spawn(
 ) -> u32 {
     let (run_id, cancel) = state.group_runs.allocate();
 
-    let task_id = state.tasks.register(task_name, detail);
+    let task_id = state.tasks.register(task_name, detail, Some(run_id));
     let (tx, mut rx) = mpsc::channel::<yohu_domain::GroupRunEvent>(GROUP_EVENT_CHANNEL_CAP);
     let sink = state.event_tx.clone();
 

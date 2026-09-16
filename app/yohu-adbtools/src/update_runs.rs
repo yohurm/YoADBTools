@@ -83,6 +83,7 @@ pub async fn download(
         } else {
             format!("v{}", request.version.trim_start_matches(['v', 'V']))
         },
+        None,
     );
     let event_tx = state.event_tx.clone();
     let result = download_configured(

@@ -60,9 +60,11 @@ pub async fn start(state: &AppState, req: MirrorStartRequest) -> Result<MirrorSt
         "mirror.start 返回"
     );
     if !result.adopted {
-        let task_id = state
-            .tasks
-            .register(format!("投屏: {}", serial), format!("设备 {}", serial));
+        let task_id = state.tasks.register(
+            format!("投屏: {}", serial),
+            format!("设备 {}", serial),
+            None,
+        );
         state.mirror_sessions.register_task(&serial, task_id);
     }
     if let Some(pipe) = state.mirror.frame_pipe(&serial) {

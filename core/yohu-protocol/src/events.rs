@@ -20,6 +20,9 @@ pub struct TaskInfo {
     /// 悬停明细（如「3 台设备 · 5 条命令」；状态栏 title 提示）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// 组/块运行号（`group_runs` 抄写；传输/采集/更新为 None）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<u32>,
 }
 
 /// 命令组进度（每命令完成一条）。
@@ -116,8 +119,6 @@ pub mod event_names {
     pub const MIRROR_STATE: &str = "mirror/state";
     pub const MIRROR_PAINTED: &str = "mirror/painted";
     pub const UPDATE_PROGRESS: &str = "update/progress";
-    /// 壳把 wry 拖放收成 CSS 点后发出；不是 [`AppEvent`]。
-    pub const WINDOW_DRAG: &str = "window/drag";
 }
 
 impl AppEvent {
@@ -267,6 +268,27 @@ mod tests {
     }
 
     #[test]
+    fn task_info_omits_none_run_id() {
+        let task = TaskInfo {
+            id: 1,
+            name: "上传".into(),
+            active: true,
+            detail: None,
+            run_id: None,
+        };
+        let v = serde_json::to_value(&task).expect("serialize");
+        assert!(v.get("run_id").is_none());
+        let linked = TaskInfo {
+            run_id: Some(7),
+            ..task
+        };
+        assert_eq!(
+            serde_json::to_value(&linked).expect("serialize")["run_id"],
+            7
+        );
+    }
+
+    #[test]
     fn event_names_are_tauri_safe() {
         for name in [
             event_names::DEVICES_CHANGED,
@@ -283,7 +305,6 @@ mod tests {
             event_names::MIRROR_STATE,
             event_names::MIRROR_PAINTED,
             event_names::UPDATE_PROGRESS,
-            event_names::WINDOW_DRAG,
         ] {
             assert!(
                 name.chars()

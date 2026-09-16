@@ -44,9 +44,11 @@ pub async fn start(state: &AppState, serial: &str) -> Result<CaptureStart, LogEr
         .start(serial, snap.clear_device_on_start)
         .await?;
     if !result.adopted {
-        let task_id = state
-            .tasks
-            .register(format!("logcat 采集: {serial}"), format!("设备 {serial}"));
+        let task_id = state.tasks.register(
+            format!("logcat 采集: {serial}"),
+            format!("设备 {serial}"),
+            None,
+        );
         state.capture_runs.register(serial, task_id);
     }
     Ok(result)
