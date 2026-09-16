@@ -10,6 +10,7 @@ import type { DeviceInfo } from "@yohu/api";
 import {
   YoButton,
   YoCheckbox,
+  YoCorner,
   YoDialog,
   YoFormRow,
   YoIndicator,
@@ -205,7 +206,7 @@ export function NewSessionDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <YoButton variant="ghost" tone="neutral" onClick={props.onClose}>
+          <YoButton variant="ghost" tone="accent" onClick={props.onClose}>
             取消
           </YoButton>
           <YoButton onClick={create} disabled={!canCreate()}>
@@ -231,6 +232,7 @@ export function NewSessionDialog(props: {
 
         <div class="yohu-logs__new-seg">
           <YoSegmentedButton
+            block
             ariaLabel="划分方式"
             value={mode()}
             items={[
@@ -267,29 +269,31 @@ export function NewSessionDialog(props: {
         </div>
 
         <div class="yohu-logs__new-list">
-          <YoIndicator follow={query().trim() || undefined} variant="fill" />
-          <Show
-            when={pickerItems().length > 0}
-            fallback={<p class="yohu-logs__new-empty">{emptyHint()}</p>}
-          >
-            <NewSessionActivate.Provider
-              value={(item) => {
-                pickItem(item);
-                create();
-              }}
+          <YoCorner role="control" class="yohu-logs__new-list-chrome">
+            <YoIndicator follow={query().trim() || undefined} variant="fill" />
+            <Show
+              when={pickerItems().length > 0}
+              fallback={<p class="yohu-logs__new-empty">{emptyHint()}</p>}
             >
-              <YoVirtualList<PickerItem>
-                items={pickerItems}
-                itemHeight={controlRowHeight()}
-                tone="list"
-                getItemKey={(item) => item.key}
-                selectedKey={selectedKey}
-                onSelectRow={(item) => pickItem(item)}
-                ariaLabel={mode() === "package" ? "包名列表" : "进程列表"}
-                renderRow={NewSessionRow}
-              />
-            </NewSessionActivate.Provider>
-          </Show>
+              <NewSessionActivate.Provider
+                value={(item) => {
+                  pickItem(item);
+                  create();
+                }}
+              >
+                <YoVirtualList<PickerItem>
+                  items={pickerItems}
+                  itemHeight={controlRowHeight()}
+                  tone="list"
+                  getItemKey={(item) => item.key}
+                  selectedKey={selectedKey}
+                  onSelectRow={(item) => pickItem(item)}
+                  ariaLabel={mode() === "package" ? "包名列表" : "进程列表"}
+                  renderRow={NewSessionRow}
+                />
+              </NewSessionActivate.Provider>
+            </Show>
+          </YoCorner>
         </div>
 
         <Show when={mode() === "package"}>

@@ -8,7 +8,7 @@
  * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
- * 级别筛选格走 L1 .yohu-ink；模块只写 --yohu-log-ink。按下只认 aria-pressed，禁止槽上 data-paint / 模块 --yohu-button-*。
+ * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
  * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
  * ========================================================================== */
@@ -42,27 +42,9 @@
 }
 
 .yohu-logs__levels {
-  display: inline-flex;
-  align-items: stretch;
-  height: var(--yohu-control-height);
-  box-sizing: border-box;
-  overflow: hidden;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
   flex-shrink: 0;
   font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
-}
-
-.yohu-logs__level-slot {
-  display: inline-flex;
-  height: 100%;
-}
-
-.yohu-logs__level-slot:not(:last-child) {
-  border-inline-end: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
 /* 检索框：前缀走 YoTextField prefix；过滤生效走公开 active */
@@ -312,13 +294,23 @@
 }
 
 .yohu-logs__new-list {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
   position: relative;
+  display: flex;
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background: var(--yohu-surface);
+}
+
+.yohu-logs__new-list-chrome {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.yohu-logs__new-list-chrome .yohu-corner__content {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .yohu-logs__new-item {

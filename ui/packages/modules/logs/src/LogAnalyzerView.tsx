@@ -539,7 +539,7 @@ export function LogAnalyzerView(props: DeviceSession) {
         onClose={() => setRenameTarget(null)}
         footer={
           <>
-            <YoButton variant="ghost" tone="neutral" onClick={() => setRenameTarget(null)}>
+            <YoButton variant="ghost" tone="accent" onClick={() => setRenameTarget(null)}>
               取消
             </YoButton>
             <YoButton

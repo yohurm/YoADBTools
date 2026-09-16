@@ -1,15 +1,14 @@
 /**
- * 过滤条：级别钮 / Tag Chip / 关键字。变更走 store.patchFilter。
+ * 过滤条：级别分段 / Tag Chip / 关键字。变更走 store.patchFilter。
  */
 
-import { For } from "solid-js";
 import type { JSX } from "solid-js";
 
 import {
   YoBadge,
-  YoButton,
   YoChip,
   YoListPresence,
+  YoSegmentedButton,
   YoTextField,
   type YoTextFieldControl,
 } from "@yohu/ui";
@@ -19,12 +18,11 @@ import {
   joinTagInput,
   levelKey,
   levelLabel,
+  normalizeLevels,
   removeTagNeedle,
   splitTagInput,
   tagFilterActive,
-  toggleLevel,
 } from "./filter";
-import { levelInkStyle } from "./level-paint";
 import { logStore } from "./store";
 import type { LogSessionState } from "./workspace";
 
@@ -79,42 +77,35 @@ function scopeLabel(session: { scope: { kind: string; pkg?: string; pid?: number
   return "System";
 }
 
+const LEVEL_ITEMS = LEVELS.map((letter) => {
+  const key = levelKey(letter);
+  return {
+    value: letter,
+    label: letter,
+    ariaLabel: levelLabel(letter),
+    ink: key ? `var(--yohu-level-${key})` : undefined,
+    fill: key ? `var(--yohu-level-${key})` : undefined,
+  };
+});
+
 export function LogFilterBar(props: {
   session: LogSessionState;
   keywordRef: (el: YoTextFieldControl) => void;
-}) {
+}): JSX.Element {
   return (
     <div class="yohu-logs__filter">
-      <div class="yohu-logs__levels" role="group" aria-label="级别">
-        <For each={LEVELS}>
-          {(letter) => {
-            const pressed = (): boolean => props.session.levels.includes(letter);
-            const key = levelKey(letter);
-            return (
-              <span
-                class="yohu-logs__level-slot yohu-ink"
-                style={key ? (levelInkStyle(key) as JSX.CSSProperties) : undefined}
-              >
-                <YoButton
-                  variant="ghost"
-                  tone="neutral"
-                  size="md"
-                  ink
-                  flush
-                  aria-label={levelLabel(letter)}
-                  aria-pressed={pressed()}
-                  onClick={() =>
-                    logStore.patchFilter(props.session.id, {
-                      levels: toggleLevel(props.session.levels, letter),
-                    })
-                  }
-                >
-                  {letter}
-                </YoButton>
-              </span>
-            );
-          }}
-        </For>
+      <div class="yohu-logs__levels">
+        <YoSegmentedButton
+          type="capsule"
+          multiple
+          size="sm"
+          ariaLabel="级别"
+          items={LEVEL_ITEMS}
+          values={[...props.session.levels]}
+          onChangeValues={(values) =>
+            logStore.patchFilter(props.session.id, { levels: normalizeLevels(values) })
+          }
+        />
       </div>
       <span class="yohu-logs__field yohu-logs__field--tag">
         <TagFilterField session={props.session} />

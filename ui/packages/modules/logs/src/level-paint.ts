@@ -1,7 +1,7 @@
 /**
  * 级别怎么画：色相只引用 `--yohu-level-${key}`；反色 / 消息同色是本文件的 paint。
  * 禁止在 CSS / 本文件再列 V–F 六条 ink 映射或 color-mix。
- * 行反色只有 Fatal。筛选格按下由 YoButton inherit（底 fill、字 fg-on），不进本文件。
+ * 行反色只有 Fatal。筛选格走 YoSegmentedButton，不进本文件。
  */
 
 import type { LevelKey } from "./filter";
