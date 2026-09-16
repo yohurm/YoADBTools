@@ -1,0 +1,113 @@
+.yohu-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  width: 100%;
+  min-width: 0;
+  padding: 0 var(--yohu-space-sm);
+  border: none;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--yohu-fg);
+  font: inherit;
+  font-size: var(--yohu-font-body);
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.yohu-list-item[data-size="nav"] {
+  min-height: var(--yohu-row-height-nav);
+}
+
+.yohu-list-item[data-size="device"] {
+  min-height: var(--yohu-row-height-device);
+  padding: var(--yohu-space-xs) var(--yohu-space-sm);
+}
+
+.yohu-list-item[aria-current] .yohu-list-item__title {
+  font-weight: var(--yohu-font-weight-semibold);
+}
+
+.yohu-list-item__leading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--yohu-space-lg);
+  height: var(--yohu-space-lg);
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.yohu-list-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.yohu-list-item__extra {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.yohu-list-item__extra-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.yohu-list-item__extra-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yohu-space-2xs);
+  padding-top: var(--yohu-space-2xs);
+  min-width: 0;
+}
+
+.yohu-list-item__end {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.yohu-list-item__end-inner {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.yohu-list-item__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yohu-list-item[data-size="device"] .yohu-list-item__title {
+  font-weight: var(--yohu-font-weight-semibold);
+  line-height: var(--yohu-font-leading-tight);
+}
+
+.yohu-list-item__description,
+.yohu-list-item__meta {
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-data);
+  color: var(--yohu-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yohu-list-item__description {
+  font-family: var(--yohu-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.yohu-list-item__meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.yohu-list-item__trailing {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}

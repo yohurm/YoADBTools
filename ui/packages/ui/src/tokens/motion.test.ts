@@ -135,6 +135,7 @@ describe("动效 token 单一事实源契约", () => {
     expect(Math.max(...values)).toBeGreaterThan(1);
     expect(MotionSpec.spatialSmall).toEqual({ duration: "small", easing: "spring" });
     expect(MotionSpec.spatialStretch).toEqual({ duration: "local", easing: "springSoft" });
+    expect(MotionSpec.spatialRail).toEqual({ duration: "slow", easing: "springSoft" });
     expect(MotionSpec.spatialLocal).toEqual({ duration: "local", easing: "emphasized" });
   });
 

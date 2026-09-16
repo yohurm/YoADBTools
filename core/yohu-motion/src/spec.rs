@@ -18,8 +18,10 @@ pub enum MotionSpec {
     SpatialStretch,
     /// 折叠高度：200ms emphasized
     SpatialLocal,
-    /// 侧栏 / 共享容器：300ms standard
+    /// 共享容器 / 预览 / swap：300ms standard
     SpatialPanel,
+    /// 侧栏开合：300ms（CSS 软弹簧；原生回退 standard）
+    SpatialRail,
     /// Dialog 入场：350ms decel
     SpatialEnter,
     /// Dialog / 卡片出场：200ms accel
@@ -34,7 +36,7 @@ impl MotionSpec {
             Self::SpatialSmall => 150,
             Self::EffectsEnter => 160,
             Self::EffectsExit | Self::SpatialStretch | Self::SpatialLocal | Self::SpatialExit => 200,
-            Self::SpatialPanel => 300,
+            Self::SpatialPanel | Self::SpatialRail => 300,
             Self::SpatialEnter => 350,
         }
     }
@@ -42,7 +44,11 @@ impl MotionSpec {
     /// 原生合成器采样用的贝塞尔。弹簧槽位回退 standard，避免第二套物理积分。
     pub fn ease(self) -> fn(f64) -> f64 {
         match self {
-            Self::EffectsFast | Self::SpatialPanel | Self::SpatialSmall | Self::SpatialStretch => {
+            Self::EffectsFast
+            | Self::SpatialPanel
+            | Self::SpatialRail
+            | Self::SpatialSmall
+            | Self::SpatialStretch => {
                 ease_standard
             }
             Self::EffectsEnter | Self::SpatialEnter => ease_decel,
@@ -80,6 +86,7 @@ mod tests {
             "spatialStretch" => MotionSpec::SpatialStretch,
             "spatialLocal" => MotionSpec::SpatialLocal,
             "spatialPanel" => MotionSpec::SpatialPanel,
+            "spatialRail" => MotionSpec::SpatialRail,
             "spatialEnter" => MotionSpec::SpatialEnter,
             "spatialExit" => MotionSpec::SpatialExit,
             other => panic!("unknown MotionSpec name {other}"),
@@ -94,6 +101,7 @@ mod tests {
         "spatialStretch",
         "spatialLocal",
         "spatialPanel",
+        "spatialRail",
         "spatialEnter",
         "spatialExit",
     ];

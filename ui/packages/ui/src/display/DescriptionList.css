@@ -1,0 +1,22 @@
+.yohu-description-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--yohu-space-xs) var(--yohu-space-sm);
+  width: 100%;
+  margin: 0;
+  font-size: var(--yohu-font-caption);
+  box-sizing: border-box;
+}
+
+.yohu-description-list__term {
+  color: var(--yohu-fg-3);
+}
+
+.yohu-description-list__detail {
+  margin: 0;
+  color: var(--yohu-fg);
+  font-family: var(--yohu-font-mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

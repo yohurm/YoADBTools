@@ -1,0 +1,84 @@
+/*
+ * 配方 inline-end：贴 inline-end 的双轴裁切（与 YoSwap / collapse 同构）。
+ * 宽 compact↔100%；高 0fr↔1fr。闭合不占列高，把手溢出到上一行。
+ * 1fr 兄弟（居中空态、结果流）被挤位时靠布局插值跟随。
+ * 禁止 max-height:none / height:auto 离散跳变；禁止给空态写 keyframes。
+ * 禁止 0fr auto ↔ minmax 1fr 0fr。禁止 container-type 写在本宿主上。
+ */
+.yohu-recipe-inline-end {
+  position: relative;
+  align-self: end;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 0fr;
+  width: var(--yohu-control-height);
+  max-width: 100%;
+  overflow: visible;
+  isolation: isolate;
+  z-index: 1;
+  transition:
+    width var(--yohu-motion-spatial-panel),
+    grid-template-rows var(--yohu-motion-spatial-panel);
+}
+
+.yohu-recipe-inline-end[data-open="true"] {
+  width: 100%;
+  grid-template-rows: 1fr;
+}
+
+.yohu-recipe-inline-end > :first-child {
+  display: flex;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.yohu-recipe-inline-end > :first-child > * {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100cqi;
+  min-width: 100cqi;
+  max-width: 100cqi;
+  min-height: min-content;
+  opacity: 0;
+  transform: translateX(var(--yohu-space-xs));
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-recipe-inline-end[data-open="true"] > :first-child > * {
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--yohu-motion-effects-enter),
+    transform var(--yohu-motion-effects-enter);
+}
+
+.yohu-recipe-inline-end > :last-child {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: var(--yohu-control-height);
+  height: var(--yohu-control-height);
+  display: flex;
+  opacity: 1;
+  transition: opacity var(--yohu-motion-effects-exit);
+}
+
+.yohu-recipe-inline-end[data-open="true"] > :last-child {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--yohu-motion-effects-enter);
+}
+
+.yohu-recipe-inline-end > :last-child > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}

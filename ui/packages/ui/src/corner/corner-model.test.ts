@@ -4,10 +4,13 @@ import { Stroke } from "../tokens/layout";
 import {
   clampCornerRadii,
   cornerRadiusForRole,
+  cornerEdgeHaloPath,
+  cornerHaloOutset,
   cornerStrokeRingPath,
   cssCornerPath,
   insetCornerRadii,
   mergeCornerRadii,
+  outsetCornerRadii,
   pointInRoundedRect,
   resolveCornerPaint,
   roundedRectPath,
@@ -56,6 +59,28 @@ describe("corner-model", () => {
     expect(pointInRoundedRect(240, 150, 480, 300, r)).toBe(true);
   });
 
+  it("外圈与 inset 描边对偶：中心线在盒外，不复用 fill", () => {
+    expect(outsetCornerRadii(uniformCornerRadii(16), 5)).toEqual(uniformCornerRadii(21));
+    expect(cornerHaloOutset(4, 2)).toBe(5);
+    const radii = uniformCornerRadii(16);
+    expect(cornerEdgeHaloPath(80, 40, radii, 0)).toBe("");
+    const halo = cornerEdgeHaloPath(80, 40, radii, 5);
+    const fill = roundedRectPath(0, 0, 80, 40, radii);
+    expect(halo).not.toBe(fill);
+    expect(halo).toContain("-5");
+    const paint = resolveCornerPaint({
+      width: 80,
+      height: 40,
+      role: "card",
+      stroke: Stroke.Hairline,
+      edgeOutset: 5,
+    });
+    expect(paint.edgePath).toBe(halo);
+    expect(paint.edgePath).not.toBe(paint.fillPath);
+    expect(paint.edgePath).not.toBe(paint.strokePath);
+    expect(resolveCornerPaint({ width: 80, height: 40, role: "card" }).edgePath).toBe("");
+  });
+
   it("描边环是外顺 + 内逆的 evenodd 洞", () => {
     const ring = cornerStrokeRingPath(80, 40, uniformCornerRadii(8), Stroke.Hairline);
     expect(ring.split("Z").length - 1).toBe(2);
@@ -83,6 +108,7 @@ describe("corner-model", () => {
   it("零盒不画路径", () => {
     const empty = resolveCornerPaint({ width: 0, height: 0, role: "card" });
     expect(empty.fillPath).toBe("");
+    expect(empty.edgePath).toBe("");
     expect(empty.clipPath).toBe("none");
     expect(empty.viewBox).toBe("0 0 1 1");
   });

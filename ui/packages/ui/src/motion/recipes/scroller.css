@@ -1,0 +1,18 @@
+/*
+ * YoScroller 滑块：显隐只走透明度。侧轨预留，不跟 Travel 抢插值。
+ * 几何（高/位移）不过渡，跟视口溢出走。对照 ArkUI BarState 用 opacity。
+ */
+.yohu-scroller__thumb {
+  opacity: 0;
+}
+
+.yohu-scroller[data-scroll="in"] .yohu-scroller__thumb,
+.yohu-scroller[data-scroll="on"] .yohu-scroller__thumb {
+  opacity: 1;
+  transition: opacity var(--yohu-motion-effects-enter);
+}
+
+.yohu-scroller[data-scroll="out"] .yohu-scroller__thumb {
+  opacity: 0;
+  transition: opacity var(--yohu-motion-effects-exit);
+}

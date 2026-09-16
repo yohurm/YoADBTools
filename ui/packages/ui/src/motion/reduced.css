@@ -1,0 +1,67 @@
+/* —— reduced-motion：配方统一降级；循环指示改为静止 —— */
+
+@media (prefers-reduced-motion: reduce) {
+  .yohu-recipe-rail,
+  .yohu-rail-slot,
+  .yohu-rail-slot__content,
+  .yohu-recipe-rail .yohu-list-item,
+  .yohu-recipe-rail .yohu-list-item[data-size="device"],
+  .yohu-recipe-rail .yohu-list-item__info,
+  .yohu-recipe-rail .yohu-list-item__extra,
+  .yohu-recipe-rail .yohu-list-item__end,
+  .yohu-recipe-preview,
+  .yohu-recipe-inline-end,
+  .yohu-recipe-inline-end > :first-child > *,
+  .yohu-recipe-inline-end > :last-child,
+  .yohu-collapse,
+  .yohu-collapse[data-recipe="panel"] .yohu-collapse__content,
+  .yohu-travel[data-ready],
+  .yohu-scroller__lane,
+  .yohu-scroller__thumb,
+  .yohu-presence[data-recipe="list"],
+  .yohu-presence[data-recipe="list"] .yohu-presence__clip,
+  .yohu-presence[data-recipe="chip"],
+  .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
+  .yohu-switch,
+  .yohu-switch__thumb,
+  .yohu-recipe-reorder-bar[data-ready],
+  .yohu-recipe-reorder-overlay[data-ready],
+  .yohu-recipe-indicator[data-ready],
+  [data-reordering] > * > [data-key]:not([data-reorder="source"]),
+  .yohu-tabs__tab,
+  .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
+  .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,
+  .yohu-recipe-tree-chevron,
+  .yohu-recipe-send-aim .yohu-icon,
+  .yohu-progress__bar,
+  .yohu-button,
+  .yohu-icon-button,
+  .yohu-theme-toggle__sun,
+  .yohu-theme-toggle__moon,
+  .yohu-checkbox__box,
+  .yohu-text-field__control,
+  .yohu-swap[data-resizing] .yohu-swap__clip {
+    transition-duration: 0.01ms !important;
+  }
+
+  .yohu-dialog__backdrop,
+  .yohu-dialog__panel,
+  .yohu-toast,
+  .yohu-select__menu,
+  .yohu-tooltip,
+  .yohu-context-menu,
+  .yohu-presence[data-recipe="fade"],
+  .yohu-presence[data-recipe="rise"],
+  .yohu-presence[data-recipe="list"] .yohu-presence__clip,
+  .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
+  .yohu-recipe-dismiss-fade {
+    animation: none !important;
+  }
+
+  .yohu-button__spinner,
+  .yohu-loading__spinner,
+  .yohu-icon-button[data-busy] > .yohu-icon,
+  .yohu-progress[data-mode="indeterminate"] .yohu-progress__bar {
+    animation: none !important;
+  }
+}

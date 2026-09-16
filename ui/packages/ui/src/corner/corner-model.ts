@@ -23,6 +23,8 @@ export interface CornerPaintInput {
   radius?: number;
   radii?: Partial<CornerRadii>;
   stroke?: number;
+  /** 外圈中心线相对填充盒的外扩。0 不画外圈。禁止与 fill / stroke 共用路径。 */
+  edgeOutset?: number;
 }
 
 export interface CornerPaint {
@@ -31,6 +33,7 @@ export interface CornerPaint {
   radii: CornerRadii;
   fillPath: string;
   strokePath: string;
+  edgePath: string;
   clipPath: string;
   viewBox: string;
 }
@@ -96,6 +99,42 @@ export function insetCornerRadii(radii: CornerRadii, inset: number): CornerRadii
     br: Math.max(0, radii.br - step),
     bl: Math.max(0, radii.bl - step),
   };
+}
+
+/** 外扩后半径随中心线一起变大，保持同心四分之一圆。 */
+export function outsetCornerRadii(radii: CornerRadii, outset: number): CornerRadii {
+  const step = Math.max(0, outset);
+  return {
+    tl: radii.tl + step,
+    tr: radii.tr + step,
+    br: radii.br + step,
+    bl: radii.bl + step,
+  };
+}
+
+/**
+ * 外圈中心线：空隙（盒边 → 描边内沿）+ 半宽。
+ * 与 inset 描边环对偶：stroke 在盒内，edge 在盒外。
+ */
+export function cornerHaloOutset(gap: number, strokeWidth: number): number {
+  return Math.max(0, gap) + Math.max(0, strokeWidth) / 2;
+}
+
+/** 填充盒外侧的圆角矩形（中心线）。outset≤0 不画。 */
+export function cornerEdgeHaloPath(
+  width: number,
+  height: number,
+  radii: CornerRadii,
+  outset: number,
+): string {
+  if (outset <= 0 || width <= 0 || height <= 0) return "";
+  return roundedRectPath(
+    -outset,
+    -outset,
+    width + outset * 2,
+    height + outset * 2,
+    outsetCornerRadii(radii, outset),
+  );
 }
 
 export function formatCornerCoord(value: number): string {
@@ -238,6 +277,7 @@ export function resolveCornerPaint(input: CornerPaintInput): CornerPaint {
   const empty = width <= 0 || height <= 0;
   const fillPath = empty ? "" : roundedRectPath(0, 0, width, height, radii);
   const strokePath = empty ? "" : cornerStrokeRingPath(width, height, radii, stroke);
+  const edgePath = empty ? "" : cornerEdgeHaloPath(width, height, radii, Math.max(0, input.edgeOutset ?? 0));
   const clipRadii = stroke > 0 ? insetCornerRadii(radii, stroke) : radii;
   const clipW = width - stroke * 2;
   const clipH = height - stroke * 2;
@@ -251,6 +291,7 @@ export function resolveCornerPaint(input: CornerPaintInput): CornerPaint {
     radii,
     fillPath,
     strokePath,
+    edgePath,
     clipPath: cssCornerPath(clipD),
     viewBox: empty ? "0 0 1 1" : `0 0 ${formatCornerCoord(width)} ${formatCornerCoord(height)}`,
   };

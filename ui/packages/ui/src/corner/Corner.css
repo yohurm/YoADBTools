@@ -4,13 +4,21 @@
   position: relative;
   isolation: isolate;
   min-width: 0;
+  overflow: visible;
 }
 
 .yohu-corner[data-mode="host"] {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
   min-height: 0;
+}
+
+.yohu-corner[data-mode="host"][data-flex="fill"] {
+  flex: 1 1 auto;
+}
+
+.yohu-corner[data-mode="host"][data-flex="hug"] {
+  flex: 0 0 auto;
 }
 
 .yohu-corner[data-mode="paint"] {
@@ -38,7 +46,22 @@
   fill: var(--yohu-corner-stroke, transparent);
 }
 
+/* 外圈中心线：路径在填充盒外。色/宽/虚线走 token；无路径则不画。 */
+.yohu-corner__edge {
+  fill: none;
+  stroke: var(--yohu-corner-edge, transparent);
+  stroke-width: var(--yohu-corner-edge-width, 0px);
+  stroke-dasharray: var(--yohu-corner-edge-dash, none);
+  vector-effect: non-scaling-stroke;
+}
+
 .yohu-corner__content {
+  /* 铬 token 停在本宿主。嵌套 Corner 从透明基线起步，禁止继承虚线/填。 */
+  --yohu-corner-fill: transparent;
+  --yohu-corner-stroke: transparent;
+  --yohu-corner-edge: transparent;
+  --yohu-corner-edge-width: 0px;
+  --yohu-corner-edge-dash: none;
   position: relative;
   z-index: 1;
   display: flex;
@@ -47,4 +70,16 @@
   min-width: 0;
   min-height: 0;
   width: 100%;
+}
+
+.yohu-corner__content[data-overflow="hidden"] {
+  overflow: hidden;
+}
+
+.yohu-corner__content[data-pad="xs"] {
+  padding: var(--yohu-space-xs) var(--yohu-space-sm);
+}
+
+.yohu-corner__content[data-pad="sm"] {
+  padding: var(--yohu-space-sm) var(--yohu-space-md);
 }

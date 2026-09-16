@@ -1,0 +1,239 @@
+.yohu-text-field {
+  --yohu-text-field-edge: var(--yohu-border);
+  /* 写入盒 = 铬高 − 两侧 hairline。字/caret 落在这格，不用 leading-ui 顶到盒顶。 */
+  --yohu-text-field-line: calc(var(--yohu-control-height) - 2 * var(--yohu-stroke-hairline));
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--yohu-space-xs);
+  min-width: calc(var(--yohu-space-xl) * 5);
+  max-width: 100%;
+  vertical-align: middle;
+  box-sizing: border-box;
+  font-family: var(--yohu-font-sans);
+}
+
+.yohu-text-field[data-width="number"] {
+  width: var(--yohu-layout-settings-number-w);
+  min-width: var(--yohu-layout-settings-number-w);
+  flex: 0 0 auto;
+}
+
+.yohu-text-field[data-width="fill"] {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  /* 只铺父级宽。flex-grow 会在 pane 竖栏里把字段沿栏高拉开。 */
+  flex: 0 1 auto;
+}
+
+.yohu-text-field[data-active] {
+  --yohu-text-field-edge: var(--yohu-accent);
+}
+
+.yohu-text-field[data-paint="error"] {
+  --yohu-text-field-edge: var(--yohu-error);
+}
+
+.yohu-text-field[data-paint="warning"] {
+  --yohu-text-field-edge: var(--yohu-warn);
+}
+
+.yohu-text-field__label {
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg-2);
+}
+
+.yohu-text-field__group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.yohu-text-field__addon {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  height: var(--yohu-control-height);
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  color: var(--yohu-fg-2);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.yohu-text-field__addon-chrome {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: var(--yohu-border);
+  height: 100%;
+}
+
+.yohu-text-field__addon-chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 var(--yohu-space-sm);
+}
+
+.yohu-text-field__control {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-text-field-edge);
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--yohu-control-height);
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+.yohu-text-field__chrome {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 0;
+}
+
+.yohu-text-field__chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--yohu-space-xs);
+  padding: 0 var(--yohu-space-sm);
+  /* 只 clip 字。铬面圆角走 YoCorner，禁止本盒再 border + overflow:hidden。 */
+  overflow: hidden;
+}
+
+.yohu-text-field[data-paint="neutral"]:focus-within {
+  --yohu-text-field-edge: var(--yohu-accent);
+}
+
+.yohu-text-field__affix {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--yohu-fg-3);
+}
+
+/* 无盒。气泡提升为写入盒 flex 子项，与 input 抢同一行。禁止本槽再做滚动口。 */
+.yohu-text-field__tokens {
+  display: contents;
+}
+
+.yohu-text-field__input {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: auto;
+  height: var(--yohu-text-field-line);
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent;
+  color: var(--yohu-fg);
+  font-family: inherit;
+  font-size: var(--yohu-font-body);
+  /* 与写入盒同高：Chromium 单行 input 才把字/caret 垂直居中。 */
+  line-height: var(--yohu-text-field-line);
+}
+
+.yohu-text-field[data-font="mono"] .yohu-text-field__input {
+  font-family: var(--yohu-font-mono);
+}
+
+.yohu-text-field[data-tokens] .yohu-text-field__input {
+  min-width: calc(var(--yohu-space-xl) * 2);
+}
+
+/*
+ * 多行：Chromium textarea 从盒顶起笔，caret 跟 leading。
+ * 行高走 leading-ui，上下垫把第一行推到写入盒中线。
+ * 禁止用元素选择器给 textarea 另开后门。
+ */
+.yohu-text-field[data-multiline] .yohu-text-field__control {
+  height: auto;
+  min-height: var(--yohu-control-height);
+  align-items: flex-start;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__input {
+  height: auto;
+  min-height: var(--yohu-text-field-line);
+  line-height: var(--yohu-font-leading-ui);
+  padding-block: calc((var(--yohu-text-field-line) - 1em * var(--yohu-font-leading-ui)) / 2);
+  overflow: auto;
+  scrollbar-width: none;
+  resize: none;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__affix,
+.yohu-text-field[data-multiline] .yohu-text-field__clear {
+  margin-block-start: calc((var(--yohu-text-field-line) - var(--yohu-layout-icon-inline)) / 2);
+}
+
+/* 数字：去掉 UA 步进钮；值贴尾缘，避免短数字在槽里看起来居中。 */
+.yohu-text-field__input[type="number"] {
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.yohu-text-field__input[type="number"]::-webkit-outer-spin-button,
+.yohu-text-field__input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.yohu-text-field__input::placeholder {
+  color: var(--yohu-fg-3);
+}
+
+.yohu-text-field__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: pointer;
+}
+
+.yohu-text-field__clear:hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-text-field[data-disabled] {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-text-field-edge: var(--yohu-border);
+}
+
+.yohu-text-field[data-disabled] .yohu-text-field__addon {
+  color: var(--yohu-fg-3);
+}
+
+.yohu-text-field[data-disabled] .yohu-text-field__input,
+.yohu-text-field[data-disabled] .yohu-text-field__affix {
+  color: var(--yohu-disabled);
+  cursor: not-allowed;
+}
+
+.yohu-text-field[data-readonly] .yohu-text-field__input {
+  cursor: default;
+}

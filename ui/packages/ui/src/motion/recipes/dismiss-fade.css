@@ -1,0 +1,4 @@
+.yohu-recipe-dismiss-fade {
+  animation: yohu-fade-out var(--yohu-motion-spatial-panel) forwards;
+  animation-delay: calc(var(--yohu-dur-toast) - var(--yohu-dur-slow));
+}

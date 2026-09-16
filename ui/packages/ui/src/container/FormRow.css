@@ -1,0 +1,85 @@
+/* 表单行默认排布：左信息栈吃剩余、右控件 hug 贴尾，两列垂直居中。
+ * justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。 */
+
+.yohu-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: var(--yohu-space-md);
+  row-gap: var(--yohu-space-sm);
+  min-width: 0;
+  padding: var(--yohu-space-md) 0;
+  box-sizing: border-box;
+  font-family: var(--yohu-font-sans);
+}
+
+.yohu-form-row__info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--yohu-space-xs);
+  min-width: var(--yohu-layout-settings-label-min);
+  flex: 1 1 var(--yohu-layout-settings-label-min);
+}
+
+.yohu-form-row__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--yohu-space-xs);
+  row-gap: var(--yohu-space-2xs);
+  min-width: 0;
+}
+
+.yohu-form-row__title {
+  min-width: 0;
+  font-size: var(--yohu-font-body);
+  font-weight: var(--yohu-font-weight-semibold);
+  line-height: var(--yohu-font-leading-ui);
+  color: var(--yohu-fg);
+}
+
+.yohu-form-row__description {
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-ui);
+  color: var(--yohu-fg-3);
+}
+
+.yohu-form-row__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yohu-space-xs);
+  flex: 0 0 auto;
+}
+
+.yohu-form-row__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  flex: 0 1 auto;
+  margin-inline-start: auto;
+}
+
+.yohu-form-row[data-layout="stacked"] {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.yohu-form-row[data-layout="stacked"] .yohu-form-row__info {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.yohu-form-row[data-layout="stacked"] .yohu-form-row__control {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-inline-start: 0;
+  justify-content: stretch;
+}

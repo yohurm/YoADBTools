@@ -34,6 +34,11 @@
     "easing": "standard",
     "controlPoints": [0.4, 0.0, 0.2, 1.0]
   },
+  "spatialRail": {
+    "durationMs": 300,
+    "easing": "springSoft",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
   "spatialEnter": {
     "durationMs": 350,
     "easing": "decel",

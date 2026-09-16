@@ -1,0 +1,128 @@
+/*
+ * 配方 rail：一拍软弹簧（spatialRail）。
+ * data-rail = 列宽意图（当拍）。data-stream = 文案/槽/卡高（展开|展开行程开流）。
+ * 宽、高、字同时起步，禁止先水平再垂直，禁止锁展开宽硬裁。
+ */
+.yohu-recipe-rail {
+  overflow: hidden;
+  min-width: 0;
+  transition:
+    width var(--yohu-motion-spatial-rail),
+    flex-basis var(--yohu-motion-spatial-rail),
+    max-width var(--yohu-motion-spatial-rail);
+}
+
+.yohu-rail-slot {
+  display: grid;
+  min-width: 0;
+  transition:
+    grid-template-rows var(--yohu-motion-spatial-rail),
+    grid-template-columns var(--yohu-motion-spatial-rail);
+}
+
+.yohu-rail-slot:not([data-axis="inline"]) {
+  grid-template-rows: 0fr;
+}
+
+.yohu-rail-slot:not([data-axis="inline"])[data-open] {
+  grid-template-rows: 1fr;
+}
+
+.yohu-rail-slot[data-axis="inline"] {
+  grid-template-columns: 0fr;
+}
+
+.yohu-rail-slot[data-axis="inline"][data-open] {
+  grid-template-columns: 1fr;
+}
+
+.yohu-rail-slot__inner {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yohu-rail-slot__content {
+  min-width: 0;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--yohu-motion-spatial-rail),
+    transform var(--yohu-motion-spatial-rail);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-rail-slot__content {
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--yohu-space-sm)));
+  pointer-events: none;
+}
+
+.yohu-recipe-rail .yohu-list-item {
+  transition:
+    gap var(--yohu-motion-spatial-rail),
+    min-height var(--yohu-motion-spatial-rail),
+    padding var(--yohu-motion-spatial-rail);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-list-item {
+  gap: 0;
+}
+
+.yohu-recipe-rail .yohu-list-item[data-size="device"] {
+  transition:
+    gap var(--yohu-motion-spatial-rail),
+    min-height var(--yohu-motion-spatial-rail),
+    padding var(--yohu-motion-spatial-rail);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-list-item[data-size="device"] {
+  min-height: var(--yohu-row-height-nav);
+  padding-block: 0;
+}
+
+.yohu-recipe-rail .yohu-list-item__info {
+  overflow: hidden;
+  max-width: 100%;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width var(--yohu-motion-spatial-rail),
+    opacity var(--yohu-motion-spatial-rail),
+    transform var(--yohu-motion-spatial-rail),
+    color var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-list-item__info {
+  max-width: 0;
+  flex-grow: 0;
+  flex-basis: 0;
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--yohu-space-sm)));
+  pointer-events: none;
+}
+
+.yohu-recipe-rail .yohu-list-item__title,
+.yohu-recipe-rail .yohu-list-item__description,
+.yohu-recipe-rail .yohu-list-item__meta {
+  white-space: nowrap;
+}
+
+.yohu-recipe-rail .yohu-list-item__extra {
+  transition:
+    grid-template-rows var(--yohu-motion-spatial-rail),
+    color var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-list-item__extra {
+  grid-template-rows: 0fr;
+}
+
+.yohu-recipe-rail .yohu-list-item__end {
+  transition:
+    grid-template-columns var(--yohu-motion-spatial-rail),
+    color var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-rail:not([data-stream="open"]) .yohu-list-item__end {
+  grid-template-columns: 0fr;
+}

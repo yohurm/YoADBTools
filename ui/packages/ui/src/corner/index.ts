@@ -2,16 +2,19 @@
  * 圆角绘制模块。L5 只转发 YoCorner / CornerPillRadius，不转发路径函数。
  */
 export { YoCorner } from "./Corner";
-export type { YoCornerProps } from "./Corner";
+export type { YoCornerProps, YoCornerFlex, YoCornerOverflow, YoCornerPad } from "./Corner";
 export {
   CornerPillRadius,
   clampCornerRadii,
+  cornerEdgeHaloPath,
+  cornerHaloOutset,
   cornerRadiusForRole,
   cornerStrokeRingPath,
   cssCornerPath,
   formatCornerCoord,
   insetCornerRadii,
   mergeCornerRadii,
+  outsetCornerRadii,
   pointInRoundedRect,
   resolveCornerPaint,
   roundedRectPath,

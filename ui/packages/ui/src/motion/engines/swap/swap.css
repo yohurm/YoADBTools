@@ -1,0 +1,42 @@
+/*
+ * 配方 swap：与侧栏/预览栏同一套——锁固有宽、沿轴裁切、width 过渡。
+ * 先换目标文案再插槽宽。默认贴 inline-end（往左展开/收起）。
+ * idle hug `__inner`；只在 resizing 锁宽并裁切。
+ * 禁止交叉淡入淡出、width 补间测按钮铬、收到尽头再换字。
+ */
+.yohu-swap {
+  position: relative;
+  display: inline-flex;
+  vertical-align: bottom;
+}
+
+.yohu-swap__clip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: min-content;
+  line-height: inherit;
+}
+
+.yohu-swap[data-anchor="start"] .yohu-swap__clip {
+  justify-content: flex-start;
+}
+
+.yohu-swap[data-anchor="center"] .yohu-swap__clip {
+  justify-content: center;
+}
+
+.yohu-swap[data-phase="resizing"] .yohu-swap__clip {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.yohu-swap[data-resizing] .yohu-swap__clip {
+  transition: width var(--yohu-motion-spatial-panel);
+}
+
+.yohu-swap__inner {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  line-height: inherit;
+}

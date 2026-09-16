@@ -1,0 +1,18 @@
+.yohu-divider {
+  display: block;
+  border: none;
+  margin: var(--yohu-space-sm) 0;
+  background-color: var(--yohu-border);
+  flex-shrink: 0;
+}
+
+.yohu-divider[data-orientation="horizontal"] {
+  width: 100%;
+  height: var(--yohu-stroke-hairline);
+}
+
+.yohu-divider[data-orientation="vertical"] {
+  width: var(--yohu-stroke-hairline);
+  height: 100%;
+  margin: 0 var(--yohu-space-sm);
+}

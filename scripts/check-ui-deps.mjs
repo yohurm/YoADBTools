@@ -19,6 +19,7 @@ let failed = false;
 
 function walk(dir, out) {
   for (const name of readdirSync(dir)) {
+    if (name === "node_modules" || name === "dist") continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else out.push(full);
@@ -79,6 +80,21 @@ function scanNoDirectTauri(dir, pkgJson) {
 
 scanNoDirectTauri(join(ROOT, "ui/packages/workbench/src"), join(ROOT, "ui/packages/workbench/package.json"));
 scanNoDirectTauri(join(ROOT, "ui/apps/shell/src"), join(ROOT, "ui/apps/shell/package.json"));
+
+const PIERCE = /\.yohu-(scroller|panel|dialog|chrome|toolbar|virtual-list|corner)__/;
+function scanNoPierce(dir) {
+  if (!statSync(dir).isDirectory()) return;
+  for (const file of walk(dir, [])) {
+    if (!file.endsWith(".css")) continue;
+    const text = readFileSync(file, "utf8");
+    if (PIERCE.test(text)) {
+      console.error(`${relative(ROOT, file)} 禁止点 Yo 内部槽（.yohu-*__*）；模块只组合公开 class`);
+      failed = true;
+    }
+  }
+}
+scanNoPierce(MODULES_DIR);
+scanNoPierce(join(ROOT, "ui/packages/workbench/src"));
 
 if (failed) process.exit(1);
 console.log("check-ui-deps: ok");

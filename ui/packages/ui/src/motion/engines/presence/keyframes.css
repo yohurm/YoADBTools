@@ -1,0 +1,171 @@
+/**
+ * Presence 关键帧。组件 CSS 只引用 animation-name，禁止再写一套。
+ */
+
+/* —— 关键帧 —— */
+
+@keyframes yohu-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes yohu-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes yohu-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-sm));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-rise-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-sm));
+  }
+}
+
+@keyframes yohu-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-sm)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-sm)));
+  }
+}
+
+/* 指向气泡：PC 以淡入为主，行程只走 2xs，不是菜单的 sm 位移 */
+@keyframes yohu-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-2xs));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-tip-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-2xs));
+  }
+}
+
+@keyframes yohu-tip-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-2xs)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes yohu-tip-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--yohu-space-2xs)));
+  }
+}
+
+@keyframes yohu-slide-end-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--yohu-space-md) * 2));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes yohu-slide-end-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--yohu-space-md) * 2));
+  }
+}
+
+@keyframes yohu-scale-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--yohu-space-xs)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes yohu-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes yohu-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes yohu-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}

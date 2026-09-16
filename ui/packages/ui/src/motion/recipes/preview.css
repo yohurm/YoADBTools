@@ -1,0 +1,3 @@
+.yohu-recipe-preview {
+  transition: grid-template-columns var(--yohu-motion-spatial-panel);
+}

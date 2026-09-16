@@ -21,8 +21,9 @@ const MOTION_RE = /(?:transition|animation)\s*:[^;]*\b\d+(?:\.\d+)?(?:ms|s)\b/;
 const RADIUS_DECL_RE = /border-radius\s*:\s*([^;]+)/;
 /** 行高必须走 --yohu-font-leading-*。`line-height: 1` 会裁切中文底部（雅黑 ink 超出 em）。 */
 const LINE_HEIGHT_DECL_RE = /line-height\s*:\s*([^;]+)/;
-/** 关键帧只允许 tokens/motion.css（动画系统-v6.md L5）。 */
+/** 关键帧只允许动效层 CSS（tokens 桶或 motion/engines|recipes）。 */
 const KEYFRAMES_RE = /@keyframes\s+/;
+const KEYFRAMES_ALLOW_PREFIX = "packages/ui/src/motion/";
 const KEYFRAMES_ALLOW = new Set(["packages/ui/src/tokens/motion.css"]);
 /** 已废弃的兼容别名与旧选中底（改走 --yohu-state-*）。 */
 const DEPRECATED_ALIAS_RE =
@@ -74,11 +75,17 @@ for (const file of files) {
     if (isCss && FONT_SIZE_RE.test(line)) {
       violations.push(`${rel}:${i + 1}: 硬编码字号 → ${line.trim()}`);
     }
-    if (isCss && MOTION_RE.test(line)) {
+    if (isCss && MOTION_RE.test(line) && !rel.endsWith("/reduced.css")) {
       violations.push(`${rel}:${i + 1}: 硬编码动效时长 → ${line.trim()}（须用 var(--yohu-dur-*)）`);
     }
-    if (isCss && KEYFRAMES_RE.test(line) && !KEYFRAMES_ALLOW.has(rel) && !inTokens) {
-      violations.push(`${rel}:${i + 1}: 禁止私有 @keyframes → ${line.trim()}（须写入 tokens/motion.css）`);
+    if (
+      isCss &&
+      KEYFRAMES_RE.test(line) &&
+      !KEYFRAMES_ALLOW.has(rel) &&
+      !rel.startsWith(KEYFRAMES_ALLOW_PREFIX) &&
+      !inTokens
+    ) {
+      violations.push(`${rel}:${i + 1}: 禁止私有 @keyframes → ${line.trim()}（须写入 motion/**/*.css）`);
     }
     if (
       isCss &&
@@ -93,7 +100,12 @@ for (const file of files) {
     }
     if (isCss && !/^\s*\/\*/.test(line)) {
       const radius = RADIUS_DECL_RE.exec(line);
-      if (radius && !/^var\(--yohu-radius-/.test(radius[1].trim()) && radius[1].trim() !== "inherit") {
+      if (
+        radius &&
+        !/^var\(--yohu-radius-/.test(radius[1].trim()) &&
+        radius[1].trim() !== "inherit" &&
+        radius[1].trim() !== "var(--yohu-ripple-radius)"
+      ) {
         violations.push(`${rel}:${i + 1}: 硬编码圆角 → ${line.trim()}（须用 var(--yohu-radius-*)）`);
       }
       const leading = LINE_HEIGHT_DECL_RE.exec(line);
@@ -109,7 +121,7 @@ for (const file of files) {
       }
     }
   });
-  if (isCss && rel.startsWith("packages/modules/") && rel !== "packages/ui/src/components/page.css") {
+  if (isCss && rel.startsWith("packages/modules/") && rel !== "packages/ui/src/container/page.css") {
     const pageBlocks = readFileSync(file, "utf8").split("}");
     for (const block of pageBlocks) {
       if (
@@ -122,7 +134,7 @@ for (const file of files) {
       }
     }
   }
-  if (isCss && !inTokens && rel !== "packages/ui/src/components/Panel.css") {
+  if (isCss && !inTokens && rel !== "packages/ui/src/container/Panel.css") {
     const blocks = readFileSync(file, "utf8").split("}");
     for (const block of blocks) {
       if (

@@ -1,0 +1,218 @@
+.yohu-button {
+  --yohu-button-fill: var(--yohu-accent);
+  --yohu-button-fill-hover: var(--yohu-accent-hover);
+  --yohu-button-fill-pressed: var(--yohu-accent-pressed);
+  --yohu-button-ink: var(--yohu-accent);
+  --yohu-button-soft: var(--yohu-accent-soft);
+  --yohu-corner-fill: transparent;
+  --yohu-corner-stroke: transparent;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  font-family: var(--yohu-font-sans);
+  font-size: var(--yohu-font-body);
+  font-weight: var(--yohu-font-weight-medium);
+  line-height: var(--yohu-font-leading-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
+  min-width: min-content;
+  max-width: var(--yohu-layout-button-max);
+  transition:
+    color var(--yohu-motion-effects-fast);
+}
+
+.yohu-button__label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yohu-space-xs);
+  min-width: min-content;
+  text-align: center;
+}
+
+.yohu-button[data-tone="accent"] {
+  --yohu-button-fill: var(--yohu-accent);
+  --yohu-button-fill-hover: var(--yohu-accent-hover);
+  --yohu-button-fill-pressed: var(--yohu-accent-pressed);
+  --yohu-button-ink: var(--yohu-accent);
+  --yohu-button-soft: var(--yohu-accent-soft);
+}
+
+.yohu-button[data-tone="neutral"] {
+  --yohu-button-fill: var(--yohu-surface-2);
+  --yohu-button-fill-hover: var(--yohu-state-hover);
+  --yohu-button-fill-pressed: var(--yohu-state-pressed);
+  --yohu-button-ink: var(--yohu-fg);
+  --yohu-button-soft: var(--yohu-state-hover);
+}
+
+.yohu-button[data-tone="danger"] {
+  --yohu-button-fill: var(--yohu-error);
+  --yohu-button-fill-hover: var(--yohu-error-hover);
+  --yohu-button-fill-pressed: var(--yohu-error-pressed);
+  --yohu-button-ink: var(--yohu-error);
+  --yohu-button-soft: var(--yohu-signal-bg);
+}
+
+.yohu-button[data-tone="success"] {
+  --yohu-button-fill: var(--yohu-success);
+  --yohu-button-fill-hover: var(--yohu-success-hover);
+  --yohu-button-fill-pressed: var(--yohu-success-pressed);
+  --yohu-button-ink: var(--yohu-success);
+  --yohu-button-soft: var(--yohu-success-bg);
+}
+
+.yohu-button[data-tone="warning"] {
+  --yohu-button-fill: var(--yohu-warn);
+  --yohu-button-fill-hover: var(--yohu-warn-hover);
+  --yohu-button-fill-pressed: var(--yohu-warn-pressed);
+  --yohu-button-ink: var(--yohu-warn);
+  --yohu-button-soft: var(--yohu-warn-bg);
+}
+
+.yohu-button[data-size="sm"] {
+  height: var(--yohu-control-height-sm);
+  font-size: var(--yohu-font-caption);
+}
+
+.yohu-button[data-size="sm"] .yohu-button__label {
+  padding: 0 var(--yohu-space-sm);
+}
+
+.yohu-button[data-size="md"] {
+  height: var(--yohu-control-height);
+}
+
+.yohu-button[data-size="md"] .yohu-button__label {
+  padding: 0 var(--yohu-space-md);
+}
+
+.yohu-button[data-block] {
+  width: 100%;
+  max-width: none;
+}
+
+.yohu-button[data-block] .yohu-button__label {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.yohu-button[data-paint="solid-on"] {
+  --yohu-corner-fill: var(--yohu-button-fill);
+  color: var(--yohu-fg-on);
+}
+
+.yohu-button[data-paint="solid-on"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-button-fill-hover);
+}
+
+.yohu-button[data-paint="solid-on"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-button-fill-pressed);
+}
+
+.yohu-button[data-paint="solid-tone"] {
+  --yohu-corner-fill: var(--yohu-button-soft);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="solid-tone"]:not(:disabled):hover {
+  --yohu-corner-stroke: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="solid-tone"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="solid-neutral"] {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  color: var(--yohu-fg);
+}
+
+.yohu-button[data-paint="solid-neutral"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-state-hover);
+}
+
+.yohu-button[data-paint="solid-neutral"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="outlined-neutral"] {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  color: var(--yohu-fg);
+}
+
+.yohu-button[data-paint="outlined-neutral"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-state-hover);
+}
+
+.yohu-button[data-paint="outlined-neutral"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="outlined-tone"] {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-button-ink);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="outlined-tone"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-button-soft);
+}
+
+.yohu-button[data-paint="outlined-tone"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="ghost-neutral"] {
+  --yohu-corner-fill: transparent;
+  color: var(--yohu-fg-2);
+}
+
+.yohu-button[data-paint="ghost-neutral"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-button[data-paint="ghost-neutral"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button[data-paint="ghost-tone"] {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-paint="ghost-tone"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-state-hover);
+}
+
+.yohu-button[data-paint="ghost-tone"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-button:disabled {
+  --yohu-corner-fill: var(--yohu-disabled);
+  --yohu-corner-stroke: transparent;
+  cursor: not-allowed;
+  color: var(--yohu-fg-3);
+}
+
+.yohu-button__spinner {
+  width: 1em;
+  height: 1em;
+  border: var(--yohu-stroke-accent) solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--yohu-radius-full);
+  box-sizing: border-box;
+  animation: yohu-spin var(--yohu-dur-loop) linear infinite;
+}

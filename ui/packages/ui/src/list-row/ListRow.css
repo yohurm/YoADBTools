@@ -1,0 +1,42 @@
+/*
+ * 清单行盒。只画格子：直角、通栏 hairline、选中/热态底。
+ * 投放框不在本文件。
+ */
+.yohu-list-row {
+  box-sizing: border-box;
+  border-radius: var(--yohu-radius-none);
+  outline: none;
+}
+
+.yohu-list-row[data-tone="list"] {
+  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
+}
+
+.yohu-list-row[data-selectable] {
+  user-select: none;
+  cursor: default;
+}
+
+.yohu-list-row[data-selectable]:hover:not([data-fill]) {
+  background-color: var(--yohu-state-hover);
+}
+
+.yohu-list-row[data-selectable]:active:not([data-fill]) {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-list-row[data-fill="selected"] {
+  background-color: var(--yohu-state-selected);
+}
+
+.yohu-list-row[data-fill="selected"]:hover {
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
+}
+
+.yohu-list-row[data-fill="selected"]:active {
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
+}
+
+.yohu-list-row[data-fill="hot"] {
+  background-color: var(--yohu-accent-soft);
+}

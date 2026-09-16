@@ -1,0 +1,17 @@
+/*
+ * 配方换位行铬：抓手、邻行让位、源行淡化。
+ * 宿主挂 data-reordering；源行挂 data-reorder=source。两 L4 只挂 data-*。
+ */
+[data-reordering],
+[data-reordering] > * > [data-key] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+[data-reordering] > * > [data-key]:not([data-reorder="source"]) {
+  transition: transform var(--yohu-motion-spatial-small);
+}
+
+[data-reordering] [data-reorder="source"] {
+  opacity: var(--yohu-state-reorder-source);
+}

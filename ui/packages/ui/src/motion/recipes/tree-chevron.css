@@ -1,0 +1,9 @@
+.yohu-recipe-tree-chevron {
+  display: inline-flex;
+  transition: transform var(--yohu-motion-spatial-small);
+  transform: rotate(-90deg);
+}
+
+.yohu-recipe-tree-chevron--open {
+  transform: rotate(0deg);
+}

@@ -1,0 +1,79 @@
+/*
+ * YoReveal：绘制轴始终绝对定位。自己不插高度过渡、不淡入、不裁切。
+ * in = 宿主占 --yohu-reveal-span；out = 宿主 0。出流溢出可见，父级 clip。
+ */
+.yohu-reveal {
+  position: relative;
+  /* 名单是 flex 列：height:0 必须压过 min-height:auto，否则出流仍占位。 */
+  min-height: 0;
+  min-width: 0;
+}
+
+.yohu-reveal__content {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  contain: layout;
+}
+
+.yohu-reveal[data-layout="out"] {
+  height: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/*
+ * 落定后：出流 abspos 不得撑祖先 scrollHeight（CSS Overflow / CSSOM View）。
+ * 行程中 Travel 已 clip，保持 visible，避免 height:0 + clip 把内容闪没。
+ */
+.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"] {
+  overflow: clip;
+}
+
+.yohu-reveal[data-layout="in"] {
+  height: var(--yohu-reveal-span, 0px);
+  overflow: visible;
+}
+
+/*
+ * YoTravel：命令式用后 px。used 当拍起程，无 hold。
+ * 只过渡已声明的轴。禁止 auto，禁止点 Dialog / Chip。
+ */
+.yohu-travel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.yohu-travel[data-ready] {
+  overflow: hidden;
+}
+
+.yohu-travel[data-ready] > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.yohu-travel[data-ready][data-axis-block] {
+  transition: height var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-ready][data-axis-inline] {
+  transition: width var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-ready][data-axis-block][data-axis-inline] {
+  transition:
+    height var(--yohu-motion-spatial-panel),
+    width var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-travel="used"] {
+  will-change: height, width;
+}

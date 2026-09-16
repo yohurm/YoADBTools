@@ -6,7 +6,13 @@ import { Spacing } from "./spacing";
  * 窗口默认/最小、断点、页边距对齐 HarmonyOS 电脑/大屏规范。
  */
 export const Layout = {
+  /** 侧栏展开：设备卡 + 图标与标题 */
   ShellNav: 232,
+  /**
+   * 侧栏收起：图标轨。与标题栏三键 / 投屏操作栏同一档 48vp 热区，
+   * 不是把 232 裁到 0。文件预览仍走 Preview↔0。
+   */
+  ShellNavIcons: 48,
   Sidebar: 280,
   Preview: 240,
   /** 投屏设备操作栏（鸿蒙标题栏热区 48vp）。 */

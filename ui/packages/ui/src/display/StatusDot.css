@@ -1,0 +1,33 @@
+.yohu-status-dot {
+  display: inline-block;
+  width: var(--yohu-space-sm);
+  height: var(--yohu-space-sm);
+  border-radius: var(--yohu-radius-full);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background-color: var(--yohu-offline);
+}
+
+.yohu-status-dot[data-tone="success"] {
+  background-color: var(--yohu-success);
+}
+
+.yohu-status-dot[data-tone="offline"] {
+  background-color: var(--yohu-offline);
+}
+
+.yohu-status-dot[data-tone="accent"] {
+  background-color: var(--yohu-accent);
+}
+
+.yohu-status-dot[data-tone="danger"] {
+  background-color: var(--yohu-error);
+}
+
+.yohu-status-dot[data-tone="warning"] {
+  background-color: var(--yohu-warn);
+}
+
+.yohu-status-dot[data-tone="neutral"] {
+  background-color: var(--yohu-fg-3);
+}

@@ -1,0 +1,142 @@
+.yohu-select {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+  font-family: var(--yohu-font-sans);
+}
+
+.yohu-select[data-block] {
+  display: flex;
+  width: 100%;
+}
+
+.yohu-select__trigger {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  /* min-width 必须在触发钮上：写在根上时短文案 hug 触发钮靠左，右侧留出空白，表单行看起来没贴右。 */
+  min-width: calc(var(--yohu-space-xl) * 5);
+  height: var(--yohu-control-height);
+  padding: 0 var(--yohu-space-sm);
+  overflow: visible;
+  border: none;
+  background-color: transparent;
+  color: var(--yohu-fg);
+  font-family: inherit;
+  font-size: var(--yohu-font-body);
+  line-height: var(--yohu-font-leading-ui);
+  cursor: pointer;
+}
+
+.yohu-select[data-block] .yohu-select__trigger {
+  display: flex;
+  width: 100%;
+}
+
+.yohu-select__trigger:not(:disabled):hover {
+  --yohu-corner-stroke: var(--yohu-splitter-hover);
+}
+
+.yohu-select__value {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yohu-select__value[data-placeholder] {
+  color: var(--yohu-fg-3);
+}
+
+.yohu-select__chevron {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+}
+
+/* 铬：落点与夹紧。内容 hug，禁止写死 width。叠层走 popover-place overlay token。 */
+.yohu-select__layer {
+  position: fixed;
+  z-index: var(--yohu-z-overlay);
+  box-sizing: border-box;
+  width: max-content;
+}
+
+.yohu-select__layer:not([data-placed]) {
+  visibility: hidden;
+}
+
+/* 内容区：默认裁切。仅 data-overflow-y 时纵滚；系统条关掉，横向永远 hidden。 */
+.yohu-select__menu {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  position: relative;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+  max-height: inherit;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  list-style: none;
+  border: none;
+  background-color: transparent;
+  border-radius: var(--yohu-radius-sm);
+  box-shadow: var(--yohu-shadow-overlay);
+}
+
+.yohu-select__menu-chrome .yohu-corner__content {
+  padding: var(--yohu-space-xs) 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.yohu-select__layer[data-overflow-y] .yohu-select__menu-chrome .yohu-corner__content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.yohu-select__layer[data-overflow-y] .yohu-select__menu-chrome .yohu-corner__content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.yohu-select__option {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--yohu-control-height);
+  padding: 0 var(--yohu-space-sm);
+  font-size: var(--yohu-font-body);
+  line-height: var(--yohu-font-leading-ui);
+  color: var(--yohu-fg);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yohu-select__option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yohu-select[data-disabled] .yohu-select__trigger {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  color: var(--yohu-disabled);
+  cursor: not-allowed;
+}

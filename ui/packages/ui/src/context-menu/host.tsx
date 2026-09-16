@@ -7,7 +7,7 @@
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 
-import { YoContextMenu } from "../components/ContextMenu";
+import { YoContextMenu } from "./ContextMenu";
 import { contextMenu, type ContextMenuController, type ContextMenuHostController } from "./controller";
 
 export interface YoContextMenuHostProps {

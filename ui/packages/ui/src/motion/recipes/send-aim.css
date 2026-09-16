@@ -1,0 +1,12 @@
+/*
+ * 配方 send-aim：水平纸飞机有内容时转到朝上。
+ * 持续元素，spatialSmall，可打断。模块只挂 class，禁止自写 rotate。
+ */
+.yohu-recipe-send-aim .yohu-icon {
+  transition: transform var(--yohu-motion-spatial-small);
+  transform: rotate(0deg);
+}
+
+.yohu-recipe-send-aim[data-armed="true"] .yohu-icon {
+  transform: rotate(-90deg);
+}

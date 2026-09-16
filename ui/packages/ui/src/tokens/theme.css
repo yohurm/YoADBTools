@@ -134,6 +134,7 @@
   --yohu-segment-hybrid: 56px;
   --yohu-title-bar-height: 40px;
   --yohu-layout-shell-nav: 232px;
+  --yohu-layout-shell-nav-icons: 48px;
   --yohu-layout-sidebar: 280px;
   --yohu-layout-preview: 240px;
   --yohu-layout-mirror-ops: 48px;
@@ -214,6 +215,7 @@
   --yohu-motion-spatial-stretch: var(--yohu-dur-local) var(--yohu-ease-spring-soft);
   --yohu-motion-spatial-local: var(--yohu-dur-local) var(--yohu-ease-emphasized);
   --yohu-motion-spatial-panel: var(--yohu-dur-slow) var(--yohu-ease-standard);
+  --yohu-motion-spatial-rail: var(--yohu-dur-slow) var(--yohu-ease-spring-soft);
   --yohu-motion-spatial-enter: var(--yohu-dur-enter) var(--yohu-ease-decel);
   --yohu-motion-spatial-exit: var(--yohu-dur-local) var(--yohu-ease-accel);
 }

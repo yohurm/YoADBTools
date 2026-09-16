@@ -1,0 +1,15 @@
+/*
+ * 清单投放框。直角叠加层，描边走 YoCorner，禁止 CSS border 贴行盒。
+ */
+.yohu-list-frame {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  box-sizing: border-box;
+  --yohu-corner-fill: transparent;
+  --yohu-corner-stroke: var(--yohu-accent);
+}
+
+.yohu-list-frame[data-variant="focus"] {
+  --yohu-corner-stroke: var(--yohu-focus-ring);
+}

@@ -112,8 +112,10 @@ export const MotionSpec = {
   spatialStretch: { duration: "local", easing: "springSoft" },
   /** 折叠高度 */
   spatialLocal: { duration: "local", easing: "emphasized" },
-  /** 侧栏宽度 */
+  /** 共享容器 / 预览 / swap 宽度（鸿蒙持续元素 = 标准曲线） */
   spatialPanel: { duration: "slow", easing: "standard" },
+  /** 侧栏开合：宽、高、文案流同一拍软弹簧 */
+  spatialRail: { duration: "slow", easing: "springSoft" },
   /** Dialog 入场 */
   spatialEnter: { duration: "enter", easing: "decel" },
   /** Dialog / 卡片出场 */

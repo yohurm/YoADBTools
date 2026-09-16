@@ -7,7 +7,7 @@ import type { ContextMenuController, Toaster } from "./index";
 /** 公开 Yo* 组件清单（与 index.ts 分组导出对齐）。 */
 const YO_PUBLIC = [
   "YoFileIcon",
-  // 基础
+  // 按钮与选择 / 文本与输入 / 信息展示
   "YoButton",
   "YoSegmentedButton",
   "YoIconButton",
@@ -18,8 +18,14 @@ const YO_PUBLIC = [
   "YoSwitch",
   "YoBadge",
   "YoChip",
+  "YoStatusDot",
+  "YoDivider",
+  "YoSubheader",
+  "YoListItem",
+  "YoDescriptionList",
+  "YoAddressField",
   "YoProgressBar",
-  // 导航
+  // 容器 / 列表 / 滚动 / 栅格 / 导航
   "YoToolbar",
   "YoTabs",
   "YoTree",
@@ -37,7 +43,7 @@ const YO_PUBLIC = [
   "YoFormRow",
   "YoCorner",
 
-  // 反馈
+  // 空态与加载 / 弹窗
   "YoEmptyState",
   "YoLoading",
   "YoDialog",
@@ -57,6 +63,17 @@ const YO_PUBLIC = [
   "YoChrome",
   "YoTitleBar",
   "YoStatusBar",
+  "YoRail",
+  "YoRailSlot",
+] as const;
+
+const ADDRESS_PUBLIC = [
+  "addressClickKind",
+  "addressDismissOutside",
+  "addressOpenCaret",
+  "addressScrollPin",
+  "addressCrumbPath",
+  "isAddressVacantClick",
 ] as const;
 
 describe("@yohu/ui 公开组件清单", () => {
@@ -69,6 +86,13 @@ describe("@yohu/ui 公开组件清单", () => {
   it("含 YoSwitch 与 YoTitleBar", () => {
     expect(ui.YoSwitch).toBeTypeOf("function");
     expect(ui.YoTitleBar).toBeTypeOf("function");
+  });
+
+  it("公开地址策略与 YoRail", () => {
+    expect(ui.YoRail).toBeTypeOf("function");
+    for (const name of ADDRESS_PUBLIC) {
+      expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
+    }
   });
 
   it("不公开 fileGlyphFor / FileGlyph", () => {
@@ -101,6 +125,10 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("bindTravel");
     expect(index).not.toContain("bindHugTravel");
     expect(index).not.toContain("TravelRoot");
+    expect(index).not.toContain("YoListRow");
+    expect(index).not.toContain("list-row");
+    expect(index).not.toContain("YoListFrame");
+    expect(index).not.toContain("list-frame");
   });
 
   it("公开 Controller / Toaster 只有模块契约字段", () => {

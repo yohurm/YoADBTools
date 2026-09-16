@@ -2,7 +2,8 @@
  * YoCorner —— 算法圆角铬（L4）。
  * 填充与描边共用 L2 圆弧路径；内容用同一 inset 路径裁，避免毛边。
  * host = 自持盒；paint = 铺在已有宿主上（按钮等）。
- * 色走 `--yohu-corner-fill` / `--yohu-corner-stroke`，禁止本文件写语义色。
+ * 色走 `--yohu-corner-fill` / `--yohu-corner-stroke` / `--yohu-corner-edge`，禁止本文件写语义色。
+ * edge 是填充盒外圈，不是 fill / stroke 路径。
  */
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
@@ -12,6 +13,10 @@ import "./Corner.css";
 
 export type { CornerRadii, CornerRole, YoCornerMode };
 
+export type YoCornerFlex = "fill" | "hug";
+export type YoCornerOverflow = "visible" | "hidden";
+export type YoCornerPad = "none" | "xs" | "sm";
+
 export interface YoCornerProps {
   role?: CornerRole;
   radius?: number;
@@ -19,6 +24,14 @@ export interface YoCornerProps {
   stroke?: boolean;
   clip?: boolean;
   mode?: YoCornerMode;
+  /** 外圈中心线外扩；0 或不传不画。与面板描边无关。 */
+  edgeOutset?: number;
+  /** host 默认 fill；hug 不吃剩余高（校验条）。 */
+  flex?: YoCornerFlex;
+  /** 内容槽溢出。默认 visible。清单定高用 hidden。 */
+  overflow?: YoCornerOverflow;
+  /** 内容槽垫。默认 none。 */
+  pad?: YoCornerPad;
   class?: string;
   children?: JSX.Element;
 }
@@ -75,6 +88,7 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       radius: host.radius,
       radii: props.radii,
       stroke: host.stroke,
+      edgeOutset: props.edgeOutset,
     });
   });
 
@@ -84,19 +98,25 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       class={`yohu-corner${props.class ? ` ${props.class}` : ""}`}
       data-mode={spec().mode}
       data-role={spec().role}
+      data-flex={spec().mode === "host" ? (props.flex ?? "fill") : undefined}
       aria-hidden={spec().mode === "paint" ? true : undefined}
     >
-      <svg class="yohu-corner__paint" viewBox={paint().viewBox} aria-hidden="true" focusable="false">
+      <svg class="yohu-corner__paint" viewBox={paint().viewBox} aria-hidden="true">
         <Show when={paint().fillPath.length > 0}>
           <path class="yohu-corner__fill" d={paint().fillPath} />
         </Show>
         <Show when={paint().strokePath.length > 0}>
           <path class="yohu-corner__stroke" d={paint().strokePath} fill-rule="evenodd" />
         </Show>
+        <Show when={paint().edgePath.length > 0}>
+          <path class="yohu-corner__edge" d={paint().edgePath} />
+        </Show>
       </svg>
       <Show when={spec().mode === "host"}>
         <div
           class="yohu-corner__content"
+          data-overflow={props.overflow ?? "visible"}
+          data-pad={props.pad ?? "none"}
           style={
             spec().clip && paint().clipPath !== "none"
               ? { "clip-path": paint().clipPath }

@@ -1,0 +1,63 @@
+/* —— 配方：折叠 collapse / panel / fill —— */
+
+.yohu-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--yohu-motion-spatial-local);
+}
+
+.yohu-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.yohu-collapse__inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/*
+ * 配方 panel：Fluent Collapse 双轨（高度空间运动 ∥ 内容淡入上移）。
+ * 高度与位移走 spatial-stretch（尺寸软弹簧）；透明度仍走 effects。
+ * 只打 Collapse 自己的 `__content`。`__inner` 只裁切高度。
+ * 禁止变换裁切盒，禁止选择器穿到消费者子树。
+ */
+.yohu-collapse[data-recipe="panel"] {
+  transition: grid-template-rows var(--yohu-motion-spatial-stretch);
+}
+
+.yohu-collapse[data-recipe="panel"] .yohu-collapse__content {
+  opacity: 0;
+  transform: translateY(var(--yohu-space-sm));
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-spatial-stretch);
+}
+
+.yohu-collapse[data-recipe="panel"][data-open="true"] .yohu-collapse__content {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--yohu-motion-effects-enter),
+    transform var(--yohu-motion-spatial-stretch);
+}
+
+/*
+ * 配方 fill：高度仍 0fr/1fr。`__content` 吃剩余高并可收缩。
+ * 禁止默认 collapse 给子项写 min-height（会压过 Tree 行高）。
+ */
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__content > * {
+  flex: 1;
+  min-height: 0;
+}

@@ -1,0 +1,22 @@
+.yohu-reorder-list {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  box-sizing: border-box;
+}
+
+.yohu-reorder-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.yohu-reorder-list__inner {
+  position: relative;
+  width: 100%;
+}
+
+.yohu-reorder-list__row {
+  position: relative;
+  box-sizing: border-box;
+}

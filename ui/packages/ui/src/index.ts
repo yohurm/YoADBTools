@@ -1,6 +1,7 @@
 /**
  * @yohu/ui 组件库入口。
  * 导出全部 token、图标与公开组件（Yo* 标注）。
+ * 源码按 HarmonyOS 族目录存放；本文件只做 L5 转发。
  * 工厂公开返回值只带模块契约；Host 队列 / 会话快照留在内部类型。
  */
 import {
@@ -11,8 +12,8 @@ import {
   openContextMenu,
 } from "./context-menu";
 import type { ContextMenuController } from "./context-menu";
-import { YoToast, YoToaster, createToaster as createToasterHost } from "./components/Toast";
-import type { Toaster } from "./components/Toast";
+import { YoToast, YoToaster, createToaster as createToasterHost } from "./overlay/Toast";
+import type { Toaster } from "./overlay/Toast";
 
 // —— tokens ——
 // 公开面只表达契约：`MotionDuration` / `MotionEasing` / `MotionSpec`、`motionDurationMs` / `motionSpecMs`。
@@ -68,61 +69,97 @@ export type { IconName, IconProps } from "./icons";
 export { YoFileIcon } from "./file-icons";
 export type { YoFileIconProps } from "./file-icons";
 
-// —— 基础 ——
-export { YoButton } from "./components/Button";
-export type { YoButtonProps, YoButtonVariant, YoButtonTone, YoButtonSize } from "./components/Button";
+// —— 按钮与选择 / 文本与输入 / 信息展示 / 空白与分隔 ——
+export { YoButton } from "./basic/Button";
+export type { YoButtonProps, YoButtonVariant, YoButtonTone, YoButtonSize } from "./basic/Button";
 
-export { YoSegmentedButton } from "./components/SegmentedButton";
+export { YoSegmentedButton } from "./basic/SegmentedButton";
 export type {
   YoSegmentedButtonProps,
   YoSegmentedButtonSize,
   YoSegmentedItem,
   YoSegmentedType,
-} from "./components/SegmentedButton";
+} from "./basic/SegmentedButton";
 
-export { YoIconButton } from "./components/IconButton";
-export type { YoIconButtonProps } from "./components/IconButton";
-export { YoThemeToggle } from "./components/ThemeToggle";
-export type { YoThemeToggleProps } from "./components/ThemeToggle";
+export { YoIconButton } from "./basic/IconButton";
+export type { YoIconButtonProps } from "./basic/IconButton";
+export { YoThemeToggle } from "./basic/ThemeToggle";
+export type { YoThemeToggleProps } from "./basic/ThemeToggle";
 
-export { YoTextField } from "./components/TextField";
-export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix, YoTextFieldControl } from "./components/TextField";
+export { YoTextField } from "./form/TextField";
+export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix, YoTextFieldControl } from "./form/TextField";
 
-export { YoSelect } from "./components/Select";
-export type { YoSelectProps, YoSelectOption } from "./components/Select";
+export { YoSelect } from "./form/Select";
+export type { YoSelectProps, YoSelectOption } from "./form/Select";
 
-export { YoCheckbox } from "./components/Checkbox";
-export type { YoCheckboxProps } from "./components/Checkbox";
+export { YoCheckbox } from "./basic/Checkbox";
+export type { YoCheckboxProps } from "./basic/Checkbox";
 
-export { YoSwitch } from "./components/Switch";
-export type { YoSwitchProps } from "./components/Switch";
+export { YoSwitch } from "./basic/Switch";
+export type { YoSwitchProps } from "./basic/Switch";
 
-export { YoBadge } from "./components/Badge";
-export type { YoBadgeProps, YoBadgeTone } from "./components/Badge";
-export { YoChip } from "./components/Chip";
-export type { YoChipProps, YoChipTone, YoChipLeading } from "./components/Chip";
+export { YoBadge } from "./display/Badge";
+export type { YoBadgeProps, YoBadgeTone } from "./display/Badge";
+export { YoChip } from "./display/Chip";
+export type { YoChipProps, YoChipTone, YoChipLeading } from "./display/Chip";
 
-export { YoProgressBar } from "./components/ProgressBar";
-export type { YoProgressBarProps } from "./components/ProgressBar";
+export { YoStatusDot } from "./display/StatusDot";
+export type { YoStatusDotProps, YoStatusDotTone } from "./display/StatusDot";
 
-// —— 导航 ——
-export { YoToolbar } from "./components/Toolbar";
-export type { YoToolbarProps, YoToolbarPad } from "./components/Toolbar";
+export { YoDivider } from "./blank/Divider";
+export type { YoDividerProps, YoDividerOrientation } from "./blank/Divider";
 
-export { YoTabs } from "./components/Tabs";
-export type { YoTabsProps, YoTabItem, YoTabDot, YoTabDotTone } from "./components/Tabs";
+export { YoSubheader } from "./list/Subheader";
+export type { YoSubheaderProps, YoSubheaderTone, YoSubheaderPad } from "./list/Subheader";
 
-export { YoTree } from "./components/Tree";
-export type { YoTreeProps, TreeNode } from "./components/Tree";
+export { YoListItem } from "./list/ListItem";
+export type {
+  YoListItemProps,
+  YoListItemRole,
+  YoListItemSize,
+  YoListItemRing,
+} from "./list/ListItem";
 
-export { YoScroller } from "./components/Scroller";
-export type { YoScrollerProps } from "./components/Scroller";
+export { YoDescriptionList } from "./display/DescriptionList";
+export type { YoDescriptionListProps, YoDescriptionItem } from "./display/DescriptionList";
 
-export { YoVirtualList } from "./components/VirtualList";
-export type { YoVirtualListProps, YoVirtualListTone } from "./components/VirtualList";
+export { YoAddressField } from "./form/AddressField";
+export type { YoAddressFieldProps, YoAddressFieldApi } from "./form/AddressField";
+export {
+  addressClickKind,
+  addressDismissOutside,
+  addressOpenCaret,
+  addressScrollPin,
+  addressCrumbPath,
+  isAddressVacantClick,
+} from "./form/address-field-model";
+export type {
+  AddressClickKind,
+  AddressCaret,
+  AddressScrollPin,
+} from "./form/address-field-model";
 
-export { YoReorderList } from "./components/ReorderList";
-export type { YoReorderListProps } from "./components/ReorderList";
+export { YoProgressBar } from "./display/ProgressBar";
+export type { YoProgressBarProps } from "./display/ProgressBar";
+
+// —— 容器 / 列表 / 滚动 / 栅格 / 导航 ——
+export { YoToolbar } from "./container/Toolbar";
+export type { YoToolbarProps, YoToolbarPad } from "./container/Toolbar";
+
+export { YoTabs } from "./navigation/Tabs";
+export type { YoTabsProps, YoTabItem, YoTabDot, YoTabDotTone } from "./navigation/Tabs";
+
+export { YoTree } from "./list/Tree";
+export type { YoTreeProps, TreeNode } from "./list/Tree";
+
+export { YoScroller } from "./scroll/Scroller";
+export type { YoScrollerProps, YoScrollerHandle } from "./scroll/Scroller";
+
+export { YoVirtualList } from "./scroll/VirtualList";
+export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";
+
+export { YoReorderList } from "./scroll/ReorderList";
+export type { YoReorderListProps } from "./scroll/ReorderList";
 
 export {
   insertIndexFromPointerY,
@@ -130,51 +167,59 @@ export {
   moveIndexFromInsert,
   moveItemTo,
   shiftForReorder,
-} from "./components/reorder-model";
+} from "./scroll/reorder-model";
 
-export { YoColResizer } from "./components/ColResizer";
-export type { YoColResizerProps } from "./components/ColResizer";
+export { YoColResizer } from "./grid/ColResizer";
+export type { YoColResizerProps } from "./grid/ColResizer";
 
-export { YoColHeader } from "./components/ColHeader";
-export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./components/ColHeader";
+export { YoColHeader } from "./grid/ColHeader";
+export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./grid/ColHeader";
 
-export { YoColFrame } from "./components/ColFrame";
-export type { YoColFrameProps, YoColCellPad } from "./components/ColFrame";
+export { YoColFrame } from "./grid/ColFrame";
+export type { YoColFrameProps, YoColCellPad } from "./grid/ColFrame";
 
-export { YoColRow } from "./components/ColRow";
-export type { YoColRowProps } from "./components/ColRow";
+export { YoColRow } from "./grid/ColRow";
+export type { YoColRowProps } from "./grid/ColRow";
 
-export { YoColTrack } from "./components/ColTrack";
-export type { YoColTrackProps } from "./components/ColTrack";
+export { YoColTrack } from "./grid/ColTrack";
+export type { YoColTrackProps } from "./grid/ColTrack";
 
-export { YoColCell } from "./components/ColCell";
-export type { YoColCellProps } from "./components/ColCell";
+export { YoColCell } from "./grid/ColCell";
+export type { YoColCellProps } from "./grid/ColCell";
 
 export {
   colTrackTemplate,
   defaultColWidths,
   setColWidth,
-} from "./components/col-model";
-export type { YoColSpec, YoColWidths } from "./components/col-model";
+} from "./grid/col-model";
+export type { YoColSpec, YoColWidths } from "./grid/col-model";
 
-export { YoPanel } from "./components/Panel";
+export { YoPanel } from "./container/Panel";
 export type {
   YoPanelProps,
   YoPanelAlign,
+  YoPanelEdge,
   YoPanelGap,
   YoPanelOverflow,
   YoPanelPadding,
   YoPanelVariant,
-} from "./components/Panel";
+} from "./container/Panel";
 
-export { YoPage } from "./components/Page";
-export type { YoPageProps } from "./components/Page";
+export { YoPage } from "./container/Page";
+export type { YoPageProps } from "./container/Page";
 
-export { YoFormRow } from "./components/FormRow";
-export type { YoFormRowProps } from "./components/FormRow";
+export { YoFormRow } from "./container/FormRow";
+export type { YoFormRowProps, YoFormRowLayout } from "./container/FormRow";
 
 export { YoCorner, CornerPillRadius } from "./corner";
-export type { YoCornerProps, CornerRadii, CornerRole } from "./corner";
+export type {
+  YoCornerProps,
+  YoCornerFlex,
+  YoCornerOverflow,
+  YoCornerPad,
+  CornerRadii,
+  CornerRole,
+} from "./corner";
 
 // —— 键盘作用域（L1；页面提供绑定表） ——
 export {
@@ -210,24 +255,24 @@ export type {
   SelectMode,
 } from "./keymap";
 
-// —— 反馈 ——
-export { YoEmptyState } from "./components/EmptyState";
-export type { YoEmptyStateProps } from "./components/EmptyState";
+// —— 空态与加载 / 弹窗 ——
+export { YoEmptyState } from "./feedback/EmptyState";
+export type { YoEmptyStateProps } from "./feedback/EmptyState";
 
-export { YoLoading } from "./components/Loading";
-export type { YoLoadingProps } from "./components/Loading";
+export { YoLoading } from "./feedback/Loading";
+export type { YoLoadingProps } from "./feedback/Loading";
 
-export { YoDialog } from "./components/Dialog";
+export { YoDialog } from "./overlay/Dialog";
 export type {
   YoDialogProps,
   YoDialogBodyLayout,
   YoDialogBodyOverflow,
   YoDialogBodyPad,
   YoDialogInitial,
-} from "./components/Dialog";
+} from "./overlay/Dialog";
 
-export { YoTooltip, YoTooltipHost } from "./components/Tooltip";
-export type { YoTooltipProps, YoTooltipHostProps } from "./components/Tooltip";
+export { YoTooltip, YoTooltipHost } from "./overlay/Tooltip";
+export type { YoTooltipProps, YoTooltipHostProps } from "./overlay/Tooltip";
 
 // —— 右键菜单（L1；页面提供场景表，壳挂唯一 Host；YoContextMenu 仅 Host 内部使用） ——
 // 默认单例只被 Host 内部读取，不从此处导出。
@@ -249,7 +294,7 @@ export type {
 
 export { YoToast, YoToaster };
 export const createToaster: () => Toaster = createToasterHost;
-export type { ToastTone, Toaster, YoToastProps, YoToasterProps } from "./components/Toast";
+export type { ToastTone, Toaster, YoToastProps, YoToasterProps } from "./overlay/Toast";
 
 export {
   YoPresence,
@@ -259,6 +304,20 @@ export {
   YoTravel,
   YoSwap,
   YoIndicator,
+  YoRail,
+  YoRailSlot,
+  useRail,
+  railBlockHidden,
+  railCopyOpaque,
+  railLayoutExpanded,
+  railSlotOpen,
+  railStreamAttr,
+  railStreamOpen,
+  railPhaseAfterWidthSettle,
+  railPhaseOnIntentChange,
+  railTooltipEnabled,
+  railWidthIntent,
+  railWidthMatchesIntent,
   prefersReducedMotion,
   shouldSkipMotion,
   DISMISS_HOLD_DURATION,
@@ -274,14 +333,21 @@ export type {
   YoSwapProps,
   YoIndicatorProps,
   IndicatorVariant,
+  YoRailProps,
+  YoRailContextValue,
+  YoRailSlotProps,
+  RailSlotAxis,
+  RailIntent,
+  RailPhase,
+  RailPresentation,
   PresenceRecipe,
 } from "./motion";
 
 // —— 窗口铬 ——
-export { YoChrome } from "./components/chrome";
-export type { YoChromeProps } from "./components/chrome";
-export { YoTitleBar } from "./components/TitleBar";
-export type { YoTitleBarProps } from "./components/TitleBar";
+export { YoChrome } from "./chrome/chrome";
+export type { YoChromeProps } from "./chrome/chrome";
+export { YoTitleBar } from "./chrome/TitleBar";
+export type { YoTitleBarProps } from "./chrome/TitleBar";
 
-export { YoStatusBar } from "./components/StatusBar";
-export type { YoStatusBarProps } from "./components/StatusBar";
+export { YoStatusBar } from "./chrome/StatusBar";
+export type { YoStatusBarProps } from "./chrome/StatusBar";
