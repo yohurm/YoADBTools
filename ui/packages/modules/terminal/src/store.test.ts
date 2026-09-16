@@ -30,6 +30,7 @@ vi.mock("@yohu/api", async () => {
   };
 });
 
+import { isRunFinished } from "./run-wait";
 import { createTerminalStore } from "./store";
 
 const COMMAND: CommandDto = {
@@ -55,15 +56,14 @@ function texts(store: ReturnType<typeof createTerminalStore>): string[] {
   return store.lines.map((row) => `${row.kind}:${row.text}`);
 }
 
-async function finishTask(name: string): Promise<void> {
+function emitTasks(tasks: TaskInfo[]): void {
+  for (const h of mocks.tasks) h({ tasks });
+}
+
+async function finishRun(runId: number): Promise<void> {
   await Promise.resolve();
-  const tasks = [
-    { id: 1, name, active: true },
-    { id: 1, name, active: false },
-  ] as const;
-  for (const task of tasks) {
-    for (const h of mocks.tasks) h({ tasks: [task] });
-  }
+  emitTasks([{ id: 1, name: "x", active: true, run_id: runId }]);
+  emitTasks([{ id: 1, name: "x", active: false, run_id: runId }]);
 }
 
 function emitProgress(e: { run_id: number; serial: string; template: string; message?: string }): void {
@@ -122,11 +122,11 @@ describe("send / 队列 / runGroup 目标设备", () => {
     expect(store.lines.some((row) => row.text === "未选择在线设备")).toBe(true);
   });
 
-  it("命令组把传入 serials 原样交给 groupRun，busy 等到任务终态", async () => {
+  it("命令组把传入 serials 原样交给 groupRun，busy 等到 run_id 终态", async () => {
     mocks.groupRun.mockResolvedValue(7);
     const store = createTerminalStore();
     const running = store.runGroup(["B2"], GROUP);
-    await finishTask("命令组: demo");
+    await finishRun(7);
     await running;
     expect(mocks.groupRun).toHaveBeenCalledWith({ group_id: "g1", serials: ["B2"] });
     expect(store.session.activeRunId).toBeNull();
@@ -154,7 +154,7 @@ describe("send / 队列 / runGroup 目标设备", () => {
     expect(store.session.queue[0]?.kind).toBe("group");
     const sending = store.sendAll(["B2"]);
     expect(store.session.busy).toBe(true);
-    await finishTask("命令组: demo");
+    await finishRun(11);
     await sending;
     expect(mocks.groupRun).toHaveBeenCalledWith({ group_id: "g1", serials: ["B2"] });
     expect(store.session.busy).toBe(false);
@@ -191,16 +191,19 @@ describe("send / 队列 / runGroup 目标设备", () => {
     });
     await Promise.resolve();
     expect(released).toBe(false);
-    await finishTask("命令块: 连上再看");
+    await finishRun(8);
     await running;
     expect(released).toBe(true);
     expect(store.session.activeRunId).toBeNull();
   });
 
-  it("进度事件数够了也结束等待", async () => {
+  it("进度计满不结束等待", async () => {
     mocks.blockRun.mockResolvedValue(8);
     const store = createTerminalStore();
-    const running = store.runBlock(["B2"], BLOCK, []);
+    let done = false;
+    const running = store.runBlock(["B2"], BLOCK, []).then(() => {
+      done = true;
+    });
     await Promise.resolve();
     emitProgress({ run_id: 8, serial: "B2", template: "wait-for-device", message: "a" });
     emitProgress({
@@ -209,8 +212,49 @@ describe("send / 队列 / runGroup 目标设备", () => {
       template: "shell getprop ro.product.model",
       message: "b",
     });
+    await Promise.resolve();
+    expect(done).toBe(false);
+    expect(store.session.activeRunId).toBe(8);
+    await finishRun(8);
     await running;
-    expect(store.session.activeRunId).toBeNull();
+    expect(done).toBe(true);
+  });
+
+  it("快照缺任务不结束等待", async () => {
+    mocks.groupRun.mockResolvedValue(7);
+    const store = createTerminalStore();
+    let done = false;
+    const running = store.runGroup(["B2"], GROUP).then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    emitTasks([]);
+    emitTasks([{ id: 1, name: "命令组: demo", active: false }]);
+    await Promise.resolve();
+    expect(done).toBe(false);
+    expect(store.session.activeRunId).toBe(7);
+    await finishRun(7);
+    await running;
+    expect(done).toBe(true);
+  });
+
+  it("cancel 失败不 settle，仍 busy", async () => {
+    mocks.groupRun.mockResolvedValue(9);
+    mocks.groupCancel.mockRejectedValue({ code: "not_found", message: "运行不存在" });
+    const store = createTerminalStore();
+    let done = false;
+    const running = store.runGroup(["B2"], GROUP).then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    await store.cancelGroup();
+    expect(mocks.groupCancel).toHaveBeenCalledWith(9);
+    await Promise.resolve();
+    expect(done).toBe(false);
+    expect(store.session.activeRunId).toBe(9);
+    await finishRun(9);
+    await running;
+    expect(done).toBe(true);
   });
 
   it("cancelGroup 把当前世代 run_id 交给 groupCancel", async () => {
@@ -221,46 +265,43 @@ describe("send / 队列 / runGroup 目标设备", () => {
     await Promise.resolve();
     await store.cancelGroup();
     expect(mocks.groupCancel).toHaveBeenCalledWith(9);
-    await finishTask("命令组: demo");
+    expect(store.session.activeRunId).toBe(9);
+    await finishRun(9);
     await running;
   });
 
-  it("两个 store 实例不共用 activeRun 槽", async () => {
-    const other: CommandGroupDto = { ...GROUP, id: "g2", name: "other" };
+  it("同名两运行只认 run_id", async () => {
     mocks.groupRun.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
     const a = createTerminalStore();
     const b = createTerminalStore();
     const runA = a.runGroup(["A"], GROUP);
-    const runB = b.runGroup(["B"], other);
+    const runB = b.runGroup(["B"], GROUP);
     await Promise.resolve();
     expect(a.session.activeRunId).toBe(1);
     expect(b.session.activeRunId).toBe(2);
-    for (const h of mocks.tasks) {
-      h({
-        tasks: [
-          { id: 1, name: "命令组: demo", active: true },
-          { id: 2, name: "命令组: other", active: true },
-        ],
-      });
-    }
+    emitTasks([
+      { id: 10, name: "命令组: demo", active: true, run_id: 1 },
+      { id: 20, name: "命令组: demo", active: true, run_id: 2 },
+    ]);
     await a.cancelGroup();
     expect(mocks.groupCancel).toHaveBeenCalledWith(1);
-    for (const h of mocks.tasks) {
-      h({
-        tasks: [
-          { id: 1, name: "命令组: demo", active: false },
-          { id: 2, name: "命令组: other", active: true },
-        ],
-      });
-    }
+    emitTasks([
+      { id: 10, name: "命令组: demo", active: false, run_id: 1 },
+      { id: 20, name: "命令组: demo", active: true, run_id: 2 },
+    ]);
     await runA;
     expect(a.session.activeRunId).toBeNull();
     expect(b.session.activeRunId).toBe(2);
-    for (const h of mocks.tasks) {
-      h({ tasks: [{ id: 2, name: "命令组: other", active: false }] });
-    }
+    emitTasks([{ id: 20, name: "命令组: demo", active: false, run_id: 2 }]);
     await runB;
     expect(b.session.activeRunId).toBeNull();
+  });
+
+  it("isRunFinished 只要快照有该项且 !active", () => {
+    expect(isRunFinished(7, [])).toBe(false);
+    expect(isRunFinished(7, [{ id: 1, name: "x", active: false }])).toBe(false);
+    expect(isRunFinished(7, [{ id: 1, name: "x", active: true, run_id: 7 }])).toBe(false);
+    expect(isRunFinished(7, [{ id: 1, name: "x", active: false, run_id: 7 }])).toBe(true);
   });
 
   it("clearResults 清空执行结果面板", async () => {

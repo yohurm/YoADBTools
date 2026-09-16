@@ -5,7 +5,7 @@
 
 import { createContext, useContext } from "solid-js";
 
-import { YoIconButton, YoReorderList } from "@yohu/ui";
+import { YoIconButton, YoReorderList, YoSubheader } from "@yohu/ui";
 
 import type { DraftStep } from "../draft";
 import { TemplateField } from "./TemplateField";
@@ -54,10 +54,11 @@ export function BlockSteps(props: {
 
   return (
     <div class="yohu-cm__steps">
-      <div class="yohu-cm__steps-head">
-        <span class="yohu-cm__caption">步骤</span>
-        <YoIconButton icon="plus" title="新增步骤" onClick={() => props.onAdd()} />
-      </div>
+      <YoSubheader
+        title="步骤"
+        pad="flush"
+        actions={<YoIconButton icon="plus" title="新增步骤" onClick={() => props.onAdd()} />}
+      />
       <BlockStepActions.Provider value={actions}>
         <YoReorderList<DraftStep>
           items={() => props.steps}

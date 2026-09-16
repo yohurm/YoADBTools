@@ -1,12 +1,13 @@
 /**
- * 命令管理 Dialog：开窗快照、保存全量提交、打开右键菜单。
- * 草稿与选区在 manager/store；三栏视图各自渲染。
+ * 命令管理 Dialog：绑模块单例、保存全量提交、打开右键菜单。
+ * 草稿与选区在 manager/store；禁止 effect 里自动 load。
  */
 
-import { Show, createEffect, onCleanup, onMount, untrack } from "solid-js";
+import { Show, onCleanup, onMount } from "solid-js";
 
 import { errorText } from "@yohu/api";
 import {
+  YoBadge,
   YoButton,
   YoDialog,
   attachPanelKeys,
@@ -23,20 +24,15 @@ import { EntryColumn } from "./manager/EntryColumn";
 import { GroupColumn } from "./manager/GroupColumn";
 import { MANAGER_DIALOG } from "./layout";
 import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./manager/keys";
-import { createCommandManagerStore } from "./manager/store";
+import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./command-manager.css";
 
 const toaster = createToaster();
 
-export function CommandManager(props: { open: () => boolean; onClose: () => void }) {
-  const store = createCommandManagerStore();
+export function CommandManager() {
+  const store = commandManagerStore;
   let root: HTMLDivElement | undefined;
-
-  const openDraft = (): void => {
-    store.load(terminalStore.library);
-    closeContextMenu();
-  };
 
   onMount(() => {
     if (!root) return;
@@ -50,18 +46,9 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
     onCleanup(stop);
   });
 
-  createEffect((wasOpen?: boolean) => {
-    const open = props.open();
-    if (open && !wasOpen) {
-      untrack(openDraft);
-    }
-    if (!open) closeContextMenu();
-    return open;
-  }, false);
-
   const close = (): void => {
     closeContextMenu();
-    props.onClose();
+    store.close();
   };
 
   const save = async (): Promise<void> => {
@@ -100,7 +87,7 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
 
   return (
     <YoDialog
-      open={props.open}
+      open={() => store.ui.open}
       title="命令管理"
       width={MANAGER_DIALOG.width}
       height={MANAGER_DIALOG.height}
@@ -110,7 +97,9 @@ export function CommandManager(props: { open: () => boolean; onClose: () => void
       footer={
         <>
           <Show when={store.ui.error}>
-            <span class="yohu-cm__error">{store.ui.error}</span>
+            <span class="yohu-cm__error">
+              <YoBadge text={store.ui.error} tone="danger" />
+            </span>
           </Show>
           <YoButton variant="ghost" tone="accent" onClick={close} disabled={store.ui.saving}>
             取消

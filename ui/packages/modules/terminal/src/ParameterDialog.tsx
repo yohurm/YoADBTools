@@ -6,7 +6,7 @@
 import { For, createEffect, createSignal } from "solid-js";
 
 import type { CommandParamDto } from "@yohu/api";
-import { YoButton, YoDialog, YoTextField } from "@yohu/ui";
+import { YoButton, YoDialog, YoScroller, YoSubheader, YoTextField } from "@yohu/ui";
 
 import { formatAdbLine, paramDescription } from "./command-line";
 import { PARAM_DIALOG_WIDTH } from "./layout";
@@ -55,27 +55,37 @@ export function ParameterDialog(props: {
         </>
       }
     >
-      <div class="yohu-terminal__params">
-        <section class="yohu-terminal__params-section">
-          <p class="yohu-terminal__params-caption">原始命令</p>
-          <For each={originals()}>{(line) => <p class="yohu-terminal__params-line">{line}</p>}</For>
-        </section>
-        <section class="yohu-terminal__params-section">
-          <p class="yohu-terminal__params-caption">填写参数</p>
-          <For each={props.slots}>
-            {(index, position) => (
-              <YoTextField
-                block
-                label={fieldLabel(index)}
-                value={values()[position()] ?? ""}
-                onInput={(v) =>
-                  setValues((vs) => vs.map((old, i) => (i === position() ? v : old)))
-                }
-              />
-            )}
-          </For>
-        </section>
-      </div>
+      <YoScroller>
+        <div class="yohu-terminal__params">
+          <section class="yohu-terminal__params-section">
+            <YoSubheader title="原始命令" pad="flush" />
+            <YoTextField
+              block
+              readOnly
+              multiline
+              font="mono"
+              ariaLabel="原始命令"
+              rows={Math.max(1, originals().length)}
+              value={originals().join("\n")}
+            />
+          </section>
+          <section class="yohu-terminal__params-section">
+            <YoSubheader title="填写参数" pad="flush" />
+            <For each={props.slots}>
+              {(index, position) => (
+                <YoTextField
+                  block
+                  label={fieldLabel(index)}
+                  value={values()[position()] ?? ""}
+                  onInput={(v) =>
+                    setValues((vs) => vs.map((old, i) => (i === position() ? v : old)))
+                  }
+                />
+              )}
+            </For>
+          </section>
+        </div>
+      </YoScroller>
     </YoDialog>
   );
 }

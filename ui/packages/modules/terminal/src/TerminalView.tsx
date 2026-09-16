@@ -4,7 +4,7 @@
 
 import { Show, createEffect, createSignal, onMount } from "solid-js";
 
-import { YoBadge, YoButton, YoChrome, YoPage, YoPanel } from "@yohu/ui";
+import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, YoScroller } from "@yohu/ui";
 import type { DeviceSession, LibraryEntryDto } from "@yohu/api";
 import { ModuleTitle } from "@yohu/api";
 
@@ -14,11 +14,11 @@ import { Composer } from "./Composer";
 import { ParameterDialog } from "./ParameterDialog";
 import { ResultStream } from "./ResultStream";
 import { entryParams, entrySlots, entryTemplates } from "./command-line";
+import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./terminal.css";
 
 export function TerminalView(props: DeviceSession) {
-  const [managerOpen, setManagerOpen] = createSignal(false);
   const [inputEntry, setInputEntry] = createSignal<LibraryEntryDto | null>(null);
   const [inputOpen, setInputOpen] = createSignal(false);
 
@@ -36,7 +36,10 @@ export function TerminalView(props: DeviceSession) {
 
   return (
     <YoPage class="yohu-terminal">
-      <YoChrome title={ModuleTitle.Terminal} deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome
+        title={ModuleTitle.Terminal}
+        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
+      >
         <YoButton variant="outlined" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
           清屏
         </YoButton>
@@ -45,23 +48,24 @@ export function TerminalView(props: DeviceSession) {
             取消
           </YoButton>
         </Show>
-        <YoButton variant="outlined" tone="neutral" onClick={() => setManagerOpen(true)}>
+        <YoButton variant="outlined" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
           命令管理
         </YoButton>
       </YoChrome>
 
       <div class="yohu-terminal__body">
-        <YoPanel variant="pane" padding="sm">
-          <CommandTree
-            onNeedValues={(entry) => {
-              setInputEntry(entry);
-              setInputOpen(true);
-            }}
-          />
+        <YoPanel variant="pane" padding="sm" overflow="hidden">
+          <YoScroller>
+            <CommandTree
+              onNeedValues={(entry) => {
+                setInputEntry(entry);
+                setInputOpen(true);
+              }}
+            />
+          </YoScroller>
         </YoPanel>
 
         <YoPanel
-          class="yohu-terminal__output"
           variant="pane"
           padding="none"
           overflow="hidden"
@@ -79,7 +83,7 @@ export function TerminalView(props: DeviceSession) {
         </YoPanel>
       </div>
 
-      <CommandManager open={managerOpen} onClose={() => setManagerOpen(false)} />
+      <CommandManager />
 
       <Show when={inputEntry()}>
         <ParameterDialog

@@ -24,7 +24,6 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: auto;
   padding: var(--yohu-space-sm);
 }
 
@@ -51,7 +50,6 @@
 }
 
 .yohu-terminal__line-time {
-  flex-shrink: 0;
   color: var(--yohu-fg-3);
   font-family: var(--yohu-font-mono);
   font-variant-numeric: tabular-nums;
@@ -85,36 +83,6 @@
   background: var(--yohu-surface-2);
 }
 
-.yohu-terminal__dock-toggle {
-  --yohu-corner-fill: var(--yohu-surface-2);
-  --yohu-corner-stroke: transparent;
-  --yohu-ripple-radius: var(--yohu-radius-sm);
-  display: inline-flex;
-  align-items: stretch;
-  justify-content: center;
-  width: 100%;
-  min-height: var(--yohu-control-height);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--yohu-fg-2);
-  font-family: var(--yohu-font-sans);
-  font-size: var(--yohu-font-caption);
-  cursor: pointer;
-}
-
-.yohu-terminal__dock-chrome {
-  width: 100%;
-  min-height: inherit;
-}
-
-.yohu-terminal__dock-chrome .yohu-corner__content {
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: var(--yohu-space-xs);
-}
-
 .yohu-terminal__queue {
   margin: 0;
   padding: 0 var(--yohu-space-sm);
@@ -145,10 +113,6 @@
   min-width: 0;
 }
 
-.yohu-terminal__composer-field :is(input, textarea) {
-  font-family: var(--yohu-font-mono);
-}
-
 .yohu-terminal__send {
   flex-shrink: 0;
 }
@@ -165,18 +129,4 @@
   gap: var(--yohu-space-sm);
 }
 
-.yohu-terminal__params-caption {
-  margin: 0;
-  font-size: var(--yohu-font-caption);
-  font-weight: var(--yohu-font-weight-semibold);
-  color: var(--yohu-fg-2);
-}
-
-.yohu-terminal__params-line {
-  margin: 0;
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-1);
-  overflow-wrap: anywhere;
-}
 

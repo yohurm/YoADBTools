@@ -10,6 +10,7 @@ import {
   YoBadge,
   YoIconButton,
   YoPanel,
+  YoSubheader,
   YoToolbar,
   YoVirtualList,
   pointerSelectMode,
@@ -40,7 +41,7 @@ export function EntryColumn(props: {
   return (
     <YoPanel class="yohu-cm__commands" variant="pane" overflow="hidden" header={
       <YoToolbar pad="xs">
-        <span class="yohu-cm__caption">条目</span>
+        <YoSubheader title="条目" pad="flush" />
         <YoIconButton icon="plus" title="新增命令" onClick={() => props.store.addCommand()} />
         <YoIconButton icon="list" title="新增命令块" onClick={() => props.store.addBlock()} />
         <YoIconButton icon="trash" title="删除条目" onClick={() => props.store.removeEntries()} />

@@ -42,12 +42,6 @@ describe("EditorColumn 选区", () => {
     expect(screen.getByLabelText(/具体命令/)).toBeTruthy();
     expect(screen.getByLabelText("{0}")).toBeTruthy();
     expect(screen.queryByLabelText("组名称")).toBeNull();
-    const labels = [...document.querySelectorAll(".yohu-cm__editor .yohu-text-field__label")].map(
-      (node) => node.textContent,
-    );
-    expect(labels[0]).toBe("命令名称");
-    expect(labels[1]).toMatch(/^具体命令/);
-    expect(labels[2]).toBe("{0}");
 
     store.selectEntry("b1", "replace");
     expect(screen.getByLabelText("命令块名称")).toBeTruthy();

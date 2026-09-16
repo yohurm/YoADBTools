@@ -4,7 +4,7 @@
 
 import { Show } from "solid-js";
 
-import { Icon, YoBadge, YoChip, YoCorner, YoIconButton, YoListPresence, YoTextField, YoTooltip } from "@yohu/ui";
+import { Icon, YoBadge, YoButton, YoChip, YoIconButton, YoListPresence, YoTextField } from "@yohu/ui";
 
 import { commandBlockGapLabel } from "./block-gap";
 
@@ -73,6 +73,7 @@ export function Composer(props: { serials: string[] }) {
               <YoTextField
                 block
                 multiline
+                font="mono"
                 rows={1}
                 ariaLabel="命令"
                 value={terminalStore.session.draft}
@@ -101,22 +102,19 @@ export function Composer(props: { serials: string[] }) {
         aria-hidden={open() || undefined}
         inert={open() ? true : undefined}
       >
-        <YoTooltip content="展开输入">
-          <button
-            type="button"
-            class="yohu-terminal__dock-toggle yohu-interactive yohu-focus-ring"
-            aria-expanded={false}
-            aria-label="展开输入"
-            onClick={() => terminalStore.setComposerOpen(true)}
-          >
-            <YoCorner role="control" stroke={false} radii={{ tr: 0, br: 0, bl: 0 }} class="yohu-terminal__dock-chrome">
-              <Icon name="chevron-left" />
-              <Show when={terminalStore.session.queue.length > 0}>
-                <YoBadge text={String(terminalStore.session.queue.length)} tone="accent" />
-              </Show>
-            </YoCorner>
-          </button>
-        </YoTooltip>
+        <YoButton
+          variant="solid"
+          tone="neutral"
+          block
+          aria-expanded={false}
+          aria-label="展开输入"
+          onClick={() => terminalStore.setComposerOpen(true)}
+        >
+          <Icon name="chevron-left" />
+          <Show when={terminalStore.session.queue.length > 0}>
+            <YoBadge text={String(terminalStore.session.queue.length)} tone="accent" />
+          </Show>
+        </YoButton>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 /**
  * 终端运行时 store：命令库、队列、统一输入/输出行。
  * View 只绑事件；发送 / 组 / 块编排在本层经 @yohu/api。
- * 块与组 busy 等到进度终态或任务终态，不把 run_id 当成完成。
+ * 块与组 busy 等到 task/summary 中该 run_id 且 !active；进度只画行。
  */
 
 import { createStore } from "solid-js/store";
@@ -32,9 +32,9 @@ import {
   commandBody,
   fillTemplate,
   formatAdbLine,
-  groupStepCount,
   toExecLine,
 } from "./command-line";
+import { isRunFinished, type RunWait } from "./run-wait";
 
 export type IoKind = "in" | "out";
 
@@ -50,16 +50,6 @@ export type QueuedSend =
   | { id: number; title: string; kind: "line"; line: string }
   | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] }
   | { id: number; title: string; kind: "group"; group: CommandGroupDto };
-
-type RunWait = {
-  generation: number;
-  runId: number;
-  taskName: string;
-  taskId: number | null;
-  expected: number;
-  seen: number;
-  resolve: () => void;
-};
 
 export function createTerminalStore() {
   let prependAdb = false;
@@ -95,20 +85,6 @@ export function createTerminalStore() {
     pushLine("out", text.replace(/\n+$/, ""));
   }
 
-  function bindTaskId(current: RunWait): void {
-    if (current.taskId !== null) return;
-    const active = lastTasks.find((task) => task.active && task.name === current.taskName);
-    if (active) current.taskId = active.id;
-  }
-
-  function isRunFinished(current: RunWait): boolean {
-    if (current.expected > 0 && current.seen >= current.expected) return true;
-    bindTaskId(current);
-    if (current.taskId === null) return false;
-    const task = lastTasks.find((item) => item.id === current.taskId);
-    return !task || !task.active;
-  }
-
   function settleRun(): void {
     const current = wait;
     if (!current) return;
@@ -120,19 +96,17 @@ export function createTerminalStore() {
   function considerSettle(): void {
     const current = wait;
     if (!current) return;
-    if (isRunFinished(current)) settleRun();
+    if (!isRunFinished(current.runId, lastTasks)) return;
+    if (wait?.generation !== current.generation) return;
+    settleRun();
   }
 
-  function awaitRun(runId: number, taskName: string, expected: number): Promise<void> {
+  function awaitRun(runId: number): Promise<void> {
     const gen = ++generation;
     return new Promise((resolve) => {
       wait = {
         generation: gen,
         runId,
-        taskName,
-        taskId: null,
-        expected,
-        seen: 0,
         resolve,
       };
       setSession("activeRunId", runId);
@@ -185,7 +159,7 @@ export function createTerminalStore() {
     }
     try {
       const runId = await blockRun({ block_id: block.id, values, serials });
-      await awaitRun(runId, `命令块: ${block.name}`, block.steps.length * serials.length);
+      await awaitRun(runId);
     } catch (e) {
       setSession("activeRunId", null);
       pushLine("in", `块: ${block.name}`);
@@ -201,7 +175,7 @@ export function createTerminalStore() {
     }
     try {
       const runId = await groupRun({ group_id: group.id, serials });
-      await awaitRun(runId, `命令组: ${group.name}`, groupStepCount(group) * serials.length);
+      await awaitRun(runId);
     } catch (e) {
       setSession("activeRunId", null);
       pushLine("in", `组: ${group.name}`);
@@ -211,14 +185,12 @@ export function createTerminalStore() {
 
   async function cancelGroup(): Promise<void> {
     drainGen += 1;
-    const current = wait;
-    const runId = current?.runId ?? session.activeRunId;
+    const runId = wait?.runId ?? session.activeRunId;
     if (runId === null) return;
     try {
       await groupCancel(runId);
     } catch (e) {
       YoLog.warn("terminal", "取消失败", { runId, error: errorText(e) });
-      if (wait?.runId === runId) settleRun();
     }
   }
 
@@ -285,10 +257,6 @@ export function createTerminalStore() {
   void onGroupProgress((e) => {
     pushLine("in", formatAdbLine(e.serial, e.template));
     pushOut(e.message ?? "");
-    const current = wait;
-    if (!current || e.run_id !== current.runId) return;
-    current.seen += 1;
-    considerSettle();
   });
 
   void onTaskSummary((e) => {

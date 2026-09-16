@@ -4,7 +4,7 @@
 
 import { Show, createMemo } from "solid-js";
 
-import { YoEmptyState, YoTree } from "@yohu/ui";
+import { YoBadge, YoEmptyState, YoTree } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
 import type { CommandGroupDto, LibraryEntryDto } from "@yohu/api";
 
@@ -76,6 +76,7 @@ export function CommandTree(props: {
         data={treeData()}
         defaultExpandedKeys={terminalStore.library.groups.map((g) => `g:${g.id}`)}
         onSelect={onSelect}
+        renderBadge={(text) => <YoBadge text={text} />}
       />
     </Show>
   );

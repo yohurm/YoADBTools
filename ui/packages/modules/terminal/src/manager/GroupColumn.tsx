@@ -4,7 +4,7 @@
  * 整行按住拖动换位走 YoVirtualList onReorder。
  */
 
-import { YoBadge, YoIconButton, YoPanel, YoToolbar, YoVirtualList } from "@yohu/ui";
+import { YoBadge, YoIconButton, YoPanel, YoSubheader, YoToolbar, YoVirtualList } from "@yohu/ui";
 
 import type { DraftGroup } from "../draft";
 import { controlRowHeight } from "../layout";
@@ -26,7 +26,7 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
   return (
     <YoPanel class="yohu-cm__groups" variant="pane" overflow="hidden" header={
       <YoToolbar pad="xs">
-        <span class="yohu-cm__caption">命令组</span>
+        <YoSubheader title="命令组" pad="flush" />
         <YoIconButton icon="plus" title="新增组" onClick={() => props.store.addGroup()} />
         <YoIconButton icon="trash" title="删除组" onClick={() => props.store.removeGroup()} />
       </YoToolbar>

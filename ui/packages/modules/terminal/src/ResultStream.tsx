@@ -1,10 +1,18 @@
 /**
  * 结果流：IO 行 + 钉底。清屏直切；新块 Presence 升起。
+ * 滚轴走 YoScroller；钉底走 handle.scrollToEnd（in-flow，禁止 scrollHeight）。
  */
 
 import { Show, createEffect, onCleanup } from "solid-js";
 
-import { YoEmptyState, YoListPresence, motionSpecMs, shouldSkipMotion } from "@yohu/ui";
+import {
+  YoEmptyState,
+  YoListPresence,
+  YoScroller,
+  motionSpecMs,
+  shouldSkipMotion,
+  type YoScrollerHandle,
+} from "@yohu/ui";
 import type { TerminalTimeFormat } from "@yohu/api";
 import { formatClockFromMs } from "@yohu/api";
 
@@ -29,16 +37,14 @@ function IoRow(props: { line: IoLine; format: TerminalTimeFormat }) {
 }
 
 export function ResultStream(props: { format: TerminalTimeFormat }) {
-  let resultBox: HTMLDivElement | undefined;
+  let scroller: YoScrollerHandle | undefined;
   const hasLines = (): boolean => terminalStore.lines.length > 0;
 
   createEffect(() => {
     const count = terminalStore.lines.length;
     void count;
-    const box = resultBox;
-    if (!box) return;
     const pin = (): void => {
-      box.scrollTop = box.scrollHeight;
+      scroller?.scrollToEnd();
     };
     pin();
     if (shouldSkipMotion()) return;
@@ -59,9 +65,6 @@ export function ResultStream(props: { format: TerminalTimeFormat }) {
     <div
       class="yohu-terminal__stream"
       classList={{ "yohu-terminal__stream--empty": !hasLines() }}
-      ref={(el) => {
-        resultBox = el;
-      }}
     >
       <Show
         when={hasLines()}
@@ -73,9 +76,11 @@ export function ResultStream(props: { format: TerminalTimeFormat }) {
           />
         }
       >
-        <YoListPresence each={terminalStore.lines} key={(line) => line.id} exit={false}>
-          {(line) => <IoRow line={line} format={props.format} />}
-        </YoListPresence>
+        <YoScroller handle={(api) => { scroller = api; }}>
+          <YoListPresence each={terminalStore.lines} key={(line) => line.id} exit={false}>
+            {(line) => <IoRow line={line} format={props.format} />}
+          </YoListPresence>
+        </YoScroller>
       </Show>
     </div>
   );

@@ -20,12 +20,10 @@
   min-height: 0;
 }
 
-.yohu-cm__caption {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--yohu-font-caption);
-  font-weight: var(--yohu-font-weight-semibold);
-  color: var(--yohu-fg-2);
+.yohu-cm__editor-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yohu-space-md);
 }
 
 .yohu-cm__list {
@@ -57,27 +55,13 @@
   white-space: nowrap;
 }
 
-.yohu-cm__empty {
-  margin: auto;
-  color: var(--yohu-fg-3);
-  font-size: var(--yohu-font-caption);
-}
-
 .yohu-cm__error {
   margin-right: auto;
-  color: var(--yohu-error);
-  font-size: var(--yohu-font-caption);
 }
 
 .yohu-cm__steps {
   display: flex;
   flex-direction: column;
-  gap: var(--yohu-space-sm);
-}
-
-.yohu-cm__steps-head {
-  display: flex;
-  align-items: center;
   gap: var(--yohu-space-sm);
 }
 

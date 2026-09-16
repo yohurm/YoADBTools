@@ -5,7 +5,7 @@
 import { For, Show } from "solid-js";
 
 import type { CommandParamDto } from "@yohu/api";
-import { YoTextField } from "@yohu/ui";
+import { YoSubheader, YoTextField } from "@yohu/ui";
 
 import { paramDescription, setParamDescription } from "../command-line";
 
@@ -17,6 +17,7 @@ export function ParamDescriptions(props: {
   return (
     <Show when={props.slots.length > 0}>
       <div class="yohu-cm__param-descs" aria-label="参数描述">
+        <YoSubheader title="参数描述" pad="flush" />
         <For each={props.slots}>
           {(index) => (
             <YoTextField

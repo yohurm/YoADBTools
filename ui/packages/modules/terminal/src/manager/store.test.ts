@@ -92,6 +92,31 @@ describe("命令管理 store", () => {
     expect(store.selectedGroup()?.entries.map((e) => e.id)).toEqual(["c2", "c1", "b1"]);
   });
 
+  it("open 从关闭切快照，已打开再 open 不覆盖草稿", () => {
+    const store = createCommandManagerStore();
+    store.open(sample);
+    expect(store.ui.open).toBe(true);
+    store.updateGroupName("g1", "改过");
+    store.open({
+      ...sample,
+      groups: [{ id: "g9", name: "新库", entries: [] }],
+    });
+    expect(store.selectedGroup()?.name).toBe("改过");
+    expect(store.draft.groups.map((g) => g.id)).toEqual(["g1", "g2"]);
+  });
+
+  it("close 丢草稿，下次 open 才再切库", () => {
+    const store = createCommandManagerStore();
+    store.open(sample);
+    store.updateGroupName("g1", "改过");
+    store.close();
+    expect(store.ui.open).toBe(false);
+    expect(store.draft.groups).toEqual([]);
+    store.open(sample);
+    expect(store.ui.open).toBe(true);
+    expect(store.selectedGroup()?.name).toBe("设备信息");
+  });
+
   it("块步骤排序只改当前选中块", () => {
     const store = createCommandManagerStore();
     store.load(sample);

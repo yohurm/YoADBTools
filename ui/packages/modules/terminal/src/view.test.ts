@@ -42,16 +42,27 @@ describe("命令终端动效接线", () => {
     expect(view).not.toContain("YoCollapse");
     expect(view).not.toContain("Show when={!composerOpen()}");
     expect(css).toContain("container-type: inline-size");
-    expect(view).toContain("YoCorner");
-    expect(view).toContain("yohu-terminal__dock-chrome");
+    expect(load("Composer.tsx")).toContain("YoButton");
+    expect(load("Composer.tsx")).toContain("block");
+    expect(load("Composer.tsx")).not.toContain("<button");
+    expect(load("Composer.tsx")).not.toContain("yohu-terminal__dock-toggle");
+    expect(css).not.toContain(".yohu-terminal__dock-toggle");
+    expect(css).not.toContain(".yohu-terminal__dock-chrome");
     expect(css).not.toContain("border-start-start-radius");
     expect(css).not.toContain("border-block-start");
     expect(css).not.toContain("border-inline-start");
   });
 
-  it("模块 CSS 不自写 animation / keyframes", () => {
+  it("模块 CSS 不自写 animation / keyframes / 产品滚轴", () => {
+    const managerCss = load("command-manager.css");
     expect(css).not.toMatch(/animation\s*:/);
     expect(css).not.toMatch(/@keyframes/);
+    expect(css).not.toMatch(/overflow:\s*auto/);
+    expect(css).not.toMatch(/overflow-y:\s*auto/);
+    expect(css).not.toMatch(/overflow:\s*scroll/);
+    expect(managerCss).not.toMatch(/overflow:\s*auto/);
+    expect(managerCss).not.toMatch(/overflow-y:\s*auto/);
+    expect(managerCss).not.toMatch(/overflow:\s*scroll/);
   });
 
   it("有内容时发送图标挂 send-aim，空内容不朝上", () => {
@@ -61,10 +72,31 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain("rotate(");
   });
 
+  it("结果流与命令树走 YoScroller，钉底不读原生内容高", () => {
+    expect(load("ResultStream.tsx")).toContain("YoScroller");
+    expect(load("ResultStream.tsx")).toContain("scrollToEnd");
+    expect(load("ResultStream.tsx")).not.toMatch(/\.\s*scrollHeight/);
+    expect(load("TerminalView.tsx")).toContain("YoScroller");
+    expect(load("TerminalView.tsx")).toContain('overflow="hidden"');
+    expect(load("manager/EditorColumn.tsx")).toContain("YoScroller");
+    expect(load("manager/EditorColumn.tsx")).toContain("YoEmptyState");
+    expect(load("manager/EditorColumn.tsx")).toContain("YoToolbar");
+    expect(load("manager/EditorColumn.tsx")).toContain("YoSubheader");
+    expect(load("manager/EditorColumn.tsx")).toContain("editorPaneTitle");
+    expect(load("manager/EditorColumn.tsx")).not.toContain('overflow="auto"');
+    expect(load("manager/EditorColumn.tsx")).not.toContain("yohu-cm__empty");
+    expect(load("manager/EditorColumn.tsx")).not.toContain("title={editorPaneTitle");
+    expect(load("manager/EditorColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
+    expect(load("ParameterDialog.tsx")).toContain("YoScroller");
+    expect(load("ParameterDialog.tsx")).not.toMatch(/\.\s*scrollHeight/);
+    expect(load("CommandManager.tsx")).not.toContain("YoScroller");
+  });
+
   it("composer 走 YoTextField multiline，不自挂 textarea 壳", () => {
     const composer = load("Composer.tsx");
     expect(composer).toContain("YoTextField");
     expect(composer).toContain("multiline");
+    expect(composer).toContain('font="mono"');
     expect(composer).toContain("rows={1}");
     expect(composer).not.toContain("<textarea");
     expect(composer).not.toContain("YoTextArea");
@@ -74,7 +106,7 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain(".yohu-terminal__composer-input");
     expect(css).not.toContain(".yohu-text-field");
     expect(css).toContain(".yohu-terminal__composer-field");
-    expect(css).toContain("var(--yohu-font-mono)");
+    expect(css).not.toContain(":is(input, textarea)");
     expect(css).not.toContain(".yohu-terminal__send .yohu-icon-button:disabled");
   });
 
@@ -89,8 +121,12 @@ describe("命令终端动效接线", () => {
     expect(manager).toContain('bodyPad="none"');
     expect(managerCss).not.toContain(".yohu-dialog__body");
     const params = load("ParameterDialog.tsx");
+    expect(params).toContain("YoScroller");
+    expect(params).toContain("YoSubheader");
     expect(params).toContain("原始命令");
     expect(params).toContain("填写参数");
+    expect(params).not.toContain("params-caption");
+    expect(params).not.toContain("params-line");
     expect(params).not.toContain("预览");
     expect(params).not.toContain("previewFill");
     expect(params).not.toContain('querySelectorAll("input")');
@@ -121,6 +157,7 @@ describe("命令终端动效接线", () => {
       load("CommandManager.tsx"),
       load("manager/GroupColumn.tsx"),
       load("manager/EntryColumn.tsx"),
+      load("manager/EditorColumn.tsx"),
     ].join("\n");
     const managerCss = load("command-manager.css");
     expect(manager).toContain('pad="xs"');
@@ -144,7 +181,15 @@ describe("命令终端动效接线", () => {
     expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__step-grip");
     expect(load("manager/BlockSteps.tsx")).not.toContain('name="grip"');
     expect(load("manager/BlockSteps.tsx")).not.toContain("onShift");
+    expect(load("manager/GroupColumn.tsx")).toContain('title="命令组"');
+    expect(load("manager/EntryColumn.tsx")).toContain('title="条目"');
+    expect(load("manager/GroupColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
+    expect(load("manager/EntryColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
     expect(load("manager/EntryColumn.tsx")).toContain('tone="list"');
+    expect(load("manager/BlockSteps.tsx")).toContain("YoSubheader");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__caption");
+    expect(load("CommandManager.tsx")).toContain("YoBadge");
+    expect(load("manager/ParamDescriptions.tsx")).toContain("YoSubheader");
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColFrame");
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColTrack");
     expect(load("manager/EditorColumn.tsx")).toContain('variant="pane"');
@@ -194,6 +239,12 @@ describe("命令终端动效接线", () => {
     expect(load("CommandManager.tsx")).toContain("errorText(e)");
     expect(load("CommandManager.tsx")).not.toContain("JSON.stringify(e)");
     expect(load("CommandManager.tsx")).toContain("MANAGER_DIALOG");
+    expect(load("CommandManager.tsx")).toContain("commandManagerStore");
+    expect(load("CommandManager.tsx")).not.toContain("createCommandManagerStore");
+    expect(load("CommandManager.tsx")).not.toContain("open && !wasOpen");
+    expect(load("TerminalView.tsx")).toContain("commandManagerStore.open");
+    expect(load("TerminalView.tsx")).not.toContain("setManagerOpen");
+    expect(load("manager/store.ts")).toContain("export const commandManagerStore");
     expect(load("command-manager.css")).not.toContain("var(--yohu-z-overlay)");
     expect(load("command-manager.css")).not.toContain(".yohu-cm__step-grip");
     expect(load("command-manager.css")).not.toContain("position: absolute");

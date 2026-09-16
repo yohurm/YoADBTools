@@ -1,6 +1,6 @@
 /**
- * 命令管理 store：草稿 + 选区。
- * 不依赖运行时终端 store；load / library 由 Dialog 注入。
+ * 命令管理 store：草稿 + 选区 + 开窗旗标。
+ * 模块会话单例；不依赖运行时终端 store。
  * 不开菜单、不写剪贴板、不查 DOM。
  *
  * 设计后链路（换位）：
@@ -31,6 +31,7 @@ import {
 export function createCommandManagerStore() {
   const [draft, setDraft] = createStore<DraftState>({ groups: [] });
   const [ui, setUi] = createStore({
+    open: false,
     selectedGroupId: null as string | null,
     selectedEntryIds: [] as string[],
     entryPivot: null as string | null,
@@ -86,6 +87,26 @@ export function createCommandManagerStore() {
     setDraft({ groups: snapshot.groups });
     setUi({
       selectedGroupId: snapshot.groups[0]?.id ?? null,
+      selectedEntryIds: [],
+      entryPivot: null,
+      saving: false,
+      error: "",
+    });
+  }
+
+  /** 从关闭到打开才切库快照；已打开再调用不覆盖草稿。 */
+  function open(library: CommandLibraryDto): void {
+    if (ui.open) return;
+    load(library);
+    setUi("open", true);
+  }
+
+  /** 页脚取消 / 关窗：丢草稿。下次 open 才再切库。 */
+  function close(): void {
+    setDraft({ groups: [] });
+    setUi({
+      open: false,
+      selectedGroupId: null,
       selectedEntryIds: [],
       entryPivot: null,
       saving: false,
@@ -201,6 +222,8 @@ export function createCommandManagerStore() {
     draft,
     ui,
     load,
+    open,
+    close,
     library,
     selectedGroup,
     selectedEntry,
@@ -229,3 +252,5 @@ export function createCommandManagerStore() {
 }
 
 export type CommandManagerStore = ReturnType<typeof createCommandManagerStore>;
+
+export const commandManagerStore = createCommandManagerStore();
