@@ -87,10 +87,10 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toContain("100cqi");
     expect(filesCss).not.toContain("container-type");
     expect(filesCss).not.toContain(".yohu-text-field");
-    expect(filesCss).toMatch(
-      /\.yohu-files__field\s*\{[^}]*border:\s*var\(--yohu-stroke-hairline\)\s+solid\s+var\(--yohu-accent\)/,
-    );
-    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*border-radius:\s*var\(--yohu-radius-sm\)/);
+    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*--yohu-corner-stroke:\s*var\(--yohu-accent\)/);
+    expect(filesCss).toContain(".yohu-files__field-chrome");
+    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*border:\s*var\(--yohu-stroke-hairline\)/);
+    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*border-radius:/);
     expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*height:\s*var\(--yohu-control-height\)/);
   });
 
@@ -234,6 +234,12 @@ describe("确认删除多文件契约", () => {
     expect(fileView).not.toContain('bodyOverflow="hidden"');
     expect(fileView).toContain('initial="footer"');
     expect(fileView).not.toContain('join("、")');
+    const deleteFooter = fileView.slice(fileView.indexOf("确认删除"), fileView.indexOf("新建目录"));
+    expect(deleteFooter).toContain('variant="ghost"');
+    expect(deleteFooter).toContain('tone="accent"');
+    expect(deleteFooter).toContain('tone="danger"');
+    expect(deleteFooter).not.toContain('tone="neutral"');
+    expect(fileView).toContain("createReady");
   });
 
   it("open 独立于名单，出场后再清载荷", () => {
@@ -248,24 +254,34 @@ describe("确认删除多文件契约", () => {
     expect(closeBlock).not.toContain("setDeleteExpanded");
   });
 
-  it("超出预览走一层 YoCollapse panel", () => {
-    expect(deleteTargets).toContain("YoCollapse");
-    expect(deleteTargets).toContain('recipe="panel"');
-    expect(deleteTargets.match(/<YoCollapse /g)?.length).toBe(1);
+  it("超出预览走一层 YoReveal", () => {
+    expect(deleteTargets).toContain("YoReveal");
+    expect(deleteTargets).not.toContain("YoCollapse");
+    expect(deleteTargets).not.toContain('recipe="clip"');
+    expect(deleteTargets).not.toContain('recipe="panel"');
+    expect(deleteTargets.match(/<YoReveal /g)?.length).toBe(1);
   });
 
   it("芯片网格走 YoChip leading + dismiss，不自造关闭钮", () => {
     expect(filesCss).toMatch(
       /\.yohu-files__delete-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit/,
     );
-    expect(deleteTargets).toContain("yohu-files__delete-more");
-    expect(filesCss).toContain("grid-column: 1 / -1");
-    expect(filesCss).toMatch(/\.yohu-files__delete-more\s*\{[^}]*min-height:\s*0/);
+    expect(filesCss).toMatch(
+      /\.yohu-files__delete-grid\s*\{[^}]*gap:\s*var\(--yohu-space-sm\)/,
+    );
+    expect(deleteTargets).toContain("yohu-files__delete-list");
+    expect(deleteTargets).toContain("yohu-files__delete-rest");
+    expect(deleteTargets).not.toContain("yohu-files__delete-more");
+    expect(filesCss).toContain(".yohu-files__delete-list");
+    expect(filesCss).toContain(".yohu-files__delete-rest");
+    expect(filesCss).not.toContain("grid-column: 1 / -1");
+    expect(filesCss).not.toContain("delete-more");
     expect(filesCss).not.toContain("delete-grid--rest");
     expect(deleteTargets).not.toContain("delete-grid--rest");
     expect(deleteTargets).toContain("YoChip");
     expect(deleteTargets).toContain("block");
-    expect(deleteTargets).toContain('dismiss="hover"');
+    expect(deleteTargets).not.toContain("dismiss=");
+    expect(deleteTargets).toContain("onDismiss");
     expect(deleteTargets).toContain("YoFileIcon");
     expect(deleteTargets).not.toContain("yohu-files__delete-chip-remove");
     expect(filesCss).not.toContain(".yohu-files__delete-chip-remove");

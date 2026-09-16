@@ -67,8 +67,10 @@
   cursor: text;
 }
 
-/* 路径编辑揭开层：同格 clip，盒跟文字 hug，不铺满槽剩余。不是第二套 YoTextField 皮。 */
+/* 路径编辑揭开层：同格 clip，盒跟文字 hug，不铺满槽剩余。铬走 YoCorner，不是第二套 YoTextField 皮。 */
 .yohu-files__field {
+  --yohu-corner-fill: var(--yohu-canvas);
+  --yohu-corner-stroke: var(--yohu-accent);
   display: flex;
   align-items: center;
   justify-self: start;
@@ -77,14 +79,22 @@
   min-width: 0;
   height: 100%;
   box-sizing: border-box;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-accent);
-  border-radius: var(--yohu-radius-sm);
-  background: var(--yohu-canvas);
   pointer-events: none;
   overflow-x: hidden;
   overflow-y: hidden;
   clip-path: inset(0 100% 0 0);
   transition: clip-path var(--yohu-motion-spatial-local);
+}
+
+.yohu-files__field-chrome.yohu-corner[data-mode="host"] {
+  height: 100%;
+  flex: 0 0 auto;
+}
+
+.yohu-files__field-chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
 }
 
 .yohu-files__field[data-reveal="1"] {
@@ -97,7 +107,7 @@
 }
 
 .yohu-files__field--invalid {
-  border-color: var(--yohu-error);
+  --yohu-corner-stroke: var(--yohu-error);
 }
 
 .yohu-files__field-input {
@@ -368,16 +378,24 @@
 }
 
 .yohu-files__transfer {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: transparent;
   display: flex;
+}
+
+.yohu-files__transfer-chrome {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.yohu-files__transfer-chrome .yohu-corner__content {
+  flex-direction: row;
   gap: var(--yohu-space-sm);
   padding: var(--yohu-space-sm) var(--yohu-space-md);
-  border: none;
-  border-radius: var(--yohu-radius-sm);
-  background: var(--yohu-surface-2);
 }
 
 .yohu-files__transfer--failed {
-  border-left: var(--yohu-stroke-emphasis) solid var(--yohu-error);
+  --yohu-corner-stroke: var(--yohu-error);
 }
 
 .yohu-files__transfer-dir {
@@ -433,10 +451,16 @@
   color: var(--yohu-fg);
 }
 
+.yohu-files__delete-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .yohu-files__delete-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(var(--yohu-space-xl) * 6), 1fr));
-  gap: var(--yohu-space-xs);
+  gap: var(--yohu-space-sm);
   margin: 0;
   padding: 0;
   width: 100%;
@@ -444,11 +468,9 @@
   box-sizing: border-box;
 }
 
-/* 其余项占满一行：与预览同一张网格、同一档 gap，禁止再当第二截区块。 */
-.yohu-files__delete-more {
-  grid-column: 1 / -1;
-  min-width: 0;
-  min-height: 0;
+/* 收起时垫随 Reveal 出流，由主槽裁；展开后与预览格同一档间距。 */
+.yohu-files__delete-rest {
+  padding-top: var(--yohu-space-sm);
 }
 
 .yohu-files__delete-item {
@@ -458,12 +480,17 @@
 
 /* 仅对话框内校验，路径错误走 YoToast，禁止再做页内错误条。 */
 .yohu-files__error {
-  flex-shrink: 0;
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: var(--yohu-error);
   margin: 0 0 var(--yohu-space-sm);
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
   color: var(--yohu-error);
-  background: var(--yohu-surface-2);
-  border: var(--yohu-stroke-hairline) solid var(--yohu-error);
-  border-radius: var(--yohu-radius-sm);
   font-size: var(--yohu-font-caption);
+}
+
+.yohu-files__error.yohu-corner[data-mode="host"] {
+  flex: 0 0 auto;
+}
+
+.yohu-files__error .yohu-corner__content {
+  padding: var(--yohu-space-xs) var(--yohu-space-sm);
 }

@@ -8,7 +8,7 @@
 
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
-import { YoIconButton, YoTooltip, motionSpecMs } from "@yohu/ui";
+import { YoCorner, YoIconButton, YoTooltip, motionSpecMs } from "@yohu/ui";
 
 import {
   addressDismissOutside,
@@ -205,33 +205,35 @@ export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
               if (!open()) finishClose();
             }}
           >
-            <input
-              ref={(el) => {
-                inputEl = el;
-                el.value = seed();
-              }}
-              class="yohu-files__field-input"
-              spellcheck={false}
-              autocomplete="off"
-              aria-label="设备路径"
-              aria-invalid={invalid()}
-              onInput={() => {
-                setInvalid(false);
-                pinFieldToCaret();
-              }}
-              onSelect={pinFieldToCaret}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  stopEdit();
-                  return;
-                }
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  commit();
-                }
-              }}
-            />
+            <YoCorner role="control" class="yohu-files__field-chrome">
+              <input
+                ref={(el) => {
+                  inputEl = el;
+                  el.value = seed();
+                }}
+                class="yohu-files__field-input"
+                spellcheck={false}
+                autocomplete="off"
+                aria-label="设备路径"
+                aria-invalid={invalid()}
+                onInput={() => {
+                  setInvalid(false);
+                  pinFieldToCaret();
+                }}
+                onSelect={pinFieldToCaret}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    stopEdit();
+                    return;
+                  }
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commit();
+                  }
+                }}
+              />
+            </YoCorner>
           </div>
         </Show>
       </div>

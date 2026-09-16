@@ -10,6 +10,7 @@ import {
   Layout,
   YoBadge,
   YoCollapse,
+  YoCorner,
   YoIconButton,
   YoPanel,
   YoPresence,
@@ -91,41 +92,47 @@ export function TransferPanel() {
                     "yohu-files__transfer--failed": transfer.state === "failed",
                   }}
                 >
-                  <YoTooltip content={transfer.direction === "push" ? "上传" : "下载"}>
-                    <span class="yohu-files__transfer-dir">
-                      <Icon name={transfer.direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
-                    </span>
-                  </YoTooltip>
-                  <div class="yohu-files__transfer-body">
-                    <div class="yohu-files__transfer-head">
-                      <span class="yohu-files__transfer-name">{transfer.name}</span>
-                      <YoBadge text={transferLabel(transfer)} tone={transferTone(transfer)} />
-                      <Show when={transfer.state === "running"}>
-                        <YoIconButton
-                          icon="close"
-                          title="取消传输"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void fileStore.cancel(transfer.id);
-                          }}
-                        />
+                  <YoCorner
+                    role="control"
+                    stroke={transfer.state === "failed"}
+                    class="yohu-files__transfer-chrome"
+                  >
+                    <YoTooltip content={transfer.direction === "push" ? "上传" : "下载"}>
+                      <span class="yohu-files__transfer-dir">
+                        <Icon name={transfer.direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
+                      </span>
+                    </YoTooltip>
+                    <div class="yohu-files__transfer-body">
+                      <div class="yohu-files__transfer-head">
+                        <span class="yohu-files__transfer-name">{transfer.name}</span>
+                        <YoBadge text={transferLabel(transfer)} tone={transferTone(transfer)} />
+                        <Show when={transfer.state === "running"}>
+                          <YoIconButton
+                            icon="close"
+                            title="取消传输"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void fileStore.cancel(transfer.id);
+                            }}
+                          />
+                        </Show>
+                      </div>
+                      <YoProgressBar
+                        value={transfer.total ? (transfer.bytes / transfer.total) * 100 : undefined}
+                        indeterminate={transfer.state === "running" && transfer.total === undefined}
+                      />
+                      <div class="yohu-files__transfer-meta">
+                        {formatSize(transfer.bytes)}
+                        {transfer.total ? ` / ${formatSize(transfer.total)}` : ""}
+                        <Show when={transfer.speed !== undefined && transfer.state === "running"}>
+                          <span class="yohu-files__transfer-speed">· {formatSize(transfer.speed!)}/s</span>
+                        </Show>
+                      </div>
+                      <Show when={transfer.message}>
+                        <div class="yohu-files__transfer-msg">{transfer.message}</div>
                       </Show>
                     </div>
-                    <YoProgressBar
-                      value={transfer.total ? (transfer.bytes / transfer.total) * 100 : undefined}
-                      indeterminate={transfer.state === "running" && transfer.total === undefined}
-                    />
-                    <div class="yohu-files__transfer-meta">
-                      {formatSize(transfer.bytes)}
-                      {transfer.total ? ` / ${formatSize(transfer.total)}` : ""}
-                      <Show when={transfer.speed !== undefined && transfer.state === "running"}>
-                        <span class="yohu-files__transfer-speed">· {formatSize(transfer.speed!)}/s</span>
-                      </Show>
-                    </div>
-                    <Show when={transfer.message}>
-                      <div class="yohu-files__transfer-msg">{transfer.message}</div>
-                    </Show>
-                  </div>
+                  </YoCorner>
                 </div>
               )}
             </For>

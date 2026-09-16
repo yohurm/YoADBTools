@@ -22,17 +22,19 @@ describe("DeleteTargets", () => {
     ));
     expect(visibleChips()).toHaveLength(1);
     expect(document.querySelector("[aria-expanded]")).toBeNull();
+    expect(document.querySelector(".yohu-reveal")).toBeNull();
     expect(document.querySelector(".yohu-collapse")).toBeNull();
     expect(document.body.textContent).toContain("确定删除以下 1 项吗");
   });
 
-  it("多文件默认只露前几项，其余走 YoCollapse", () => {
+  it("多文件默认只露前几项，其余走 YoReveal", () => {
     const names = manyNames(DELETE_PREVIEW_LIMIT + 4);
     render(() => (
       <DeleteTargets names={names} expanded={false} onExpandedChange={() => {}} onRemove={() => {}} />
     ));
     expect(visibleChips()).toHaveLength(DELETE_PREVIEW_LIMIT);
-    expect(document.querySelector(".yohu-collapse")?.getAttribute("data-open")).toBe("false");
+    expect(document.querySelector(".yohu-reveal")?.getAttribute("data-open")).toBe("false");
+    expect(document.querySelector(".yohu-reveal")?.getAttribute("data-layout")).toBe("out");
     expect(document.body.textContent).toContain(`展开其余 4 项`);
     expect(visibleChips().some((el) => el.textContent?.includes("file-6.png"))).toBe(false);
   });
@@ -50,13 +52,13 @@ describe("DeleteTargets", () => {
     ));
     fireEvent.click(document.querySelector("[aria-expanded]")!);
     expect(expanded()).toBe(true);
-    expect(document.querySelector(".yohu-collapse")?.getAttribute("data-open")).toBe("true");
+    expect(document.querySelector(".yohu-reveal")?.getAttribute("data-open")).toBe("true");
+    expect(document.querySelector(".yohu-reveal")?.getAttribute("data-layout")).toBe("in");
     expect(visibleChips()).toHaveLength(names.length);
     expect(document.body.textContent).toContain("收起");
-    expect(document.querySelector(".yohu-files__delete-more")).toBeTruthy();
-    expect(
-      document.querySelector(".yohu-files__delete-more .yohu-files__delete-grid"),
-    ).toBeTruthy();
+    expect(document.querySelector(".yohu-files__delete-list")).toBeTruthy();
+    expect(document.querySelector(".yohu-files__delete-rest")).toBeTruthy();
+    expect(document.querySelector(".yohu-files__delete-more")).toBeNull();
   });
 
   it("YoChip dismiss 按名移除", () => {

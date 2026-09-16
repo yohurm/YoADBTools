@@ -8,6 +8,7 @@ import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, YoLog, t
 import {
   YoButton,
   YoChrome,
+  YoCorner,
   YoDialog,
   YoEmptyState,
   YoIconButton,
@@ -139,6 +140,9 @@ export function FileView(props: DeviceSession) {
     setCreateError("");
     closeContextMenu();
   };
+
+  const createReady = (): boolean =>
+    validateEntryName(createName().trim()) === null && !fileStore.session.mutating;
 
   const confirmCreate = (): void => {
     const name = createName().trim();
@@ -328,10 +332,10 @@ export function FileView(props: DeviceSession) {
           onExitComplete={finishDelete}
           footer={
             <>
-              <YoButton variant="ghost" tone="neutral" onClick={closeDelete}>
+              <YoButton variant="ghost" tone="accent" onClick={closeDelete}>
                 取消
               </YoButton>
-              <YoButton tone="danger" onClick={confirmDelete}>
+              <YoButton variant="ghost" tone="danger" onClick={confirmDelete}>
                 删除
               </YoButton>
             </>
@@ -350,10 +354,10 @@ export function FileView(props: DeviceSession) {
           onClose={() => setCreateKind(null)}
           footer={
             <>
-              <YoButton variant="ghost" tone="neutral" onClick={() => setCreateKind(null)}>
+              <YoButton variant="ghost" tone="accent" onClick={() => setCreateKind(null)}>
                 取消
               </YoButton>
-              <YoButton onClick={confirmCreate} disabled={fileStore.session.mutating}>
+              <YoButton onClick={confirmCreate} disabled={!createReady()}>
                 创建
               </YoButton>
             </>
@@ -370,7 +374,9 @@ export function FileView(props: DeviceSession) {
             ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}
           />
           <Show when={createError()}>
-            <div class="yohu-files__error">{createError()}</div>
+            <YoCorner role="control" class="yohu-files__error">
+              {createError()}
+            </YoCorner>
           </Show>
         </YoDialog>
       </div>
