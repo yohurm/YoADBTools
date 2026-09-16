@@ -18,6 +18,20 @@ export function formatDeviceStatusMeta(status: DeviceStatus | undefined): string
   return parts.join(" · ");
 }
 
+/** 图标轨气泡 / 无障碍名：型号 · 串号 · 未授权 · 运行时提示。 */
+export function formatDeviceRailTip(input: {
+  name: string;
+  serial: string;
+  unauthorized?: boolean;
+  hint?: string;
+}): string {
+  const parts = [input.name, input.serial];
+  if (input.unauthorized) parts.push("未授权");
+  const hint = input.hint?.trim();
+  if (hint) parts.push(hint);
+  return parts.join(" · ");
+}
+
 /** 设备卡片 title 附加：次行 + 深浅色/亮屏/品牌。 */
 export function formatDeviceStatusHint(status: DeviceStatus | undefined): string {
   if (!status) return "";

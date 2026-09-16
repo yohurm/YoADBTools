@@ -1,5 +1,5 @@
 /**
- * 工作台主布局：窗口铬 + 左侧抽屉（设备栏 + 模块导航）/ 右侧内容区 / 底部状态栏。
+ * 工作台主布局：窗口铬 + 左侧常驻导航轨（展开文案 / 收起图标）/ 右侧内容区 / 底部状态栏。
  * 单一 canvas 铺满窗口；标题栏/侧栏/状态栏不刷互打架的实底。
  */
 
@@ -12,9 +12,11 @@ import {
   YoTooltipHost,
   YoIconButton,
   YoPresence,
+  YoRail,
   YoThemeToggle,
   YoTitleBar,
   shouldSkipMotion,
+  type RailIntent,
 } from "@yohu/ui";
 
 import { modules, type ModuleDescriptor } from "../registry";
@@ -88,7 +90,11 @@ const ModuleStage: Component<{
 /** 工作台壳。窗口三键与模块身份走 store。 */
 export const AppLayout: Component = () => {
   const current = () => modules().find((m) => m.id === navStore.activeModuleId());
-  const [railOpen, setRailOpen] = createSignal(true);
+  const [railIntent, setRailIntent] = createSignal<RailIntent>("expanded");
+
+  const toggleRail = (): void => {
+    setRailIntent((current) => (current === "expanded" ? "icons" : "expanded"));
+  };
 
   return (
     <div class="yohu-window">
@@ -109,29 +115,34 @@ export const AppLayout: Component = () => {
             />
             <YoIconButton
               icon="sidebar"
-              title={railOpen() ? "收起侧栏" : "展开侧栏"}
-              aria-expanded={railOpen()}
-              onClick={() => setRailOpen((open) => !open)}
+              title={railIntent() === "expanded" ? "收起侧栏" : "展开侧栏"}
+              aria-expanded={railIntent() === "expanded"}
+              onClick={toggleRail}
             />
           </>
         }
       />
       <div
-        class="yohu-layout yohu-recipe-rail"
-        classList={{ "yohu-layout--rail-collapsed": !railOpen() }}
+        class="yohu-layout"
+        data-rail={railIntent()}
       >
-        <aside class="yohu-layout__rail" inert={!railOpen() ? true : undefined}>
-          <div class="yohu-layout__rail-inner">
-            <DeviceRail
-              moduleId={navStore.activeModuleId()}
-              selectionMode={current()?.selectionMode}
-            />
-            <NavList activeId={navStore.activeModuleId()} onNavigate={navStore.navigate} />
-          </div>
-        </aside>
-        <main class="yohu-layout__content">
-          <ModuleStage current={current()} />
-        </main>
+        <div class="yohu-layout__work">
+          <YoRail intent={railIntent()} class="yohu-layout__rail">
+            <div class="yohu-layout__rail-inner">
+              <DeviceRail
+                moduleId={navStore.activeModuleId()}
+                selectionMode={current()?.selectionMode}
+              />
+              <NavList
+                activeId={navStore.activeModuleId()}
+                onNavigate={navStore.navigate}
+              />
+            </div>
+          </YoRail>
+          <main class="yohu-layout__content">
+            <ModuleStage current={current()} />
+          </main>
+        </div>
         <StatusBar />
       </div>
       <YoContextMenuHost />

@@ -258,8 +258,10 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(items[0]?.getAttribute("tabindex")).toBe("0");
     expect(items[1]?.getAttribute("tabindex")).toBe("-1");
     expect(container.querySelector(".yohu-device-rail__list")?.getAttribute("role")).toBe("listbox");
-    expect(container.querySelector(".yohu-device-rail__scroller")).toBeTruthy();
+    expect(container.querySelector(".yohu-device-rail__scroller")).toBeNull();
+    expect(container.querySelector(".yohu-scroller")).toBeTruthy();
     expect(items[0]?.classList.contains("yohu-interactive--selected")).toBe(true);
+    expect(items[0]?.classList.contains("yohu-list-item")).toBe(true);
     expect(items[0]?.classList.contains("yohu-device-rail__item--active")).toBe(false);
   });
 
@@ -328,7 +330,7 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(deviceStore.state.statuses.A1?.battery_pct).toBe(87);
     render(() => <DeviceRail />);
     expect(screen.getByText("Android 15 · 87% 充电")).toBeTruthy();
-    expect(document.querySelector('[role="option"]')?.getAttribute("title")).toBe(
+    expect(document.querySelector('[role="option"]')?.getAttribute("aria-label")).toContain(
       "Android 15 · 87% 充电",
     );
   });
@@ -399,12 +401,41 @@ describe("DeviceRail（§3 设备卡片）", () => {
       );
     expect(decls("yohu-device-rail__list")).toMatch(/overflow:\s*hidden/);
     expect(decls("yohu-device-rail__list")).not.toMatch(/overflow:\s*auto/);
-    expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-x:\s*hidden/);
-    expect(decls("yohu-device-rail__scroller")).toMatch(/overflow-y:\s*auto/);
+    expect(css).not.toContain(".yohu-device-rail__scroller");
+    expect(css).not.toContain(".yohu-device-rail__fold");
+    expect(css).not.toMatch(/overflow:\s*auto/);
     expect(decls("yohu-device-rail")).toMatch(/max-height:\s*var\(--yohu-layout-device-rail-max\)/);
     expect(css).toMatch(/\.yohu-device-rail\[data-empty\]\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toMatch(/max-height:\s*42%/);
     expect(css).not.toContain(".yohu-collapse__inner");
+    expect(css).toContain('data-rail="icons"');
+    expect(css).not.toContain("data-presentation");
+    expect(css).not.toMatch(
+      /\.yohu-layout__rail:not\(\[data-phase="expanded"\]\).*display:\s*none/,
+    );
+    expect(css).toContain("--yohu-layout-shell-nav-icons");
+    expect(css).toMatch(/\.yohu-layout__work\s*\{[^}]*display:\s*flex/);
+    expect(css).toMatch(
+      /\.yohu-layout__rail\[data-rail="expanded"\]\s*\{[^}]*flex-basis:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(css).toMatch(
+      /\.yohu-layout__rail\[data-rail="expanded"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(css).toMatch(
+      /\.yohu-layout__rail\[data-rail="icons"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav-icons\)/,
+    );
+    expect(css).not.toMatch(
+      /(?:^|\n)\.yohu-layout__rail\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(css).not.toContain("yohu-layout--rail-collapsed");
+    expect(css).not.toMatch(/grid-template-columns:\s*0\s+minmax/);
+    expect(css).not.toMatch(
+      /\.yohu-layout\[data-rail="(?:expanded|icons)"\]\s*\{[^}]*grid-template-columns/,
+    );
+    expect(css).toMatch(/\.yohu-layout__rail-inner\s*\{[^}]*width:\s*100%/);
+    expect(css).not.toMatch(
+      /\.yohu-layout__rail-inner\s*\{[^}]*min-width:\s*var\(--yohu-layout-shell-nav\)/,
+    );
   });
 
   it("无设备折叠 hug；有列表才 fill，不穿 __inner", async () => {
@@ -435,6 +466,22 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(content?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
     expect(content?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
   });
+
+  it("图标轨只留状态点，仍能选设备", async () => {
+    mocks.deviceRefresh.mockResolvedValue([
+      { serial: "A1", model: "Moto X", state: "online", connection: "usb" },
+      { serial: "B2", model: "Moto Y", state: "online", connection: "usb" },
+    ]);
+    await deviceStore.refresh();
+    const { container } = render(() => <DeviceRail presentation="icons" />);
+    const items = Array.from(container.querySelectorAll('[role="option"]'));
+    expect(items).toHaveLength(2);
+    expect(items[0]?.querySelector(".yohu-status-dot")).toBeTruthy();
+    expect(items[0]?.querySelector(".yohu-list-item__leading")).toBeTruthy();
+    expect(items[0]?.getAttribute("aria-label")).toContain("Moto X");
+    fireEvent.click(items[1] as HTMLElement);
+    expect(deviceStore.state.focusSerial).toBe("B2");
+  });
 });
 
 describe("NavList（§3 模块导航）", () => {
@@ -445,8 +492,9 @@ describe("NavList（§3 模块导航）", () => {
     expect(active).toBeTruthy();
     expect(active?.classList.contains("yohu-interactive--selected")).toBe(true);
     expect(active?.classList.contains("yohu-nav__item--active")).toBe(false);
+    expect(active?.classList.contains("yohu-list-item")).toBe(true);
     expect(active?.getAttribute("tabindex")).toBe("0");
-    const settingsItem = Array.from(container.querySelectorAll(".yohu-nav__item")).find((el) =>
+    const settingsItem = Array.from(container.querySelectorAll(".yohu-list-item")).find((el) =>
       el.textContent?.includes("设置"),
     );
     expect(settingsItem).toBeTruthy();
@@ -458,7 +506,7 @@ describe("NavList（§3 模块导航）", () => {
 
   it("每个导航项都有独立图标（不因模块复用而消失）", () => {
     const { container } = render(() => <NavList activeId={ModuleId.Files} onNavigate={() => undefined} />);
-    const items = container.querySelectorAll(".yohu-nav__item");
+    const items = container.querySelectorAll(".yohu-nav .yohu-list-item");
     expect(items.length).toBeGreaterThanOrEqual(4);
     items.forEach((item) => {
       expect(item.querySelector("svg.yohu-icon")).toBeTruthy();
@@ -474,7 +522,7 @@ describe("NavList（§3 模块导航）", () => {
 
   it("投屏模块不再显示「开发中」徽章", () => {
     render(() => <NavList activeId={ModuleId.Mirror} onNavigate={() => undefined} />);
-    const mirror = screen.getByText(ModuleTitle.Mirror).closest(".yohu-nav__item");
+    const mirror = screen.getByText(ModuleTitle.Mirror).closest(".yohu-list-item");
     expect(mirror?.textContent).not.toContain("开发中");
     expect(screen.getByText("开发中")).toBeTruthy();
   });
@@ -484,18 +532,29 @@ describe("NavList（§3 模块导航）", () => {
       <NavList activeId={ModuleId.Terminal} onNavigate={() => undefined} />
     ));
     const moduleTitles = Array.from(
-      container.querySelectorAll(".yohu-nav__modules .yohu-nav__item"),
+      container.querySelectorAll(".yohu-nav__modules .yohu-list-item"),
     ).map((el) => el.textContent ?? "");
     expect(moduleTitles.some((t) => t.includes("设置"))).toBe(false);
     expect(moduleTitles.some((t) => t.includes(ModuleTitle.Terminal))).toBe(true);
 
-    const footerItems = container.querySelectorAll(".yohu-nav__footer .yohu-nav__item");
+    const footerItems = container.querySelectorAll(".yohu-nav__footer .yohu-list-item");
     expect(footerItems).toHaveLength(1);
     expect(footerItems[0]?.textContent).toContain("设置");
-    expect(container.querySelector(".yohu-nav__rule")).toBeTruthy();
+    expect(container.querySelector(".yohu-divider")).toBeTruthy();
 
-    const allItems = container.querySelectorAll(".yohu-nav__item");
+    const allItems = container.querySelectorAll(".yohu-nav .yohu-list-item");
     expect(allItems[allItems.length - 1]?.textContent).toContain("设置");
+  });
+
+  it("图标轨用 aria-label 导航，图标仍在", () => {
+    const onNavigate = vi.fn();
+    const { container } = render(() => (
+      <NavList presentation="icons" activeId={ModuleId.Terminal} onNavigate={onNavigate} />
+    ));
+    const settings = container.querySelector('[aria-label="设置"]');
+    expect(settings?.querySelector("svg.yohu-icon")).toBeTruthy();
+    fireEvent.click(settings as HTMLElement);
+    expect(onNavigate).toHaveBeenCalledWith(ModuleId.Settings);
   });
 });
 
@@ -719,6 +778,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     render(() => <SettingsView />);
     expect(screen.getByRole("switch", { name: "开始采集前清空设备缓冲（logcat -c）" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "输入命令默认加上 adb" })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "拖入时指向文件夹" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "强制 ADB forward（跳过 reverse）" })).toBeTruthy();
     expect(screen.queryByText("启用")).toBeNull();
   });
@@ -732,6 +792,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(chromeWrap).toBeTruthy();
     expect(chrome).toBeTruthy();
     expect(body).toBeTruthy();
+    expect(body?.querySelector(".yohu-scroller")).toBeTruthy();
     expect(body?.querySelector(".yohu-panel")).toBeTruthy();
     expect(body?.contains(chrome as Node)).toBe(false);
   });
@@ -838,17 +899,31 @@ describe("AppLayout 窗口铬", () => {
     });
   });
 
-  it("侧栏可收起为抽屉", () => {
+  it("侧栏可收起为图标轨，导航仍可点", () => {
     navStore.navigate(ModuleId.Terminal);
     render(() => <AppLayout />);
     fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
-    expect(document.querySelector(".yohu-layout--rail-collapsed")).toBeTruthy();
-    expect(document.querySelector(".yohu-recipe-rail")).toBeTruthy();
-    expect(document.querySelector(".yohu-layout__rail-inner")).toBeTruthy();
-    expect(Boolean((document.querySelector(".yohu-layout__rail") as HTMLElement | null)?.inert)).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "展开侧栏" }));
+    const layout = document.querySelector(".yohu-layout");
+    expect(layout?.getAttribute("data-rail")).toBe("icons");
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-phase")).toBe("icons");
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-stream")).toBe("closed");
+    expect(document.querySelector(".yohu-layout__rail.yohu-recipe-rail")).toBeTruthy();
+    expect(document.querySelector(".yohu-layout.yohu-recipe-rail")).toBeNull();
     expect(document.querySelector(".yohu-layout--rail-collapsed")).toBeNull();
-    expect(Boolean((document.querySelector(".yohu-layout__rail") as HTMLElement | null)?.inert)).toBe(false);
+    expect(Boolean((document.querySelector(".yohu-layout__rail") as HTMLElement | null)?.inert)).toBe(
+      false,
+    );
+    const icons = document.querySelectorAll(".yohu-nav .yohu-list-item svg.yohu-icon");
+    expect(icons.length).toBeGreaterThanOrEqual(4);
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    expect(navStore.activeModuleId()).toBe(ModuleId.Settings);
+    fireEvent.click(screen.getByRole("button", { name: "展开侧栏" }));
+    const opened = document.querySelector(".yohu-layout");
+    expect(opened?.getAttribute("data-rail")).toBe("expanded");
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-phase")).toBe(
+      "expanded",
+    );
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-stream")).toBe("open");
   });
 
   it("切换设备后内容区选中设备名立即更新，不依赖切模块", async () => {
@@ -933,6 +1008,8 @@ describe("View 不越级 IPC", () => {
     ]) {
       const src = readFileSync(resolve(root!, rel), "utf-8");
       expect(src, rel).not.toMatch(banned);
+      expect(src, rel).not.toContain("deviceLabel");
+      expect(src, rel).not.toContain("__scroller");
     }
   });
 });

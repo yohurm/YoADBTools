@@ -9,6 +9,7 @@ import { systemReportError, YoLog } from "@yohu/api";
 import { setDensity, setTheme } from "@yohu/ui";
 
 import { runBootPipeline } from "./boot";
+import { formatWindowError } from "./js-error";
 import { allowNativeContextMenu } from "./native-context-menu";
 import "./register";
 import { AppLayout } from "./shell/AppLayout";
@@ -37,10 +38,11 @@ export const App: Component = () => {
       },
     });
 
-    YoLog.info("shell", "UI 已挂载");
+    YoLog.info("shell", "UI 已挂载", { href: window.location.href, bundle: import.meta.url });
     const onError = (e: ErrorEvent): void => {
-      YoLog.error("shell", `JS: ${e.message}`);
-      void systemReportError(`JS: ${e.message}`);
+      const text = formatWindowError(e);
+      YoLog.error("shell", text);
+      void systemReportError(text);
     };
     window.addEventListener("error", onError);
     const onContextMenu = (event: MouseEvent): void => {

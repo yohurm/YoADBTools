@@ -20,6 +20,7 @@ import {
   YoCheckbox,
   YoFormRow,
   YoPanel,
+  YoScroller,
   YoSelect,
   YoSwitch,
   YoTextField,
@@ -91,7 +92,9 @@ export function SettingsForm(props: {
 }): JSX.Element {
   return (
     <div class="yohu-settings__body">
-      <YoPanel title="工具链">
+      <YoScroller class="yohu-settings__scroll">
+      <div class="yohu-settings__stack">
+      <YoPanel title="工具链" overflow="visible">
         <YoFormRow title="ADB 路径" note={<EffectBadge text="立即生效" />}>
           <PathChrome
             label="ADB 路径"
@@ -124,7 +127,7 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
 
-      <YoPanel title={ModuleTitle.Terminal}>
+      <YoPanel title={ModuleTitle.Terminal} overflow="visible">
         <YoFormRow title="输入命令默认加上 adb" note={<EffectBadge text="立即生效" />}>
           <YoSwitch
             ariaLabel="输入命令默认加上 adb"
@@ -141,7 +144,17 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
 
-      <YoPanel title={ModuleTitle.Logs}>
+      <YoPanel title={ModuleTitle.Files} overflow="visible">
+        <YoFormRow title="拖入时指向文件夹" note={<EffectBadge text="立即生效" />}>
+          <YoSwitch
+            ariaLabel="拖入时指向文件夹"
+            checked={settingsStore.state.files_drop_into_folder}
+            onChange={(v) => props.save("files_drop_into_folder", v, "已保存（立即生效）")}
+          />
+        </YoFormRow>
+      </YoPanel>
+
+      <YoPanel title={ModuleTitle.Logs} overflow="visible">
         <YoFormRow title="清单时间显示" note={<EffectBadge text="立即生效" />}>
           <YoSelect
             options={LOG_TIME_FORMAT_OPTIONS}
@@ -217,7 +230,7 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
 
-      <YoPanel title={ModuleTitle.Mirror}>
+      <YoPanel title={ModuleTitle.Mirror} overflow="visible">
         <YoFormRow
           title="强制 ADB forward"
           description="协议、长边、码率、帧率在投屏显示页调节。无线调试默认 forward；USB 上 reverse 失败也会回退。需要跳过 reverse 时打开此开关。"
@@ -231,7 +244,7 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
 
-      <YoPanel title="外观">
+      <YoPanel title="外观" overflow="visible">
         <YoFormRow title="主题" note={<EffectBadge text="立即生效" />}>
           <YoSelect
             options={THEME_OPTIONS}
@@ -249,7 +262,7 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
 
-      <YoPanel title="关于">
+      <YoPanel title="关于" overflow="visible">
         <div class="yohu-settings__about">
           <img
             class="yohu-settings__about-icon"
@@ -264,7 +277,7 @@ export function SettingsForm(props: {
           </div>
         </div>
         <YoFormRow title="版本">
-          <span class="yohu-settings__value">{settingsStore.identity.version}</span>
+          {settingsStore.identity.version}
           <YoButton
             size="sm"
             variant="outlined"
@@ -277,10 +290,10 @@ export function SettingsForm(props: {
           </YoButton>
         </YoFormRow>
         <YoFormRow title="标识">
-          <span class="yohu-settings__value">{settingsStore.identity.identifier}</span>
+          {settingsStore.identity.identifier}
         </YoFormRow>
         <YoFormRow title="版权">
-          <span class="yohu-settings__value">{settingsStore.identity.copyright}</span>
+          {settingsStore.identity.copyright}
         </YoFormRow>
         <YoFormRow title="应用日志">
           <PathChrome
@@ -292,6 +305,8 @@ export function SettingsForm(props: {
           />
         </YoFormRow>
       </YoPanel>
+      </div>
+      </YoScroller>
     </div>
   );
 }

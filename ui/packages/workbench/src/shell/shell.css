@@ -15,50 +15,60 @@
 }
 
 .yohu-layout {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-columns: var(--yohu-layout-shell-nav) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
-.yohu-layout--rail-collapsed {
-  grid-template-columns: 0 minmax(0, 1fr);
-}
-
-.yohu-layout--rail-collapsed .yohu-layout__rail {
+.yohu-layout__work {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  pointer-events: none;
-  border-right: none;
 }
 
 .yohu-layout__rail {
-  grid-row: 1;
-  grid-column: 1;
-  overflow: hidden;
+  flex-grow: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
   min-width: 0;
+  overflow: hidden;
   background: transparent;
   border-right: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
-/* 槽位随列宽收；内层锁死壳宽，避免换行把内容向下挤。裁切沿收缩方向（水平）。 */
+/* 两态都写死，禁止回退到同一条基础宽——展开会变成 232→232，插不回去。
+ * 宽跟轨自己的 data-rail（宽度拍），不是页栅上的用户意图。 */
+.yohu-layout__rail[data-rail="expanded"] {
+  flex-basis: var(--yohu-layout-shell-nav);
+  width: var(--yohu-layout-shell-nav);
+  max-width: var(--yohu-layout-shell-nav);
+}
+
+.yohu-layout__rail[data-rail="icons"] {
+  flex-basis: var(--yohu-layout-shell-nav-icons);
+  width: var(--yohu-layout-shell-nav-icons);
+  max-width: var(--yohu-layout-shell-nav-icons);
+}
+
+/* 内层跟轨宽。文案 nowrap + 关流 0fr，不锁 232 硬裁。 */
 .yohu-layout__rail-inner {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   box-sizing: border-box;
-  width: var(--yohu-layout-shell-nav);
-  min-width: var(--yohu-layout-shell-nav);
+  width: 100%;
+  min-width: 0;
   height: 100%;
   overflow: hidden;
 }
 
 .yohu-layout__content {
-  grid-row: 1;
-  grid-column: 2;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -71,11 +81,6 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-}
-
-.yohu-layout > :last-child {
-  grid-row: 2;
-  grid-column: 1 / span 2;
 }
 
 /* ===== 设备栏（卡片式，§3） ===== */
@@ -112,18 +117,19 @@
   gap: var(--yohu-space-xs);
 }
 
+.yohu-device-rail__header .yohu-subheader,
 .yohu-device-rail__heading {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-xs);
-  flex: 1;
   min-width: 0;
 }
 
-.yohu-device-rail__title {
-  font-size: var(--yohu-font-body);
-  font-weight: var(--yohu-font-weight-semibold);
-  color: var(--yohu-fg);
+.yohu-device-rail__heading {
+  flex-grow: 0;
+  flex-shrink: 1;
+  flex-basis: auto;
+}
+
+.yohu-device-rail__heading[data-open="true"] {
+  flex-grow: 1;
 }
 
 /* fill 只有一个直接子级：列表吃剩余高度，空态卡片 hug，避免两者各 flex:1。 */
@@ -147,82 +153,10 @@
   overflow: hidden;
 }
 
-.yohu-device-rail__scroller {
+.yohu-device-rail__stack {
   display: flex;
   flex-direction: column;
   gap: var(--yohu-space-xs);
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.yohu-device-rail__item {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  min-height: var(--yohu-row-height-device);
-  width: 100%;
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  border: none;
-  border-radius: var(--yohu-radius-sm);
-  background: transparent;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.yohu-device-rail__dot {
-  width: var(--yohu-space-sm);
-  height: var(--yohu-space-sm);
-  border-radius: var(--yohu-radius-full);
-  flex-shrink: 0;
-}
-
-.yohu-device-rail__dot--online {
-  background: var(--yohu-success);
-}
-
-.yohu-device-rail__dot--off {
-  background: var(--yohu-offline);
-}
-
-.yohu-device-rail__info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-2xs);
-  min-width: 0;
-  flex: 1;
-}
-
-.yohu-device-rail__model {
-  font-weight: var(--yohu-font-weight-semibold);
-  font-size: var(--yohu-font-body);
-  line-height: var(--yohu-font-leading-tight);
-  color: var(--yohu-fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.yohu-device-rail__serial {
-  font-family: var(--yohu-font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--yohu-font-caption);
-  line-height: var(--yohu-font-leading-data);
-  color: var(--yohu-fg-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.yohu-device-rail__meta {
-  font-variant-numeric: tabular-nums;
-  font-size: var(--yohu-font-caption);
-  line-height: var(--yohu-font-leading-data);
-  color: var(--yohu-fg-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ===== 模块导航（§3） ===== */
@@ -238,26 +172,14 @@
 }
 
 .yohu-nav__modules {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
 }
 
 .yohu-nav__footer {
   flex: 0 0 auto;
-}
-
-.yohu-nav__rule {
-  border: none;
-  border-top: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  margin: var(--yohu-space-sm) 0;
-}
-
-.yohu-nav__caption {
-  font-weight: var(--yohu-font-weight-semibold);
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-3);
-  margin: var(--yohu-space-sm) 0 var(--yohu-space-xs);
 }
 
 .yohu-nav__list {
@@ -269,41 +191,12 @@
   gap: var(--yohu-space-2xs);
 }
 
-.yohu-nav__item {
+.yohu-nav__list > li {
   display: flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  min-height: var(--yohu-row-height-nav);
-  width: 100%;
-  padding: 0 var(--yohu-space-sm);
-  border: none;
-  background: transparent;
-  border-radius: var(--yohu-radius-sm);
-  cursor: pointer;
-  color: var(--yohu-fg);
-  font: inherit;
-  font-size: var(--yohu-font-body);
-  text-align: left;
+  min-width: 0;
 }
 
-.yohu-nav__item[aria-current] {
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
-.yohu-nav__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--yohu-space-lg);
-  height: var(--yohu-space-lg);
-  flex-shrink: 0;
-  color: inherit;
-}
-
-
-.yohu-nav__title {
-  flex: 1;
-}
+/* 壳栏文案槽走 YoRailSlot，禁止再 display:none。 */
 
 /* ===== 状态栏（§3：左版本 · 中留白 · 右设备/任务/状态） ===== */
 

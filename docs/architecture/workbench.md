@@ -79,6 +79,9 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
         installer_url → 应用内下载；page_url → update.open
 路径铬：PathChrome = YoTextField readOnly + YoButton（槽宽 settings-control-max）
 窗口铬：AppLayout → windowStore（minimize / toggleMaximize / close / 最大化快照）
+侧栏：AppLayout 用户意图 `data-rail`；`YoRail` 宽度拍 + `data-stream` 文案流（常驻双态，不是抽屉）
+        轨 width / 槽 0fr / 卡高 / 字流同一拍 spatialRail
+        DeviceRail / NavList 读 `useRail()` / `YoRailSlot`；图标轨可点
 ```
 
 ## 启动链路
@@ -152,3 +155,13 @@ invoke settings.set → settings_apply::set
 invoke update.check/info → commands/update → update_runs
 invoke update.download/install → update_runs（installed_exe_path 必须 Result）
 ```
+
+## UI 组合
+
+- DeviceRail：`YoListItem` + `YoStatusDot` + `YoScroller` + `YoEmptyState`。list 宿主只 `overflow: hidden`。禁止 `__scroller` 包装。
+- NavList：`YoListItem` + `YoScroller`。
+- AppLayout：侧栏 `YoRail`。页眉设备名走 `selectedDeviceLabel` → `DeviceSession.selectedLabel` → 模块 `YoChrome.leading` + `YoBadge`。禁止 `YoChrome deviceLabel`。
+- Settings：页眉外置；页面级一根 `YoScroller`。卡片 `YoPanel overflow=visible`，禁止再套 scroller，禁止改成 `YoPage`（40vp vs 12vp）。
+- UpdateDialogs：`YoDialog` children 各一根 `YoScroller`。
+- PathChrome：`YoTextField` 只读 + `YoButton`。
+- 壳 CSS 禁止 `overflow: auto` / `scroll` 双轴产品条。

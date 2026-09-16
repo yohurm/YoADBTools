@@ -5,7 +5,7 @@
 import { Show, type JSX } from "solid-js";
 
 import { errorText } from "@yohu/api";
-import { YoButton, YoDialog, YoProgressBar } from "@yohu/ui";
+import { YoButton, YoDialog, YoProgressBar, YoScroller } from "@yohu/ui";
 
 import { settingsStore, updateStore } from "../stores";
 
@@ -79,27 +79,29 @@ export function UpdateDialogs(props: {
             </Show>
           </Show>
         }
-      >
-        <p class="yohu-settings__update-ver">{updateStore.pending()?.version}</p>
-        <Show when={(updateStore.pending()?.size_bytes ?? 0) > 0}>
-          <p class="yohu-settings__update-meta">{formatBytes(updateStore.pending()?.size_bytes ?? 0)}</p>
-        </Show>
-        <Show when={updateStore.pending()?.description}>
-          <p class="yohu-settings__update-desc">{updateStore.pending()?.description}</p>
-        </Show>
-        <Show when={downloading()}>
-          <div class="yohu-settings__update-progress">
-            <YoProgressBar
-              value={updateStore.percent()}
-              indeterminate={(updateStore.progress()?.total_bytes ?? 0) <= 0}
-            />
-            <p class="yohu-settings__update-progress-text">
-              {updateStore.progress()?.total_bytes
-                ? `已下载 ${formatBytes(updateStore.progress()?.received_bytes ?? 0)} / ${formatBytes(updateStore.progress()?.total_bytes ?? 0)}`
-                : "正在下载安装包…"}
-            </p>
-          </div>
-        </Show>
+        >
+        <YoScroller>
+          <p class="yohu-settings__update-ver">{updateStore.pending()?.version}</p>
+          <Show when={(updateStore.pending()?.size_bytes ?? 0) > 0}>
+            <p class="yohu-settings__update-meta">{formatBytes(updateStore.pending()?.size_bytes ?? 0)}</p>
+          </Show>
+          <Show when={updateStore.pending()?.description}>
+            <p class="yohu-settings__update-desc">{updateStore.pending()?.description}</p>
+          </Show>
+          <Show when={downloading()}>
+            <div class="yohu-settings__update-progress">
+              <YoProgressBar
+                value={updateStore.percent()}
+                indeterminate={(updateStore.progress()?.total_bytes ?? 0) <= 0}
+              />
+              <p class="yohu-settings__update-progress-text">
+                {updateStore.progress()?.total_bytes
+                  ? `已下载 ${formatBytes(updateStore.progress()?.received_bytes ?? 0)} / ${formatBytes(updateStore.progress()?.total_bytes ?? 0)}`
+                  : "正在下载安装包…"}
+              </p>
+            </div>
+          </Show>
+        </YoScroller>
       </YoDialog>
 
       <YoDialog
@@ -124,15 +126,17 @@ export function UpdateDialogs(props: {
             </YoButton>
           </>
         }
-      >
-        <p class="yohu-settings__update-copy">
-          {settingsStore.os() === "macos"
-            ? `已下载 ${updateStore.pending()?.version}。将打开 DMG，请拖入应用程序文件夹。`
-            : `已下载 ${updateStore.pending()?.version}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
-        </p>
-        <Show when={applying()}>
-          <p class="yohu-settings__update-progress-text">正在覆盖安装，应用即将重启…</p>
-        </Show>
+        >
+        <YoScroller>
+          <p class="yohu-settings__update-copy">
+            {settingsStore.os() === "macos"
+              ? `已下载 ${updateStore.pending()?.version}。将打开 DMG，请拖入应用程序文件夹。`
+              : `已下载 ${updateStore.pending()?.version}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
+          </p>
+          <Show when={applying()}>
+            <p class="yohu-settings__update-progress-text">正在覆盖安装，应用即将重启…</p>
+          </Show>
+        </YoScroller>
       </YoDialog>
     </>
   );
