@@ -78,8 +78,8 @@
   --yohu-splitter: var(--yohu-border-strong);
   --yohu-state-hover: #0000000C;
   --yohu-state-pressed: #00000019;
-  --yohu-state-selected: var(--yohu-accent);
-  --yohu-state-selected-fg: var(--yohu-fg-on);
+  --yohu-state-selected: var(--yohu-accent-soft);
+  --yohu-state-selected-fg: var(--yohu-fg);
   --yohu-state-reorder-source: 0.32;
   --yohu-font-caption-m: 10px;
   --yohu-font-caption: 12px;
@@ -296,8 +296,8 @@
   --yohu-canvas: var(--yohu-bg-base);
   --yohu-state-hover: #FFFFFF0C;
   --yohu-state-pressed: #FFFFFF19;
-  --yohu-state-selected: var(--yohu-accent);
-  --yohu-state-selected-fg: var(--yohu-fg-on);
+  --yohu-state-selected: var(--yohu-accent-soft);
+  --yohu-state-selected-fg: var(--yohu-fg);
 }
 
 [data-density="compact"] {

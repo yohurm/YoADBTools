@@ -4,6 +4,7 @@
  */
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import { progressFillWidth, progressHostAttrs } from "./progress-policy";
 import "./ProgressBar.css";
 
@@ -27,7 +28,9 @@ export function YoProgressBar(props: YoProgressBarProps): JSX.Element {
       aria-valuemax={host()["aria-valuemax"]}
       aria-valuenow={host()["aria-valuenow"]}
     >
-      <div class="yohu-progress__bar" style={width() ? { width: width() } : undefined} />
+      <YoCorner role="control" class="yohu-progress__chrome">
+        <div class="yohu-progress__bar" style={width() ? { width: width() } : undefined} />
+      </YoCorner>
     </div>
   );
 }

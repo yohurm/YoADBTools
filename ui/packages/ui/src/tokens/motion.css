@@ -442,17 +442,14 @@
 
 /*
  * 配方 panel：Fluent Collapse 双轨（高度空间运动 ∥ 内容淡入上移）。
- * 高度走 spatial-panel（300ms 标准，大行程无弹簧过冲）；内容走 effects 进出场。
- * 两轨同时起步、曲线不对称，可打断；禁止再叠一层 collapse。
- *
- * `__inner` 只裁切高度，禁止变换裁切盒：translateY 打在盒子上会进入祖先
- * scrollable overflow，Windows 展开时右侧纵条闪一下。淡入上移只打直接子级。
+ * 高度走 spatial-panel；淡入上移只打 Collapse 自己的 `__content`。
+ * `__inner` 只裁切高度，禁止变换裁切盒，禁止选择器穿到消费者子树。
  */
 .yohu-collapse[data-recipe="panel"] {
   transition: grid-template-rows var(--yohu-motion-spatial-panel);
 }
 
-.yohu-collapse[data-recipe="panel"] .yohu-collapse__inner > * {
+.yohu-collapse[data-recipe="panel"] .yohu-collapse__content {
   opacity: 0;
   transform: translateY(var(--yohu-space-xs));
   transition:
@@ -460,7 +457,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-collapse[data-recipe="panel"][data-open="true"] .yohu-collapse__inner > * {
+.yohu-collapse[data-recipe="panel"][data-open="true"] .yohu-collapse__content {
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -469,16 +466,102 @@
 }
 
 /*
- * 配方 fill：高度仍 0fr/1fr（spatialLocal），不改过渡语义。
- * 内层 column flex，直接子级填满并可收缩，供设备栏等在父级帽下由 scroller 纵滚。
- * 禁止默认 collapse 给 __inner > * 写 min-height（会压过 Tree 行高）。
+ * YoReveal：绘制轴始终绝对定位。自己不插高度过渡、不淡入、不裁切。
+ * in = 宿主占 --yohu-reveal-span；out = 宿主 0。出流溢出可见，父级 clip。
+ */
+.yohu-reveal {
+  position: relative;
+  /* 名单是 flex 列：height:0 必须压过 min-height:auto，否则出流仍占位。 */
+  min-height: 0;
+  min-width: 0;
+}
+
+.yohu-reveal__content {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  contain: layout;
+}
+
+.yohu-reveal[data-layout="out"] {
+  height: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/*
+ * 落定后：出流 abspos 不得撑祖先 scrollHeight（CSS Overflow / CSSOM View）。
+ * 行程中 Travel 已 clip，保持 visible，避免 height:0 + clip 把内容闪没。
+ */
+.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"] {
+  overflow: clip;
+}
+
+.yohu-reveal[data-layout="in"] {
+  height: var(--yohu-reveal-span, 0px);
+  overflow: visible;
+}
+
+/*
+ * YoTravel：命令式用后 px。used 当拍起程，无 hold。
+ * 只过渡已声明的轴。禁止 auto，禁止点 Dialog / Chip。
+ */
+.yohu-travel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.yohu-travel[data-ready] {
+  overflow: hidden;
+}
+
+.yohu-travel[data-ready] > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.yohu-travel[data-ready][data-axis-block] {
+  transition: height var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-ready][data-axis-inline] {
+  transition: width var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-ready][data-axis-block][data-axis-inline] {
+  transition:
+    height var(--yohu-motion-spatial-panel),
+    width var(--yohu-motion-spatial-panel);
+}
+
+.yohu-travel[data-travel="used"] {
+  will-change: height, width;
+}
+
+/*
+ * 配方 fill：高度仍 0fr/1fr。`__content` 吃剩余高并可收缩。
+ * 禁止默认 collapse 给子项写 min-height（会压过 Tree 行高）。
  */
 .yohu-collapse[data-recipe="fill"] .yohu-collapse__inner {
   display: flex;
   flex-direction: column;
 }
 
-.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner > * {
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.yohu-collapse[data-recipe="fill"] .yohu-collapse__content > * {
   flex: 1;
   min-height: 0;
 }
@@ -578,11 +661,13 @@
 }
 
 .yohu-indicator-host[data-indicator-variant="fill"]:has(.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
-  background: var(--yohu-accent-hover);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
 .yohu-indicator-host[data-indicator-variant="fill"]:has(.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
-  background: var(--yohu-accent-pressed);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive {
@@ -605,6 +690,7 @@
 /*
  * 配方 swap：与侧栏/预览栏同一套——锁固有宽、沿轴裁切、width 过渡。
  * 先换目标文案再插槽宽。默认贴 inline-end（往左展开/收起）。
+ * idle hug `__inner`；只在 resizing 锁宽并裁切。
  * 禁止交叉淡入淡出、width 补间测按钮铬、收到尽头再换字。
  */
 .yohu-swap {
@@ -617,13 +703,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  overflow: hidden;
-  min-width: 0;
+  min-width: min-content;
   line-height: inherit;
 }
 
 .yohu-swap[data-anchor="start"] .yohu-swap__clip {
   justify-content: flex-start;
+}
+
+.yohu-swap[data-anchor="center"] .yohu-swap__clip {
+  justify-content: center;
+}
+
+.yohu-swap[data-phase="resizing"] .yohu-swap__clip {
+  overflow: hidden;
+  min-width: 0;
 }
 
 .yohu-swap[data-resizing] .yohu-swap__clip {
@@ -699,6 +793,25 @@ html[data-theme-transition] *::after {
   opacity: var(--yohu-state-reorder-source);
 }
 
+/*
+ * YoScroller 滑块：显隐只走透明度。侧轨预留，不跟 Travel 抢插值。
+ * 几何（高/位移）不过渡，跟视口溢出走。对照 ArkUI BarState 用 opacity。
+ */
+.yohu-scroller__thumb {
+  opacity: 0;
+}
+
+.yohu-scroller[data-scroll="in"] .yohu-scroller__thumb,
+.yohu-scroller[data-scroll="on"] .yohu-scroller__thumb {
+  opacity: 1;
+  transition: opacity var(--yohu-motion-effects-enter);
+}
+
+.yohu-scroller[data-scroll="out"] .yohu-scroller__thumb {
+  opacity: 0;
+  transition: opacity var(--yohu-motion-effects-exit);
+}
+
 /* —— reduced-motion：配方统一降级；循环指示改为静止 —— */
 
 @media (prefers-reduced-motion: reduce) {
@@ -707,7 +820,10 @@ html[data-theme-transition] *::after {
   .yohu-recipe-inline-end > :first-child > *,
   .yohu-recipe-inline-end > :last-child,
   .yohu-collapse,
-  .yohu-collapse[data-recipe="panel"] .yohu-collapse__inner > *,
+  .yohu-collapse[data-recipe="panel"] .yohu-collapse__content,
+  .yohu-travel[data-ready],
+  .yohu-scroller__lane,
+  .yohu-scroller__thumb,
   .yohu-presence[data-recipe="list"],
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-presence[data-recipe="chip"],
@@ -718,7 +834,6 @@ html[data-theme-transition] *::after {
   .yohu-recipe-reorder-overlay[data-ready],
   .yohu-recipe-indicator[data-ready],
   [data-reordering] > * > [data-key]:not([data-reorder="source"]),
-  .yohu-chip[data-dismiss="hover"] .yohu-chip__remove,
   .yohu-tabs__tab,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,

@@ -1,18 +1,29 @@
 .yohu-icon-button {
+  --yohu-corner-fill: transparent;
+  --yohu-corner-stroke: transparent;
+  position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   padding: 0;
   border: none;
-  border-radius: var(--yohu-radius-sm);
   background-color: transparent;
   color: var(--yohu-fg-2);
   cursor: pointer;
   box-sizing: border-box;
-  transition:
-    background-color var(--yohu-motion-effects-fast),
-    color var(--yohu-motion-effects-fast);
+  transition: color var(--yohu-motion-effects-fast);
+}
+
+.yohu-icon-button__chrome {
+  width: 100%;
+  height: 100%;
+}
+
+.yohu-icon-button__chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
 }
 
 .yohu-icon-button[data-size="sm"] {
@@ -25,27 +36,27 @@
   height: var(--yohu-control-height);
 }
 
-.yohu-icon-button[data-size="sm"] > .yohu-icon {
+.yohu-icon-button[data-size="sm"] .yohu-icon {
   width: var(--yohu-layout-icon-sm);
   height: var(--yohu-layout-icon-sm);
 }
 
-.yohu-icon-button[data-size="md"] > .yohu-icon {
+.yohu-icon-button[data-size="md"] .yohu-icon {
   width: var(--yohu-layout-icon-md);
   height: var(--yohu-layout-icon-md);
 }
 
 .yohu-icon-button:not(:disabled):hover {
-  background-color: var(--yohu-state-hover);
+  --yohu-corner-fill: var(--yohu-state-hover);
   color: var(--yohu-fg);
 }
 
 .yohu-icon-button:not(:disabled):active {
-  background-color: var(--yohu-state-pressed);
+  --yohu-corner-fill: var(--yohu-state-pressed);
 }
 
 .yohu-icon-button[data-pressed]:not(:disabled) {
-  background-color: var(--yohu-accent-soft);
+  --yohu-corner-fill: var(--yohu-accent-soft);
   color: var(--yohu-accent);
 }
 
@@ -54,12 +65,12 @@
   cursor: not-allowed;
 }
 
-.yohu-icon-button[data-busy] > .yohu-icon {
+.yohu-icon-button[data-busy] .yohu-icon {
   animation: yohu-spin var(--yohu-dur-loop) linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .yohu-icon-button[data-busy] > .yohu-icon {
+  .yohu-icon-button[data-busy] .yohu-icon {
     animation: none;
   }
 }

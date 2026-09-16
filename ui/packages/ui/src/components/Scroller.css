@@ -1,0 +1,61 @@
+/*
+ * YoScroller 几何。显隐过渡在 motion.css。
+ * 侧轨 8vp = 内容边 4vp + 滑块 4vp。无法滚动则收轨，不占布局。
+ */
+
+.yohu-scroller {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.yohu-scroller__view {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.yohu-scroller[data-overflow="auto"] > .yohu-scroller__view {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.yohu-scroller[data-overflow="auto"] > .yohu-scroller__view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.yohu-scroller[data-overflow="hidden"] > .yohu-scroller__view {
+  overflow: hidden;
+}
+
+.yohu-scroller__lane {
+  position: relative;
+  flex: 0 0 0;
+  width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yohu-scroller__lane[data-lane="on"] {
+  flex: 0 0 var(--yohu-space-sm);
+  width: var(--yohu-space-sm);
+}
+
+.yohu-scroller[data-scroll="out"] > .yohu-scroller__lane {
+  pointer-events: none;
+}
+
+.yohu-scroller__thumb {
+  position: absolute;
+  inset-inline-end: 0;
+  width: var(--yohu-space-xs);
+  border-radius: var(--yohu-radius-xs);
+  background-color: var(--yohu-border);
+  touch-action: none;
+}

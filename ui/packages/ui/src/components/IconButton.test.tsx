@@ -62,6 +62,6 @@ describe("YoIconButton", () => {
       </YoIconButton>
     ));
     expect(container.querySelector("[data-slot=glyph]")?.textContent).toBe("槽");
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector(".yohu-icon")).toBeNull();
   });
 });

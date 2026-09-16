@@ -1,11 +1,20 @@
 /**
  * YoDialog —— 模态对话框（L4 视图 / L5 门面）。
- * HarmonyOS 对照：弹出框；最大宽 400vp；遮罩 10% 中性，不点遮罩关闭。
+ * HarmonyOS 对照：AdvancedDialog / AlertDialog（API 20+）。
+ * 标题居中、内容区必选、操作区 AUTO（L2 center|row|stack → 页脚 data-layout）；
+ * 三区之间不画分割线。脚钮对照 AlertDialog：取消/破坏 NORMAL（ghost+accent/danger，灰底+语义字），
+ * 建设确认 EMPHASIZED（solid+accent）。禁止脚钮再走 TEXTUAL 透明。
+ * 最大宽 400vp；电脑圆角走 YoCorner（role=dialog=16）；
+ * 遮罩不点关。禁止面板再用 CSS border + overflow:hidden 画圆角。
  * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
  *
  * 盒：`open` 只是 Presence 开关。fit hug、fill 显式高、exit 锁最后打开盒。
- * fit + overflow=auto 的滚槽预算是 `--yohu-layout-dialog-body-max`，不是 90% 视口。
- * split（bodyLead / bodyTail）钉住铬，只有 `__main` 滚；Collapse 只进 main。
+ * fit 外包公开 YoTravel；名单走 YoReveal（open 即接入）。
+ * hug 跟 Presence 寿命。关窗冻锁。行程中主槽 clip。
+ * 滚条走公开 YoScroller（无法滚动不画条，滑块可拖），不是 travel 配方。
+ * 禁止观察 DOM、禁止 hold+rAF、禁止模块自绑行程。
+ * fit + overflow=auto 的滚槽预算是 `--yohu-layout-dialog-body-max`。
+ * split（bodyLead / bodyTail）钉住铬，只有 YoScroller 视口滚；YoReveal 只进视口。
  * 载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。
  *
  * 受控 API：open / title / width / height / bodyLayout / bodyOverflow / bodyPad /
@@ -17,14 +26,17 @@
  * - **焦点陷阱**：Tab/Shift+Tab 在面板内循环，不逃逸到背景
  * - Esc 触发 onClose；关闭后焦点还原到打开前的元素
  * - 遮罩点击不关闭（防误触；仅由显式取消/确认按钮关闭）
+ * - 操作区只数页脚 `button` 槽，写成 `data-layout`；CSS 只认 data。skip 是 Dialog 自己的属性，禁止 Chip 等控件代写
  *
  * 多实例叠加：Esc/Tab 由 dialog-stack 单栈裁决。视图只 attach / detach。
  *
  * `open` 支持 `boolean` 或响应式 `Accessor<boolean>`。
  */
-import { Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { Show, children, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import { YoPresence } from "../motion/presence";
+import { YoTravel } from "../motion/travel";
 import {
   resolveDialogBox,
   resolveDialogInitial,
@@ -36,12 +48,15 @@ import {
 } from "./dialog-model";
 import {
   attachDialog,
+  countDialogActions,
+  dialogActionsAttrs,
   dialogBodyAttrs,
   dialogExitLock,
   dialogLayerStyle,
   resolveDialogOpen,
   type DialogStackEntry,
 } from "./dialog-policy";
+import { YoScroller } from "./Scroller";
 import "./Dialog.css";
 
 export type { YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad, YoDialogInitial };
@@ -82,6 +97,7 @@ export interface YoDialogProps {
 export function YoDialog(props: YoDialogProps): JSX.Element {
   const isOpen = (): boolean => resolveDialogOpen(props.open);
   const titleId = createUniqueId();
+  const footerKids = children(() => props.footer);
 
   const [panelEl, setPanelEl] = createSignal<HTMLDivElement | undefined>();
   let lastOpenBox: DialogBoxLock | undefined;
@@ -101,18 +117,14 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
   });
 
   createEffect(() => {
-    if (!isOpen()) return;
     const el = panelEl();
     if (!el) return;
-    const sync = (): void => {
+    const snap = (): void => {
       const lock = dialogExitLock(el);
       if (lock) lastOpenBox = lock;
     };
-    sync();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(sync);
-    observer.observe(el);
-    onCleanup(() => observer.disconnect());
+    if (isOpen()) snap();
+    onCleanup(snap);
   });
 
   const box = () =>
@@ -131,6 +143,8 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
       lead: props.bodyLead != null,
       tail: props.bodyTail != null,
     });
+
+  const footer = () => dialogActionsAttrs(countDialogActions(footerKids.toArray()));
 
   return (
     <YoPresence
@@ -154,29 +168,39 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
           data-sized={box().sized ? "" : undefined}
           style={box().style}
         >
-          {props.title ? (
-            <h3 id={titleId} class="yohu-dialog__title">
-              {props.title}
-            </h3>
-          ) : null}
-          <div
-            class="yohu-dialog__body"
-            data-layout={body()["data-layout"]}
-            data-overflow={body()["data-overflow"]}
-            data-pad={body()["data-pad"]}
-            data-region={body()["data-region"]}
-          >
-            <Show when={body()["data-region"] === "split"} fallback={props.children}>
-              <Show when={props.bodyLead != null}>
-                <div class="yohu-dialog__lead">{props.bodyLead}</div>
-              </Show>
-              <div class="yohu-dialog__main">{props.children}</div>
-              <Show when={props.bodyTail != null}>
-                <div class="yohu-dialog__tail">{props.bodyTail}</div>
-              </Show>
-            </Show>
-          </div>
-          {props.footer ? <div class="yohu-dialog__footer">{props.footer}</div> : null}
+          <YoTravel axes={["block"]} enabled={props.height === undefined && isOpen()}>
+            <YoCorner role="dialog" class="yohu-dialog__chrome">
+              {props.title ? (
+                <h3 id={titleId} class="yohu-dialog__title">
+                  {props.title}
+                </h3>
+              ) : null}
+              <div
+                class="yohu-dialog__body"
+                data-layout={body()["data-layout"]}
+                data-overflow={body()["data-overflow"]}
+                data-pad={body()["data-pad"]}
+                data-region={body()["data-region"]}
+              >
+                <Show when={body()["data-region"] === "split"} fallback={props.children}>
+                  <Show when={props.bodyLead != null}>
+                    <div class="yohu-dialog__lead">{props.bodyLead}</div>
+                  </Show>
+                  <div class="yohu-dialog__scroller">
+                    <YoScroller overflow={body()["data-overflow"]}>{props.children}</YoScroller>
+                  </div>
+                  <Show when={props.bodyTail != null}>
+                    <div class="yohu-dialog__tail">{props.bodyTail}</div>
+                  </Show>
+                </Show>
+              </div>
+              {props.footer ? (
+                <div class="yohu-dialog__footer" data-layout={footer()["data-layout"]}>
+                  {footerKids()}
+                </div>
+              ) : null}
+            </YoCorner>
+          </YoTravel>
         </div>
       </div>
     </YoPresence>

@@ -1,0 +1,50 @@
+/* 圆角铬只在这里画。宿主禁止再写 border + overflow:hidden 叠圆角。 */
+
+.yohu-corner {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+}
+
+.yohu-corner[data-mode="host"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.yohu-corner[data-mode="paint"] {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.yohu-corner__paint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.yohu-corner__fill {
+  fill: var(--yohu-corner-fill, transparent);
+}
+
+.yohu-corner__stroke {
+  fill: var(--yohu-corner-stroke, transparent);
+}
+
+.yohu-corner__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}

@@ -15,14 +15,14 @@ describe("createToaster + YoToaster", () => {
     const toaster = createToaster();
     render(() => <YoToaster toaster={toaster} />);
     toaster.show("失败", "error");
-    expect(screen.getByText("失败").getAttribute("data-tone")).toBe("danger");
+    expect(screen.getByText("失败").closest(".yohu-toast")?.getAttribute("data-tone")).toBe("danger");
   });
 
   it("show 默认 info → accent 涂装", () => {
     const toaster = createToaster();
     render(() => <YoToaster toaster={toaster} />);
     toaster.show("提示");
-    expect(screen.getByText("提示").getAttribute("data-tone")).toBe("accent");
+    expect(screen.getByText("提示").closest(".yohu-toast")?.getAttribute("data-tone")).toBe("accent");
   });
 
   it("多条消息堆叠渲染", () => {
@@ -69,10 +69,11 @@ describe("createToaster + YoToaster", () => {
 describe("YoToast", () => {
   it("渲染单条 toast，不使用旧 tone class", () => {
     render(() => <YoToast toast={{ id: 1, text: "单条", tone: "success", open: true }} />);
-    const el = screen.getByText("单条");
-    expect(el.className).toContain("yohu-toast");
-    expect(el.className).not.toContain("yohu-toast--success");
-    expect(el.getAttribute("data-tone")).toBe("success");
-    expect(el.getAttribute("role")).toBe("status");
+    const el = screen.getByText("单条").closest(".yohu-toast");
+    expect(el?.className).toContain("yohu-toast");
+    expect(el?.className).not.toContain("yohu-toast--success");
+    expect(el?.getAttribute("data-tone")).toBe("success");
+    expect(el?.getAttribute("role")).toBe("status");
+    expect(el?.querySelector(".yohu-toast__chrome")).toBeTruthy();
   });
 });

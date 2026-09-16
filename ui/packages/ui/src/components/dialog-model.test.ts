@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveDialogActionsLayout,
   resolveDialogBodyRegion,
   resolveDialogBodySpec,
   resolveDialogBox,
@@ -89,9 +90,18 @@ describe("dialog-model", () => {
     expect(resolveDialogInitial("first")).toBe("auto");
   });
 
+  it("操作区 AUTO：1 居中、2 左右、3 以上从下至上", () => {
+    expect(resolveDialogActionsLayout(0)).toBe("center");
+    expect(resolveDialogActionsLayout(1)).toBe("center");
+    expect(resolveDialogActionsLayout(2)).toBe("row");
+    expect(resolveDialogActionsLayout(3)).toBe("stack");
+    expect(resolveDialogActionsLayout(4)).toBe("stack");
+  });
+
   it("零盒不锁，正盒锁成 px", () => {
     expect(resolveDialogExitLock(0, 320)).toBeUndefined();
     expect(resolveDialogExitLock(400, 0)).toBeUndefined();
     expect(resolveDialogExitLock(400, 320)).toEqual({ width: "400px", height: "320px" });
   });
+
 });

@@ -38,11 +38,13 @@
 }
 
 .yohu-virtual-list[data-indicator="fill"]:has(.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
-  background: var(--yohu-accent-hover);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
 .yohu-virtual-list[data-indicator="fill"]:has(.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
-  background: var(--yohu-accent-pressed);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-virtual-list[data-indicator="fill"] .yohu-interactive {
@@ -76,7 +78,7 @@
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive {
   position: absolute;
   isolation: auto;
-  border-radius: var(--yohu-ripple-radius);
+  border-radius: var(--yohu-radius-sm);
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive::before {
@@ -101,11 +103,13 @@
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"]) {
-  background-color: var(--yohu-accent-hover);
+  background-color: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"]) {
-  background-color: var(--yohu-accent-pressed);
+  background-color: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-start {
@@ -114,7 +118,7 @@
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-mid {
-  border-radius: 0;
+  border-radius: var(--yohu-radius-none);
 }
 
 .yohu-virtual-list[role="listbox"] .yohu-virtual-list__row.yohu-interactive--selected.yohu-interactive--sel-end {

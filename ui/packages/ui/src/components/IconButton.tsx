@@ -5,6 +5,7 @@
  */
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import { Icon, type IconName } from "../icons";
 import type { YoIconButtonSize } from "./icon-button-model";
 import { iconButtonHostAttrs } from "./icon-button-policy";
@@ -64,7 +65,9 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
       disabled={host().disabled}
       onClick={props.onClick}
     >
-      {props.children ?? (props.icon ? <Icon name={props.icon} /> : null)}
+      <YoCorner role="control" class="yohu-icon-button__chrome">
+        {props.children ?? (props.icon ? <Icon name={props.icon} /> : null)}
+      </YoCorner>
     </button>
   );
   return props.title ? (

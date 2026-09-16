@@ -101,6 +101,66 @@ describe("YoDialog", () => {
     expect(screen.getByRole("button", { name: "确定" })).toBeTruthy();
   });
 
+  it("操作区 AUTO 写成 data-layout，只数页脚 button 槽", () => {
+    const row = render(() => (
+      <YoDialog
+        open
+        onClose={() => {}}
+        footer={
+          <>
+            <span>路径非法</span>
+            <button class="yohu-button">取消</button>
+            <button class="yohu-button">确定</button>
+          </>
+        }
+      >
+        内容
+      </YoDialog>
+    ));
+    expect(row.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
+      "row",
+    );
+    row.unmount();
+
+    const center = render(() => (
+      <YoDialog
+        open
+        onClose={() => {}}
+        footer={
+          <button class="yohu-button">
+            <span class="yohu-button__chrome">确定</span>
+          </button>
+        }
+      >
+        内容
+      </YoDialog>
+    ));
+    expect(center.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
+      "center",
+    );
+    center.unmount();
+
+    const stack = render(() => (
+      <YoDialog
+        open
+        onClose={() => {}}
+        footer={
+          <>
+            <button class="yohu-button">A</button>
+            <button class="yohu-button">B</button>
+            <button class="yohu-button">C</button>
+          </>
+        }
+      >
+        内容
+      </YoDialog>
+    ));
+    expect(stack.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
+      "stack",
+    );
+    stack.unmount();
+  });
+
   it("内容区缺省写成 stack / auto / lg", () => {
     const { container } = render(() => (
       <YoDialog open onClose={() => {}}>
@@ -183,6 +243,54 @@ describe("YoDialog", () => {
     expect(fitBody).not.toContain("flex: 1 1 auto");
   });
 
+  it("标准弹出框铬对照 HarmonyOS：居中标题、无分割线、操作区 AUTO", () => {
+    expect(dialogCss).toContain("text-align: center");
+    expect(dialogCss).toContain("line-clamp: 2");
+    expect(dialogCss).not.toMatch(/\.yohu-dialog__title\s*\{[^}]*border-bottom/);
+    expect(dialogCss).not.toMatch(/\.yohu-dialog__footer\s*\{[^}]*border-top/);
+    expect(dialogCss).toContain('.yohu-dialog__footer[data-layout="row"]');
+    expect(dialogCss).toContain('.yohu-dialog__footer[data-layout="stack"]');
+    expect(dialogCss).toContain("flex-direction: column-reverse");
+    expect(dialogCss).not.toContain(":has(> .yohu-button");
+    expect(dialogCss).not.toContain(".yohu-button");
+    expect(dialogCss).toContain('[data-layout="row"] > button');
+    expect(dialogCss).toContain("[data-sized] .yohu-dialog__footer");
+    expect(dialogCss).toContain(".yohu-dialog__body[data-region=\"split\"]");
+    expect(dialogCss).toMatch(
+      /\.yohu-dialog__body\[data-region="split"\]\s*\{[^}]*gap:\s*var\(--yohu-space-sm\)/,
+    );
+    expect(dialogCss).toContain("padding: var(--yohu-space-lg) var(--yohu-space-xl) var(--yohu-space-xl)");
+    expect(dialogCss).toContain(".yohu-dialog__body[data-pad=\"lg\"]");
+    expect(dialogCss).toMatch(
+      /\.yohu-dialog__body\[data-pad="lg"\]\s*\{[^}]*padding:\s*0 var\(--yohu-space-xl\)/,
+    );
+  });
+
+  it("tail 分区 hug 自己，不点 Button chrome", () => {
+    const hug =
+      dialogCss.match(/\.yohu-dialog__tail\s*\{[^}]*align-self:\s*flex-start[^}]*\}/)?.[0] ?? "";
+    expect(hug).toContain("min-width: min-content");
+    expect(hug).toContain("max-width: 100%");
+    expect(dialogCss).not.toContain("button__chrome");
+    expect(dialogCss).not.toMatch(/\.yohu-dialog__tail\s+\.yohu-button/);
+  });
+
+  it("面板圆角走 YoCorner，不叠 CSS border + overflow:hidden", () => {
+    const { container } = render(() => (
+      <YoDialog open onClose={() => {}} title="确认">
+        内容
+      </YoDialog>
+    ));
+    const chrome = container.querySelector(".yohu-dialog__chrome");
+    expect(chrome?.getAttribute("data-role")).toBe("dialog");
+    const panelRule = dialogCss.match(/\.yohu-dialog__panel\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(panelRule).toContain("overflow: visible");
+    expect(panelRule).not.toContain("overflow: hidden");
+    expect(panelRule).not.toContain("border: var(--yohu-stroke-hairline)");
+    expect(panelRule).toContain("border-radius: var(--yohu-radius-md)");
+    expect(dialogCss).toContain("--yohu-corner-fill: var(--yohu-surface)");
+  });
+
   it("fit 滚槽预算走 dialog-body-max，不把 90% 当内容帽", () => {
     expect(dialogCss).toContain("max-height: var(--yohu-layout-dialog-body-max)");
     expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fit"]');
@@ -190,6 +298,25 @@ describe("YoDialog", () => {
     expect(dialogCss).not.toContain("grid-template-rows: auto auto auto");
     expect(dialogCss).not.toContain("data-exit-lock");
     expect(dialogCss).not.toContain(".yohu-dialog__panel[data-fill]");
+  });
+
+  it("fit used-clip：盒高交给 YoTravel，滚条走 YoScroller", () => {
+    expect(dialogCss).toContain(".yohu-dialog__panel:has(.yohu-travel[data-travel])");
+    expect(dialogCss).toContain('[data-travel="used"]');
+    expect(dialogCss).not.toContain('[data-travel="hold"]');
+    expect(dialogCss).toContain("yohu-dialog__scroller");
+    expect(dialogCss).toContain("yohu-scroller");
+    expect(dialogCss).not.toContain("yohu-dialog__scroll-thumb");
+    expect(dialogCss).not.toContain(".yohu-dialog__scroll {");
+    expect(dialogCss).not.toContain("pointer-events: none");
+    expect(dialogCss).not.toContain("yohu-hug-scroll");
+    expect(dialogCss).not.toContain("[data-travel] .yohu-reveal");
+    expect(dialogCss).not.toContain("transition: width var(--yohu-motion-spatial-panel), flex-basis");
+    expect(dialogCss).not.toContain("inset-inline-end: var(--yohu-space-xs)");
+    expect(dialogCss).not.toContain(':has(.yohu-reveal[data-open="false"])');
+    expect(dialogCss).not.toContain("transition: scrollbar-color");
+    expect(dialogCss).not.toContain("--yohu-collapse-rows-transition");
+    expect(dialogCss).not.toContain("grid-template-rows: 0fr");
   });
 
   it("bodyLead / bodyTail 写成 split，只有 main 滚", () => {
@@ -206,7 +333,9 @@ describe("YoDialog", () => {
     const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
     expect(body.getAttribute("data-region")).toBe("split");
     expect(container.querySelector(".yohu-dialog__lead")?.textContent).toBe("确定删除吗");
-    expect(container.querySelector(".yohu-dialog__main")?.textContent).toBe("名单");
+    expect(container.querySelector(".yohu-dialog__scroller")).not.toBeNull();
+    expect(container.querySelector(".yohu-scroller__view")?.textContent).toBe("名单");
+    expect(container.querySelector(".yohu-scroller")).not.toBeNull();
     expect(container.querySelector(".yohu-dialog__tail")?.textContent).toBe("展开其余");
   });
 
@@ -238,7 +367,7 @@ describe("YoDialog", () => {
     expect(onExitComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("打开是 fit，出场盒写在 data-box=exit", () => {
+  it("打开是 fit，出场盒写在 data-box=exit，内容区不改 fill-flex", () => {
     const { container } = render(() => (
       <YoDialog open onClose={() => {}}>
         内容
@@ -248,6 +377,28 @@ describe("YoDialog", () => {
     expect(panel.getAttribute("data-box")).toBe("fit");
     expect(dialogCss).toContain('.yohu-dialog__panel[data-box="exit"]');
     expect(dialogCss).toContain("max-height: none");
+    expect(dialogCss).not.toContain('[data-box="exit"] .yohu-dialog__body');
+    expect(dialogCss).not.toContain('[data-box="exit"] .yohu-dialog__body[data-region="split"]');
+  });
+
+  it("fit 外包 YoTravel，关窗冻锁，不自持行程引擎", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/components/Dialog.tsx"),
+      resolve(process.cwd(), "packages/ui/src/components/Dialog.tsx"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src).toContain("YoTravel");
+    expect(src).toContain("YoScroller");
+    expect(src).toContain('axes={["block"]}');
+    expect(src).toContain("props.height === undefined && isOpen()");
+    expect(src).not.toContain("bindHugTravel");
+    expect(src).not.toContain("bindTravel");
+    expect(src).not.toContain("MutationObserver");
+    expect(src).not.toContain("watch:");
+    expect(src).not.toContain("new ResizeObserver");
+    expect(src).not.toContain(".yohu-dialog__main, .yohu-reveal");
+    expect(src).not.toContain('transition: "height var(--yohu-motion-spatial-panel)"');
+    expect(src).not.toContain('transition: "none"');
   });
 
   it("initial=footer 聚焦页脚第一钮，跳过 chip skip", () => {

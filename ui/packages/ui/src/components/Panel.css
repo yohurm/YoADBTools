@@ -4,9 +4,9 @@
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border: none;
+  background-color: transparent;
   border-radius: var(--yohu-radius-md);
-  background-color: var(--yohu-surface);
   box-shadow: var(--yohu-shadow-xs);
   color: var(--yohu-fg);
   font-family: var(--yohu-font-sans);
@@ -22,16 +22,10 @@
 }
 
 .yohu-panel__clip {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
   min-width: 0;
   min-height: 0;
-}
-
-.yohu-panel[data-variant="pane"] .yohu-panel__clip {
-  overflow: hidden;
-  border-radius: inherit;
 }
 
 .yohu-panel__title {

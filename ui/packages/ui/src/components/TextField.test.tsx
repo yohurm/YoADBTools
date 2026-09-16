@@ -15,6 +15,7 @@ describe("YoTextField", () => {
     expect(input).toBeTruthy();
     expect(input.getAttribute("placeholder")).toBe("请输入");
     expect(input.closest(".yohu-text-field")?.getAttribute("data-paint")).toBe("neutral");
+    expect(input.closest(".yohu-text-field__chrome")).toBeTruthy();
   });
 
   it("change 事件也触发 onInput（UIA SetValue）", () => {
@@ -212,8 +213,10 @@ describe("YoTextField", () => {
 
     const controlBlock = css.slice(css.indexOf(".yohu-text-field__control {"));
     const controlRule = controlBlock.slice(0, controlBlock.indexOf("}") + 1);
-    expect(controlRule).toContain("overflow: hidden");
+    expect(controlRule).toContain("overflow: visible");
+    expect(controlRule).not.toContain("overflow: hidden");
     expect(controlRule).not.toContain("overflow: auto");
+    expect(css).toContain(".yohu-text-field__chrome .yohu-corner__content");
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
     const multilineInput = css.slice(css.indexOf(".yohu-text-field[data-multiline] .yohu-text-field__input"));
     expect(multilineInput).toContain("overflow: auto");

@@ -1,53 +1,107 @@
-/* HarmonyOS SegmentButtonV2：单行 40vp / 图文 56vp；compact 落到 V1 最小 28vp。 */
+/* HarmonyOS SegmentButton：单行 40vp / 图文 56vp；compact 落到 V1 最小 28vp。
+ * 电脑小圆角走 YoCorner role=control paint。轨 surface-2，选中块距轨 4vp。
+ * 默认 hug；block 才铺满。单选选择块是填充滑块；多选共轨、选中项自绘底并并角。
+ * 填归属只消费 data-fill-owner / data-selected / 交互伪类，不按类型把已选 hover 写成 transparent。 */
 
 .yohu-segmented {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: transparent;
+  --yohu-segmented-ink: var(--yohu-fg-2);
+  --yohu-segmented-on: var(--yohu-fg);
+  --yohu-segmented-thumb-fill: var(--yohu-surface);
+  --yohu-segmented-thumb-shadow: var(--yohu-shadow-xs);
+  --yohu-segmented-item-fill: var(--yohu-accent);
   position: relative;
   isolation: isolate;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: max-content;
   align-items: stretch;
-  width: 100%;
+  padding: var(--yohu-space-xs);
+  width: max-content;
   max-width: var(--yohu-layout-button-max);
   min-height: var(--yohu-segment-single);
-  padding: var(--yohu-space-2xs);
   box-sizing: border-box;
-  background: var(--yohu-surface-2);
-  border-radius: var(--yohu-radius-xl);
+}
+
+.yohu-segmented[data-block] {
+  width: 100%;
+  grid-auto-columns: minmax(0, 1fr);
 }
 
 .yohu-segmented[data-hybrid] {
   min-height: var(--yohu-segment-hybrid);
 }
 
-.yohu-segmented[data-paint="tab-surface"] .yohu-recipe-indicator--thumb {
-  background: var(--yohu-surface);
-  box-shadow: var(--yohu-shadow-xs);
-  border-radius: var(--yohu-radius-xl);
+.yohu-segmented[data-paint="tab-surface"] {
+  --yohu-segmented-thumb-fill: var(--yohu-surface);
+  --yohu-segmented-thumb-shadow: var(--yohu-shadow-xs);
+  --yohu-segmented-on: var(--yohu-fg);
 }
 
-.yohu-segmented[data-paint="capsule-accent"] .yohu-recipe-indicator--thumb {
-  background: var(--yohu-accent);
-  border-radius: var(--yohu-radius-xl);
+.yohu-segmented[data-paint="capsule-accent"] {
+  --yohu-segmented-thumb-fill: var(--yohu-accent);
+  --yohu-segmented-thumb-shadow: 0 0 0 0 transparent;
+  --yohu-segmented-on: var(--yohu-fg-on);
+}
+
+.yohu-segmented[data-paint="capsule-multi"] {
+  --yohu-segmented-on: var(--yohu-fg-on);
+}
+
+.yohu-segmented[data-fill-owner="thumb"] .yohu-recipe-indicator--thumb {
+  background: var(--yohu-segmented-thumb-fill);
+  box-shadow: var(--yohu-segmented-thumb-shadow);
+  border-radius: var(--yohu-radius-sm);
+}
+
+.yohu-segmented[data-fill-owner="thumb"]:has(.yohu-segmented__item[data-selected]:hover:not(:disabled))
+  .yohu-recipe-indicator--thumb {
+  box-shadow: var(--yohu-segmented-thumb-shadow), inset 0 0 0 9999px var(--yohu-state-hover);
+}
+
+.yohu-segmented[data-fill-owner="thumb"]:has(.yohu-segmented__item[data-selected]:active:not(:disabled))
+  .yohu-recipe-indicator--thumb {
+  box-shadow: var(--yohu-segmented-thumb-shadow), inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-segmented__item {
   position: relative;
   z-index: 1;
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   gap: var(--yohu-space-xs);
-  min-width: 0;
+  min-width: var(--yohu-control-height-sm);
   padding: var(--yohu-space-xs) var(--yohu-space-sm);
   border: 0;
+  border-radius: var(--yohu-radius-sm);
   background: transparent;
-  color: var(--yohu-fg-2);
+  color: var(--yohu-segmented-ink);
   font-family: inherit;
   font-weight: var(--yohu-font-weight-medium);
   line-height: var(--yohu-font-leading-tight);
   cursor: pointer;
+}
+
+.yohu-segmented__item[data-join="start"] {
+  border-start-end-radius: var(--yohu-radius-none);
+  border-end-end-radius: var(--yohu-radius-none);
+}
+
+.yohu-segmented__item[data-join="end"] {
+  border-start-start-radius: var(--yohu-radius-none);
+  border-end-start-radius: var(--yohu-radius-none);
+}
+
+.yohu-segmented__item[data-join="mid"] {
+  border-radius: var(--yohu-radius-none);
+}
+
+.yohu-segmented[data-hybrid] .yohu-segmented__item[data-content="hybrid"] {
+  flex-direction: column;
+  gap: var(--yohu-space-2xs);
 }
 
 .yohu-segmented[data-size="sm"] .yohu-segmented__item {
@@ -58,14 +112,22 @@
   font-size: var(--yohu-font-body);
 }
 
-.yohu-segmented[data-icon-size="sm"] .yohu-icon {
+.yohu-segmented[data-icon-size="sm"] .yohu-icon,
+.yohu-segmented[data-icon-size="sm"] .yohu-segmented__image {
   width: var(--yohu-layout-icon-sm);
   height: var(--yohu-layout-icon-sm);
 }
 
-.yohu-segmented[data-icon-size="md"] .yohu-icon {
+.yohu-segmented[data-icon-size="md"] .yohu-icon,
+.yohu-segmented[data-icon-size="md"] .yohu-segmented__image {
   width: var(--yohu-layout-icon-md);
   height: var(--yohu-layout-icon-md);
+}
+
+.yohu-segmented__image {
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .yohu-segmented__label {
@@ -75,20 +137,30 @@
   white-space: nowrap;
 }
 
-.yohu-segmented[data-paint="tab-surface"] .yohu-segmented__item[data-selected] {
-  color: var(--yohu-fg);
+.yohu-segmented__item:not([data-selected]):not(:disabled):hover {
+  background: var(--yohu-state-hover);
 }
 
-.yohu-segmented[data-paint="capsule-accent"] .yohu-segmented__item[data-selected] {
-  color: var(--yohu-fg-on);
+.yohu-segmented__item:not([data-selected]):not(:disabled):active {
+  background: var(--yohu-state-pressed);
 }
 
-.yohu-segmented__item:not(:disabled):hover {
-  color: var(--yohu-fg);
+.yohu-segmented__item[data-selected] {
+  color: var(--yohu-segmented-on);
 }
 
-.yohu-segmented[data-paint="capsule-accent"] .yohu-segmented__item[data-selected]:not(:disabled):hover {
-  color: var(--yohu-fg-on);
+.yohu-segmented[data-fill-owner="item"] .yohu-segmented__item[data-selected] {
+  background: var(--yohu-segmented-item-fill);
+}
+
+.yohu-segmented[data-fill-owner="item"] .yohu-segmented__item[data-selected]:not(:disabled):hover {
+  background: var(--yohu-segmented-item-fill);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
+}
+
+.yohu-segmented[data-fill-owner="item"] .yohu-segmented__item[data-selected]:not(:disabled):active {
+  background: var(--yohu-segmented-item-fill);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-segmented__item:disabled {

@@ -21,29 +21,25 @@ describe("button-policy", () => {
     });
   });
 
-  it("缺省宿主属性是主按钮涂装", () => {
+  it("缺省宿主属性是主按钮涂装，不写 ink / flush", () => {
     expect(buttonHostAttrs({})).toEqual({
       "data-variant": "solid",
       "data-tone": "accent",
       "data-size": "md",
       "data-paint": "solid-on",
-      "data-ink": undefined,
-      "data-flush": undefined,
       disabled: false,
       "aria-busy": undefined,
     });
   });
 
-  it("ink + flush 只写 data-ink/data-flush，不改 paint", () => {
+  it("ghost + neutral 只写涂装，没有 data-ink / data-flush", () => {
     const attrs = buttonHostAttrs({
       variant: "ghost",
       tone: "neutral",
-      ink: true,
-      flush: true,
     });
     expect(attrs["data-paint"]).toBe("ghost-neutral");
-    expect(attrs["data-ink"]).toBe("inherit");
-    expect(attrs["data-flush"]).toBe("");
+    expect(attrs).not.toHaveProperty("data-ink");
+    expect(attrs).not.toHaveProperty("data-flush");
   });
 
   it("outlined + neutral 对应旧 secondary", () => {

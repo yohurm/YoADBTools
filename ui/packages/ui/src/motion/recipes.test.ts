@@ -93,20 +93,59 @@ describe("motion recipes", () => {
       collapse.indexOf(".yohu-collapse[data-recipe=\"panel\"]"),
       collapse.indexOf("配方 fill"),
     );
-    expect(panel).toContain(".yohu-collapse__inner > *");
+    expect(panel).toContain(".yohu-collapse__content");
     expect(panel).toContain("translateY(var(--yohu-space-xs))");
-    const panelHost = panel.slice(0, panel.indexOf(".yohu-collapse__inner > *"));
+    expect(panel).not.toContain(".yohu-collapse__inner > *");
+    const panelHost = panel.slice(0, panel.indexOf(".yohu-collapse__content"));
     expect(panelHost).not.toContain("overflow: hidden");
     expect(panelHost).not.toContain("transform:");
+    expect(panelHost).not.toContain("--yohu-collapse-rows-transition");
+    expect(panelHost).toContain("grid-template-rows var(--yohu-motion-spatial-panel)");
   });
 
-  it("fill 内层 column flex，直接子级填满可收缩，高度仍 0fr/1fr", () => {
+  it("YoTravel 当拍 used，双轴同 spec，不点 Dialog", () => {
+    const css = loadMotionCss();
+    const travel = css.slice(css.indexOf("YoTravel"));
+    const untilFill = travel.slice(0, travel.indexOf("配方 fill"));
+    expect(untilFill).toContain(".yohu-travel[data-ready][data-axis-block]");
+    expect(untilFill).toContain(".yohu-travel[data-ready][data-axis-inline]");
+    expect(untilFill).toContain("height var(--yohu-motion-spatial-panel)");
+    expect(untilFill).toContain("width var(--yohu-motion-spatial-panel)");
+    expect(untilFill).toContain("overflow: hidden");
+    expect(untilFill).not.toContain("yohu-dialog");
+    expect(untilFill).not.toContain('[data-travel="hold"]');
+    expect(untilFill).not.toContain("requestAnimationFrame");
+    expect(css).toContain('.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"]');
+    expect(css).toContain("overflow: clip");
+  });
+
+  it("YoReveal 绘制轴始终绝对定位，出流不自裁，不淡入不插行", () => {
+    const css = loadMotionCss();
+    const reveal = css.slice(css.indexOf("YoReveal"));
+    const untilFill = reveal.slice(0, reveal.indexOf("YoTravel"));
+    expect(untilFill).toContain('.yohu-reveal[data-layout="out"]');
+    expect(untilFill).toContain('.yohu-reveal[data-layout="in"]');
+    expect(untilFill).toContain("height: 0");
+    expect(untilFill).toContain("min-height: 0");
+    expect(untilFill).toContain("--yohu-reveal-span");
+    expect(untilFill).toContain("overflow: visible");
+    expect(untilFill).not.toContain("overflow: hidden");
+    expect(untilFill).toContain(".yohu-reveal__content");
+    expect(untilFill).toContain("position: absolute");
+    expect(untilFill).not.toContain("opacity");
+    expect(untilFill).not.toContain("translateY");
+    expect(untilFill).not.toContain("grid-template-rows");
+    expect(css).not.toContain('[data-recipe="clip"]');
+  });
+
+  it("fill 内层 column flex，__content 填满可收缩，高度仍 0fr/1fr", () => {
     const css = loadMotionCss();
     const fill = css.slice(css.indexOf("配方 fill"));
     const untilRail = fill.slice(0, fill.indexOf(".yohu-recipe-rail"));
     expect(untilRail).toContain('.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner');
     expect(untilRail).toContain("flex-direction: column");
-    expect(untilRail).toContain(".yohu-collapse__inner > *");
+    expect(untilRail).toContain(".yohu-collapse__content");
+    expect(untilRail).not.toContain(".yohu-collapse__inner > *");
     expect(untilRail).toContain("flex: 1");
     expect(untilRail).toContain("min-height: 0");
     expect(untilRail).not.toContain("grid-template-rows");
@@ -142,7 +181,7 @@ describe("motion recipes", () => {
     expect(untilIndicator).not.toMatch(/\b\d+ms\b/);
   });
 
-  it("换位行铬在 L1，reduce 覆盖邻行让位与 Chip hover 关闭", () => {
+  it("换位行铬在 L1，reduce 覆盖邻行让位", () => {
     const css = loadMotionCss();
     const chrome = css.slice(css.indexOf("配方换位行铬"));
     const untilReduce = chrome.slice(0, chrome.indexOf("reduced-motion"));
@@ -157,7 +196,7 @@ describe("motion recipes", () => {
 
     const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(reduce).toContain("[data-reordering] > * > [data-key]:not([data-reorder=\"source\"])");
-    expect(reduce).toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
+    expect(reduce).not.toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
     expect(reduce).toContain(".yohu-recipe-reorder-bar[data-ready]");
     expect(reduce).toContain(".yohu-recipe-reorder-overlay[data-ready]");
     expect(reduce).not.toContain(".yohu-virtual-list[data-reordering] .yohu-virtual-list__row");

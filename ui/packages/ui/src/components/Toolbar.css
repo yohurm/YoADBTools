@@ -1,17 +1,29 @@
 .yohu-toolbar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: nowrap;
   flex-shrink: 0;
-  gap: var(--yohu-space-sm);
   min-height: var(--yohu-control-height);
   overflow-x: auto;
   box-sizing: border-box;
 }
 
-.yohu-toolbar[data-chrome="band"] {
-  background: var(--yohu-surface-2);
-  border-radius: var(--yohu-radius-sm);
+.yohu-toolbar[data-chrome="band"] .yohu-toolbar__chrome {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: transparent;
+}
+
+.yohu-toolbar__chrome {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+
+.yohu-toolbar__chrome .yohu-corner__content {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  min-height: var(--yohu-control-height);
 }
 
 .yohu-toolbar[data-pad="band"] {

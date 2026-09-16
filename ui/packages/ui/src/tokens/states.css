@@ -2,7 +2,6 @@
  * 交互态单源（UI设计系统-v6.md §2.7）
  * 列表 / 树 / 菜单 / 导航 / 命令库 / 命令管理 只加 .yohu-interactive--selected，禁止再写选中底或选中字色。
  * 语义色逃生：.yohu-badge / .yohu-tone。
- * 语义 ink：.yohu-ink（把 --yohu-log-ink 桥到按钮 inherit 的 ink/fill；按下反色在 inherit）。
  * 子树可覆盖 --yohu-ripple-radius / --yohu-ripple-inset，不得另起配方。
  * ========================================================================== */
 
@@ -46,9 +45,7 @@
   color: var(--yohu-state-selected-fg);
 }
 
-.yohu-interactive--selected *:not(.yohu-badge):not(.yohu-badge *):not(.yohu-tone):not(.yohu-tone *) {
-  color: var(--yohu-state-selected-fg);
-}
+/* 软底选中不洗白子树。.yohu-badge / .yohu-tone 保持自身色。 */
 
 .yohu-interactive--selected::before,
 .yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])::before,
@@ -58,11 +55,13 @@
 }
 
 .yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])::before {
-  background: var(--yohu-accent-hover);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
 .yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])::before {
-  background: var(--yohu-accent-pressed);
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 /* 连续选中：邻接边削平圆角，合成一块。行间线仍走 VirtualList tone=list。 */
@@ -80,28 +79,36 @@
   border-start-end-radius: 0;
 }
 
-.yohu-focus-ring:focus-visible {
-  outline: var(--yohu-focus-width) solid var(--yohu-focus-ring);
-  outline-offset: var(--yohu-focus-offset);
+/* 焦点框：Tab 才画（html[data-yohu-focus=keyboard]）。::after 跟宿主 border-radius，禁止 outline 直角。 */
+.yohu-focus-ring,
+.yohu-focus-host {
+  position: relative;
+  outline: none;
+  border-radius: var(--yohu-radius-sm);
 }
 
-.yohu-focus-ring--inset:focus-visible {
-  outline: var(--yohu-focus-width) solid var(--yohu-focus-ring);
-  outline-offset: var(--yohu-focus-offset-inset);
+.yohu-focus-ring--inset {
+  outline: none;
+  border-radius: var(--yohu-radius-sm);
 }
 
-.yohu-focus-host:focus-within:has(:focus-visible) {
-  outline: var(--yohu-focus-width) solid var(--yohu-focus-ring);
-  outline-offset: var(--yohu-focus-offset);
+html[data-yohu-focus="keyboard"] .yohu-focus-ring:focus-visible::after,
+html[data-yohu-focus="keyboard"] .yohu-focus-ring--inset:focus-visible::after,
+html[data-yohu-focus="keyboard"] .yohu-focus-host:focus-within:has(:focus-visible)::after {
+  content: "";
+  position: absolute;
+  border: var(--yohu-focus-width) solid var(--yohu-focus-ring);
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 2;
 }
 
-.yohu-focus-host--inset:focus-within:has(:focus-visible) {
-  outline: var(--yohu-focus-width) solid var(--yohu-focus-ring);
-  outline-offset: var(--yohu-focus-offset-inset);
+html[data-yohu-focus="keyboard"] .yohu-focus-ring:focus-visible::after,
+html[data-yohu-focus="keyboard"] .yohu-focus-host:focus-within:has(:focus-visible)::after {
+  inset: calc(-1 * var(--yohu-focus-width) - var(--yohu-focus-offset));
 }
 
-/* 语义 ink → 按钮 inherit。选中只认 aria-pressed；反色不在本层再写一遍。 */
-.yohu-ink {
-  --yohu-button-ink: var(--yohu-log-ink);
-  --yohu-button-fill: var(--yohu-log-ink);
+html[data-yohu-focus="keyboard"] .yohu-focus-ring--inset:focus-visible::after {
+  inset: calc(-1 * var(--yohu-focus-offset-inset) - var(--yohu-focus-width));
 }

@@ -377,7 +377,9 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 | 最大高度 | = 0.9 ×（屏幕高 − 信号栏 − 导航栏） |
 | 按钮布局 | ≤3 个左右布局；>3 个改上下（从下至上） |
 | 电脑设备 | 宽度固定不随父窗变；自带阴影（获焦/失焦区分层级）；最小 **360×240vp**，最大 ≤ 当前窗口 |
-| 电脑圆角 | 更小圆角 |
+| 电脑圆角 | 更小圆角（Yohu：`YoCorner role=dialog` = 16vp，手机 32vp） |
+
+YoDialog 落地：标题居中、无分割线、操作区 AUTO。官方确认框脚钮是 NORMAL（灰底 + 蓝取消 / 红删除字），不是 TEXTUAL 透明；带输入框时确认 EMPHASIZED，无内容置灰。圆角走独立 `corner/` 算法绘制（四分之一圆 + 内侧描边），禁止 CSS border 叠 overflow 出毛边。整页对话框（命令管理）不铺满按钮。YoButton 字重 Medium，圆角 `role=control` = 8vp。
 
 ### 6.7 半模态面板（Sheet）
 
@@ -394,7 +396,7 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 | 组件 | 关键规格 |
 |------|----------|
 | **开关 Switch** | 手柄 + 滑块，开启态品牌色反馈；重要功能切换加确认；关联列表项未激活置灰（具体尺寸见控件图，文档未给数值） |
-| **分段按钮** | V2：页签型默认**白选择块** + 32vp 圆角 + XS 阴影（`YoSegmentedButton type=tab`）；胶囊型强调色块（`type=capsule`）。多会话栏仍走 `YoTabs`。手机 ≤5、大屏 ≤7；最大宽 448vp；不用作一级导航与编辑 |
+| **分段按钮** | 官方三种：页签单选（白选择块）、胶囊单选（蓝选择块）、胶囊多选（`multiply`，共轨、相邻选中连成一块）。电脑**小圆角**。内容：纯文本 / 纯图标 / 纯图片 / 图文（图标在上）。`YoSegmentedButton`：`type=tab\|capsule` + `multiple`（仅 capsule）；项可 `selectedIcon` / `image`；未选字色 `item.ink`，选中填 `item.fill`（鸿蒙 `selectedBackgroundColor`）。选中 hover 叠 state，不换 accent-hover 实底。多会话栏仍走 `YoTabs`。手机 ≤5、大屏 ≤7；最大宽 448vp；不用作一级导航与编辑 |
 | **文本框** | 单行/多行（最大 **10 行**）/全宽/内联；占位符精简；错误实时提示 + `showError`；字符计数器（超长抖动变红）；密码掩码 |
 | **搜索框** | 基础 / 基础+搜索键 / 标题栏入口；右侧默认仅语音图标；输入后出现清除按钮；电脑小圆角，可折叠为图标 |
 
@@ -452,7 +454,7 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 ### 7.4 状态栏 / 键盘 / 鼠标
 
 - **状态栏**：沉浸一体化背景（不单独切割），按区域背景选黑/白字保证易读，避免左右半区差异过大的背景色。
-- **键盘优先**：主要任务流支持 Tab/方向键/Space/Enter/Shift+F10 焦点导航；通用快捷键沿用系统（Ctrl+C/V/X/Z）。
+- **键盘优先**：主要任务流支持 Tab/方向键/Space/Enter/Shift+F10 焦点导航；通用快捷键沿用系统（Ctrl+C/V/X/Z）。焦点框只在 Tab 激活（`bindFocusModality` / `html[data-yohu-focus=keyboard]`），方向键不激活，指针卸掉。
 - **鼠标/触控板**：可交互控件必须响应悬浮反馈；多选支持框选/连选（Shift）/点选（Ctrl）；滚动/缩放/拖移/右键上下文菜单均需可用。
 - **点击热区**：触屏 ≥40×40vp（推荐 48×48vp）；电脑键鼠 ≥5mm、触屏 ≥7mm。
 
@@ -497,7 +499,8 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 | `background_secondary` 雪域灰 / `#191A1C` | `--yohu-bg-base` |
 | `comp_background_primary` | `--yohu-surface` |
 | `comp_emphasize_secondary` 20% | `--yohu-accent-soft`（徽章/芯片） |
-| `interactive_active` 品牌实底 | `--yohu-state-selected` + `--yohu-state-selected-fg`（全表面选中） |
+| `interactive_select` 品牌 20% | `--yohu-state-selected` + `--yohu-state-selected-fg`（列表/导航/树选中软底） |
+| `interactive_active` 品牌实底 | 按钮 / 开关 / 级别格按下，不进列表选中 |
 | `interactive_hover` 5% / `pressed` 10% | `--yohu-state-hover` / `--yohu-state-pressed`（中性叠色，深浅分板） |
 | `comp_divider` 20% | `--yohu-border` |
 | 圆角 4/8/16/20/32vp | `--yohu-radius-xs`…`xl` |

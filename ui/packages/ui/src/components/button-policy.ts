@@ -38,8 +38,6 @@ export interface ButtonHostAttrs {
   "data-tone": YoButtonTone;
   "data-size": YoButtonSize;
   "data-paint": ButtonPaintKind;
-  "data-ink": "inherit" | undefined;
-  "data-flush": "" | undefined;
   disabled: boolean;
   "aria-busy": true | undefined;
 }
@@ -52,8 +50,6 @@ export function buttonHostAttrs(input: ButtonInput & ButtonInteractiveInput): Bu
     "data-tone": spec.tone,
     "data-size": spec.size,
     "data-paint": buttonPaintKind(spec),
-    "data-ink": spec.ink === "inherit" ? "inherit" : undefined,
-    "data-flush": spec.flush ? "" : undefined,
     disabled: interactive.disabled,
     "aria-busy": interactive.busy ? true : undefined,
   };

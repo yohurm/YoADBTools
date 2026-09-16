@@ -13,10 +13,6 @@
   font-family: var(--yohu-font-sans);
 }
 
-.yohu-form-row + .yohu-form-row {
-  border-top: var(--yohu-stroke-hairline) solid var(--yohu-border);
-}
-
 .yohu-form-row__info {
   display: flex;
   flex-direction: column;

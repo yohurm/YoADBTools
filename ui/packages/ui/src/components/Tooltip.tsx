@@ -10,6 +10,7 @@
 import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
+import { YoCorner } from "../corner";
 import { YoPresence } from "../motion/presence";
 import type { MotionSpecName } from "../tokens/motion";
 import type { PopoverPlacement } from "./popover-place";
@@ -143,15 +144,17 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
               data-placement={placement()}
               role="tooltip"
             >
-              <div
-                ref={(el) => {
-                  contentRef = el;
-                  if (el) layout();
-                }}
-                class="yohu-tooltip__content"
-              >
-                {paint()?.content ?? ""}
-              </div>
+              <YoCorner role="control" class="yohu-tooltip__chrome">
+                <div
+                  ref={(el) => {
+                    contentRef = el;
+                    if (el) layout();
+                  }}
+                  class="yohu-tooltip__content"
+                >
+                  {paint()?.content ?? ""}
+                </div>
+              </YoCorner>
               <span class="yohu-tooltip__arrow" aria-hidden="true" />
             </div>
           </div>

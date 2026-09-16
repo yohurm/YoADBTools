@@ -5,6 +5,19 @@ import { YoPresence } from "./presence";
 import { YoCollapse } from "./collapse";
 
 describe("YoPresence", () => {
+  it("when 从 false 到 true 同拍挂载，data-state=open", () => {
+    const [open, setOpen] = createSignal(false);
+    render(() => (
+      <YoPresence when={open()} recipe="dialog">
+        <div role="dialog">面板</div>
+      </YoPresence>
+    ));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    setOpen(true);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.querySelector(".yohu-presence")?.getAttribute("data-state")).toBe("open");
+  });
+
   it("when=true 渲染子节点并带 data-state=open", () => {
     render(() => (
       <YoPresence when recipe="dialog">
@@ -84,6 +97,7 @@ describe("YoCollapse", () => {
     const root = document.querySelector(".yohu-collapse");
     expect(root?.getAttribute("data-open")).toBe("false");
     expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
+    expect(root?.querySelector(".yohu-collapse__content")?.textContent).toBe("折叠内容");
     setOpen(true);
     expect(root?.getAttribute("data-open")).toBe("true");
     expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBeNull();

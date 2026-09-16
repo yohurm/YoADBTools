@@ -1,10 +1,16 @@
 /**
  * YoButton —— 通用按钮（L4 视图）。
+ * HarmonyOS 对照：ButtonStyleMode EMPHASIZED / NORMAL / TEXTUAL
+ * → solid-on / ghost-tone（灰底+语义字）与 solid-neutral / ghost-neutral。
+ * 弹出框脚钮走 NORMAL（ghost+accent/danger），不是 TEXTUAL 透明。
  * 外形 / 语义色 / 禁用由 button-model + button-policy 决定；本文件只绑属性与内容区。
- * 纯文案走 YoSwap；加载环走 tokens/motion.css 的 yohu-spin。
+ * 纯文案走公开 YoSwap `anchor="center"`；加载环走 tokens/motion.css 的 yohu-spin。
+ * 宿主是 button；YoCorner 只 paint。文案在 `__label` hug，禁止 clip-path 裁字。
+ * paint 声明描边几何；实心底默认 `--yohu-corner-stroke: transparent`，色只走 CSS。
  */
 import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import { resolveText } from "../dom/text";
 import { YoSwap } from "../motion/swap";
 import type { YoButtonSize, YoButtonTone, YoButtonVariant } from "./button-model";
@@ -20,10 +26,6 @@ export interface YoButtonProps {
   tone?: YoButtonTone;
   /** 尺寸 */
   size?: YoButtonSize;
-  /** 字色 / 按下实底消费父级 `--yohu-button-ink` / `--yohu-button-fill`；按下字走 `fg-on`；未选悬浮走 `--yohu-state-hover` */
-  ink?: boolean;
-  /** 铺满父级交叉轴，自隐边框与圆角（组内容单元） */
-  flush?: boolean;
   /** 加载态（spinner + 禁用 + aria-busy） */
   loading?: boolean;
   /** 禁用 */
@@ -41,11 +43,21 @@ export interface YoButtonProps {
   children: JSX.Element;
 }
 
-/** 渲染按钮。内容区 = spinner + 文案/复合 children，圆角内裁剪。 */
+/** 渲染按钮。内容区 = spinner + 文案/复合 children；圆角只铺底。 */
 export function YoButton(props: YoButtonProps): JSX.Element {
   const resolved = children(() => props.children);
   const text = createMemo(() => resolveText(resolved()));
   const host = createMemo(() => buttonHostAttrs(props));
+  const body = () => (
+    <>
+      {props.loading ? <span class="yohu-button__spinner" aria-hidden="true" /> : null}
+      <Show when={text() !== null} fallback={resolved()}>
+        <YoSwap keys={text() as string} anchor="center">
+          {text()}
+        </YoSwap>
+      </Show>
+    </>
+  );
 
   return (
     <button
@@ -55,8 +67,6 @@ export function YoButton(props: YoButtonProps): JSX.Element {
       data-tone={host()["data-tone"]}
       data-size={host()["data-size"]}
       data-paint={host()["data-paint"]}
-      data-ink={host()["data-ink"]}
-      data-flush={host()["data-flush"]}
       disabled={host().disabled}
       aria-busy={host()["aria-busy"]}
       aria-expanded={props["aria-expanded"]}
@@ -64,10 +74,8 @@ export function YoButton(props: YoButtonProps): JSX.Element {
       aria-label={props["aria-label"]}
       onClick={props.onClick}
     >
-      {props.loading ? <span class="yohu-button__spinner" aria-hidden="true" /> : null}
-      <Show when={text() !== null} fallback={resolved()}>
-        <YoSwap keys={text() as string}>{text()}</YoSwap>
-      </Show>
+      <YoCorner mode="paint" role="control" stroke class="yohu-button__chrome" />
+      <span class="yohu-button__label">{body()}</span>
     </button>
   );
 }

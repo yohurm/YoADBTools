@@ -55,4 +55,9 @@ describe("YoFormRow", () => {
     expect(css).not.toContain("data-control-fill");
     expect(css).not.toMatch(/\.yohu-form-row__control[\s\S]*?flex:\s*1 1 auto/);
   });
+
+  it("相邻行不画分割线", () => {
+    expect(css).not.toContain(".yohu-form-row + .yohu-form-row");
+    expect(css).not.toMatch(/border-top:\s*var\(--yohu-stroke-hairline\)/);
+  });
 });

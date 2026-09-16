@@ -14,6 +14,7 @@ import {
   menuKeyIntent,
   nextTypeaheadQuery,
 } from "../context-menu/menu-key-policy";
+import { YoCorner } from "../corner";
 import { YoPresence } from "../motion/presence";
 import "./ContextMenu.css";
 
@@ -132,31 +133,33 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
         role="menu"
         style={{ left: `${props.x}px`, top: `${props.y}px` }}
       >
-        <For each={props.items}>
-          {(item, index) => {
-            const attrs = () => menuItemHostAttrs(item, index() === focusIndex());
-            return (
-              <button
-                type="button"
-                role={attrs().role}
-                class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
-                data-tone={attrs()["data-tone"]}
-                data-slot={attrs()["data-slot"]}
-                disabled={attrs().disabled}
-                tabindex={attrs().tabindex}
-                onClick={() => {
-                  if (item.disabled) return;
-                  props.onSelect(item.id);
-                  props.onClose();
-                }}
-              >
-                <span class="yohu-context-menu__slot" data-slot="label">
-                  {item.label}
-                </span>
-              </button>
-            );
-          }}
-        </For>
+        <YoCorner role="control" class="yohu-context-menu__chrome">
+          <For each={props.items}>
+            {(item, index) => {
+              const attrs = () => menuItemHostAttrs(item, index() === focusIndex());
+              return (
+                <button
+                  type="button"
+                  role={attrs().role}
+                  class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
+                  data-tone={attrs()["data-tone"]}
+                  data-slot={attrs()["data-slot"]}
+                  disabled={attrs().disabled}
+                  tabindex={attrs().tabindex}
+                  onClick={() => {
+                    if (item.disabled) return;
+                    props.onSelect(item.id);
+                    props.onClose();
+                  }}
+                >
+                  <span class="yohu-context-menu__slot" data-slot="label">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            }}
+          </For>
+        </YoCorner>
       </div>
     </YoPresence>
   );

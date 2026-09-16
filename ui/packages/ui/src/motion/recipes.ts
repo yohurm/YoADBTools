@@ -18,7 +18,7 @@ export function presenceClipProperty(
   return null;
 }
 
-/** Collapse 配方名（与 motion.css data-recipe 对齐）。 */
+/** Collapse 配方名（与 motion.css data-recipe 对齐）。对话框名单走 YoReveal，不在此列。 */
 export type CollapseRecipe = "collapse" | "panel" | "fill";
 
 /**
@@ -45,6 +45,9 @@ export const PRESENCE_EXIT_SAFETY_MS = 50;
 
 /** 按钮文案槽：与侧栏/预览栏同一 spatial-panel 宽度过渡。 */
 export const SWAP_DURATION: MotionDurationName = MotionSpec.spatialPanel.duration;
+
+/** 尺寸行程：与 rail / swap 同一 spatial-panel。 */
+export const TRAVEL_SPEC = "spatialPanel" as const;
 
 /** 选中滑块位移默认档：邻项 150ms 弹簧；短跳/跨栏由 YoIndicator 按行程改写。 */
 export const INDICATOR_DURATION: MotionDurationName = MotionSpec.spatialSmall.duration;

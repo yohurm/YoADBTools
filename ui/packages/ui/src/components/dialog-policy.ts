@@ -1,6 +1,6 @@
 /**
  * 对话框策略门面（L3）。
- * 栈与焦点陷阱已在 dialog-stack / dialog-focus；本文件只装配 attach、开闭读取与内容区 data-*。
+ * 栈与焦点陷阱已在 dialog-stack / dialog-focus；本文件只装配 attach、开闭读取与内容区 / 操作区 data-*。
  * 禁止另起一套 Modal.confirm / 第二套 keydown。
  */
 
@@ -8,8 +8,10 @@ import type { Accessor } from "solid-js";
 
 import { dialogInitialFocus } from "./dialog-focus";
 import {
+  resolveDialogActionsLayout,
   resolveDialogBodySpec,
   resolveDialogExitLock,
+  type DialogActionsLayout,
   type DialogBodyInput,
   type DialogBoxLock,
   type DialogBodyRegion,
@@ -51,10 +53,37 @@ export function dialogBodyAttrs(input: DialogBodyInput): DialogBodyAttrs {
   };
 }
 
-/** 读面板最后一次打开盒。零盒不锁。 */
+export interface DialogActionsAttrs {
+  "data-layout": DialogActionsLayout;
+}
+
+/**
+ * 只数页脚 `button` 槽。不认 Button 类名，不穿 chrome。
+ * 容器走直接子节点；装配面走 children 列表。
+ */
+export function countDialogActions(source: ParentNode | ArrayLike<unknown>): number {
+  const nodes = source instanceof Node ? source.children : source;
+  let count = 0;
+  for (let i = 0; i < nodes.length; i += 1) {
+    const node = nodes[i];
+    if (node instanceof HTMLButtonElement) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** 操作区 AUTO 写成 data-layout；CSS 只认 center | row | stack。 */
+export function dialogActionsAttrs(count: number): DialogActionsAttrs {
+  return { "data-layout": resolveDialogActionsLayout(count) };
+}
+
+/** 读面板最后一次打开盒。优先 Travel 锁高（目标 px），否则 offset 布局高。零盒不锁。 */
 export function dialogExitLock(panel: HTMLElement): DialogBoxLock | undefined {
-  const rect = panel.getBoundingClientRect();
-  return resolveDialogExitLock(rect.width, rect.height);
+  const travel = panel.querySelector(":scope > .yohu-travel") as HTMLElement | null;
+  const locked = travel?.style.height ? Number.parseFloat(travel.style.height) : 0;
+  const height = locked > 0 ? locked : panel.offsetHeight;
+  return resolveDialogExitLock(panel.offsetWidth, height);
 }
 
 /** 入栈：先卸轻浮层，再在微任务里把焦点送进面板。返回 detach（出栈）。 */

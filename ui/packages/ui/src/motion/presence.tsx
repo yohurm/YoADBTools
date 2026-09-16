@@ -2,7 +2,7 @@
  * YoPresence —— 进场挂载、出场播完再卸载（动画系统-v6.md L2）。
  * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip 改为 grid 裁切）。
  */
-import { Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Show, createEffect, createRenderEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { motionDurationMs } from "../tokens/motion";
 import {
@@ -39,6 +39,20 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
     setExiting(false);
     props.onExitComplete?.();
   };
+
+  /**
+   * 进场：when 变 true 必须同拍挂载。
+   * Solid 文档：createEffect 在渲染完成后才跑；Show 只认 present() 会再等一拍 setPresent。
+   * 对照 corvu/Radix：visible = show || present。clip 配方仍由 createEffect 双 rAF。
+   */
+  createRenderEffect(() => {
+    if (!props.when) return;
+    setPresent(true);
+    setExiting(false);
+    const recipe = props.recipe ?? "fade";
+    if (presenceUsesClip(recipe) && !shouldSkipMotion()) return;
+    setState("open");
+  });
 
   createEffect(() => {
     const want = props.when;
@@ -99,7 +113,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   const recipe = () => props.recipe ?? "fade";
 
   return (
-    <Show when={present()}>
+    <Show when={props.when || present()}>
       <div
         ref={(el) => {
           host = el;

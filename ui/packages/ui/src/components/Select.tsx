@@ -14,6 +14,7 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
+import { YoCorner } from "../corner";
 import { Icon } from "../icons";
 import { YoIndicator } from "../motion/indicator";
 import { YoPresence } from "../motion/presence";
@@ -175,15 +176,17 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         onClick={openMenu}
         onKeyDown={onTriggerKeyDown}
       >
-        <span
-          class="yohu-select__value"
-          data-placeholder={selected() ? undefined : ""}
-        >
-          {selected()?.label ?? props.placeholder ?? ""}
-        </span>
-        <span class="yohu-select__chevron" aria-hidden="true">
-          <Icon name="chevron-down" size={Layout.IconInline} />
-        </span>
+        <YoCorner role="control" class="yohu-select__chrome">
+          <span
+            class="yohu-select__value"
+            data-placeholder={selected() ? undefined : ""}
+          >
+            {selected()?.label ?? props.placeholder ?? ""}
+          </span>
+          <span class="yohu-select__chevron" aria-hidden="true">
+            <Icon name="chevron-down" size={Layout.IconInline} />
+          </span>
+        </YoCorner>
       </button>
       <Portal mount={document.body}>
         <YoPresence when={open()} recipe="popover">
@@ -206,25 +209,27 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
               data-placement={placement()}
               role="listbox"
             >
-              <YoIndicator follow={props.value} variant="fill" />
-              <For each={props.options}>
-                {(option, index) => (
-                  <div
-                    id={optionDomId(option.value)}
-                    class="yohu-select__option yohu-interactive"
-                    classList={{
-                      "yohu-interactive--selected": option.value === props.value,
-                      "yohu-interactive--active": index() === activeIndex(),
-                    }}
-                    role="option"
-                    aria-selected={option.value === props.value}
-                    onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: applySelectHover(index()) }))}
-                    onClick={() => commitValue(option.value)}
-                  >
-                    <span class="yohu-select__option-label">{option.label}</span>
-                  </div>
-                )}
-              </For>
+              <YoCorner role="control" class="yohu-select__menu-chrome">
+                <YoIndicator follow={props.value} variant="fill" />
+                <For each={props.options}>
+                  {(option, index) => (
+                    <div
+                      id={optionDomId(option.value)}
+                      class="yohu-select__option yohu-interactive"
+                      classList={{
+                        "yohu-interactive--selected": option.value === props.value,
+                        "yohu-interactive--active": index() === activeIndex(),
+                      }}
+                      role="option"
+                      aria-selected={option.value === props.value}
+                      onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: applySelectHover(index()) }))}
+                      onClick={() => commitValue(option.value)}
+                    >
+                      <span class="yohu-select__option-label">{option.label}</span>
+                    </div>
+                  )}
+                </For>
+              </YoCorner>
             </div>
           </div>
         </YoPresence>

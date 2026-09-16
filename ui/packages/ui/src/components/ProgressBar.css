@@ -1,15 +1,26 @@
 .yohu-progress {
   position: relative;
+  display: flex;
   width: 100%;
   height: var(--yohu-space-xs);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface-2);
+  background-color: transparent;
+  overflow: visible;
+}
+
+.yohu-progress__chrome {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: transparent;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.yohu-progress__chrome .yohu-corner__content {
   overflow: hidden;
 }
 
 .yohu-progress__bar {
   height: 100%;
-  border-radius: var(--yohu-radius-sm);
   background-color: var(--yohu-accent);
   transition: width var(--yohu-dur-progress) var(--yohu-ease-standard);
 }

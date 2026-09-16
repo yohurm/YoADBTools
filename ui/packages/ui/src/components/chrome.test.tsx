@@ -65,6 +65,7 @@ describe("YoChrome", () => {
     expect(css).toMatch(/padding-bottom:\s*var\(--yohu-layout-chrome-pad\)/);
     const chromeBlock = css.match(/\.yohu-chrome\s*\{[^}]+\}/)?.[0] ?? "";
     expect(chromeBlock).not.toMatch(/min-height/);
+    expect(chromeBlock).not.toMatch(/border-bottom/);
   });
 
   it("extra 落在次行，不进主行功能栏", () => {

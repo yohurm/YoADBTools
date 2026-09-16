@@ -23,6 +23,7 @@ const YO_PUBLIC = [
   "YoToolbar",
   "YoTabs",
   "YoTree",
+  "YoScroller",
   "YoVirtualList",
   "YoReorderList",
   "YoColResizer",
@@ -34,6 +35,7 @@ const YO_PUBLIC = [
   "YoPanel",
   "YoPage",
   "YoFormRow",
+  "YoCorner",
 
   // 反馈
   "YoEmptyState",
@@ -47,6 +49,8 @@ const YO_PUBLIC = [
   "YoPresence",
   "YoListPresence",
   "YoCollapse",
+  "YoReveal",
+  "YoTravel",
   "YoSwap",
   "YoIndicator",
   // 窗口铬
@@ -91,6 +95,12 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("ReorderBinder");
     expect(index).not.toContain("createReorderBinder");
     expect(index).not.toContain("dropIndexFromCenters");
+    expect(index).not.toContain("YOHU_FOCUS_ATTR");
+    expect(index).not.toContain("YOHU_FOCUS_KEYBOARD");
+    expect(index).not.toContain("YoChipDismiss");
+    expect(index).not.toContain("bindTravel");
+    expect(index).not.toContain("bindHugTravel");
+    expect(index).not.toContain("TravelRoot");
   });
 
   it("公开 Controller / Toaster 只有模块契约字段", () => {

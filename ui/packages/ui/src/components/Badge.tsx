@@ -4,6 +4,7 @@
  */
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { CornerPillRadius, YoCorner } from "../corner";
 import type { YoBadgeTone } from "./badge-model";
 import { badgeHostAttrs } from "./badge-policy";
 import "./Badge.css";
@@ -22,7 +23,9 @@ export function YoBadge(props: YoBadgeProps): JSX.Element {
   const host = createMemo(() => badgeHostAttrs(props));
   return (
     <span class="yohu-badge" data-tone={host()["data-tone"]} aria-label={host()["aria-label"]}>
-      {props.text}
+      <YoCorner role="control" radius={CornerPillRadius} class="yohu-badge__chrome">
+        {props.text}
+      </YoCorner>
     </span>
   );
 }

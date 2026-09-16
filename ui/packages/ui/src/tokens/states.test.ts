@@ -42,14 +42,21 @@ describe("yohu-interactive 叠层契约", () => {
     expect(statesCss).toContain(".yohu-tone");
   });
 
-  it("语义 ink 只桥 log-ink → 按钮 inherit，不在本层写 invert", () => {
-    expect(statesCss).toContain(".yohu-ink {");
-    expect(statesCss).toContain("--yohu-button-ink: var(--yohu-log-ink)");
-    expect(statesCss).toContain("--yohu-button-fill: var(--yohu-log-ink)");
-    expect(statesCss).not.toContain('.yohu-ink[data-paint');
-    expect(statesCss).not.toContain("color-mix");
+  it("不再桥 log-ink 到按钮 inherit", () => {
+    expect(statesCss).not.toContain(".yohu-ink");
+    expect(statesCss).not.toContain("--yohu-button-ink");
+    expect(statesCss).not.toContain("--yohu-button-fill");
     expect(statesCss).not.toContain("ink-wash");
+    expect(statesCss).not.toContain("color-mix");
     expect(statesCss).not.toContain("--yohu-button-soft");
+  });
+
+  it("焦点环 Tab 才画，跟宿主圆角，禁止 outline 直角", () => {
+    expect(statesCss).toContain('html[data-yohu-focus="keyboard"]');
+    expect(statesCss).toContain("border-radius: inherit");
+    expect(statesCss).toContain("border: var(--yohu-focus-width) solid var(--yohu-focus-ring)");
+    expect(statesCss).not.toMatch(/\.yohu-focus-ring:focus-visible\s*\{[^}]*outline:\s*var\(--yohu-focus-width\)/);
+    expect(statesCss).not.toContain("yohu-focus-host--inset");
   });
 
   it("连续选中削平邻接圆角，不另画项间分割线", () => {

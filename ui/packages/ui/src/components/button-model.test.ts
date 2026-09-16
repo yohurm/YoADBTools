@@ -11,13 +11,11 @@ import {
 } from "./button-model";
 
 describe("button-model", () => {
-  it("缺省是 solid + accent + md，ink=tone，不 flush", () => {
+  it("缺省是 solid + accent + md", () => {
     expect(resolveButtonSpec({})).toEqual({
       variant: "solid",
       tone: "accent",
       size: "md",
-      ink: "tone",
-      flush: false,
     });
   });
 
@@ -26,19 +24,14 @@ describe("button-model", () => {
       variant: "ghost",
       tone: "danger",
       size: "sm",
-      ink: "tone",
-      flush: false,
     });
   });
 
-  it("ink 与 flush 是独立契约，不改涂装轴", () => {
-    expect(resolveButtonSpec({ variant: "ghost", tone: "neutral", ink: true, flush: true })).toEqual({
-      variant: "ghost",
-      tone: "neutral",
-      size: "md",
-      ink: "inherit",
-      flush: true,
-    });
+  it("规格只有 variant × tone × size，没有 ink / flush", () => {
+    const spec = resolveButtonSpec({ variant: "ghost", tone: "neutral" });
+    expect(spec).toEqual({ variant: "ghost", tone: "neutral", size: "md" });
+    expect(spec).not.toHaveProperty("ink");
+    expect(spec).not.toHaveProperty("flush");
   });
 
   it("实心上墨：accent/danger 反色字，success/warning 语义字，neutral 次级底", () => {
@@ -76,7 +69,7 @@ describe("button-model", () => {
 
     for (const variant of BUTTON_VARIANTS) {
       for (const tone of BUTTON_TONES) {
-        expect(buttonPaintKind({ variant, tone, size: "md" })).toBe(matrix[variant][tone]);
+        expect(buttonPaintKind({ variant, tone })).toBe(matrix[variant][tone]);
       }
     }
   });

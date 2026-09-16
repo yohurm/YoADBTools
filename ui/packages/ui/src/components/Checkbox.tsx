@@ -5,6 +5,8 @@
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
+import { Radius } from "../tokens/radius";
 import { canCommitCheckboxChange, checkboxHostAttrs } from "./checkbox-policy";
 import "./Checkbox.css";
 
@@ -37,27 +39,29 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
       data-disabled={host()["data-disabled"]}
     >
       <span class="yohu-checkbox__box yohu-focus-host" data-paint={host()["data-paint"]}>
-        <input
-          type="checkbox"
-          class="yohu-checkbox__input"
-          checked={host()["data-checked"] === "true"}
-          disabled={host().disabled}
-          onChange={handleChange}
-        />
-        <Show when={host()["data-checked"] === "true"}>
-          <svg
-            class="yohu-checkbox__check"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width={3}
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </Show>
+        <YoCorner role="control" radius={Radius.Xs} class="yohu-checkbox__chrome">
+          <input
+            type="checkbox"
+            class="yohu-checkbox__input"
+            checked={host()["data-checked"] === "true"}
+            disabled={host().disabled}
+            onChange={handleChange}
+          />
+          <Show when={host()["data-checked"] === "true"}>
+            <svg
+              class="yohu-checkbox__check"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width={3}
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </Show>
+        </YoCorner>
       </span>
       <Show when={props.label}>
         <span class="yohu-checkbox__label">{props.label}</span>

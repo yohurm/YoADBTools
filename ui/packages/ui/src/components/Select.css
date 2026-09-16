@@ -12,24 +12,38 @@
 }
 
 .yohu-select__trigger {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  position: relative;
   display: inline-flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
+  align-items: stretch;
   box-sizing: border-box;
   width: max-content;
   max-width: 100%;
   /* min-width 必须在触发钮上：写在根上时短文案 hug 触发钮靠左，右侧留出空白，表单行看起来没贴右。 */
   min-width: calc(var(--yohu-space-xl) * 5);
   height: var(--yohu-control-height);
-  padding: 0 var(--yohu-space-sm);
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
+  padding: 0;
+  border: none;
+  background-color: transparent;
   color: var(--yohu-fg);
   font-family: inherit;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   cursor: pointer;
+}
+
+.yohu-select__chrome {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 0;
+}
+
+.yohu-select__chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  padding: 0 var(--yohu-space-sm);
 }
 
 .yohu-select[data-block] .yohu-select__trigger {
@@ -38,7 +52,7 @@
 }
 
 .yohu-select__trigger:not(:disabled):hover {
-  border-color: var(--yohu-splitter-hover);
+  --yohu-corner-stroke: var(--yohu-splitter-hover);
 }
 
 .yohu-select__value {
@@ -72,6 +86,8 @@
 
 /* 内容区：默认裁切、无滚动条。仅 data-overflow-y 时出现纵向条；横向永远 hidden。 */
 .yohu-select__menu {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
   position: relative;
   box-sizing: border-box;
   width: max-content;
@@ -79,17 +95,22 @@
   max-width: 100%;
   max-height: inherit;
   margin: 0;
-  padding: var(--yohu-space-xs) 0;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  padding: 0;
+  overflow: visible;
   list-style: none;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  border: none;
+  background-color: transparent;
   border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
   box-shadow: var(--yohu-shadow-overlay);
 }
 
-.yohu-select__layer[data-overflow-y] .yohu-select__menu {
+.yohu-select__menu-chrome .yohu-corner__content {
+  padding: var(--yohu-space-xs) 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.yohu-select__layer[data-overflow-y] .yohu-select__menu-chrome .yohu-corner__content {
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -116,7 +137,7 @@
 }
 
 .yohu-select[data-disabled] .yohu-select__trigger {
-  background-color: var(--yohu-surface-2);
+  --yohu-corner-fill: var(--yohu-surface-2);
   color: var(--yohu-disabled);
   cursor: not-allowed;
 }

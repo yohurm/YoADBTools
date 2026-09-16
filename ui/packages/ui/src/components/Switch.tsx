@@ -7,6 +7,7 @@
  */
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { CornerPillRadius, YoCorner } from "../corner";
 import { switchHostAttrs, switchNextChecked } from "./switch-policy";
 import "./Switch.css";
 
@@ -44,7 +45,9 @@ export function YoSwitch(props: YoSwitchProps): JSX.Element {
       disabled={host().disabled}
       onClick={handleClick}
     >
-      <span class="yohu-switch__thumb" aria-hidden="true" />
+      <YoCorner role="control" radius={CornerPillRadius} stroke={false} class="yohu-switch__chrome">
+        <span class="yohu-switch__thumb" aria-hidden="true" />
+      </YoCorner>
     </button>
   );
 }

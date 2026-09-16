@@ -100,7 +100,8 @@ for (const file of files) {
       if (
         leading &&
         leading[1].trim() !== "inherit" &&
-        !/^var\(--yohu-font-leading-/.test(leading[1].trim())
+        !/^var\(--yohu-font-leading-/.test(leading[1].trim()) &&
+        leading[1].trim() !== "var(--yohu-text-field-line)"
       ) {
         violations.push(
           `${rel}:${i + 1}: 硬编码行高 → ${line.trim()}（须用 var(--yohu-font-leading-*)；禁止 1，会裁切中文底部）`,

@@ -41,13 +41,14 @@
   filter: var(--yohu-shadow-overlay-drop);
 }
 
+.yohu-tooltip__chrome {
+  --yohu-corner-fill: var(--yohu-tooltip-bg);
+  --yohu-corner-stroke: var(--yohu-tooltip-border);
+}
+
 .yohu-tooltip__content {
   box-sizing: border-box;
   padding: var(--yohu-space-xs) var(--yohu-space-sm);
-  overflow: hidden;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-tooltip-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-tooltip-bg);
   font-size: var(--yohu-font-caption);
   font-weight: var(--yohu-font-weight-medium);
   line-height: var(--yohu-font-leading-tight);

@@ -4,6 +4,8 @@ import { createSignal } from "solid-js";
 import { motionSpecMs } from "../tokens/motion";
 import {
   attachDialog,
+  countDialogActions,
+  dialogActionsAttrs,
   dialogBodyAttrs,
   dialogExitLock,
   dialogLayerStyle,
@@ -46,6 +48,21 @@ describe("dialog-policy", () => {
     });
   });
 
+  it("操作区 AUTO 写成 data-layout，只数 button 槽", () => {
+    expect(dialogActionsAttrs(0)).toEqual({ "data-layout": "center" });
+    expect(dialogActionsAttrs(1)).toEqual({ "data-layout": "center" });
+    expect(dialogActionsAttrs(2)).toEqual({ "data-layout": "row" });
+    expect(dialogActionsAttrs(3)).toEqual({ "data-layout": "stack" });
+
+    const footer = document.createElement("div");
+    footer.innerHTML =
+      `<span>路径非法</span>` +
+      `<button><span class="yohu-button__chrome"></span></button>` +
+      `<button>确定</button>`;
+    expect(countDialogActions(footer)).toBe(2);
+    expect(countDialogActions(footer.querySelectorAll(".yohu-button__chrome"))).toBe(0);
+  });
+
   it("pad none 写成 data-pad", () => {
     expect(dialogBodyAttrs({ pad: "none" })).toEqual({
       "data-layout": "stack",
@@ -59,17 +76,8 @@ describe("dialog-policy", () => {
   it("读面板盒：零盒不锁，正盒锁 px", () => {
     const panel = document.createElement("div");
     expect(dialogExitLock(panel)).toBeUndefined();
-    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      right: 400,
-      bottom: 320,
-      width: 400,
-      height: 320,
-      toJSON: () => ({}),
-    });
+    Object.defineProperty(panel, "offsetWidth", { configurable: true, value: 400 });
+    Object.defineProperty(panel, "offsetHeight", { configurable: true, value: 320 });
     expect(dialogExitLock(panel)).toEqual({ width: "400px", height: "320px" });
   });
 

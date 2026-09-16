@@ -9,11 +9,18 @@
   box-sizing: border-box;
   pointer-events: none;
   z-index: 2;
-  overflow: hidden;
-  border-radius: var(--yohu-ripple-radius);
-  background: var(--yohu-surface);
+  display: flex;
+  overflow: visible;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
   box-shadow: none;
   opacity: 0;
+}
+
+.yohu-recipe-reorder-chrome {
+  --yohu-corner-fill: var(--yohu-surface);
+  width: 100%;
+  height: 100%;
 }
 
 .yohu-recipe-reorder-overlay[data-ready] {

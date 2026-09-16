@@ -1,11 +1,13 @@
 /**
  * @yohu/ui token 入口。
  * 引入 theme.css + states.css；导出 setTheme/getTheme（含 system 偏好）。
+ * 焦点框模态在本文件绑一次，壳不必再 bind/unbind。
  */
 import "./theme.css";
 import "./states.css";
 
 import type { DensityName } from "./density";
+import { bindFocusModality } from "./focus-modality";
 
 export * from "./colors";
 export * from "./typography";
@@ -17,7 +19,12 @@ export * from "./elevation";
 export * from "./z-index";
 export * from "./motion";
 export * from "./state";
+export { bindFocusModality } from "./focus-modality";
 export { emitThemeCss } from "./emit-theme";
+
+if (typeof document !== "undefined") {
+  bindFocusModality();
+}
 
 /** 解析后的外观（写入 `data-theme`）。 */
 export type ThemeName = "light" | "dark";

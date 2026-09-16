@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoSwitch } from "./Switch";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Switch.css"), "utf8");
 
 describe("YoSwitch", () => {
   it("关闭态 aria-checked=false", () => {
@@ -25,6 +30,16 @@ describe("YoSwitch", () => {
     expect(sw.getAttribute("data-checked")).toBe("true");
     expect(sw.getAttribute("aria-checked")).toBe("true");
     expect(sw.className).not.toContain("yohu-switch--on");
+  });
+
+  it("轨走 YoCorner 胶囊，宿主不再 overflow+底色叠圆角", () => {
+    const { container } = render(() => <YoSwitch ariaLabel="自动刷新" checked={false} />);
+    expect(container.querySelector(".yohu-switch__chrome")?.getAttribute("data-role")).toBe("control");
+    const host = css.match(/^\.yohu-switch\s*\{([^}]*)\}/m)?.[1] ?? "";
+    expect(host).toContain("overflow: visible");
+    expect(host).toContain("background-color: transparent");
+    expect(host).not.toContain("overflow: hidden");
+    expect(host).toContain("--yohu-corner-fill: var(--yohu-switch-off)");
   });
 
   it("disabled 不触发 onChange", () => {

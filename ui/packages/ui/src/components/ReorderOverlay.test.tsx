@@ -25,5 +25,7 @@ describe("ReorderOverlay", () => {
     expect(css).toContain("--yohu-motion-effects-fast");
     expect(css).not.toMatch(/top\s+var\(--yohu-motion/);
     expect(css).not.toMatch(/\d+ms/);
+    expect(css).not.toContain("overflow: hidden");
+    expect(css).toContain("--yohu-corner-fill");
   });
 });

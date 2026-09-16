@@ -1,17 +1,25 @@
 .yohu-context-menu {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
   position: fixed;
   z-index: var(--yohu-z-overlay);
   min-width: var(--yohu-layout-menu-min);
   /* 视口上限兜底：即使落点估算偏小，也不含溢出视口（超出滚动）。 */
   max-width: calc(100vw - var(--yohu-space-lg));
   max-height: calc(100vh - var(--yohu-space-lg));
-  overflow: auto;
-  padding: var(--yohu-space-xs) 0;
-  background: var(--yohu-surface);
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: none;
   border-radius: var(--yohu-radius-sm);
   box-shadow: var(--yohu-shadow-overlay);
   box-sizing: border-box;
+}
+
+.yohu-context-menu__chrome .yohu-corner__content {
+  padding: var(--yohu-space-xs) 0;
+  overflow: auto;
+  max-height: calc(100vh - var(--yohu-space-lg));
 }
 
 .yohu-context-menu__item {

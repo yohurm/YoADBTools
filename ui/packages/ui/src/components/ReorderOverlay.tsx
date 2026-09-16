@@ -4,6 +4,7 @@
 
 import type { JSX } from "solid-js";
 
+import { YoCorner } from "../corner";
 import { reorderOverlayAttrs } from "./reorder-policy";
 import "./ReorderOverlay.css";
 
@@ -23,7 +24,9 @@ export function ReorderOverlay(props: {
       style={attrs().style}
       aria-hidden="true"
     >
-      {props.children}
+      <YoCorner role="control" stroke={false} class="yohu-recipe-reorder-chrome">
+        {props.children}
+      </YoCorner>
     </div>
   );
 }

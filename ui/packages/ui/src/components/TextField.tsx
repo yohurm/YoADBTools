@@ -5,8 +5,10 @@
  */
 import { Show, createMemo, createUniqueId } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import { Icon, isIconName, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
+import { Radius } from "../tokens/radius";
 import type { YoTextFieldStatus } from "./textfield-model";
 import { textFieldHostAttrs } from "./textfield-policy";
 import "./TextField.css";
@@ -73,11 +75,20 @@ function TextFieldAffix(props: { value: YoTextFieldAffix | undefined }): JSX.Ele
   );
 }
 
-/** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input/textarea + 清除；写入盒只 clip。 */
+/** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input/textarea + 清除；圆角走 YoCorner。 */
 export function YoTextField(props: YoTextFieldProps): JSX.Element {
   const id = createUniqueId();
   let inputRef: YoTextFieldControl | undefined;
   const host = createMemo(() => textFieldHostAttrs(props));
+  const chromeRadii = createMemo(() => {
+    const before = Boolean(host()["data-addon-before"]);
+    const after = Boolean(host()["data-addon-after"]);
+    if (!before && !after) return undefined;
+    return {
+      ...(before ? { tl: 0, bl: 0 } : {}),
+      ...(after ? { tr: 0, br: 0 } : {}),
+    };
+  });
 
   const bindControl = (el: YoTextFieldControl): void => {
     inputRef = el;
@@ -129,7 +140,13 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       <div class="yohu-text-field__group">
         <Show when={host()["data-addon-before"]}>
           <span class="yohu-text-field__addon" data-edge="before">
-            {props.addonBefore}
+            <YoCorner
+              role="control"
+              class="yohu-text-field__addon-chrome"
+              radii={{ tl: Radius.Sm, bl: Radius.Sm, tr: 0, br: 0 }}
+            >
+              {props.addonBefore}
+            </YoCorner>
           </span>
         </Show>
         <div
@@ -144,23 +161,41 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             inputRef.focus();
           }}
         >
-          <Show when={host()["data-prefix"]}>
-            <span class="yohu-text-field__affix" data-edge="start">
-              <TextFieldAffix value={props.prefix} />
-            </span>
-          </Show>
-          <Show when={host()["data-tokens"]}>
-            <span class="yohu-text-field__tokens">{props.tokens}</span>
-          </Show>
-          <Show
-            when={host()["data-multiline"]}
-            fallback={
-              <input
+          <YoCorner role="control" class="yohu-text-field__chrome" radii={chromeRadii()}>
+            <Show when={host()["data-prefix"]}>
+              <span class="yohu-text-field__affix" data-edge="start">
+                <TextFieldAffix value={props.prefix} />
+              </span>
+            </Show>
+            <Show when={host()["data-tokens"]}>
+              <span class="yohu-text-field__tokens">{props.tokens}</span>
+            </Show>
+            <Show
+              when={host()["data-multiline"]}
+              fallback={
+                <input
+                  ref={(el) => bindControl(el)}
+                  id={id}
+                  class="yohu-text-field__input"
+                  type={props.type ?? "text"}
+                  size={1}
+                  value={props.value ?? ""}
+                  placeholder={props.placeholder ?? ""}
+                  aria-label={props.ariaLabel ?? props.label}
+                  aria-invalid={host()["aria-invalid"]}
+                  disabled={host().disabled}
+                  readOnly={host().readOnly}
+                  onInput={handleInput}
+                  onChange={handleChange}
+                  onKeyDown={(event) => props.onKeyDown?.(event)}
+                />
+              }
+            >
+              <textarea
                 ref={(el) => bindControl(el)}
                 id={id}
                 class="yohu-text-field__input"
-                type={props.type ?? "text"}
-                size={1}
+                rows={host().rows}
                 value={props.value ?? ""}
                 placeholder={props.placeholder ?? ""}
                 aria-label={props.ariaLabel ?? props.label}
@@ -171,43 +206,33 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
                 onChange={handleChange}
                 onKeyDown={(event) => props.onKeyDown?.(event)}
               />
-            }
-          >
-            <textarea
-              ref={(el) => bindControl(el)}
-              id={id}
-              class="yohu-text-field__input"
-              rows={host().rows}
-              value={props.value ?? ""}
-              placeholder={props.placeholder ?? ""}
-              aria-label={props.ariaLabel ?? props.label}
-              aria-invalid={host()["aria-invalid"]}
-              disabled={host().disabled}
-              readOnly={host().readOnly}
-              onInput={handleInput}
-              onChange={handleChange}
-              onKeyDown={(event) => props.onKeyDown?.(event)}
-            />
-          </Show>
-          <Show when={host()["data-suffix"]}>
-            <span class="yohu-text-field__affix" data-edge="end">
-              <TextFieldAffix value={props.suffix} />
-            </span>
-          </Show>
-          <Show when={host()["data-clearable"]}>
-            <button
-              type="button"
-              class="yohu-text-field__clear yohu-focus-ring"
-              aria-label="清除"
-              onClick={handleClear}
-            >
-              <Icon name="close" size={Layout.IconInline} />
-            </button>
-          </Show>
+            </Show>
+            <Show when={host()["data-suffix"]}>
+              <span class="yohu-text-field__affix" data-edge="end">
+                <TextFieldAffix value={props.suffix} />
+              </span>
+            </Show>
+            <Show when={host()["data-clearable"]}>
+              <button
+                type="button"
+                class="yohu-text-field__clear yohu-focus-ring"
+                aria-label="清除"
+                onClick={handleClear}
+              >
+                <Icon name="close" size={Layout.IconInline} />
+              </button>
+            </Show>
+          </YoCorner>
         </div>
         <Show when={host()["data-addon-after"]}>
           <span class="yohu-text-field__addon" data-edge="after">
-            {props.addonAfter}
+            <YoCorner
+              role="control"
+              class="yohu-text-field__addon-chrome"
+              radii={{ tl: 0, bl: 0, tr: Radius.Sm, br: Radius.Sm }}
+            >
+              {props.addonAfter}
+            </YoCorner>
           </span>
         </Show>
       </div>

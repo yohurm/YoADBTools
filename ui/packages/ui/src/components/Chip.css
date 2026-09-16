@@ -1,35 +1,67 @@
+/* HarmonyOS Chip：28vp 胶囊。铬只 paint。圆钮在宿主流内。 */
+
 .yohu-chip {
+  --yohu-corner-fill: var(--yohu-accent-soft);
+  --yohu-corner-stroke: transparent;
+  position: relative;
   display: inline-flex;
   flex-direction: row;
   align-items: center;
+  gap: var(--yohu-space-xs);
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  height: var(--yohu-control-height-sm);
   padding-block: 0;
   padding-inline: var(--yohu-space-sm);
-  overflow: hidden;
-  border: var(--yohu-stroke-hairline) solid transparent;
-  border-radius: var(--yohu-radius-pill);
+  border: none;
+  background-color: transparent;
   font-family: var(--yohu-font-sans);
   font-size: var(--yohu-font-caption);
-  font-weight: var(--yohu-font-weight-semibold);
+  font-weight: var(--yohu-font-weight-medium);
   line-height: var(--yohu-font-leading-tight);
   white-space: nowrap;
 }
 
-.yohu-chip[data-dismiss] {
-  padding-inline-end: 0;
+.yohu-chip[data-block] {
+  width: 100%;
+  flex: 1 1 auto;
 }
 
 .yohu-chip[data-leading] {
   padding-inline-start: var(--yohu-space-xs);
 }
 
-.yohu-chip[data-block] {
-  width: 100%;
-  flex: 1 1 auto;
+.yohu-chip[data-tone="neutral"] {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  color: var(--yohu-fg);
+}
+
+.yohu-chip[data-tone="accent"] {
+  --yohu-corner-fill: var(--yohu-accent-soft);
+  color: var(--yohu-accent);
+}
+
+.yohu-chip[data-tone="success"] {
+  --yohu-corner-fill: var(--yohu-success-bg);
+  color: var(--yohu-success);
+}
+
+.yohu-chip[data-tone="warning"] {
+  --yohu-corner-fill: var(--yohu-warn-bg);
+  color: var(--yohu-warn);
+}
+
+.yohu-chip[data-tone="danger"] {
+  --yohu-corner-fill: var(--yohu-signal-bg);
+  color: var(--yohu-error);
+}
+
+.yohu-chip__leading,
+.yohu-chip__label {
+  position: relative;
+  z-index: 1;
 }
 
 .yohu-chip__leading {
@@ -39,76 +71,33 @@
   justify-content: center;
 }
 
-.yohu-chip[data-tone="neutral"] {
-  background-color: var(--yohu-surface-2);
-  border-color: var(--yohu-border);
-  color: var(--yohu-fg-2);
-}
-
-.yohu-chip[data-tone="accent"] {
-  background-color: var(--yohu-accent-soft);
-  border-color: var(--yohu-accent);
-  color: var(--yohu-accent);
-}
-
-.yohu-chip[data-tone="success"] {
-  background-color: var(--yohu-success-bg);
-  color: var(--yohu-success);
-}
-
-.yohu-chip[data-tone="warning"] {
-  background-color: var(--yohu-warn-bg);
-  color: var(--yohu-warn);
-}
-
-.yohu-chip[data-tone="danger"] {
-  background-color: var(--yohu-signal-bg);
-  color: var(--yohu-error);
-}
-
 .yohu-chip__label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* block 是填格行：文案吃中间，关闭贴盒 inline-end。hug 仍跟文案走。禁止 absolute。 */
 .yohu-chip[data-block] .yohu-chip__label {
   flex: 1 1 auto;
 }
 
 .yohu-chip__remove {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: var(--yohu-space-lg);
-  height: var(--yohu-space-lg);
+  width: var(--yohu-layout-icon-sm);
+  height: var(--yohu-layout-icon-sm);
   padding: 0;
   border: none;
   border-radius: var(--yohu-radius-full);
-  background: transparent;
-  color: inherit;
+  background-color: var(--yohu-fg-2);
+  color: var(--yohu-surface);
   cursor: pointer;
 }
 
 .yohu-chip__remove:hover {
-  background-color: var(--yohu-state-hover);
-  color: var(--yohu-fg);
-}
-
-.yohu-chip[data-dismiss="hover"] .yohu-chip__remove {
-  opacity: 0;
-  transition: opacity var(--yohu-motion-effects-fast);
-}
-
-.yohu-chip[data-dismiss="hover"]:hover .yohu-chip__remove,
-.yohu-chip[data-dismiss="hover"]:focus-within .yohu-chip__remove {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .yohu-chip[data-dismiss="hover"] .yohu-chip__remove {
-    opacity: 1;
-  }
+  background-color: var(--yohu-fg);
 }

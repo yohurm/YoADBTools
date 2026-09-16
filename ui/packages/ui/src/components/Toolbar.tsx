@@ -4,6 +4,7 @@
  * 命令坐在 band 铬里；溢出走横向滚动。禁止在本控件内再做一套 Overflow ActionMenu。
  */
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import type { ToolbarPad } from "./toolbar-model";
 import { toolbarHostAttrs } from "./toolbar-policy";
 import "./Toolbar.css";
@@ -29,7 +30,9 @@ export function YoToolbar(props: YoToolbarProps): JSX.Element {
       data-overflow={host()["data-overflow"]}
       data-pad={host()["data-pad"]}
     >
-      {props.children}
+      <YoCorner role="control" class="yohu-toolbar__chrome">
+        {props.children}
+      </YoCorner>
     </div>
   );
 }

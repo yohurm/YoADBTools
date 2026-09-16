@@ -9,7 +9,6 @@
   flex: 0 0 auto;
   min-width: 0;
   padding-bottom: var(--yohu-layout-chrome-pad);
-  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
   box-sizing: border-box;
 }
 

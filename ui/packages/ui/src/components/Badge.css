@@ -1,11 +1,11 @@
 .yohu-badge {
   display: inline-flex;
-  align-items: center;
-  overflow: hidden;
-  padding: 0 var(--yohu-space-sm);
+  align-items: stretch;
   height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
-  border-radius: var(--yohu-radius-pill);
-  border: var(--yohu-stroke-hairline) solid transparent;
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background-color: transparent;
   font-family: var(--yohu-font-sans);
   font-size: var(--yohu-font-caption);
   font-weight: var(--yohu-font-weight-semibold);
@@ -14,28 +14,43 @@
   box-sizing: border-box;
 }
 
+.yohu-badge__chrome {
+  height: 100%;
+}
+
+.yohu-badge__chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 var(--yohu-space-sm);
+  overflow: hidden;
+}
+
 .yohu-badge[data-tone="neutral"] {
-  background-color: var(--yohu-surface-2);
-  border-color: var(--yohu-border);
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: var(--yohu-border);
   color: var(--yohu-fg-2);
 }
 
 .yohu-badge[data-tone="accent"] {
-  background-color: var(--yohu-accent-soft);
+  --yohu-corner-fill: var(--yohu-accent-soft);
+  --yohu-corner-stroke: transparent;
   color: var(--yohu-accent);
 }
 
 .yohu-badge[data-tone="success"] {
-  background-color: var(--yohu-success-bg);
+  --yohu-corner-fill: var(--yohu-success-bg);
+  --yohu-corner-stroke: transparent;
   color: var(--yohu-success);
 }
 
 .yohu-badge[data-tone="warning"] {
-  background-color: var(--yohu-warn-bg);
+  --yohu-corner-fill: var(--yohu-warn-bg);
+  --yohu-corner-stroke: transparent;
   color: var(--yohu-warn);
 }
 
 .yohu-badge[data-tone="danger"] {
-  background-color: var(--yohu-signal-bg);
+  --yohu-corner-fill: var(--yohu-signal-bg);
+  --yohu-corner-stroke: transparent;
   color: var(--yohu-error);
 }

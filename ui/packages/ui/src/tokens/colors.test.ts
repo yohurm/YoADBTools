@@ -369,8 +369,8 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-canvas: var(--yohu-bg-base)");
     expect(themeCss).toContain("color-scheme: light");
     expect(themeCss).toContain("color-scheme: dark");
-    expect(themeCss).toContain("--yohu-state-selected: var(--yohu-accent)");
-    expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg-on)");
+    expect(themeCss).toContain("--yohu-state-selected: var(--yohu-accent-soft)");
+    expect(themeCss).toContain("--yohu-state-selected-fg: var(--yohu-fg)");
     expect(themeCss).toContain("--yohu-state-reorder-source: 0.32");
     expect(themeCss).not.toContain("--yohu-state-selected-rule:");
     expect(themeCss).toContain("--yohu-text-sel:");

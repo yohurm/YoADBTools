@@ -50,6 +50,7 @@ export {
   onResolvedThemeChange,
   setDensity,
   getDensity,
+  bindFocusModality,
 } from "./tokens";
 export type {
   SemanticColorName,
@@ -99,7 +100,7 @@ export type { YoSwitchProps } from "./components/Switch";
 export { YoBadge } from "./components/Badge";
 export type { YoBadgeProps, YoBadgeTone } from "./components/Badge";
 export { YoChip } from "./components/Chip";
-export type { YoChipProps, YoChipTone, YoChipDismiss, YoChipLeading } from "./components/Chip";
+export type { YoChipProps, YoChipTone, YoChipLeading } from "./components/Chip";
 
 export { YoProgressBar } from "./components/ProgressBar";
 export type { YoProgressBarProps } from "./components/ProgressBar";
@@ -113,6 +114,9 @@ export type { YoTabsProps, YoTabItem, YoTabDot, YoTabDotTone } from "./component
 
 export { YoTree } from "./components/Tree";
 export type { YoTreeProps, TreeNode } from "./components/Tree";
+
+export { YoScroller } from "./components/Scroller";
+export type { YoScrollerProps } from "./components/Scroller";
 
 export { YoVirtualList } from "./components/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./components/VirtualList";
@@ -168,6 +172,9 @@ export type { YoPageProps } from "./components/Page";
 
 export { YoFormRow } from "./components/FormRow";
 export type { YoFormRowProps } from "./components/FormRow";
+
+export { YoCorner, CornerPillRadius } from "./corner";
+export type { YoCornerProps, CornerRadii, CornerRole } from "./corner";
 
 // —— 键盘作用域（L1；页面提供绑定表） ——
 export {
@@ -248,6 +255,8 @@ export {
   YoPresence,
   YoListPresence,
   YoCollapse,
+  YoReveal,
+  YoTravel,
   YoSwap,
   YoIndicator,
   prefersReducedMotion,
@@ -259,6 +268,9 @@ export type {
   YoListPresenceProps,
   YoCollapseProps,
   CollapseRecipe,
+  YoRevealProps,
+  YoTravelProps,
+  TravelAxis,
   YoSwapProps,
   YoIndicatorProps,
   IndicatorVariant,

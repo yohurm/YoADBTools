@@ -23,12 +23,49 @@
   width: var(--yohu-dialog-width);
   max-width: var(--yohu-dialog-width);
   max-height: 90%;
-  border: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-radius: var(--yohu-radius-sm);
-  background-color: var(--yohu-surface);
+  border: none;
+  background-color: transparent;
+  border-radius: var(--yohu-radius-md);
   color: var(--yohu-fg);
   box-shadow: var(--yohu-shadow-dialog);
   box-sizing: border-box;
+  overflow: visible;
+}
+
+.yohu-dialog__chrome {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  min-height: 0;
+}
+
+/*
+ * used-clip：盒高交给公开 YoTravel。名单走 YoReveal（始终绝对定位）。
+ * 行程中主槽 clip。侧轨预留，横轴不 snap。
+ */
+.yohu-dialog__panel > .yohu-travel {
+  width: 100%;
+}
+
+.yohu-dialog__panel[data-box="fill"] > .yohu-travel,
+.yohu-dialog__panel[data-box="exit"] > .yohu-travel {
+  flex: 1 1 0;
+  height: 100%;
+}
+
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__chrome {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-corner__content,
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__body,
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__body[data-region="split"] .yohu-dialog__scroller,
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-scroller,
+.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-scroller__view {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -51,18 +88,33 @@
   flex: 0 0 auto;
 }
 
+/*
+ * HarmonyOS AlertDialog / AdvancedDialog（API 20+）：
+ * 标题居中、最多两行省略；标题/内容/操作区之间不画分割线。
+ * 整页对话框（data-sized）按窗口铬左对齐。
+ */
 .yohu-dialog__title {
   margin: 0;
-  padding: var(--yohu-space-md) var(--yohu-space-lg);
-  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  padding: var(--yohu-space-xl) var(--yohu-space-xl) var(--yohu-space-sm);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-align: center;
   font-size: var(--yohu-font-page-title);
   font-weight: var(--yohu-font-weight-bold);
   line-height: var(--yohu-font-leading-tight);
 }
 
+.yohu-dialog__panel[data-sized] .yohu-dialog__title {
+  padding: var(--yohu-space-md) var(--yohu-space-lg);
+  text-align: start;
+}
+
 /*
- * fit：内容区 hug，不吃 90% 剩余高。
- * fill / exit：内容区吃 title/footer 之间的剩余（整页对话框 / 出场锁盒）。
+ * fit / exit：内容区 hug。出场只锁最后打开盒 + Presence 淡出缩放，不改内容布局。
+ * fill：内容区吃 title/footer 之间的剩余（整页对话框）。
  */
 .yohu-dialog__body {
   flex: 0 1 auto;
@@ -73,8 +125,7 @@
   line-height: var(--yohu-font-leading-ui);
 }
 
-.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body,
-.yohu-dialog__panel[data-box="exit"] .yohu-dialog__body {
+.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body {
   flex: 1 1 0;
 }
 
@@ -89,32 +140,49 @@
 }
 
 /*
- * split：Fluent 钉铬、只滚内容。fit 用纵向 flex hug；
- * fill/exit 才让 main 吃剩余高。禁止 fit 用 1fr 当滚槽。
+ * split：Fluent 钉铬、只滚内容。fit / exit 用纵向 flex hug；
+ * fill 才让 main 吃剩余高。禁止 fit 用 1fr 当滚槽。禁止出场改 fill-flex。
  */
 .yohu-dialog__body[data-region="split"] {
   display: flex;
   flex-direction: column;
+  /* 同级无硬边界：8vp（间隔参数 / ChipGroup itemSpace）。 */
+  gap: var(--yohu-space-sm);
 }
 
 .yohu-dialog__lead,
 .yohu-dialog__tail {
   flex: 0 0 auto;
-  min-width: 0;
 }
 
+/* 确认句对照 AlertDialog message：居中。名单/表单仍在 main 里起排。 */
+.yohu-dialog__lead {
+  min-width: 0;
+  text-align: center;
+}
+
+/* 展开钮 hug 文案：只订分区契约，禁止点 Button 内部 chrome。 */
 .yohu-dialog__tail {
   align-self: flex-start;
+  min-width: min-content;
+  max-width: 100%;
 }
 
-.yohu-dialog__main {
+.yohu-dialog__scroller {
   flex: 0 1 auto;
   min-width: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body[data-region="split"] .yohu-dialog__main,
-.yohu-dialog__panel[data-box="exit"] .yohu-dialog__body[data-region="split"] .yohu-dialog__main {
+.yohu-dialog__scroller > .yohu-scroller {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body[data-region="split"] .yohu-dialog__scroller {
   flex: 1 1 0;
 }
 
@@ -128,9 +196,8 @@
   overflow: hidden;
 }
 
-.yohu-dialog__body[data-overflow="auto"][data-region="split"] .yohu-dialog__main {
-  overflow-x: hidden;
-  overflow-y: auto;
+.yohu-dialog__panel:has(.yohu-travel[data-travel="used"]) .yohu-scroller[data-overflow="auto"] > .yohu-scroller__view {
+  overflow-y: hidden;
 }
 
 .yohu-dialog__body[data-overflow="hidden"] {
@@ -142,27 +209,58 @@
   max-height: var(--yohu-layout-dialog-body-max);
 }
 
-.yohu-dialog__panel[data-box="fit"] .yohu-dialog__body[data-overflow="auto"][data-region="split"] .yohu-dialog__main {
+.yohu-dialog__panel[data-box="fit"] .yohu-dialog__body[data-overflow="auto"][data-region="split"] .yohu-dialog__scroller {
   max-height: var(--yohu-layout-dialog-body-max);
 }
 
+/*
+ * 标题区已垫 title↔正文 8vp。内容区左右 24vp；底 0，与页脚顶 16vp
+ * 拼成内容↔操作区 16vp（有明显边界的控件间隔）。
+ */
 .yohu-dialog__body[data-pad="lg"] {
-  padding: var(--yohu-space-lg);
-}
-
-.yohu-dialog__body[data-region="split"][data-pad="lg"] {
-  gap: var(--yohu-space-md);
+  padding: 0 var(--yohu-space-xl);
 }
 
 .yohu-dialog__body[data-pad="none"] {
   padding: 0;
 }
 
+/*
+ * 操作区 AUTO：L2 center|row|stack → 页脚 data-layout。CSS 只认 data。
+ * 2 钮对页脚 button 槽铺满。不认 Button 类名。整页对话框不铺满。
+ */
 .yohu-dialog__footer {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: var(--yohu-space-md);
+  padding: var(--yohu-space-lg) var(--yohu-space-xl) var(--yohu-space-xl);
+}
+
+.yohu-dialog__footer[data-layout="row"] > button {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.yohu-dialog__footer[data-layout="stack"] {
+  flex-direction: column-reverse;
+}
+
+.yohu-dialog__footer[data-layout="stack"] > button {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
+}
+
+.yohu-dialog__panel[data-sized] .yohu-dialog__footer {
+  justify-content: flex-end;
   padding: var(--yohu-space-md) var(--yohu-space-lg);
-  border-top: var(--yohu-stroke-hairline) solid var(--yohu-border);
+}
+
+.yohu-dialog__panel[data-sized] .yohu-dialog__footer > button {
+  flex: 0 0 auto;
+  width: auto;
 }

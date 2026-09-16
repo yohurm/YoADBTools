@@ -1,12 +1,14 @@
 /**
- * YoCollapse —— 高度 0fr/1fr 过渡（动画系统-v6.md 配方 collapse / panel / fill）。
- * 子树保持挂载以便插值；关闭时 aria-hidden + inert。
- * `__inner` 只裁切高度，不承担配方位移。
- * panel：高度 + 直接子级淡入上移（禁止变换裁切盒）。
- * fill：高度仍 collapse；内层 column flex，直接子级填满并可收缩（设备栏 42% 帽下纵滚）。
+ * YoCollapse —— 高度槽（动画系统-v6.md）。
+ * collapse / panel / fill：0fr/1fr。对话框名单走 YoReveal，不走 Collapse。
+ * 子树保持挂载；关闭时 aria-hidden + inert。
+ * `__inner` 只裁切高度。`__content` 是配方自己的动画盒。
+ * 禁止把位移打在裁切盒上，禁止选择器穿到消费者子树。
  */
+import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
-import type { CollapseRecipe } from "./recipes";
+import { collapseHostAttrs } from "./collapse-policy";
+import type { CollapseRecipe } from "./collapse-model";
 
 export type { CollapseRecipe };
 
@@ -18,14 +20,11 @@ export interface YoCollapseProps {
 }
 
 export function YoCollapse(props: YoCollapseProps): JSX.Element {
+  const host = createMemo(() => collapseHostAttrs({ open: props.open, recipe: props.recipe }));
   return (
-    <div
-      class="yohu-collapse"
-      data-open={props.open ? "true" : "false"}
-      data-recipe={props.recipe ?? "collapse"}
-    >
+    <div class="yohu-collapse" data-open={host()["data-open"]} data-recipe={host()["data-recipe"]}>
       <div class="yohu-collapse__inner" aria-hidden={!props.open || undefined} inert={!props.open ? true : undefined}>
-        {props.children}
+        <div class="yohu-collapse__content">{props.children}</div>
       </div>
     </div>
   );

@@ -38,5 +38,6 @@ describe("YoCheckbox", () => {
     expect(host?.querySelector(".yohu-checkbox__box")?.className).not.toContain(
       "yohu-checkbox__box--checked",
     );
+    expect(host?.querySelector(".yohu-checkbox__chrome")).toBeTruthy();
   });
 });

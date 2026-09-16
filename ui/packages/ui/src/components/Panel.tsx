@@ -1,10 +1,11 @@
 /**
  * YoPanel —— 画布上的卡片/分区唯一容器（L4 视图）。
  * 变体 / 内边距 / 顶栏 / 内容区排布由 panel-model + panel-policy 决定；本文件只绑属性与内容区。
- * 铬（surface + radius-md + hairline + XS 阴影）只写在 Panel.css。
+ * 铬走 YoCorner（role=card=16）；阴影仍在外壳。禁止 CSS border + overflow:hidden 画圆角。
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoCorner } from "../corner";
 import type {
   YoPanelAlign,
   YoPanelGap,
@@ -75,7 +76,7 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       data-padding-block={host()["data-padding-block"]}
       aria-label={props["aria-label"]}
     >
-      <div class="yohu-panel__clip">
+      <YoCorner role="card" class="yohu-panel__clip">
         <Show when={host()["data-header"] === "custom"}>
           <div class="yohu-panel__header">{props.header}</div>
         </Show>
@@ -93,7 +94,7 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
           <h3 class="yohu-panel__title">{props.title}</h3>
         </Show>
         <div class="yohu-panel__body">{props.children}</div>
-      </div>
+      </YoCorner>
     </section>
   );
 }
