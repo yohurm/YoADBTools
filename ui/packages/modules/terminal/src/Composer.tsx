@@ -4,7 +4,7 @@
 
 import { Show } from "solid-js";
 
-import { Icon, YoBadge, YoChip, YoIconButton, YoListPresence, YoTextField, YoTooltip } from "@yohu/ui";
+import { Icon, YoBadge, YoChip, YoCorner, YoIconButton, YoListPresence, YoTextField, YoTooltip } from "@yohu/ui";
 
 import { commandBlockGapLabel } from "./block-gap";
 
@@ -55,7 +55,6 @@ export function Composer(props: { serials: string[] }) {
                   <YoChip
                     tone="neutral"
                     leading={queuedLeading(item)}
-                    dismiss="hover"
                     text={queuedText(item)}
                     onDismiss={() => terminalStore.removeQueued(item.id)}
                   />
@@ -110,10 +109,12 @@ export function Composer(props: { serials: string[] }) {
             aria-label="展开输入"
             onClick={() => terminalStore.setComposerOpen(true)}
           >
-            <Icon name="chevron-left" />
-            <Show when={terminalStore.session.queue.length > 0}>
-              <YoBadge text={String(terminalStore.session.queue.length)} tone="accent" />
-            </Show>
+            <YoCorner role="control" stroke={false} radii={{ tr: 0, br: 0, bl: 0 }} class="yohu-terminal__dock-chrome">
+              <Icon name="chevron-left" />
+              <Show when={terminalStore.session.queue.length > 0}>
+                <YoBadge text={String(terminalStore.session.queue.length)} tone="accent" />
+              </Show>
+            </YoCorner>
           </button>
         </YoTooltip>
       </div>

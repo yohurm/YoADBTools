@@ -42,7 +42,11 @@ describe("命令终端动效接线", () => {
     expect(view).not.toContain("YoCollapse");
     expect(view).not.toContain("Show when={!composerOpen()}");
     expect(css).toContain("container-type: inline-size");
-    expect(css).toContain("border-start-start-radius");
+    expect(view).toContain("YoCorner");
+    expect(view).toContain("yohu-terminal__dock-chrome");
+    expect(css).not.toContain("border-start-start-radius");
+    expect(css).not.toContain("border-block-start");
+    expect(css).not.toContain("border-inline-start");
   });
 
   it("模块 CSS 不自写 animation / keyframes", () => {
@@ -176,7 +180,8 @@ describe("命令终端动效接线", () => {
     expect(load("Composer.tsx")).toContain("sendAll");
     expect(load("Composer.tsx")).toContain("YoChip");
     expect(load("Composer.tsx")).toContain("leading={queuedLeading(item)}");
-    expect(load("Composer.tsx")).toContain('dismiss="hover"');
+    expect(load("Composer.tsx")).not.toContain("dismiss=");
+    expect(load("Composer.tsx")).toContain("onDismiss");
     expect(load("Composer.tsx")).toContain("onDismiss");
     expect(load("Composer.tsx")).not.toContain("<textarea");
     expect(load("store.ts")).not.toContain("function runCommand");

@@ -83,27 +83,36 @@
 
 .yohu-terminal__composer-pane {
   background: var(--yohu-surface-2);
-  border-block-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
 .yohu-terminal__dock-toggle {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-stroke: transparent;
+  --yohu-ripple-radius: var(--yohu-radius-sm);
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: var(--yohu-space-xs);
   width: 100%;
   min-height: var(--yohu-control-height);
   padding: 0;
   border: none;
-  border-block-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-inline-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  border-start-start-radius: var(--yohu-radius-sm);
-  --yohu-ripple-radius: var(--yohu-radius-sm);
-  background: var(--yohu-surface-2);
+  background: transparent;
   color: var(--yohu-fg-2);
   font-family: var(--yohu-font-sans);
   font-size: var(--yohu-font-caption);
   cursor: pointer;
+}
+
+.yohu-terminal__dock-chrome {
+  width: 100%;
+  min-height: inherit;
+}
+
+.yohu-terminal__dock-chrome .yohu-corner__content {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yohu-space-xs);
 }
 
 .yohu-terminal__queue {

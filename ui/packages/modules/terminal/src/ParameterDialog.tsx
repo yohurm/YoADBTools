@@ -48,7 +48,7 @@ export function ParameterDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <YoButton variant="ghost" tone="neutral" onClick={props.onClose}>
+          <YoButton variant="ghost" tone="accent" onClick={props.onClose}>
             取消
           </YoButton>
           <YoButton onClick={submit}>加入队列</YoButton>
