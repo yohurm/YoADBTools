@@ -46,15 +46,17 @@ pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), DndError> {
     if paths.is_empty() {
         return Err(FileError::EmptyTree(String::new()).into());
     }
+    for path in paths {
+        if !path.exists() {
+            return Err(FileError::Local(path.display().to_string()).into());
+        }
+    }
     let app = NSApplication::sharedApplication(mtm);
     let event = app.currentEvent().ok_or(DndError::NoGesture)?;
     let window = app.keyWindow().ok_or(DndError::NoWindow)?;
     let view = window.contentView().ok_or(DndError::NoContentView)?;
     let mut items: Vec<Retained<NSDraggingItem>> = Vec::with_capacity(paths.len());
     for path in paths {
-        if !path.exists() {
-            continue;
-        }
         let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
         let item = NSDraggingItem::initWithPasteboardWriter(
             NSDraggingItem::alloc(),

@@ -40,7 +40,7 @@ mod yolog;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tauri::{Manager, RunEvent, WebviewEvent};
+use tauri::{Manager, RunEvent};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -126,11 +126,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root_cancel = CancellationToken::new();
 
     let builder = tauri::Builder::default()
-        .on_webview_event(|webview, event| {
-            if let WebviewEvent::DragDrop(drag) = event {
-                crate::dnd::emit_native_drag(webview.app_handle(), webview.label(), drag);
-            }
-        })
         .on_page_load(|webview, payload| {
             let event = payload.event();
             let started = matches!(event, tauri::webview::PageLoadEvent::Started);

@@ -6,6 +6,7 @@ import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "s
 
 import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, YoLog, type DeviceSession } from "@yohu/api";
 import {
+  YoBadge,
   YoButton,
   YoChrome,
   YoCorner,
@@ -14,6 +15,7 @@ import {
   YoIconButton,
   YoPage,
   YoPanel,
+  YoScroller,
   YoTextField,
   YoToaster,
   attachPanelKeys,
@@ -25,15 +27,29 @@ import {
 import { DeleteConfirm, DeleteExpand, DeleteTargetList } from "./DeleteTargets";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
-import { TransferPanel } from "./TransferPanel";
+import { TransferDock } from "./TransferDock";
 import { DELETE_PREVIEW_LIMIT, canToggleDelete, dropDeleteName } from "./delete-targets";
-import { type DropHit, localBaseName, resolveDropHit } from "./drop";
+import {
+  adoptDropSession,
+  cssPointFromPhysical,
+  destDirFromEntries,
+  DROP_IDLE,
+  dropCommit,
+  dropSessionForEvent,
+  dropSessionWithDir,
+  localBaseName,
+  readFolderTargets,
+  readListHitSpace,
+  type DropSession,
+} from "./drop";
+import { controlRowHeight } from "./layout";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
 import { filesListMenu } from "./menu";
 import { filesFaultText } from "./fault";
 import { childPath, validateEntryName } from "./model";
 import { AddressSlot, type AddressSlotApi } from "./AddressSlot";
-import { fileStore } from "./store";
+import { listingStore } from "./listing";
+import { transferStore } from "./transfers";
 import "./files.css";
 
 type CreateKind = "file" | "dir";
@@ -47,42 +63,38 @@ export function FileView(props: DeviceSession) {
   const [createKind, setCreateKind] = createSignal<CreateKind | null>(null);
   const [createName, setCreateName] = createSignal("");
   const [createError, setCreateError] = createSignal("");
-  const [dropHit, setDropHit] = createSignal<DropHit>({ accept: false });
+  const [dropSession, setDropSession] = createSignal<DropSession>(DROP_IDLE);
   let pageEl: HTMLDivElement | undefined;
+  let explorerEl: HTMLDivElement | undefined;
+  let listEl: HTMLDivElement | undefined;
   let addressSlot: AddressSlotApi | undefined;
 
   createEffect(() => {
-    fileStore.bindSerial(props.selectedSerials[0] ?? null);
+    listingStore.bindSerial(props.selectedSerials[0] ?? null);
   });
 
   createEffect(() => {
-    const tick = fileStore.session.errorTick;
-    const text = untrack(() => fileStore.session.error);
+    const tick = listingStore.session.errorTick;
+    const text = untrack(() => listingStore.session.error);
     if (tick > 0 && text) toaster.show(text, "error");
   });
 
-  const dropCurrent = (): boolean => {
-    const hit = dropHit();
-    return hit.accept && hit.dirName === null;
-  };
+  const dropHot = (): boolean => dropSession().hot;
+
+  const dropIntoFolder = (): boolean => props.settings.files_drop_into_folder;
 
   const dropDirName = (): string | null | undefined => {
-    const hit = dropHit();
-    return hit.accept ? hit.dirName : undefined;
+    const session = dropSession();
+    return session.hot && dropIntoFolder() ? session.dirName : undefined;
   };
 
-  const applyDropHit = (x: number, y: number): DropHit => {
-    if (!props.selectedSerials[0] || !pageEl) return { accept: false };
-    return resolveDropHit(document.elementFromPoint(x, y), pageEl);
-  };
-
-  const onNativeDrop = (paths: string[], hit: DropHit): void => {
-    if (!hit.accept || paths.length === 0) return;
+  const onNativeDrop = (paths: string[], dirName: string | null): void => {
+    if (paths.length === 0) return;
     try {
-      const dest = hit.dirName ? childPath(fileStore.session.path, hit.dirName) : fileStore.session.path;
-      void fileStore.pushLocals(paths, dest);
+      const dest = dirName ? childPath(listingStore.session.path, dirName) : listingStore.session.path;
+      void transferStore.pushLocals(paths, dest);
     } catch (e) {
-      fileStore.notifyError(filesFaultText(e));
+      listingStore.notifyError(filesFaultText(e));
     }
   };
 
@@ -90,15 +102,15 @@ export function FileView(props: DeviceSession) {
     const selectedPath = await dialogOpenFile({ title: "选择要上传的文件" });
     if (typeof selectedPath === "string") {
       const name = localBaseName(selectedPath) || "upload.bin";
-      void fileStore.push(selectedPath, name);
+      void transferStore.push(selectedPath, name);
     }
   };
 
   const onDownload = async (): Promise<void> => {
-    const file = fileStore.singleFile();
+    const file = listingStore.singleFile();
     if (!file) return;
     const dest = await dialogSaveFile({ defaultPath: file.name, title: "保存到本机" });
-    if (typeof dest === "string") void fileStore.pull(file.name, dest);
+    if (typeof dest === "string") void transferStore.pull(file.name, dest, file.size);
   };
 
   const closeDelete = (): void => {
@@ -131,7 +143,7 @@ export function FileView(props: DeviceSession) {
   const confirmDelete = (): void => {
     const names = deleteNames();
     setDeleteOpen(false);
-    void fileStore.removeMany(names);
+    void listingStore.removeMany(names);
   };
 
   const openCreate = (kind: CreateKind): void => {
@@ -142,7 +154,7 @@ export function FileView(props: DeviceSession) {
   };
 
   const createReady = (): boolean =>
-    validateEntryName(createName().trim()) === null && !fileStore.session.mutating;
+    validateEntryName(createName().trim()) === null && !listingStore.session.mutating;
 
   const confirmCreate = (): void => {
     const name = createName().trim();
@@ -154,32 +166,32 @@ export function FileView(props: DeviceSession) {
     }
     setCreateKind(null);
     if (!kind) return;
-    if (kind === "dir") void fileStore.mkdir(name);
-    else void fileStore.createFile(name);
+    if (kind === "dir") void listingStore.mkdir(name);
+    else void listingStore.createFile(name);
   };
 
   const copySelected = (): void => {
-    const names = fileStore.selection.names;
+    const names = listingStore.selection.names;
     if (names.length === 0) return;
-    const text = copyRemotePaths(fileStore.session.path, names);
-    void navigator.clipboard.writeText(text).catch((e) => fileStore.notifyError(filesFaultText(e)));
+    const text = copyRemotePaths(listingStore.session.path, names);
+    void navigator.clipboard.writeText(text).catch((e) => listingStore.notifyError(filesFaultText(e)));
   };
 
   const openSelected = (event: KeyboardEvent): void => {
-    const names = fileStore.selection.names;
+    const names = listingStore.selection.names;
     const focused =
       event.target instanceof Element ? event.target.closest<HTMLElement>("[data-key]")?.dataset.key : undefined;
     const name = names.length === 1 ? names[0] : names.length === 0 ? focused : undefined;
     if (!name) return;
-    const entry = fileStore.entries.find((item) => item.name === name);
+    const entry = listingStore.entries.find((item) => item.name === name);
     if (entry && (entry.kind === "dir" || entry.kind === "symlink")) {
-      void fileStore.enterDirectory(name);
+      void listingStore.enterDirectory(name);
     }
   };
 
   const onKeyAction = (action: FilesKeyAction, event: KeyboardEvent): void => {
     if (action === "select-all") {
-      fileStore.selectAll();
+      listingStore.selectAll();
       return;
     }
     if (action === "copy") {
@@ -187,15 +199,15 @@ export function FileView(props: DeviceSession) {
       return;
     }
     if (action === "delete") {
-      askDelete([...fileStore.selection.names]);
+      askDelete([...listingStore.selection.names]);
       return;
     }
     if (action === "refresh") {
-      void fileStore.refresh();
+      void listingStore.refresh();
       return;
     }
     if (action === "go-up") {
-      void fileStore.goUp();
+      void listingStore.goUp();
       return;
     }
     if (action === "edit-path") {
@@ -206,6 +218,8 @@ export function FileView(props: DeviceSession) {
   };
 
   onMount(() => {
+    listingStore.attachView();
+    onCleanup(() => listingStore.detachView());
     if (!pageEl) return;
     const stopKeys = attachPanelKeys(pageEl, {
       listSelector: FILES_LIST_SELECTOR,
@@ -214,29 +228,72 @@ export function FileView(props: DeviceSession) {
     });
     let stopDrag: (() => void) | undefined;
     let cancelled = false;
+    let destFrame = 0;
+    let destPoint = { x: 0, y: 0 };
+    const stopDestFrame = (): void => {
+      if (destFrame === 0) return;
+      cancelAnimationFrame(destFrame);
+      destFrame = 0;
+    };
     void onNativeDragDrop((event) => {
-      if (event.type === "leave") {
-        setDropHit({ accept: false });
+      const gate = {
+        hasDevice: Boolean(props.selectedSerials[0]),
+        blocked: deleteOpen() || createKind() !== null,
+      };
+      setDropSession((prev) => adoptDropSession(prev, dropSessionForEvent(event, gate)));
+      const intoFolder = dropIntoFolder();
+      const scale = window.devicePixelRatio;
+      if (
+        (event.type === "enter" || event.type === "over") &&
+        intoFolder &&
+        gate.hasDevice &&
+        !gate.blocked
+      ) {
+        destPoint = cssPointFromPhysical(event.position.x, event.position.y, scale);
+        if (destFrame === 0) {
+          destFrame = requestAnimationFrame(() => {
+            destFrame = 0;
+            const list = listEl;
+            if (!list) return;
+            const dirName = destDirFromEntries(
+              destPoint.x,
+              destPoint.y,
+              readListHitSpace(list, controlRowHeight()),
+              listingStore.entries,
+            );
+            setDropSession((prev) => dropSessionWithDir(prev, dirName));
+          });
+        }
         return;
       }
-      const hit = applyDropHit(event.x, event.y);
-      if (event.type === "drop") {
-        setDropHit({ accept: false });
-        onNativeDrop(event.paths, hit);
+      if (event.type !== "drop") {
+        stopDestFrame();
         return;
       }
-      setDropHit(hit);
+      stopDestFrame();
+      const commit = dropCommit(event, {
+        ...gate,
+        intoFolder,
+        folders: intoFolder && explorerEl ? readFolderTargets(explorerEl) : [],
+        scale,
+      });
+      if (!commit) {
+        YoLog.info("files", "投放未提交", { x: event.position.x, y: event.position.y, paths: event.paths.length });
+        return;
+      }
+      onNativeDrop(commit.paths, commit.dirName);
     }).then(
       (unlisten) => {
         if (cancelled) unlisten();
         else stopDrag = unlisten;
       },
       (error: unknown) => {
-        YoLog.error("files", "订阅 window/drag 失败", error);
+        YoLog.error("files", "订阅官方拖放失败", error);
       },
     );
     onCleanup(() => {
       cancelled = true;
+      stopDestFrame();
       stopKeys();
       stopDrag?.();
       closeContextMenu();
@@ -244,73 +301,82 @@ export function FileView(props: DeviceSession) {
   });
 
   const openListMenu = (x: number, y: number): void => {
-    const selected = fileStore.selection.names.length > 0;
+    const selected = listingStore.selection.names.length > 0;
     openContextMenu(filesListMenu, {
       x,
       y,
       ctx: {
-        canDownload: fileStore.singleFile() !== undefined,
+        canDownload: listingStore.singleFile() !== undefined,
         canDelete: selected,
         canCopy: selected,
         newFile: () => openCreate("file"),
         newDir: () => openCreate("dir"),
         download: () => void onDownload(),
         copy: copySelected,
-        remove: () => askDelete([...fileStore.selection.names]),
+        remove: () => askDelete([...listingStore.selection.names]),
       },
     });
   };
 
   return (
     <YoPage class="yohu-files" ref={(el) => { pageEl = el; }}>
-        <YoChrome title={ModuleTitle.Files} deviceLabel={props.selectedLabel ?? undefined} dropIgnore>
-          <YoButton onClick={() => void onUpload()}>上传</YoButton>
-          <YoButton variant="outlined" tone="neutral" disabled={fileStore.singleFile() === undefined} onClick={() => void onDownload()}>
-            下载
-          </YoButton>
-          <YoIconButton
-            icon="refresh"
-            title="刷新"
-            loading={fileStore.session.loading}
-            onClick={() => void fileStore.refresh()}
-          />
-          <YoButton
-            variant="ghost" tone="neutral"
-            aria-expanded={fileStore.ui.previewOpen}
-            onClick={() => fileStore.togglePreview()}
-          >
-            {fileStore.ui.previewOpen ? "收起预览" : "预览"}
-          </YoButton>
-        </YoChrome>
+      <YoChrome
+        title={ModuleTitle.Files}
+        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
+        dropIgnore
+      >
+        <YoButton onClick={() => void onUpload()}>上传</YoButton>
+        <YoButton variant="outlined" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
+          下载
+        </YoButton>
+        <YoIconButton
+          icon="refresh"
+          title="刷新"
+          loading={listingStore.session.loading}
+          onClick={() => void listingStore.refresh()}
+        />
+        <YoButton
+          variant="ghost" tone="neutral"
+          aria-expanded={listingStore.ui.previewOpen}
+          onClick={() => listingStore.togglePreview()}
+        >
+          {listingStore.ui.previewOpen ? "收起预览" : "预览"}
+        </YoButton>
+      </YoChrome>
 
       <div
-        class="yohu-files__stage yohu-recipe-rail"
-        classList={{ "yohu-files__stage--preview-collapsed": !fileStore.ui.previewOpen }}
+        class="yohu-files__stage yohu-recipe-preview"
+        classList={{ "yohu-files__stage--preview-collapsed": !listingStore.ui.previewOpen }}
       >
         <div
           class="yohu-files__explorer"
-          classList={{ "yohu-files__explorer--drop": dropCurrent() }}
           data-drop="files"
+          ref={(el) => { explorerEl = el; }}
         >
           <YoPanel
-            class="yohu-files__explorer-pane"
             variant="pane"
+            overflow="hidden"
+            edge={dropHot() ? "drop" : undefined}
             header={<AddressSlot api={(slot) => { addressSlot = slot; }} />}
           >
             <Show
               when={props.selectedSerials[0]}
               fallback={<YoEmptyState fill icon="folder" title="未选择设备" description="请在左侧设备栏选择在线设备" />}
             >
-              <FileTable dropDirName={dropDirName()} onContextMenu={openListMenu} />
+              <FileTable
+                dropDirName={dropDirName()}
+                listRef={(el) => { listEl = el; }}
+                onContextMenu={openListMenu}
+              />
             </Show>
           </YoPanel>
         </div>
-        <div class="yohu-files__preview-slot" data-drop="ignore" inert={!fileStore.ui.previewOpen ? true : undefined}>
+        <div class="yohu-files__preview-slot" data-drop="ignore" inert={!listingStore.ui.previewOpen ? true : undefined}>
           <PreviewPane />
         </div>
       </div>
       <div class="yohu-files__transfer-slot" data-drop="ignore">
-        <TransferPanel />
+        <TransferDock />
       </div>
 
       <div data-drop="ignore">
@@ -341,11 +407,13 @@ export function FileView(props: DeviceSession) {
             </>
           }
         >
-          <DeleteTargetList
-            names={deleteNames()}
-            expanded={deleteExpanded()}
-            onRemove={dropFromDelete}
-          />
+          <YoScroller>
+            <DeleteTargetList
+              names={deleteNames()}
+              expanded={deleteExpanded()}
+              onRemove={dropFromDelete}
+            />
+          </YoScroller>
         </YoDialog>
 
         <YoDialog
@@ -363,21 +431,23 @@ export function FileView(props: DeviceSession) {
             </>
           }
         >
-          <YoTextField
-            block
-            label="名称"
-            value={createName()}
-            onInput={(v) => {
-              setCreateName(v);
-              setCreateError(validateEntryName(v) ?? "");
-            }}
-            ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}
-          />
-          <Show when={createError()}>
-            <YoCorner role="control" class="yohu-files__error">
-              {createError()}
-            </YoCorner>
-          </Show>
+          <YoScroller>
+            <YoTextField
+              block
+              label="名称"
+              value={createName()}
+              onInput={(v) => {
+                setCreateName(v);
+                setCreateError(validateEntryName(v) ?? "");
+              }}
+              ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}
+            />
+            <Show when={createError()}>
+              <YoCorner role="control" class="yohu-files__error" flex="hug" pad="xs">
+                {createError()}
+              </YoCorner>
+            </Show>
+          </YoScroller>
         </YoDialog>
       </div>
       <YoToaster toaster={toaster} />

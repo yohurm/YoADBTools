@@ -239,17 +239,35 @@ impl ProcessRunner {
         })
     }
 
-    /// 流式命令：stdout 逐行经 `line_tx` 转发；非零退出为 [`ProcessError::BadExit`]。
-    ///
-    /// 计划稿曾写 `spawn_streaming`；实现名强调「跑到退出或取消」。
-    /// 通路：stdout 泵行 → stdout EOF → 排空 stderr（通道关闭或取消）→ `wait`。
-    /// 泵 Io/Truncated 与取消仍 fail-closed（drop 接收端 + abort + reap）。
+    /// logcat：只转发 stdout。传输进度走 [`Self::run_streaming_joined`]。
     pub async fn run_streaming(
         &self,
         program: &Path,
         args: &[String],
         cancel: CancellationToken,
         line_tx: mpsc::Sender<String>,
+    ) -> Result<i32, ProcessError> {
+        self.stream(program, args, cancel, line_tx, false).await
+    }
+
+    /// 传输：stdout 与 stderr 行都进 `line_tx`。adb push/pull 摘要在 stderr。
+    pub async fn run_streaming_joined(
+        &self,
+        program: &Path,
+        args: &[String],
+        cancel: CancellationToken,
+        line_tx: mpsc::Sender<String>,
+    ) -> Result<i32, ProcessError> {
+        self.stream(program, args, cancel, line_tx, true).await
+    }
+
+    async fn stream(
+        &self,
+        program: &Path,
+        args: &[String],
+        cancel: CancellationToken,
+        line_tx: mpsc::Sender<String>,
+        join_stderr: bool,
     ) -> Result<i32, ProcessError> {
         let mut child = self.spawn(program, args)?;
         let stdout = child.stdout.take();
@@ -278,7 +296,15 @@ impl ProcessRunner {
                     }
                     chunk = stderr_rx.recv(), if !stderr_done => {
                         match chunk {
-                            Some(c) => stderr_text.push_str(&c),
+                            Some(c) => {
+                                stderr_text.push_str(&c);
+                                if join_stderr {
+                                    if let Err(e) = forward_line(&line_tx, &c, &cancel).await {
+                                        stop = Some(e);
+                                        break;
+                                    }
+                                }
+                            }
                             None => stderr_done = true,
                         }
                     }
@@ -339,7 +365,17 @@ impl ProcessRunner {
                 }
                 chunk = stderr_rx.recv() => {
                     match chunk {
-                        Some(c) => stderr_text.push_str(&c),
+                        Some(c) => {
+                            stderr_text.push_str(&c);
+                            if join_stderr {
+                                if let Err(e) = forward_line(&line_tx, &c, &cancel).await {
+                                    drop(stderr_rx);
+                                    abort_task(stderr_task.take());
+                                    reap(&mut child).await;
+                                    return Err(e);
+                                }
+                            }
+                        }
                         None => stderr_done = true,
                     }
                 }
@@ -439,6 +475,28 @@ async fn join_pump_task(
             result
         }
         None => std::future::pending().await,
+    }
+}
+
+async fn forward_line(
+    line_tx: &mpsc::Sender<String>,
+    chunk: &str,
+    cancel: &CancellationToken,
+) -> Result<(), ProcessError> {
+    let line = chunk.trim_end_matches(['\r', '\n']);
+    if line.is_empty() {
+        return Ok(());
+    }
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(ProcessError::Cancelled),
+        sent = line_tx.send(line.to_string()) => {
+            if sent.is_err() {
+                Err(ProcessError::Cancelled)
+            } else {
+                Ok(())
+            }
+        }
     }
 }
 
@@ -597,5 +655,29 @@ mod tests {
             }
             other => panic!("期望 BadExit，得到 {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn run_streaming_joined_forwards_stderr_lines() {
+        let runner = ProcessRunner;
+        let cancel = CancellationToken::new();
+        let (tx, mut rx) = mpsc::channel::<String>(32);
+        let (program, args) = stderr_burst_after_stdout_close();
+        let job_cancel = cancel.clone();
+        let join = tokio::spawn(async move {
+            runner
+                .run_streaming_joined(program, &args, job_cancel, tx)
+                .await
+        });
+        let mut saw_stderr = false;
+        while let Some(line) = rx.recv().await {
+            if line.contains("stderr-line-1") {
+                saw_stderr = true;
+                cancel.cancel();
+                break;
+            }
+        }
+        assert!(saw_stderr, "joined 必须把 stderr 行交给 line_tx");
+        let _ = join.await;
     }
 }

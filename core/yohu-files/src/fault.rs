@@ -30,6 +30,8 @@ pub enum FileError {
     Local(String),
     #[error("传输进度通道已关闭")]
     ProgressClosed,
+    #[error("传输进度任务已中断")]
+    ProgressJoin,
     #[error("没有可拖出的项目: {0}")]
     EmptyTree(String),
     #[error("拖出目录超过 {0} 项")]
@@ -162,10 +164,7 @@ mod tests {
             FileError::Adb(AdbError::Timeout)
         ));
         assert!(matches!(
-            file_error_from_adb(
-                "/sdcard",
-                AdbError::Io(std::io::Error::other("pipe"))
-            ),
+            file_error_from_adb("/sdcard", AdbError::Io(std::io::Error::other("pipe"))),
             FileError::Adb(AdbError::Io(_))
         ));
     }
@@ -221,6 +220,12 @@ mod tests {
             "本地操作失败: /tmp/partial.bin"
         );
         assert_eq!(FileError::ProgressClosed.to_string(), "传输进度通道已关闭");
+        assert_eq!(FileError::ProgressJoin.to_string(), "传输进度任务已中断");
+        assert!(!matches!(FileError::ProgressJoin, FileError::Adb(_)));
+        let join_text = FileError::ProgressJoin.to_string();
+        assert!(!join_text.to_ascii_lowercase().contains("panic"));
+        assert!(!join_text.contains("JoinError"));
+        assert!(!join_text.contains("io"));
         assert_eq!(
             FileError::EmptyTree("/sdcard/DCIM".into()).to_string(),
             "没有可拖出的项目: /sdcard/DCIM"

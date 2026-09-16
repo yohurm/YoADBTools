@@ -52,32 +52,12 @@ describe("文件表头布局契约", () => {
     const path = filesCss.match(/\.yohu-files__path\s*\{[^}]*\}/)?.[0] ?? "";
     expect(path).toContain("width: 100%");
     expect(path).toContain("cursor: default");
-    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*width:\s*max-content/);
-    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*flex:\s*0 1 auto/);
-    expect(filesCss).not.toMatch(/\.yohu-files__slot-hit\s*\{[^}]*flex:\s*1 1 auto/);
-    expect(filesCss).toMatch(/\.yohu-files__crumbs\[inert\]\s*\{[^}]*display:\s*none/);
-    expect(filesCss).toMatch(/\.yohu-files__field\[data-gate\]\s*\{[^}]*pointer-events:\s*none/);
+    expect(filesCss).not.toContain(".yohu-files__slot");
+    expect(filesCss).not.toContain(".yohu-files__field");
+    expect(filesCss).not.toContain(".yohu-files__crumb");
   });
 
-  it("路径行只有一条地址槽：展开与收回共用 clip-path", () => {
-    expect(filesCss).toContain(".yohu-files__slot");
-    expect(filesCss).toContain(".yohu-files__slot-hit");
-    expect(filesCss).toContain(".yohu-files__field");
-    expect(filesCss).toContain("grid-area: 1 / 1");
-    expect(filesCss).toContain("clip-path: inset(0 100% 0 0)");
-    expect(filesCss).toContain("clip-path var(--yohu-motion-spatial-local)");
-    expect(filesCss).not.toContain("width var(--yohu-motion-spatial-local)");
-    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*width:\s*max-content/);
-    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*max-width:\s*100%/);
-    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*justify-self:\s*start/);
-    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*(?<![-])width:\s*100%/);
-    const fieldInput = filesCss.match(/\.yohu-files__field-input\s*\{[^}]*\}/)?.[0] ?? "";
-    expect(fieldInput).toContain("field-sizing: content");
-    expect(fieldInput).toContain("width: auto");
-    expect(fieldInput).toContain("min-width: 0");
-    expect(fieldInput).not.toMatch(/min-width:\s*100%/);
-    expect(fieldInput).not.toMatch(/(?<![-])width:\s*100%/);
-    expect(fieldInput).not.toMatch(/flex:\s*1/);
+  it("路径行只留上级与槽位，地址铬在 YoAddressField", () => {
     expect(filesCss).not.toContain("[data-leave");
     expect(filesCss).not.toContain("effects-exit");
     expect(filesCss).not.toContain(".yohu-files__address");
@@ -87,26 +67,32 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toContain("100cqi");
     expect(filesCss).not.toContain("container-type");
     expect(filesCss).not.toContain(".yohu-text-field");
-    expect(filesCss).toMatch(/\.yohu-files__field\s*\{[^}]*--yohu-corner-stroke:\s*var\(--yohu-accent\)/);
-    expect(filesCss).toContain(".yohu-files__field-chrome");
-    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*border:\s*var\(--yohu-stroke-hairline\)/);
-    expect(filesCss).not.toMatch(/\.yohu-files__field\s*\{[^}]*border-radius:/);
-    expect(filesCss).toMatch(/\.yohu-files__slot\s*\{[^}]*height:\s*var\(--yohu-control-height\)/);
+    expect(filesCss).not.toContain(".yohu-address");
   });
 
-  it("拖入高亮走 accent token", () => {
-    expect(filesCss).toContain(".yohu-files__explorer--drop");
-    expect(filesCss).toContain(".yohu-files__row--drop");
-    expect(filesCss).toContain("var(--yohu-accent-soft)");
-    expect(filesCss).toContain("var(--yohu-accent)");
-    expect(filesCss).toContain("var(--yohu-stroke-accent)");
-    const drop =
-      filesCss.match(/\.yohu-files__explorer--drop\s+\.yohu-files__explorer-pane\s*\{[^}]*\}/)?.[0] ?? "";
-    expect(drop).toContain("outline:");
-    expect(drop).toContain("var(--yohu-accent-soft)");
+  it("拖入高亮走 YoPanel edge + VirtualList hotKey，模块不写行铬", () => {
+    const tableCandidates = [
+      resolve(process.cwd(), "src/FileTable.tsx"),
+      resolve(process.cwd(), "packages/modules/files/src/FileTable.tsx"),
+    ];
+    const table =
+      tableCandidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ??
+      "";
+    expect(table).toContain("hotKey");
+    expect(table).not.toContain("FileTableBind");
+    expect(table).not.toContain("yohu-files__row--drop");
+    expect(filesCss).not.toContain(".yohu-files__row--drop");
+    expect(filesCss).not.toContain("yohu-files__explorer-pane--drop");
+    expect(filesCss).not.toContain("--yohu-corner-edge");
+    expect(filesCss).not.toMatch(/\.yohu-files__explorer--drop\s*\{[^}]*outline:/);
     expect(filesCss).not.toContain(".yohu-empty-state");
     expect(filesCss).not.toContain(".yohu-loading");
     expect(filesCss).not.toContain(".yohu-panel");
+    expect(filesCss).not.toContain(".yohu-panel__body");
+    expect(filesCss).not.toContain(".yohu-dialog__body");
+    expect(filesCss).not.toContain(":has(");
+    expect(filesCss).not.toContain("__content");
+    expect(filesCss).not.toContain("__scroller");
   });
 });
 
@@ -132,18 +118,22 @@ function loadAddressSlot(): string {
   return "";
 }
 
-describe("地址铬 clip 时长", () => {
-  it("只消费 spatialLocal，不加 50", () => {
+describe("地址槽接线", () => {
+  it("只挂 YoAddressField，不自造输入", () => {
     const slot = loadAddressSlot();
-    expect(slot).toContain('motionSpecMs("spatialLocal")');
-    expect(slot).not.toMatch(/spatialLocal"\)\s*\+\s*50/);
+    expect(slot).toContain("YoAddressField");
+    expect(slot).not.toContain("<input");
+    expect(slot).not.toContain("./address-edit");
+    expect(slot).not.toContain("addressClickKind");
+    expect(slot).not.toContain("addressDismissOutside");
+    expect(slot).not.toContain("addressOpenCaret");
   });
 });
 
-function loadTransferPanel(): string {
+function loadTransferDock(): string {
   const candidates = [
-    resolve(process.cwd(), "src/TransferPanel.tsx"),
-    resolve(process.cwd(), "packages/modules/files/src/TransferPanel.tsx"),
+    resolve(process.cwd(), "src/TransferDock.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/TransferDock.tsx"),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
@@ -153,22 +143,35 @@ function loadTransferPanel(): string {
   return "";
 }
 
-const transferPanel = loadTransferPanel();
+const transferDock = loadTransferDock();
 
-describe("传输面板开合契约", () => {
-  it("整块走 Presence rise，列表走一层 YoCollapse panel，箭头走 tree-chevron", () => {
-    expect(transferPanel).toContain('recipe="rise"');
-    expect(transferPanel).toContain("YoPresence");
-    expect(transferPanel.match(/<YoCollapse /g)?.length).toBe(1);
-    expect(transferPanel).toContain('recipe="panel"');
-    expect(transferPanel).toContain("yohu-recipe-tree-chevron");
-    expect(transferPanel).toContain("toggleTransfers");
+describe("传输坞开合契约", () => {
+  it("整块走 Presence rise，列表走一层 YoCollapse，行不套第二张卡", () => {
+    expect(transferDock).toContain('recipe="rise"');
+    expect(transferDock).toContain("YoPresence");
+    expect(transferDock.match(/<YoCollapse /g)?.length).toBe(1);
+    expect(transferDock).toContain('recipe="panel"');
+    expect(transferDock).not.toMatch(/<YoScroller[\s>]/);
+    expect(transferDock).not.toMatch(/<YoCorner[\s>]/);
+    expect(transferDock).toContain("yohu-recipe-tree-chevron");
+    expect(transferDock).toContain("toggleTransfers");
+    expect(transferDock).toContain("YoButton");
+    expect(transferDock).toContain("block");
+    expect(transferDock).not.toContain("<button");
+    expect(transferDock).not.toContain("TransferPanel");
+    expect(transferDock).not.toContain("overflowX");
   });
 
-  it("模块 CSS 不自写 animation，列表帽高走 layout token", () => {
+  it("模块 CSS 不自写 animation / 原生 overflow auto，帽高走 layout token", () => {
     expect(filesCss).not.toMatch(/animation\s*:/);
+    expect(filesCss).not.toMatch(/overflow:\s*auto/);
+    expect(filesCss).not.toMatch(/overflow-y:\s*auto/);
+    expect(filesCss).not.toMatch(/overflow:\s*scroll/);
+    expect(filesCss).not.toMatch(/overflow-y:\s*scroll/);
     expect(filesCss).toContain(".yohu-files__transfer-bar");
     expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
+    expect(filesCss).not.toContain(".yohu-files__transfer-viewport");
+    expect(filesCss).not.toContain(".yohu-files__transfer-chrome");
   });
 });
 
@@ -191,6 +194,17 @@ describe("预览图标尺寸", () => {
   it("只消费 Layout.IconPreview，不写死 48", () => {
     expect(previewPane).toContain("Layout.IconPreview");
     expect(previewPane).not.toMatch(/size=\{48\}/);
+    expect(previewPane).toContain('overflow="hidden"');
+    expect(previewPane).toContain("YoEmptyState");
+    expect(previewPane).toContain("YoScroller");
+    expect(previewPane).toContain("YoDescriptionList");
+    expect(previewPane).not.toContain("<dl");
+    expect(previewPane).not.toContain("yohu-files__preview-empty");
+    expect(previewPane).not.toContain("overflowX");
+    expect(filesCss).not.toContain(".yohu-files__preview-empty");
+    expect(filesCss).not.toContain(".yohu-files__preview-meta");
+    expect(filesCss).not.toContain(".yohu-scroller");
+    expect(filesCss).not.toContain(".yohu-scroller__view");
   });
 });
 
@@ -208,6 +222,45 @@ function loadFileView(): string {
 }
 
 const fileView = loadFileView();
+
+function loadDrop(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/drop.ts"),
+    resolve(process.cwd(), "packages/modules/files/src/drop.ts"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const dropSrc = loadDrop();
+
+describe("官方拖放契约", () => {
+  it("api 形状进 dest；换算不读 globalThis", () => {
+    expect(dropSrc).toContain("NativeDragDropEvent");
+    expect(dropSrc).toContain("cssPointFromPhysical");
+    expect(dropSrc).not.toContain("DropDragEvent");
+    expect(dropSrc).not.toContain("devicePixelRatio");
+    expect(dropSrc).not.toContain("globalThis");
+    expect(dropSrc).not.toContain("files.dropIn");
+    expect(fileView).toContain("yohu-recipe-preview");
+    expect(fileView).not.toContain("yohu-recipe-rail");
+    expect(fileView).toContain("onNativeDragDrop");
+    expect(fileView).toContain("listRef");
+    expect(fileView).not.toContain('querySelector(".yohu-virtual-list")');
+    expect(fileView).not.toContain("files.dropIn");
+    expect(fileView).not.toContain("ondrop=");
+    expect(fileView).toContain('edge={dropHot() ? "drop" : undefined}');
+    expect(fileView).not.toContain("explorer-pane--drop");
+    expect(fileView).not.toContain("yohu-files__explorer-pane");
+    expect(fileView).not.toContain("deviceLabel");
+    expect(fileView).toContain("selectedLabel");
+    expect(fileView).not.toContain("overflowX");
+  });
+});
 
 function loadDeleteTargets(): string {
   const candidates = [
@@ -229,17 +282,43 @@ describe("确认删除多文件契约", () => {
     expect(fileView).toContain("DeleteConfirm");
     expect(fileView).toContain("DeleteTargetList");
     expect(fileView).toContain("DeleteExpand");
+    expect(fileView).toContain("YoScroller");
     expect(fileView).toContain("bodyLead");
     expect(fileView).toContain("bodyTail");
     expect(fileView).not.toContain('bodyOverflow="hidden"');
     expect(fileView).toContain('initial="footer"');
     expect(fileView).not.toContain('join("、")');
     const deleteFooter = fileView.slice(fileView.indexOf("确认删除"), fileView.indexOf("新建目录"));
+    expect(deleteFooter).toMatch(/<YoScroller[\s>]/);
     expect(deleteFooter).toContain('variant="ghost"');
     expect(deleteFooter).toContain('tone="accent"');
     expect(deleteFooter).toContain('tone="danger"');
     expect(deleteFooter).not.toContain('tone="neutral"');
+    const createDialog = fileView.slice(fileView.indexOf("新建目录"));
+    expect(createDialog).toMatch(/<YoScroller[\s>]/);
+    expect(createDialog).toContain("YoTextField");
+    expect(createDialog).toContain("YoCorner");
     expect(fileView).toContain("createReady");
+    expect(fileView).toContain("TransferDock");
+    expect(fileView).not.toContain("TransferPanel");
+    expect(fileView).toContain('overflow="hidden"');
+    expect(fileView).toContain("attachView");
+    expect(fileView).toContain("dropSessionForEvent");
+    expect(fileView).toContain("adoptDropSession");
+    expect(fileView).toContain("destDirFromEntries");
+    expect(fileView).not.toContain("destDirName(");
+    expect(fileView).toContain("dropCommit");
+    expect(fileView).toContain("event.position");
+    expect(fileView).toContain("devicePixelRatio");
+    expect(fileView).not.toContain("event.x");
+    expect(fileView).not.toContain("resolveDropAt");
+    expect(fileView).not.toContain("applyDropEvent");
+    expect(fileView).not.toContain("elementFromPoint");
+    expect(fileView).not.toContain("pointInElement");
+    expect(fileView).not.toContain("files.dropIn");
+    expect(fileView).not.toContain("ondrop=");
+    expect(fileView).not.toContain("DataTransfer.files");
+    expect(fileView).toContain("dropHot");
   });
 
   it("open 独立于名单，出场后再清载荷", () => {
@@ -291,5 +370,27 @@ describe("确认删除多文件契约", () => {
     const deleteBlock = filesCss.slice(filesCss.indexOf(".yohu-files__confirm {"));
     expect(deleteBlock).not.toMatch(/overflow:\s*auto/);
     expect(deleteBlock).not.toMatch(/overflow-y:\s*auto/);
+  });
+});
+
+describe("磁盘幽灵", () => {
+  it("address-edit / TransferPanel / store / progress 已不在磁盘", () => {
+    const names = [
+      "address-edit.ts",
+      "address-edit.test.ts",
+      "TransferPanel.tsx",
+      "TransferPanel.test.tsx",
+      "store.ts",
+      "store.test.ts",
+      "progress.ts",
+      "progress.test.ts",
+    ];
+    for (const name of names) {
+      const candidates = [
+        resolve(process.cwd(), `src/${name}`),
+        resolve(process.cwd(), `packages/modules/files/src/${name}`),
+      ];
+      expect(candidates.some((path) => existsSync(path)), name).toBe(false);
+    }
   });
 });

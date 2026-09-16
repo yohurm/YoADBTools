@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_files::{FileBrowser, FileMutator, TransferRunner, TransferSpec};
-use yohu_protocol::{AppEvent, Direction};
+use yohu_protocol::{AppEvent, Direction, TransferState};
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -82,7 +82,7 @@ async fn real_browse_and_transfer_roundtrip() {
     let remote = format!("/sdcard/yohu-real-test-{stamp}.txt");
 
     let runner = TransferRunner::new(client.clone());
-    let (tx, _rx) = mpsc::channel::<AppEvent>(16);
+    let (tx, mut rx) = mpsc::channel::<AppEvent>(16);
     let pushed = runner
         .run(
             TransferSpec {
@@ -91,6 +91,7 @@ async fn real_browse_and_transfer_roundtrip() {
                 direction: Direction::Push,
                 local: local.to_string_lossy().into_owned(),
                 remote: remote.clone(),
+                expected_bytes: None,
             },
             CancellationToken::new(),
             tx.clone(),
@@ -98,6 +99,16 @@ async fn real_browse_and_transfer_roundtrip() {
         .await
         .expect("push 失败");
     assert_eq!(pushed, content.len() as u64, "push 字节数应等于内容长度");
+    let mut last_push = None;
+    while let Ok(ev) = rx.try_recv() {
+        if let AppEvent::TransferProgress(p) = ev {
+            last_push = Some(p);
+        }
+    }
+    let last = last_push.expect("push 应有终态进度");
+    assert_eq!(last.state, TransferState::Done);
+    assert!(last.fault.is_none());
+    assert_eq!(last.bytes, content.len() as u64);
     eprintln!("[真机] push 完成: {remote} ({pushed} bytes)");
 
     // 3) pull 回来并比对内容
@@ -110,6 +121,7 @@ async fn real_browse_and_transfer_roundtrip() {
                 direction: Direction::Pull,
                 local: pulled_path.to_string_lossy().into_owned(),
                 remote: remote.clone(),
+                expected_bytes: Some(content.len() as u64),
             },
             CancellationToken::new(),
             tx.clone(),
@@ -218,6 +230,7 @@ async fn real_transfer_cancel_midflight() {
         direction: Direction::Pull,
         local: local.to_string_lossy().into_owned(),
         remote: format!("/storage/emulated/0/{}", big.name),
+        expected_bytes: Some(big.size),
     };
     let handle = tokio::spawn({
         let runner = runner.clone();
@@ -245,6 +258,17 @@ async fn real_transfer_cancel_midflight() {
     assert!(result.is_ok(), "join 失败");
     let outcome = result.expect("checked");
     assert!(outcome.is_err(), "取消应返回错误");
+    let mut last = None;
+    while let Ok(ev) = rx.try_recv() {
+        if let AppEvent::TransferProgress(p) = ev {
+            last = Some(p);
+        }
+    }
+    if let Some(p) = last {
+        if p.state == TransferState::Cancelled {
+            assert!(p.fault.is_none(), "取消不带 fault");
+        }
+    }
     eprintln!("[真机] 取消生效: {outcome:?}");
     let _ = std::fs::remove_file(&local);
 }

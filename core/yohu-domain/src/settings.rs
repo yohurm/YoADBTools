@@ -129,6 +129,9 @@ pub fn apply_setting(
         SettingKey::TerminalPrependAdb => {
             settings.terminal_prepend_adb = must_bool(key, value)?;
         }
+        SettingKey::FilesDropIntoFolder => {
+            settings.files_drop_into_folder = must_bool(key, value)?;
+        }
         SettingKey::TerminalTimeFormat => {
             settings.terminal_time_format = must_clock_format(key, value)?;
         }
@@ -177,6 +180,8 @@ mod tests {
         assert!(!s.terminal_prepend_adb);
         apply_setting(&mut s, SettingKey::TerminalPrependAdb, &json!(true)).unwrap();
         assert!(s.terminal_prepend_adb);
+        apply_setting(&mut s, SettingKey::FilesDropIntoFolder, &json!(true)).unwrap();
+        assert!(s.files_drop_into_folder);
     }
 
     #[test]

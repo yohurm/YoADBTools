@@ -112,12 +112,40 @@ impl AdbClient {
         cancel: CancellationToken,
         line_tx: mpsc::Sender<String>,
     ) -> Result<i32, AdbError> {
+        self.stream_with(serial, argv, cancel, line_tx, false).await
+    }
+
+    /// 传输进度：stdout ∪ stderr 行。adb push/pull 摘要在 stderr。
+    pub async fn stream_progress_lines(
+        &self,
+        serial: &str,
+        argv: &[String],
+        cancel: CancellationToken,
+        line_tx: mpsc::Sender<String>,
+    ) -> Result<i32, AdbError> {
+        self.stream_with(serial, argv, cancel, line_tx, true).await
+    }
+
+    async fn stream_with(
+        &self,
+        serial: &str,
+        argv: &[String],
+        cancel: CancellationToken,
+        line_tx: mpsc::Sender<String>,
+        join_stderr: bool,
+    ) -> Result<i32, AdbError> {
         let adb = self.resolve_adb()?;
-        match self
-            .runner
-            .run_streaming(&adb, &Self::argv_with_serial(serial, argv), cancel, line_tx)
-            .await
-        {
+        let argv = Self::argv_with_serial(serial, argv);
+        let result = if join_stderr {
+            self.runner
+                .run_streaming_joined(&adb, &argv, cancel, line_tx)
+                .await
+        } else {
+            self.runner
+                .run_streaming(&adb, &argv, cancel, line_tx)
+                .await
+        };
+        match result {
             Ok(code) => Ok(code),
             Err(ProcessError::BadExit { stderr, .. }) if is_device_offline(&stderr) => {
                 Err(AdbError::DeviceOffline(stderr.trim().to_string()))

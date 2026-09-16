@@ -2,7 +2,7 @@
  * 确认删除对象：确认文案 / Chip 网格 / 展开钮。
  * 预览格与其余格是兄弟：其余走 YoReveal（绘制轴始终绝对定位），高度交给祖先 YoTravel。
  * 禁止把 Reveal 嵌进预览网格当一格。禁止套 Collapse / panel 淡入去冒充实收。
- * 三截分别进 YoDialog bodyLead / children / bodyTail，Reveal 只住 YoScroller 视口。
+ * 三截分别进 YoDialog bodyLead / children / bodyTail；children 由调用方组合 YoScroller，Reveal 只住视口。
  */
 
 import { For, Show } from "solid-js";
@@ -10,7 +10,7 @@ import { For, Show } from "solid-js";
 import { Layout, YoButton, YoChip, YoFileIcon, YoReveal, type YoFileIconProps } from "@yohu/ui";
 
 import { DELETE_PREVIEW_LIMIT, canToggleDelete } from "./delete-targets";
-import { fileStore } from "./store";
+import { listingStore } from "./listing";
 
 export interface DeleteTargetsProps {
   names: string[];
@@ -20,7 +20,7 @@ export interface DeleteTargetsProps {
 }
 
 function entryKind(name: string): YoFileIconProps["kind"] {
-  return fileStore.entries.find((entry) => entry.name === name)?.kind ?? "file";
+  return listingStore.entries.find((entry) => entry.name === name)?.kind ?? "file";
 }
 
 function DeleteChip(props: { name: string; onRemove: (name: string) => void }) {

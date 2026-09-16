@@ -1,11 +1,11 @@
 /* ============================================================================
  * 文件管理（UI设计系统-v6.md §4.3）。
- * 路径行（上级 + 地址铬 hug：浏览=面包屑+短热区，编辑=输入盒；盒外不是路径栏；clip 只打铬）→ 四列清单（名称定宽截断 / 类型 / 大小 / 日期吃剩余；
+ * 路径行（上级 + 公开 YoAddressField；盒外不是路径栏）→ 四列清单（名称定宽截断 / 类型 / 大小 / 日期吃剩余；
  * 表头轨道走 YoColHeader（悬浮片与文案边距分权）；行间 hairline 走 YoVirtualList tone=list，背板 canvas）
- * + 独立预览分区 → 传输面板（Presence rise + Collapse panel 双轨；终态 3s 淡出）。
+ * + 独立预览分区 → 传输坞（Presence rise + Collapse 插高；行即作业；终态 3s 淡出）。
  * ========================================================================== */
 
-/* ===== 路径行：上级 + 地址铬 hug（盒外不是路径栏；收回只 clip 输入铬） ===== */
+/* ===== 路径行：上级 + 公开 YoAddressField（盒外不是路径栏） ===== */
 
 .yohu-files__path {
   display: flex;
@@ -22,142 +22,6 @@
   flex: 0 0 auto;
   display: inline-flex;
   cursor: default;
-}
-
-.yohu-files__slot {
-  display: grid;
-  grid-template-columns: max-content;
-  grid-template-rows: minmax(0, 1fr);
-  flex: 0 1 auto;
-  width: max-content;
-  max-width: 100%;
-  min-width: 0;
-  height: var(--yohu-control-height);
-  overflow: hidden;
-}
-
-.yohu-files__crumbs,
-.yohu-files__field {
-  grid-area: 1 / 1;
-}
-
-.yohu-files__crumbs {
-  display: flex;
-  align-items: stretch;
-  gap: var(--yohu-space-xs);
-  min-width: 0;
-  width: max-content;
-  max-width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.yohu-files__crumbs[inert] {
-  display: none;
-}
-
-.yohu-files__slot-hit {
-  flex: 0 0 auto;
-  align-self: stretch;
-  min-width: var(--yohu-space-lg);
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: text;
-}
-
-/* 路径编辑揭开层：同格 clip，盒跟文字 hug，不铺满槽剩余。铬走 YoCorner，不是第二套 YoTextField 皮。 */
-.yohu-files__field {
-  --yohu-corner-fill: var(--yohu-canvas);
-  --yohu-corner-stroke: var(--yohu-accent);
-  display: flex;
-  align-items: center;
-  justify-self: start;
-  width: max-content;
-  max-width: 100%;
-  min-width: 0;
-  height: 100%;
-  box-sizing: border-box;
-  pointer-events: none;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  clip-path: inset(0 100% 0 0);
-  transition: clip-path var(--yohu-motion-spatial-local);
-}
-
-.yohu-files__field-chrome.yohu-corner[data-mode="host"] {
-  height: 100%;
-  flex: 0 0 auto;
-}
-
-.yohu-files__field-chrome .yohu-corner__content {
-  flex-direction: row;
-  align-items: stretch;
-  height: 100%;
-}
-
-.yohu-files__field[data-reveal="1"] {
-  clip-path: inset(0 0 0 0);
-  pointer-events: auto;
-}
-
-.yohu-files__field[data-gate] {
-  pointer-events: none;
-}
-
-.yohu-files__field--invalid {
-  --yohu-corner-stroke: var(--yohu-error);
-}
-
-.yohu-files__field-input {
-  display: block;
-  flex: 0 0 auto;
-  field-sizing: content;
-  width: auto;
-  min-width: 0;
-  max-width: none;
-  height: 100%;
-  margin: 0;
-  padding: 0 var(--yohu-space-md);
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--yohu-fg);
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-body);
-  box-sizing: border-box;
-}
-
-.yohu-files__crumb {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 1 auto;
-  border: none;
-  background: transparent;
-  color: var(--yohu-fg-2);
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-body);
-  cursor: pointer;
-  padding: 0 var(--yohu-space-xs);
-  border-radius: var(--yohu-radius-xs);
-  max-width: var(--yohu-layout-crumb-max);
-  --yohu-ripple-radius: var(--yohu-radius-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.yohu-files__crumb--current {
-  color: var(--yohu-fg);
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
-.yohu-files__crumb-sep {
-  flex: 0 0 auto;
-  align-self: center;
-  color: var(--yohu-fg-3);
-  font-size: var(--yohu-font-caption);
 }
 
 /* ===== 主体：圆角分区（清单 | 预览 | 传输） ===== */
@@ -192,18 +56,6 @@
   min-height: 0;
   min-width: 0;
   height: 100%;
-}
-
-/* 描边和软底画在模块自己的 pane class 上；不透明卡片会盖住 explorer 宿主底。 */
-.yohu-files__explorer--drop .yohu-files__explorer-pane {
-  outline: var(--yohu-stroke-accent) dashed var(--yohu-accent);
-  outline-offset: calc(var(--yohu-stroke-hairline) * -1);
-  background-color: var(--yohu-accent-soft);
-}
-
-.yohu-files__row--drop {
-  background-color: var(--yohu-accent-soft);
-  box-shadow: inset 0 0 0 var(--yohu-stroke-accent) var(--yohu-accent);
 }
 
 .yohu-files__table {
@@ -283,10 +135,10 @@
   margin-left: var(--yohu-space-md);
 }
 
-.yohu-files__preview-empty {
-  padding: var(--yohu-space-md);
-  color: var(--yohu-fg-3);
-  font-size: var(--yohu-font-caption);
+.yohu-files__preview-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
 .yohu-files__preview-body {
@@ -303,26 +155,7 @@
   word-break: break-all;
 }
 
-.yohu-files__preview-meta {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--yohu-space-xs) var(--yohu-space-sm);
-  width: 100%;
-  margin: 0;
-  font-size: var(--yohu-font-caption);
-}
-
-.yohu-files__preview-meta dt {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-files__preview-meta dd {
-  margin: 0;
-  color: var(--yohu-fg);
-  font-family: var(--yohu-font-mono);
-}
-
-/* ===== 传输列表（容器走 YoPanel；开合走 YoCollapse） ===== */
+/* ===== 传输坞（容器 YoPanel；开合 YoCollapse；行即作业，不套第二张卡） ===== */
 
 .yohu-files__transfer-slot {
   flex-shrink: 0;
@@ -339,15 +172,7 @@
   align-items: center;
   gap: var(--yohu-space-sm);
   width: 100%;
-  min-height: var(--yohu-control-height);
-  padding: 0 var(--yohu-space-sm) 0 var(--yohu-space-md);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--yohu-font-sans);
-  text-align: left;
-  color: inherit;
-  box-sizing: border-box;
+  min-width: 0;
 }
 
 .yohu-files__transfer-title {
@@ -371,31 +196,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--yohu-space-xs);
-  padding: 0 var(--yohu-space-sm) var(--yohu-space-sm);
   max-height: var(--yohu-layout-output-max);
-  overflow: auto;
+  padding: 0 var(--yohu-space-sm) var(--yohu-space-sm);
   box-sizing: border-box;
 }
 
 .yohu-files__transfer {
-  --yohu-corner-fill: var(--yohu-surface-2);
-  --yohu-corner-stroke: transparent;
   display: flex;
-}
-
-.yohu-files__transfer-chrome {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.yohu-files__transfer-chrome .yohu-corner__content {
-  flex-direction: row;
+  align-items: flex-start;
   gap: var(--yohu-space-sm);
+  min-width: 0;
   padding: var(--yohu-space-sm) var(--yohu-space-md);
+  background-color: var(--yohu-surface-2);
 }
 
 .yohu-files__transfer--failed {
-  --yohu-corner-stroke: var(--yohu-error);
+  box-shadow: inset 0 0 0 var(--yohu-stroke-hairline) var(--yohu-error);
 }
 
 .yohu-files__transfer-dir {
@@ -403,6 +219,7 @@
   align-items: center;
   color: var(--yohu-accent);
   flex-shrink: 0;
+  height: var(--yohu-control-height);
 }
 
 .yohu-files__transfer-body {
@@ -487,10 +304,3 @@
   font-size: var(--yohu-font-caption);
 }
 
-.yohu-files__error.yohu-corner[data-mode="host"] {
-  flex: 0 0 auto;
-}
-
-.yohu-files__error .yohu-corner__content {
-  padding: var(--yohu-space-xs) var(--yohu-space-sm);
-}

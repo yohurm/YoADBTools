@@ -1,6 +1,6 @@
 /**
  * 用户输入 → 设备绝对 POSIX 路径（只做句法，不管安全根）。
- * 策略按固定顺序串联；core RemotePath 仍拒绝未折叠的 `..`，本层先消掉。
+ * 不折叠 `.` / `..` / `//`；穿越只由 path-guard 判定。
  */
 
 export type PathStrategy =
@@ -9,8 +9,7 @@ export type PathStrategy =
   | "separators"
   | "host-reject"
   | "alias"
-  | "relative"
-  | "collapse";
+  | "relative";
 
 export type PathParseOk = { ok: true; path: string; applied: PathStrategy[] };
 export type PathParseErr = { ok: false; reason: string; applied: PathStrategy[] };
@@ -67,10 +66,7 @@ export function parseRemotePath(raw: string, current: string): PathParseResult {
     text = joinAbs(current, text);
   }
 
-  const collapsed = collapseDotSegments(text);
-  if (!collapsed.ok) return fail(collapsed.reason, [...applied, "collapse"]);
-  if (collapsed.path !== text) applied.push("collapse");
-  return { ok: true, path: collapsed.path, applied };
+  return { ok: true, path: text, applied };
 }
 
 function fail(reason: string, applied: PathStrategy[]): PathParseErr {
@@ -123,24 +119,5 @@ function expandAliases(text: string): string {
 
 function joinAbs(base: string, rel: string): string {
   const root = base.startsWith("/") ? base : `/${base}`;
-  if (rel === "" || rel === ".") return normalizeSlashes(root);
-  return normalizeSlashes(`${root.replace(/\/+$/, "")}/${rel}`);
-}
-
-function normalizeSlashes(path: string): string {
-  return path.replace(/\/{2,}/g, "/");
-}
-
-function collapseDotSegments(path: string): { ok: true; path: string } | { ok: false; reason: string } {
-  const parts: string[] = [];
-  for (const seg of normalizeSlashes(path).split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") {
-      if (parts.length === 0) return { ok: false, reason: "路径穿越安全根" };
-      parts.pop();
-      continue;
-    }
-    parts.push(seg);
-  }
-  return { ok: true, path: parts.length === 0 ? "/" : `/${parts.join("/")}` };
+  return `${root.replace(/\/+$/, "")}/${rel}`;
 }

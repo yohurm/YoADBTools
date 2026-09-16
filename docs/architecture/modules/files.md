@@ -3,11 +3,12 @@
 - 能力 crate：`yohu-files`（browse / transfer / mutate）
 - 安全根：`yohu-domain::SafetyRoot`（ADR-v6-013）；浏览 `check`；突变与传输 `check_descendant` + `validate_entry_name`；符号链接 `readlink -f` 复核（运输错误/无法解析失败；目标不存在则祖先 realpath）。`ReadlinkF` 从 `yohu-adb` 根导出，files 不点 `parse`。`FileError` 只分类+路径/计数/层数，不实现 `From<AdbError>`；未分类 BadExit 走 `RemoteFailed(path)`，Display 无 stderr。拖出树 `TreeLimit` / `TreeDepth` 触顶 fail-closed。变更超时在 `mutate.rs`
 - UI：`@yohu/module-files`；`singleRequired`
-- **路径槽：** `AddressSlot`。上级 + 地址铬 hug（行铺满，盒外不是路径栏）。浏览态：面包屑 + 短热区。点铬内热区 / 分隔符 / `Ctrl+L` 后输入同格从左向右揭开；打开手势 `pointerup` 后再 focus，光标在末尾、不预选；点分段跳转。收回只 clip 输入铬，时长只消费 `spatialLocal`，面包屑 `display: none` 不占位，播完再卸。输入盒 `field-sizing: content`，跟文字 hug；长路径 `max-width: 100%` 当铬视野。编辑盒铬走 `YoCorner`（描边 accent / 校验 error），禁止再 `border` + `overflow:hidden` 叠圆角。取消只认输入铬外。禁止 JS 测宽。提交走 `path-parse` → `path-guard` → `path-resolve` → `files.list`。`path-guard` 与 domain `testdata/safety_root.json` 同一向量（拒绝相对 / `..` / 根外）。解析/安全根失败或设备上不存在/不是目录/无权限：不改当前路径、不关输入，`YoToast` 提示（远端不存在为「没有这个目录，请重新输入」）。禁止路径栏上方错误卡片，禁止扫 `ls` stderr。分类在 core `FileError`；壳 `ipc_file`：`RemoteNotFound` → `not_found`，`LocalNotFound` 与其余路径类 → `invalid_args`。`SafetyRoot` 仍强制校验
-- **清单列：** 表头与日志同一套 YoUI 列架：`YoColFrame` + `YoColRow` / `YoColHeader`。文件走 Family B：`cellPad=list`、`YoColTrack` / `YoColCell`、`YoVirtualList tone="list"`。行高走 `controlRowHeight()`（与日志同池：`Density.*.controlHeight`）。日志走 Family A：`cellPad=list`（列垫进 `padLeftChars`）、ch 文档尺、VirtualList 默认 `document`（无行线）。列宽走 `col-model` / `col-resize`，模块只 `setColWidth`，不进设置。排序走 `YoColHeader.onSort`，模块不自绘排序钮、不挂 `__label`。删除名单走 `YoChip` leading + onDismiss，禁止自造关闭钮。传输坞/面包屑折叠是库缺口，不自绘第二套
+- **路径槽：** `AddressSlot` 只接线。上级钮 + 公开 `YoAddressField`（`.yohu-address*`）。地址策略在 `@yohu/ui` `address-field-model`（由 `YoAddressField` 消费）；模块禁止再维护 `address-edit`，禁止再 import 交互函数。行铺满，盒外不是路径栏。浏览态：面包屑 + 短热区。点铬内热区 / 分隔符 / `Ctrl+L` 后输入同格从左向右揭开；打开手势 `pointerup` 后再 focus，光标在末尾、不预选；点分段跳转。收回只 clip 输入铬，时长只消费 `spatialLocal`，面包屑 `display: none` 不占位，播完再卸。输入盒 `field-sizing: content`，跟文字 hug；长路径 `max-width: 100%` 当铬视野。编辑盒铬走 `YoCorner`（描边 accent / 校验 error），禁止再 `border` + `overflow:hidden` 叠圆角，禁止套 `YoTextField`。取消只认输入铬外。禁止 JS 测宽。Enter 只交 `listingStore.goTo(原文)`（模块内唯一 `resolveRemotePath`：`path-parse` 句法、不折叠 `..` → `path-guard` → `files.list`）。面包屑 / 上级走 `navigate` / `goUp`（夹紧绝对段，不经 resolve）。`path-guard` 与 domain `testdata/safety_root.json` 同一向量（拒绝相对 / `..` / 根外）。解析/安全根失败或设备上不存在/不是目录/无权限：不改当前路径、不关输入，`YoToast` 提示（远端不存在为「没有这个目录，请重新输入」）。禁止路径栏上方错误卡片，禁止扫 `ls` stderr。分类在 core `FileError`；壳 `ipc_file`：`RemoteNotFound` → `not_found`，`LocalNotFound` 与其余路径类 → `invalid_args`。`SafetyRoot` 仍强制校验
+- **清单列：** 表头与日志同一套 YoUI 列架：`YoColFrame` + `YoColRow` / `YoColHeader`。文件走 Family B：`cellPad=list`、`YoColTrack` / `YoColCell`、`YoVirtualList tone="list"`。投放目录热态走 `hotKey`：行底在 `list-row/`，投放框在 `list-frame/` 叠加层，禁止模块 `--drop` / `focus-ring`。行高走 `controlRowHeight()`（与日志同池：`Density.*.controlHeight`）。日志走 Family A：`cellPad=list`（列垫进 `padLeftChars`）、ch 文档尺、VirtualList 默认 `document`（无行线）。列宽走 `col-model` / `col-resize`，模块只 `setColWidth`，不进设置。排序走 `YoColHeader.onSort`，模块不自绘排序钮、不挂 `__label`。删除名单走 `YoChip` leading + onDismiss，禁止自造关闭钮。地址折叠在 `YoAddressField`；传输坞开合走 `YoCollapse`。禁止再自绘第二套路径栏或坞折叠。模块 CSS 禁止点 `.yohu-panel__body` / `__content` / `.yohu-scroller*` / `:has`，禁止 `overflow: auto` 当产品滚轴，禁止再铺 surface + radius 当面板铬
+- **页眉：** `YoChrome.leading={<YoBadge text={selectedLabel} tone="neutral" />}`。禁止 `deviceLabel`
 - **修改时间：** `ls -lla`（toybox `-ll` = 秒+纳秒+时区）在解析边界经 domain `canonicalize_datetime_seconds` 收到 `YYYY-MM-DD HH:mm:ss`。列表与预览按原文显示，不补毫秒、不把「只有时分」补成秒
-- 传输：壳发号；Running 200ms `try_send`；终态必达；取消杀进程树；pull 失败删本机目标
-- 拖拽：[文件拖拽-v6.md](../文件拖拽-v6.md)；IPC `files.dragOut`。空态/加载走 `YoEmptyState` / `YoLoading` 的 `fill`；拖入描边画在模块 `.yohu-files__explorer--drop`，禁止点库根 `.yohu-empty-state` / `.yohu-loading` / `.yohu-panel`
+- **传输作业：** [文件传输-v6.md](../文件传输-v6.md)。四个入口同一 `TransferJob`；DropSession 热态（官方拖入 enter 即亮虚线）；默认进当前目录，`files_drop_into_folder`（立即，默认关，无副标题）才指向目录行；浏览在 `listing.ts`，作业寿命在 `transfers.ts`；清单只经 `listingStore.requestListing`；传输终态只点名 `requestListing("transfer")`；坞是 `TransferDock`。禁止 `fileStore` 别名
+- 拖出协议细节：[文件拖拽-v6.md](../文件拖拽-v6.md) + ADR-v6-018。空态/加载走 `YoEmptyState` / `YoLoading` 的 `fill`；拖入虚线走清单 `YoPanel edge="drop"`（填充盒外一圈 YoCorner halo，不是面板描边），禁止 CSS `outline` 直角环，禁止模块再写 `--drop` 补丁，禁止点库根 `.yohu-empty-state` / `.yohu-loading` / `.yohu-panel`
 - 右键：`files/src/menu.ts` → `openContextMenu`
 
 ### 设计前（清单 / 错误）
@@ -31,7 +32,8 @@ path-guard 只做前缀 startsWith，放过 /sdcard/../data
 ### 设计后（清单 / 错误 / 图标尺寸）
 
 ```text
-store 提交路径 → invoke files.list
+AddressSlot Enter → listingStore.goTo(原文)
+  → path-resolve（唯一）→ invoke files.list
   → commands/files require_online + 转发
   → browse_runs::list（替换取消槽，后一次取消前一次）
   → FileBrowser.list（SafetyRoot + ls）
@@ -47,22 +49,82 @@ store 提交路径 → invoke files.list
           not_found → 「没有这个目录，请重新输入」
           其余已分类 → Display 原文
         isCancelledError / isNotFoundError 只认 code
-  → model.ts 只管路径 / 列 / 分类（RemoteEntry 类型 + SAFETY_ROOTS 契约常量）
+  → model.ts 只管路径 / 列 / ListingEntry（SAFETY_ROOTS 契约常量）
         parentWithinSafety → parentOf + path-guard.isWithinSafety
         禁止再导出 errorText，禁止第二套 startsWith
+        表不持 RemoteEntry；listingEntryFromWire 丢掉 link_target，mtime 缺省 ""
 
 图标尺寸（模块只消费 Layout，禁止写死 px）：
   FileTable / DeleteTargets YoFileIcon → Layout.IconSm（16）
-  PreviewPane YoFileIcon → Layout.IconPreview（48）
+  PreviewPane YoPanel overflow=hidden + YoScroller；图标 Layout.IconPreview（48）
   Layout.IconPreview
     → emit-theme.ts
     → --yohu-layout-icon-preview
     → theme.css（与 emitThemeCss() 字节一致）
 ```
 
-清单：`YoVirtualList itemHeight={controlRowHeight()}`。地址铬 clip 只消费 `spatialLocal`。删除名单 `YoChip` leading=`YoFileIcon` + `block` + `onDismiss`（16vp 正圆关闭贴盒尾）。确认框 `YoDialog initial="footer"`，`open` 独立于名单（`deleteOpen`）；关只翻 open，`onExitComplete` 再清名单/展开。确认文案走 `bodyLead`（居中），名单走 children（`YoScroller` 视口），展开/收起走 `bodyTail`；`YoReveal` 只进视口。操作区取消=`ghost+accent`、删除=`ghost+danger`（AlertDialog NORMAL 灰底+语义字），双钮铺满。新建目录确认=`solid+accent`，名称不合法时置灰。内容区走缺省 `bodyOverflow=auto`（弹窗唯一滚轴，预算 `--yohu-layout-dialog-body-max`）；禁止 `hidden` + 模块内第二套 scroller。入场焦点走 `initial=footer`，禁止 Chip 代写 `data-dialog-skip`。预览格与其余格是兄弟；其余走 `YoReveal`（`.yohu-files__delete-rest` 顶垫 `space-sm`；绘制轴始终绝对定位，行程中出流由主槽裁，落定 clip 避免撑 `scrollHeight`）。盒高交给 Dialog 外包的 `YoTravel` 当拍锁用后 px，关窗冻锁，主槽 clip；滚条走公开 `YoScroller`（无法滚动不画条，滑块可拖），禁止再套 Collapse / `panel` 淡入。禁止把 Reveal 嵌进预览网格当一格。模块只改 `open` / 按钮文案，不写时长、不绑行程。
+清单：`YoVirtualList itemHeight={controlRowHeight()}`（自己滚，禁止再外包 `YoScroller`）。地址铬 clip 只消费 `spatialLocal`。删除名单 `YoChip` leading=`YoFileIcon` + `block` + `onDismiss`（16vp 正圆关闭贴盒尾）。确认框 `YoDialog initial="footer"`，`open` 独立于名单（`deleteOpen`）；关只翻 open，`onExitComplete` 再清名单/展开。确认文案走 `bodyLead`（居中），名单走 children（调用方组合 `YoScroller`），展开/收起走 `bodyTail`；`YoReveal` 只进视口。操作区取消=`ghost+accent`、删除=`ghost+danger`（AlertDialog NORMAL 灰底+语义字），双钮铺满。新建文件/目录表单同样走 children + `YoScroller`（`YoTextField` + 错误 `YoCorner`）。`bodyOverflow=auto` 只裁切、不 `overflow-y: auto`；模块 CSS 禁止再用 `overflow: auto` / `overflow-y: auto` 当产品滚轴（VirtualList 宿主除外）。传输坞 `TransferDock` 禁止再套 `YoScroller`，列表高度走 Collapse + `--yohu-layout-output-max`。入场焦点走 `initial=footer`，禁止 Chip 代写 `data-dialog-skip`。预览格与其余格是兄弟；其余走 `YoReveal`（`.yohu-files__delete-rest` 顶垫 `space-sm`；绘制轴始终绝对定位，行程中出流由主槽裁，落定 clip 避免撑 `scrollHeight`）。盒高交给 Dialog 外包的 `YoTravel` 当拍锁用后 px，关窗冻锁，主槽 clip；滚条走公开 `YoScroller`（无法滚动不画条，滑块可拖），禁止再套 Collapse / `panel` 淡入。禁止把 Reveal 嵌进预览网格当一格。模块只改 `open` / 按钮文案，不写时长、不绑行程。
 
 不做什么：不在 UI 扫 stderr；不把 `LocalNotFound` 打成 `not_found`；不自绘传输坞/面包屑第二套折叠；预览不降成 `IconLg=40`。
+
+### 设计前（路径提交）
+
+```text
+AddressSlot.commit
+  → resolveRemotePath(原文)                         ← 第一次
+       parseRemotePath.collapseDotSegments
+         /sdcard/../data/x → /data/x
+       guardBrowsePath：.. 已被消掉，只能 outside_root
+  → goTo(已折叠绝对路径)
+       resolveRemotePath 再跑一遍                   ← 第二次
+面包屑也走 goTo，再解析一次
+```
+
+问题：`safety_root.json` 的 `/sdcard/../data/x` → `traversal` 只在直接测 guard 时命中；提交链与 domain `RemotePath::parse` 分叉。
+
+### 设计后（路径提交）
+
+```text
+AddressSlot Enter
+  → listingStore.goTo(原文)                         ← 只这一次 resolveRemotePath
+       path-parse：unquote / file-uri / separators / host-reject / alias / relative
+                  保留 // . .. ；无 collapseDotSegments
+       path-guard：向量 = testdata/safety_root.json
+       失败：notifyError，不改 path，不关输入
+       成功：loadListing → ++listGen → files.list → ListingEntry
+面包屑 / 上级
+  → listingStore.navigate / goUp（夹紧绝对段，不经 resolve）
+```
+
+不做什么：不在 parse 折叠 `..`；不给 `../Pictures` 开「先消掉再当兄弟目录」旁路。
+
+### 设计前（store 神对象）
+
+```text
+store.ts 一份 createFileStore
+  listGen / loadListing / requestListing
+  + TransferJob / onTransferProgress / push-pull
+  + UiTransfer = TransferJob 别名
+  + errorTick 进程单例；detachView 不清 fault
+```
+
+问题：浏览与作业寿命同文件；切模块再挂会重弹 toast。
+
+### 设计后（listing / transfers）
+
+```text
+listing.ts
+  listGen / requestListing / goTo（唯一 resolve）/ 挂载期 fault
+  detachView：error=""，errorTick=0
+  不 import transfers，不订 transfer/progress
+
+transfers.ts
+  TransferJob 寿命（adopt / upsert / fade / push / pull / cancel / dragOut）
+  读 listingStore.serial / path
+  终态只调 listingStore.requestListing("transfer")
+```
+
+不做什么：不留 `fileStore` / `UiTransfer` / re-export；不把 store 叫 ViewModel。
 
 ### 设计前（传输寿命）
 
@@ -168,7 +230,7 @@ ls:
 push:
   TransferRunner.run
     → normalize_mut + resolve_and_recheck
-    → stream_lines
+    → stream_progress_lines
     → Ok(nonzero) → file_error_from_adb(BadExit{stderr: last_summary})
     → Err(Cancelled) → FileError::Adb(Cancelled)
     → Err(其它) → file_error_from_adb
@@ -185,3 +247,6 @@ delete:
 ```
 
 不做什么：不恢复 `From<AdbError>`；不把分类推到壳；files 不写 `yohu_adb::parse::`；守卫只做词典 + 祖先拼接 + SafetyRoot 复核。
+
+传输 / 拖入 / 清单 / 坞的作业模型见 [文件传输-v6.md](../文件传输-v6.md)，本文不再叠第二套设计前/后。
+

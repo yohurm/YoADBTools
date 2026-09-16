@@ -73,6 +73,7 @@ pub fn ipc_file(e: FileError) -> IpcError {
                 FileError::RemoteFailed(_) | FileError::Local(_) | FileError::ProgressClosed => {
                     IpcErrorCode::AdbError
                 }
+                FileError::ProgressJoin => IpcErrorCode::Internal,
                 FileError::Adb(_) => unreachable!("Adb 已在外层匹配"),
                 _ => IpcErrorCode::InvalidArgs,
             };
@@ -253,5 +254,13 @@ mod tests {
         let host = ipc_dnd(DndError::Host);
         assert_eq!(host.code, IpcErrorCode::Internal);
         assert_eq!(host.message, "拖出宿主调度失败");
+    }
+
+    #[test]
+    fn progress_join_is_internal_not_adb() {
+        let e = ipc_file(FileError::ProgressJoin);
+        assert_eq!(e.code, IpcErrorCode::Internal);
+        assert_eq!(e.message, "传输进度任务已中断");
+        assert_ne!(e.code, IpcErrorCode::AdbError);
     }
 }

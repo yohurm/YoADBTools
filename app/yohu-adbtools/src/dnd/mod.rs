@@ -4,11 +4,8 @@
 #[cfg(target_os = "macos")]
 mod macos;
 mod names;
-mod native_drop;
 #[cfg(windows)]
 mod ole;
-
-pub use native_drop::emit_native_drag;
 
 use std::fs;
 use std::path::Path;
@@ -163,6 +160,7 @@ impl DragPayload {
             serial: self.serial.clone(),
             local: local.to_string_lossy().into_owned(),
             remote: remote.to_string(),
+            expected_bytes: None,
         }
     }
 

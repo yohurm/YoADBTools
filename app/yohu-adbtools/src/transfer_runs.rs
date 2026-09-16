@@ -93,7 +93,7 @@ pub fn run(app: AppHandle, req: TransferRequest, direction: Direction) -> Transf
     let state = app.state::<AppState>();
     let (id, cancel) = state.transfer_runs.allocate();
     let (name, detail) = task_labels(direction, &req);
-    let task_id = state.tasks.register(name, detail);
+    let task_id = state.tasks.register(name, detail, None);
     let transfers = state.transfers.clone();
     let sink = state.event_tx.clone();
     let spec = yohu_files::TransferSpec {
@@ -102,6 +102,7 @@ pub fn run(app: AppHandle, req: TransferRequest, direction: Direction) -> Transf
         direction,
         local: req.local.clone(),
         remote: req.remote.clone(),
+        expected_bytes: req.expected_bytes,
     };
     let inner = Box::pin(async move {
         let result = transfers.run(spec, cancel, sink).await;

@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parseRemotePath } from "./path-parse";
-import { resolveRemotePath } from "./path-resolve";
 
 describe("parseRemotePath（句法策略）", () => {
-  it("POSIX 绝对路径原样（折叠多余斜杠）", () => {
+  it("POSIX 绝对路径原样，保留 // . ..", () => {
     const r = parseRemotePath("/sdcard//DCIM/./Camera/", "/sdcard");
-    expect(r).toMatchObject({ ok: true, path: "/sdcard/DCIM/Camera" });
-    expect(r.ok && r.applied).toContain("collapse");
+    expect(r).toMatchObject({ ok: true, path: "/sdcard//DCIM/./Camera/" });
+    expect(r.ok && r.applied).not.toContain("collapse");
   });
 
   it("反斜杠按 Windows 分隔符转 POSIX", () => {
@@ -48,7 +50,7 @@ describe("parseRemotePath（句法策略）", () => {
     });
   });
 
-  it("相对当前目录；. 与 .. 折叠", () => {
+  it("相对当前目录；. 与 .. 不折叠", () => {
     expect(parseRemotePath("DCIM", "/sdcard")).toMatchObject({
       ok: true,
       path: "/sdcard/DCIM",
@@ -56,9 +58,9 @@ describe("parseRemotePath（句法策略）", () => {
     });
     expect(parseRemotePath("../Pictures", "/sdcard/DCIM")).toMatchObject({
       ok: true,
-      path: "/sdcard/Pictures",
+      path: "/sdcard/DCIM/../Pictures",
     });
-    expect(parseRemotePath(".", "/sdcard/DCIM")).toMatchObject({ ok: true, path: "/sdcard/DCIM" });
+    expect(parseRemotePath(".", "/sdcard/DCIM")).toMatchObject({ ok: true, path: "/sdcard/DCIM/." });
   });
 
   it("本机盘符与 UNC 拒绝", () => {
@@ -72,31 +74,24 @@ describe("parseRemotePath（句法策略）", () => {
     });
   });
 
-  it("空输入与穿越根", () => {
+  it("空输入失败", () => {
     expect(parseRemotePath("   ", "/sdcard")).toMatchObject({ ok: false, reason: "路径为空" });
-    expect(parseRemotePath("/sdcard/../../etc", "/sdcard")).toMatchObject({
-      ok: false,
-      reason: "路径穿越安全根",
-    });
+  });
+
+  it("../x 与 /sdcard/../data/x parse 成功且仍含 ..", () => {
+    const relative = parseRemotePath("../x", "/sdcard");
+    expect(relative.ok).toBe(true);
+    if (relative.ok) expect(relative.path).toContain("..");
+    const absolute = parseRemotePath("/sdcard/../data/x", "/sdcard");
+    expect(absolute).toMatchObject({ ok: true, path: "/sdcard/../data/x" });
+    if (absolute.ok) expect(absolute.path).toContain("..");
   });
 });
 
-describe("resolveRemotePath（解析 + 安全根）", () => {
-  it("相对名不会被误加成 /DCIM", () => {
-    expect(resolveRemotePath("DCIM", "/sdcard")).toMatchObject({ ok: true, path: "/sdcard/DCIM" });
-  });
-
-  it("安全根外拒绝", () => {
-    expect(resolveRemotePath("/data/local/tmp", "/sdcard")).toMatchObject({
-      ok: false,
-      reason: "路径不在安全根内",
-    });
-  });
-
-  it("/storage/emulated/0 在安全根内", () => {
-    expect(resolveRemotePath("/storage/emulated/0/DCIM", "/sdcard")).toMatchObject({
-      ok: true,
-      path: "/storage/emulated/0/DCIM",
-    });
+describe("path-parse 不再折叠点段", () => {
+  it("源码不含 collapseDotSegments", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "path-parse.ts"), "utf8");
+    expect(src).not.toContain("collapseDotSegments");
+    expect(src).not.toContain("\"collapse\"");
   });
 });

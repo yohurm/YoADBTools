@@ -1,13 +1,22 @@
 /**
- * 文件模块纯函数（View / store 之外）：路径 / 列 / 分类。
+ * 文件模块纯函数（View / store 之外）：路径 / 列 / ListingEntry。
  * 零 IPC。错码与文案只在 fault.ts。
  */
 
-import type { RemoteEntry } from "@yohu/api";
 import { SAFETY_ROOTS } from "@yohu/api";
 import { colTrackTemplate, defaultColWidths, type YoColWidths } from "@yohu/ui";
 
 import { isWithinSafety } from "./path-guard";
+
+export type ListingKind = "dir" | "file" | "symlink" | "other";
+
+export interface ListingEntry {
+  name: string;
+  kind: ListingKind;
+  size: number;
+  permission: string;
+  mtime: string;
+}
 
 export function joinPath(dir: string, name: string): string {
   if (dir === "/") return `/${name}`;
@@ -118,13 +127,13 @@ export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
 };
 
 export function sortEntries(
-  entries: RemoteEntry[],
+  entries: ListingEntry[],
   key: SortKey = "name",
   dir: SortDir = "asc",
-): RemoteEntry[] {
+): ListingEntry[] {
   const sign = dir === "asc" ? 1 : -1;
   return [...entries].sort((a, b) => {
-    const kindRank = (k: RemoteEntry["kind"]): number => (k === "dir" ? 0 : 1);
+    const kindRank = (k: ListingEntry["kind"]): number => (k === "dir" ? 0 : 1);
     const rankDiff = kindRank(a.kind) - kindRank(b.kind);
     if (rankDiff !== 0) return rankDiff;
     const cmp = compareByKey(a, b, key);
@@ -132,7 +141,7 @@ export function sortEntries(
   });
 }
 
-function compareByKey(a: RemoteEntry, b: RemoteEntry, key: SortKey): number {
+function compareByKey(a: ListingEntry, b: ListingEntry, key: SortKey): number {
   switch (key) {
     case "name":
       return a.name.localeCompare(b.name, "en", { sensitivity: "base" });
@@ -141,8 +150,8 @@ function compareByKey(a: RemoteEntry, b: RemoteEntry, key: SortKey): number {
     case "size":
       return a.size - b.size;
     case "mtime": {
-      const am = a.mtime ?? "";
-      const bm = b.mtime ?? "";
+      const am = a.mtime;
+      const bm = b.mtime;
       if (am === bm) return 0;
       if (am === "") return 1;
       if (bm === "") return -1;
@@ -160,24 +169,7 @@ export function formatSize(bytes: number): string {
   return `${(mb / 1024).toFixed(2)} GB`;
 }
 
-export type FileCategory = "apk" | "media" | "doc" | "archive" | "other";
-
-export function fileCategory(name: string): FileCategory {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  if (ext === "apk" || ext === "aab") return "apk";
-  if (
-    ["png", "jpg", "jpeg", "gif", "webp", "bmp", "mp3", "mp4", "mkv", "avi", "flac", "ogg", "wav", "webm"].includes(ext)
-  ) {
-    return "media";
-  }
-  if (["txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "md", "json", "xml", "log", "csv"].includes(ext)) {
-    return "doc";
-  }
-  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return "archive";
-  return "other";
-}
-
-export function fileTypeLabel(entry: RemoteEntry): string {
+export function fileTypeLabel(entry: ListingEntry): string {
   if (entry.kind === "dir") return "目录";
   if (entry.kind === "symlink") return "链接";
   const ext = entry.name.split(".").pop();

@@ -54,6 +54,9 @@ pub struct TransferRequest {
     pub serial: String,
     pub local: String,
     pub remote: String,
+    /// 已知总量（单文件 pull 用清单 size）。缺省由 runner 自己量本地 push。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_bytes: Option<u64>,
 }
 
 /// `files.dragOut`：把设备路径交给壳虚拟文件拖出（DoDragDrop 结束后返回）。
@@ -130,6 +133,12 @@ mod tests {
                 .unwrap();
         assert_eq!(parsed.serial, "S");
         assert_eq!(parsed.remote, "/sdcard/a.bin");
+        assert_eq!(parsed.expected_bytes, None);
+        let sized: TransferRequest = serde_json::from_str(
+            r#"{"serial":"S","local":"C:/a.bin","remote":"/sdcard/a.bin","expected_bytes":12}"#,
+        )
+        .unwrap();
+        assert_eq!(sized.expected_bytes, Some(12));
     }
 
     #[test]

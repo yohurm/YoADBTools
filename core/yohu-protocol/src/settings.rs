@@ -105,6 +105,9 @@ pub struct AppSettings {
     /// 终端输入默认在命令前加上 `adb`。立即生效；默认关。
     #[serde(default)]
     pub terminal_prepend_adb: bool,
+    /// 拖入时指向目录行。立即生效；默认关（进当前目录）。
+    #[serde(default)]
+    pub files_drop_into_folder: bool,
     /// 终端 IO 行时间显示形状。立即生效；默认时分秒.毫秒。
     #[serde(default)]
     pub terminal_time_format: TerminalTimeFormat,
@@ -183,6 +186,7 @@ impl Default for AppSettings {
             mirror_protocol: MirrorProtocol::Usb,
             mirror_force_forward: false,
             terminal_prepend_adb: false,
+            files_drop_into_folder: false,
             terminal_time_format: TerminalTimeFormat::TimeMillis,
         }
     }
@@ -209,6 +213,7 @@ pub enum SettingKey {
     MirrorProtocol,
     MirrorForceForward,
     TerminalPrependAdb,
+    FilesDropIntoFolder,
     TerminalTimeFormat,
 }
 
@@ -233,6 +238,7 @@ impl SettingKey {
             SettingKey::MirrorProtocol => "mirror_protocol",
             SettingKey::MirrorForceForward => "mirror_force_forward",
             SettingKey::TerminalPrependAdb => "terminal_prepend_adb",
+            SettingKey::FilesDropIntoFolder => "files_drop_into_folder",
             SettingKey::TerminalTimeFormat => "terminal_time_format",
         }
     }
@@ -258,6 +264,7 @@ mod tests {
         assert_eq!(s.mirror_protocol, MirrorProtocol::Usb);
         assert!(!s.mirror_force_forward);
         assert!(!s.terminal_prepend_adb);
+        assert!(!s.files_drop_into_folder);
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
         let fixture: serde_json::Value =
@@ -346,6 +353,7 @@ mod tests {
             SettingKey::MirrorProtocol,
             SettingKey::MirrorForceForward,
             SettingKey::TerminalPrependAdb,
+            SettingKey::FilesDropIntoFolder,
             SettingKey::TerminalTimeFormat,
         ];
         for key in all {

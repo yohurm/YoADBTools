@@ -1,5 +1,5 @@
 /**
- * 文件页右键场景表。动作经 ctx 注入，本文件不碰 fileStore。
+ * 文件页右键场景表。动作经 ctx 注入，本文件不碰 listing / transfers。
  */
 
 import { defineContextMenu } from "@yohu/ui";
