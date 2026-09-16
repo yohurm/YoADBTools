@@ -230,6 +230,7 @@
   display: flex;
   align-items: center;
   gap: var(--yohu-space-md);
+  flex-shrink: 0;
   padding: var(--yohu-space-xs) var(--yohu-space-md);
   font-size: var(--yohu-font-caption);
   color: var(--yohu-fg-2);
@@ -239,27 +240,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--yohu-space-xs);
-}
-
-.yohu-logs__status-dot {
-  width: var(--yohu-space-sm);
-  height: var(--yohu-space-sm);
-  border-radius: var(--yohu-radius-full);
-  background: var(--yohu-offline);
-}
-
-.yohu-logs__status-dot--on {
-  background: var(--yohu-success);
-}
-
-.yohu-logs__status-signal {
-  color: var(--yohu-error);
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
-.yohu-logs__status-lag {
-  color: var(--yohu-warn);
-  font-weight: var(--yohu-font-weight-semibold);
 }
 
 /* ===== 空态 / 新建窗口 ===== */
@@ -307,12 +287,6 @@
   min-height: 0;
 }
 
-.yohu-logs__new-list-chrome .yohu-corner__content {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .yohu-logs__new-item {
   display: flex;
   align-items: center;
@@ -337,26 +311,4 @@
   flex-shrink: 0;
   color: var(--yohu-fg-3);
   font-variant-numeric: tabular-nums;
-}
-
-.yohu-logs__new-empty,
-.yohu-logs__new-hint,
-.yohu-logs__new-error {
-  margin: 0;
-  padding: var(--yohu-space-md);
-  font-size: var(--yohu-font-caption);
-}
-
-.yohu-logs__new-empty,
-.yohu-logs__new-hint {
-  color: var(--yohu-fg-2);
-}
-
-.yohu-logs__new-hint,
-.yohu-logs__new-error {
-  padding: 0;
-}
-
-.yohu-logs__new-error {
-  color: var(--yohu-error);
 }

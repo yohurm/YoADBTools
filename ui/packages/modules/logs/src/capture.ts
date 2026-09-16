@@ -1,8 +1,9 @@
 /**
  * 采集客户端：窗口订阅 ↔ 每设备一路 logcat。
- * 引用计数、世代、掉线、溢出回补在本文件；批次扇出在 ingest。
- * 设备流停靠 captureState 事件；confirmStart 只退订本窗口。
+ * 引用只认 hold（capturing || starting，计数在 hold.ts）；世代对账在 capture-event。
+ * 设备流停靠 captureState 事件；confirmStart 只退订本窗。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
+ * start 每次 await 后用 sessionId 重定位，禁止跨 await 缓存 idx。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
  * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
  * 清空可见区走 discardView（推进 fromSeq）。清设备缓冲清环与镜像并 flush 面板。
@@ -30,7 +31,9 @@ import {
 } from "@yohu/api";
 import type { ProcessEntry } from "@yohu/api";
 
+import { applyCaptureEvent } from "./capture-event";
 import { toWireFilter } from "./filter";
+import { foreignHoldCount, holdCount, sessionHolds } from "./hold";
 import type { IngestApi } from "./ingest";
 import type { MirrorBank } from "./mirror";
 import {
@@ -70,7 +73,6 @@ export function createCapture(
 ): CaptureApi {
   let bindGen = 0;
   const gates = new Map<string, Promise<void>>();
-  const lastStoppedGen = new Map<string, number>();
   const pending: Promise<() => void>[] = [];
 
   function runExclusive(serial: string, fn: () => Promise<void>): Promise<void> {
@@ -96,8 +98,10 @@ export function createCapture(
     return state.sessions.find((s) => s.id === id) ?? null;
   }
 
-  function capturingCount(device: string): number {
-    return state.sessions.filter((s) => s.serial === device && s.capturing).length;
+  function heldSession(sessionId: number, device: string): LogSessionState | null {
+    const session = state.sessions.find((s) => s.id === sessionId);
+    if (!session || session.serial !== device || !sessionHolds(session)) return null;
+    return session;
   }
 
   function setDeviceGen(device: string, generation: number): void {
@@ -122,24 +126,27 @@ export function createCapture(
 
   function stopWindowsOn(device: string): void {
     state.sessions.forEach((session, idx) => {
-      if (session.serial !== device || !session.capturing) return;
+      if (session.serial !== device || !sessionHolds(session)) return;
       setState("sessions", idx, { capturing: false, starting: false });
     });
   }
 
+  async function stopIfIdle(device: string): Promise<void> {
+    if (holdCount(state.sessions, device) > 0) return;
+    YoLog.info("logs", "采集停止", { serial: device });
+    await logCaptureStop(device);
+  }
+
   function applyEvent(device: string, generation: number, running: boolean): void {
-    const stopped = lastStoppedGen.get(device) ?? 0;
     const currentGen = deviceSlice(state, device).generation;
-    if (running) {
-      if (generation <= stopped || generation < currentGen) return;
-      setDeviceGen(device, generation);
-      return;
+    // 掉线后 generation=0 且无 hold：忽略过期 running，避免抬世代但不订窗
+    if (currentGen === 0 && holdCount(state.sessions, device) === 0) return;
+    const decision = applyCaptureEvent(currentGen, generation, running);
+    if (decision.kind === "ignore") return;
+    setDeviceGen(device, decision.generation);
+    if (decision.kind === "stopped") {
+      stopWindowsOn(device);
     }
-    if (generation < stopped) return;
-    lastStoppedGen.set(device, generation);
-    if (generation < currentGen) return;
-    setDeviceGen(device, generation);
-    stopWindowsOn(device);
   }
 
   function setBufferCapacity(capacity: number): void {
@@ -154,9 +161,6 @@ export function createCapture(
     try {
       const status = await logCaptureStatus(device);
       if (status.capturing) {
-        if (status.generation > 0 && (lastStoppedGen.get(device) ?? 0) >= status.generation) {
-          lastStoppedGen.set(device, status.generation - 1);
-        }
         setDeviceGen(device, status.generation);
         await pullSnapshot(device);
         return;
@@ -191,19 +195,13 @@ export function createCapture(
   async function startCapture(): Promise<void> {
     workspace.ensureSession();
     const session = activeSession();
-    if (!session) {
-      throw new Error("请先选择设备");
-    }
-    const current = session.serial ?? state.serial;
-    if (!current) {
-      throw new Error("请先选择设备");
-    }
+    const current = session?.serial ?? state.serial;
+    if (!current || !session) return;
     const sessionId = session.id;
     return runExclusive(current, async () => {
       const idx = sessionIndex(sessionId);
       if (idx < 0) return;
-      const live = state.sessions[idx]!;
-      if (!live.serial) {
+      if (!state.sessions[idx]!.serial) {
         setState("sessions", idx, { serial: current });
       }
       if (state.sessions[idx]!.capturing) return;
@@ -211,16 +209,20 @@ export function createCapture(
       setState("sessions", idx, { starting: true });
       try {
         await refreshProcesses(current);
-        const resumeWindow = state.sessions[idx]!.fromSeq >= 0;
-        const already = capturingCount(current);
+        if (!heldSession(sessionId, current)) return;
+        const resumeWindow = state.sessions[sessionIndex(sessionId)]!.fromSeq >= 0;
         let startedGen = deviceSlice(state, current).generation;
-        if (already === 0) {
+        if (foreignHoldCount(state.sessions, current, sessionId) === 0) {
           const result = await logCaptureStart(current);
           YoLog.info("logs", "采集已启动", {
             serial: current,
             generation: result.generation,
             adopted: result.adopted,
           });
+          if (!heldSession(sessionId, current)) {
+            await stopIfIdle(current);
+            return;
+          }
           startedGen = result.generation;
           setDeviceGen(current, result.generation);
           if (!result.adopted) {
@@ -229,8 +231,13 @@ export function createCapture(
             workspace.flushPanel(sessionId);
           }
         }
-        subscribeWindow(idx, current, sessionId, resumeWindow);
+        if (!heldSession(sessionId, current)) return;
+        subscribeWindow(sessionId, current, resumeWindow);
         await pullSnapshot(current);
+        if (!heldSession(sessionId, current)) {
+          await stopIfIdle(current);
+          return;
+        }
         await confirmStart(current, startedGen, sessionId);
       } catch (e) {
         const done = sessionIndex(sessionId);
@@ -247,7 +254,10 @@ export function createCapture(
     });
   }
 
-  function subscribeWindow(idx: number, device: string, sessionId: number, resumeWindow: boolean): void {
+  function subscribeWindow(sessionId: number, device: string, resumeWindow: boolean): void {
+    const idx = sessionIndex(sessionId);
+    if (idx < 0) return;
+    if (state.sessions[idx]!.serial !== device) return;
     if (resumeWindow) {
       setState("sessions", idx, {
         capturing: true,
@@ -283,20 +293,23 @@ export function createCapture(
     const session = activeSession();
     const current = session?.serial ?? state.serial;
     if (!current || !session) return;
-    const lastOnDevice = capturingCount(current) <= 1 && (session.capturing || session.starting);
-    const interrupt = lastOnDevice ? logCaptureStop(current) : Promise.resolve();
-    return runExclusive(current, async () => {
-      const idx = sessionIndex(session.id);
-      if (idx >= 0) {
-        setState("sessions", idx, { capturing: false, starting: false });
-      }
-      if (!lastOnDevice) return;
+    const sessionId = session.id;
+    const shouldStop = sessionHolds(session) && foreignHoldCount(state.sessions, current, sessionId) === 0;
+    const idx = sessionIndex(sessionId);
+    if (idx >= 0) {
+      setState("sessions", idx, { capturing: false, starting: false });
+    }
+    const interrupt = shouldStop ? logCaptureStop(current) : Promise.resolve();
+    if (shouldStop) {
       YoLog.info("logs", "采集停止", { serial: current });
+    }
+    return runExclusive(current, async () => {
+      const done = sessionIndex(sessionId);
+      if (done >= 0) {
+        setState("sessions", done, { capturing: false, starting: false });
+      }
+      if (!shouldStop) return;
       await interrupt;
-      lastStoppedGen.set(
-        current,
-        Math.max(lastStoppedGen.get(current) ?? 0, deviceSlice(state, current).generation),
-      );
       try {
         const status = await logCaptureStatus(current);
         if (!status.capturing) {
@@ -309,9 +322,9 @@ export function createCapture(
     });
   }
 
-  function releaseDeviceIfIdle(device: string | null, wasCapturing: boolean): void {
-    if (!device || !wasCapturing) return;
-    if (capturingCount(device) > 0) return;
+  function releaseDeviceIfIdle(device: string | null, hadHold: boolean): void {
+    if (!device || !hadHold) return;
+    if (holdCount(state.sessions, device) > 0) return;
     void logCaptureStop(device).catch((e) => {
       console.error("关闭窗口后停采失败", e);
     });
@@ -319,14 +332,15 @@ export function createCapture(
 
   function closeSession(id: number): void {
     const session = state.sessions.find((s) => s.id === id);
+    const hadHold = session ? sessionHolds(session) : false;
     workspace.closeSession(id);
-    releaseDeviceIfIdle(session?.serial ?? null, session?.capturing ?? false);
+    releaseDeviceIfIdle(session?.serial ?? null, hadHold);
   }
 
   function closeOthers(id: number): void {
     const closed = state.sessions.filter((s) => s.id !== id);
     workspace.closeOthers(id);
-    const devices = new Set(closed.filter((s) => s.capturing && s.serial).map((s) => s.serial!));
+    const devices = new Set(closed.filter((s) => sessionHolds(s) && s.serial).map((s) => s.serial!));
     for (const device of devices) {
       releaseDeviceIfIdle(device, true);
     }
@@ -410,10 +424,6 @@ export function createCapture(
   }
 
   function onOffline(device: string): void {
-    lastStoppedGen.set(
-      device,
-      Math.max(lastStoppedGen.get(device) ?? 0, deviceSlice(state, device).generation),
-    );
     setDeviceGen(device, 0);
     setOverflowed(device, false);
     setProcessIndex(device, [], false);
@@ -425,7 +435,7 @@ export function createCapture(
   const onUiResume = (): void => {
     if (document.hidden) return;
     const serials = new Set(
-      state.sessions.filter((s) => s.capturing && s.serial).map((s) => s.serial!),
+      state.sessions.filter((s) => sessionHolds(s) && s.serial).map((s) => s.serial!),
     );
     for (const device of serials) {
       void pullSnapshot(device);
@@ -479,7 +489,7 @@ export function createCapture(
     resumeFollow: (id: number): void => {
       workspace.resumeFollow(id);
       const session = state.sessions.find((s) => s.id === id);
-      if (session?.serial && (session.capturing || session.starting)) {
+      if (session?.serial && sessionHolds(session)) {
         void pullSnapshot(session.serial);
       }
     },

@@ -3,6 +3,8 @@
  * 崩溃 / ANR 是可见面板上的派生值，不得改采集相颜色。
  */
 
+import { sessionHolds } from "./hold";
+
 export type SessionCapturePhase = "live" | "starting" | "stopped";
 
 export function sessionCapturePhase(session: {
@@ -15,7 +17,7 @@ export function sessionCapturePhase(session: {
 }
 
 export function sessionIsLive(session: { capturing: boolean; starting: boolean }): boolean {
-  return sessionCapturePhase(session) !== "stopped";
+  return sessionHolds(session);
 }
 
 export function sessionCaptureLabel(phase: SessionCapturePhase): string {

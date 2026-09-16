@@ -7,9 +7,9 @@
 - **级别色：** `LogLevelLight/Dark` 只持 ink。V=`font_secondary`；D/I/W/E=brand/confirm/alert/warning；F=warning 压黑。paint 在 `level-paint.ts`：Fatal `invert`，Error/Fatal `tintMessage`。反色字走 `--yohu-fg-on`。禁止 `--yohu-level-f-bg`、禁止社区紫
 - **检索焦点：** `YoTextField` 公开 `inputRef` 转发内部 input。禁止宿主 `querySelector("input")`。过滤生效走公开 `active`，禁止模块点 `.yohu-text-field` 改铬 token
 - **清单选字：** `YoVirtualList` 默认 `tone=document` 承担 `user-select` / `cursor`。Ctrl+A 铺底只涂 `.yohu-logs__row--picked`。禁止点 `__row`
-- 窗口 = 会话订阅（serial / capturing / fromSeq）；设备流按窗口引用计数启停；切焦点不停其他设备
+- 窗口 = 会话订阅（serial / capturing / starting / fromSeq）。**hold** = `capturing || starting`（`hold.ts` 唯一计数）。该 serial 上 `foreignHoldCount==0` 才 `log.capture.start`；关窗/停采先去掉本窗 hold，`holdCount==0` 才 `stop`。禁止只数 `capturing`。切焦点不停其他设备
 - **新建窗口：** 包名检索走 `log.packageSnapshot`（`pm list packages` 已安装列表）；PID 检索走 `ps` 进程索引。进程索引仍只用于包名 PID 重绑，不是新建窗口的包名源。对话框 `YoDialog bodyOverflow="hidden"`，禁止点 `__body` / `:has`。划分走 `YoSegmentedButton` 页签单选（轨 `YoCorner`）；清单铬走 `YoCorner`，`YoIndicator` 放在内容区里，禁止再 `border` + `overflow` 叠圆角
-- **UI store 分层：** `workspace`（Tab/过滤/面板）∥ `ingest`（批次按 serial 扇出）∥ `capture`（每设备启停/世代/溢出回补）。门面显式拼装；`closeSession` / `closeOthers` / `resumeFollow` 以 capture 为准。进程索引、世代、溢出按 serial 分桶
+- **UI store 分层：** `workspace`（Tab/过滤/面板）∥ `ingest`（批次按 serial 扇出）∥ `capture`（每设备启停/窗口 hold/世代对账）。门面显式拼装；`closeSession` / `closeOthers` / `resumeFollow` 以 capture 为准。进程索引、世代、溢出按 serial 分桶
 - **显示面板：** 窗口私有。唯一游标 `fromSeq`：一行能进面板 ⟺ 已订阅 && `seq >= fromSeq` &&（跟滚 || `seq ≤ frozenThroughSeq`）&& 过滤命中。入镜 / PID 重绑 / 跟滚走 `applyAppend`；改过滤走 `projectWindow`（镜像覆盖游标范围时镜像是唯一权威，否则只收窄已画行）。**清空可见区** `discardView`：把 `fromSeq` 推过已见与镜像末 seq，旧行不得再投影回来。**冻结与过滤解耦：** 离开底部记下 `frozenThroughSeq`；未跟滚只合并到该上限，其后计 pending。**空面板不能冻结**（`canFreezeFollow`）：没有已画行就没有底部，`detachFollow` 空操作；否则 `frozenThroughSeq=fromSeq-1`，新行全进 pending，空态仍显示「等待设备输出」。点开始订阅时强制跟滚。暂停只挡入镜/catchUp，不进 `patchFilter`。点开始才订阅：先 `log.processSnapshot` 绑 PID，`fromSeq=0`，按本窗口过滤从当前环补齐
 - 环：`buffer_capacity` 默认 10000；掉线清该 serial 的 core 环与 UI 镜像，**不清面板**
 - **导出（ADR-v6-021）：** `log.export` 扫该设备环：`seq >= fromSeq` 且 domain `log_filter_matches`。仅用户点导出时落盘。导出行文本走 domain `format_log_line` testdata，不驱动清单选区。默认目录：`export_default_path` 非空用设置值，否则 `paths.exports_dir()`；策略在 `capture_runs::export`，commands 只转发
@@ -17,7 +17,8 @@
 - **复制是清单文档（Family A）：** 载荷是 `formatLogDoc`（pad 空格进文档）。禁止再按格命中、禁止 `selection.ts` / `DocRange` / Highlight overlay。解析失败（`level=?`）整行只有消息
 - **选区与复制：** 行 `user-select: text`。原生 Selection 走文档 DOM（=== `formatLogDoc`）。选字底/字走 `--yohu-text-sel` / `--yohu-text-sel-fg`（强调实底 + 反白）。字段列垫在 DOM 里拆成 `data-log-pad` 且 `user-select: none`，双击只选正文，不带尾部空白；文档字符串仍含垫。禁止对 `pointerdown` `preventDefault`（否则没有 `dblclick`）。复制按选区偏移切文档；虚拟列表未挂载的中间行用同一 `formatLogDoc` 补齐。禁止 `Selection.toString()` 当跨行唯一载荷。Ctrl+A = 整表 visible（同色铺底）。无选区右键复制该行文档。折叠徽章 `data-log-chrome` 不进文档
 - UI：`@yohu/module-logs`；轨 `singleRequired`；多窗口可绑不同设备
-- **采集相只有一源：** Tab 圆点、状态行、空态只认窗口订阅 `capturing` / `starting`（`session-chrome`）。设备流停靠 `log/captureState`（`applyEvent`）停该 serial 全部窗口。`confirmStart` 只退订本窗口，禁止 `stopWindowsOn`。崩溃只要 `FATAL EXCEPTION`，ANR 只要 `ANR in` / `am_anr`；信号计数由可见面板 `ViewRow.signal` 派生，禁止改 Tab 色、禁止累计已裁掉的行
+- **页壳：** `YoPage` + `YoChrome` + `YoTabs` + `YoPanel overflow="hidden"`。清单 `YoVirtualList` 自持滚轴，禁止再外包 `YoScroller`。重命名会话 Dialog children 保持 `YoScroller`。过滤条只走 `YoSegmentedButton` / `YoTextField` / `YoChip` / `YoBadge`，禁止自造 input/select/checkbox。`ingest.ts` 只写入环镜像；`mirror.ts` 是设备 logcat 环（不是投屏）。消费端 pipeline 在 `filter.ts` + `stack.ts` + `panel.ts`（无 `pipeline.ts`）。模块 CSS 禁止 `overflow: auto` 产品条，禁止点 `__body`
+- **采集相只有一源：** Tab 圆点、状态行、空态只认窗口订阅 `capturing` / `starting`（`session-chrome`；`sessionIsLive` = `sessionHolds`）。设备流停靠 `log/captureState`（`applyCaptureEvent` 只比 generation，只升不减）停该 serial 全部 hold 窗口。`confirmStart` 只退订本窗，禁止 `stopWindowsOn`。掉线置 generation=0，无 hold 则忽略过期事件。崩溃只要 `FATAL EXCEPTION`，ANR 只要 `ANR in` / `am_anr`；信号计数由可见面板 `ViewRow.signal` 派生，禁止改 Tab 色、禁止累计已裁掉的行
 - 状态行设备：型号 + Android 版本 + API（`DeviceSession.devices` + `deviceStatuses`），不拼 serial
 - 快捷键：Space / Ctrl+L / F / T / W / Tab
 

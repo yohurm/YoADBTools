@@ -35,6 +35,9 @@ describe("日志表头布局契约", () => {
     expect(logsCss).toMatch(/\.yohu-logs__cols--head\s*\{[^}]*flex-shrink:\s*0/);
     expect(logsCss).toContain("var(--yohu-row-height-header)");
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
+    expect(logsCss).toMatch(/\.yohu-logs__status\s*\{[^}]*flex-shrink:\s*0/);
+    expect(logsCss).not.toMatch(/overflow-y:\s*(auto|scroll)/);
+    expect(logsCss).not.toMatch(/overflow:\s*(auto|scroll)/);
   });
 
   it("列轨道不在模块 CSS 写死，交给 YoColFrame", () => {
@@ -73,6 +76,20 @@ describe("日志表头布局契约", () => {
       dialogCandidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ??
       "";
     expect(dialog).toContain('bodyOverflow="hidden"');
+    expect(dialog).toContain("YoVirtualList");
+    expect(dialog).not.toMatch(/<YoScroller[\s>/]/);
+    expect(dialog).toContain("YoEmptyState");
+    expect(dialog).toContain("YoLoading");
+    expect(dialog).toContain("block");
+    expect(dialog).not.toContain("yohu-logs__new-empty");
+    expect(dialog).not.toContain("yohu-logs__new-hint");
+    expect(dialog).not.toContain("yohu-logs__new-error");
+    expect(logsCss).not.toContain(".yohu-logs__new-empty");
+    expect(logsCss).not.toContain(".yohu-logs__status-signal");
+    expect(logsCss).not.toContain(".yohu-logs__status-lag");
+    expect(logsCss).not.toContain(".yohu-logs__status-dot");
+    expect(logsCss).not.toContain(".yohu-logs__row--raw");
+    expect(dialog).not.toContain("__body");
     expect(logsCss).toMatch(/\.yohu-logs__ch-probe\s*\{[^}]*display:\s*inline/);
     expect(logsCss).not.toMatch(/\.yohu-logs__ch-probe\s*\{[^}]*display:\s*block/);
   });
@@ -164,9 +181,25 @@ describe("日志显示列", () => {
     const view = load("LogAnalyzerView.tsx");
     const filter = load("LogFilterBar.tsx");
     const doc = load("LogDocView.tsx");
+    expect(view).toContain('overflow="hidden"');
+    expect(view).toContain('variant="pane"');
+    expect(view).toContain("YoScroller");
+    expect(view).toContain('title="重命名会话"');
+    expect(view.slice(view.indexOf('title="重命名会话"'))).toMatch(
+      /<YoScroller>\s*<YoTextField/,
+    );
+    expect(view).not.toMatch(/<YoScroller[\s\S]*?<YoVirtualList/);
     expect(view).toContain("visibleLogColumns(displayColumns())");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
+    expect(filter).toContain("YoChip");
+    expect(filter).toContain("YoTextField");
+    expect(filter).not.toMatch(/<(input|select|textarea)\b/);
+    expect(filter).not.toContain("__body");
+    expect(doc).not.toMatch(/<(input|select|textarea|button)\b/);
+    expect(doc).not.toContain("__body");
+    expect(doc).not.toContain("yohu-logs__row--raw");
+    expect(view).not.toContain("__body");
     expect(filter).toContain("YoSegmentedButton");
     expect(filter).toContain('type="capsule"');
     expect(filter).toContain("multiple");
@@ -180,6 +213,8 @@ describe("日志显示列", () => {
     expect(filter).not.toContain("data-level");
     expect(view).not.toContain("logDocColumns(docLayout())");
     expect(view).not.toContain("logDocTrackPx");
+    expect(view).toContain("action=");
+    expect(view).toContain("text={`信号 ${session.signalCount}`}");
     expect(view).toContain("width={logStore.state.colWidths[col.key]}");
     expect(view).toContain("align={col.align}");
     expect(view).toContain("layout: docLayout");

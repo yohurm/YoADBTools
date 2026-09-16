@@ -1064,6 +1064,126 @@ describe("logStore 多窗口 × 多设备", () => {
   });
 });
 
+describe("logStore 窗口 hold 引用", () => {
+  it("关闭 starting 窗口必 stop 且不订新 System", async () => {
+    let releaseStart!: (value: { serial: string; generation: number; adopted: boolean }) => void;
+    mocks.logCaptureStart.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseStart = resolve;
+      }),
+    );
+    const store = track(createLogStore());
+    await store.bindSerial("S1");
+    store.ensureSession();
+    const id = store.state.sessions[0]!.id;
+    const starting = store.startCapture();
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.starting).toBe(true);
+    });
+    store.closeSession(id);
+    expect(mocks.logCaptureStop).toHaveBeenCalledWith("S1");
+    const rebuilt = store.state.sessions[0]!;
+    expect(rebuilt.id).not.toBe(id);
+    expect(rebuilt.capturing).toBe(false);
+    expect(rebuilt.starting).toBe(false);
+    releaseStart({ serial: "S1", generation: 1, adopted: false });
+    await starting;
+    expect(store.state.sessions[0]!.id).not.toBe(id);
+    expect(store.state.sessions[0]!.capturing).toBe(false);
+    expect(store.state.sessions[0]!.starting).toBe(false);
+  });
+
+  it("await 中删兄窗仍订原 id", async () => {
+    const store = await liveStore();
+    const systemId = store.state.sessions[0]!.id;
+    const other = store.createSession({ kind: "all" }, "A");
+    store.setActive(other);
+    let releasePs!: () => void;
+    mocks.logProcessSnapshot.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releasePs = () => resolve([]);
+      }),
+    );
+    const starting = store.startCapture();
+    await vi.waitFor(() => {
+      expect(store.state.sessions.find((s) => s.id === other)!.starting).toBe(true);
+    });
+    store.closeSession(systemId);
+    expect(store.state.sessions.find((s) => s.id === systemId)).toBeUndefined();
+    releasePs();
+    await starting;
+    const live = store.state.sessions.find((s) => s.id === other);
+    expect(live).toBeTruthy();
+    expect(live!.capturing).toBe(true);
+    expect(live!.starting).toBe(false);
+    expect(store.state.sessions[0]!.id).toBe(other);
+  });
+
+  it("兄 live 时取消启动不 stop", async () => {
+    const store = await liveStore();
+    const system = store.state.sessions[0]!;
+    const other = store.createSession({ kind: "all" }, "A");
+    store.setActive(other);
+    let releasePs!: () => void;
+    mocks.logProcessSnapshot.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releasePs = () => resolve([]);
+      }),
+    );
+    const starting = store.startCapture();
+    await vi.waitFor(() => {
+      expect(store.state.sessions.find((s) => s.id === other)!.starting).toBe(true);
+    });
+    const stopping = store.stopCapture();
+    expect(mocks.logCaptureStop).not.toHaveBeenCalled();
+    releasePs();
+    await starting;
+    await stopping;
+    expect(mocks.logCaptureStop).not.toHaveBeenCalled();
+    expect(store.state.sessions.find((s) => s.id === other)!.capturing).toBe(false);
+    expect(store.state.sessions.find((s) => s.id === other)!.starting).toBe(false);
+    expect(store.state.sessions.find((s) => s.id === system.id)!.capturing).toBe(true);
+  });
+
+  it("无 serial 的 start/stop 直接返回，不 throw、不 IPC", async () => {
+    const store = track(createLogStore());
+    store.ensureSession();
+    await expect(store.startCapture()).resolves.toBeUndefined();
+    expect(mocks.logCaptureStart).not.toHaveBeenCalled();
+    await expect(store.stopCapture()).resolves.toBeUndefined();
+    expect(mocks.logCaptureStop).not.toHaveBeenCalled();
+  });
+
+  it("adopt 同世代不回拨，窗口保持订阅", async () => {
+    const store = await liveStore();
+    expect(generationOf(store, "S1")).toBe(1);
+    await store.stopCapture();
+    mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S1", generation: 1, adopted: true });
+    mocks.logCaptureStatus.mockResolvedValue({
+      serial: "S1",
+      capturing: true,
+      generation: 1,
+      last_seq: 0,
+    });
+    await store.startCapture();
+    expect(store.state.sessions[0]!.capturing).toBe(true);
+    expect(generationOf(store, "S1")).toBe(1);
+    mocks.captureStateHandlers.at(-1)?.({ serial: "S1", generation: 1, state: "running" });
+    expect(store.state.sessions[0]!.capturing).toBe(true);
+    expect(generationOf(store, "S1")).toBe(1);
+  });
+
+  it("掉线后过期 running 不抬世代、不订窗", async () => {
+    const store = await liveStore();
+    mocks.deviceOfflineHandlers.at(-1)?.({ serial: "S1" });
+    expect(generationOf(store, "S1")).toBe(0);
+    expect(store.state.sessions[0]!.capturing).toBe(false);
+    mocks.captureStateHandlers.at(-1)?.({ serial: "S1", generation: 1, state: "running" });
+    expect(generationOf(store, "S1")).toBe(0);
+    expect(store.state.sessions[0]!.capturing).toBe(false);
+  });
+});
+
 describe("logStore 设置联动", () => {
   it("清空可见区后 PID 重绑与改过滤不得把旧行投影回来", async () => {
     const store = wiredStore();

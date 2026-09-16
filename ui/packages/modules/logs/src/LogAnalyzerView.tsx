@@ -19,6 +19,8 @@ import {
   YoLoading,
   YoPage,
   YoPanel,
+  YoScroller,
+  YoStatusDot,
   YoTabs,
   YoTextField,
   YoToaster,
@@ -70,13 +72,6 @@ function isCancelled(e: unknown): boolean {
   return ipcErrorCode(e) === "cancelled";
 }
 
-const beginCapture = (): void => {
-  void logStore.startCapture().catch((e) => {
-    if (isCancelled(e)) return;
-    toaster.show(errorMessage(e), "error");
-  });
-};
-
 function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumns {
   return {
     ...DEFAULT_LOG_DISPLAY_COLUMNS,
@@ -89,7 +84,7 @@ function tabTitle(session: LogSessionState): string {
   return short ? `${session.title} · ${short}` : session.title;
 }
 
-function SessionEmpty(props: { session: LogSessionState }) {
+function SessionEmpty(props: { session: LogSessionState; canStart: boolean; onStart: () => void }) {
   const filterActive = (): boolean =>
     props.session.levels.length > 0 || tagFilterActive(props.session.tagContains) || props.session.keyword.length > 0;
   const phase = (): ReturnType<typeof sessionCapturePhase> => sessionCapturePhase(props.session);
@@ -99,10 +94,16 @@ function SessionEmpty(props: { session: LogSessionState }) {
       <Show
         when={!idle()}
         fallback={
-          <>
-            <YoEmptyState icon="log" title="未采集" description="点击「开始采集」拉取设备日志" />
-            <YoButton onClick={() => beginCapture()}>开始采集</YoButton>
-          </>
+          <YoEmptyState
+            icon="log"
+            title="未采集"
+            description="点击「开始采集」拉取设备日志"
+            action={
+              <YoButton disabled={!props.canStart} onClick={() => props.onStart()}>
+                开始采集
+              </YoButton>
+            }
+          />
         }
       >
         <Show
@@ -169,6 +170,17 @@ export function LogAnalyzerView(props: DeviceSession) {
   const overflowed = createMemo(() => deviceSlice(logStore.state, active()?.serial).overflowed);
 
   const windowSerial = (): string | null => active()?.serial ?? props.selectedSerials[0] ?? null;
+
+  const beginCapture = (): void => {
+    if (windowSerial() === null) {
+      toaster.show("请先选择设备", "info");
+      return;
+    }
+    void logStore.startCapture().catch((e) => {
+      if (isCancelled(e)) return;
+      toaster.show(errorMessage(e), "error");
+    });
+  };
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
@@ -327,7 +339,10 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   return (
     <YoPage class="yohu-logs">
-      <YoChrome title={ModuleTitle.Logs} deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome
+        title={ModuleTitle.Logs}
+        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
+      >
         <YoButton
           tone={windowLive() ? "danger" : "accent"}
           disabled={!windowLive() && windowSerial() === null}
@@ -376,7 +391,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       <Show
         when={logStore.state.sessions.length > 0}
         fallback={
-          <YoPanel variant="pane">
+          <YoPanel variant="pane" overflow="hidden">
             <YoEmptyState icon="log" title="未选择设备" description="请在左侧设备栏选择在线设备，或新建日志窗口" />
           </YoPanel>
         }
@@ -414,7 +429,7 @@ export function LogAnalyzerView(props: DeviceSession) {
 
         <Show when={active()} keyed>
           {(session) => (
-            <YoPanel variant="pane">
+            <YoPanel variant="pane" overflow="hidden">
               <LogFilterBar
                 session={session}
                 keywordRef={(el) => {
@@ -490,7 +505,11 @@ export function LogAnalyzerView(props: DeviceSession) {
                       (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0
                     }
                   >
-                    <SessionEmpty session={session} />
+                    <SessionEmpty
+                      session={session}
+                      canStart={windowSerial() !== null}
+                      onStart={beginCapture}
+                    />
                   </Show>
                 </div>
                 <Show when={session.pendingCount > 0}>
@@ -504,9 +523,8 @@ export function LogAnalyzerView(props: DeviceSession) {
 
               <div class="yohu-logs__status">
                 <span class="yohu-logs__status-capture">
-                  <span
-                    class="yohu-logs__status-dot"
-                    classList={{ "yohu-logs__status-dot--on": sessionCapturePhase(session) === "live" }}
+                  <YoStatusDot
+                    tone={sessionCapturePhase(session) === "live" ? "success" : "offline"}
                   />
                   {sessionCaptureLabel(sessionCapturePhase(session))}
                 </span>
@@ -514,11 +532,12 @@ export function LogAnalyzerView(props: DeviceSession) {
                   {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}
                 </span>
                 <span>行数 {session.visible.length}</span>
-                <span classList={{ "yohu-logs__status-signal": session.signalCount > 0 }}>
-                  信号 {session.signalCount}
-                </span>
+                <YoBadge
+                  text={`信号 ${session.signalCount}`}
+                  tone={session.signalCount > 0 ? "danger" : "neutral"}
+                />
                 <Show when={overflowed()}>
-                  <span class="yohu-logs__status-lag">缓冲滞后（已回补）</span>
+                  <YoBadge text="缓冲滞后（已回补）" tone="warning" />
                 </Show>
               </div>
             </YoPanel>
@@ -554,7 +573,9 @@ export function LogAnalyzerView(props: DeviceSession) {
           </>
         }
       >
-        <YoTextField block label="会话标题" value={renameText()} onInput={setRenameText} />
+        <YoScroller>
+          <YoTextField block label="会话标题" value={renameText()} onInput={setRenameText} />
+        </YoScroller>
       </YoDialog>
 
       <YoToaster toaster={toaster} />

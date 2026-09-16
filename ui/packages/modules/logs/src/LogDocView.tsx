@@ -105,7 +105,6 @@ export function LogRow(props: { item: ViewRow; index: number }) {
       style={key() ? (levelInkStyle(key()!) as JSX.CSSProperties) : undefined}
       classList={{
         "yohu-logs__row--signal": props.item.signal !== undefined,
-        "yohu-logs__row--raw": props.item.line.level === "?",
         "yohu-logs__row--picked": bind.pickAll(),
       }}
     >
