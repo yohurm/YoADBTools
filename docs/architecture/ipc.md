@@ -66,11 +66,11 @@ core AppEvent ──emit──► Tauri（负载已是 AppEvent）
   → events.ts listen<AppEvent> 原样 handler(payload)
   → 工作台 / 模块 store
 
-wry WebviewEvent::DragDrop 物理点
-  → 壳 dnd/native_drop：scale_factor 收成 CSS 点
-  → emit window/drag（单一 NativeDragDropEvent）
-  → drag.ts listen 原样转发
-  → FileView elementFromPoint
+wry WindowEvent::DragDrop 物理点（主窗 WindowContent）
+  → Tauri 官方 tauri://drag-enter|over|drop|leave
+  → @yohu/api onNativeDragDrop（getCurrentWebview().onDragDropEvent；handler(payload) 原样；禁止几何换算）
+  → FileView DropSession（enter 即热）
+  → files dest：cssPointFromPhysical(position, scale) 只细化目录
 
 App onMount bindIpc()（listen 已可用）→ 各 store 订阅
   listen 失败立即 reject，禁止 api 重试
@@ -89,12 +89,12 @@ App onMount bindIpc()（listen 已可用）→ 各 store 订阅
 | `log/captureState` | 必达 |
 | `log/overflow` | 丢批计数 |
 | `transfer/progress` | Running 200ms 可丢；终态必达 |
-| `group/progress` / `task/summary` | 命令/任务 |
+| `group/progress` / `task/summary` | 命令/任务；`TaskInfo.run_id` 仅组/块 |
 | `settings/changed` | 必达；带全量快照 |
 | `mirror/state` | 必达 |
 | `mirror/painted` | 首帧必达；之后 1s 窗口 fps |
 | `update/progress` | 下载 200ms 可丢；阶段切换必达 |
-| `window/drag` | 壳把 wry 拖放收成 CSS 点后发出；不是 AppEvent；`@yohu/api` `onNativeDragDrop` 原样转发 |
+| 官方 `tauri://drag-*` | 框架把 wry 拖放发给 webview；不是 AppEvent；`@yohu/api` `onNativeDragDrop` 原样转发。禁止几何换算。换算只在 files dest。禁止自造 `window/drag` |
 
 ## 背压
 
