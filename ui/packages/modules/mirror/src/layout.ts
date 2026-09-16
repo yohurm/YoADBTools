@@ -90,8 +90,3 @@ export function assembleMirrorLayout(avail: AvailZone, flags: LayoutFlags): Mirr
 export function layoutInsetKey(layout: MirrorLayout): string {
   return `${layout.serial},${layout.x},${layout.y},${layout.width}x${layout.height},v=${layout.visible},dpr=${layout.dpr},f=${layout.fullscreen},p=${layout.paused},c=${layout.control},dev=${layout.has_device},fail=${layout.failed},e=${layout.error},dark=${layout.dark}`;
 }
-
-/** HWND chrome / letterbox 跟工作台主题，不是设备夜览。 */
-export function workbenchDark(doc: Document): boolean {
-  return doc.documentElement.getAttribute("data-theme") === "dark";
-}

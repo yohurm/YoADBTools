@@ -12,13 +12,16 @@ import {
   YoIconButton,
   YoPage,
   YoPanel,
+  YoScroller,
   YoSelect,
   YoToaster,
   createToaster,
+  getTheme,
+  onResolvedThemeChange,
   type IconName,
 } from "@yohu/ui";
 
-import { clientZoneRect, workbenchDark } from "./layout";
+import { clientZoneRect } from "./layout";
 import {
   FPS_OPTIONS,
   PROTOCOL_OPTIONS,
@@ -53,7 +56,7 @@ const BRIGHTNESS_OPS: DeviceOp[] = [
 export function MirrorView(props: DeviceSession) {
   let avail: HTMLDivElement | undefined;
   let zoneObserver: ResizeObserver | undefined;
-  let themeObserver: MutationObserver | undefined;
+  let stopTheme: (() => void) | undefined;
   let layoutRaf = 0;
 
   function pushLayout(): void {
@@ -69,7 +72,7 @@ export function MirrorView(props: DeviceSession) {
         ...rect,
         visible: document.visibilityState === "visible",
         dpr,
-        dark: workbenchDark(document),
+        dark: getTheme() === "dark",
       });
     });
   }
@@ -83,10 +86,9 @@ export function MirrorView(props: DeviceSession) {
       });
       zoneObserver.observe(avail);
     }
-    themeObserver = new MutationObserver(() => {
+    stopTheme = onResolvedThemeChange(() => {
       pushLayout();
     });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("scroll", onWin, true);
     window.addEventListener("keydown", onEsc);
     document.addEventListener("visibilitychange", onVis);
@@ -94,7 +96,7 @@ export function MirrorView(props: DeviceSession) {
   onCleanup(() => {
     if (layoutRaf !== 0) window.cancelAnimationFrame(layoutRaf);
     zoneObserver?.disconnect();
-    themeObserver?.disconnect();
+    stopTheme?.();
     window.removeEventListener("scroll", onWin, true);
     window.removeEventListener("keydown", onEsc);
     document.removeEventListener("visibilitychange", onVis);
@@ -178,7 +180,10 @@ export function MirrorView(props: DeviceSession) {
 
   return (
     <YoPage class={`yohu-mirror${mirrorStore.state.fullscreen ? " yohu-mirror--full" : ""}`}>
-      <YoChrome title={ModuleTitle.Mirror} deviceLabel={props.selectedLabel ?? undefined}>
+      <YoChrome
+        title={ModuleTitle.Mirror}
+        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
+      >
         <YoButton
           size="sm"
           variant="solid"
@@ -243,85 +248,96 @@ export function MirrorView(props: DeviceSession) {
           overflowX="hidden"
           aria-label="设备操作"
         >
-          <For each={NAV_OPS}>
-            {(op) => (
-              <YoIconButton
-                icon={op.icon}
-                title={op.title}
-                size="md"
-                disabled={!canControl()}
-                onClick={() => void runOp(op)}
-              />
-            )}
-          </For>
-          <YoIconButton
-            icon={mirrorStore.state.night === true ? "display-off" : "display-on"}
-            title={
-              mirrorStore.state.night === null
-                ? "设备深浅色"
-                : mirrorStore.state.night === true
-                  ? "设备深色"
-                  : "设备浅色"
-            }
-            size="md"
-            pressed={mirrorStore.state.night === true}
-            disabled={!props.selectedSerials[0] || mirrorStore.state.night === null}
-            onClick={() => void toggleDeviceNight()}
-          />
-          <For each={BRIGHTNESS_OPS}>
-            {(op) => (
-              <YoIconButton
-                icon={op.icon}
-                title={op.title}
-                size="md"
-                disabled={!canControl()}
-                onClick={() => void runOp(op)}
-              />
-            )}
-          </For>
+          <YoScroller>
+            <div class="yohu-mirror__ops-stack">
+            <For each={NAV_OPS}>
+              {(op) => (
+                <YoIconButton
+                  icon={op.icon}
+                  title={op.title}
+                  size="md"
+                  disabled={!canControl()}
+                  onClick={() => void runOp(op)}
+                />
+              )}
+            </For>
+            <YoIconButton
+              icon={mirrorStore.state.night === true ? "display-off" : "display-on"}
+              title={
+                mirrorStore.state.night === null
+                  ? "设备深浅色"
+                  : mirrorStore.state.night === true
+                    ? "设备深色"
+                    : "设备浅色"
+              }
+              size="md"
+              pressed={mirrorStore.state.night === true}
+              disabled={!props.selectedSerials[0] || mirrorStore.state.night === null}
+              onClick={() => void toggleDeviceNight()}
+            />
+            <For each={BRIGHTNESS_OPS}>
+              {(op) => (
+                <YoIconButton
+                  icon={op.icon}
+                  title={op.title}
+                  size="md"
+                  disabled={!canControl()}
+                  onClick={() => void runOp(op)}
+                />
+              )}
+            </For>
+            </div>
+          </YoScroller>
         </YoPanel>
 
-        <YoPanel class="yohu-mirror__func" variant="pane" padding="md" gap="sm" align="start" aria-label="投屏功能栏">
-          <div class="yohu-mirror__group-label">
-            质量
-            <YoBadge text="下次开始生效" tone="neutral" />
-          </div>
-          <YoFormRow title="投屏协议">
-            <YoSelect
-              block
-              options={PROTOCOL_OPTIONS}
-              value={mirrorStore.state.protocol}
-              disabled={qualityDisabled()}
-              onChange={(v) => void persistQuality("mirror_protocol", v as "usb" | "wifi")}
-            />
-          </YoFormRow>
-          <YoFormRow title="长边">
-            <YoSelect
-              block
-              options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, sizeLabel)}
-              value={String(mirrorStore.state.maxSize)}
-              disabled={qualityDisabled()}
-              onChange={(v) => void persistQuality("mirror_max_size", Number.parseInt(v, 10))}
-            />
-          </YoFormRow>
-          <YoFormRow title="码率">
-            <YoSelect
-              block
-              options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, rateLabel)}
-              value={String(mirrorStore.state.videoBitRate)}
-              disabled={qualityDisabled()}
-              onChange={(v) => void persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
-            />
-          </YoFormRow>
-          <YoFormRow title="帧率">
-            <YoSelect
-              block
-              options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, fpsLabel)}
-              value={String(mirrorStore.state.maxFps)}
-              disabled={qualityDisabled()}
-              onChange={(v) => void persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
-            />
-          </YoFormRow>
+        <YoPanel
+          class="yohu-mirror__func"
+          variant="pane"
+          title="质量"
+          actions={<YoBadge text="下次开始生效" tone="neutral" />}
+          padding="md"
+          gap="sm"
+          overflow="hidden"
+          aria-label="投屏功能栏"
+        >
+          <YoScroller>
+            <YoFormRow title="投屏协议" layout="stacked">
+              <YoSelect
+                block
+                options={PROTOCOL_OPTIONS}
+                value={mirrorStore.state.protocol}
+                disabled={qualityDisabled()}
+                onChange={(v) => void persistQuality("mirror_protocol", v as "usb" | "wifi")}
+              />
+            </YoFormRow>
+            <YoFormRow title="长边" layout="stacked">
+              <YoSelect
+                block
+                options={withCurrentOption(SIZE_OPTIONS, mirrorStore.state.maxSize, sizeLabel)}
+                value={String(mirrorStore.state.maxSize)}
+                disabled={qualityDisabled()}
+                onChange={(v) => void persistQuality("mirror_max_size", Number.parseInt(v, 10))}
+              />
+            </YoFormRow>
+            <YoFormRow title="码率" layout="stacked">
+              <YoSelect
+                block
+                options={withCurrentOption(RATE_OPTIONS, mirrorStore.state.videoBitRate, rateLabel)}
+                value={String(mirrorStore.state.videoBitRate)}
+                disabled={qualityDisabled()}
+                onChange={(v) => void persistQuality("mirror_video_bit_rate", Number.parseInt(v, 10))}
+              />
+            </YoFormRow>
+            <YoFormRow title="帧率" layout="stacked">
+              <YoSelect
+                block
+                options={withCurrentOption(FPS_OPTIONS, mirrorStore.state.maxFps, fpsLabel)}
+                value={String(mirrorStore.state.maxFps)}
+                disabled={qualityDisabled()}
+                onChange={(v) => void persistQuality("mirror_max_fps", Number.parseInt(v, 10))}
+              />
+            </YoFormRow>
+          </YoScroller>
         </YoPanel>
       </div>
       <YoToaster toaster={toaster} />

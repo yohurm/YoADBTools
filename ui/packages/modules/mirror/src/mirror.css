@@ -33,35 +33,24 @@
   min-height: 0;
 }
 
-.yohu-mirror__ops.yohu-panel[data-variant="pane"] {
+.yohu-mirror__ops {
   flex: 0 0 var(--yohu-layout-mirror-ops);
   width: var(--yohu-layout-mirror-ops);
   max-width: var(--yohu-layout-mirror-ops);
 }
 
-.yohu-mirror__func.yohu-panel[data-variant="pane"] {
+/* 钮列自己排；禁止点 YoScroller 内部槽。 */
+.yohu-mirror__ops-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--yohu-space-2xs);
+}
+
+.yohu-mirror__func {
   flex: 0 0 var(--yohu-layout-mirror-func);
   width: var(--yohu-layout-mirror-func);
   max-width: var(--yohu-layout-mirror-func);
-}
-
-.yohu-mirror__group-label {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-xs);
-  font-size: var(--yohu-font-caption);
-  font-weight: var(--yohu-font-weight-semibold);
-  color: var(--yohu-fg-2);
-  line-height: var(--yohu-font-leading-tight);
-}
-
-.yohu-mirror__func .yohu-form-row {
-  width: 100%;
-}
-
-.yohu-mirror__func .yohu-form-row__control {
-  flex: 1 1 100%;
-  margin-inline-start: 0;
 }
 
 .yohu-mirror--full .yohu-mirror__ops,

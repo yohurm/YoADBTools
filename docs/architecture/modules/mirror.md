@@ -234,4 +234,4 @@ Host 只提供 BGRA + 路径
 
 ## UI
 
-`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏；月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。操作栏 / 功能栏是 `YoPanel` pane，内容区排布走库的 align / gap / overflow，模块 CSS 只锁栏宽。状态采样见 [device.md](device.md)。
+`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps；实测走 `Status.tsx` 的 `YoBadge` 进状态栏右槽。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏；月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。页眉 `YoChrome.leading` 组合 `YoBadge`，禁止 `deviceLabel`。舞台 `.yohu-mirror__avail` 是透明洞，禁止套 `YoScroller`。操作栏 / 质量是 `YoPanel` pane + `YoScroller`；模块 CSS 只锁栏宽，禁止 `overflow: auto`。状态采样见 [device.md](device.md)。

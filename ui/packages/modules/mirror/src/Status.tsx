@@ -3,6 +3,7 @@
  */
 
 import { Show } from "solid-js";
+import { YoBadge } from "@yohu/ui";
 
 import { mirrorStore } from "./store";
 
@@ -10,9 +11,10 @@ export function MirrorStatus() {
   const live = () => mirrorStore.state.phase === "live" && mirrorStore.state.hasFrame;
   return (
     <Show when={live()}>
-      <span>
-        {mirrorStore.state.width}×{mirrorStore.state.height} · {mirrorStore.state.paintedFps} fps
-      </span>
+      <YoBadge
+        text={`${mirrorStore.state.width}×${mirrorStore.state.height} · ${mirrorStore.state.paintedFps} fps`}
+        tone="neutral"
+      />
     </Show>
   );
 }

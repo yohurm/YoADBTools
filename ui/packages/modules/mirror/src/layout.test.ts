@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@yohu/api", () => ({
@@ -6,7 +9,7 @@ vi.mock("@yohu/api", () => ({
 
 import { MIRROR_MIN_LAYOUT_PX } from "@yohu/api";
 
-import { clientZoneRect, assembleMirrorLayout, layoutInsetKey, layoutIsPresentable, shouldReportLayout, workbenchDark } from "./layout";
+import { clientZoneRect, assembleMirrorLayout, layoutInsetKey, layoutIsPresentable, shouldReportLayout } from "./layout";
 
 describe("clientZoneRect", () => {
   it("把 CSS 盒乘 DPR，不加屏幕原点", () => {
@@ -47,18 +50,6 @@ describe("layoutIsPresentable", () => {
     expect(MIRROR_MIN_LAYOUT_PX).toBe(64);
     expect(layoutIsPresentable(486, 1)).toBe(false);
     expect(layoutIsPresentable(MIRROR_MIN_LAYOUT_PX, MIRROR_MIN_LAYOUT_PX)).toBe(true);
-  });
-});
-
-describe("workbenchDark", () => {
-  it("只认 html data-theme=dark", () => {
-    const prev = document.documentElement.getAttribute("data-theme");
-    document.documentElement.setAttribute("data-theme", "dark");
-    expect(workbenchDark(document)).toBe(true);
-    document.documentElement.setAttribute("data-theme", "light");
-    expect(workbenchDark(document)).toBe(false);
-    if (prev === null) document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.setAttribute("data-theme", prev);
   });
 });
 
@@ -110,6 +101,27 @@ describe("assembleMirrorLayout", () => {
     expect(layoutInsetKey(layout)).toBe(
       "S1,10,20,300x600,v=true,dpr=1.5,f=true,p=true,c=false,dev=true,fail=false,e=,dark=true",
     );
+  });
+});
+
+const viewSrc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "MirrorView.tsx"), "utf-8");
+const statusSrc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Status.tsx"), "utf-8");
+
+describe("MirrorView 滚轴", () => {
+  it("ops / func 走 YoScroller，avail 不套", () => {
+    expect(viewSrc).toContain("YoScroller");
+    const ops = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__ops"'), viewSrc.indexOf('class="yohu-mirror__func"'));
+    expect(ops).toMatch(/<YoScroller>/);
+    expect(ops).toContain("<For");
+    const func = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__func"'));
+    expect(func).toMatch(/<YoScroller>/);
+    expect(func).toContain("YoFormRow");
+    const avail = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__avail"'), viewSrc.indexOf('class="yohu-mirror__ops"'));
+    expect(avail).not.toContain("YoScroller");
+    expect(avail).toContain("yohu-mirror__hole");
+    expect(viewSrc).not.toContain("deviceLabel");
+    expect(statusSrc).toContain("YoBadge");
+    expect(statusSrc).not.toMatch(/<span[\s>]/);
   });
 });
 
