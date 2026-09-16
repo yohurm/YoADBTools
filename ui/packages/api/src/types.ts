@@ -125,6 +125,7 @@ export interface AppSettings {
   mirror_protocol: MirrorProtocol;
   mirror_force_forward: boolean;
   terminal_prepend_adb: boolean;
+  files_drop_into_folder: boolean;
   terminal_time_format: TerminalTimeFormat;
 }
 
@@ -156,6 +157,7 @@ export type SettingKey =
   | "mirror_protocol"
   | "mirror_force_forward"
   | "terminal_prepend_adb"
+  | "files_drop_into_folder"
   | "terminal_time_format";
 
 /** `settings.set` 单键值类型：按键映射到 `AppSettings` 对应字段类型。
@@ -205,13 +207,32 @@ export interface SystemInfo {
 export type Direction = "push" | "pull";
 export type TransferState = "running" | "done" | "failed" | "cancelled";
 
+/** 传输失败分类。只带 kind + 路径/serial；禁止用户句子。 */
+export type TransferFault =
+  | { kind: "path"; path: string }
+  | { kind: "outside_root"; path: string }
+  | { kind: "remote_not_found"; path: string }
+  | { kind: "not_a_directory"; path: string }
+  | { kind: "permission_denied"; path: string }
+  | { kind: "read_only"; path: string }
+  | { kind: "already_exists"; path: string }
+  | { kind: "remote_failed"; path: string }
+  | { kind: "local_not_found"; path: string }
+  | { kind: "local"; path: string }
+  | { kind: "device_offline"; serial: string }
+  | { kind: "timeout" }
+  | { kind: "io" }
+  | { kind: "tool_unavailable" }
+  | { kind: "progress_join" };
+
 export interface TransferProgress {
   id: number;
   direction: Direction;
   bytes: number;
   total?: number;
   state: TransferState;
-  message?: string;
+  fault?: TransferFault;
+  name?: string;
 }
 
 export type EntryKind = "dir" | "file" | "symlink" | "other";
@@ -261,6 +282,7 @@ export interface TransferRequest {
   serial: string;
   local: string;
   remote: string;
+  expected_bytes?: number;
 }
 
 export interface DragOutRequest {
@@ -466,6 +488,8 @@ export interface TaskInfo {
   active: boolean;
   /** 悬停明细（状态栏 title 提示） */
   detail?: string;
+  /** 组/块运行号；传输/采集/更新缺省 */
+  run_id?: number;
 }
 
 export interface GroupProgress {

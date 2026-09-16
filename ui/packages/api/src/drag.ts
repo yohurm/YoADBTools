@@ -1,21 +1,17 @@
 /**
- * 窗口级拖放订阅。负载是壳已收成 CSS 点的单一 DTO，本文件只原样转发。
+ * L1：官方 webview 拖放。Tauri 已把 wry WindowEvent::DragDrop 收成
+ * `tauri://drag-enter|over|drop|leave`；本文件只订这一路，原样转发 payload。
+ * 不是 AppEvent。禁止再 listen 自造 `window/drag`。禁止几何换算。
  */
 
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 
-/** 与 yohu-protocol::event_names::WINDOW_DRAG 对齐。 */
-export const NATIVE_DRAG_EVENT = "window/drag";
-
-/** wry 拖放经壳 `scale_factor` 换成 CSS 像素，供 `elementFromPoint`。 */
-export type NativeDragDropEvent =
-  | { type: "enter"; paths: string[]; x: number; y: number }
-  | { type: "over"; x: number; y: number }
-  | { type: "drop"; paths: string[]; x: number; y: number }
-  | { type: "leave" };
+/** 官方 `onDragDropEvent` 负载。`position` 仍是物理点。 */
+export type NativeDragDropEvent = DragDropEvent;
 
 export function onNativeDragDrop(handler: (event: NativeDragDropEvent) => void): Promise<UnlistenFn> {
-  return listen<NativeDragDropEvent>(NATIVE_DRAG_EVENT, (event) => {
+  return getCurrentWebview().onDragDropEvent((event) => {
     handler(event.payload);
   });
 }

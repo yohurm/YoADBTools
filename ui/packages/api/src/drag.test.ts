@@ -1,28 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
-import { NATIVE_DRAG_EVENT, onNativeDragDrop, type NativeDragDropEvent } from "./drag";
+import { onNativeDragDrop, type NativeDragDropEvent } from "./drag";
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => undefined)),
+type DragPayload =
+  | { type: "enter"; paths: string[]; position: { x: number; y: number } }
+  | { type: "over"; position: { x: number; y: number } }
+  | { type: "drop"; paths: string[]; position: { x: number; y: number } }
+  | { type: "leave" };
+
+const onDragDropEvent = vi.fn();
+
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: vi.fn(() => ({ onDragDropEvent })),
 }));
 
 beforeEach(() => {
-  vi.mocked(listen).mockReset();
-  vi.mocked(listen).mockImplementation(() => Promise.resolve(() => undefined));
+  onDragDropEvent.mockReset();
+  vi.mocked(getCurrentWebview).mockReturnValue({ onDragDropEvent } as never);
 });
 
 afterEach(() => {
-  vi.mocked(listen).mockClear();
+  onDragDropEvent.mockClear();
 });
 
 describe("onNativeDragDrop", () => {
-  it("只 listen window/drag 并原样转发", async () => {
-    let captured: ((event: { payload: NativeDragDropEvent }) => void) | undefined;
-    vi.mocked(listen).mockImplementation((name, handler) => {
-      expect(name).toBe(NATIVE_DRAG_EVENT);
-      captured = handler as (event: { payload: NativeDragDropEvent }) => void;
+  it("只订官方 onDragDropEvent，payload 原样转发", async () => {
+    let captured: ((event: { payload: DragPayload }) => void) | undefined;
+    onDragDropEvent.mockImplementation((handler: (event: { payload: DragPayload }) => void) => {
+      captured = handler;
       return Promise.resolve(() => undefined);
     });
 
@@ -30,15 +37,24 @@ describe("onNativeDragDrop", () => {
     await onNativeDragDrop((event) => {
       received.push(event);
     });
-    const payload: NativeDragDropEvent = { type: "drop", paths: ["C:/a.txt"], x: 10, y: 20 };
-    captured!({ payload });
-    expect(received[0]).toBe(payload);
-    expect(vi.mocked(listen)).toHaveBeenCalledTimes(1);
+
+    const enter: DragPayload = { type: "enter", paths: ["C:/a.txt"], position: { x: 20, y: 40 } };
+    const over: DragPayload = { type: "over", position: { x: 40, y: 80 } };
+    const drop: DragPayload = { type: "drop", paths: ["C:/a.txt"], position: { x: 20, y: 40 } };
+    const leave: DragPayload = { type: "leave" };
+    captured!({ payload: enter });
+    captured!({ payload: over });
+    captured!({ payload: drop });
+    captured!({ payload: leave });
+
+    expect(received).toEqual([enter, over, drop, leave]);
+    expect(onDragDropEvent).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(getCurrentWebview)).toHaveBeenCalledTimes(1);
   });
 
-  it("listen 失败立即 reject", async () => {
-    vi.mocked(listen).mockRejectedValueOnce(new Error("ipc down"));
+  it("订阅失败立即 reject", async () => {
+    onDragDropEvent.mockRejectedValueOnce(new Error("ipc down"));
     await expect(onNativeDragDrop(() => {})).rejects.toThrow("ipc down");
-    expect(vi.mocked(listen)).toHaveBeenCalledTimes(1);
+    expect(onDragDropEvent).toHaveBeenCalledTimes(1);
   });
 });

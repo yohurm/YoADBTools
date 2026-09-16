@@ -8,12 +8,11 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { NATIVE_DRAG_EVENT } from "./drag";
 import { DEFAULT_BROWSE_ROOT, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./identity";
 import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION } from "./library";
 import { AndroidKey, MIRROR_MIN_LAYOUT_PX } from "./scrcpy";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type Theme, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -232,12 +231,67 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     });
   });
 
-  it("TransferRequest 无 id/direction", () => {
+  it("TransferRequest 无 id/direction；expected_bytes 可选", () => {
     const req: TransferRequest = { serial: "S", local: "C:/a.bin", remote: "/sdcard/a.bin" };
     expect(JSON.parse(JSON.stringify(req))).toEqual({
       serial: "S",
       local: "C:/a.bin",
       remote: "/sdcard/a.bin",
+    });
+    const sized: TransferRequest = {
+      serial: "S",
+      local: "C:/a.bin",
+      remote: "/sdcard/a.bin",
+      expected_bytes: 12,
+    };
+    expect(sized.expected_bytes).toBe(12);
+  });
+
+  it("TaskInfo.run_id 可选；缺省不进 JSON", () => {
+    const task: TaskInfo = { id: 1, name: "命令组: demo", active: true };
+    expect(JSON.parse(JSON.stringify(task))).toEqual({
+      id: 1,
+      name: "命令组: demo",
+      active: true,
+    });
+    const linked: TaskInfo = { ...task, run_id: 7 };
+    expect(JSON.parse(JSON.stringify(linked)).run_id).toBe(7);
+  });
+
+  it("TransferProgress.fault 可选；缺省不进 JSON；无 message", () => {
+    const progress: TransferProgress = {
+      id: 1,
+      direction: "push",
+      bytes: 0,
+      state: "running",
+    };
+    expect(JSON.parse(JSON.stringify(progress))).toEqual({
+      id: 1,
+      direction: "push",
+      bytes: 0,
+      state: "running",
+    });
+    expect(JSON.parse(JSON.stringify(progress))).not.toHaveProperty("message");
+    const named: TransferProgress = { ...progress, name: "a.bin" };
+    expect(named.name).toBe("a.bin");
+    const failed: TransferProgress = {
+      ...progress,
+      state: "failed",
+      fault: { kind: "remote_not_found", path: "/sdcard/a" },
+    };
+    expect(JSON.parse(JSON.stringify(failed))).toEqual({
+      id: 1,
+      direction: "push",
+      bytes: 0,
+      state: "failed",
+      fault: { kind: "remote_not_found", path: "/sdcard/a" },
+    });
+    expect(JSON.parse(JSON.stringify({ kind: "progress_join" as const }))).toEqual({
+      kind: "progress_join",
+    });
+    expect(JSON.parse(JSON.stringify({ kind: "device_offline" as const, serial: "S1" }))).toEqual({
+      kind: "device_offline",
+      serial: "S1",
     });
   });
 
@@ -283,6 +337,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         mirror_protocol: "usb",
         mirror_force_forward: false,
         terminal_prepend_adb: false,
+        files_drop_into_folder: false,
         terminal_time_format: "time_millis",
       },
     };
@@ -410,8 +465,6 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(EVENT_NAMES.devicesChanged).toBe("devices/changed");
     expect(EVENT_NAMES.deviceStatus).toBe("device/status");
     expect(EVENT_NAMES.updateProgress).toBe("update/progress");
-    expect(NATIVE_DRAG_EVENT).toBe("window/drag");
-    expect(NATIVE_DRAG_EVENT).not.toContain(".");
   });
 });
 
