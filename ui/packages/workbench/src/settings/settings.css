@@ -59,7 +59,6 @@
   align-items: center;
   gap: var(--yohu-space-md);
   padding: var(--yohu-space-md) 0;
-  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
 .yohu-settings__about-icon {

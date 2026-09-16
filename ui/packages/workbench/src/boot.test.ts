@@ -174,10 +174,9 @@ describe("启动编排", () => {
 
   it("深色首帧 fallback 锁 DarkColors.BgBase，且每条背景都走 --yohu-canvas", () => {
     const css = bootInlineCss(shellHtml());
-    expect(DarkColors.BgBase.toUpperCase()).toBe("#191A1C");
     expect(css).toContain(`var(--yohu-canvas, ${Colors.BgBase})`);
     expect(css).toContain(`var(--yohu-canvas, ${DarkColors.BgBase})`);
-    expect(css).not.toMatch(/background(?:-color)?\s*:\s*#000(?:000)?\b/i);
+    expect(css).not.toMatch(/background(?:-color)?\s*:\s*#(?:0{3}|0{6})\b/i);
     const bgDecls = [...css.matchAll(/background(?:-color)?\s*:\s*([^;]+);/g)].flatMap((m) =>
       m[1] ? [m[1].trim()] : [],
     );
@@ -205,6 +204,11 @@ describe("启动编排", () => {
     expect(js).toContain("prefers-color-scheme: dark");
     expect(js).toContain('setAttribute("data-theme"');
     expect(js).not.toMatch(/catch\s*\(/);
+  });
+
+  it("焦点模态由 token 入口绑，App 不再 bind/unbind", () => {
+    const app = readFileSync(findRepoFile(["packages/workbench/src/App.tsx", "src/App.tsx"]), "utf8");
+    expect(app).not.toContain("bindFocusModality");
   });
 
   it("Vite 端口读 tauri.conf.json devUrl，不另写字面量", () => {

@@ -9,6 +9,7 @@ import { systemReportError, YoLog } from "@yohu/api";
 import { setDensity, setTheme } from "@yohu/ui";
 
 import { runBootPipeline } from "./boot";
+import { allowNativeContextMenu } from "./native-context-menu";
 import "./register";
 import { AppLayout } from "./shell/AppLayout";
 import { deviceStore, settingsStore, taskStore, updateStore, windowStore } from "./stores";
@@ -42,10 +43,15 @@ export const App: Component = () => {
       void systemReportError(`JS: ${e.message}`);
     };
     window.addEventListener("error", onError);
+    const onContextMenu = (event: MouseEvent): void => {
+      if (!allowNativeContextMenu(event.target)) event.preventDefault();
+    };
+    document.addEventListener("contextmenu", onContextMenu);
     onCleanup(() => {
       disposed = true;
       detachWindow();
       window.removeEventListener("error", onError);
+      document.removeEventListener("contextmenu", onContextMenu);
     });
   });
 

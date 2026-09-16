@@ -63,12 +63,12 @@ export function UpdateDialogs(props: {
           <Show
             when={!downloading()}
             fallback={
-              <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
                 取消
               </YoButton>
             }
           >
-            <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
+            <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
               稍后
             </YoButton>
             <YoButton variant="ghost" tone="neutral" onClick={() => void openDownload()}>
@@ -109,7 +109,7 @@ export function UpdateDialogs(props: {
         footer={
           <>
             <Show when={!applying()}>
-              <YoButton variant="ghost" tone="neutral" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
                 取消
               </YoButton>
             </Show>

@@ -416,9 +416,10 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(emptyCollapse?.getAttribute("data-recipe")).toBe("collapse");
     expect(emptyCollapse?.getAttribute("data-open")).toBe("true");
     const emptyInner = emptyCollapse?.querySelector(":scope > .yohu-collapse__inner");
-    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
-    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
-    expect(emptyInner?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
+    const emptyContent = emptyInner?.querySelector(":scope > .yohu-collapse__content");
+    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
+    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
+    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
     empty.unmount();
 
     mocks.deviceRefresh.mockResolvedValue([
@@ -430,8 +431,9 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(container.querySelector(".yohu-device-rail")?.hasAttribute("data-empty")).toBe(false);
     expect(collapse?.getAttribute("data-recipe")).toBe("fill");
     const inner = collapse?.querySelector(":scope > .yohu-collapse__inner");
-    expect(inner?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
-    expect(inner?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
+    const content = inner?.querySelector(":scope > .yohu-collapse__content");
+    expect(content?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
+    expect(content?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
   });
 });
 
