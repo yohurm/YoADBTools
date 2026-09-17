@@ -186,7 +186,7 @@ export function MirrorView(props: DeviceSession) {
       >
         <YoButton
           size="sm"
-          variant="solid"
+          buttonStyle="emphasized"
           disabled={!props.selectedSerials[0] || starting()}
           loading={starting()}
           onClick={() => {
@@ -216,7 +216,7 @@ export function MirrorView(props: DeviceSession) {
         />
         <YoButton
           size="sm"
-          variant={mirrorStore.state.readOnly ? "solid" : "outlined"}
+          buttonStyle={mirrorStore.state.readOnly ? "emphasized" : "normal"}
           tone={mirrorStore.state.readOnly ? "accent" : "neutral"}
           aria-pressed={mirrorStore.state.readOnly}
           disabled={!props.selectedSerials[0] || starting()}
