@@ -1,9 +1,9 @@
 /**
- * 命令管理 Dialog：绑模块单例、保存全量提交、打开右键菜单。
- * 草稿与选区在 manager/store；禁止 effect 里自动 load。
+ * 命令管理：薄 fill Dialog。草稿在 manager/store，三栏在 ManagerWorkspace。
+ * 保存全量提交；右键菜单在此打开。禁止 effect 里自动 load。
  */
 
-import { Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Show, onCleanup } from "solid-js";
 
 import { errorText } from "@yohu/api";
 import {
@@ -11,7 +11,6 @@ import {
   YoButton,
   YoDialog,
   YoToaster,
-  attachPanelKeys,
   closeContextMenu,
   createToaster,
   openContextMenu,
@@ -20,11 +19,8 @@ import {
 import { commandCopyLines } from "./command-line";
 import { terminalCommandMenu } from "./menu";
 import type { DraftEntry } from "./draft";
-import { EditorColumn } from "./manager/EditorColumn";
-import { EntryColumn } from "./manager/EntryColumn";
-import { GroupColumn } from "./manager/GroupColumn";
+import { ManagerWorkspace } from "./manager/Workspace";
 import { MANAGER_DIALOG } from "./layout";
-import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./manager/keys";
 import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./command-manager.css";
@@ -32,22 +28,8 @@ import "./command-manager.css";
 export function CommandManager() {
   const store = commandManagerStore;
   const toaster = createToaster();
-  const [root, setRoot] = createSignal<HTMLDivElement>();
 
   onCleanup(() => toaster.destroy());
-
-  createEffect(() => {
-    const el = root();
-    if (!store.ui.open || !el) return;
-    const stop = attachPanelKeys(el, {
-      listSelector: COMMAND_MANAGER_LIST_SELECTOR,
-      bindings: COMMAND_MANAGER_KEY_BINDINGS,
-      onAction: (action) => {
-        if (action === "select-all") store.selectAllEntries();
-      },
-    });
-    onCleanup(stop);
-  });
 
   const requestClose = (): void => {
     closeContextMenu();
@@ -106,7 +88,7 @@ export function CommandManager() {
                 <YoBadge text={store.ui.error} tone="danger" />
               </span>
             </Show>
-            <YoButton variant="ghost" tone="accent" onClick={requestClose} disabled={store.ui.saving}>
+            <YoButton buttonStyle="normal" tone="accent" onClick={requestClose} disabled={store.ui.saving}>
               取消
             </YoButton>
             <YoButton onClick={() => void save()} loading={store.ui.saving}>
@@ -115,11 +97,7 @@ export function CommandManager() {
           </>
         }
       >
-        <div class="yohu-cm" ref={setRoot}>
-          <GroupColumn store={store} />
-          <EntryColumn store={store} onContextMenu={openCommandMenu} />
-          <EditorColumn store={store} />
-        </div>
+        <ManagerWorkspace store={store} onContextMenu={openCommandMenu} />
       </YoDialog>
       <YoToaster toaster={toaster} />
     </>

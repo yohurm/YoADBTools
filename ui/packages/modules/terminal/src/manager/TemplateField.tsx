@@ -59,25 +59,16 @@ export function TemplateField(props: {
 
   return (
     <div class="yohu-cm__template">
-      <div class="yohu-cm__template-row">
-        <div class="yohu-cm__template-field">
-          <YoTextField
-            block
-            label={props.label}
-            ariaLabel={props.ariaLabel}
-            value={display()}
-            onInput={(v) => props.onChange(commandBody(v))}
-            inputRef={(el) => setInput(el)}
-          />
-        </div>
-        <YoButton
-          type="button"
-          variant="outlined"
-          tone="neutral"
-          size="sm"
-          aria-label="在光标处插入参数"
-          onClick={insert}
-        >
+      <YoTextField
+        block
+        label={props.label}
+        ariaLabel={props.ariaLabel}
+        value={display()}
+        onInput={(v) => props.onChange(commandBody(v))}
+        inputRef={(el) => setInput(el)}
+      />
+      <div class="yohu-cm__template-actions">
+        <YoButton type="button" aria-label="在光标处插入参数" onClick={insert}>
           插入参数
         </YoButton>
       </div>

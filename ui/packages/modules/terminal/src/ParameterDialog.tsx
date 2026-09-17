@@ -52,7 +52,7 @@ export function ParameterDialog(props: {
       onExitComplete={props.onExitComplete}
       footer={
         <>
-          <YoButton variant="ghost" tone="accent" onClick={props.onClose}>
+          <YoButton buttonStyle="normal" tone="accent" onClick={props.onClose}>
             取消
           </YoButton>
           <YoButton onClick={submit}>加入队列</YoButton>

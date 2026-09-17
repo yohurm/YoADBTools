@@ -1,5 +1,5 @@
 /**
- * 命令库树：点组入队，纸飞机 sendAll 才 runGroup；点叶子入队命令/块（需填值则交给 View 开弹窗）。
+ * 命令库树：点组只开合，不入队；点叶子入队命令/块（需填值则交给 View 开弹窗）。
  */
 
 import { Show, createMemo } from "solid-js";
@@ -48,10 +48,7 @@ export function CommandTree(props: {
   );
 
   const onSelect = (_key: string, node: TreeNode<LibraryEntryDto | CommandGroupDto>): void => {
-    if (isGroup(node.data)) {
-      terminalStore.enqueueGroup(node.data);
-      return;
-    }
+    if (isGroup(node.data)) return;
     const entry = node.data;
     if (!entry || !("kind" in entry)) return;
     if (entryNeedsInput(entry)) {

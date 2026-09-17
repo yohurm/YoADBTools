@@ -54,15 +54,15 @@ export function TerminalView(props: DeviceSession) {
         title={ModuleTitle.Terminal}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
       >
-        <YoButton variant="outlined" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
           清屏
         </YoButton>
         <Show when={canCancel()}>
-          <YoButton variant="outlined" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
+          <YoButton buttonStyle="normal" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
             取消
           </YoButton>
         </Show>
-        <YoButton variant="outlined" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
           命令管理
         </YoButton>
       </YoChrome>

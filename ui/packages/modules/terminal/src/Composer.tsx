@@ -103,7 +103,7 @@ export function Composer(props: { serials: string[] }) {
         inert={open() ? true : undefined}
       >
         <YoButton
-          variant="solid"
+          buttonStyle="normal"
           tone="neutral"
           block
           aria-expanded={false}

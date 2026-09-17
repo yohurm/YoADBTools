@@ -90,6 +90,7 @@ describe("命令终端动效接线", () => {
     expect(load("ParameterDialog.tsx")).toContain("YoScroller");
     expect(load("ParameterDialog.tsx")).not.toMatch(/\.\s*scrollHeight/);
     expect(load("CommandManager.tsx")).not.toContain("YoScroller");
+    expect(load("manager/Workspace.tsx")).not.toContain("YoScroller");
   });
 
   it("composer 走 YoTextField multiline，不自挂 textarea 壳", () => {
@@ -109,6 +110,7 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain(":is(input, textarea)");
     expect(css).not.toContain(".yohu-terminal__send .yohu-icon-button:disabled");
     expect(composer).not.toContain("YoTravel");
+    expect(composer).not.toContain("YoGrow");
     expect(composer).not.toContain("maxRows");
     expect(css).toContain("align-items: flex-end");
   });
@@ -158,6 +160,7 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain(".yohu-presence");
     const manager = [
       load("CommandManager.tsx"),
+      load("manager/Workspace.tsx"),
       load("manager/GroupColumn.tsx"),
       load("manager/EntryColumn.tsx"),
       load("manager/EditorColumn.tsx"),
@@ -201,17 +204,21 @@ describe("命令终端动效接线", () => {
     expect(manager).toContain("attachPanelKeys");
     expect(manager).toContain("createEffect");
     expect(manager).toContain("store.ui.open");
-    expect(load("CommandManager.tsx")).toContain("onCleanup(stop)");
+    expect(load("manager/Workspace.tsx")).toContain("onCleanup(stop)");
     expect(load("CommandManager.tsx")).toContain("toaster.destroy()");
     expect(load("CommandManager.tsx")).not.toContain("onMount");
     expect(manager).toContain("COMMAND_MANAGER_KEY_BINDINGS");
     expect(manager).toContain("openContextMenu");
     expect(manager).toContain("terminalCommandMenu");
+    expect(manager).toContain("ManagerWorkspace");
     expect(manager).not.toContain("<YoContextMenu");
     expect(manager).not.toContain("<ul");
     expect(manager).not.toContain("<li");
     expect(load("CommandManager.tsx")).not.toContain("querySelectorAll");
     expect(load("CommandManager.tsx")).not.toContain("createStore");
+    expect(load("CommandManager.tsx")).not.toContain("attachPanelKeys");
+    expect(load("manager/Workspace.tsx")).toContain("attachPanelKeys");
+    expect(load("manager/Workspace.tsx")).toContain("onCleanup(stop)");
     const managerStore = load("manager/store.ts");
     expect(managerStore).not.toMatch(/from ["']\.\.\/store["']/);
     expect(managerStore).not.toContain("openContextMenu");
@@ -274,8 +281,8 @@ describe("命令终端动效接线", () => {
   });
 
   it("发送/组编排在 store，View 不双轨、不写死 Comfortable", () => {
-    expect(load("CommandTree.tsx")).toContain("enqueueGroup");
-    expect(load("CommandTree.tsx")).not.toMatch(/if \(key\.startsWith\("g:"\)\) return;/);
+    expect(load("CommandTree.tsx")).not.toContain("enqueueGroup");
+    expect(load("CommandTree.tsx")).toContain("if (isGroup(node.data)) return;");
     expect(load("TerminalView.tsx")).toContain("cancelGroup");
     expect(load("TerminalView.tsx")).not.toContain("fillTemplate");
     expect(load("Composer.tsx")).toContain("sendAll");

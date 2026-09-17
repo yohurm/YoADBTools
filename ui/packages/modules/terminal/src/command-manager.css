@@ -1,5 +1,5 @@
-/* 命令管理：三栏（组 | 条目 | 编辑器），各自滚动，互不挤压。
- * 对话框内容区走 YoDialog bodyOverflow=hidden bodyPad=none，禁止再点 __body。 */
+/* 命令管理：fill Dialog 的三栏工作区（组 | 条目 | 编辑器），各自滚动，互不挤压。
+ * 层与裁切由 YoDialog Portal + fill 定高负责。禁止再点 __body。 */
 
 .yohu-cm {
   display: grid;
@@ -75,16 +75,10 @@
   flex: 0 1 auto;
 }
 
-.yohu-cm__template-row {
+/* 与整页 Dialog 脚钮同一套：默认 YoButton hug，靠右，不铺满。 */
+.yohu-cm__template-actions {
   display: flex;
-  align-items: flex-end;
-  gap: var(--yohu-space-xs);
-  min-width: 0;
-}
-
-.yohu-cm__template-field {
-  flex: 1;
-  min-width: 0;
+  justify-content: flex-end;
 }
 
 .yohu-cm__param-descs {
