@@ -120,6 +120,8 @@ describe("MirrorView 滚轴", () => {
     expect(avail).not.toContain("YoScroller");
     expect(avail).toContain("yohu-mirror__hole");
     expect(viewSrc).not.toContain("deviceLabel");
+    expect(viewSrc).toContain("onCleanup(() => toaster.destroy())");
+    expect(viewSrc).not.toContain("Toast.success");
     expect(statusSrc).toContain("YoBadge");
     expect(statusSrc).not.toMatch(/<span[\s>]/);
   });

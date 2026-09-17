@@ -35,8 +35,6 @@ import {
 import { mirrorStore } from "./store";
 import "./mirror.css";
 
-const toaster = createToaster();
-
 type DeviceOp = { icon: IconName; title: string; keycode: number };
 
 const NAV_OPS: DeviceOp[] = [
@@ -54,6 +52,8 @@ const BRIGHTNESS_OPS: DeviceOp[] = [
 ];
 
 export function MirrorView(props: DeviceSession) {
+  const toaster = createToaster();
+  onCleanup(() => toaster.destroy());
   let avail: HTMLDivElement | undefined;
   let zoneObserver: ResizeObserver | undefined;
   let stopTheme: (() => void) | undefined;
@@ -245,7 +245,6 @@ export function MirrorView(props: DeviceSession) {
           paddingBlock="xs"
           align="center"
           gap="2xs"
-          overflowX="hidden"
           aria-label="设备操作"
         >
           <YoScroller>
