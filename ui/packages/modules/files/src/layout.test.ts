@@ -162,6 +162,19 @@ describe("传输坞开合契约", () => {
     expect(transferDock).not.toContain("overflowX");
   });
 
+  it("方向图标走 YoTooltip，不写原生 title、不包已画出的文件名", () => {
+    expect(transferDock).toContain("YoTooltip");
+    expect(transferDock).toContain('content={job().direction === "push" ? "上传" : "下载"}');
+    expect(transferDock).toContain("tabIndex={0}");
+    expect(transferDock).not.toMatch(/<span[^>]*title=/);
+    const nameSlice = transferDock.slice(
+      transferDock.indexOf("yohu-files__transfer-name"),
+      transferDock.indexOf("yohu-files__transfer-meta"),
+    );
+    expect(nameSlice).not.toContain("YoTooltip");
+    expect(nameSlice).not.toContain("tabIndex");
+  });
+
   it("模块 CSS 不自写 animation / 原生 overflow auto，帽高走 layout token", () => {
     expect(filesCss).not.toMatch(/animation\s*:/);
     expect(filesCss).not.toMatch(/overflow:\s*auto/);
@@ -319,6 +332,8 @@ describe("确认删除多文件契约", () => {
     expect(fileView).not.toContain("ondrop=");
     expect(fileView).not.toContain("DataTransfer.files");
     expect(fileView).toContain("dropHot");
+    expect(fileView).toContain("onCleanup(() => toaster.destroy())");
+    expect(fileView).not.toContain("Toast.success");
   });
 
   it("open 独立于名单，出场后再清载荷", () => {
@@ -331,6 +346,27 @@ describe("确认删除多文件契约", () => {
     expect(closeBlock).toContain("setDeleteOpen(false)");
     expect(closeBlock).not.toContain("setDeleteNames");
     expect(closeBlock).not.toContain("setDeleteExpanded");
+  });
+
+  it("新建窗 open 独立于 kind，出场后再清载荷", () => {
+    expect(fileView).toContain("createOpen");
+    expect(fileView).toContain("finishCreate");
+    expect(fileView).toContain("open={createOpen}");
+    expect(fileView).not.toContain("open={() => createKind() !== null}");
+    expect(fileView).toContain('title={createKind() === "dir" ? "新建目录" : "新建文件"}');
+    expect(fileView).toContain('ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}');
+    const closeBlock = fileView.slice(fileView.indexOf("const closeCreate"), fileView.indexOf("const finishCreate"));
+    expect(closeBlock).toContain("setCreateOpen(false)");
+    expect(closeBlock).not.toContain("setCreateKind");
+    expect(closeBlock).not.toContain("setCreateName");
+    expect(closeBlock).not.toContain("setCreateError");
+    const finishBlock = fileView.slice(fileView.indexOf("const finishCreate"), fileView.indexOf("const openCreate"));
+    expect(finishBlock).toContain("setCreateKind(null)");
+    expect(finishBlock).toContain("setCreateName");
+    expect(finishBlock).toContain("setCreateError");
+    const confirmBlock = fileView.slice(fileView.indexOf("const confirmCreate"), fileView.indexOf("const copySelected"));
+    expect(confirmBlock).toContain("setCreateOpen(false)");
+    expect(confirmBlock).not.toContain("setCreateKind");
   });
 
   it("超出预览走一层 YoReveal", () => {

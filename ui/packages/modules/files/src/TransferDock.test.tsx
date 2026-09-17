@@ -1,7 +1,20 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { transferFaultText, type TransferJob } from "./transfer-model";
+
+function loadTransferDock(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/TransferDock.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/TransferDock.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return readFileSync(candidate, "utf-8");
+  }
+  return "";
+}
 
 const state = vi.hoisted(() => ({
   transfers: [] as TransferJob[],
@@ -46,6 +59,31 @@ describe("TransferDock", () => {
     expect(transferStore.ui.transfersOpen).toBe(!start);
     transferStore.toggleTransfers();
     expect(transferStore.ui.transfersOpen).toBe(start);
+  });
+
+  it("方向图标无原生 title，文件名不进气泡锚", () => {
+    state.transfers = [
+      {
+        id: 1,
+        direction: "push",
+        name: "shot.bin",
+        bytes: 10,
+        total: 99,
+        state: "running",
+      },
+    ];
+    render(() => <TransferDock />);
+    const dir = document.querySelector(".yohu-files__transfer-dir");
+    expect(dir).not.toBeNull();
+    expect(dir?.getAttribute("title")).toBeNull();
+    expect(dir?.getAttribute("tabindex")).toBe("0");
+    const name = document.querySelector(".yohu-files__transfer-name");
+    expect(name?.textContent).toBe("shot.bin");
+    const src = loadTransferDock();
+    const tooltip = src.match(/<YoTooltip[\s\S]*?<\/YoTooltip>/)?.[0] ?? "";
+    expect(tooltip).toContain("yohu-files__transfer-dir");
+    expect(tooltip).not.toContain("yohu-files__transfer-name");
+    expect(src.indexOf("yohu-files__transfer-name")).toBeGreaterThan(src.indexOf("</YoTooltip>"));
   });
 
   it("失败行只渲染 transferFaultText(job.fault)", () => {

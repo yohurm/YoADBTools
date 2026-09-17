@@ -14,6 +14,7 @@ import {
   YoPanel,
   YoPresence,
   YoProgressBar,
+  YoTooltip,
 } from "@yohu/ui";
 
 import { formatSize } from "./model";
@@ -46,9 +47,11 @@ function TransferRow(props: { job: TransferJob }) {
         "yohu-files__transfer--failed": job().state === "failed",
       }}
     >
-      <span class="yohu-files__transfer-dir" title={job().direction === "push" ? "上传" : "下载"}>
-        <Icon name={job().direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
-      </span>
+      <YoTooltip content={job().direction === "push" ? "上传" : "下载"}>
+        <span class="yohu-files__transfer-dir" tabIndex={0}>
+          <Icon name={job().direction === "push" ? "arrow-up" : "arrow-down"} size={Layout.IconInline} />
+        </span>
+      </YoTooltip>
       <div class="yohu-files__transfer-body">
         <div class="yohu-files__transfer-head">
           <span class="yohu-files__transfer-name">{job().name}</span>

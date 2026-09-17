@@ -54,12 +54,13 @@ import "./files.css";
 
 type CreateKind = "file" | "dir";
 
-const toaster = createToaster();
-
 export function FileView(props: DeviceSession) {
+  const toaster = createToaster();
+  onCleanup(() => toaster.destroy());
   const [deleteOpen, setDeleteOpen] = createSignal(false);
   const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
   const [deleteExpanded, setDeleteExpanded] = createSignal(false);
+  const [createOpen, setCreateOpen] = createSignal(false);
   const [createKind, setCreateKind] = createSignal<CreateKind | null>(null);
   const [createName, setCreateName] = createSignal("");
   const [createError, setCreateError] = createSignal("");
@@ -146,10 +147,21 @@ export function FileView(props: DeviceSession) {
     void listingStore.removeMany(names);
   };
 
+  const closeCreate = (): void => {
+    setCreateOpen(false);
+  };
+
+  const finishCreate = (): void => {
+    setCreateKind(null);
+    setCreateName("");
+    setCreateError("");
+  };
+
   const openCreate = (kind: CreateKind): void => {
     setCreateKind(kind);
     setCreateName(kind === "dir" ? "新建文件夹" : "新建文件.txt");
     setCreateError("");
+    setCreateOpen(true);
     closeContextMenu();
   };
 
@@ -164,7 +176,7 @@ export function FileView(props: DeviceSession) {
       setCreateError(invalid);
       return;
     }
-    setCreateKind(null);
+    setCreateOpen(false);
     if (!kind) return;
     if (kind === "dir") void listingStore.mkdir(name);
     else void listingStore.createFile(name);
@@ -238,7 +250,7 @@ export function FileView(props: DeviceSession) {
     void onNativeDragDrop((event) => {
       const gate = {
         hasDevice: Boolean(props.selectedSerials[0]),
-        blocked: deleteOpen() || createKind() !== null,
+        blocked: deleteOpen() || createOpen(),
       };
       setDropSession((prev) => adoptDropSession(prev, dropSessionForEvent(event, gate)));
       const intoFolder = dropIntoFolder();
@@ -417,12 +429,13 @@ export function FileView(props: DeviceSession) {
         </YoDialog>
 
         <YoDialog
-          open={() => createKind() !== null}
+          open={createOpen}
           title={createKind() === "dir" ? "新建目录" : "新建文件"}
-          onClose={() => setCreateKind(null)}
+          onClose={closeCreate}
+          onExitComplete={finishCreate}
           footer={
             <>
-              <YoButton variant="ghost" tone="accent" onClick={() => setCreateKind(null)}>
+              <YoButton variant="ghost" tone="accent" onClick={closeCreate}>
                 取消
               </YoButton>
               <YoButton onClick={confirmCreate} disabled={!createReady()}>
