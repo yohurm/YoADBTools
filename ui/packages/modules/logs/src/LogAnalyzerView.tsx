@@ -363,14 +363,14 @@ export function LogAnalyzerView(props: DeviceSession) {
         </YoButton>
         <Show when={active()?.capturing}>
           <YoButton
-            variant="outlined" tone="neutral"
+            buttonStyle="normal" tone="neutral"
             onClick={togglePause}
           >
             {active()?.paused ? "继续" : "暂停"}
           </YoButton>
         </Show>
         <YoButton
-          variant="outlined" tone="neutral"
+          buttonStyle="normal" tone="neutral"
           onClick={() => {
             const id = logStore.state.activeSessionId;
             if (id !== null) void logStore.clearVisible(id);
@@ -378,10 +378,10 @@ export function LogAnalyzerView(props: DeviceSession) {
         >
           清空
         </YoButton>
-        <YoButton variant="outlined" tone="neutral" onClick={() => void logStore.clearDevice()} disabled={windowSerial() === null}>
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void logStore.clearDevice()} disabled={windowSerial() === null}>
           清设备缓冲
         </YoButton>
-        <YoButton variant="outlined" tone="neutral" onClick={() => void doExport()}>
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void doExport()}>
           导出
         </YoButton>
         <Show when={overflowed()}>
@@ -516,7 +516,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                 </div>
                 <Show when={session.pendingCount > 0}>
                   <div class="yohu-logs__pending">
-                    <YoButton variant="outlined" tone="neutral" onClick={() => logStore.resumeFollow(session.id)}>
+                    <YoButton buttonStyle="normal" tone="neutral" onClick={() => logStore.resumeFollow(session.id)}>
                       {session.pendingCount} 条新日志
                     </YoButton>
                   </div>
@@ -564,7 +564,7 @@ export function LogAnalyzerView(props: DeviceSession) {
         }}
         footer={
           <>
-            <YoButton variant="ghost" tone="accent" onClick={() => setRenameOpen(false)}>
+            <YoButton buttonStyle="normal" tone="accent" onClick={() => setRenameOpen(false)}>
               取消
             </YoButton>
             <YoButton

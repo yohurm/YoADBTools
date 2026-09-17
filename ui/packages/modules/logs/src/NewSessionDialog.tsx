@@ -216,7 +216,7 @@ export function NewSessionDialog(props: {
       onClose={props.onClose}
       footer={
         <>
-          <YoButton variant="ghost" tone="accent" onClick={props.onClose}>
+          <YoButton buttonStyle="normal" tone="accent" onClick={props.onClose}>
             取消
           </YoButton>
           <YoButton onClick={create} disabled={!canCreate()}>
