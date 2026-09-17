@@ -219,14 +219,14 @@ HarmonyOS 对照：TextInput。盒内缀与盒外缀两清，status 一等。禁
     写入盒 `--yohu-text-field-line` = control-height − 2×hairline（L2 `textFieldLineBoxPx`）。
     单行 input 高与行高等于写入盒，禁止 `height: 100%` + `leading-ui`（Chromium 会把字/caret 顶到盒顶）。
     `multiline` 同一门面画 textarea：宿主 `data-multiline`，行高 leading-ui，`padding-block` 把第一行推到写入盒中线；
-    写入盒 `height: auto`，textarea `overflow: auto` + `resize: none`。禁止元素选择器 `textarea.yohu-text-field__input` 后门。
+    写入盒 `height: auto`，textarea `overflow: auto` + `resize: none`。弱多行按硬换行抬高：`rows` 是下限，`maxRows` 默认 6；可见行走 L2 `resolveTextFieldGrowRows`（不认软折行，禁止 `scrollHeight`）。宿主写 `--yohu-text-field-rows`，控件高 = 铬高 + (rows−1)×`--yohu-font-body`×leading（定值 calc），`transition: height` 走 `spatialSmall`。禁止 `height: auto` 冒充动画，禁止 `field-sizing`，禁止外包 YoTravel 量盒，禁止用 `1em` 当行距（控件未设字号）。禁止元素选择器 `textarea.yohu-text-field__input` 后门。
     addon 在盒外。页面禁止再写 .yohu-text-field { width }
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
 | L1 | `icons.tsx` | `isIconName`：盒内缀图标名守卫 |
-| L2 | `textfield-model.ts` | 槽位占有；status 归一；涂装；width；multiline/rows；写入盒 `textFieldLineBoxPx`；`TEXT_FIELD_CONTROL_OVERFLOW` |
+| L2 | `textfield-model.ts` | 槽位占有；status 归一；涂装；width；multiline/rows/maxRows；弱多行 `countTextFieldLines` / `resolveTextFieldGrowRows`；写入盒 `textFieldLineBoxPx` |
 | L3 | `textfield-policy.ts` | 禁用与清除显隐；`data-*`（含 `data-tokens` / `data-multiline`） |
 | L4 | `TextField.tsx` + `TextField.css` | 铬 + 内容区；Token 槽 `display: contents`；input/textarea 吃剩余宽 |
 | L5 | `index.ts` | `YoTextField` + Props / Status / Affix / Control |
@@ -239,10 +239,11 @@ addonBefore?: JSX.Element
 addonAfter?: JSX.Element
 status?: "none" | "error" | "warning"
 multiline?: boolean
-rows?: number                 // 仅 multiline；默认 2
+rows?: number                 // 仅 multiline；默认 2；弱多行下限
+maxRows?: number              // 仅 multiline；默认 6；超过后写入盒滚动
 ```
 
-保留 `value` / `onInput` / `label` / `placeholder` / `clearable` / `disabled` / `readOnly`（可点选复制，不灰，隐藏清除）/ `ariaLabel` / `type` / `block` / `inputRef`（转发内部 input 或 textarea）/ `onKeyDown`（转发内部控件）/ `active`（过滤生效描边，写 `data-active`，不与 status 混）/ `tokens`（写入盒内输入前的 Token 槽）。不做 YoForm、YoTextArea、密码显隐、size 轴、status 别名。禁止模块 `querySelector("input")`，禁止点 `.yohu-text-field` 改 `--yohu-text-field-edge`。禁止页面自绘第二套只读路径皮，禁止再挂 `textarea.yohu-text-field__input`。
+保留 `value` / `onInput` / `label` / `placeholder` / `clearable` / `disabled` / `readOnly`（可点选复制，不灰，隐藏清除）/ `ariaLabel` / `type` / `block` / `inputRef`（转发内部 input 或 textarea）/ `onKeyDown`（转发内部控件）/ `active`（过滤生效描边，写 `data-active`，不与 status 混）/ `tokens`（写入盒内输入前的 Token 槽）/ `maxRows`（弱多行抬高帽）。不做 YoForm、YoTextArea、密码显隐、size 轴、status 别名。禁止模块 `querySelector("input")`，禁止点 `.yohu-text-field` 改 `--yohu-text-field-edge`。禁止页面自绘第二套只读路径皮，禁止再挂 `textarea.yohu-text-field__input`。
 
 ---
 
@@ -352,7 +353,7 @@ size / icon|children / disabled / loading / pressed
 | L3 | `icon-button-policy.ts` |
 | L4 | `IconButton.tsx` + `IconButton.css` |
 
-减动效钩子：`tokens/motion.css` 的 `.yohu-icon-button[data-busy] > .yohu-icon`。不做 solid、variant 轴、`size: number` 别名。禁止再写原生 `title` 属性。
+减动效钩子：`tokens/motion.css` 的 `.yohu-icon-button[data-busy] > .yohu-icon`。不做 solid、variant 轴、`size: number` 别名。禁止再写原生 `title` 属性。禁用油墨走 `--yohu-fg-4`（透明底，四级字；失焦不跟缀标抢三级）。禁止 `color: var(--yohu-disabled)`：禁用底是 fill，深色与 `surface-2` 同值。禁止跟实心 `YoButton` 的 `--yohu-fg-3` 对齐。
 
 ---
 

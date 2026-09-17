@@ -1,12 +1,14 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.28（2026-09-17，滚轴贴底 / Port 几何 / barHide）
+> **状态：** v3.30（2026-09-17，透明图标钮禁用四级字）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.30 变更（透明图标钮禁用四级字）：** `YoIconButton` 禁用油墨改 `--yohu-fg-4`。透明底没有禁用填，三级字与失焦描边/缀标同级会过跳；四级字仍能从深色 `surface-2` 分开。禁止再跟实心 `YoButton` 的 `--yohu-fg-3` 对齐。见 [youi.md](youi.md)。
+> **v3.29 变更（禁用油墨 / 弱多行抬高）：** `--yohu-disabled` 只作禁用底（深色 = `surface-2` = `#2E3033`）。透明图标钮禁用油墨禁止走禁用底（发送栏空态纸飞机会隐没）。`YoTextField multiline` 按硬换行抬高（`rows` 是下限，帽默认 6），盒高走写入盒 calc 定值 + `spatialSmall`；禁止 `height: auto` / `scrollHeight` / 模块自写过渡。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
 > **v3.28 变更（滚轴贴底 / Port 几何 / barHide）：** `YoVirtualList` 贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。`YoReorderList` 行盒与指针坐标用 `port.scrollTop()`。`useScrollerPort` 只在 `scroller-port.ts`，L4 不二次导出。Auto 隐藏走 `MotionDuration.barHide`（2s）。贴底阈值走 `Spacing.TwoXl`。见 [youi.md](youi.md)。
 > **v3.27 变更（Dialog data-clip / Corner 公开槽 / RailIntent）：** `YoDialog` panel 自写 `data-clip`（=`fit∧open` 或 `traveling()`，DialogChrome 订），禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`；`data-travel` 只属 `YoTravel`。`YoCorner` 公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`，禁止消费方点 `__content`。`YoRail` 只留 `RailIntent`，禁止 `RailPresentation`。`YoSubheader.meta` 贴标题、`actions` 行尾；`YoScroller` 视口 `flex: 1 1 auto`，禁止 `1 1 0`。见 [youi.md](youi.md)。
 > **v3.26 变更（Subheader meta / Scroller hug 视口）：** `YoSubheader.meta` 贴标题，`actions` 只走行尾。设备栏徽章走 meta，刷新是标题行兄弟；展开时 heading 槽吃剩余宽，图标轨关流刷新留起边。`YoScroller` 视口 `flex: 1 1 auto`，禁止 `1 1 0` 把 hug 列表压成 0。Dialog 只订自己的 flex 子项，禁止点 `__view`。见 [youi.md](youi.md)。
@@ -383,7 +385,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `error-hover` / `pressed` | warning + `interactive` 5% / 10% | 叠黑 | 叠白 | 危险实心叠态；禁止 CSS 再写 88%/76% |
 | `offline` | `font_tertiary` | 黑 40% | 白 40% | 离线点 |
 | `focus-ring` | `icon_sub_emphasize` | 宇宙蓝 40% | 宇宙蓝 40% | 键盘焦点环 |
-| `disabled` | `background_fourth` | `#D1D1D6` | `#2E3033` | 禁用底 |
+| `disabled` | `background_fourth` | `#D1D1D6` | `#2E3033` | 禁用底（不是禁用字；深色与 `surface-2` 同值） |
 | `switch-off` | `comp_background_secondary` | 黑 10% | 白 10% | Switch 关闭轨 |
 | `switch-off-hover` / `pressed` | 关闭轨 + `font_primary` 5% / 10% | 叠字色 | 叠字色 | Switch 关闭叠态；禁止组件再写 color-mix |
 | `scrim` | 黑 10% / 黑 40% | `#00000019` | `#00000066` | 对话框压暗；禁止用 `fg`（深色会变白雾） |
