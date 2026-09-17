@@ -1,5 +1,6 @@
 /**
  * YoListPresence —— 非虚拟短列表的 insert/remove（动画系统-v6.md 配方 list）。
+ * 对照 Vue TransitionGroup：只给新 key 挂 Presence（出生 closed→open）；已在场槽不重挂。
  * 保留正在出场的项直到 YoPresence 卸完；清屏等一次性整表移除可 `exit={false}` 直切。
  */
 import { For, createEffect, createMemo } from "solid-js";
@@ -7,7 +8,7 @@ import type { JSX } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 import type { PresenceRecipe } from "../../spec/recipes";
-import { firstPresentSlotKey, type ListPresenceSlot } from "./list-presence-model";
+import { firstPresentSlotKey, reconcileListPresenceSlots, type ListPresenceSlot } from "./list-presence-model";
 import { listPresenceHostAttrs } from "./list-presence-policy";
 import { YoPresence } from "./presence";
 
@@ -33,37 +34,13 @@ export function YoListPresence<T>(props: YoListPresenceProps<T>): JSX.Element {
 
     setSlots(
       produce((list) => {
-        const prevKeys = new Set(list.map((slot) => slot.key));
-
-        for (let i = list.length - 1; i >= 0; i--) {
-          const slot = list[i]!;
-          const nextIndex = keys.indexOf(slot.key);
-          if (nextIndex >= 0) {
-            slot.item = items[nextIndex]!;
-            slot.present = true;
-          } else if (allowExit) {
-            slot.present = false;
-          } else {
-            list.splice(i, 1);
-          }
-        }
-
-        keys.forEach((key, index) => {
-          if (prevKeys.has(key) || list.some((slot) => slot.key === key)) {
-            return;
-          }
-          const slot: Slot<T> = { key, item: items[index]!, present: true };
-          let insertAt = list.length;
-          for (let look = index - 1; look >= 0; look--) {
-            const neighbor = keys[look]!;
-            const neighborIndex = list.findIndex((entry) => entry.key === neighbor);
-            if (neighborIndex >= 0) {
-              insertAt = neighborIndex + 1;
-              break;
-            }
-          }
-          list.splice(insertAt, 0, slot);
+        const next = reconcileListPresenceSlots({
+          prev: list,
+          items,
+          keys,
+          allowExit,
         });
+        list.splice(0, list.length, ...next);
       }),
     );
   });

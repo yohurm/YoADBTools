@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { Layout } from "@yohu/ui";
+
 import {
   railPhaseOnIntentChange,
   railSlotOpen,
@@ -22,7 +24,9 @@ describe("rail 公开时序（转发 YoRail）", () => {
   });
 
   it("宽度未落到意图 token 不算落地", () => {
-    expect(railWidthMatchesIntent(48, true, "232px", "48px")).toBe(false);
-    expect(railWidthMatchesIntent(232, true, "232px", "48px")).toBe(true);
+    const expanded = `${Layout.ShellNav}px`;
+    const icons = `${Layout.ShellNavIcons}px`;
+    expect(railWidthMatchesIntent(Layout.ShellNavIcons, true, expanded, icons)).toBe(false);
+    expect(railWidthMatchesIntent(Layout.ShellNav, true, expanded, icons)).toBe(true);
   });
 });

@@ -12,9 +12,15 @@ import {
 
 describe("dialog-model", () => {
   it("打开且无显式高是 fit hug，不写 height", () => {
-    expect(resolveDialogBox({ open: true })).toEqual({ kind: "fit", sized: false, style: {} });
+    expect(resolveDialogBox({ open: true })).toEqual({
+      kind: "fit",
+      locked: false,
+      sized: false,
+      style: {},
+    });
     expect(resolveDialogBox({ open: true, width: 960 })).toEqual({
       kind: "fit",
+      locked: false,
       sized: true,
       style: { width: "960px" },
     });
@@ -29,27 +35,47 @@ describe("dialog-model", () => {
   it("显式高才 fill", () => {
     expect(resolveDialogBox({ open: true, width: 960, height: 480 })).toEqual({
       kind: "fill",
+      locked: false,
       sized: true,
       style: { width: "960px", height: "480px" },
     });
   });
 
-  it("关闭有最后打开盒才 exit 锁盒，否则回退 props 尺寸", () => {
+  it("关窗只锁盒，kind 仍按有没有显式高", () => {
     const lock = { width: "400px", height: "320px" };
     expect(resolveDialogBox({ open: false, lastOpen: lock })).toEqual({
-      kind: "exit",
+      kind: "fit",
+      locked: true,
       sized: false,
       style: lock,
     });
     expect(resolveDialogBox({ open: false, width: 960, lastOpen: lock })).toEqual({
-      kind: "exit",
+      kind: "fit",
+      locked: true,
       sized: true,
       style: lock,
     });
     expect(resolveDialogBox({ open: false, width: 960 })).toEqual({
-      kind: "exit",
+      kind: "fit",
+      locked: true,
       sized: true,
       style: { width: "960px" },
+    });
+  });
+
+  it("fill 关窗仍是 fill，只加 locked", () => {
+    const lock = { width: "960px", height: "560px" };
+    expect(resolveDialogBox({ open: false, width: 960, height: 560, lastOpen: lock })).toEqual({
+      kind: "fill",
+      locked: true,
+      sized: true,
+      style: lock,
+    });
+    expect(resolveDialogBox({ open: false, width: 960, height: 560 })).toEqual({
+      kind: "fill",
+      locked: true,
+      sized: true,
+      style: { width: "960px", height: "560px" },
     });
   });
 

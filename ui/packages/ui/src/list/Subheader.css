@@ -31,7 +31,7 @@
 .yohu-subheader[data-tone="list"] .yohu-subheader__title {
   font-size: var(--yohu-font-caption);
   font-weight: var(--yohu-font-weight-semibold);
-  color: var(--yohu-fg-3);
+  color: var(--yohu-fg-2);
 }
 
 .yohu-subheader[data-tone="content"] .yohu-subheader__title {

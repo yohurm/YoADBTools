@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 
+import * as reduced from "../../reduced";
 import { firstPresentSlotKey, listPresenceHostAttrs, YoListPresence } from "./index";
+
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
 
 describe("YoListPresence", () => {
   it("recipe 可换成 chip", () => {
@@ -30,6 +39,34 @@ describe("YoListPresence", () => {
     expect(screen.getByText("alpha")).toBeTruthy();
     expect(screen.getByText("beta")).toBeTruthy();
     expect(document.querySelectorAll('.yohu-presence[data-recipe="list"]').length).toBe(2);
+  });
+
+  it("追加邻项时新项从 closed 进场，旧项保持 open", async () => {
+    const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
+    const [items, setItems] = createSignal([{ id: 1, text: "one" }]);
+    render(() => (
+      <YoListPresence each={items()} key={(item) => item.id}>
+        {(item) => <div>{item.text}</div>}
+      </YoListPresence>
+    ));
+    await nextPaint();
+    const first = document.querySelector(".yohu-presence");
+    expect(first?.getAttribute("data-state")).toBe("open");
+    const seen: string[] = [];
+    const observer = new MutationObserver(() => {
+      seen.push(first?.getAttribute("data-state") ?? "");
+    });
+    observer.observe(first!, { attributes: true, attributeFilter: ["data-state"] });
+    setItems((list) => [...list, { id: 2, text: "two" }]);
+    const hosts = document.querySelectorAll(".yohu-presence");
+    expect(hosts[1]?.getAttribute("data-state")).toBe("closed");
+    await nextPaint();
+    observer.disconnect();
+    expect(first?.getAttribute("data-state")).toBe("open");
+    expect(hosts[1]?.getAttribute("data-state")).toBe("open");
+    expect(seen).not.toContain("closed");
+    expect(screen.getByText("two")).toBeTruthy();
+    skip.mockRestore();
   });
 
   it("追加后新项出现", () => {

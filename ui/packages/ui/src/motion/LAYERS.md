@@ -10,7 +10,7 @@ motion/
   engines/
     presence/           L2 进出树（含 keyframes / list / chip）
     collapse/           L2 0fr/1fr
-    rail/               L2 232↔48 一拍软弹簧
+    rail/               L2 200↔48 一拍软弹簧
     travel/             L2 Travel + Reveal
     indicator/          L2 选中滑块
     swap/               L2 文案换牌

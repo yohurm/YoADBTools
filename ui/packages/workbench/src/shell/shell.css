@@ -40,7 +40,7 @@
   border-right: var(--yohu-stroke-hairline) solid var(--yohu-border);
 }
 
-/* 两态都写死，禁止回退到同一条基础宽——展开会变成 232→232，插不回去。
+/* 两态都写死，禁止回退到同一条基础宽——展开会变成同宽→同宽，插不回去。
  * 宽跟轨自己的 data-rail（宽度拍），不是页栅上的用户意图。 */
 .yohu-layout__rail[data-rail="expanded"] {
   flex-basis: var(--yohu-layout-shell-nav);
@@ -54,7 +54,7 @@
   max-width: var(--yohu-layout-shell-nav-icons);
 }
 
-/* 内层跟轨宽。文案 nowrap + 关流 0fr，不锁 232 硬裁。 */
+/* 内层跟轨宽。文案 nowrap + 关流 0fr，不锁展开宽硬裁。 */
 .yohu-layout__rail-inner {
   display: flex;
   flex-direction: column;

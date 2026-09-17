@@ -108,6 +108,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const paint = (): void => {
     const el = view;
+    if (el) el.scrollLeft = 0;
     if (!el || host.overflow() === "hidden") {
       last = undefined;
       lastThumb = undefined;

@@ -1,8 +1,9 @@
 /**
  * YoPresence —— 进场挂载、出场播完再卸载（动画系统-v6.md L2）。
  * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip 改为 grid 裁切）。
+ * clip：出生 closed（0fr），仅本实例 want 上升后双 rAF 开。邻项增删不重挂、不重播。
  */
-import { Show, createEffect, createRenderEffect, createSignal, onCleanup } from "solid-js";
+import { Show, createEffect, createMemo, createRenderEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { motionDurationMs } from "../../../tokens/motion";
 import {
@@ -13,6 +14,7 @@ import {
   type PresenceRecipe,
 } from "../../spec/recipes";
 import { shouldSkipMotion } from "../../reduced";
+import { presenceClipBornState } from "./presence-model";
 import { presenceHostRecipe } from "./presence-policy";
 
 export type { PresenceRecipe };
@@ -27,11 +29,30 @@ export interface YoPresenceProps {
 }
 
 export function YoPresence(props: YoPresenceProps): JSX.Element {
+  const recipeOf = (): PresenceRecipe => props.recipe ?? "fade";
   const [present, setPresent] = createSignal(Boolean(props.when));
-  const [state, setState] = createSignal<"open" | "closed">(props.when ? "open" : "closed");
+  const [state, setState] = createSignal<"open" | "closed">(
+    presenceClipBornState({
+      when: Boolean(props.when),
+      usesClip: presenceUsesClip(recipeOf()),
+      skipMotion: shouldSkipMotion(),
+    }),
+  );
   const [exiting, setExiting] = createSignal(false);
   let host: HTMLDivElement | undefined;
   let exitGen = 0;
+  let enterRaf1 = 0;
+  let enterRaf2 = 0;
+  const want = createMemo(() => props.when === true);
+
+  const cancelEnterRafs = (): void => {
+    if (enterRaf1) window.cancelAnimationFrame(enterRaf1);
+    if (enterRaf2) window.cancelAnimationFrame(enterRaf2);
+    enterRaf1 = 0;
+    enterRaf2 = 0;
+  };
+
+  onCleanup(cancelEnterRafs);
 
   const finishExit = (gen: number): void => {
     if (gen !== exitGen) return;
@@ -44,36 +65,31 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   /**
    * 进场：when 变 true 必须同拍挂载。
    * Solid 文档：createEffect 在渲染完成后才跑；Show 只认 present() 会再等一拍 setPresent。
-   * 对照 corvu/Radix：visible = show || present。clip 配方仍由 createEffect 双 rAF。
+   * 对照 corvu/Radix：visible = show || present。clip 出生已是 closed，这里只负责非 clip 同拍 open。
    */
   createRenderEffect(() => {
-    if (!props.when) return;
+    if (!want()) return;
     setPresent(true);
     setExiting(false);
-    const recipe = props.recipe ?? "fade";
+    const recipe = recipeOf();
     if (presenceUsesClip(recipe) && !shouldSkipMotion()) return;
     setState("open");
   });
 
   createEffect(() => {
-    const want = props.when;
-    const recipe = props.recipe ?? "fade";
-    if (want) {
+    const next = want();
+    const recipe = recipeOf();
+    if (next) {
       const gen = ++exitGen;
       setExiting(false);
       setPresent(true);
       if (presenceUsesClip(recipe) && !shouldSkipMotion()) {
-        setState("closed");
-        let raf2 = 0;
-        const raf1 = window.requestAnimationFrame(() => {
-          raf2 = window.requestAnimationFrame(() => {
+        cancelEnterRafs();
+        enterRaf1 = window.requestAnimationFrame(() => {
+          enterRaf2 = window.requestAnimationFrame(() => {
             if (gen !== exitGen) return;
             setState("open");
           });
-        });
-        onCleanup(() => {
-          window.cancelAnimationFrame(raf1);
-          window.cancelAnimationFrame(raf2);
         });
         return;
       }
@@ -81,6 +97,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
       return;
     }
     if (!present()) return;
+    cancelEnterRafs();
     const gen = ++exitGen;
     setExiting(true);
     setState("closed");
@@ -111,8 +128,6 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
     });
   });
 
-  const recipe = () => props.recipe ?? "fade";
-
   return (
     <Show when={props.when || present()}>
       <div
@@ -121,11 +136,11 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
         }}
         class="yohu-presence"
         data-state={state()}
-        data-recipe={presenceHostRecipe(recipe())["data-recipe"]}
+        data-recipe={presenceHostRecipe(recipeOf())["data-recipe"]}
         data-exiting={exiting() ? "" : undefined}
         data-first={props.first ? "" : undefined}
       >
-        {presenceUsesClip(recipe()) ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
+        {presenceUsesClip(recipeOf()) ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
       </div>
     </Show>
   );

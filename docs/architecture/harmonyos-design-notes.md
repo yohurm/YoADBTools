@@ -311,7 +311,7 @@ HarmonyOS Symbol 以**描边（线性）**为主，几何型塑造，避免尖�
 - `SideBarContainer` / `HdsSideBar`：`showSideBar` 切 Embed（挤内容）或 Overlay（浮层）。`minSideBarWidth` 默认可拖到约 50vp 再 `autoHide`。控制钮示例 `Curve.Sharp` 100ms。
 - Apple HIG Sidebars：macOS Show/Hide Sidebar；窗口变窄可自动收起。图标尺寸 small/medium/large 是行高，不是收成 48 轨。
 
-Yohu 壳要的是常驻 232↔48 图标轨。因此：
+Yohu 壳要的是常驻 200↔48 图标轨。因此：
 
 - **不抄物种**（不 `showSideBar=false`、不收到 0、不 Overlay 滑入）。
 - **抄编排**：持续容器改宽（标准 300ms）+ 兄弟标题 `OPACITY` 同拍进出场（减速入 / 加速出）；交叉淡入淡出错开用 100ms 简单动画档。弹簧留给跟手，不给点击铬。
@@ -378,6 +378,7 @@ Yohu 壳要的是常驻 232↔48 图标轨。因此：
 | 手机强调型高度 | **112vp** |
 | 电脑标题栏高度 | Compact **40vp** / Default **56vp** / Medium **64vp** / Large **72vp**。Yohu 页眉已回内容区，窗口铬用 Compact 40vp |
 | 电脑标题栏风格 | 更小字号、去圆形底板；右侧铬条等宽 48vp 贴合铺满栏高，无内边距 |
+| 标题文本色 | 官方 `titleStyle`：主标题 `font_primary`、副标题 `font_secondary`。三级字不是标题 |
 | 右侧图标 | 最多 3 个（含菜单） |
 | 渐变模糊层 | 较标题栏底边高 **32vp**，色与页面背景一致 |
 | 电脑窗口顶部固定区 | 建议 ≤ 窗口高度 **1/4** |
@@ -394,7 +395,7 @@ Yohu 壳要的是常驻 232↔48 图标轨。因此：
 | 电脑设备 | 宽度固定不随父窗变；自带阴影（获焦/失焦区分层级）；最小 **360×240vp**，最大 ≤ 当前窗口 |
 | 电脑圆角 | 更小圆角（Yohu：`YoCorner role=dialog` = 16vp，手机 32vp） |
 
-YoDialog 落地：标题居中、无分割线、操作区 AUTO。官方确认框脚钮是 NORMAL（`comp_background_gray` + 蓝取消 / 红删除字），不是 TEXTUAL 透明；带输入框时确认 EMPHASIZED，无内容置灰。圆角走独立 `corner/` 算法绘制（四分之一圆 + 内侧描边），禁止 CSS border 叠 overflow 出毛边。整页对话框（命令管理）不铺满按钮。YoButton 字重 Medium，圆角 `role=control` = 8vp。
+YoDialog 落地：标题居中、一级字 `font_primary`、无分割线、操作区 AUTO。官方确认框脚钮是 NORMAL（`comp_background_gray` + 蓝取消 / 红删除字），不是 TEXTUAL 透明；带输入框时确认 EMPHASIZED，无内容置灰。圆角走独立 `corner/` 算法绘制（四分之一圆 + 内侧描边），禁止 CSS border 叠 overflow 出毛边。整页对话框（命令管理）不铺满按钮。YoButton 字重 Medium，圆角 `role=control` = 8vp。
 
 ### 6.7 半模态面板（Sheet）
 

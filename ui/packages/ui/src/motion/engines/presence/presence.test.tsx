@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
+import * as reduced from "../../reduced";
 import { YoPresence } from "./index";
+
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
 
 describe("YoPresence", () => {
   it("when 从 false 到 true 同拍挂载，data-state=open", () => {
@@ -54,6 +63,20 @@ describe("YoPresence", () => {
     expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("HfLooper");
   });
 
+  it("clip 配方出生 closed，双 rAF 后 open", async () => {
+    const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
+    render(() => (
+      <YoPresence when recipe="list">
+        <div>行</div>
+      </YoPresence>
+    ));
+    const host = document.querySelector(".yohu-presence");
+    expect(host?.getAttribute("data-state")).toBe("closed");
+    await nextPaint();
+    expect(host?.getAttribute("data-state")).toBe("open");
+    skip.mockRestore();
+  });
+
   it("recipe=list 用 clip 包一层，skip motion 时直接 open", () => {
     render(() => (
       <YoPresence when recipe="list">
@@ -73,6 +96,30 @@ describe("YoPresence", () => {
       </YoPresence>
     ));
     expect(document.querySelector(".yohu-presence")?.hasAttribute("data-first")).toBe(true);
+  });
+
+  it("when 维持 true 不重播 clip 进场", async () => {
+    const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
+    const [count, setCount] = createSignal(1);
+    render(() => (
+      <YoPresence when={count() > 0} recipe="list">
+        <div>行</div>
+      </YoPresence>
+    ));
+    const host = document.querySelector(".yohu-presence");
+    await nextPaint();
+    expect(host?.getAttribute("data-state")).toBe("open");
+    const seen: string[] = [];
+    const observer = new MutationObserver(() => {
+      seen.push(host?.getAttribute("data-state") ?? "");
+    });
+    observer.observe(host!, { attributes: true, attributeFilter: ["data-state"] });
+    setCount(2);
+    await nextPaint();
+    observer.disconnect();
+    expect(host?.getAttribute("data-state")).toBe("open");
+    expect(seen).not.toContain("closed");
+    skip.mockRestore();
   });
 
   it("未标 first 不写 data-first", () => {

@@ -5,6 +5,7 @@
   isolation: isolate;
   min-width: 0;
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .yohu-corner[data-mode="host"] {
@@ -69,6 +70,8 @@
   min-width: 0;
   min-height: 0;
   width: 100%;
+  /* pad 是槽内 inset。content-box + width:100% 会把左右垫加出滚动口，焦点横滚裁首字。 */
+  box-sizing: border-box;
 }
 
 .yohu-corner__content[data-direction="column"] {

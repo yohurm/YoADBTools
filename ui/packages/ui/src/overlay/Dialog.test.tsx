@@ -265,6 +265,7 @@ describe("YoDialog", () => {
   it("标准弹出框铬对照 HarmonyOS：居中标题、无分割线、操作区 AUTO", () => {
     expect(dialogCss).toContain("text-align: center");
     expect(dialogCss).toContain("line-clamp: 2");
+    expect(dialogCss).toMatch(/\.yohu-dialog__title\s*\{[^}]*color:\s*var\(--yohu-fg\)/);
     expect(dialogCss).not.toMatch(/\.yohu-dialog__title\s*\{[^}]*border-bottom/);
     expect(dialogCss).not.toMatch(/\.yohu-dialog__footer\s*\{[^}]*border-top/);
     expect(dialogCss).toContain('.yohu-dialog__footer[data-layout="row"]');
@@ -399,7 +400,7 @@ describe("YoDialog", () => {
     expect(onExitComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("打开是 fit，出场盒写在 data-box=exit，内容区不改 fill-flex", () => {
+  it("尺寸策略只有 fit/fill，关窗用 data-locked，内容区不改 flex", () => {
     render(() => (
       <YoDialog open onClose={() => {}}>
         内容
@@ -407,10 +408,14 @@ describe("YoDialog", () => {
     ));
     const panel = dialogPanel();
     expect(panel.getAttribute("data-box")).toBe("fit");
-    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="exit"]');
+    expect(panel.hasAttribute("data-locked")).toBe(false);
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-locked]");
     expect(dialogCss).toContain("max-height: none");
-    expect(dialogCss).not.toContain('[data-box="exit"] .yohu-dialog__body');
-    expect(dialogCss).not.toContain('[data-box="exit"] .yohu-dialog__body[data-region="split"]');
+    expect(dialogCss).toContain("min-height: 0");
+    expect(dialogCss).toContain("flex: 0 0 auto");
+    expect(dialogCss).not.toContain('[data-box="exit"]');
+    expect(dialogCss).not.toContain('[data-locked] .yohu-dialog__body');
+    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body');
   });
 
   it("fit 外包 YoTravel，关窗冻锁，不自持行程引擎", () => {
@@ -430,6 +435,7 @@ describe("YoDialog", () => {
     expect(src).not.toMatch(/from\s+["'][^"']*Scroller["']/);
     expect(src).toContain('axes={["block"]}');
     expect(src).toContain("resolveDialogBox");
+    expect(src).toContain("data-locked");
     expect(src).toContain("hug() && isOpen()");
     expect(src).toContain("travelOn() || trip()");
     expect(src).not.toContain('kind === "fit" && isOpen()');

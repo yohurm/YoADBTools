@@ -62,6 +62,10 @@ describe("YoCorner", () => {
     expect(src).not.toMatch(/viewBox=\{paint\(\)\.viewBox\}/);
   });
 
+  it("内容槽 border-box，pad 不把 width:100% 加出宿主", () => {
+    expect(cornerCss).toMatch(/\.yohu-corner__content\s*\{[^}]*box-sizing:\s*border-box;/);
+  });
+
   it("pad / direction / align / justify / gap 由本 CSS 解释", () => {
     expect(cornerCss).toContain('.yohu-corner__content[data-direction="row"]');
     expect(cornerCss).toContain('.yohu-corner__content[data-align="center"]');

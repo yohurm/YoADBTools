@@ -1,6 +1,7 @@
 /**
  * YoCorner —— 算法圆角铬（L4）。
  * 填充与描边共用 L2 圆弧路径；内容用同一 inset 路径裁，避免毛边。
+ * 内容槽 border-box：pad 是槽内 inset，禁止 content-box 把 width:100% 加出宿主。
  * host = 自持盒；paint = 铺在已有宿主上（按钮等）。
  * 绘制空间是 CSS 盒：viewBox 0 0 1 1 + preserveAspectRatio=none（铺满 dest）。
  * 量盒只把 token 半径换成单位分数；禁止把量到的 px 写成第二套 viewBox 再 meet。

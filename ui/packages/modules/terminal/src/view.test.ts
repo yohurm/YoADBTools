@@ -72,6 +72,19 @@ describe("命令终端动效接线", () => {
     expect(css).not.toContain("rotate(");
   });
 
+  it("左右分栏都走 YoPanel 栏标题，命令库宽走 sidebar token", () => {
+    const terminalView = load("TerminalView.tsx");
+    expect(terminalView).toContain('title="命令库"');
+    expect(terminalView).toContain('title="执行结果"');
+    const commandPane = terminalView.slice(
+      terminalView.indexOf("<YoPanel variant=\"pane\" padding=\"sm\""),
+      terminalView.indexOf("<CommandTree"),
+    );
+    expect(commandPane).toContain('title="命令库"');
+    expect(css).toContain("var(--yohu-layout-sidebar)");
+    expect(css).not.toMatch(/grid-template-columns:\s*280px/);
+  });
+
   it("结果流与命令树走 YoScroller，钉底不读原生内容高", () => {
     expect(load("ResultStream.tsx")).toContain("YoScroller");
     expect(load("ResultStream.tsx")).toContain("scrollToEnd");
@@ -148,6 +161,11 @@ describe("命令终端动效接线", () => {
     expect(load("manager/EditorColumn.tsx")).not.toContain("<Switch");
     expect(load("manager/TemplateField.tsx")).toContain("insertPlaceholderAtDisplay");
     expect(load("manager/BlockSteps.tsx")).toContain("TemplateField");
+    expect(load("manager/ParamDescriptions.tsx")).toContain("YoListPresence");
+    expect(load("manager/ParamDescriptions.tsx")).toContain('recipe="list"');
+    expect(load("manager/ParamDescriptions.tsx")).not.toContain("<For");
+    expect(load("manager/ParamDescriptions.tsx")).not.toContain("<Show");
+    expect(managerCss).toContain(".yohu-cm__param-descs:not(:has(.yohu-presence))");
     const templateBlock = managerCss.slice(managerCss.indexOf(".yohu-cm__template {"));
     const templateRule = templateBlock.slice(0, templateBlock.indexOf("}") + 1);
     expect(templateRule).toContain("flex: 0 1 auto");
@@ -227,6 +245,7 @@ describe("命令终端动效接线", () => {
     expect(managerCss).not.toContain(".yohu-toolbar");
     expect(managerCss).not.toContain(".yohu-panel");
     expect(managerCss).toContain(".yohu-cm__commands .yohu-cm__list");
+    expect(managerCss).toContain("grid-template-rows: minmax(0, 1fr)");
     expect(managerCss).toContain("var(--yohu-canvas)");
     expect(managerCss).not.toContain(".yohu-cm__table");
     expect(managerCss).not.toContain(".yohu-cm__cols");

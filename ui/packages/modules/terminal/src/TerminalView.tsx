@@ -68,7 +68,7 @@ export function TerminalView(props: DeviceSession) {
       </YoChrome>
 
       <div class="yohu-terminal__body">
-        <YoPanel variant="pane" padding="sm" overflow="hidden">
+        <YoPanel variant="pane" padding="sm" overflow="hidden" title="命令库">
           <YoScroller>
             <CommandTree
               onNeedValues={(entry) => {

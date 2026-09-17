@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Layout } from "../../../tokens/layout";
 import {
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
@@ -62,8 +63,10 @@ describe("YoRail 时序", () => {
   it("宽度拍与休息相位一致", () => {
     expect(railWidthIntent("collapsing")).toBe("icons");
     expect(railWidthIntent("expanding")).toBe("expanded");
-    expect(railWidthMatchesIntent(48, true, "232px", "48px")).toBe(false);
-    expect(railWidthMatchesIntent(232, true, "232px", "48px")).toBe(true);
-    expect(railWidthMatchesIntent(48, false, "232px", "48px")).toBe(true);
+    const expanded = `${Layout.ShellNav}px`;
+    const icons = `${Layout.ShellNavIcons}px`;
+    expect(railWidthMatchesIntent(Layout.ShellNavIcons, true, expanded, icons)).toBe(false);
+    expect(railWidthMatchesIntent(Layout.ShellNav, true, expanded, icons)).toBe(true);
+    expect(railWidthMatchesIntent(Layout.ShellNavIcons, false, expanded, icons)).toBe(true);
   });
 });

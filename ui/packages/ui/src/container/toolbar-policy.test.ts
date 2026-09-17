@@ -12,10 +12,10 @@ describe("toolbar-policy", () => {
     });
   });
 
-  it("pad=xs 写成 data-pad", () => {
+  it("pad=xs 写成贴栏素底", () => {
     expect(toolbarHostAttrs({ pad: "xs" })).toEqual({
       role: "toolbar",
-      "data-chrome": "band",
+      "data-chrome": "plain",
       "data-overflow": "hidden",
       "data-pad": "xs",
     });

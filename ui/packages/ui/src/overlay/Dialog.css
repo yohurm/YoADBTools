@@ -18,6 +18,10 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
+  /* 锁盒：禁止 min-content 把 height 顶破。阴影仍在本盒，overflow 保持 visible。 */
+  min-width: 0;
+  min-height: 0;
   /* 对话框宽度单源：受页边距约束，且不超 dialog 层上限（命令管理整页对话框放开上限见 [data-sized]）。 */
   --yohu-dialog-width: min(var(--yohu-layout-dialog-max), calc(100% - var(--yohu-layout-page-margin) * 2));
   width: var(--yohu-dialog-width);
@@ -47,9 +51,9 @@
 }
 
 .yohu-dialog__panel[data-box="fill"] > .yohu-travel,
-.yohu-dialog__panel[data-box="exit"] > .yohu-travel,
+.yohu-dialog__panel[data-locked] > .yohu-travel,
 .yohu-dialog__panel[data-box="fill"] > .yohu-dialog__chrome,
-.yohu-dialog__panel[data-box="exit"] > .yohu-dialog__chrome {
+.yohu-dialog__panel[data-locked] > .yohu-dialog__chrome {
   flex: 1 1 0;
   height: 100%;
   min-height: 0;
@@ -86,8 +90,8 @@
   max-width: calc(100% - var(--yohu-layout-page-margin) * 2);
 }
 
-/* 出场：用最后一次打开盒，不再被 90% hug 或子树折叠改高。 */
-.yohu-dialog__panel[data-box="exit"] {
+/* 关窗锁最后打开盒：放开 90% 帽，不改 data-box。 */
+.yohu-dialog__panel[data-locked] {
   max-height: none;
 }
 
@@ -117,6 +121,7 @@
   font-size: var(--yohu-font-page-title);
   font-weight: var(--yohu-font-weight-bold);
   line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg);
 }
 
 .yohu-dialog__panel[data-sized] .yohu-dialog__title {
@@ -125,8 +130,8 @@
 }
 
 /*
- * fit / exit：内容区 hug。出场只锁最后打开盒 + Presence 淡出缩放，不改内容布局。
- * fill：内容区吃 title/footer 之间的剩余（整页对话框）。
+ * fit：内容区 hug。关窗只 data-locked，不改 flex。
+ * fill：内容区吃 title/footer 之间的剩余；插入/增删字段只在区内滚。
  */
 .yohu-dialog__body {
   flex: 0 1 auto;
@@ -152,8 +157,8 @@
 }
 
 /*
- * split：Fluent 钉铬、只滚内容。fit / exit 用纵向 flex hug；
- * fill 才让 main 吃剩余高。禁止 fit 用 1fr 当滚槽。禁止出场改 fill-flex。
+ * split：Fluent 钉铬、只滚内容。fit 用纵向 flex hug；
+ * fill 才让 main 吃剩余高。禁止 fit 用 1fr 当滚槽。关窗不改 fill-flex。
  */
 .yohu-dialog__body[data-region="split"] {
   display: flex;

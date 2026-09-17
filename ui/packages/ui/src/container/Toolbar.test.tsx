@@ -27,19 +27,24 @@ describe("YoToolbar", () => {
     expect(screen.getByRole("button", { name: "导出" })).toBeTruthy();
   });
 
-  it("pad=xs 写成 data-pad", () => {
+  it("pad=xs 写成贴栏素底", () => {
     render(() => (
       <YoToolbar pad="xs">
         <YoButton>新增</YoButton>
       </YoToolbar>
     ));
-    expect(screen.getByRole("toolbar").getAttribute("data-pad")).toBe("xs");
+    const toolbar = screen.getByRole("toolbar");
+    expect(toolbar.getAttribute("data-pad")).toBe("xs");
+    expect(toolbar.getAttribute("data-chrome")).toBe("plain");
   });
 
-  it("垫走 data-pad，铬不写 padding", () => {
+  it("垫走 data-pad，铬不写 padding；贴栏行内 md", () => {
     expect(toolbarCss).toContain('[data-pad="band"]');
     expect(toolbarCss).toContain('[data-pad="xs"]');
+    expect(toolbarCss).toContain('[data-chrome="plain"]');
+    expect(toolbarCss).toMatch(/\[data-pad="xs"\]\s*\{[^}]*--yohu-space-md/);
     expect(toolbarCss).not.toMatch(/\[data-chrome="band"\]\s*\{[^}]*padding:/);
+    expect(toolbarCss).not.toMatch(/\[data-chrome="plain"\][^{]*\{[^}]*--yohu-surface-2/);
   });
 
   it("两轴 overflow hidden，消费 data-overflow", () => {
@@ -52,5 +57,6 @@ describe("YoToolbar", () => {
     expect(toolbarSrc).toContain('align="center"');
     expect(toolbarSrc).toContain('overflow="hidden"');
     expect(toolbarSrc).toContain('gap="sm"');
+    expect(toolbarSrc).toContain("Radius.None");
   });
 });

@@ -3,12 +3,15 @@
  * 盒、内容区排列/溢出/垫、铬/滚槽分区、操作区 AUTO 是不变式；不碰 DOM、不入栈、不抢焦点。
  *
  * 盒对照：
- * - 鸿蒙 bindSheet / center popup：FIT_CONTENT 随内容，超过帽用帽（API 23 以下不够帽则自适应）
- * - Fluent Dialog：Surface hug + maxHeight；Header/Footer 钉住，滚槽只在 Body（auto 只裁切，条由调用方组合 YoScroller）
+ * - 鸿蒙 bindSheet / center popup：FIT_CONTENT 随内容，超过帽用帽
+ * - Fluent Dialog：Surface hug + maxHeight；Header/Footer 钉住，滚槽只在 Body
+ * - ArkUI CloseDialogAnimation：关窗 = 最后一盒上 opacity + scale，FillMode FORWARDS，不改子树固有高
  * - 0fr/1fr Collapse 只在高度不确定的流里成立；确定高 flex 剩余轨里 1fr = 剩余高，收回会把盒归零
  * - fit 走 used-clip：盒高交给公开 YoTravel 当拍锁用后 px；名单走 YoReveal；主槽 clip
  * - 滚条走公开 YoScroller，不是 travel。无法滚动不画条
- * - 关窗锁最后打开盒；内容区保持 fit hug，不改 fill-flex
+ *
+ * 尺寸策略只认有没有显式高（fit | fill），与 open 正交。
+ * 关窗只锁最后打开盒（inline + data-locked），禁止第三种 kind 去改内容区 flex。
  */
 
 export type YoDialogBodyLayout = "stack" | "row";
@@ -16,8 +19,8 @@ export type YoDialogBodyOverflow = "auto" | "hidden";
 export type YoDialogBodyPad = "lg" | "none";
 /** auto = 首个未 skip 的可聚焦；footer = 页脚第一钮（破坏性确认）。 */
 export type YoDialogInitial = "auto" | "footer";
-/** fit = hug；fill = 显式高；exit = 锁最后打开盒。 */
-export type DialogBoxKind = "fit" | "fill" | "exit";
+/** fit = hug；fill = 显式高。关窗不改 kind。 */
+export type DialogBoxKind = "fit" | "fill";
 /** plain = 子树即滚槽；split = lead / main / tail，只有 main 滚。 */
 export type DialogBodyRegion = "plain" | "split";
 /**
@@ -86,6 +89,7 @@ export interface DialogBoxInput {
 
 export interface DialogBoxPaint {
   kind: DialogBoxKind;
+  locked: boolean;
   sized: boolean;
   style: { width?: string; height?: string };
 }
@@ -103,22 +107,17 @@ export function dialogHugsContent(height?: number): boolean {
 }
 
 /**
- * 打开：显式高 = fill，否则 fit（hug，滚槽自有预算）。
- * 关闭：有最后打开盒才 exit。hug 冻到 Presence 卸节点；内容区不改 fill-flex。
+ * 尺寸策略只看显式高。关窗只锁盒，kind 不变。
+ * fill 内容区始终吃剩余高；fit 内容区始终 hug。禁止用第三种 kind 改 flex。
  */
 export function resolveDialogBox(input: DialogBoxInput): DialogBoxPaint {
   const sized = input.width !== undefined;
-  if (!input.open) {
-    return {
-      kind: "exit",
-      sized,
-      style: input.lastOpen ?? dialogSizeStyle(input.width, input.height),
-    };
-  }
-  if (input.height !== undefined) {
-    return { kind: "fill", sized, style: dialogSizeStyle(input.width, input.height) };
-  }
-  return { kind: "fit", sized, style: dialogSizeStyle(input.width) };
+  const kind: DialogBoxKind = input.height !== undefined ? "fill" : "fit";
+  const locked = !input.open;
+  const style = locked
+    ? (input.lastOpen ?? dialogSizeStyle(input.width, input.height))
+    : dialogSizeStyle(input.width, input.height);
+  return { kind, locked, sized, style };
 }
 
 /** 正宽高才锁；0 盒（未布局 / jsdom）不写 inline，避免出场折成一条线。 */
@@ -126,4 +125,3 @@ export function resolveDialogExitLock(width: number, height: number): DialogBoxL
   if (width <= 0 || height <= 0) return undefined;
   return { width: `${width}px`, height: `${height}px` };
 }
-

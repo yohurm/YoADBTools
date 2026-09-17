@@ -8,7 +8,8 @@
  * 遮罩不点关。禁止面板再用 CSS border + overflow:hidden 画圆角。
  * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
  *
- * 盒：`open` 只是 Presence 开关。fit hug、fill 显式高、exit 锁最后打开盒。
+ * 盒：`open` 只是 Presence 开关。尺寸策略只认 fit / fill，与开关正交。
+ * 关窗写 data-locked 冻最后打开盒，不改 kind，不改内容区 flex。
  * 层：Portal 到 body，避免模块页 / fade 祖先 overflow 与 transform 裁 fixed。
  * hug 外包公开 YoTravel；fill 定高不套 Travel。名单走 YoReveal（open 即接入）。
  * hug 跟 Presence 寿命。关窗冻锁。
@@ -251,6 +252,7 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
             tabindex={-1}
             ref={setPanelEl}
             data-box={box().kind}
+            data-locked={box().locked ? "" : undefined}
             data-sized={box().sized ? "" : undefined}
             data-clip={clip() ? "on" : undefined}
             style={box().style}

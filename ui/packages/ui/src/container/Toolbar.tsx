@@ -5,6 +5,7 @@
  */
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { Radius } from "../tokens/radius";
 import type { ToolbarPad } from "./toolbar-model";
 import { toolbarHostAttrs } from "./toolbar-policy";
 import "./Toolbar.css";
@@ -14,7 +15,7 @@ export type YoToolbarPad = ToolbarPad;
 export interface YoToolbarProps {
   /** 命令带内容。标题请调用方组合 YoSubheader，禁止本容器 import 产品 Yo*。 */
   children: JSX.Element;
-  /** 命令带垫。band = 底距 + 行内 xs；xs = 贴栏（无外距，块 xs / 行内 sm）。 */
+  /** 命令带垫。band = 独立灰带 + 底距 / 行内 xs；xs = 贴栏素底（块 xs / 行内 md，与卡片清单文本对齐）。 */
   pad?: YoToolbarPad;
 }
 
@@ -23,16 +24,18 @@ export interface YoToolbarProps {
  */
 export function YoToolbar(props: YoToolbarProps): JSX.Element {
   const host = () => toolbarHostAttrs({ pad: props.pad });
+  const chrome = () => host()["data-chrome"];
   return (
     <div
       class="yohu-toolbar"
       role={host().role}
-      data-chrome={host()["data-chrome"]}
+      data-chrome={chrome()}
       data-overflow={host()["data-overflow"]}
       data-pad={host()["data-pad"]}
     >
       <YoCorner
         role="control"
+        radius={chrome() === "plain" ? Radius.None : undefined}
         class="yohu-toolbar__chrome"
         direction="row"
         align="center"

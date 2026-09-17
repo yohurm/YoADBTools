@@ -2,7 +2,8 @@
  * 滚动条领域模型（L2）。
  * 对照 OpenHarmony Scroll / ScrollBar：无法滚动则不显示；滑块高 = 视口² / 内容；
  * 条宽 4vp（Spacing.Xs）；热区 8vp（Spacing.Sm）；BarState.Auto 停滚 2s 后隐藏。
- * 内置条是 overlay；官方 ScrollBar 示例给内容右边距。溢出且未 Off 时让出侧轨。
+ * 内置条是 overlay；官方 ScrollBar 示例给内容右边距。溢出且未 Off 时
+ * 视口 padding-inline-end 让出侧轨，不夺滚动口宽。
  * 电脑轨道点按翻页、长按 100ms 连翻。溢出只认 in-flow 盒，不认 abspos 撑的 scrollHeight。
  * traveling 由祖先 YoTravel / YoCollapse / YoGrow / Rail 信号提供；插值中不新出条；收回留 out 直到淡出结束。
  */

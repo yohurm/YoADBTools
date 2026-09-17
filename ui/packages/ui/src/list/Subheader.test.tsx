@@ -40,6 +40,19 @@ describe("YoSubheader", () => {
     expect(host.hasAttribute("data-has-trailing")).toBe(false);
   });
 
+  it("列表型标题走二级字，不是三级点缀", () => {
+    const css = loadCss();
+    expect(css).toMatch(
+      /\.yohu-subheader\[data-tone="list"\] \.yohu-subheader__title\s*\{[^}]*color:\s*var\(--yohu-fg-2\)/,
+    );
+    expect(css).toMatch(
+      /\.yohu-subheader\[data-tone="content"\] \.yohu-subheader__title\s*\{[^}]*color:\s*var\(--yohu-fg\)/,
+    );
+    expect(css).not.toMatch(
+      /\.yohu-subheader\[data-tone="list"\] \.yohu-subheader__title\s*\{[^}]*--yohu-fg-3/,
+    );
+  });
+
   it("有 meta 时标题 hug，禁止 flex 1 把邻接槽挤到盒尾", () => {
     const css = loadCss();
     expect(css).toMatch(

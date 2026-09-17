@@ -32,14 +32,18 @@ describe("YoScroller", () => {
 
   it("溢出让出侧轨，滑块在轨里，视口不留系统条", () => {
     const css = load("src/scroll/Scroller.css");
-    expect(css).toContain("flex-direction: row");
-    expect(css).toContain('[data-gutter="on"] > .yohu-scroller__lane');
-    expect(css).toContain("flex: 0 0 var(--yohu-space-sm)");
+    expect(css).toContain("flex-direction: column");
+    expect(css).toContain('[data-gutter="on"] > .yohu-scroller__view');
+    expect(css).toContain("padding-inline-end: var(--yohu-space-sm)");
+    expect(css).toContain("inset-inline-end: 0");
+    expect(css).toContain("width: var(--yohu-space-sm)");
     expect(css).toContain("inset-inline-end: var(--yohu-space-xs)");
     expect(css).toContain("width: var(--yohu-space-xs)");
     expect(css).toContain("background-color: var(--yohu-fg-3)");
     expect(css).toContain(".yohu-scroller__view {");
-    expect(css).toContain("overflow: hidden");
+    expect(css).toContain("overflow-x: clip");
+    expect(css).toContain("overflow-y: hidden");
+    expect(css).not.toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).not.toContain("!important");
     expect(css).toContain("flex: 1 1 auto");
     expect(css).not.toContain("flex: 1 1 0");
@@ -85,6 +89,7 @@ describe("YoScroller", () => {
     expect(binder).toContain("lastThumb");
     expect(binder).toContain("ResizeObserver");
     expect(binder).toContain("applyScrollTop");
+    expect(binder).toContain("scrollLeft = 0");
     expect(binder).not.toContain("scrollHeight");
     expect(binder).not.toContain("yohu-dialog");
     expect(binder).not.toMatch(/overflow-y\s*:\s*auto/);

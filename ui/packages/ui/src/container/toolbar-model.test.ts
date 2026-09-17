@@ -19,18 +19,18 @@ describe("toolbar-model", () => {
     expect(DEFAULT_TOOLBAR_PAD).toBe("band");
   });
 
-  it("pad=xs 是贴栏垫，不改铬", () => {
+  it("pad=xs 贴栏走 plain 铬，不嵌套命令带", () => {
     expect(resolveToolbarSpec({ pad: "xs" })).toEqual({
-      chrome: DEFAULT_TOOLBAR_CHROME,
+      chrome: "plain",
       overflow: DEFAULT_TOOLBAR_OVERFLOW,
       pad: "xs",
     });
   });
 
-  it("chrome / overflow 来自常量，不接受 input 覆写", () => {
+  it("chrome / overflow 不接受 input 覆写；贴栏由 pad 推导", () => {
     expect(resolveToolbarSpec().chrome).toBe("band");
     expect(resolveToolbarSpec().overflow).toBe("hidden");
-    expect(resolveToolbarSpec({ pad: "xs" }).chrome).toBe(DEFAULT_TOOLBAR_CHROME);
+    expect(resolveToolbarSpec({ pad: "xs" }).chrome).toBe("plain");
     expect(resolveToolbarSpec({ pad: "xs" }).overflow).toBe(DEFAULT_TOOLBAR_OVERFLOW);
   });
 });
