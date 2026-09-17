@@ -16,6 +16,8 @@ pub enum MotionSpec {
     SpatialSmall,
     /// 滑块宽高：200ms（CSS 软弹簧；原生回退 standard）
     SpatialStretch,
+    /// 内容用后高：300ms（CSS 长尾弹簧；原生回退 standard）
+    SpatialGrow,
     /// 折叠高度：200ms emphasized
     SpatialLocal,
     /// 共享容器 / 预览 / swap：300ms standard
@@ -36,7 +38,7 @@ impl MotionSpec {
             Self::SpatialSmall => 150,
             Self::EffectsEnter => 160,
             Self::EffectsExit | Self::SpatialStretch | Self::SpatialLocal | Self::SpatialExit => 200,
-            Self::SpatialPanel | Self::SpatialRail => 300,
+            Self::SpatialPanel | Self::SpatialRail | Self::SpatialGrow => 300,
             Self::SpatialEnter => 350,
         }
     }
@@ -48,7 +50,8 @@ impl MotionSpec {
             | Self::SpatialPanel
             | Self::SpatialRail
             | Self::SpatialSmall
-            | Self::SpatialStretch => {
+            | Self::SpatialStretch
+            | Self::SpatialGrow => {
                 ease_standard
             }
             Self::EffectsEnter | Self::SpatialEnter => ease_decel,
@@ -84,6 +87,7 @@ mod tests {
             "effectsExit" => MotionSpec::EffectsExit,
             "spatialSmall" => MotionSpec::SpatialSmall,
             "spatialStretch" => MotionSpec::SpatialStretch,
+            "spatialGrow" => MotionSpec::SpatialGrow,
             "spatialLocal" => MotionSpec::SpatialLocal,
             "spatialPanel" => MotionSpec::SpatialPanel,
             "spatialRail" => MotionSpec::SpatialRail,
@@ -99,6 +103,7 @@ mod tests {
         "effectsExit",
         "spatialSmall",
         "spatialStretch",
+        "spatialGrow",
         "spatialLocal",
         "spatialPanel",
         "spatialRail",

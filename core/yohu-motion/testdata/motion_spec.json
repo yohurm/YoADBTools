@@ -24,6 +24,11 @@
     "easing": "springSoft",
     "controlPoints": [0.4, 0.0, 0.2, 1.0]
   },
+  "spatialGrow": {
+    "durationMs": 300,
+    "easing": "springGrow",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
   "spatialLocal": {
     "durationMs": 200,
     "easing": "emphasized",
