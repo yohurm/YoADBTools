@@ -77,7 +77,7 @@ export function DeleteExpand(props: {
   return (
     <Show when={canToggleDelete(props.names)}>
       <YoButton
-        variant="ghost"
+        buttonStyle="textual"
         tone="neutral"
         size="sm"
         aria-expanded={props.expanded}

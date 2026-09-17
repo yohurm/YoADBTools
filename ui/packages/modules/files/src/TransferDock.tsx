@@ -94,7 +94,7 @@ export function TransferDock() {
     <YoPresence when={hasJobs()} recipe="rise">
       <YoPanel class="yohu-files__transfers" padding="none" overflow="hidden" header={
         <YoButton
-          variant="ghost"
+          buttonStyle="textual"
           tone="neutral"
           block
           aria-expanded={listOpen()}

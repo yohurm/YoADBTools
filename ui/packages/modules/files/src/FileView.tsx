@@ -338,7 +338,7 @@ export function FileView(props: DeviceSession) {
         dropIgnore
       >
         <YoButton onClick={() => void onUpload()}>上传</YoButton>
-        <YoButton variant="outlined" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
+        <YoButton buttonStyle="normal" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
           下载
         </YoButton>
         <YoIconButton
@@ -348,7 +348,7 @@ export function FileView(props: DeviceSession) {
           onClick={() => void listingStore.refresh()}
         />
         <YoButton
-          variant="ghost" tone="neutral"
+          buttonStyle="normal" tone="neutral"
           aria-expanded={listingStore.ui.previewOpen}
           onClick={() => listingStore.togglePreview()}
         >
@@ -410,10 +410,10 @@ export function FileView(props: DeviceSession) {
           onExitComplete={finishDelete}
           footer={
             <>
-              <YoButton variant="ghost" tone="accent" onClick={closeDelete}>
+              <YoButton buttonStyle="normal" tone="accent" onClick={closeDelete}>
                 取消
               </YoButton>
-              <YoButton variant="ghost" tone="danger" onClick={confirmDelete}>
+              <YoButton buttonStyle="normal" tone="danger" onClick={confirmDelete}>
                 删除
               </YoButton>
             </>
@@ -435,7 +435,7 @@ export function FileView(props: DeviceSession) {
           onExitComplete={finishCreate}
           footer={
             <>
-              <YoButton variant="ghost" tone="accent" onClick={closeCreate}>
+              <YoButton buttonStyle="normal" tone="accent" onClick={closeCreate}>
                 取消
               </YoButton>
               <YoButton onClick={confirmCreate} disabled={!createReady()}>

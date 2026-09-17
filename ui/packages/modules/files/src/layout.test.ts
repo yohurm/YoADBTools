@@ -236,6 +236,15 @@ function loadFileView(): string {
 
 const fileView = loadFileView();
 
+describe("页眉按钮样式", () => {
+  it("预览是页眉次要，走 normal+neutral，不是 TEXTUAL", () => {
+    const chrome = fileView.slice(fileView.indexOf("<YoChrome"), fileView.indexOf("</YoChrome>"));
+    expect(chrome).toContain('buttonStyle="normal" tone="neutral"');
+    expect(chrome).not.toContain('buttonStyle="textual"');
+    expect(chrome).toContain("togglePreview");
+  });
+});
+
 function loadDrop(): string {
   const candidates = [
     resolve(process.cwd(), "src/drop.ts"),
@@ -303,7 +312,7 @@ describe("确认删除多文件契约", () => {
     expect(fileView).not.toContain('join("、")');
     const deleteFooter = fileView.slice(fileView.indexOf("确认删除"), fileView.indexOf("新建目录"));
     expect(deleteFooter).toMatch(/<YoScroller[\s>]/);
-    expect(deleteFooter).toContain('variant="ghost"');
+    expect(deleteFooter).toContain('buttonStyle="normal"');
     expect(deleteFooter).toContain('tone="accent"');
     expect(deleteFooter).toContain('tone="danger"');
     expect(deleteFooter).not.toContain('tone="neutral"');
