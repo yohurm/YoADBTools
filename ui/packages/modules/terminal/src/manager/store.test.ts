@@ -105,13 +105,18 @@ describe("命令管理 store", () => {
     expect(store.draft.groups.map((g) => g.id)).toEqual(["g1", "g2"]);
   });
 
-  it("close 丢草稿，下次 open 才再切库", () => {
+  it("requestClose 只关窗，finishClose 才丢草稿", () => {
     const store = createCommandManagerStore();
     store.open(sample);
     store.updateGroupName("g1", "改过");
-    store.close();
+    store.requestClose();
     expect(store.ui.open).toBe(false);
+    expect(store.draft.groups.map((g) => g.id)).toEqual(["g1", "g2"]);
+    expect(store.selectedGroup()?.name).toBe("改过");
+    store.finishClose();
     expect(store.draft.groups).toEqual([]);
+    expect(store.ui.selectedGroupId).toBeNull();
+    expect(store.ui.error).toBe("");
     store.open(sample);
     expect(store.ui.open).toBe(true);
     expect(store.selectedGroup()?.name).toBe("设备信息");

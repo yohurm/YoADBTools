@@ -3,13 +3,14 @@
  * 草稿与选区在 manager/store；禁止 effect 里自动 load。
  */
 
-import { Show, onCleanup, onMount } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 
 import { errorText } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
   YoDialog,
+  YoToaster,
   attachPanelKeys,
   closeContextMenu,
   createToaster,
@@ -28,15 +29,17 @@ import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./command-manager.css";
 
-const toaster = createToaster();
-
 export function CommandManager() {
   const store = commandManagerStore;
-  let root: HTMLDivElement | undefined;
+  const toaster = createToaster();
+  const [root, setRoot] = createSignal<HTMLDivElement>();
 
-  onMount(() => {
-    if (!root) return;
-    const stop = attachPanelKeys(root, {
+  onCleanup(() => toaster.destroy());
+
+  createEffect(() => {
+    const el = root();
+    if (!store.ui.open || !el) return;
+    const stop = attachPanelKeys(el, {
       listSelector: COMMAND_MANAGER_LIST_SELECTOR,
       bindings: COMMAND_MANAGER_KEY_BINDINGS,
       onAction: (action) => {
@@ -46,9 +49,9 @@ export function CommandManager() {
     onCleanup(stop);
   });
 
-  const close = (): void => {
+  const requestClose = (): void => {
     closeContextMenu();
-    store.close();
+    store.requestClose();
   };
 
   const save = async (): Promise<void> => {
@@ -56,7 +59,7 @@ export function CommandManager() {
     store.setError("");
     try {
       await terminalStore.save(store.library());
-      close();
+      requestClose();
     } catch (e) {
       store.setError(errorText(e));
     } finally {
@@ -86,35 +89,39 @@ export function CommandManager() {
   };
 
   return (
-    <YoDialog
-      open={() => store.ui.open}
-      title="命令管理"
-      width={MANAGER_DIALOG.width}
-      height={MANAGER_DIALOG.height}
-      bodyOverflow="hidden"
-      bodyPad="none"
-      onClose={close}
-      footer={
-        <>
-          <Show when={store.ui.error}>
-            <span class="yohu-cm__error">
-              <YoBadge text={store.ui.error} tone="danger" />
-            </span>
-          </Show>
-          <YoButton variant="ghost" tone="accent" onClick={close} disabled={store.ui.saving}>
-            取消
-          </YoButton>
-          <YoButton onClick={() => void save()} loading={store.ui.saving}>
-            保存
-          </YoButton>
-        </>
-      }
-    >
-      <div class="yohu-cm" ref={(el) => { root = el; }}>
-        <GroupColumn store={store} />
-        <EntryColumn store={store} onContextMenu={openCommandMenu} />
-        <EditorColumn store={store} />
-      </div>
-    </YoDialog>
+    <>
+      <YoDialog
+        open={() => store.ui.open}
+        title="命令管理"
+        width={MANAGER_DIALOG.width}
+        height={MANAGER_DIALOG.height}
+        bodyOverflow="hidden"
+        bodyPad="none"
+        onClose={requestClose}
+        onExitComplete={() => store.finishClose()}
+        footer={
+          <>
+            <Show when={store.ui.error}>
+              <span class="yohu-cm__error">
+                <YoBadge text={store.ui.error} tone="danger" />
+              </span>
+            </Show>
+            <YoButton variant="ghost" tone="accent" onClick={requestClose} disabled={store.ui.saving}>
+              取消
+            </YoButton>
+            <YoButton onClick={() => void save()} loading={store.ui.saving}>
+              保存
+            </YoButton>
+          </>
+        }
+      >
+        <div class="yohu-cm" ref={setRoot}>
+          <GroupColumn store={store} />
+          <EntryColumn store={store} onContextMenu={openCommandMenu} />
+          <EditorColumn store={store} />
+        </div>
+      </YoDialog>
+      <YoToaster toaster={toaster} />
+    </>
   );
 }

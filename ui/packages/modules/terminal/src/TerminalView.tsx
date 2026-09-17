@@ -2,7 +2,7 @@
  * 终端主视图：树 / 流 / 发送栏。队列与组执行在 store。
  */
 
-import { Show, createEffect, createSignal, onMount } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
 
 import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, YoScroller } from "@yohu/ui";
 import type { DeviceSession, LibraryEntryDto } from "@yohu/api";
@@ -21,6 +21,20 @@ import "./terminal.css";
 export function TerminalView(props: DeviceSession) {
   const [inputEntry, setInputEntry] = createSignal<LibraryEntryDto | null>(null);
   const [inputOpen, setInputOpen] = createSignal(false);
+  const dialogEntry = createMemo<LibraryEntryDto | null>((prev) => inputEntry() ?? prev ?? null);
+  const dialogTitle = (): string => dialogEntry()?.name ?? "";
+  const dialogTemplates = (): string[] => {
+    const entry = dialogEntry();
+    return entry ? entryTemplates(entry) : [];
+  };
+  const dialogParams = (): ReturnType<typeof entryParams> => {
+    const entry = dialogEntry();
+    return entry ? entryParams(entry) : [];
+  };
+  const dialogSlots = (): number[] => {
+    const entry = dialogEntry();
+    return entry ? entrySlots(entry) : [];
+  };
 
   onMount(() => {
     void terminalStore.load();
@@ -85,28 +99,28 @@ export function TerminalView(props: DeviceSession) {
 
       <CommandManager />
 
-      <Show when={inputEntry()}>
-        <ParameterDialog
-          title={inputEntry()!.name}
-          templates={entryTemplates(inputEntry()!)}
-          params={entryParams(inputEntry()!)}
-          slots={entrySlots(inputEntry()!)}
-          open={inputOpen}
-          onClose={() => {
-            setInputOpen(false);
-            setInputEntry(null);
-          }}
-          onSubmit={(values) => {
-            const entry = inputEntry();
-            if (entry?.kind === "command") {
-              terminalStore.enqueueCommand(entry, values);
-            } else if (entry?.kind === "block") {
-              terminalStore.enqueueBlock(entry, values);
-            }
-            setInputEntry(null);
-          }}
-        />
-      </Show>
+      <ParameterDialog
+        title={dialogTitle()}
+        templates={dialogTemplates()}
+        params={dialogParams()}
+        slots={dialogSlots()}
+        open={inputOpen}
+        onClose={() => {
+          setInputOpen(false);
+        }}
+        onExitComplete={() => {
+          setInputEntry(null);
+        }}
+        onSubmit={(values) => {
+          const entry = inputEntry();
+          if (entry?.kind === "command") {
+            terminalStore.enqueueCommand(entry, values);
+          } else if (entry?.kind === "block") {
+            terminalStore.enqueueBlock(entry, values);
+          }
+          setInputOpen(false);
+        }}
+      />
     </YoPage>
   );
 }

@@ -101,11 +101,15 @@ export function createCommandManagerStore() {
     setUi("open", true);
   }
 
-  /** 页脚取消 / 关窗：丢草稿。下次 open 才再切库。 */
-  function close(): void {
+  /** 页脚取消 / 关窗：只关 open。载荷等出场完成再丢。 */
+  function requestClose(): void {
+    setUi("open", false);
+  }
+
+  /** Dialog 出场完成：丢草稿、清选区/error。下次 open 才再切库。 */
+  function finishClose(): void {
     setDraft({ groups: [] });
     setUi({
-      open: false,
       selectedGroupId: null,
       selectedEntryIds: [],
       entryPivot: null,
@@ -223,7 +227,8 @@ export function createCommandManagerStore() {
     ui,
     load,
     open,
-    close,
+    requestClose,
+    finishClose,
     library,
     selectedGroup,
     selectedEntry,

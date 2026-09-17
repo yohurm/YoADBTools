@@ -18,14 +18,17 @@ export function ParameterDialog(props: {
   slots: readonly number[];
   open: () => boolean;
   onClose: () => void;
+  onExitComplete?: () => void;
   onSubmit: (values: string[]) => void;
 }) {
   const [values, setValues] = createSignal<string[]>([]);
 
-  createEffect(() => {
-    if (props.open()) {
+  createEffect((wasOpen?: boolean) => {
+    const now = props.open();
+    if (!wasOpen && now) {
       setValues(props.slots.map(() => ""));
     }
+    return now;
   });
 
   const originals = (): string[] => props.templates.map((template) => formatAdbLine("-", template));
@@ -46,6 +49,7 @@ export function ParameterDialog(props: {
       title={`填写参数: ${props.title}`}
       width={PARAM_DIALOG_WIDTH}
       onClose={props.onClose}
+      onExitComplete={props.onExitComplete}
       footer={
         <>
           <YoButton variant="ghost" tone="accent" onClick={props.onClose}>

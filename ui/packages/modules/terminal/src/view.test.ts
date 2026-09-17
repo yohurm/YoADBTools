@@ -196,6 +196,11 @@ describe("命令终端动效接线", () => {
     expect(load("manager/EditorColumn.tsx")).not.toContain("<div class=\"yohu-cm__editor\"");
     expect(manager).toContain("pointerSelectMode");
     expect(manager).toContain("attachPanelKeys");
+    expect(manager).toContain("createEffect");
+    expect(manager).toContain("store.ui.open");
+    expect(load("CommandManager.tsx")).toContain("onCleanup(stop)");
+    expect(load("CommandManager.tsx")).toContain("toaster.destroy()");
+    expect(load("CommandManager.tsx")).not.toContain("onMount");
     expect(manager).toContain("COMMAND_MANAGER_KEY_BINDINGS");
     expect(manager).toContain("openContextMenu");
     expect(manager).toContain("terminalCommandMenu");
@@ -215,6 +220,54 @@ describe("命令终端动效接线", () => {
     expect(managerCss).toContain("var(--yohu-canvas)");
     expect(managerCss).not.toContain(".yohu-cm__table");
     expect(managerCss).not.toContain(".yohu-cm__cols");
+  });
+
+  it("参数 Dialog 常挂，关窗只翻 open，出场完成再卸 entry", () => {
+    const terminalView = load("TerminalView.tsx");
+    const params = load("ParameterDialog.tsx");
+    expect(terminalView).not.toContain("<Show when={inputEntry()}");
+    expect(terminalView).toContain("open={inputOpen}");
+    expect(terminalView).toContain("onExitComplete");
+    expect(terminalView).toContain("setInputEntry(null)");
+    expect(terminalView).toContain("setInputOpen(false)");
+    const onCloseBlock = terminalView.slice(
+      terminalView.indexOf("onClose={() => {"),
+      terminalView.indexOf("onExitComplete"),
+    );
+    expect(onCloseBlock).toContain("setInputOpen(false)");
+    expect(onCloseBlock).not.toContain("setInputEntry");
+    const onSubmitBlock = terminalView.slice(terminalView.indexOf("onSubmit={(values)"));
+    expect(onSubmitBlock).toContain("setInputOpen(false)");
+    expect(onSubmitBlock).not.toContain("setInputEntry");
+    expect(params).toContain("onExitComplete={props.onExitComplete}");
+    expect(params).toContain("props.onClose()");
+    expect(params).toContain("createEffect((wasOpen");
+    expect(params).toContain("!wasOpen && now");
+    expect(params).not.toContain("if (props.open())");
+  });
+
+  it("命令管理关窗不抽空草稿，Toaster 挂回树", () => {
+    const manager = load("CommandManager.tsx");
+    const managerStore = load("manager/store.ts");
+    expect(manager).toContain("YoToaster");
+    expect(manager).toContain("toaster={toaster}");
+    expect(manager).toContain("onExitComplete");
+    expect(manager).toContain("store.finishClose()");
+    expect(manager).toContain("store.requestClose()");
+    expect(manager).not.toContain("store.close()");
+    expect(manager).not.toContain("Toast.success");
+    expect(manager).toContain("toaster.destroy()");
+    expect(manager).toContain("onCleanup(() => toaster.destroy())");
+    expect(managerStore).toContain("function requestClose");
+    expect(managerStore).toContain("function finishClose");
+    expect(managerStore).not.toContain("function close(");
+    const requestCloseBlock = managerStore.slice(
+      managerStore.indexOf("function requestClose"),
+      managerStore.indexOf("function finishClose"),
+    );
+    expect(requestCloseBlock).toContain('setUi("open", false)');
+    expect(requestCloseBlock).not.toContain("setDraft");
+    expect(requestCloseBlock).not.toContain("groups: []");
   });
 
   it("发送/组编排在 store，View 不双轨、不写死 Comfortable", () => {
