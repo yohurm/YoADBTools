@@ -220,6 +220,27 @@ describe("日志显示列", () => {
     expect(view).toContain("layout: docLayout");
     expect(doc).toContain("layout={bind.layout}");
     expect(view).not.toContain("layout={docLayout()}");
+    expect(view).toContain("onCleanup(() => toaster.destroy())");
+    expect(view).not.toContain("Toast.success");
+  });
+
+  it("重命名窗 open 独立于载荷，出场后再清 target", () => {
+    const load = (name: string): string => {
+      const candidates = [
+        resolve(process.cwd(), `src/${name}`),
+        resolve(process.cwd(), `packages/modules/logs/src/${name}`),
+      ];
+      return candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
+    };
+    const view = load("LogAnalyzerView.tsx");
+    expect(view).toContain("renameOpen");
+    expect(view).toContain("onExitComplete");
+    expect(view).toContain("open={renameOpen}");
+    expect(view).not.toContain("open={() => renameTarget() !== null}");
+    expect(view).not.toContain("onClose={() => setRenameTarget(null)}");
+    const confirm = view.slice(view.indexOf("logStore.renameSession"), view.indexOf("确定"));
+    expect(confirm).toContain("setRenameOpen(false)");
+    expect(confirm).not.toContain("setRenameTarget(null)");
   });
 });
 

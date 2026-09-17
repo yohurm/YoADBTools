@@ -62,8 +62,6 @@ import { deviceSlice, logStore } from "./store";
 import type { LogSessionState } from "./workspace";
 import "./logs.css";
 
-const toaster = createToaster();
-
 function errorMessage(e: unknown): string {
   return errorText(e);
 }
@@ -122,8 +120,11 @@ function SessionEmpty(props: { session: LogSessionState; canStart: boolean; onSt
 }
 
 export function LogAnalyzerView(props: DeviceSession) {
+  const toaster = createToaster();
+  onCleanup(() => toaster.destroy());
   const [newOpen, setNewOpen] = createSignal(false);
   const [contextLine, setContextLine] = createSignal<ViewRow["line"] | null>(null);
+  const [renameOpen, setRenameOpen] = createSignal(false);
   const [renameTarget, setRenameTarget] = createSignal<number | null>(null);
   const [renameText, setRenameText] = createSignal("");
   const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
@@ -414,6 +415,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     const session = logStore.state.sessions.find((s) => s.id === target);
                     setRenameTarget(target);
                     setRenameText(session?.title ?? "");
+                    setRenameOpen(true);
                   },
                   duplicate: () => {
                     logStore.duplicateSession(target);
@@ -553,19 +555,23 @@ export function LogAnalyzerView(props: DeviceSession) {
       />
 
       <YoDialog
-        open={() => renameTarget() !== null}
+        open={renameOpen}
         title="重命名会话"
-        onClose={() => setRenameTarget(null)}
+        onClose={() => setRenameOpen(false)}
+        onExitComplete={() => {
+          setRenameTarget(null);
+          setRenameText("");
+        }}
         footer={
           <>
-            <YoButton variant="ghost" tone="accent" onClick={() => setRenameTarget(null)}>
+            <YoButton variant="ghost" tone="accent" onClick={() => setRenameOpen(false)}>
               取消
             </YoButton>
             <YoButton
               onClick={() => {
                 const id = renameTarget();
                 if (id !== null) logStore.renameSession(id, renameText());
-                setRenameTarget(null);
+                setRenameOpen(false);
               }}
             >
               确定
