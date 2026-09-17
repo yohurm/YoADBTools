@@ -52,6 +52,14 @@ describe("YoIconButton", () => {
     expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("禁用油墨走 fg-4，不用禁用底或三级字", () => {
+    const block = css.slice(css.indexOf(".yohu-icon-button:disabled"));
+    const rule = block.slice(0, block.indexOf("}") + 1);
+    expect(rule).toContain("color: var(--yohu-fg-4)");
+    expect(rule).not.toContain("var(--yohu-fg-3)");
+    expect(rule).not.toContain("var(--yohu-disabled)");
+  });
+
   it("loading 时旋转并禁用", () => {
     const { container } = render(() => <YoIconButton icon="refresh" title="刷新" loading />);
     const btn = screen.getByRole("button", { name: "刷新" });

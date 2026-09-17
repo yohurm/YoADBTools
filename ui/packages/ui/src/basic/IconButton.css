@@ -73,7 +73,8 @@
 }
 
 .yohu-icon-button:disabled {
-  color: var(--yohu-disabled);
+  /* 透明底没有禁用填。三级字和缀标同级，失焦态过跳；四级字仍能从 surface-2 里分开。 */
+  color: var(--yohu-fg-4);
   cursor: not-allowed;
 }
 
