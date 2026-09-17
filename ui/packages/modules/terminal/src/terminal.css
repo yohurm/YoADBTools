@@ -103,7 +103,7 @@
 
 .yohu-terminal__composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--yohu-space-sm);
   padding: var(--yohu-space-sm);
 }

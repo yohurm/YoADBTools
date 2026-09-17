@@ -108,6 +108,9 @@ describe("命令终端动效接线", () => {
     expect(css).toContain(".yohu-terminal__composer-field");
     expect(css).not.toContain(":is(input, textarea)");
     expect(css).not.toContain(".yohu-terminal__send .yohu-icon-button:disabled");
+    expect(composer).not.toContain("YoTravel");
+    expect(composer).not.toContain("maxRows");
+    expect(css).toContain("align-items: flex-end");
   });
 
   it("结果区与参数对话框走公开契约，不点内部槽、不挖 input", () => {
