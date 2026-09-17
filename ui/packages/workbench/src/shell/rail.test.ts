@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  railBlockHidden,
-  railCopyOpaque,
   railPhaseOnIntentChange,
   railSlotOpen,
   railStreamOpen,
@@ -10,13 +8,16 @@ import {
 } from "./rail";
 
 describe("rail 公开时序（转发 YoRail）", () => {
-  it("收起当拍关流，展开行程开流，铬按图标列收", () => {
-    expect(railPhaseOnIntentChange("expanded", false)).toBe("expanding");
+  it("文案流四相位：展开与展开行程开，收起当拍关", () => {
+    expect(railStreamOpen("expanded")).toBe(true);
     expect(railStreamOpen("expanding")).toBe(true);
-    expect(railCopyOpaque("expanding")).toBe(true);
-    expect(railSlotOpen("expanding")).toBe(true);
-    expect(railBlockHidden("expanding")).toBe(true);
     expect(railStreamOpen("collapsing")).toBe(false);
+    expect(railStreamOpen("icons")).toBe(false);
+  });
+
+  it("点开合先走行程相位；槽跟文案流", () => {
+    expect(railPhaseOnIntentChange("expanded", false)).toBe("expanding");
+    expect(railSlotOpen("expanding")).toBe(true);
     expect(railSlotOpen("collapsing")).toBe(false);
   });
 

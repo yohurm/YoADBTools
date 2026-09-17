@@ -109,11 +109,13 @@ export const AppLayout: Component = () => {
         actions={
           <>
             <YoThemeToggle
+              paint="window"
               onThemeChange={(theme) => {
                 void settingsStore.set("theme", theme);
               }}
             />
             <YoIconButton
+              paint="window"
               icon="sidebar"
               title={railIntent() === "expanded" ? "收起侧栏" : "展开侧栏"}
               aria-expanded={railIntent() === "expanded"}

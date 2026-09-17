@@ -8,6 +8,7 @@ const load = (name: string): string => readFileSync(resolve(here, name), "utf-8"
 
 const dialogs = load("UpdateDialogs.tsx");
 const form = load("SettingsForm.tsx");
+const view = load("SettingsView.tsx");
 const css = load("settings.css");
 
 describe("设置页滚轴", () => {
@@ -16,6 +17,21 @@ describe("设置页滚轴", () => {
     expect(dialogs.match(/<YoScroller>/g)?.length).toBe(2);
     expect(dialogs).toContain("yohu-settings__update-desc");
     expect(dialogs).toContain("yohu-settings__update-copy");
+  });
+
+  it("open 走开关，关窗不清 pending，出场再 dismiss", () => {
+    expect(dialogs).toContain("dialogOpen");
+    expect(dialogs).toContain("onExitComplete");
+    expect(dialogs).toContain("updateStore.close()");
+    expect(dialogs).toContain("updateStore.dismiss()");
+    expect(dialogs).not.toContain("onClose={() => updateStore.dismiss()}");
+    expect(dialogs).not.toContain("pending() !== null");
+  });
+
+  it("Toaster 随视图卸载 destroy，禁止静态 Toast.success", () => {
+    expect(view).toContain("createToaster()");
+    expect(view).toContain("onCleanup(() => toaster.destroy())");
+    expect(view).not.toContain("Toast.success");
   });
 
   it("表单只在页面级滚，卡片不套 YoScroller", () => {

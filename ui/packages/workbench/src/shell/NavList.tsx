@@ -21,7 +21,7 @@ import {
   railSlotOpen,
   railTooltipEnabled,
   useRail,
-  type RailPresentation,
+  type RailIntent,
 } from "@yohu/ui";
 
 import { systemModules, workspaceModules, type ModuleDescriptor } from "../registry";
@@ -33,7 +33,7 @@ function navItemLabel(mod: ModuleDescriptor): string {
 const NavItem: Component<{
   mod: ModuleDescriptor;
   activeId: string;
-  tooltip: boolean;
+  iconTip: boolean;
   onNavigate: (id: string) => void;
 }> = (props) => {
   const active = () => props.mod.id === props.activeId;
@@ -43,25 +43,32 @@ const NavItem: Component<{
       props.onNavigate(props.mod.id);
     }
   };
+  const name = () => props.mod.title;
+  const tip = () => navItemLabel(props.mod);
+  const icon = () => <Icon name={props.mod.icon} size={Layout.IconSm} />;
 
   return (
     <li>
-      <YoTooltip block content={navItemLabel(props.mod)} disabled={!props.tooltip}>
-        <YoListItem
-          role="button"
-          size="nav"
-          ring="inset"
-          current={active()}
-          selected={active()}
-          tabIndex={active() ? 0 : -1}
-          label={navItemLabel(props.mod)}
-          title={props.mod.title}
-          leading={<Icon name={props.mod.icon} size={Layout.IconSm} />}
-          trailing={props.mod.isPlanned ? <YoBadge text="开发中" tone="neutral" /> : undefined}
-          onClick={() => props.onNavigate(props.mod.id)}
-          onKeyDown={onItemKeyDown}
-        />
-      </YoTooltip>
+      <YoListItem
+        role="button"
+        size="nav"
+        ring="inset"
+        current={active()}
+        selected={active()}
+        tabIndex={active() ? 0 : -1}
+        label={props.iconTip ? tip() : name()}
+        title={name()}
+        leading={
+          props.iconTip ? (
+            <YoTooltip content={tip()}>{icon()}</YoTooltip>
+          ) : (
+            icon()
+          )
+        }
+        trailing={props.mod.isPlanned ? <YoBadge text="开发中" tone="neutral" /> : undefined}
+        onClick={() => props.onNavigate(props.mod.id)}
+        onKeyDown={onItemKeyDown}
+      />
     </li>
   );
 };
@@ -69,11 +76,11 @@ const NavItem: Component<{
 export const NavList: Component<{
   activeId: string;
   onNavigate: (id: string) => void;
-  presentation?: RailPresentation;
+  intent?: RailIntent;
 }> = (props) => {
   const rail = useRail();
-  const phase = () => rail?.phase() ?? props.presentation ?? "expanded";
-  const tooltip = () => railTooltipEnabled(phase());
+  const phase = () => rail?.phase() ?? props.intent ?? "expanded";
+  const iconTip = () => railTooltipEnabled(phase());
   return (
     <nav class="yohu-nav" aria-label="侧栏导航">
       <YoIndicator follow={props.activeId} variant="fill" />
@@ -88,7 +95,7 @@ export const NavList: Component<{
                 <NavItem
                   mod={mod}
                   activeId={props.activeId}
-                  tooltip={tooltip()}
+                  iconTip={iconTip()}
                   onNavigate={props.onNavigate}
                 />
               )}
@@ -105,7 +112,7 @@ export const NavList: Component<{
                 <NavItem
                   mod={mod}
                   activeId={props.activeId}
-                  tooltip={tooltip()}
+                  iconTip={iconTip()}
                   onNavigate={props.onNavigate}
                 />
               )}

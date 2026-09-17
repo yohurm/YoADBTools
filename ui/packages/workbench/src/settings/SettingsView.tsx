@@ -3,7 +3,7 @@
  * 启动已 load 设置；本页不二次 settingsStore.load。关于页不展示通道，不打 update.info。
  */
 
-import { Component } from "solid-js";
+import { Component, onCleanup } from "solid-js";
 
 import { errorText, ModuleTitle, type SettingKey } from "@yohu/api";
 import { YoChrome, YoToaster, createToaster } from "@yohu/ui";
@@ -13,9 +13,10 @@ import { SettingsForm } from "./SettingsForm";
 import { UpdateDialogs } from "./UpdateDialogs";
 import "./settings.css";
 
-const toaster = createToaster();
-
 export const SettingsView: Component = () => {
+  const toaster = createToaster();
+  onCleanup(() => toaster.destroy());
+
   const save = (key: SettingKey, value: unknown, okText: string): void => {
     void settingsStore
       .set(key, value)

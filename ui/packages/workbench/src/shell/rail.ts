@@ -5,12 +5,8 @@
 export type {
   RailIntent,
   RailPhase,
-  RailPresentation,
 } from "@yohu/ui";
 export {
-  railBlockHidden,
-  railCopyOpaque,
-  railLayoutExpanded,
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
   railSlotOpen,

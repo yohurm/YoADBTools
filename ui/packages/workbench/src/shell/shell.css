@@ -117,19 +117,12 @@
   gap: var(--yohu-space-xs);
 }
 
-.yohu-device-rail__header .yohu-subheader,
 .yohu-device-rail__heading {
   min-width: 0;
 }
 
-.yohu-device-rail__heading {
-  flex-grow: 0;
-  flex-shrink: 1;
-  flex-basis: auto;
-}
-
-.yohu-device-rail__heading[data-open="true"] {
-  flex-grow: 1;
+.yohu-device-rail[data-stream="open"] .yohu-device-rail__heading {
+  flex: 1 1 auto;
 }
 
 /* fill 只有一个直接子级：列表吃剩余高度，空态卡片 hug，避免两者各 flex:1。 */

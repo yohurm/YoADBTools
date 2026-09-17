@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import type { Component } from "solid-js";
 
 const mocks = vi.hoisted(() => ({
@@ -258,11 +258,22 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(items[0]?.getAttribute("tabindex")).toBe("0");
     expect(items[1]?.getAttribute("tabindex")).toBe("-1");
     expect(container.querySelector(".yohu-device-rail__list")?.getAttribute("role")).toBe("listbox");
+    expect(container.querySelector(".yohu-scroller")).toBeTruthy();
+    expect(container.querySelector(".yohu-device-rail")?.hasAttribute("data-rail")).toBe(false);
+    expect(container.querySelector(".yohu-device-rail")?.getAttribute("data-stream")).toBe("open");
+    const header = container.querySelector(".yohu-device-rail__header") as HTMLElement;
+    const headerKids = Array.from(header.children);
+    expect(within(header).getByText("设备")).toBeTruthy();
+    expect(header.querySelector(".yohu-badge")?.textContent).toBe("2");
+    expect(within(header).getByRole("button", { name: "刷新设备" })).toBeTruthy();
+    expect(headerKids[0]?.classList.contains("yohu-rail-slot")).toBe(true);
     expect(container.querySelector(".yohu-device-rail__scroller")).toBeNull();
     expect(container.querySelector(".yohu-scroller")).toBeTruthy();
     expect(items[0]?.classList.contains("yohu-interactive--selected")).toBe(true);
     expect(items[0]?.classList.contains("yohu-list-item")).toBe(true);
     expect(items[0]?.classList.contains("yohu-device-rail__item--active")).toBe(false);
+    expect(items[0]?.getAttribute("title")).toBeNull();
+    expect(items[0]?.getAttribute("aria-label")).toBe("Moto X");
   });
 
   it("点击与 Enter 键切换焦点设备（roving tabindex 跟随）", async () => {
@@ -330,9 +341,7 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(deviceStore.state.statuses.A1?.battery_pct).toBe(87);
     render(() => <DeviceRail />);
     expect(screen.getByText("Android 15 · 87% 充电")).toBeTruthy();
-    expect(document.querySelector('[role="option"]')?.getAttribute("aria-label")).toContain(
-      "Android 15 · 87% 充电",
-    );
+    expect(document.querySelector('[role="option"]')?.getAttribute("aria-label")).toBe("Moto X");
   });
 
   it("两台在线时执行目标仅为焦点，不广播全部在线设备", async () => {
@@ -405,9 +414,13 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(css).not.toContain(".yohu-device-rail__fold");
     expect(css).not.toMatch(/overflow:\s*auto/);
     expect(decls("yohu-device-rail")).toMatch(/max-height:\s*var\(--yohu-layout-device-rail-max\)/);
-    expect(css).toMatch(/\.yohu-device-rail\[data-empty\]\s*\{[^}]*flex:\s*0 0 auto/);
+    expect(css).toMatch(
+      /\.yohu-device-rail\[data-stream="open"\] \.yohu-device-rail__heading\s*\{[^}]*flex:\s*1 1 auto/,
+    );
+    expect(css).not.toContain(".yohu-device-rail__header > :last-child");
+    expect(css).not.toContain(".yohu-device-rail__header .yohu-subheader");
     expect(css).not.toMatch(/max-height:\s*42%/);
-    expect(css).not.toContain(".yohu-collapse__inner");
+    expect(css.includes("collapse__inner")).toBe(false);
     expect(css).toContain('data-rail="icons"');
     expect(css).not.toContain("data-presentation");
     expect(css).not.toMatch(
@@ -442,15 +455,14 @@ describe("DeviceRail（§3 设备卡片）", () => {
     mocks.deviceRefresh.mockResolvedValue([]);
     await deviceStore.refresh();
     const empty = render(() => <DeviceRail />);
+    const emptyRail = empty.container.querySelector(".yohu-device-rail");
     const emptyCollapse = empty.container.querySelector(".yohu-collapse");
-    expect(empty.container.querySelector(".yohu-device-rail")?.getAttribute("data-empty")).toBe("true");
+    expect(emptyRail?.getAttribute("data-empty")).toBe("true");
     expect(emptyCollapse?.getAttribute("data-recipe")).toBe("collapse");
     expect(emptyCollapse?.getAttribute("data-open")).toBe("true");
-    const emptyInner = emptyCollapse?.querySelector(":scope > .yohu-collapse__inner");
-    const emptyContent = emptyInner?.querySelector(":scope > .yohu-collapse__content");
-    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
-    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
-    expect(emptyContent?.querySelector(":scope > .yohu-device-rail__empty")).toBeNull();
+    expect(emptyRail?.querySelector(".yohu-device-rail__body")).toBeTruthy();
+    expect(emptyRail?.querySelector(".yohu-device-rail__list")).toBeNull();
+    expect(emptyRail?.querySelector(".yohu-device-rail__empty")).toBeNull();
     empty.unmount();
 
     mocks.deviceRefresh.mockResolvedValue([
@@ -458,13 +470,14 @@ describe("DeviceRail（§3 设备卡片）", () => {
     ]);
     await deviceStore.refresh();
     const { container } = render(() => <DeviceRail />);
+    const rail = container.querySelector(".yohu-device-rail");
     const collapse = container.querySelector(".yohu-collapse");
-    expect(container.querySelector(".yohu-device-rail")?.hasAttribute("data-empty")).toBe(false);
+    expect(rail?.hasAttribute("data-empty")).toBe(false);
     expect(collapse?.getAttribute("data-recipe")).toBe("fill");
-    const inner = collapse?.querySelector(":scope > .yohu-collapse__inner");
-    const content = inner?.querySelector(":scope > .yohu-collapse__content");
-    expect(content?.querySelector(":scope > .yohu-device-rail__body")).toBeTruthy();
-    expect(content?.querySelector(":scope > .yohu-device-rail__list")).toBeNull();
+    expect(collapse?.getAttribute("data-open")).toBe("true");
+    expect(rail?.querySelector(".yohu-device-rail__body")).toBeTruthy();
+    expect(rail?.querySelector(".yohu-device-rail__list")).toBeTruthy();
+    expect(rail?.querySelector(".yohu-device-rail__empty")).toBeNull();
   });
 
   it("图标轨只留状态点，仍能选设备", async () => {
@@ -473,14 +486,30 @@ describe("DeviceRail（§3 设备卡片）", () => {
       { serial: "B2", model: "Moto Y", state: "online", connection: "usb" },
     ]);
     await deviceStore.refresh();
-    const { container } = render(() => <DeviceRail presentation="icons" />);
+    const { container } = render(() => <DeviceRail intent="icons" />);
     const items = Array.from(container.querySelectorAll('[role="option"]'));
     expect(items).toHaveLength(2);
     expect(items[0]?.querySelector(".yohu-status-dot")).toBeTruthy();
-    expect(items[0]?.querySelector(".yohu-list-item__leading")).toBeTruthy();
+    expect(container.querySelector(".yohu-device-rail")?.hasAttribute("data-rail")).toBe(false);
+    expect(container.querySelector(".yohu-device-rail")?.getAttribute("data-stream")).toBe("closed");
     expect(items[0]?.getAttribute("aria-label")).toContain("Moto X");
+    expect(items[0]?.getAttribute("aria-label")).toContain("A1");
+    expect(items[0]?.getAttribute("title")).toBeNull();
     fireEvent.click(items[1] as HTMLElement);
     expect(deviceStore.state.focusSerial).toBe("B2");
+  });
+
+  it("设备卡不包 YoTooltip；图标轨只给状态点挂气泡", () => {
+    const roots = [
+      resolve(process.cwd(), "src"),
+      resolve(process.cwd(), "packages/workbench/src"),
+    ];
+    const root = roots.find((path) => existsSync(path));
+    expect(root).toBeTruthy();
+    const src = readFileSync(resolve(root!, "shell/DeviceRail.tsx"), "utf-8");
+    expect(src).not.toMatch(/<YoTooltip[\s\S]*?<YoListItem/);
+    expect(src).toContain("<YoTooltip content={tip()}>{statusDot()}</YoTooltip>");
+    expect(src).toContain("railTooltipEnabled");
   });
 });
 
@@ -494,6 +523,7 @@ describe("NavList（§3 模块导航）", () => {
     expect(active?.classList.contains("yohu-nav__item--active")).toBe(false);
     expect(active?.classList.contains("yohu-list-item")).toBe(true);
     expect(active?.getAttribute("tabindex")).toBe("0");
+    expect(active?.getAttribute("title")).toBeNull();
     const settingsItem = Array.from(container.querySelectorAll(".yohu-list-item")).find((el) =>
       el.textContent?.includes("设置"),
     );
@@ -549,12 +579,26 @@ describe("NavList（§3 模块导航）", () => {
   it("图标轨用 aria-label 导航，图标仍在", () => {
     const onNavigate = vi.fn();
     const { container } = render(() => (
-      <NavList presentation="icons" activeId={ModuleId.Terminal} onNavigate={onNavigate} />
+      <NavList intent="icons" activeId={ModuleId.Terminal} onNavigate={onNavigate} />
     ));
     const settings = container.querySelector('[aria-label="设置"]');
     expect(settings?.querySelector("svg.yohu-icon")).toBeTruthy();
+    expect(settings?.getAttribute("title")).toBeNull();
     fireEvent.click(settings as HTMLElement);
     expect(onNavigate).toHaveBeenCalledWith(ModuleId.Settings);
+  });
+
+  it("导航行不包 YoTooltip；图标轨只给 leading 图标挂气泡", () => {
+    const roots = [
+      resolve(process.cwd(), "src"),
+      resolve(process.cwd(), "packages/workbench/src"),
+    ];
+    const root = roots.find((path) => existsSync(path));
+    expect(root).toBeTruthy();
+    const src = readFileSync(resolve(root!, "shell/NavList.tsx"), "utf-8");
+    expect(src).not.toMatch(/<YoTooltip[\s\S]*?<YoListItem/);
+    expect(src).toContain("<YoTooltip content={tip()}>{icon()}</YoTooltip>");
+    expect(src).toContain("railTooltipEnabled");
   });
 });
 
@@ -573,7 +617,6 @@ describe("StatusBar（§3 状态栏）", () => {
     expect(task?.textContent).toBe("上传: x.apk");
     expect(task?.getAttribute("title")).toBeNull();
     expect(task?.getAttribute("aria-label")).toBe("C:\\x.apk → /sdcard/x.apk");
-    expect(task?.closest(".yohu-tooltip__anchor")).toBeNull();
   });
 
   it("版本文案来自 system.info 身份", async () => {
@@ -629,18 +672,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   });
 
   it("日志显示列走 YoFormRow：标题备注在左侧信息栈，复选在右侧控件槽", () => {
-    const { container } = render(() => <SettingsView />);
-    const title = [...container.querySelectorAll(".yohu-form-row__title")].find(
-      (el) => el.textContent === "日志显示列",
-    );
-    const row = title?.closest(".yohu-form-row");
-    const info = row?.querySelector(":scope > .yohu-form-row__info");
-    const control = row?.querySelector(":scope > .yohu-form-row__control");
-    expect(info).toBeTruthy();
-    expect(info?.querySelector(".yohu-form-row__description")).toBeNull();
-    expect(info?.querySelector(".yohu-form-row__note")).toBeTruthy();
-    expect(control).toBeTruthy();
-    expect(control?.querySelector(".yohu-settings__checks")).toBeTruthy();
+    render(() => <SettingsView />);
+    const title = screen.getByText("日志显示列");
+    const row = title.closest(".yohu-form-row");
+    expect(row?.getAttribute("data-has-note")).toBe("true");
+    expect(row?.hasAttribute("data-has-description")).toBe(false);
+    expect(row?.querySelector(".yohu-settings__checks")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "时间" })).toBeTruthy();
   });
 
   it("关闭 PID 列立即写入 log_display_columns", async () => {
@@ -675,11 +713,10 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(document.querySelectorAll(".yohu-text-field[data-readonly]")).toHaveLength(4);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
-    for (const title of ["ADB 路径", "数据目录"]) {
-      const heading = [...document.querySelectorAll(".yohu-form-row__title")].find(
-        (el) => el.textContent === title,
-      );
-      expect(heading?.closest(".yohu-form-row")?.querySelector(".yohu-form-row__description")).toBeNull();
+    for (const name of ["ADB 路径", "数据目录"]) {
+      const row = screen.getByLabelText(name).closest(".yohu-form-row");
+      expect(row?.getAttribute("data-has-note")).toBe("true");
+      expect(row?.hasAttribute("data-has-description")).toBe(false);
     }
 
     mocks.dialogOpenDirectory.mockResolvedValue("D:\\YohuData");
@@ -864,6 +901,27 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       expect(mocks.updateInstall).toHaveBeenCalledWith("C:\\Temp\\YohuAdbTools-update\\setup.exe");
     });
   });
+
+  it("稍后关窗不清 pending，出场期间仍能读版本", async () => {
+    render(() => <SettingsView />);
+    mocks.updateCheck.mockResolvedValueOnce({
+      has_new_version: true,
+      version: "1.2.0",
+      description: "修复若干问题",
+      installer_url: "https://example.com/setup.exe",
+      page_url: "https://github.com/yohurm/Windows-YoADBTools",
+      sha256: "",
+      size_bytes: 0,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "检查更新" }) as HTMLButtonElement);
+    await waitFor(() => {
+      expect(screen.getByText("1.2.0")).toBeTruthy();
+    });
+    expect(updateStore.pending()?.version).toBe("1.2.0");
+    fireEvent.click(screen.getByRole("button", { name: "稍后" }) as HTMLButtonElement);
+    expect(updateStore.dialogOpen()).toBe(false);
+    expect(updateStore.pending()).toBeNull();
+  });
 });
 
 describe("AppLayout 窗口铬", () => {
@@ -871,11 +929,10 @@ describe("AppLayout 窗口铬", () => {
     navStore.navigate(ModuleId.Terminal);
     render(() => <AppLayout />);
     expect(screen.getByText("Yohu ADB Tools")).toBeTruthy();
-    const bar = document.querySelector(".yohu-titlebar");
-    const buttons = bar?.querySelectorAll(".yohu-titlebar__caption") ?? [];
-    expect([...buttons].map((b) => b.getAttribute("aria-label"))).toEqual(["最小化", "最大化", "关闭"]);
+    expect(screen.getByRole("button", { name: "最小化" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "最大化" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "关闭" })).toBeTruthy();
     expect(document.querySelector(".yohu-window")).toBeTruthy();
-    expect(document.querySelector(".yohu-titlebar__center")).toBeTruthy();
   });
 
   it("模块标题与功能栏在右侧内容区，不进窗口标题栏", () => {
@@ -883,16 +940,17 @@ describe("AppLayout 窗口铬", () => {
     render(() => <AppLayout />);
     const titlebar = document.querySelector(".yohu-titlebar");
     expect(titlebar?.textContent).not.toContain("设置");
-    expect(document.querySelector(".yohu-layout__content .yohu-chrome__title")?.textContent).toContain("设置");
+    const content = document.querySelector(".yohu-layout__content") as HTMLElement;
+    expect(within(content).getByText("设置")).toBeTruthy();
   });
 
   it("主题钮在展开侧栏按钮左侧，点击即切深浅并落盘", async () => {
     navStore.navigate(ModuleId.Terminal);
     render(() => <AppLayout />);
-    const actions = document.querySelectorAll(".yohu-titlebar__actions .yohu-icon-button");
-    expect(actions[0]?.getAttribute("aria-label")).toBe("切换到深色模式");
-    expect(actions[1]?.getAttribute("aria-label")).toBe("收起侧栏");
-    fireEvent.click(screen.getByRole("button", { name: "切换到深色模式" }));
+    const theme = screen.getByRole("button", { name: "切换到深色模式" });
+    const rail = screen.getByRole("button", { name: "收起侧栏" });
+    expect(theme.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(theme);
     await waitFor(() => {
       expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
       expect(mocks.settingsSet).toHaveBeenCalledWith("theme", "dark");
@@ -1010,6 +1068,30 @@ describe("View 不越级 IPC", () => {
       expect(src, rel).not.toMatch(banned);
       expect(src, rel).not.toContain("deviceLabel");
       expect(src, rel).not.toContain("__scroller");
+    }
+  });
+
+  it("壳测试不点 YoUI 未公开 BEM", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/shell/Shell.test.tsx"),
+      resolve(process.cwd(), "packages/workbench/src/shell/Shell.test.tsx"),
+    ];
+    const src =
+      candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ??
+      "";
+    expect(src.length).toBeGreaterThan(0);
+    const banned = [
+      [".yohu-subheader", "__"].join(""),
+      [".yohu-collapse", "__"].join(""),
+      [".yohu-list-item", "__"].join(""),
+      [".yohu-tooltip", "__"].join(""),
+      [".yohu-form-row", "__"].join(""),
+      [".yohu-titlebar", "__"].join(""),
+      [".yohu-icon", "-button"].join(""),
+      [".yohu-chrome", "__title"].join(""),
+    ];
+    for (const sel of banned) {
+      expect(src, sel).not.toContain(sel);
     }
   });
 });

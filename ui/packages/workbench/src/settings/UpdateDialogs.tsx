@@ -1,5 +1,6 @@
 /**
  * 设置页更新对话框。检查/下载/安装走 updateStore；本文件只绑信号与 toast。
+ * open 走 dialogOpen 开关；onClose 只 close，onExitComplete 再 dismiss 清载荷。
  */
 
 import { Show, type JSX } from "solid-js";
@@ -22,11 +23,17 @@ export function UpdateDialogs(props: {
   const applying = (): boolean => updateStore.phase() === "applying";
   const foundOpen = (): boolean => {
     const phase = updateStore.phase();
-    return updateStore.pending() !== null && (phase === "idle" || phase === "downloading");
+    return updateStore.dialogOpen() && (phase === "idle" || phase === "downloading");
   };
   const confirmOpen = (): boolean => {
     const phase = updateStore.phase();
-    return updateStore.pending() !== null && (phase === "ready" || phase === "applying");
+    return updateStore.dialogOpen() && (phase === "ready" || phase === "applying");
+  };
+
+  const closeDialog = (): void => updateStore.close();
+  const finishDialog = (): void => {
+    if (updateStore.dialogOpen()) return;
+    updateStore.dismiss();
   };
 
   const openDownload = async (): Promise<void> => {
@@ -58,17 +65,18 @@ export function UpdateDialogs(props: {
       <YoDialog
         open={foundOpen}
         title="发现新版本"
-        onClose={() => updateStore.dismiss()}
+        onClose={closeDialog}
+        onExitComplete={finishDialog}
         footer={
           <Show
             when={!downloading()}
             fallback={
-              <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="accent" onClick={closeDialog}>
                 取消
               </YoButton>
             }
           >
-            <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
+            <YoButton variant="ghost" tone="accent" onClick={closeDialog}>
               稍后
             </YoButton>
             <YoButton variant="ghost" tone="neutral" onClick={() => void openDownload()}>
@@ -107,11 +115,12 @@ export function UpdateDialogs(props: {
       <YoDialog
         open={confirmOpen}
         title="安装更新"
-        onClose={() => updateStore.dismiss()}
+        onClose={closeDialog}
+        onExitComplete={finishDialog}
         footer={
           <>
             <Show when={!applying()}>
-              <YoButton variant="ghost" tone="accent" onClick={() => updateStore.dismiss()}>
+              <YoButton variant="ghost" tone="accent" onClick={closeDialog}>
                 取消
               </YoButton>
             </Show>

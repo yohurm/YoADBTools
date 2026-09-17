@@ -20,6 +20,7 @@ export type UpdateApplyPhase = "idle" | "downloading" | "ready" | "applying";
 export function createUpdateStore() {
   const [checking, setChecking] = createSignal(false);
   const [pending, setPending] = createSignal<RemoteUpdate | null>(null);
+  const [dialogOpen, setDialogOpen] = createSignal(false);
   const [phase, setPhase] = createSignal<UpdateApplyPhase>("idle");
   const [progress, setProgress] = createSignal<UpdateProgress | null>(null);
   const [installerPath, setInstallerPath] = createSignal<string | null>(null);
@@ -51,11 +52,13 @@ export function createUpdateStore() {
       const result = await updateCheck();
       if (result.has_new_version) {
         setPending(result);
+        setDialogOpen(true);
         setPhase("idle");
         setProgress(null);
         setInstallerPath(null);
       } else {
         setPending(null);
+        setDialogOpen(false);
         setPhase("idle");
         setProgress(null);
         setInstallerPath(null);
@@ -122,18 +125,26 @@ export function createUpdateStore() {
     const update = pending();
     if (!update) return;
     await updateOpen(update.page_url);
-    setPending(null);
-    setPhase("idle");
-    setProgress(null);
-    setInstallerPath(null);
+    close();
   }
 
-  function dismiss(): void {
+  /** 关窗：停下载，不清载荷。出场后再 dismiss。 */
+  function close(): void {
+    if (phase() === "applying") return;
     if (phase() === "downloading") {
       void updateCancel();
     }
+    setDialogOpen(false);
+  }
+
+  /** 清载荷。调用方在 onExitComplete 再调；关窗请走 close。 */
+  function dismiss(): void {
     if (phase() === "applying") return;
+    if (phase() === "downloading") {
+      void updateCancel();
+    }
     setPending(null);
+    setDialogOpen(false);
     setPhase("idle");
     setProgress(null);
     setInstallerPath(null);
@@ -142,6 +153,7 @@ export function createUpdateStore() {
   return {
     checking,
     pending,
+    dialogOpen,
     phase,
     progress,
     installerPath,
@@ -151,6 +163,7 @@ export function createUpdateStore() {
     download,
     install,
     openDownload,
+    close,
     dismiss,
     bindIpc,
   };

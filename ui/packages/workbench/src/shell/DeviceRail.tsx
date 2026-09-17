@@ -1,6 +1,7 @@
 /**
  * 设备栏（UI设计系统-v6.md §3）：展开为卡片，图标轨为状态点。
- * 行走 YoListItem + YoStatusDot；标题走 YoSubheader；滚动走 YoScroller。
+ * 行走 YoListItem + YoStatusDot；标题走 YoSubheader（计数徽章走 meta）；
+ * 刷新是标题行兄弟，不进 actions。滚动走 YoScroller。
  * 选中 = `.yohu-interactive--selected`（全表面同一配方）；
  * 无设备 hug（`recipe=collapse` + `YoEmptyState size=sm`）；有列表才 `fill` 吃帽下剩余高。
  * 空态短引导；有 lastError 才出明细和重试。
@@ -26,11 +27,12 @@ import {
   YoStatusDot,
   YoSubheader,
   YoTooltip,
-  railBlockHidden,
   railSlotOpen,
+  railStreamAttr,
+  railStreamOpen,
   railTooltipEnabled,
   useRail,
-  type RailPresentation,
+  type RailIntent,
 } from "@yohu/ui";
 import { deviceDisplayName } from "@yohu/api";
 
@@ -45,14 +47,14 @@ import {
 export const DeviceRail: Component<{
   moduleId?: string;
   selectionMode?: SelectionMode;
-  /** 壳外单测可指定相位；工作台内跟 YoRail。 */
-  presentation?: RailPresentation;
+  /** 壳外单测可指定意图；工作台内跟 YoRail。 */
+  intent?: RailIntent;
 }> = (props) => {
   const rail = useRail();
-  const phase = () => rail?.phase() ?? props.presentation ?? "expanded";
+  const phase = () => rail?.phase() ?? props.intent ?? "expanded";
   const [expanded, setExpanded] = createSignal(true);
   const multi = () => props.selectionMode === "multiOptional";
-  const compact = () => railBlockHidden(phase());
+  const compact = () => !railStreamOpen(phase());
   const slotOpen = () => railSlotOpen(phase());
   const listOpen = () => compact() || expanded();
 
@@ -88,14 +90,12 @@ export const DeviceRail: Component<{
   };
 
   return (
-    <div class="yohu-device-rail" data-empty={empty() ? true : undefined}>
+    <div
+      class="yohu-device-rail"
+      data-empty={empty() ? true : undefined}
+      data-stream={railStreamAttr(phase())}
+    >
       <div class="yohu-device-rail__header">
-        <YoIconButton
-          icon="refresh"
-          title="刷新设备"
-          loading={deviceStore.state.refreshing}
-          onClick={() => void deviceStore.refresh()}
-        />
         <YoRailSlot axis="inline" open={slotOpen()}>
           <YoIconButton
             icon={listOpen() && !compact() ? "chevron-down" : "chevron-right"}
@@ -109,13 +109,19 @@ export const DeviceRail: Component<{
             title="设备"
             tone="content"
             pad="flush"
-            actions={
+            meta={
               deviceStore.state.devices.length > 0 ? (
                 <YoBadge text={String(deviceStore.state.devices.length)} tone="neutral" />
               ) : undefined
             }
           />
         </YoRailSlot>
+        <YoIconButton
+          icon="refresh"
+          title="刷新设备"
+          loading={deviceStore.state.refreshing}
+          onClick={() => void deviceStore.refresh()}
+        />
       </div>
       <YoCollapse open={listOpen()} recipe={empty() ? "collapse" : "fill"}>
         <div class="yohu-device-rail__body">
@@ -159,41 +165,48 @@ export const DeviceRail: Component<{
                         const meta = () => formatDeviceStatusMeta(runtime());
                         const hint = () => formatDeviceStatusHint(runtime());
                         const first = () => deviceStore.state.devices[0]?.serial === device.serial;
+                        const name = () => deviceDisplayName(device);
                         const tip = () =>
                           formatDeviceRailTip({
-                            name: deviceDisplayName(device),
+                            name: name(),
                             serial: device.serial,
                             unauthorized: device.state === "unauthorized",
                             hint: hint(),
                           });
+                        const iconTip = () => railTooltipEnabled(phase());
+                        const statusDot = () => (
+                          <YoStatusDot
+                            tone={device.state === "online" ? "success" : "offline"}
+                          />
+                        );
                         return (
-                          <YoTooltip block content={tip()} disabled={!railTooltipEnabled(phase())}>
-                            <YoListItem
-                              size="device"
-                              selected={isSelected(device.serial)}
-                              tabIndex={
-                                focused() || (deviceStore.state.focusSerial === null && first())
-                                  ? 0
-                                  : -1
-                              }
-                              label={tip()}
-                              title={deviceDisplayName(device)}
-                              description={device.serial}
-                              meta={meta()}
-                              leading={
-                                <YoStatusDot
-                                  tone={device.state === "online" ? "success" : "offline"}
-                                />
-                              }
-                              trailing={
-                                device.state === "unauthorized" ? (
-                                  <YoBadge text="未授权" tone="warning" />
-                                ) : undefined
-                              }
-                              onClick={(event) => select(device.serial, event)}
-                              onKeyDown={(event) => onItemKeyDown(device.serial, event)}
-                            />
-                          </YoTooltip>
+                          <YoListItem
+                            size="device"
+                            selected={isSelected(device.serial)}
+                            tabIndex={
+                              focused() || (deviceStore.state.focusSerial === null && first())
+                                ? 0
+                                : -1
+                            }
+                            label={iconTip() ? tip() : name()}
+                            title={name()}
+                            description={device.serial}
+                            meta={meta()}
+                            leading={
+                              iconTip() ? (
+                                <YoTooltip content={tip()}>{statusDot()}</YoTooltip>
+                              ) : (
+                                statusDot()
+                              )
+                            }
+                            trailing={
+                              device.state === "unauthorized" ? (
+                                <YoBadge text="未授权" tone="warning" />
+                              ) : undefined
+                            }
+                            onClick={(event) => select(device.serial, event)}
+                            onKeyDown={(event) => onItemKeyDown(device.serial, event)}
+                          />
                         );
                       }}
                     </YoListPresence>
