@@ -5,7 +5,7 @@
  *
  * 泛型组件：`.yohu-virtual-list` 只裁切；纵滚与产品条内组合 YoScroller
  *（视口 overflow hidden，滚轮改 scrollTop）。`__inner` 只撑总高。
- * 与 YoColFrame 表头共用视口：条叠在内容上，禁止 scrollbar-gutter。
+ * 与 YoColFrame 表头共用视口：溢出让出侧轨，禁止 scrollbar-gutter。
  * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
  *（absolute + translate3d）。行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
  * 滚动改 transform / data-key / 行 props，不拆行节点。
@@ -509,6 +509,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
         selected={attrs().selected && followKey() == null}
         hot={isListRowHot(attrs()["data-key"], props.hotKey?.() ?? null)}
         selectable={attrs().interactive}
+        selectedKeys={selectedKeys()}
         dataKey={attrs()["data-key"]}
         dataReorder={reorder.session()?.key === bound()?.key ? "source" : undefined}
         role={attrs().role}

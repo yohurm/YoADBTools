@@ -7,6 +7,7 @@ import {
   DEFAULT_LIST_ROW_TONE,
   resolveListRowChrome,
   type YoListRowFill,
+  type YoListRowRadius,
   type YoListRowTone,
 } from "./list-row-model";
 
@@ -15,12 +16,14 @@ export interface ListRowHostInput {
   selected?: boolean;
   hot?: boolean;
   selectable?: boolean;
+  selectedKeys?: ReadonlySet<string | number>;
 }
 
 export interface ListRowHostAttrs {
   "data-tone": YoListRowTone;
   "data-fill": Exclude<YoListRowFill, "none"> | undefined;
   "data-selectable": "" | undefined;
+  "data-radius": Exclude<YoListRowRadius, "none"> | undefined;
 }
 
 export function listRowHostAttrs(input: ListRowHostInput): ListRowHostAttrs {
@@ -29,5 +32,6 @@ export function listRowHostAttrs(input: ListRowHostInput): ListRowHostAttrs {
     "data-tone": input.tone ?? DEFAULT_LIST_ROW_TONE,
     "data-fill": chrome.fill === "none" ? undefined : chrome.fill,
     "data-selectable": input.selectable ? "" : undefined,
+    "data-radius": chrome.radius === "none" ? undefined : chrome.radius,
   };
 }

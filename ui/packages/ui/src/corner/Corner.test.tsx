@@ -44,6 +44,24 @@ describe("YoCorner", () => {
     expect(cornerCss).toContain('.yohu-corner__content[data-overflow="auto"]::-webkit-scrollbar');
   });
 
+  it("量盒走布局盒，禁止 getBoundingClientRect 吃 Presence scale", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Corner.tsx"), "utf-8");
+    expect(src).toContain("offsetWidth");
+    expect(src).toContain("offsetHeight");
+    expect(src).not.toMatch(/\.getBoundingClientRect\s*\(/);
+  });
+
+  it("绘制铺满 CSS 盒：单位 viewBox + none，禁止 meet 第二世界", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Corner.tsx"), "utf-8");
+    const { container } = render(() => <YoCorner>正文</YoCorner>);
+    const svg = container.querySelector(".yohu-corner__paint");
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 1 1");
+    expect(svg?.getAttribute("preserveAspectRatio")).toBe("none");
+    expect(src).toContain("CORNER_PAINT_VIEWBOX");
+    expect(src).toContain('preserveAspectRatio="none"');
+    expect(src).not.toMatch(/viewBox=\{paint\(\)\.viewBox\}/);
+  });
+
   it("pad / direction / align / justify / gap 由本 CSS 解释", () => {
     expect(cornerCss).toContain('.yohu-corner__content[data-direction="row"]');
     expect(cornerCss).toContain('.yohu-corner__content[data-align="center"]');

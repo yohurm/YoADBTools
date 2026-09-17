@@ -18,6 +18,8 @@ describe("L3 recipe CSS", () => {
     expect(css).toContain("grid-template-rows: 1fr");
     expect(css).toContain("grid-template-rows var(--yohu-motion-spatial-panel)");
     expect(css).toContain("100cqi");
+    expect(css).toContain("align-items: flex-start");
+    expect(css).not.toContain("min-height: min-content");
     expect(css).not.toContain("max-height: none");
     expect(css).not.toContain("grid-template-columns: 0fr auto");
   });

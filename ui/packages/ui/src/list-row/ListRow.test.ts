@@ -8,6 +8,7 @@ const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ListR
 describe("ListRow.css", () => {
   it("行盒只画格子，不画投放框", () => {
     expect(css).toMatch(/\.yohu-list-row \{[\s\S]*?border-radius:\s*var\(--yohu-radius-none\);/);
+    expect(css).toMatch(/\[data-radius="chip"\] \{\s*border-radius:\s*var\(--yohu-ripple-radius\);/);
     expect(css).toMatch(/\[data-tone="list"\] \{\s*border-bottom:/);
     expect(css).toContain('[data-fill="selected"]');
     expect(css).toContain('[data-fill="hot"]');

@@ -1,12 +1,14 @@
 /**
  * YoScroller —— 公共滚条（L4）。
  * 对照 OpenHarmony Scroll + ScrollBar：一对一；无法滚动不显示；系统条不进盒。
- * 只组合 binder：订 traveling()、写 attrs、开槽。度量/手势/相位定时在 scroller-binder。
+ * 溢出让出 8vp 侧轨（data-gutter），条画在轨里，内容不坐到滑块下。
+ * 只组合 binder：订 traveling()（Travel / Collapse / Grow / Rail）、写 attrs、开槽。度量/手势/相位定时在 scroller-binder。
  * 不知道 Dialog / Chip / Reveal。
  */
 import { createRenderEffect, createUniqueId, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { useCollapseTravel } from "../motion/engines/collapse";
+import { useGrow } from "../motion/engines/grow";
 import { useRail, railTraveling } from "../motion/engines/rail";
 import { useTravel } from "../motion/engines/travel";
 import { createScrollerBinder } from "./scroller-binder";
@@ -44,6 +46,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
   const viewId = createUniqueId();
   const travel = useTravel();
   const collapse = useCollapseTravel();
+  const grow = useGrow();
   const rail = useRail();
   const overflow = (): "auto" | "hidden" => props.overflow ?? "auto";
   const barState = (): ScrollerBarState => resolveScrollerBarState(props.state);
@@ -51,6 +54,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
   const traveling = (): boolean =>
     travel?.traveling() === true ||
     collapse?.traveling() === true ||
+    grow?.traveling() === true ||
     (rail != null && railTraveling(rail.phase()));
   const binder = createScrollerBinder({ overflow, barState, interactive, traveling });
   const handle: YoScrollerHandle = {
@@ -73,7 +77,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
 
   onCleanup(() => binder.destroy());
 
-  const host = () => scrollerHostAttrs(binder.phase(), barState(), interactive());
+  const host = () => scrollerHostAttrs(binder.phase(), barState(), interactive(), binder.gutter());
   let planeEl: HTMLDivElement | undefined;
   const port: ScrollerPort = {
     view: () => binder.view(),
@@ -90,6 +94,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
         data-scroll={host()["data-scroll"]}
         data-bar={host()["data-bar"]}
         data-interactive={host()["data-interactive"]}
+        data-gutter={host()["data-gutter"]}
         ref={(el) => {
           planeEl = el;
         }}

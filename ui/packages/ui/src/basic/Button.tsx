@@ -1,30 +1,28 @@
 /**
  * YoButton —— 通用按钮（L4 视图）。
- * HarmonyOS 对照：ButtonStyleMode EMPHASIZED / NORMAL / TEXTUAL
- * → solid-on / ghost-tone（灰底+语义字）与 solid-neutral / ghost-neutral。
- * 弹出框脚钮走 NORMAL（ghost+accent/danger），不是 TEXTUAL 透明。
- * 外形 / 语义色 / 禁用由 button-model + button-policy 决定；本文件只绑属性与内容区。
+ * HarmonyOS ButtonStyleMode：EMPHASIZED / NORMAL / TEXTUAL；role 由 tone=danger 表达 ERROR。
+ * 弹出框脚钮走 NORMAL（comp_background_gray + 语义字），不是 TEXTUAL 透明。
+ * 重要度 / 语义色 / 禁用由 button-model + button-policy 决定；本文件只绑属性与内容区。
  * 纯文案走公开 YoSwap `anchor="center"`；加载环走 tokens/motion.css 的 yohu-spin。
  * 宿主是 button；YoCorner 只 paint。文案在 `__label` hug，禁止 clip-path 裁字。
- * paint 声明描边几何；实心底默认 `--yohu-corner-stroke: transparent`，色只走 CSS。
  */
 import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { resolveText } from "../dom/text";
 import { YoSwap } from "../motion/engines/swap";
-import type { YoButtonSize, YoButtonTone, YoButtonVariant } from "./button-model";
+import type { YoButtonSize, YoButtonStyle, YoButtonTone } from "./button-model";
 import { buttonHostAttrs } from "./button-policy";
 import "./Button.css";
 
-export type { YoButtonSize, YoButtonTone, YoButtonVariant };
+export type { YoButtonSize, YoButtonStyle, YoButtonTone };
 
 export interface YoButtonProps {
-  /** 外形：实心 / 描边 / 幽灵。默认 solid */
-  variant?: YoButtonVariant;
-  /** 语义色。默认 accent。outlined/ghost 不写则是彩色，不是旧 secondary/ghost */
+  /** 鸿蒙 buttonStyle。默认 emphasized */
+  buttonStyle?: YoButtonStyle;
+  /** 语义色 / role。默认 accent */
   tone?: YoButtonTone;
-  /** 尺寸 */
+  /** 鸿蒙 controlSize：md=NORMAL，sm=SMALL */
   size?: YoButtonSize;
   /** 加载态（spinner + 禁用 + aria-busy） */
   loading?: boolean;
@@ -67,10 +65,9 @@ export function YoButton(props: YoButtonProps): JSX.Element {
     <button
       type={props.type ?? "button"}
       class="yohu-button yohu-focus-ring"
-      data-variant={host()["data-variant"]}
+      data-style={host()["data-style"]}
       data-tone={host()["data-tone"]}
       data-size={host()["data-size"]}
-      data-paint={host()["data-paint"]}
       data-block={host()["data-block"]}
       disabled={host().disabled}
       aria-busy={host()["aria-busy"]}

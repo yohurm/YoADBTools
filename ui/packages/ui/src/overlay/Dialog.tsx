@@ -2,16 +2,17 @@
  * YoDialog —— 模态对话框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：AdvancedDialog / AlertDialog（API 20+）。
  * 标题居中、内容区必选、操作区 AUTO（L2 center|row|stack → 页脚 data-layout）；
- * 三区之间不画分割线。脚钮对照 AlertDialog：取消/破坏 NORMAL（ghost+accent/danger，灰底+语义字），
- * 建设确认 EMPHASIZED（solid+accent）。禁止脚钮再走 TEXTUAL 透明。
+ * 三区之间不画分割线。脚钮对照 AlertDialog：取消/破坏 NORMAL（`buttonStyle=normal` + accent/danger，`--yohu-comp-gray` + 语义字），
+ * 建设确认 EMPHASIZED（默认）。禁止脚钮再走 TEXTUAL 透明。
  * 最大宽 400vp；电脑圆角走 YoCorner（role=dialog=16）；
  * 遮罩不点关。禁止面板再用 CSS border + overflow:hidden 画圆角。
  * 开场 spatial（Presence recipe=dialog），关闭淡出后卸节点。
  *
  * 盒：`open` 只是 Presence 开关。fit hug、fill 显式高、exit 锁最后打开盒。
- * fit 外包公开 YoTravel；名单走 YoReveal（open 即接入）。
+ * 层：Portal 到 body，避免模块页 / fade 祖先 overflow 与 transform 裁 fixed。
+ * hug 外包公开 YoTravel；fill 定高不套 Travel。名单走 YoReveal（open 即接入）。
  * hug 跟 Presence 寿命。关窗冻锁。
- * DialogChrome 订 useTravel()，panel 写 data-clip（`fit∧open` 或 `traveling()`）。
+ * DialogChrome 订 useTravel()，panel 写 data-clip（`hug∧open` 或 `traveling()`）。
  * 滚槽是 children 槽：调用方组合 YoScroller。本容器不 import 产品 Yo*。
  * 禁止观察 DOM、禁止 hold+rAF、禁止模块自绑行程。禁止 CSS 读 [data-travel]。
  * fit + overflow=auto 的滚槽预算是 `--yohu-layout-dialog-body-max`。
@@ -35,10 +36,12 @@
  */
 import { Show, children, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
+import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
 import { YoPresence } from "../motion/engines/presence";
 import { YoTravel, useTravel } from "../motion/engines/travel";
 import {
+  dialogHugsContent,
   resolveDialogBox,
   resolveDialogInitial,
   type DialogBoxLock,
@@ -111,6 +114,50 @@ function DialogChrome(props: {
   );
 }
 
+function DialogFrame(props: {
+  title?: string;
+  titleId: string;
+  body: ReturnType<typeof dialogBodyAttrs>;
+  lead?: JSX.Element;
+  tail?: JSX.Element;
+  footer?: JSX.Element;
+  footerLayout: ReturnType<typeof dialogActionsAttrs>["data-layout"];
+  onTraveling: (traveling: boolean) => void;
+  children: JSX.Element;
+}): JSX.Element {
+  return (
+    <DialogChrome onTraveling={props.onTraveling}>
+      {props.title ? (
+        <h3 id={props.titleId} class="yohu-dialog__title">
+          {props.title}
+        </h3>
+      ) : null}
+      <div
+        class="yohu-dialog__body"
+        data-layout={props.body["data-layout"]}
+        data-overflow={props.body["data-overflow"]}
+        data-pad={props.body["data-pad"]}
+        data-region={props.body["data-region"]}
+      >
+        <Show when={props.body["data-region"] === "split"} fallback={props.children}>
+          <Show when={props.lead != null}>
+            <div class="yohu-dialog__lead">{props.lead}</div>
+          </Show>
+          <div class="yohu-dialog__scroller">{props.children}</div>
+          <Show when={props.tail != null}>
+            <div class="yohu-dialog__tail">{props.tail}</div>
+          </Show>
+        </Show>
+      </div>
+      {props.footer ? (
+        <div class="yohu-dialog__footer" data-layout={props.footerLayout}>
+          {props.footer}
+        </div>
+      ) : null}
+    </DialogChrome>
+  );
+}
+
 /**
  * 渲染一个带遮罩的模态对话框。
  */
@@ -118,6 +165,7 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
   const isOpen = (): boolean => resolveDialogOpen(props.open);
   const titleId = createUniqueId();
   const footerKids = children(() => props.footer);
+  const hug = (): boolean => dialogHugsContent(props.height);
 
   const [panelEl, setPanelEl] = createSignal<HTMLDivElement | undefined>();
   const [trip, setTrip] = createSignal(false);
@@ -129,7 +177,7 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
       open: isOpen(),
       lastOpen: isOpen() ? undefined : lastOpenBox,
     });
-  const travelOn = (): boolean => box().kind === "fit" && isOpen();
+  const travelOn = (): boolean => hug() && isOpen();
   const clip = (): boolean => travelOn() || trip();
 
   createEffect(() => {
@@ -168,62 +216,55 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
 
   const footer = () => dialogActionsAttrs(countDialogActions(footerKids.toArray()));
 
-  return (
-    <YoPresence
-      when={isOpen()}
-      recipe="dialog"
-      onExitComplete={() => {
-        lastOpenBox = undefined;
-        props.onExitComplete?.();
-      }}
+  const frame = (): JSX.Element => (
+    <DialogFrame
+      title={props.title}
+      titleId={titleId}
+      body={body()}
+      lead={props.bodyLead}
+      tail={props.bodyTail}
+      footer={footerKids()}
+      footerLayout={footer()["data-layout"]}
+      onTraveling={setTrip}
     >
-      <div class="yohu-dialog" style={dialogLayerStyle() as JSX.CSSProperties}>
-        <div class="yohu-dialog__backdrop" aria-hidden="true" />
-        <div
-          class="yohu-dialog__panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={props.title ? titleId : undefined}
-          tabindex={-1}
-          ref={setPanelEl}
-          data-box={box().kind}
-          data-sized={box().sized ? "" : undefined}
-          data-clip={clip() ? "on" : undefined}
-          style={box().style}
-        >
-          <YoTravel axes={["block"]} enabled={travelOn()}>
-            <DialogChrome onTraveling={setTrip}>
-              {props.title ? (
-                <h3 id={titleId} class="yohu-dialog__title">
-                  {props.title}
-                </h3>
-              ) : null}
-              <div
-                class="yohu-dialog__body"
-                data-layout={body()["data-layout"]}
-                data-overflow={body()["data-overflow"]}
-                data-pad={body()["data-pad"]}
-                data-region={body()["data-region"]}
-              >
-                <Show when={body()["data-region"] === "split"} fallback={props.children}>
-                  <Show when={props.bodyLead != null}>
-                    <div class="yohu-dialog__lead">{props.bodyLead}</div>
-                  </Show>
-                  <div class="yohu-dialog__scroller">{props.children}</div>
-                  <Show when={props.bodyTail != null}>
-                    <div class="yohu-dialog__tail">{props.bodyTail}</div>
-                  </Show>
-                </Show>
-              </div>
-              {props.footer ? (
-                <div class="yohu-dialog__footer" data-layout={footer()["data-layout"]}>
-                  {footerKids()}
-                </div>
-              ) : null}
-            </DialogChrome>
-          </YoTravel>
+      {props.children}
+    </DialogFrame>
+  );
+
+  return (
+    <Portal mount={document.body}>
+      <YoPresence
+        when={isOpen()}
+        recipe="dialog"
+        onExitComplete={() => {
+          lastOpenBox = undefined;
+          props.onExitComplete?.();
+        }}
+      >
+        <div class="yohu-dialog" style={dialogLayerStyle() as JSX.CSSProperties}>
+          <div class="yohu-dialog__backdrop" aria-hidden="true" />
+          <div
+            class="yohu-dialog__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={props.title ? titleId : undefined}
+            tabindex={-1}
+            ref={setPanelEl}
+            data-box={box().kind}
+            data-sized={box().sized ? "" : undefined}
+            data-clip={clip() ? "on" : undefined}
+            style={box().style}
+          >
+            {hug() ? (
+              <YoTravel axes={["block"]} enabled={isOpen()}>
+                {frame()}
+              </YoTravel>
+            ) : (
+              frame()
+            )}
+          </div>
         </div>
-      </div>
-    </YoPresence>
+      </YoPresence>
+    </Portal>
   );
 }

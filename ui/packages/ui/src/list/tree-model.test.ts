@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { flattenVisible, parentIndex, treeHasChildren, treeKeyIntent, treeKeySelector } from "./tree-model";
+import {
+  flattenVisible,
+  parentIndex,
+  treeActivateIntent,
+  treeHasChildren,
+  treeKeyIntent,
+  treeKeySelector,
+} from "./tree-model";
 
 const TREE = [
   {
@@ -31,6 +38,10 @@ describe("tree-model", () => {
     expect(treeKeyIntent("ArrowLeft", 0, 3, true, true)).toEqual({ type: "toggle" });
     expect(treeKeyIntent("ArrowLeft", 1, 3, false, false)).toEqual({ type: "parent" });
     expect(treeKeyIntent("Enter", 1, 3, false, false)).toEqual({ type: "select" });
+    expect(treeKeyIntent("Enter", 0, 3, true, false)).toEqual({ type: "toggle" });
+    expect(treeKeyIntent(" ", 0, 3, true, true)).toEqual({ type: "toggle" });
+    expect(treeActivateIntent(true)).toBe("toggle");
+    expect(treeActivateIntent(false)).toBe("select");
     expect(treeKeyIntent("ArrowDown", 2, 3, false, false)).toEqual({ type: "focus", index: 2 });
   });
 

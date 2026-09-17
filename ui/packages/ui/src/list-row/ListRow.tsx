@@ -1,6 +1,7 @@
 /**
  * YoListRow —— 清单行盒（L4）。
- * 只画格子：hairline 与底。投放框是 list-frame 叠加层，不进本组件。
+ * 只画格子：hairline 与底。document 可选单选半径走 L2 chip，跟 fill 滑块同一 token。
+ * 投放框是 list-frame 叠加层，不进本组件。
  * 禁止挂 yohu-interactive / yohu-focus-ring。虚拟化几何由调用方 inline。
  */
 import type { JSX } from "solid-js";
@@ -16,6 +17,8 @@ export interface YoListRowProps {
   selected?: boolean;
   hot?: boolean;
   selectable?: boolean;
+  /** 多选 key 集；只给 L2 判 chip / 直角，行盒不读集合成员。 */
+  selectedKeys?: ReadonlySet<string | number>;
   dataKey?: string | number;
   dataReorder?: "source";
   role?: "option";
@@ -37,6 +40,7 @@ export function YoListRow(props: YoListRowProps): JSX.Element {
       selected: props.selected,
       hot: props.hot,
       selectable: props.selectable,
+      selectedKeys: props.selectedKeys,
     });
 
   return (
@@ -45,6 +49,7 @@ export function YoListRow(props: YoListRowProps): JSX.Element {
       data-tone={host()["data-tone"]}
       data-fill={host()["data-fill"]}
       data-selectable={host()["data-selectable"]}
+      data-radius={host()["data-radius"]}
       data-key={props.dataKey}
       data-reorder={props.dataReorder}
       role={props.role}

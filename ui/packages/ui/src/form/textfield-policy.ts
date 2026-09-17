@@ -5,7 +5,8 @@
  */
 
 import {
-  resolveTextFieldGrowRows,
+  resolveTextFieldMaxRows,
+  resolveTextFieldRows,
   resolveTextFieldSpec,
   resolveTextFieldStatus,
   textFieldPaintKind,
@@ -64,6 +65,7 @@ export interface TextFieldHostAttrs {
   readOnly: boolean;
   "aria-invalid": true | undefined;
   rows: number;
+  maxRows: number;
 }
 
 export function textFieldHostAttrs(
@@ -98,11 +100,11 @@ export function textFieldHostAttrs(
     disabled: interactive.disabled,
     readOnly: interactive.readOnly,
     "aria-invalid": spec.status === "error" ? true : undefined,
-    rows: resolveTextFieldGrowRows({
+    rows: resolveTextFieldRows({ multiline: spec.multiline, rows: spec.rows }),
+    maxRows: resolveTextFieldMaxRows({
       multiline: spec.multiline,
       rows: spec.rows,
       maxRows: input.maxRows,
-      value: input.value,
     }),
   };
 }

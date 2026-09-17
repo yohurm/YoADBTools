@@ -281,7 +281,7 @@ describe("YoTextField", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
     expect(src).toMatch(/overflow="hidden"/);
     expect(src).toMatch(/direction="row"/);
-    expect(src).toMatch(/align="center"/);
+    expect(src).toMatch(/align=\{props\.host\["data-multiline"\] \? undefined : "center"\}/);
     expect(src).toMatch(/pad="inline-sm"/);
     expect(src).toMatch(/gap="xs"/);
     expect(src).toMatch(/host\(\)\["data-font"\]/);
@@ -290,30 +290,57 @@ describe("YoTextField", () => {
     expect(css).not.toContain("yohu-corner__content");
   });
 
-  it("弱多行按换行抬高，盒高走 calc + spatialSmall，超过帽仍是 rows 帽", () => {
+  it("弱多行用后高走 field-sizing，盒高交给 YoGrow，rows 只是下限", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const grow = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "textfield-grow.ts"), "utf8");
     const { unmount } = render(() => (
       <YoTextField ariaLabel="命令" multiline rows={1} value={"a\nb\nc"} />
     ));
-    expect((screen.getByLabelText("命令") as HTMLTextAreaElement).rows).toBe(3);
+    const host = screen.getByLabelText("命令").closest(".yohu-text-field");
+    expect((screen.getByLabelText("命令") as HTMLTextAreaElement).rows).toBe(1);
+    expect(host?.style.getPropertyValue("--yohu-text-field-max-rows")).toBe("6");
+    expect(host?.querySelector(".yohu-grow")).toBeTruthy();
+    expect(host?.querySelector(".yohu-text-field__body")).toBeTruthy();
+    expect(host?.querySelector(".yohu-text-field__body")?.hasAttribute("data-grow-used")).toBe(true);
     unmount();
     render(() => (
       <YoTextField
         ariaLabel="长命令"
         multiline
         rows={1}
+        maxRows={4}
         value={"1\n2\n3\n4\n5\n6\n7\n8"}
       />
     ));
-    expect((screen.getByLabelText("长命令") as HTMLTextAreaElement).rows).toBe(6);
-    expect(src).toContain("--yohu-text-field-rows");
+    expect((screen.getByLabelText("长命令") as HTMLTextAreaElement).rows).toBe(1);
+    expect(
+      screen.getByLabelText("长命令").closest(".yohu-text-field")?.style.getPropertyValue("--yohu-text-field-max-rows"),
+    ).toBe("4");
+    expect(src).toContain("YoGrow");
+    expect(src).toContain("growUsedAttrs");
+    expect(src).toContain("yohu-text-field__body");
     expect(src).not.toContain("YoTravel");
-    expect(src).not.toContain("scrollHeight");
-    expect(css).toContain("transition: height var(--yohu-motion-spatial-small)");
-    expect(css).toContain("--yohu-text-field-rows");
-    expect(css).toContain("(var(--yohu-text-field-rows, 1) - 1)");
-    expect(css).toContain("var(--yohu-font-body)");
-    expect(css).not.toContain("field-sizing");
-    expect(css).not.toContain("yohu-travel");
+    expect(src).not.toContain("fit=");
+    expect(src).toContain("growQueued");
+    expect(src).toContain("domIntent");
+    expect(src).not.toContain(".scrollHeight");
+    expect(src).not.toContain("--yohu-text-field-rows");
+    expect(grow).toContain("ResizeObserver");
+    expect(grow).not.toContain(".scrollHeight");
+    expect(css).toContain("field-sizing: content");
+    expect(css).toContain("contain: inline-size");
+    expect(css).toContain("--yohu-text-field-max-rows");
+    expect(css).not.toContain("min-height: min-content");
+    expect(css).toContain(".yohu-grow");
+    expect(css).toContain("flex: 1 1 0%");
+    expect(css).toContain("align-self: flex-start");
+    expect(css).toContain("align-items: flex-start");
+    expect(css).toContain("min-height: 0");
+    expect(css).toContain("yohu-text-field__body");
+    expect(css).toContain("justify-content: flex-end");
+    expect(css).toContain("position: absolute");
+    expect(css).toContain("inset: 0");
+    expect(css).not.toContain("transition: height var(--yohu-motion-spatial-small)");
+    expect(css).not.toContain("--yohu-text-field-rows");
   });
 });

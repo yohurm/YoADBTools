@@ -1,17 +1,15 @@
 /**
  * 按钮交互策略（L3）。
  * 禁用与加载是同一写入口；宿主 data-* 从模型快照组装。
- * 不写色值、不画铬。
+ * 不写色值、不画铬、不发明 data-paint。
  */
 
 import {
-  buttonPaintKind,
   resolveButtonSpec,
   type ButtonInput,
-  type ButtonPaintKind,
   type YoButtonSize,
+  type YoButtonStyle,
   type YoButtonTone,
-  type YoButtonVariant,
 } from "./button-model";
 
 export interface ButtonInteractiveInput {
@@ -36,10 +34,9 @@ export function resolveButtonInteractive(input: ButtonInteractiveInput): ButtonI
 }
 
 export interface ButtonHostAttrs {
-  "data-variant": YoButtonVariant;
+  "data-style": YoButtonStyle;
   "data-tone": YoButtonTone;
   "data-size": YoButtonSize;
-  "data-paint": ButtonPaintKind;
   disabled: boolean;
   "aria-busy": true | undefined;
   "data-block"?: true;
@@ -49,10 +46,9 @@ export function buttonHostAttrs(input: ButtonInput & ButtonInteractiveInput): Bu
   const spec = resolveButtonSpec(input);
   const interactive = resolveButtonInteractive(input);
   return {
-    "data-variant": spec.variant,
+    "data-style": spec.buttonStyle,
     "data-tone": spec.tone,
     "data-size": spec.size,
-    "data-paint": buttonPaintKind(spec),
     disabled: interactive.disabled,
     "aria-busy": interactive.busy ? true : undefined,
     ...(input.block ? { "data-block": true as const } : {}),

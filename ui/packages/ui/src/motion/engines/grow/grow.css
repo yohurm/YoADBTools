@@ -1,0 +1,22 @@
+/*
+ * YoGrow：内容用后高。插值由 binder 写死 height from/to（Web Animations）。
+ * 宿主是锁行，也是铬的定位根。禁止 min-height:auto / min-content / 自接 transition。
+ */
+.yohu-grow {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.yohu-grow[data-ready] {
+  overflow: hidden;
+}
+
+.yohu-grow__slot {
+  min-width: 0;
+  min-height: 0;
+}

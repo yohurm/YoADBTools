@@ -25,11 +25,14 @@ describe("travel axes", () => {
     expect(css).toContain("height var(--yohu-motion-spatial-panel)");
     expect(css).toContain("width var(--yohu-motion-spatial-panel)");
     expect(css).toContain(".yohu-travel__slot");
+    const slot = css.match(/\.yohu-travel__slot\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(slot).toContain("flex: 1 1 auto");
+    expect(slot).toContain("height: 100%");
     expect(css).toContain(".yohu-travel[data-ready] > .yohu-travel__slot");
+    expect(css).not.toMatch(/\.yohu-travel\[data-ready\]\s*>\s*\.yohu-travel__slot\s*\{[^}]*height:/);
     expect(css).not.toMatch(/\.yohu-travel\[data-ready\]\s*>\s*\*/);
     expect(css).not.toContain("> *");
     expect(css).not.toContain("--yohu-motion-spatial-local");
-    expect(css).not.toContain("--yohu-motion-spatial-small");
     expect(css).not.toContain("animate(");
     expect(css).not.toContain("@keyframes");
 

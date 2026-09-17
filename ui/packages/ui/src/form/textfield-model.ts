@@ -6,6 +6,8 @@
  * Token 与 input 同属写入盒主轴，不是嵌套滚动口。溢出只由控件 clip。
  * input 吃剩余宽（flex 1 1 0% / width auto），禁止 width:100% 把气泡挤出 Windows 横条。
  * multiline 走同一门面，禁止模块再挂 textarea.yohu-text-field__input。
+ * 弱多行用后高是 UA 排版（field-sizing），L2 只给 rows 下限与 maxRows 帽。
+ * 禁止从字符串数 `\n` 冒充可见行。
  */
 
 import { Stroke } from "../tokens/layout";
@@ -97,16 +99,6 @@ export function resolveTextFieldRows(input: { multiline?: boolean; rows?: number
   return DEFAULT_TEXT_FIELD_ROWS;
 }
 
-/** 硬换行数；空串也是 1 行。不认软折行，禁止读 scrollHeight。 */
-export function countTextFieldLines(value: string | undefined): number {
-  if (value == null || value.length === 0) return 1;
-  let lines = 1;
-  for (let i = 0; i < value.length; i++) {
-    if (value.charCodeAt(i) === 10) lines += 1;
-  }
-  return lines;
-}
-
 /** 帽不低于 min rows。未写或小于 min 则走缺省帽。 */
 export function resolveTextFieldMaxRows(input: {
   multiline?: boolean;
@@ -119,21 +111,6 @@ export function resolveTextFieldMaxRows(input: {
     return Math.floor(input.maxRows);
   }
   return Math.max(minRows, DEFAULT_TEXT_FIELD_MAX_ROWS);
-}
-
-/** 弱多行可见行：min(帽, max(min, 硬换行数))。单行恒为 1。 */
-export function resolveTextFieldGrowRows(input: {
-  multiline?: boolean;
-  rows?: number;
-  maxRows?: number;
-  value?: string;
-}): number {
-  const minRows = resolveTextFieldRows(input);
-  if (!resolveTextFieldMultiline(input.multiline)) return minRows;
-  return Math.min(
-    resolveTextFieldMaxRows(input),
-    Math.max(minRows, countTextFieldLines(input.value)),
-  );
 }
 
 /** 未写或 falsy 归一成 false。不是 status，不进涂装。 */

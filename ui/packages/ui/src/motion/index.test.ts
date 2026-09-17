@@ -31,8 +31,10 @@ describe("motion 族内桶", () => {
     expect(barrel).not.toContain("themeWipeFrames");
     expect(barrel).not.toContain("themeWipeRadius");
     expect(barrel).not.toContain("useTravel");
+    expect(barrel).not.toContain("useGrow");
     expect(barrel).not.toContain("useCollapseTravel");
     expect(barrel).not.toContain("bindTravel");
+    expect(barrel).not.toContain("bindGrow");
     expect(barrel).not.toContain("RailPresentation");
     expect(barrel).not.toContain("railLayoutExpanded");
     expect(barrel).not.toContain("railCopyOpaque");

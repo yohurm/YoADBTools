@@ -7,10 +7,8 @@ import {
   DEFAULT_TEXT_FIELD_MAX_ROWS,
   DEFAULT_TEXT_FIELD_ROWS,
   DEFAULT_TEXT_FIELD_STATUS,
-  countTextFieldLines,
   hasTextFieldSlot,
   resolveTextFieldActive,
-  resolveTextFieldGrowRows,
   resolveTextFieldMaxRows,
   resolveTextFieldMultiline,
   resolveTextFieldRows,
@@ -133,25 +131,19 @@ describe("textfield-model", () => {
     });
   });
 
-  it("弱多行按硬换行抬高，空串 1 行，帽默认 6", () => {
-    expect(countTextFieldLines(undefined)).toBe(1);
-    expect(countTextFieldLines("")).toBe(1);
-    expect(countTextFieldLines("adb")).toBe(1);
-    expect(countTextFieldLines("a\nb\nc")).toBe(3);
-    expect(countTextFieldLines("a\n")).toBe(2);
+  it("弱多行 L2 只给下限与帽，不从字符串推行数", () => {
+    const files = [
+      resolve(process.cwd(), "src/form/textfield-model.ts"),
+      resolve(process.cwd(), "packages/ui/src/form/textfield-model.ts"),
+    ];
+    const src = files.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    expect(src).not.toContain("countTextFieldLines");
+    expect(src).not.toContain("resolveTextFieldGrowRows");
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 1 })).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 8 })).toBe(8);
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 1, maxRows: 4 })).toBe(4);
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 3, maxRows: 2 })).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
-    expect(resolveTextFieldGrowRows({ multiline: true, rows: 1, value: "" })).toBe(1);
-    expect(resolveTextFieldGrowRows({ multiline: true, rows: 1, value: "a\nb\nc" })).toBe(3);
-    expect(
-      resolveTextFieldGrowRows({
-        multiline: true,
-        rows: 1,
-        value: "1\n2\n3\n4\n5\n6\n7\n8",
-      }),
-    ).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
-    expect(resolveTextFieldGrowRows({ value: "a\nb" })).toBe(1);
+    expect(resolveTextFieldMaxRows({ value: "a\nb" } as { multiline?: boolean })).toBe(1);
   });
 });

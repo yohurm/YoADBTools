@@ -5,7 +5,7 @@
  *
  * 键盘：
  * - ↑/↓ 在可见节点间移动焦点；→ 展开（有子节点时，否则移到下一节点）；← 收起（已展开时，否则移到父节点）
- * - Enter 选中；空格选中（不滚动）
+ * - Enter / 空格：目录开合，叶子选中（不滚动）
  *
  * ARIA：`role=tree/treeitem` + `aria-expanded` + roving tabindex（仅焦点节点 tabindex=0）。
  * 受控展开（expandedKeys）或默认展开（defaultExpandedKeys）。
@@ -18,7 +18,7 @@ import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/engines/collapse";
 import { YoIndicator } from "../motion/engines/indicator";
-import { flattenVisible, treeHasChildren, treeKeySelector } from "./tree-model";
+import { flattenVisible, treeActivateIntent, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,
   isTreeExpanded,
@@ -54,7 +54,7 @@ export interface YoTreeProps<T = unknown> {
   defaultExpandedKeys?: string[];
   /** 选中回调 */
   onSelect?: (key: string, node: TreeNode<T>) => void;
-  /** 行高（px）；缺省走 --yohu-row-height-nav，禁止套数据行 --yohu-row-height */
+  /** 行高（px）；缺省走 --yohu-row-height-header，禁止套数据行 --yohu-row-height */
   rowHeight?: number;
   /** 调用方组合徽章（如 YoBadge）。缺省画纯文案。 */
   renderBadge?: (text: string) => JSX.Element;
@@ -136,8 +136,12 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                 "padding-left": `calc(${depth} * var(--yohu-space-lg))`,
               }}
               onClick={() => {
-                select(node);
                 setFocusedKey(node.key);
+                if (treeActivateIntent(hasChildren) === "toggle") {
+                  toggle(node.key);
+                  return;
+                }
+                select(node);
               }}
             >
               {hasChildren ? (
@@ -148,7 +152,6 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                   tabindex={-1}
                   onClick={(event) => {
                     event.stopPropagation();
-                    select(node);
                     setFocusedKey(node.key);
                     toggle(node.key);
                   }}

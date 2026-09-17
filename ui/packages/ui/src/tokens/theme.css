@@ -4,6 +4,9 @@
   --yohu-bg-base: #F1F3F5;
   --yohu-surface: #FFFFFF;
   --yohu-surface-2: #E5E5EA;
+  --yohu-comp-gray: #E5E5EA;
+  --yohu-comp-gray-hover: color-mix(in srgb, #000000 5%, #E5E5EA);
+  --yohu-comp-gray-pressed: color-mix(in srgb, #000000 10%, #E5E5EA);
   --yohu-fg: #000000E5;
   --yohu-fg-2: #00000099;
   --yohu-fg-3: #00000066;
@@ -208,11 +211,13 @@
   --yohu-ease-loop: ease-in-out;
   --yohu-ease-spring: linear(0, 0.0221 4.2%, 0.0788 8.3%, 0.1579 12.5%, 0.2499 16.7%, 0.3471 20.8%, 0.4441 25.0%, 0.5368 29.2%, 0.6226 33.3%, 0.6999 37.5%, 0.7678 41.7%, 0.8262 45.8%, 0.8753 50.0%, 0.9157 54.2%, 0.9481 58.3%, 0.9736 62.5%, 0.9929 66.7%, 1.0071 70.8%, 1.0169 75.0%, 1.0232 79.2%, 1.0268 83.3%, 1.0283 87.5%, 1.0281 91.7%, 1.0268 95.8%, 1);
   --yohu-ease-spring-soft: linear(0, 0.0313 4.2%, 0.1112 8.3%, 0.2211 12.5%, 0.3461 16.7%, 0.4745 20.8%, 0.5976 25.0%, 0.7097 29.2%, 0.8072 33.3%, 0.8886 37.5%, 0.9534 41.7%, 1.0027 45.8%, 1.0378 50.0%, 1.0607 54.2%, 1.0736 58.3%, 1.0784 62.5%, 1.0772 66.7%, 1.0718 70.8%, 1.0636 75.0%, 1.0540 79.2%, 1.0439 83.3%, 1.0341 87.5%, 1.0250 91.7%, 1.0170 95.8%, 1);
+  --yohu-ease-spring-grow: linear(0, 0.0112 3.1%, 0.0411 6.3%, 0.0850 9.4%, 0.1389 12.5%, 0.1993 15.6%, 0.2635 18.8%, 0.3294 21.9%, 0.3950 25.0%, 0.4592 28.1%, 0.5207 31.3%, 0.5790 34.4%, 0.6334 37.5%, 0.6836 40.6%, 0.7295 43.8%, 0.7711 46.9%, 0.8084 50.0%, 0.8415 53.1%, 0.8707 56.3%, 0.8963 59.4%, 0.9184 62.5%, 0.9374 65.6%, 0.9535 68.8%, 0.9670 71.9%, 0.9783 75.0%, 0.9875 78.1%, 0.9950 81.3%, 1.0009 84.4%, 1.0055 87.5%, 1.0090 90.6%, 1.0115 93.8%, 1.0132 96.9%, 1);
   --yohu-motion-effects-fast: var(--yohu-dur-fast) var(--yohu-ease-standard);
   --yohu-motion-effects-enter: var(--yohu-dur-normal) var(--yohu-ease-decel);
   --yohu-motion-effects-exit: var(--yohu-dur-local) var(--yohu-ease-accel);
   --yohu-motion-spatial-small: var(--yohu-dur-small) var(--yohu-ease-spring);
   --yohu-motion-spatial-stretch: var(--yohu-dur-local) var(--yohu-ease-spring-soft);
+  --yohu-motion-spatial-grow: var(--yohu-dur-slow) var(--yohu-ease-spring-grow);
   --yohu-motion-spatial-local: var(--yohu-dur-local) var(--yohu-ease-emphasized);
   --yohu-motion-spatial-panel: var(--yohu-dur-slow) var(--yohu-ease-standard);
   --yohu-motion-spatial-rail: var(--yohu-dur-slow) var(--yohu-ease-spring-soft);
@@ -225,6 +230,9 @@
   --yohu-bg-base: #191A1C;
   --yohu-surface: #202224;
   --yohu-surface-2: #2E3033;
+  --yohu-comp-gray: #E5E5EA;
+  --yohu-comp-gray-hover: color-mix(in srgb, #FFFFFF 5%, #E5E5EA);
+  --yohu-comp-gray-pressed: color-mix(in srgb, #FFFFFF 10%, #E5E5EA);
   --yohu-fg: #FFFFFFE5;
   --yohu-fg-2: #FFFFFF99;
   --yohu-fg-3: #FFFFFF66;

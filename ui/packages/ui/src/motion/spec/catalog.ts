@@ -1,7 +1,7 @@
 import type { MotionSpecName } from "../../tokens/motion";
 
 /** L2 引擎。L3 壳配方里一次性播放的归 one-shot。 */
-export type MotionEngine = "presence" | "implicit" | "travel" | "indicator" | "one-shot";
+export type MotionEngine = "presence" | "implicit" | "travel" | "grow" | "indicator" | "one-shot";
 
 export type MotionCatalogEntry = {
   name: string;
@@ -86,6 +86,13 @@ export const MotionCatalog = {
     engine: "travel",
     spec: "spatialPanel",
     properties: ["height", "width"],
+    interruptible: true,
+  },
+  grow: {
+    name: "grow",
+    engine: "grow",
+    spec: "spatialGrow",
+    properties: ["height"],
     interruptible: true,
   },
   list: {

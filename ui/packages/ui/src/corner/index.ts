@@ -13,12 +13,15 @@ export type {
   YoCornerPad,
 } from "./Corner";
 export {
+  CORNER_PAINT_VIEWBOX,
   CornerPillRadius,
   clampCornerRadii,
   cornerEdgeHaloPath,
   cornerHaloOutset,
+  cornerRadiiToUnit,
   cornerRadiusForRole,
   cornerStrokeRingPath,
+  cssCornerClip,
   cssCornerPath,
   formatCornerCoord,
   insetCornerRadii,
@@ -28,9 +31,10 @@ export {
   resolveCornerPaint,
   roundedRectPath,
   roundedRectPathCcw,
+  roundedRectPathXY,
   uniformCornerRadii,
 } from "./corner-model";
-export type { CornerPaint, CornerPaintInput, CornerRadii, CornerRole } from "./corner-model";
+export type { CornerPaint, CornerPaintInput, CornerRadii, CornerRadiiXY, CornerRole } from "./corner-model";
 export { resolveCornerContentSpec, resolveCornerHostSpec } from "./corner-policy";
 export type {
   CornerContentInput,

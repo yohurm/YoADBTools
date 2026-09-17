@@ -21,6 +21,14 @@ function loadDialogCss(): string {
 
 const dialogCss = loadDialogCss();
 
+function dialogRoot(): HTMLElement {
+  return document.querySelector(".yohu-dialog") as HTMLElement;
+}
+
+function dialogPanel(): HTMLElement {
+  return document.querySelector(".yohu-dialog__panel") as HTMLElement;
+}
+
 describe("YoDialog", () => {
   it("open 为 false 时不渲染", () => {
     render(() => (
@@ -74,12 +82,12 @@ describe("YoDialog", () => {
 
   it("点击遮罩不触发 onClose（防误触）", () => {
     const onClose = vi.fn();
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={onClose}>
         内容
       </YoDialog>
     ));
-    fireEvent.click(container.querySelector(".yohu-dialog__backdrop") as HTMLElement);
+    fireEvent.click(dialogRoot().querySelector(".yohu-dialog__backdrop") as HTMLElement);
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -118,9 +126,7 @@ describe("YoDialog", () => {
         内容
       </YoDialog>
     ));
-    expect(row.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
-      "row",
-    );
+    expect(document.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe("row");
     row.unmount();
 
     const center = render(() => (
@@ -136,7 +142,7 @@ describe("YoDialog", () => {
         内容
       </YoDialog>
     ));
-    expect(center.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
+    expect(document.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
       "center",
     );
     center.unmount();
@@ -156,19 +162,19 @@ describe("YoDialog", () => {
         内容
       </YoDialog>
     ));
-    expect(stack.container.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
+    expect(document.querySelector(".yohu-dialog__footer")?.getAttribute("data-layout")).toBe(
       "stack",
     );
     stack.unmount();
   });
 
   it("内容区缺省写成 stack / auto / lg", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    const body = document.querySelector(".yohu-dialog__body") as HTMLElement;
     expect(body.getAttribute("data-layout")).toBe("stack");
     expect(body.getAttribute("data-overflow")).toBe("auto");
     expect(body.getAttribute("data-pad")).toBe("lg");
@@ -190,46 +196,46 @@ describe("YoDialog", () => {
   });
 
   it("bodyOverflow=hidden 保持 stack 与 lg 垫", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open bodyOverflow="hidden" onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    const body = document.querySelector(".yohu-dialog__body") as HTMLElement;
     expect(body.getAttribute("data-layout")).toBe("stack");
     expect(body.getAttribute("data-overflow")).toBe("hidden");
     expect(body.getAttribute("data-pad")).toBe("lg");
   });
 
   it("bodyPad=none 去掉内容区垫", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open bodyPad="none" onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    const body = document.querySelector(".yohu-dialog__body") as HTMLElement;
     expect(body.getAttribute("data-pad")).toBe("none");
   });
 
   it("未指定宽度时不写 inline，由 layout token 约束", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    const panel = dialogPanel();
     expect(panel.style.width).toBe("");
     expect(panel.hasAttribute("data-sized")).toBe(false);
     expect(panel.getAttribute("data-box")).toBe("fit");
   });
 
   it("显式宽度写入 inline 并覆盖弹出框上限", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open width={960} onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    const panel = dialogPanel();
     expect(panel.style.width).toBe("960px");
     expect(panel.hasAttribute("data-sized")).toBe(true);
     expect(panel.getAttribute("data-box")).toBe("fit");
@@ -242,10 +248,14 @@ describe("YoDialog", () => {
         内容
       </YoDialog>
     ));
-    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    const panel = dialogPanel();
+    expect(document.body.contains(dialogRoot())).toBe(true);
+    expect(container.contains(dialogRoot())).toBe(false);
     expect(panel.getAttribute("data-box")).toBe("fill");
     expect(panel.hasAttribute("data-clip")).toBe(false);
+    expect(panel.querySelector(":scope > .yohu-travel")).toBeNull();
     expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body');
+    expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fill"] .yohu-dialog__chrome');
     expect(dialogCss).toContain("flex: 1 1 0");
     const fitBody = dialogCss.match(/(?:^|\n)\.yohu-dialog__body\s*\{[^}]*\}/)?.[0] ?? "";
     expect(fitBody).toContain("flex: 0 1 auto");
@@ -285,12 +295,12 @@ describe("YoDialog", () => {
   });
 
   it("面板圆角走 YoCorner，不叠 CSS border + overflow:hidden", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={() => {}} title="确认">
         内容
       </YoDialog>
     ));
-    const chrome = container.querySelector(".yohu-dialog__chrome");
+    const chrome = document.querySelector(".yohu-dialog__chrome");
     expect(chrome?.getAttribute("data-role")).toBe("dialog");
     expect(chrome?.getAttribute("data-flex")).toBe("fill");
     const panelRule = dialogCss.match(/\.yohu-dialog__panel\s*\{[^}]*\}/)?.[0] ?? "";
@@ -311,12 +321,13 @@ describe("YoDialog", () => {
   });
 
   it("fit used-clip：盒高交给 YoTravel，滚槽是调用方组合口", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    expect(container.querySelector(".yohu-dialog__panel")?.getAttribute("data-clip")).toBe("on");
+    expect(dialogPanel().getAttribute("data-clip")).toBe("on");
+    expect(dialogPanel().querySelector(":scope > .yohu-travel")).toBeTruthy();
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__chrome");
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__body");
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__scroller");
@@ -342,7 +353,7 @@ describe("YoDialog", () => {
   });
 
   it("bodyLead / bodyTail 写成 split，只有 main 滚", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog
         open
         onClose={() => {}}
@@ -352,12 +363,12 @@ describe("YoDialog", () => {
         <YoScroller>名单</YoScroller>
       </YoDialog>
     ));
-    const body = container.querySelector(".yohu-dialog__body") as HTMLElement;
+    const body = document.querySelector(".yohu-dialog__body") as HTMLElement;
     expect(body.getAttribute("data-region")).toBe("split");
-    expect(container.querySelector(".yohu-dialog__lead")?.textContent).toBe("确定删除吗");
-    expect(container.querySelector(".yohu-dialog__scroller")).not.toBeNull();
-    expect(container.querySelector(".yohu-scroller")?.textContent).toBe("名单");
-    expect(container.querySelector(".yohu-dialog__tail")?.textContent).toBe("展开其余");
+    expect(document.querySelector(".yohu-dialog__lead")?.textContent).toBe("确定删除吗");
+    expect(document.querySelector(".yohu-dialog__scroller")).not.toBeNull();
+    expect(document.querySelector(".yohu-scroller")?.textContent).toBe("名单");
+    expect(document.querySelector(".yohu-dialog__tail")?.textContent).toBe("展开其余");
   });
 
   it("open 支持 Accessor 形式（响应式开关）", () => {
@@ -389,12 +400,12 @@ describe("YoDialog", () => {
   });
 
   it("打开是 fit，出场盒写在 data-box=exit，内容区不改 fill-flex", () => {
-    const { container } = render(() => (
+    render(() => (
       <YoDialog open onClose={() => {}}>
         内容
       </YoDialog>
     ));
-    const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
+    const panel = dialogPanel();
     expect(panel.getAttribute("data-box")).toBe("fit");
     expect(dialogCss).toContain('.yohu-dialog__panel[data-box="exit"]');
     expect(dialogCss).toContain("max-height: none");
@@ -413,11 +424,15 @@ describe("YoDialog", () => {
     expect(src).toContain("data-clip");
     expect(src).toContain('flex="fill"');
     expect(src).toContain('overflow="hidden"');
+    expect(src).toContain("Portal");
+    expect(src).toContain("document.body");
+    expect(src).toContain("dialogHugsContent");
     expect(src).not.toMatch(/from\s+["'][^"']*Scroller["']/);
     expect(src).toContain('axes={["block"]}');
     expect(src).toContain("resolveDialogBox");
-    expect(src).toContain('kind === "fit" && isOpen()');
+    expect(src).toContain("hug() && isOpen()");
     expect(src).toContain("travelOn() || trip()");
+    expect(src).not.toContain('kind === "fit" && isOpen()');
     expect(src).not.toContain("props.height === undefined && isOpen()");
     expect(src).not.toContain(".yohu-corner__content");
     expect(src).not.toContain("bindHugTravel");

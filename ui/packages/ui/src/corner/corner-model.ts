@@ -38,6 +38,21 @@ export interface CornerPaint {
   viewBox: string;
 }
 
+/** 绘制空间 = CSS 盒。路径在单位方；映射永远 fill（none），禁止 meet 第二世界。 */
+export const CORNER_PAINT_VIEWBOX = "0 0 1 1";
+
+/** 单位方里每角的椭圆半径（px 半径 ÷ 盒宽/高），none 拉伸后仍是圆。 */
+export interface CornerRadiiXY {
+  tlx: number;
+  tly: number;
+  trx: number;
+  try: number;
+  brx: number;
+  bry: number;
+  blx: number;
+  bly: number;
+}
+
 const DEFAULT_CORNER_ROLE: CornerRole = "card";
 
 /** 胶囊：半径大于短边一半，clamp 后成 pill。CSS 仍走 `--yohu-radius-pill`。 */
@@ -142,6 +157,29 @@ export function formatCornerCoord(value: number): string {
   return String(snapped);
 }
 
+/** token 半径进单位方。量滞后只偏曲率，不得改盒边。 */
+export function cornerRadiiToUnit(width: number, height: number, radii: CornerRadii): CornerRadiiXY {
+  const sx = width > 0 ? 1 / width : 0;
+  const sy = height > 0 ? 1 / height : 0;
+  return {
+    tlx: radii.tl * sx,
+    tly: radii.tl * sy,
+    trx: radii.tr * sx,
+    try: radii.tr * sy,
+    brx: radii.br * sx,
+    bry: radii.br * sy,
+    blx: radii.bl * sx,
+    bly: radii.bl * sy,
+  };
+}
+
+/** 内容裁切跟 CSS 盒走，禁止量出来的 path() 冻在旧高。 */
+export function cssCornerClip(inset: number, radii: CornerRadii): string {
+  const step = Math.max(0, inset);
+  const r = insetCornerRadii(radii, step);
+  return `inset(${formatCornerCoord(step)}px round ${formatCornerCoord(r.tl)}px ${formatCornerCoord(r.tr)}px ${formatCornerCoord(r.br)}px ${formatCornerCoord(r.bl)}px)`;
+}
+
 function joinPath(parts: Array<string | "">): string {
   return parts.filter((part) => part.length > 0).join("");
 }
@@ -216,6 +254,77 @@ export function roundedRectPathCcw(
   ]);
 }
 
+function hasCornerXY(rx: number, ry: number): boolean {
+  return rx > 0 && ry > 0;
+}
+
+/** 单位方圆角矩形。rx/ry 已是分数，不再 clamp（clamp 在 px 完成）。 */
+export function roundedRectPathXY(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  r: CornerRadiiXY,
+): string {
+  if (width <= 0 || height <= 0) return "";
+  const right = x + width;
+  const bottom = y + height;
+  const { tlx, tly, trx, try: tryR, brx, bry, blx, bly } = r;
+  return joinPath([
+    `M${formatCornerCoord(x + tlx)} ${formatCornerCoord(y)}`,
+    `H${formatCornerCoord(right - trx)}`,
+    hasCornerXY(trx, tryR)
+      ? `A${formatCornerCoord(trx)} ${formatCornerCoord(tryR)} 0 0 1 ${formatCornerCoord(right)} ${formatCornerCoord(y + tryR)}`
+      : "",
+    `V${formatCornerCoord(bottom - bry)}`,
+    hasCornerXY(brx, bry)
+      ? `A${formatCornerCoord(brx)} ${formatCornerCoord(bry)} 0 0 1 ${formatCornerCoord(right - brx)} ${formatCornerCoord(bottom)}`
+      : "",
+    `H${formatCornerCoord(x + blx)}`,
+    hasCornerXY(blx, bly)
+      ? `A${formatCornerCoord(blx)} ${formatCornerCoord(bly)} 0 0 1 ${formatCornerCoord(x)} ${formatCornerCoord(bottom - bly)}`
+      : "",
+    `V${formatCornerCoord(y + tly)}`,
+    hasCornerXY(tlx, tly)
+      ? `A${formatCornerCoord(tlx)} ${formatCornerCoord(tly)} 0 0 1 ${formatCornerCoord(x + tlx)} ${formatCornerCoord(y)}`
+      : "",
+    "Z",
+  ]);
+}
+
+export function roundedRectPathXYCcw(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  r: CornerRadiiXY,
+): string {
+  if (width <= 0 || height <= 0) return "";
+  const right = x + width;
+  const bottom = y + height;
+  const { tlx, tly, trx, try: tryR, brx, bry, blx, bly } = r;
+  return joinPath([
+    `M${formatCornerCoord(x + tlx)} ${formatCornerCoord(y)}`,
+    hasCornerXY(tlx, tly)
+      ? `A${formatCornerCoord(tlx)} ${formatCornerCoord(tly)} 0 0 0 ${formatCornerCoord(x)} ${formatCornerCoord(y + tly)}`
+      : "",
+    `V${formatCornerCoord(bottom - bly)}`,
+    hasCornerXY(blx, bly)
+      ? `A${formatCornerCoord(blx)} ${formatCornerCoord(bly)} 0 0 0 ${formatCornerCoord(x + blx)} ${formatCornerCoord(bottom)}`
+      : "",
+    `H${formatCornerCoord(right - brx)}`,
+    hasCornerXY(brx, bry)
+      ? `A${formatCornerCoord(brx)} ${formatCornerCoord(bry)} 0 0 0 ${formatCornerCoord(right)} ${formatCornerCoord(bottom - bry)}`
+      : "",
+    `V${formatCornerCoord(y + tryR)}`,
+    hasCornerXY(trx, tryR)
+      ? `A${formatCornerCoord(trx)} ${formatCornerCoord(tryR)} 0 0 0 ${formatCornerCoord(right - trx)} ${formatCornerCoord(y)}`
+      : "",
+    `H${formatCornerCoord(x + tlx)}`,
+    "Z",
+  ]);
+}
+
 export function cornerStrokeRingPath(
   width: number,
   height: number,
@@ -233,6 +342,41 @@ export function cornerStrokeRingPath(
 
 export function cssCornerPath(d: string): string {
   return d.length > 0 ? `path('${d}')` : "none";
+}
+
+function cornerStrokeRingPathUnit(
+  width: number,
+  height: number,
+  radii: CornerRadii,
+  stroke: number,
+): string {
+  if (stroke <= 0 || width <= 0 || height <= 0) return "";
+  const outerPx = clampCornerRadii(width, height, radii);
+  const sx = stroke / width;
+  const sy = stroke / height;
+  const innerW = 1 - sx * 2;
+  const innerH = 1 - sy * 2;
+  const outer = roundedRectPathXY(0, 0, 1, 1, cornerRadiiToUnit(width, height, outerPx));
+  if (innerW <= 0 || innerH <= 0) return outer;
+  return `${outer}${roundedRectPathXYCcw(sx, sy, innerW, innerH, cornerRadiiToUnit(width, height, insetCornerRadii(outerPx, stroke)))}`;
+}
+
+function cornerEdgeHaloPathUnit(
+  width: number,
+  height: number,
+  radii: CornerRadii,
+  outset: number,
+): string {
+  if (outset <= 0 || width <= 0 || height <= 0) return "";
+  const ox = outset / width;
+  const oy = outset / height;
+  return roundedRectPathXY(
+    -ox,
+    -oy,
+    1 + ox * 2,
+    1 + oy * 2,
+    cornerRadiiToUnit(width, height, outsetCornerRadii(radii, outset)),
+  );
 }
 
 /** 闭圆盘含边。与启动表面 `in_round_rect` 同一四分之一圆判定。 */
@@ -275,16 +419,10 @@ export function resolveCornerPaint(input: CornerPaintInput): CornerPaint {
   const stroke = Math.max(0, input.stroke ?? 0);
   const radii = clampCornerRadii(width, height, mergeCornerRadii(radius, input.radii));
   const empty = width <= 0 || height <= 0;
-  const fillPath = empty ? "" : roundedRectPath(0, 0, width, height, radii);
-  const strokePath = empty ? "" : cornerStrokeRingPath(width, height, radii, stroke);
-  const edgePath = empty ? "" : cornerEdgeHaloPath(width, height, radii, Math.max(0, input.edgeOutset ?? 0));
-  const clipRadii = stroke > 0 ? insetCornerRadii(radii, stroke) : radii;
-  const clipW = width - stroke * 2;
-  const clipH = height - stroke * 2;
-  const clipD =
-    empty || clipW <= 0 || clipH <= 0
-      ? fillPath
-      : roundedRectPath(stroke, stroke, clipW, clipH, clipRadii);
+  const unit = empty ? null : cornerRadiiToUnit(width, height, radii);
+  const fillPath = unit ? roundedRectPathXY(0, 0, 1, 1, unit) : "";
+  const strokePath = empty ? "" : cornerStrokeRingPathUnit(width, height, radii, stroke);
+  const edgePath = empty ? "" : cornerEdgeHaloPathUnit(width, height, radii, Math.max(0, input.edgeOutset ?? 0));
   return {
     width,
     height,
@@ -292,7 +430,7 @@ export function resolveCornerPaint(input: CornerPaintInput): CornerPaint {
     fillPath,
     strokePath,
     edgePath,
-    clipPath: cssCornerPath(clipD),
-    viewBox: empty ? "0 0 1 1" : `0 0 ${formatCornerCoord(width)} ${formatCornerCoord(height)}`,
+    clipPath: empty ? "none" : cssCornerClip(stroke, radii),
+    viewBox: CORNER_PAINT_VIEWBOX,
   };
 }

@@ -73,6 +73,13 @@ describe("YoIndicator", () => {
     expect(container.querySelector(".yohu-recipe-indicator")).toBe(first);
   });
 
+  it("fill 滑块圆角走 --yohu-ripple-radius，与 document 行盒 chip 同一 token", () => {
+    const css = loadMotionLayerCss("engines/indicator/indicator.css");
+    expect(css).toMatch(
+      /\.yohu-recipe-indicator--fill\s*\{[^}]*border-radius:\s*var\(--yohu-ripple-radius\)/,
+    );
+  });
+
   it("fill 宿主两轴 hidden 裁切过冲，禁止只写 overflow-x 把纵轴算成 auto", () => {
     const css = loadMotionCss();
     expect(css).toMatch(

@@ -8,7 +8,8 @@ export {
   isListRowHot,
   listRowOwnsFill,
   resolveListRowChrome,
+  resolveListRowRadius,
 } from "./list-row-model";
-export type { ListRowChrome, ListRowChromeInput, YoListRowFill } from "./list-row-model";
+export type { ListRowChrome, ListRowChromeInput, YoListRowFill, YoListRowRadius } from "./list-row-model";
 export { listRowHostAttrs } from "./list-row-policy";
 export type { ListRowHostAttrs, ListRowHostInput } from "./list-row-policy";

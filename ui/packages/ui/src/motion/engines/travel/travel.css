@@ -48,22 +48,24 @@
   box-sizing: border-box;
 }
 
+/*
+ * 槽始终铺满宿主。fill 定高盒（整页 Dialog）关行程也不靠 data-ready 才长高。
+ */
 .yohu-travel__slot {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
+
 
 .yohu-travel[data-ready] {
   overflow: hidden;
 }
 
 .yohu-travel[data-ready] > .yohu-travel__slot {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
   overflow: hidden;
 }
 
@@ -81,6 +83,18 @@
     width var(--yohu-motion-spatial-panel);
 }
 
-.yohu-travel[data-travel="used"] {
-  will-change: height, width;
+.yohu-travel[data-ready][data-spec="spatialSmall"][data-axis-block] {
+  transition: height var(--yohu-motion-spatial-small);
 }
+
+.yohu-travel[data-ready][data-spec="spatialSmall"][data-axis-inline] {
+  transition: width var(--yohu-motion-spatial-small);
+}
+
+.yohu-travel[data-ready][data-spec="spatialSmall"][data-axis-block][data-axis-inline] {
+  transition:
+    height var(--yohu-motion-spatial-small),
+    width var(--yohu-motion-spatial-small);
+}
+
+/* data-travel 只标行程给 Scroller。禁止 will-change：跟改 height 同拍会打断降低。 */

@@ -5,12 +5,14 @@ import { motionDurationMs } from "../tokens/motion";
 import { Spacing } from "../tokens/spacing";
 import {
   SCROLLER_AUTO_HIDE_MS,
+  SCROLLER_LANE,
   SCROLLER_OVERFLOW_SLACK,
   SCROLLER_PAGE_REPEAT_MS,
   SCROLLER_THUMB_MIN,
   resolveScrollerBarState,
   resolveScrollerFlowChild,
   resolveScrollerFlowSize,
+  resolveScrollerGutter,
   resolveScrollerInteractive,
   resolveScrollerOverflow,
   resolveScrollerPhase,
@@ -41,6 +43,15 @@ describe("scroller-model", () => {
     expect(resolveScrollerPhase({ overflowing: false, prev: "on" })).toBe("out");
     expect(resolveScrollerPhase({ overflowing: false, prev: "out" })).toBe("out");
     expect(resolveScrollerPhase({ overflowing: false })).toBe("none");
+  });
+
+  it("溢出且未 Off 才让出侧轨，Auto 隐条也留槽", () => {
+    expect(SCROLLER_LANE).toBe(Spacing.Sm);
+    expect(resolveScrollerGutter({ overflowing: false })).toBe(false);
+    expect(resolveScrollerGutter({ overflowing: true })).toBe(true);
+    expect(resolveScrollerGutter({ overflowing: true, barState: "auto" })).toBe(true);
+    expect(resolveScrollerGutter({ overflowing: true, barState: "on" })).toBe(true);
+    expect(resolveScrollerGutter({ overflowing: true, barState: "off" })).toBe(false);
   });
 
   it("BarState：Auto 停滚隐藏，On 常驻，Off 不画条", () => {

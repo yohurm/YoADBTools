@@ -3,7 +3,6 @@
   --yohu-button-fill-hover: var(--yohu-accent-hover);
   --yohu-button-fill-pressed: var(--yohu-accent-pressed);
   --yohu-button-ink: var(--yohu-accent);
-  --yohu-button-soft: var(--yohu-accent-soft);
   --yohu-corner-fill: transparent;
   --yohu-corner-stroke: transparent;
   position: relative;
@@ -44,15 +43,10 @@
   --yohu-button-fill-hover: var(--yohu-accent-hover);
   --yohu-button-fill-pressed: var(--yohu-accent-pressed);
   --yohu-button-ink: var(--yohu-accent);
-  --yohu-button-soft: var(--yohu-accent-soft);
 }
 
 .yohu-button[data-tone="neutral"] {
-  --yohu-button-fill: var(--yohu-surface-2);
-  --yohu-button-fill-hover: var(--yohu-state-hover);
-  --yohu-button-fill-pressed: var(--yohu-state-pressed);
   --yohu-button-ink: var(--yohu-fg);
-  --yohu-button-soft: var(--yohu-state-hover);
 }
 
 .yohu-button[data-tone="danger"] {
@@ -60,23 +54,6 @@
   --yohu-button-fill-hover: var(--yohu-error-hover);
   --yohu-button-fill-pressed: var(--yohu-error-pressed);
   --yohu-button-ink: var(--yohu-error);
-  --yohu-button-soft: var(--yohu-signal-bg);
-}
-
-.yohu-button[data-tone="success"] {
-  --yohu-button-fill: var(--yohu-success);
-  --yohu-button-fill-hover: var(--yohu-success-hover);
-  --yohu-button-fill-pressed: var(--yohu-success-pressed);
-  --yohu-button-ink: var(--yohu-success);
-  --yohu-button-soft: var(--yohu-success-bg);
-}
-
-.yohu-button[data-tone="warning"] {
-  --yohu-button-fill: var(--yohu-warn);
-  --yohu-button-fill-hover: var(--yohu-warn-hover);
-  --yohu-button-fill-pressed: var(--yohu-warn-pressed);
-  --yohu-button-ink: var(--yohu-warn);
-  --yohu-button-soft: var(--yohu-warn-bg);
 }
 
 .yohu-button[data-size="sm"] {
@@ -106,103 +83,58 @@
   box-sizing: border-box;
 }
 
-.yohu-button[data-paint="solid-on"] {
+/* EMPHASIZED：comp_background_emphasize / role 实底 + font_on */
+.yohu-button[data-style="emphasized"] {
   --yohu-corner-fill: var(--yohu-button-fill);
   color: var(--yohu-fg-on);
 }
 
-.yohu-button[data-paint="solid-on"]:not(:disabled):hover {
+.yohu-button[data-style="emphasized"]:not(:disabled):hover {
   --yohu-corner-fill: var(--yohu-button-fill-hover);
 }
 
-.yohu-button[data-paint="solid-on"]:not(:disabled):active {
+.yohu-button[data-style="emphasized"]:not(:disabled):active {
   --yohu-corner-fill: var(--yohu-button-fill-pressed);
 }
 
-.yohu-button[data-paint="solid-tone"] {
-  --yohu-corner-fill: var(--yohu-button-soft);
+/* NORMAL：comp_background_gray + 语义字。hover 叠在灰底上，禁止换成 state-hover。 */
+.yohu-button[data-style="normal"] {
+  --yohu-corner-fill: var(--yohu-comp-gray);
   color: var(--yohu-button-ink);
 }
 
-.yohu-button[data-paint="solid-tone"]:not(:disabled):hover {
-  --yohu-corner-stroke: var(--yohu-button-ink);
+.yohu-button[data-style="normal"]:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-comp-gray-hover);
 }
 
-.yohu-button[data-paint="solid-tone"]:not(:disabled):active {
-  --yohu-corner-fill: var(--yohu-state-pressed);
+.yohu-button[data-style="normal"]:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-comp-gray-pressed);
 }
 
-.yohu-button[data-paint="solid-neutral"] {
-  --yohu-corner-fill: var(--yohu-surface-2);
-  color: var(--yohu-fg);
-}
-
-.yohu-button[data-paint="solid-neutral"]:not(:disabled):hover {
-  --yohu-corner-fill: var(--yohu-state-hover);
-}
-
-.yohu-button[data-paint="solid-neutral"]:not(:disabled):active {
-  --yohu-corner-fill: var(--yohu-state-pressed);
-}
-
-.yohu-button[data-paint="outlined-neutral"] {
-  --yohu-corner-fill: var(--yohu-surface);
-  --yohu-corner-stroke: var(--yohu-border);
-  color: var(--yohu-fg);
-}
-
-.yohu-button[data-paint="outlined-neutral"]:not(:disabled):hover {
-  --yohu-corner-fill: var(--yohu-state-hover);
-}
-
-.yohu-button[data-paint="outlined-neutral"]:not(:disabled):active {
-  --yohu-corner-fill: var(--yohu-state-pressed);
-}
-
-.yohu-button[data-paint="outlined-tone"] {
-  --yohu-corner-fill: var(--yohu-surface);
-  --yohu-corner-stroke: var(--yohu-button-ink);
-  color: var(--yohu-button-ink);
-}
-
-.yohu-button[data-paint="outlined-tone"]:not(:disabled):hover {
-  --yohu-corner-fill: var(--yohu-button-soft);
-}
-
-.yohu-button[data-paint="outlined-tone"]:not(:disabled):active {
-  --yohu-corner-fill: var(--yohu-state-pressed);
-}
-
-.yohu-button[data-paint="ghost-neutral"] {
+/* TEXTUAL：无底。内容区弱操作。弹出框脚钮禁止。 */
+.yohu-button[data-style="textual"] {
   --yohu-corner-fill: transparent;
+  color: var(--yohu-button-ink);
+}
+
+.yohu-button[data-style="textual"][data-tone="neutral"] {
   color: var(--yohu-fg-2);
 }
 
-.yohu-button[data-paint="ghost-neutral"]:not(:disabled):hover {
+.yohu-button[data-style="textual"]:not(:disabled):hover {
   --yohu-corner-fill: var(--yohu-state-hover);
+}
+
+.yohu-button[data-style="textual"][data-tone="neutral"]:not(:disabled):hover {
   color: var(--yohu-fg);
 }
 
-.yohu-button[data-paint="ghost-neutral"]:not(:disabled):active {
+.yohu-button[data-style="textual"]:not(:disabled):active {
   --yohu-corner-fill: var(--yohu-state-pressed);
 }
 
-.yohu-button[data-paint="ghost-tone"] {
-  --yohu-corner-fill: var(--yohu-surface-2);
-  color: var(--yohu-button-ink);
-}
-
-.yohu-button[data-paint="ghost-tone"]:not(:disabled):hover {
-  --yohu-corner-fill: var(--yohu-state-hover);
-}
-
-.yohu-button[data-paint="ghost-tone"]:not(:disabled):active {
-  --yohu-corner-fill: var(--yohu-state-pressed);
-}
-
+/* 穿戴/电脑禁用：背板不变，字降到 font_tertiary（40%）。 */
 .yohu-button:disabled {
-  --yohu-corner-fill: var(--yohu-disabled);
-  --yohu-corner-stroke: transparent;
   cursor: not-allowed;
   color: var(--yohu-fg-3);
 }

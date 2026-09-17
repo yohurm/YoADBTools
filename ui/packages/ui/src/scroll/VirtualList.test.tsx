@@ -283,6 +283,7 @@ describe("YoVirtualList", () => {
     expect(rows[0]?.classList.contains("yohu-interactive")).toBe(false);
     expect(rows[0]?.classList.contains("yohu-focus-ring--inset")).toBe(false);
     expect(rows[0]?.getAttribute("aria-selected")).toBe("false");
+    expect(rows[0]?.getAttribute("data-radius")).toBe("chip");
     expect(rows[0]?.getAttribute("tabindex")).toBe("0");
     expect(rows[1]?.getAttribute("tabindex")).toBe("-1");
   });
@@ -408,6 +409,7 @@ describe("YoVirtualList", () => {
     expect(row("row-1")?.getAttribute("data-fill")).toBe("selected");
     expect(row("row-5")?.getAttribute("data-fill")).toBe("selected");
     expect(row("row-0")?.hasAttribute("data-fill")).toBe(false);
+    expect(row("row-1")?.hasAttribute("data-radius")).toBe(false);
     expect(row("row-1")?.classList.contains("yohu-interactive--sel-start")).toBe(false);
     expect(row("row-1")?.classList.contains("yohu-focus-ring--inset")).toBe(false);
     expect(container.querySelector(".yohu-recipe-indicator")).toBeNull();
@@ -438,6 +440,7 @@ describe("YoVirtualList", () => {
     fireEvent.scroll(list);
     const row = (key: string): HTMLElement | null => container.querySelector(`[data-key="${key}"]`);
     expect(row("row-1")?.getAttribute("data-fill")).toBe("selected");
+    expect(row("row-1")?.hasAttribute("data-radius")).toBe(false);
     expect(row("row-2")?.getAttribute("data-fill")).toBe("hot");
     expect(row("row-2")?.hasAttribute("data-ring")).toBe(false);
     expect(container.querySelector(".yohu-list-frame")).toBeTruthy();

@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { Radius } from "../tokens/radius";
 import { Stroke } from "../tokens/layout";
 import {
+  CORNER_PAINT_VIEWBOX,
   clampCornerRadii,
   cornerRadiusForRole,
   cornerEdgeHaloPath,
   cornerHaloOutset,
+  cornerRadiiToUnit,
   cornerStrokeRingPath,
+  cssCornerClip,
   cssCornerPath,
   insetCornerRadii,
   mergeCornerRadii,
@@ -14,6 +17,7 @@ import {
   pointInRoundedRect,
   resolveCornerPaint,
   roundedRectPath,
+  roundedRectPathXY,
   uniformCornerRadii,
 } from "./corner-model";
 import { resolveCornerContentSpec, resolveCornerHostSpec } from "./corner-policy";
@@ -75,9 +79,10 @@ describe("corner-model", () => {
       stroke: Stroke.Hairline,
       edgeOutset: 5,
     });
-    expect(paint.edgePath).toBe(halo);
+    expect(paint.edgePath).toMatch(/-0\.06/);
     expect(paint.edgePath).not.toBe(paint.fillPath);
     expect(paint.edgePath).not.toBe(paint.strokePath);
+    expect(paint.edgePath).not.toBe(halo);
     expect(resolveCornerPaint({ width: 80, height: 40, role: "card" }).edgePath).toBe("");
   });
 
@@ -92,7 +97,10 @@ describe("corner-model", () => {
     const fillOnly = resolveCornerPaint({ width: 80, height: 40, role: "control" });
     expect(fillOnly.radii.tl).toBe(Radius.Sm);
     expect(fillOnly.strokePath).toBe("");
-    expect(fillOnly.clipPath).toContain("path('M");
+    expect(fillOnly.viewBox).toBe(CORNER_PAINT_VIEWBOX);
+    expect(fillOnly.fillPath).toContain("A0.1 0.2");
+    expect(fillOnly.clipPath).toBe(cssCornerClip(0, fillOnly.radii));
+    expect(fillOnly.clipPath.startsWith("inset(")).toBe(true);
     const stroked = resolveCornerPaint({
       width: 80,
       height: 40,
@@ -101,8 +109,19 @@ describe("corner-model", () => {
     });
     expect(stroked.radii.tl).toBe(Radius.Md);
     expect(stroked.strokePath.length).toBeGreaterThan(0);
-    expect(stroked.clipPath).toContain("M16 1");
-    expect(stroked.clipPath).not.toBe(`path('${stroked.fillPath}')`);
+    expect(stroked.clipPath).toBe(cssCornerClip(Stroke.Hairline, stroked.radii));
+    expect(stroked.clipPath).toContain("1px");
+    expect(stroked.clipPath).not.toContain("path(");
+  });
+
+  it("绘制空间是单位方，量盒只换算半径，裁切跟 CSS 盒", () => {
+    const paint = resolveCornerPaint({ width: 80, height: 40, role: "control", stroke: Stroke.Hairline });
+    expect(paint.viewBox).toBe("0 0 1 1");
+    const unit = cornerRadiiToUnit(80, 40, paint.radii);
+    expect(unit.tlx).toBeCloseTo(0.1);
+    expect(unit.tly).toBeCloseTo(0.2);
+    expect(paint.fillPath).toBe(roundedRectPathXY(0, 0, 1, 1, unit));
+    expect(cssCornerClip(Stroke.Hairline, paint.radii)).toMatch(/^inset\(/);
   });
 
   it("零盒不画路径", () => {
@@ -110,7 +129,7 @@ describe("corner-model", () => {
     expect(empty.fillPath).toBe("");
     expect(empty.edgePath).toBe("");
     expect(empty.clipPath).toBe("none");
-    expect(empty.viewBox).toBe("0 0 1 1");
+    expect(empty.viewBox).toBe(CORNER_PAINT_VIEWBOX);
   });
 
   it("单角覆盖仍走统一 clamp", () => {

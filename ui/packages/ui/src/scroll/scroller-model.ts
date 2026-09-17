@@ -1,9 +1,10 @@
 /**
  * 滚动条领域模型（L2）。
  * 对照 OpenHarmony Scroll / ScrollBar：无法滚动则不显示；滑块高 = 视口² / 内容；
- * 条宽 4vp（Spacing.Xs）；BarState.Auto 停滚 2s 后隐藏；电脑轨道点按翻页、长按 100ms 连翻。
- * 溢出只认 in-flow 盒，不认 abspos 撑的 scrollHeight。
- * traveling 由祖先 YoTravel 信号提供；插值中不新出条；收回留 out 直到淡出结束。
+ * 条宽 4vp（Spacing.Xs）；热区 8vp（Spacing.Sm）；BarState.Auto 停滚 2s 后隐藏。
+ * 内置条是 overlay；官方 ScrollBar 示例给内容右边距。溢出且未 Off 时让出侧轨。
+ * 电脑轨道点按翻页、长按 100ms 连翻。溢出只认 in-flow 盒，不认 abspos 撑的 scrollHeight。
+ * traveling 由祖先 YoTravel / YoCollapse / YoGrow / Rail 信号提供；插值中不新出条；收回留 out 直到淡出结束。
  */
 
 import { Layout } from "../tokens/layout";
@@ -17,6 +18,9 @@ export type ScrollerBarState = "auto" | "on" | "off";
 
 /** 滑块最小高：鸿蒙滚动条最短 48vp（Layout.IconPreview）。 */
 export const SCROLLER_THUMB_MIN = Layout.IconPreview;
+
+/** 对照 ArkUI hoverWidth：热区 / 侧轨 = activeWidth + margin×2 → 8vp。 */
+export const SCROLLER_LANE = Spacing.Sm;
 
 /** HarmonyOS BarState.Auto：停止滚动后隐藏。 */
 export const SCROLLER_AUTO_HIDE_MS = motionDurationMs("barHide");
@@ -64,6 +68,14 @@ export function resolveScrollerBarState(state?: ScrollerBarState): ScrollerBarSt
 /** enableScrollInteraction：缺省 true；false 仍可用控制器接口。 */
 export function resolveScrollerInteractive(interactive?: boolean): boolean {
   return interactive !== false;
+}
+
+/** 溢出且未 Off 则让出侧轨。Auto 隐条也留槽，避免内容跳。 */
+export function resolveScrollerGutter(input: {
+  overflowing: boolean;
+  barState?: ScrollerBarState;
+}): boolean {
+  return input.overflowing && resolveScrollerBarState(input.barState) !== "off";
 }
 
 export function resolveScrollerPhase(input: {

@@ -2,14 +2,16 @@
  * YoTextField —— 输入框（L4 视图）。
  * 盒内缀 / 盒外缀 / status / active / 禁用 / 多行由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
  * HarmonyOS 对照：TextInput / TextArea 同一门面；status 边走语义 token，不引进 antd Input。
- * 弱多行盒高走写入盒 calc 定值 + spatialSmall，禁止 height:auto 冒充动画。
+ * 弱多行用后高走 UA field-sizing；盒高交给公开 YoGrow。禁止从 `\n` 推行数。
  */
-import { Show, createMemo, createUniqueId } from "solid-js";
+import { Show, createMemo, createRenderEffect, createUniqueId, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { Icon, isIconName, type IconName } from "../icons";
+import { GROW_USED_ATTR, YoGrow, growUsedAttrs, useGrow } from "../motion/engines/grow";
 import { Layout } from "../tokens/layout";
 import { Radius } from "../tokens/radius";
+import { bindTextFieldGrow } from "./textfield-grow";
 import type { YoTextFieldStatus } from "./textfield-model";
 import { textFieldHostAttrs } from "./textfield-policy";
 import "./TextField.css";
@@ -42,13 +44,13 @@ export interface YoTextFieldProps {
   type?: string;
   /** 多行。同一门面，不是 YoTextArea。 */
   multiline?: boolean;
-  /** 多行可见行数。默认 2。 */
+  /** 多行可见行数下限。默认 2。 */
   rows?: number;
   /** 弱多行抬高帽。默认 6。超过后写入盒滚动。 */
   maxRows?: number;
-  /** 盒内前缀（图标名或节点） */
+  /** 盒内前缀（图标名或自定义节点） */
   prefix?: YoTextFieldAffix;
-  /** 盒内后缀（图标名或节点） */
+  /** 盒内后缀（图标名或自定义节点） */
   suffix?: YoTextFieldAffix;
   /** 写入盒内、输入前的 Token 槽（过滤气泡）。 */
   tokens?: JSX.Element;
@@ -77,6 +79,177 @@ function TextFieldAffix(props: { value: YoTextFieldAffix | undefined }): JSX.Ele
     <Show when={icon()} fallback={props.value}>
       {(name) => <Icon name={name()} size={Layout.IconInline} />}
     </Show>
+  );
+}
+
+function TextFieldBody(props: {
+  id: string;
+  host: ReturnType<typeof textFieldHostAttrs>;
+  field: YoTextFieldProps;
+  bind: (el: YoTextFieldControl) => void;
+  onInput: (event: InputEvent) => void;
+  onChange: (event: Event) => void;
+  onClear: () => void;
+}): JSX.Element {
+  return (
+    <>
+      <Show when={props.host["data-prefix"]}>
+        <span class="yohu-text-field__affix" data-edge="start">
+          <TextFieldAffix value={props.field.prefix} />
+        </span>
+      </Show>
+      <Show when={props.host["data-tokens"]}>
+        <span class="yohu-text-field__tokens">{props.field.tokens}</span>
+      </Show>
+      <Show
+        when={props.host["data-multiline"]}
+        fallback={
+          <input
+            ref={(el) => props.bind(el)}
+            id={props.id}
+            class="yohu-text-field__input"
+            type={props.field.type ?? "text"}
+            size={1}
+            value={props.field.value ?? ""}
+            placeholder={props.field.placeholder ?? ""}
+            aria-label={props.field.ariaLabel ?? props.field.label}
+            aria-invalid={props.host["aria-invalid"]}
+            disabled={props.host.disabled}
+            readOnly={props.host.readOnly}
+            onInput={props.onInput}
+            onChange={props.onChange}
+            onKeyDown={(event) => props.field.onKeyDown?.(event)}
+          />
+        }
+      >
+        <textarea
+          ref={(el) => props.bind(el)}
+          id={props.id}
+          class="yohu-text-field__input"
+          rows={props.host.rows}
+          value={props.field.value ?? ""}
+          placeholder={props.field.placeholder ?? ""}
+          aria-label={props.field.ariaLabel ?? props.field.label}
+          aria-invalid={props.host["aria-invalid"]}
+          disabled={props.host.disabled}
+          readOnly={props.host.readOnly}
+          onInput={props.onInput}
+          onChange={props.onChange}
+          onKeyDown={(event) => props.field.onKeyDown?.(event)}
+        />
+      </Show>
+      <Show when={props.host["data-suffix"]}>
+        <span class="yohu-text-field__affix" data-edge="end">
+          <TextFieldAffix value={props.field.suffix} />
+        </span>
+      </Show>
+      <Show when={props.host["data-clearable"]}>
+        <button
+          type="button"
+          class="yohu-text-field__clear yohu-focus-ring"
+          aria-label="清除"
+          onClick={props.onClear}
+        >
+          <Icon name="close" size={Layout.IconInline} />
+        </button>
+      </Show>
+    </>
+  );
+}
+
+function TextFieldControl(props: {
+  id: string;
+  host: ReturnType<typeof textFieldHostAttrs>;
+  chromeRadii: { tl?: number; bl?: number; tr?: number; br?: number } | undefined;
+  field: YoTextFieldProps;
+  bindControl: (el: YoTextFieldControl) => void;
+  onInput: (event: InputEvent) => void;
+  onChange: (event: Event) => void;
+  onClear: () => void;
+}): JSX.Element {
+  const grow = useGrow();
+  let inputEl: YoTextFieldControl | undefined;
+  let disposeGrow: (() => void) | undefined;
+  let growQueued = false;
+  let domIntent = false;
+  const requestGrow = (fromDom = false): void => {
+    if (fromDom) domIntent = true;
+    if (growQueued) return;
+    growQueued = true;
+    queueMicrotask(() => {
+      growQueued = false;
+      grow?.snapshot();
+      grow?.command();
+    });
+  };
+
+  createRenderEffect(() => {
+    props.field.value;
+    if (domIntent) {
+      domIntent = false;
+      return;
+    }
+    requestGrow();
+  });
+
+  onCleanup(() => disposeGrow?.());
+
+  const bind = (el: YoTextFieldControl): void => {
+    inputEl = el;
+    props.bindControl(el);
+    disposeGrow?.();
+    disposeGrow = undefined;
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    disposeGrow = bindTextFieldGrow(el, {
+      onIntent: () => requestGrow(true),
+    });
+  };
+
+  const bodyProps = {
+    id: props.id,
+    get host() {
+      return props.host;
+    },
+    field: props.field,
+    bind,
+    onInput: props.onInput,
+    onChange: props.onChange,
+    onClear: props.onClear,
+  };
+
+  return (
+    <div
+      class="yohu-text-field__control yohu-focus-host"
+      onMouseDown={(event) => {
+        if (!inputEl || event.button !== 0) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest("button, a, [data-no-focus]")) return;
+        if (target === inputEl || inputEl.contains(target)) return;
+        event.preventDefault();
+        inputEl.focus();
+      }}
+    >
+      <YoCorner
+        role="control"
+        class="yohu-text-field__chrome"
+        radii={props.chromeRadii}
+        direction="row"
+        align={props.host["data-multiline"] ? undefined : "center"}
+        overflow="hidden"
+        pad="inline-sm"
+        gap="xs"
+      >
+        <Show when={!props.host["data-multiline"]}>
+          <TextFieldBody {...bodyProps} />
+        </Show>
+      </YoCorner>
+      <Show when={props.host["data-multiline"]}>
+        <div class="yohu-text-field__body" data-grow-used={growUsedAttrs()[GROW_USED_ATTR]}>
+          <TextFieldBody {...bodyProps} />
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -120,6 +293,21 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
     props.onInput?.("", new InputEvent("input"));
   };
 
+  const controlProps = {
+    id,
+    get host() {
+      return host();
+    },
+    get chromeRadii() {
+      return chromeRadii();
+    },
+    field: props,
+    bindControl,
+    onInput: handleInput,
+    onChange: handleChange,
+    onClear: handleClear,
+  };
+
   return (
     <div
       class="yohu-text-field"
@@ -139,7 +327,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-font={host()["data-font"]}
       style={
         host()["data-multiline"]
-          ? { "--yohu-text-field-rows": String(host().rows) }
+          ? { "--yohu-text-field-max-rows": String(host().maxRows) }
           : undefined
       }
     >
@@ -163,90 +351,11 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             </YoCorner>
           </span>
         </Show>
-        <div
-          class="yohu-text-field__control yohu-focus-host"
-          onMouseDown={(event) => {
-            if (!inputRef || event.button !== 0) return;
-            const target = event.target;
-            if (!(target instanceof Element)) return;
-            if (target.closest("button, a, [data-no-focus]")) return;
-            if (target === inputRef || inputRef.contains(target)) return;
-            event.preventDefault();
-            inputRef.focus();
-          }}
-        >
-          <YoCorner
-            role="control"
-            class="yohu-text-field__chrome"
-            radii={chromeRadii()}
-            direction="row"
-            align="center"
-            overflow="hidden"
-            pad="inline-sm"
-            gap="xs"
-          >
-            <Show when={host()["data-prefix"]}>
-              <span class="yohu-text-field__affix" data-edge="start">
-                <TextFieldAffix value={props.prefix} />
-              </span>
-            </Show>
-            <Show when={host()["data-tokens"]}>
-              <span class="yohu-text-field__tokens">{props.tokens}</span>
-            </Show>
-            <Show
-              when={host()["data-multiline"]}
-              fallback={
-                <input
-                  ref={(el) => bindControl(el)}
-                  id={id}
-                  class="yohu-text-field__input"
-                  type={props.type ?? "text"}
-                  size={1}
-                  value={props.value ?? ""}
-                  placeholder={props.placeholder ?? ""}
-                  aria-label={props.ariaLabel ?? props.label}
-                  aria-invalid={host()["aria-invalid"]}
-                  disabled={host().disabled}
-                  readOnly={host().readOnly}
-                  onInput={handleInput}
-                  onChange={handleChange}
-                  onKeyDown={(event) => props.onKeyDown?.(event)}
-                />
-              }
-            >
-              <textarea
-                ref={(el) => bindControl(el)}
-                id={id}
-                class="yohu-text-field__input"
-                rows={host().rows}
-                value={props.value ?? ""}
-                placeholder={props.placeholder ?? ""}
-                aria-label={props.ariaLabel ?? props.label}
-                aria-invalid={host()["aria-invalid"]}
-                disabled={host().disabled}
-                readOnly={host().readOnly}
-                onInput={handleInput}
-                onChange={handleChange}
-                onKeyDown={(event) => props.onKeyDown?.(event)}
-              />
-            </Show>
-            <Show when={host()["data-suffix"]}>
-              <span class="yohu-text-field__affix" data-edge="end">
-                <TextFieldAffix value={props.suffix} />
-              </span>
-            </Show>
-            <Show when={host()["data-clearable"]}>
-              <button
-                type="button"
-                class="yohu-text-field__clear yohu-focus-ring"
-                aria-label="清除"
-                onClick={handleClear}
-              >
-                <Icon name="close" size={Layout.IconInline} />
-              </button>
-            </Show>
-          </YoCorner>
-        </div>
+        <Show when={host()["data-multiline"]} fallback={<TextFieldControl {...controlProps} />}>
+          <YoGrow>
+            <TextFieldControl {...controlProps} />
+          </YoGrow>
+        </Show>
         <Show when={host()["data-addon-after"]}>
           <span class="yohu-text-field__addon" data-edge="after">
             <YoCorner

@@ -14,6 +14,7 @@ const REQUIRED_RECIPES = [
   "send-aim",
   "swap",
   "travel",
+  "grow",
   "list",
   "chip",
   "fade",

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { BUTTON_TONES } from "../basic/button-model";
 import { BADGE_TONES, DEFAULT_BADGE_TONE, resolveBadgeSpec } from "./badge-model";
 
 describe("badge-model", () => {
@@ -8,9 +7,10 @@ describe("badge-model", () => {
     expect(DEFAULT_BADGE_TONE).toBe("neutral");
   });
 
-  it("tone 与 Button 同一枚举，不含 warn/error", () => {
-    expect(BADGE_TONES).toEqual(BUTTON_TONES);
+  it("徽章自持五色，不跟 Button role 绑死", () => {
+    expect(BADGE_TONES).toEqual(["accent", "neutral", "danger", "success", "warning"]);
     expect(resolveBadgeSpec({ text: "危", tone: "danger" }).tone).toBe("danger");
     expect(resolveBadgeSpec({ text: "警", tone: "warning" }).tone).toBe("warning");
   });
 });
+

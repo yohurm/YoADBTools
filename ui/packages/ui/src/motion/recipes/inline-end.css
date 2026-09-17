@@ -13,6 +13,7 @@
   grid-template-rows: 0fr;
   width: var(--yohu-control-height);
   max-width: 100%;
+  min-height: 0;
   overflow: visible;
   isolation: isolate;
   z-index: 1;
@@ -29,6 +30,8 @@
 .yohu-recipe-inline-end > :first-child {
   display: flex;
   justify-content: flex-end;
+  /* 禁止 stretch：1fr 一旦定高，pane 被拉到旧行高，锁盒降不下来。 */
+  align-items: flex-start;
   box-sizing: border-box;
   overflow: hidden;
   min-width: 0;
@@ -42,7 +45,8 @@
   width: 100cqi;
   min-width: 100cqi;
   max-width: 100cqi;
-  min-height: min-content;
+  /* 打开行高只跟 in-flow（YoGrow 锁行 + 队列）。禁止 min-content：textarea 用后高会和锁行抢高。 */
+  min-height: 0;
   opacity: 0;
   transform: translateX(var(--yohu-space-xs));
   transition:

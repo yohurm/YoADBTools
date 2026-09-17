@@ -1,7 +1,7 @@
 /**
  * 滚动条策略（L3）。
  * 宿主 data-scroll 只写 in|on|out；data-bar 写 BarState；侧轨 data-lane 只写 on|off。
- * 拖拽几何在 L2；本文件不读盒。
+ * data-gutter 只写 on：溢出让出侧轨，与显隐相位分开。拖拽几何在 L2；本文件不读盒。
  */
 
 import type { ScrollerBarState, ScrollerPhase } from "./scroller-model";
@@ -10,15 +10,18 @@ export function scrollerHostAttrs(
   phase: ScrollerPhase,
   barState: ScrollerBarState = "auto",
   interactive = true,
+  gutter = false,
 ): {
   "data-scroll"?: Exclude<ScrollerPhase, "none">;
   "data-bar": ScrollerBarState;
   "data-interactive"?: "off";
+  "data-gutter"?: "on";
 } {
   return {
     ...(phase === "none" ? {} : { "data-scroll": phase }),
     "data-bar": barState,
     ...(interactive ? {} : { "data-interactive": "off" as const }),
+    ...(gutter ? { "data-gutter": "on" as const } : {}),
   };
 }
 

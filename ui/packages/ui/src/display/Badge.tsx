@@ -14,7 +14,7 @@ export type { YoBadgeTone };
 export interface YoBadgeProps {
   /** 徽章文本 */
   text: string;
-  /** 语义色。与 Button 同一枚举。默认 neutral */
+  /** 语义色。自持五色，不跟 YoButton role 绑死。默认 neutral */
   tone?: YoBadgeTone;
 }
 

@@ -58,6 +58,7 @@ describe("tree-policy", () => {
     const rows = flattenVisible(TREE, (key) => key === "g");
     expect(resolveTreeKeyAction("ArrowDown", rows, "g", null, () => true)?.key).toBe("a");
     expect(resolveTreeKeyAction("Enter", rows, "a", null, () => false)).toEqual({ type: "select", key: "a" });
+    expect(resolveTreeKeyAction("Enter", rows, "g", null, () => true)).toEqual({ type: "toggle", key: "g" });
     expect(resolveTreeKeyAction("x", rows, "g", null, () => false)).toBeNull();
   });
 });

@@ -34,9 +34,10 @@ export type MotionDurationName = keyof typeof MotionDuration;
 /**
  * 鸿蒙弹簧：页面级 interpolatingSpring（Stiffness 128 / Damping 12 / Mass 1）。
  * snap*：指示器位移（ζ≈0.75，约 4% 过冲）；soft*：尺寸滞后（更软、过冲略大）。
+ * grow*：内容用后高（Apple response 0.36 / ζ≈0.80，长尾微过冲；感知 300ms）。
  *
  * @internal 采样实现参数：只被 `springCssEasing` / `MotionEasing` 内部消费；
- * 消费弹簧请用公开契约 `MotionEasing.spring` / `MotionEasing.springSoft`。
+ * 消费弹簧请用公开契约 `MotionEasing.spring` / `MotionEasing.springSoft` / `MotionEasing.springGrow`。
  */
 export const MotionSpring = {
   stiffness: 128,
@@ -49,13 +50,17 @@ export const MotionSpring = {
   snapDamping: 40,
   softStiffness: 531,
   softDamping: 29,
+  growStiffness: 305,
+  growDamping: 28,
+  growResponse: 0.36,
+  growDampingFraction: 0.8,
 } as const;
 
 /**
  * 欠阻尼弹簧 0→1 采样为 CSS `linear()`（WebView2 Chromium）。
  *
- * @internal 采样实现算法：仅在 `MotionEasing` 构建 spring / springSoft 时内部调用，
- * 不进入对外导出面；如需弹簧样式请直接用 `MotionEasing.spring` / `MotionEasing.springSoft`。
+ * @internal 采样实现算法：仅在 `MotionEasing` 构建弹簧曲线时内部调用，
+ * 不进入对外导出面；如需弹簧样式请直接用 `MotionEasing.spring*`。
  */
 export function springCssEasing(
   stiffness: number = MotionSpring.snapStiffness,
@@ -80,7 +85,7 @@ export function springCssEasing(
   return `linear(${stops.join(", ")})`;
 }
 
-/** 缓动曲线：standard / decel / accel / emphasized / spring / springSoft / loop。 */
+/** 缓动曲线：standard / decel / accel / emphasized / spring / springSoft / springGrow / loop。 */
 export const MotionEasing = {
   /** 标准缓动 cubic-bezier(0.4, 0, 0.2, 1)：始终在视线内的物体 */
   standard: "cubic-bezier(0.4, 0, 0.2, 1)",
@@ -96,6 +101,8 @@ export const MotionEasing = {
   spring: springCssEasing(),
   /** 软弹簧：滑块宽高滞后，形成拉伸回弹 */
   springSoft: springCssEasing(MotionSpring.softStiffness, MotionSpring.softDamping),
+  /** 内容用后高弹簧：感知 300ms，32 停长尾，微过冲后回到 1 */
+  springGrow: springCssEasing(MotionSpring.growStiffness, MotionSpring.growDamping, MotionSpring.mass, 32),
 } as const;
 
 export type MotionEasingName = keyof typeof MotionEasing;
@@ -112,6 +119,8 @@ export const MotionSpec = {
   spatialSmall: { duration: "small", easing: "spring" },
   /** 滑块宽高滞后：200ms 软弹簧（拉伸） */
   spatialStretch: { duration: "local", easing: "springSoft" },
+  /** 内容用后高：300ms 长尾弹簧（底边钉死、顶边抬起） */
+  spatialGrow: { duration: "slow", easing: "springGrow" },
   /** 折叠高度 */
   spatialLocal: { duration: "local", easing: "emphasized" },
   /** 共享容器 / 预览 / swap 宽度（鸿蒙持续元素 = 标准曲线） */

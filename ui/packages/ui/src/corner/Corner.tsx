@@ -2,12 +2,15 @@
  * YoCorner —— 算法圆角铬（L4）。
  * 填充与描边共用 L2 圆弧路径；内容用同一 inset 路径裁，避免毛边。
  * host = 自持盒；paint = 铺在已有宿主上（按钮等）。
+ * 绘制空间是 CSS 盒：viewBox 0 0 1 1 + preserveAspectRatio=none（铺满 dest）。
+ * 量盒只把 token 半径换成单位分数；禁止把量到的 px 写成第二套 viewBox 再 meet。
+ * 量盒用 offsetWidth / offsetHeight（布局盒），禁止 getBoundingClientRect（会吃 Presence scale）。
  * 色走 `--yohu-corner-fill` / `--yohu-corner-stroke` / `--yohu-corner-edge`，禁止本文件写语义色。
  * edge 是填充盒外圈，不是 fill / stroke 路径。
  */
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
-import { resolveCornerPaint, type CornerRadii, type CornerRole } from "./corner-model";
+import { CORNER_PAINT_VIEWBOX, resolveCornerPaint, type CornerRadii, type CornerRole } from "./corner-model";
 import {
   resolveCornerContentSpec,
   resolveCornerHostSpec,
@@ -87,12 +90,9 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
   const [root, setRoot] = createSignal<HTMLDivElement>();
 
   const measure = (el: HTMLElement): void => {
-    const rect = el.getBoundingClientRect();
-    setBox((prev) =>
-      prev.width === rect.width && prev.height === rect.height
-        ? prev
-        : { width: rect.width, height: rect.height },
-    );
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    setBox((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
   };
 
   const bind = (el: HTMLDivElement): void => {
@@ -137,7 +137,12 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       data-flex={spec().mode === "host" ? (props.flex ?? "fill") : undefined}
       aria-hidden={spec().mode === "paint" ? true : undefined}
     >
-      <svg class="yohu-corner__paint" viewBox={paint().viewBox} aria-hidden="true">
+      <svg
+        class="yohu-corner__paint"
+        viewBox={CORNER_PAINT_VIEWBOX}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
         <Show when={paint().fillPath.length > 0}>
           <path class="yohu-corner__fill" d={paint().fillPath} />
         </Show>

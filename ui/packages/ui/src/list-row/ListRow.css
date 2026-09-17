@@ -1,11 +1,16 @@
 /*
- * 清单行盒。只画格子：直角、通栏 hairline、选中/热态底。
+ * 清单行盒。list 直角通栏；document 可选单选 data-radius=chip 跟 fill 滑块同一半径。
  * 投放框不在本文件。
  */
 .yohu-list-row {
   box-sizing: border-box;
   border-radius: var(--yohu-radius-none);
   outline: none;
+}
+
+/* document 单选：悬浮/按压片与 YoIndicator fill 同一 --yohu-ripple-radius。 */
+.yohu-list-row[data-radius="chip"] {
+  border-radius: var(--yohu-ripple-radius);
 }
 
 .yohu-list-row[data-tone="list"] {

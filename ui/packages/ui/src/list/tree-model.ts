@@ -40,6 +40,11 @@ export function parentIndex(rows: readonly { depth: number }[], index: number): 
   return null;
 }
 
+/** 目录只开合；叶子才选中。 */
+export function treeActivateIntent(hasChildren: boolean): "toggle" | "select" {
+  return hasChildren ? "toggle" : "select";
+}
+
 /** 未识别返回 null。 */
 export function treeKeyIntent(
   key: string,
@@ -63,7 +68,7 @@ export function treeKeyIntent(
       return { type: "parent" };
     case "Enter":
     case " ":
-      return { type: "select" };
+      return { type: treeActivateIntent(hasChildren) };
     default:
       return null;
   }

@@ -15,7 +15,7 @@ describe("YoToolbar", () => {
     render(() => (
       <YoToolbar>
         <YoButton>刷新</YoButton>
-        <YoButton variant="outlined" tone="neutral">导出</YoButton>
+        <YoButton buttonStyle="normal" tone="neutral">导出</YoButton>
       </YoToolbar>
     ));
     const toolbar = screen.getByRole("toolbar");

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { MotionSpec, motionDurationMs } from "../../tokens/motion";
 import { loadMotionCss } from "../css";
-import { DISMISS_HOLD_DURATION, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, presenceClipProperty, presenceUsesClip } from "./recipes";
+import { DISMISS_HOLD_DURATION, GROW_SPEC, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, TRAVEL_SPEC, presenceClipProperty, presenceUsesClip } from "./recipes";
 
 describe("motion recipes", () => {
   it("配方时长从 MotionSpec 派生，禁止散落毫秒", () => {
     expect(SWAP_DURATION).toBe(MotionSpec.spatialPanel.duration);
+    expect(TRAVEL_SPEC).toBe("spatialPanel");
+    expect(GROW_SPEC).toBe("spatialGrow");
     expect(INDICATOR_DURATION).toBe(MotionSpec.spatialSmall.duration);
     expect(DISMISS_HOLD_DURATION).toBe("toast");
     expect(motionDurationMs(DISMISS_HOLD_DURATION)).toBe(3000);
@@ -94,17 +96,36 @@ describe("motion recipes", () => {
   it("YoTravel 当拍 used，双轴同 spec，不点 Dialog", () => {
     const css = loadMotionCss();
     const travel = css.slice(css.indexOf("YoTravel"));
-    const untilFill = travel.slice(0, travel.indexOf("配方 indicator"));
+    const untilFill = travel.slice(0, travel.indexOf("YoGrow"));
     expect(untilFill).toContain(".yohu-travel[data-ready][data-axis-block]");
     expect(untilFill).toContain(".yohu-travel[data-ready][data-axis-inline]");
     expect(untilFill).toContain("height var(--yohu-motion-spatial-panel)");
     expect(untilFill).toContain("width var(--yohu-motion-spatial-panel)");
+    expect(untilFill).toContain('[data-spec="spatialSmall"]');
+    expect(untilFill).not.toContain('[data-fit="hug"]');
+    expect(untilFill).not.toContain("min-height: min-content");
+    expect(untilFill).not.toContain("grid-template-rows");
+    expect(untilFill).toContain("height var(--yohu-motion-spatial-small)");
     expect(untilFill).toContain("overflow: hidden");
     expect(untilFill).not.toContain("yohu-dialog");
     expect(untilFill).not.toContain('[data-travel="hold"]');
     expect(untilFill).not.toContain("requestAnimationFrame");
     expect(css).toContain('.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"]');
     expect(css).toContain("overflow: clip");
+  });
+
+  it("YoGrow 只裁切，插值不接 CSS transition", () => {
+    const css = loadMotionCss();
+    const grow = css.slice(css.indexOf("YoGrow"));
+    const until = grow.slice(0, grow.indexOf("配方 indicator"));
+    expect(until).toContain(".yohu-grow");
+    expect(until).toContain("overflow: hidden");
+    expect(until).not.toContain("grid-template-rows var(--yohu-motion");
+    expect(until).not.toContain("height var(");
+    expect(until).not.toContain("min-height: min-content");
+    expect(until).not.toContain("will-change");
+    expect(until).not.toContain('[data-fit=');
+    expect(until).not.toContain("yohu-dialog");
   });
 
   it("YoReveal 绘制轴始终绝对定位，出流不自裁，不淡入不插行", () => {

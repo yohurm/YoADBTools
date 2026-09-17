@@ -97,6 +97,11 @@ function dialogSizeStyle(width?: number, height?: number): DialogBoxPaint["style
   };
 }
 
+/** 无显式高 = hug。hug 才外包 YoTravel（开窗插值、关窗冻锁）。fill 定高不套 Travel。 */
+export function dialogHugsContent(height?: number): boolean {
+  return height === undefined;
+}
+
 /**
  * 打开：显式高 = fill，否则 fit（hug，滚槽自有预算）。
  * 关闭：有最后打开盒才 exit。hug 冻到 Presence 卸节点；内容区不改 fill-flex。

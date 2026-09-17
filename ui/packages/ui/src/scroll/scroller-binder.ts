@@ -11,6 +11,7 @@ import {
   resolveScrollerClampedTop,
   resolveScrollerFlowChild,
   resolveScrollerFlowSize,
+  resolveScrollerGutter,
   resolveScrollerOverflow,
   resolveScrollerPageTowardPointer,
   resolveScrollerPageTop,
@@ -40,6 +41,7 @@ export interface ScrollerBinder {
   phase: Accessor<ScrollerPhase>;
   thumb: Accessor<ScrollerThumb | undefined>;
   pressed: Accessor<boolean>;
+  gutter: Accessor<boolean>;
   view: () => HTMLDivElement | undefined;
   attachView: (el: HTMLDivElement) => void;
   attachLane: (el: HTMLDivElement) => void;
@@ -64,6 +66,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   const [phase, setPhase] = createSignal<ScrollerPhase>("none");
   const [thumb, setThumb] = createSignal<ScrollerThumb | undefined>();
   const [pressed, setPressed] = createSignal(false);
+  const [gutter, setGutter] = createSignal(false);
   let view: HTMLDivElement | undefined;
   let lane: HTMLDivElement | undefined;
   let last: ScrollerPhase | undefined;
@@ -111,10 +114,12 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       idle = false;
       setPhase("none");
       setThumb(undefined);
+      setGutter(false);
       return;
     }
     const all = measureFlow(el);
     const overflowing = resolveScrollerOverflow(el.clientHeight, all);
+    setGutter(resolveScrollerGutter({ overflowing, barState: host.barState() }));
     const measured = overflowing
       ? resolveScrollerThumb({
           view: el.clientHeight,
@@ -456,6 +461,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     phase,
     thumb,
     pressed,
+    gutter,
     view: () => view,
     attachView,
     attachLane,

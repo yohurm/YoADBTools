@@ -42,6 +42,10 @@ describe("YoTravel binder", () => {
     expect(src).not.toContain("yohu-dialog");
     expect(src).not.toContain("yohu-reveal");
     expect(src).not.toContain("DialogBodyMax");
+    expect(src).not.toContain("gridTemplateRows");
+    expect(src).not.toContain("YoTravelFit");
+    expect(src).not.toContain("fit=");
+    expect(src).not.toContain("hug");
   });
 });
 

@@ -57,6 +57,7 @@ const YO_PUBLIC = [
   "YoCollapse",
   "YoReveal",
   "YoTravel",
+  "YoGrow",
   "YoSwap",
   "YoIndicator",
   // 窗口铬
@@ -123,9 +124,11 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("YOHU_FOCUS_KEYBOARD");
     expect(index).not.toContain("YoChipDismiss");
     expect(index).not.toContain("bindTravel");
+    expect(index).not.toContain("bindGrow");
     expect(index).not.toContain("bindHugTravel");
     expect(index).not.toContain("TravelRoot");
     expect(index).not.toContain("useTravel");
+    expect(index).not.toContain("useGrow");
     expect(index).not.toContain("useCollapseTravel");
     expect(index).not.toContain("useScrollerPort");
     expect(index).not.toContain("ScrollerPort");
@@ -150,7 +153,7 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("themeWipeRadius");
   });
 
-  it("motion barrel 不漏 useTravel / useCollapseTravel / RailPresentation / wipe 帧", () => {
+  it("motion barrel 不漏 useTravel / useGrow / useCollapseTravel / RailPresentation / wipe 帧", () => {
     const candidates = [
       resolve(process.cwd(), "src/motion/index.ts"),
       resolve(process.cwd(), "packages/ui/src/motion/index.ts"),
@@ -164,6 +167,7 @@ describe("@yohu/ui 公开组件清单", () => {
     }
     expect(barrel.length).toBeGreaterThan(0);
     expect(barrel).not.toContain("useTravel");
+    expect(barrel).not.toContain("useGrow");
     expect(barrel).not.toContain("useCollapseTravel");
     expect(barrel).not.toContain("RailPresentation");
     expect(barrel).not.toContain("railLayoutExpanded");

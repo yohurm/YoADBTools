@@ -21,7 +21,7 @@ describe("YoBadge", () => {
     expect(css).not.toContain(".yohu-corner__content");
   });
 
-  it("应用指定色调，与 Button 同一枚举", () => {
+  it("应用指定色调，自持 success 不跟 Button role 绑死", () => {
     render(() => <YoBadge text="成功" tone="success" />);
     expect(screen.getByText("成功").closest(".yohu-badge")?.getAttribute("data-tone")).toBe("success");
   });

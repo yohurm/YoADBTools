@@ -21,30 +21,30 @@ describe("button-policy", () => {
     });
   });
 
-  it("缺省宿主属性是主按钮涂装，不写 ink / flush", () => {
+  it("缺省宿主是 EMPHASIZED，不写 paint / variant", () => {
     expect(buttonHostAttrs({})).toEqual({
-      "data-variant": "solid",
+      "data-style": "emphasized",
       "data-tone": "accent",
       "data-size": "md",
-      "data-paint": "solid-on",
       disabled: false,
       "aria-busy": undefined,
     });
   });
 
-  it("ghost + neutral 只写涂装，没有 data-ink / data-flush", () => {
+  it("textual + neutral 只写 style/tone，没有 data-paint", () => {
     const attrs = buttonHostAttrs({
-      variant: "ghost",
+      buttonStyle: "textual",
       tone: "neutral",
     });
-    expect(attrs["data-paint"]).toBe("ghost-neutral");
-    expect(attrs).not.toHaveProperty("data-ink");
-    expect(attrs).not.toHaveProperty("data-flush");
+    expect(attrs["data-style"]).toBe("textual");
+    expect(attrs).not.toHaveProperty("data-paint");
+    expect(attrs).not.toHaveProperty("data-variant");
   });
 
-  it("outlined + neutral 对应旧 secondary", () => {
-    const attrs = buttonHostAttrs({ variant: "outlined", tone: "neutral" });
-    expect(attrs["data-paint"]).toBe("outlined-neutral");
+  it("normal + neutral 是鸿蒙普通按钮", () => {
+    const attrs = buttonHostAttrs({ buttonStyle: "normal", tone: "neutral" });
+    expect(attrs["data-style"]).toBe("normal");
+    expect(attrs["data-tone"]).toBe("neutral");
     expect(attrs.disabled).toBe(false);
   });
 
@@ -57,7 +57,7 @@ describe("button-policy", () => {
     const attrs = buttonHostAttrs({ loading: true, tone: "danger", size: "sm" });
     expect(attrs.disabled).toBe(true);
     expect(attrs["aria-busy"]).toBe(true);
-    expect(attrs["data-paint"]).toBe("solid-on");
+    expect(attrs["data-style"]).toBe("emphasized");
     expect(attrs["data-size"]).toBe("sm");
   });
 });

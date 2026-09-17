@@ -31,13 +31,21 @@ describe("YoTree", () => {
     expect(child?.closest(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("点击展开箭头显示子节点并选中该目录", () => {
+  it("点击目录或箭头只开合，叶子才 onSelect", () => {
     const onSelect = vi.fn();
     render(() => <YoTree data={DATA} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("根1"));
+    expect(screen.getByText("子1")).toBeTruthy();
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("收起"));
+    expect(document.querySelector('[data-tree-key="c1"]')?.closest(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(onSelect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText("展开"));
     expect(screen.getByText("子1")).toBeTruthy();
-    expect(onSelect).toHaveBeenCalledWith("root1", expect.objectContaining({ key: "root1" }));
     fireEvent.click(screen.getByText("子1"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith("c1", expect.objectContaining({ key: "c1" }));
   });
 
@@ -65,6 +73,16 @@ describe("YoTree", () => {
     );
   });
 
+  it("键盘 Enter 在目录上只开合", () => {
+    const onSelect = vi.fn();
+    render(() => <YoTree data={DATA} onSelect={onSelect} />);
+    const tree = screen.getByRole("tree");
+    tree.focus();
+    fireEvent.keyDown(tree, { key: "Enter" });
+    expect(screen.getByText("子1")).toBeTruthy();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("键盘 ↓ 移动焦点（roving tabindex），Enter 选中", () => {
     const onSelect = vi.fn();
     render(() => <YoTree data={DATA} defaultExpandedKeys={["root1"]} onSelect={onSelect} />);
@@ -86,8 +104,8 @@ describe("YoTree", () => {
     expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeTruthy();
   });
 
-  it("行高走导航尺，不套数据行，不被 collapse 盖成 min-content", () => {
-    expect(treeCss).toContain("min-height: var(--yohu-tree-row-height, var(--yohu-row-height-nav))");
+  it("行高走 header 尺，不套数据行，不被 collapse 盖成 min-content", () => {
+    expect(treeCss).toContain("min-height: var(--yohu-tree-row-height, var(--yohu-row-height-header))");
     expect(treeCss).not.toMatch(/min-height:\s*var\(--yohu-row-height\)/);
     expect(treeCss).toContain("gap: var(--yohu-space-sm)");
     expect(motionCss).not.toMatch(/\.yohu-collapse__inner\s*>\s*\*[^{]*\{[^}]*min-height:\s*min-content/);

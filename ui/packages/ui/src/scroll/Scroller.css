@@ -1,6 +1,7 @@
 /*
  * YoScroller 几何。显隐过渡在 motion.css。
- * 对照鸿蒙：滑块 4vp、距容器边 4vp、热区 8vp，叠在视口上不占布局。
+ * 对照 ArkUI：滑块 4vp、距边 4vp、热区 8vp。内置条 overlay；官方示例给内容右边距。
+ * 溢出且未 Off：侧轨进交叉轴（data-gutter），内容不坐到条下。Auto 隐条也留槽。
  * 视口 flex-basis 跟 in-flow 内容；父级有帽才收缩。禁止 1 1 0 把 hug 列表压成 0。
  * 视口只裁切，纵轴不得写成 auto（Windows 会画 overlay 条）。
  */
@@ -8,10 +9,12 @@
 .yohu-scroller {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
+  box-sizing: border-box;
 }
 
 .yohu-scroller__view {
@@ -21,16 +24,22 @@
   min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
+  box-sizing: border-box;
 }
 
 .yohu-scroller__lane {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
-  z-index: 1;
-  width: var(--yohu-space-sm);
+  position: relative;
+  flex: 0 0 0;
+  width: 0;
   min-height: 0;
+  overflow: hidden;
   pointer-events: none;
+  box-sizing: border-box;
+}
+
+.yohu-scroller[data-gutter="on"] > .yohu-scroller__lane {
+  flex: 0 0 var(--yohu-space-sm);
+  width: var(--yohu-space-sm);
 }
 
 .yohu-scroller__lane[data-lane="on"] {

@@ -1,6 +1,6 @@
 /**
  * 徽章领域模型（L2）。
- * 语义色与 Button 同一枚举；缺省 neutral。
+ * 语义色自持；缺省 neutral。不跟 YoButton role 绑死。
  * 不碰 DOM、不判定交互。
  */
 

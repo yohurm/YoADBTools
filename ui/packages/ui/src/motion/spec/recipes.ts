@@ -49,6 +49,9 @@ export const SWAP_DURATION: MotionDurationName = MotionSpec.spatialPanel.duratio
 /** 尺寸行程：与 swap / preview 同一 spatial-panel。 */
 export const TRAVEL_SPEC = "spatialPanel" as const;
 
+/** 内容用后高：微过冲弹簧。折叠 0fr/1fr 仍走 spatialLocal。 */
+export const GROW_SPEC = "spatialGrow" as const;
+
 /** 选中滑块位移默认档：邻项 150ms 弹簧；短跳/跨栏由 YoIndicator 按行程改写。 */
 export const INDICATOR_DURATION: MotionDurationName = MotionSpec.spatialSmall.duration;
 

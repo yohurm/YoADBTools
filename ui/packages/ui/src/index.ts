@@ -18,7 +18,7 @@ import type { Toaster } from "./overlay/Toast";
 // —— tokens ——
 // 公开面只表达契约：`MotionDuration` / `MotionEasing` / `MotionSpec`、`motionDurationMs` / `motionSpecMs`。
 // `MotionSpring` / `springCssEasing` 是采样实现（把欠阻尼弹簧采成 `linear()`），只被 motion 模块内部消费，
-// 不进入对外导出面；消费弹簧请用 `MotionEasing.spring` / `MotionEasing.springSoft`。
+// 不进入对外导出面；消费弹簧请用 `MotionEasing.spring` / `MotionEasing.springSoft` / `MotionEasing.springGrow`。
 export {
   Colors,
   DarkColors,
@@ -71,7 +71,7 @@ export type { YoFileIconProps } from "./file-icons";
 
 // —— 按钮与选择 / 文本与输入 / 信息展示 / 空白与分隔 ——
 export { YoButton } from "./basic/Button";
-export type { YoButtonProps, YoButtonVariant, YoButtonTone, YoButtonSize } from "./basic/Button";
+export type { YoButtonProps, YoButtonStyle, YoButtonTone, YoButtonSize } from "./basic/Button";
 
 export { YoSegmentedButton } from "./basic/SegmentedButton";
 export type {
@@ -306,6 +306,7 @@ export {
   YoCollapse,
   YoReveal,
   YoTravel,
+  YoGrow,
   YoSwap,
   YoIndicator,
   YoRail,
@@ -331,6 +332,7 @@ export type {
   CollapseRecipe,
   YoRevealProps,
   YoTravelProps,
+  YoGrowProps,
   TravelAxis,
   YoSwapProps,
   YoIndicatorProps,

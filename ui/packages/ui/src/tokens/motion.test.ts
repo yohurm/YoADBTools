@@ -113,7 +113,7 @@ describe("动效 token 单一事实源契约", () => {
   it("标准/减速/加速/强调曲线与 testdata 控制点对齐", () => {
     const seen = new Set<string>();
     for (const [name, row] of Object.entries(specFixture)) {
-      if (row.easing === "spring" || row.easing === "springSoft") {
+      if (row.easing === "spring" || row.easing === "springSoft" || row.easing === "springGrow") {
         continue;
       }
       if (seen.has(row.easing)) {
@@ -136,6 +136,7 @@ describe("动效 token 单一事实源契约", () => {
     expect(Math.max(...values)).toBeGreaterThan(1);
     expect(MotionSpec.spatialSmall).toEqual({ duration: "small", easing: "spring" });
     expect(MotionSpec.spatialStretch).toEqual({ duration: "local", easing: "springSoft" });
+    expect(MotionSpec.spatialGrow).toEqual({ duration: "slow", easing: "springGrow" });
     expect(MotionSpec.spatialRail).toEqual({ duration: "slow", easing: "springSoft" });
     expect(MotionSpec.spatialLocal).toEqual({ duration: "local", easing: "emphasized" });
   });
@@ -152,7 +153,25 @@ describe("动效 token 单一事实源契约", () => {
     expect(Math.max(...values)).toBeGreaterThan(1);
   });
 
-  it("弹簧常量含鸿蒙原值、snap 位移与 soft 尺寸参数", () => {
+  it("内容用后高弹簧过冲后回到 1，写入 spring-grow", () => {
+    expect(MotionEasing.springGrow.startsWith("linear(")).toBe(true);
+    expect(cssVarValue("--yohu-ease-spring-grow")).toBe(MotionEasing.springGrow);
+    const values = MotionEasing.springGrow
+      .slice("linear(".length, -1)
+      .split(",")
+      .map((part) => Number.parseFloat(part.trim()));
+    expect(values[0]).toBe(0);
+    expect(values[values.length - 1]).toBe(1);
+    expect(Math.max(...values)).toBeGreaterThan(1);
+    expect(Math.max(...values)).toBeLessThan(Math.max(
+      ...MotionEasing.springSoft
+        .slice("linear(".length, -1)
+        .split(",")
+        .map((part) => Number.parseFloat(part.trim())),
+    ));
+  });
+
+  it("弹簧常量含鸿蒙原值、snap 位移、soft 尺寸与 grow 用后高参数", () => {
     expect(MotionSpring.stiffness).toBe(128);
     expect(MotionSpring.damping).toBe(12);
     expect(MotionSpring.mass).toBe(1);
@@ -160,6 +179,10 @@ describe("动效 token 单一事实源契约", () => {
     expect(MotionSpring.snapDamping).toBe(40);
     expect(MotionSpring.softStiffness).toBe(531);
     expect(MotionSpring.softDamping).toBe(29);
+    expect(MotionSpring.growStiffness).toBe(305);
+    expect(MotionSpring.growDamping).toBe(28);
+    expect(MotionSpring.growResponse).toBe(0.36);
+    expect(MotionSpring.growDampingFraction).toBe(0.8);
     expect(themeCss).not.toContain("--yohu-spring-stiffness");
   });
 

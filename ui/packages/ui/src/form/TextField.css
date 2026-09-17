@@ -142,26 +142,71 @@
  * 行高走 leading-ui，上下垫把第一行推到写入盒中线。
  * 禁止用元素选择器给 textarea 另开后门。
  */
-.yohu-text-field[data-multiline] .yohu-text-field__control {
-  /* 定值 calc：首行铬高 + 后续 body×leading。禁止 1em（控件未设字号时算不准）。 */
-  height: calc(
-    var(--yohu-control-height) + (var(--yohu-text-field-rows, 1) - 1) * var(--yohu-font-body) *
-      var(--yohu-font-leading-ui)
-  );
-  min-height: var(--yohu-control-height);
+.yohu-text-field[data-multiline] {
+  min-height: 0;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__group {
+  /* stretch / min-height:auto 会按旧内容保底，降程锁行写了 to 盒仍在 from。 */
   align-items: flex-start;
-  transition: height var(--yohu-motion-spatial-small);
+  min-height: 0;
+}
+
+.yohu-text-field[data-multiline] .yohu-grow {
+  /* 行轴吃父级定宽。块轴只认锁行，禁止 stretch 写回 height，禁止 intrinsic basis。 */
+  flex: 1 1 0%;
+  align-self: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__control {
+  /* 铺满锁行。字贴底（与发送钮同一基线）；顶边裁切揭开上一行。量的是 body。 */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: auto;
+  min-height: 0;
+  flex: none;
+  overflow: hidden;
 }
 
 .yohu-text-field[data-multiline] .yohu-text-field__chrome {
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  height: auto;
+  pointer-events: none;
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 var(--yohu-space-sm);
+  gap: var(--yohu-space-xs);
 }
 
 .yohu-text-field[data-multiline] .yohu-text-field__input {
+  /* 对照 AddressField / Chrome field-sizing：排版用后高，含粘贴与软折行。 */
+  /* 只沿块轴用后高。contain:inline-size 把行宽钉在槽上，粘贴/软折行才会换行抬高。 */
+  field-sizing: content;
+  contain: inline-size;
   flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: auto;
   min-height: var(--yohu-text-field-line);
-  width: 100%;
+  max-height: calc(
+    var(--yohu-text-field-line) + (var(--yohu-text-field-max-rows, 6) - 1) * var(--yohu-font-body) *
+      var(--yohu-font-leading-ui)
+  );
   line-height: var(--yohu-font-leading-ui);
   padding-block: calc((var(--yohu-text-field-line) - 1em * var(--yohu-font-leading-ui)) / 2);
   overflow: auto;

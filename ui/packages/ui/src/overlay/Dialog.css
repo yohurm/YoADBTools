@@ -39,17 +39,27 @@
 }
 
 /*
- * used-clip：盒高交给公开 YoTravel。名单走 YoReveal（始终绝对定位）。
- * panel 自写 data-clip。行程中主槽 clip。侧轨预留，横轴不 snap。
+ * hug used-clip：盒高交给公开 YoTravel。fill 铬直接铺满定高盒。
+ * 名单走 YoReveal（始终绝对定位）。panel 自写 data-clip。行程中主槽 clip。侧轨预留，横轴不 snap。
  */
 .yohu-dialog__panel > .yohu-travel {
   width: 100%;
 }
 
 .yohu-dialog__panel[data-box="fill"] > .yohu-travel,
-.yohu-dialog__panel[data-box="exit"] > .yohu-travel {
+.yohu-dialog__panel[data-box="exit"] > .yohu-travel,
+.yohu-dialog__panel[data-box="fill"] > .yohu-dialog__chrome,
+.yohu-dialog__panel[data-box="exit"] > .yohu-dialog__chrome {
   flex: 1 1 0;
   height: 100%;
+  min-height: 0;
+}
+
+/* fill 铬铺满定高盒。clip 只服务 fit 行程，不代填剩余高。 */
+.yohu-dialog__panel[data-box="fill"] .yohu-dialog__chrome {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
 }
 
 .yohu-dialog__panel[data-clip] .yohu-dialog__chrome {

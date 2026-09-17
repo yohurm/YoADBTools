@@ -62,6 +62,7 @@ export const FAMILY_STEMS = {
     "TextField",
     "textfield-model",
     "textfield-policy",
+    "textfield-grow",
     "Select",
     "select-model",
     "select-policy",

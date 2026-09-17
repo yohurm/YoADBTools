@@ -12,6 +12,11 @@ describe("scroller-policy", () => {
   it("宿主写 BarState 与相位，Off 交互关掉手势", () => {
     expect(scrollerHostAttrs("none")).toEqual({ "data-bar": "auto" });
     expect(scrollerHostAttrs("on", "on")).toEqual({ "data-scroll": "on", "data-bar": "on" });
+    expect(scrollerHostAttrs("on", "auto", true, true)).toEqual({
+      "data-scroll": "on",
+      "data-bar": "auto",
+      "data-gutter": "on",
+    });
     expect(scrollerHostAttrs("in", "auto", false)).toEqual({
       "data-scroll": "in",
       "data-bar": "auto",

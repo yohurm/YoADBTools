@@ -1,7 +1,8 @@
 /**
  * YoTravel —— 尺寸跟内容变的盒（L4）。
  * 公开 API：axes + spec + enabled + children。
- * 意图由子树（YoReveal open / 子节点）当拍 command()。
+ * 铺满定高祖先（Dialog fill）：量盒解开宿主，插值 height / width。
+ * 内容用后高走 YoGrow，不在本引擎开第二写轨。
  * children 进自己的 `__slot`；fill / clip 打在槽上，不点裸子。
  * 不知道 Dialog、Chip、滚条。
  */
@@ -66,6 +67,7 @@ export function YoTravel(props: YoTravelProps): JSX.Element {
         }}
         data-axis-block={host()["data-axis-block"]}
         data-axis-inline={host()["data-axis-inline"]}
+        data-spec={props.spec ?? TRAVEL_SPEC}
       >
         <div class="yohu-travel__slot">{props.children}</div>
       </div>

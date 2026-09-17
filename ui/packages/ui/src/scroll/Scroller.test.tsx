@@ -30,9 +30,11 @@ describe("YoScroller", () => {
     expect(container.querySelector(".yohu-scroller")?.getAttribute("data-bar")).toBe("auto");
   });
 
-  it("几何叠在视口上，滑块可点，视口不留系统条", () => {
+  it("溢出让出侧轨，滑块在轨里，视口不留系统条", () => {
     const css = load("src/scroll/Scroller.css");
-    expect(css).toContain("position: absolute");
+    expect(css).toContain("flex-direction: row");
+    expect(css).toContain('[data-gutter="on"] > .yohu-scroller__lane');
+    expect(css).toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).toContain("inset-inline-end: var(--yohu-space-xs)");
     expect(css).toContain("width: var(--yohu-space-xs)");
     expect(css).toContain("background-color: var(--yohu-fg-3)");
@@ -47,13 +49,13 @@ describe("YoScroller", () => {
     expect(css).not.toContain("scrollbar-width");
     expect(css).toContain("touch-action: none");
     expect(css).toContain('[data-scroll="out"]');
-    expect(css).not.toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).not.toContain("yohu-dialog");
     const src = load("src/scroll/Scroller.tsx");
     const binder = load("src/scroll/scroller-binder.ts");
     expect(src).toContain("createScrollerBinder");
     expect(src).toContain("useTravel");
     expect(src).toContain("useCollapseTravel");
+    expect(src).toContain("useGrow");
     expect(src).toContain("useRail");
     expect(src).toContain("railTraveling");
     expect(src).toContain("traveling()");
@@ -74,6 +76,7 @@ describe("YoScroller", () => {
     expect(binder).toContain("setPointerCapture");
     expect(binder).toContain("resolveScrollerFlowSize");
     expect(binder).toContain("resolveScrollerFlowChild");
+    expect(binder).toContain("resolveScrollerGutter");
     expect(binder).toContain("resolveScrollerWheelDelta");
     expect(binder).toContain("resolveScrollerPageTop");
     expect(binder).toContain("SCROLLER_AUTO_HIDE_MS");

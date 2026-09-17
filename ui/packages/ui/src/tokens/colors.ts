@@ -96,6 +96,14 @@ export const Colors = {
   BgBase: Harmony.backgroundSecondary.light,
   Surface: Harmony.compBackgroundPrimary.light,
   Surface2: Harmony.backgroundTertiary.light,
+  /**
+   * 普通按钮底。浅色官方 `comp_background_gray` 与画布 `background_secondary` 同值，
+   * 页眉贴在画布上会看不见底板；桌面改用官方下一档 `background_tertiary`。
+   * 禁止 CSS 再点 `--yohu-surface-2`。
+   */
+  CompGray: Harmony.backgroundTertiary.light,
+  CompGrayHover: brandOverlay(Harmony.backgroundTertiary.light, "#000000", 5),
+  CompGrayPressed: brandOverlay(Harmony.backgroundTertiary.light, "#000000", 10),
   Fg: Harmony.fontPrimary.light,
   Fg2: Harmony.fontSecondary.light,
   Fg3: Harmony.fontTertiary.light,
@@ -155,6 +163,9 @@ export const DarkColors: Record<SemanticColorName, string> = {
   Surface: Harmony.compBackgroundPrimary.dark,
   /** 深色灰阶随层级抬升：画布 #191A1C → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
   Surface2: Harmony.backgroundFourth.dark,
+  CompGray: Harmony.compBackgroundGray.dark,
+  CompGrayHover: brandOverlay(Harmony.compBackgroundGray.dark, "#FFFFFF", 5),
+  CompGrayPressed: brandOverlay(Harmony.compBackgroundGray.dark, "#FFFFFF", 10),
   Fg: Harmony.fontPrimary.dark,
   Fg2: Harmony.fontSecondary.dark,
   Fg3: Harmony.fontTertiary.dark,

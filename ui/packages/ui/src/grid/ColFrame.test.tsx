@@ -48,10 +48,10 @@ describe("YoColFrame", () => {
 });
 
 describe("YoColFrame 侧轨", () => {
-  it("清单滚条叠层，表头不给侧轨让位，不写 scrollbar-gutter", () => {
+  it("清单溢出让出侧轨时表头跟 gutter 对齐，不写 scrollbar-gutter", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
-    expect(css).not.toContain(":has(.yohu-scroller__lane");
-    expect(css).not.toContain("padding-inline-end: var(--yohu-space-sm)");
+    expect(css).toContain(':has(.yohu-scroller[data-gutter="on"])');
+    expect(css).toContain("padding-inline-end: var(--yohu-space-sm)");
     expect(css).not.toMatch(/scrollbar-gutter\s*:/);
   });
 });

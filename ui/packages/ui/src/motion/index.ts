@@ -4,6 +4,8 @@ export { YoCollapse } from "./engines/collapse";
 export type { YoCollapseProps, CollapseRecipe, CollapseTravelApi } from "./engines/collapse";
 export { YoReveal, YoTravel } from "./engines/travel";
 export type { YoRevealProps, YoTravelProps, TravelAxis } from "./engines/travel";
+export { YoGrow } from "./engines/grow";
+export type { YoGrowProps } from "./engines/grow";
 export { YoSwap } from "./engines/swap";
 export type { YoSwapProps } from "./engines/swap";
 export { YoIndicator } from "./engines/indicator";

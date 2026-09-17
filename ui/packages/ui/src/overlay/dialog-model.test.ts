@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dialogHugsContent,
   resolveDialogActionsLayout,
   resolveDialogBodyRegion,
   resolveDialogBodySpec,
@@ -17,6 +18,12 @@ describe("dialog-model", () => {
       sized: true,
       style: { width: "960px" },
     });
+  });
+
+  it("无显式高才 hug，fill 不套 Travel", () => {
+    expect(dialogHugsContent()).toBe(true);
+    expect(dialogHugsContent(undefined)).toBe(true);
+    expect(dialogHugsContent(560)).toBe(false);
   });
 
   it("显式高才 fill", () => {
