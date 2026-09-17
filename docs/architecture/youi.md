@@ -46,7 +46,7 @@ L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplat
 列拖拽不是 `YoTable`。清单体仍是 `YoVirtualList`。公共层：
 
 1. `col-model`：`YoColSpec` / clamp / `colTrackTemplate`
-2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单滚条叠在视口上，表头不必为侧轨让位，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。日志文档把同一左垫收进 `padLeftChars`，禁止 `cellPad=none` 把标题贴边。
+2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单溢出让出侧轨时表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。日志文档把同一左垫收进 `padLeftChars`，禁止 `cellPad=none` 把标题贴边。
 3. `YoColRow` / `YoColHeader` / `YoColResizer`：表头行
 4. `YoColTrack` / `YoColCell`：Family B 清单行（`span` 通栏，不改 template）
 5. `YoVirtualList`：只虚拟化。行盒是 `list-row/`（`YoListRow`），投放框是 `list-frame/`（`YoListFrame`）。`tone` 默认 `document`（不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。投放命中走 `hotKey`，禁止模块再挂 `--drop` / `focus-ring`。命令管理中栏只借这条 hairline 画条目名之间的分割线，不是文件表。禁止默认画线再让日志去关。开启选择（`selectedKey` / `selectedKeys`）后宿主 `role=listbox`，`user-select: none`，禁止模块再自挂 `ul` 选区。禁止再为连续选中另画项间线。`onReorder` 开启整行按住拖动换位：过 `Spacing.Sm` 臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 `from`/`to`。变高非虚拟列表走 `YoReorderList`（同一套 L2 行盒几何 + binder）。禁止模块再写第二套换位几何或常驻手柄。
@@ -65,9 +65,9 @@ HarmonyOS 对照：官方「圆角半径控制圆弧曲率」= **四分之一圆
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| L2 | `corner-model.ts` | `cornerRadiusForRole` / clamp / inset / outset / `roundedRectPath` / evenodd 描边环 / 外圈 halo / `pointInRoundedRect` / `resolveCornerPaint` |
+| L2 | `corner-model.ts` | `cornerRadiusForRole` / clamp / inset / outset / `roundedRectPath` / 单位方 `roundedRectPathXY` / evenodd 描边环 / 外圈 halo / `pointInRoundedRect` / `resolveCornerPaint`（路径在 `0 0 1 1`，裁切 `inset()`） |
 | L3 | `corner-policy.ts` | host 默认描边并裁内容；paint 只铺在已有宿主上 |
-| L4 | `Corner.tsx` + `Corner.css` | SVG 三层：fill（盒）/ stroke（盒内 inset 环，面板边界）/ edge（盒外 halo，`edgeOutset` 中心线）。内容 `clip-path` 用同一 inset 路径。色认 `--yohu-corner-fill` / `--yohu-corner-stroke` / `--yohu-corner-edge`。`__content` 切断这组 token，嵌套 Corner 从透明基线起步。禁止 edge 复用 fill 路径 |
+| L4 | `Corner.tsx` + `Corner.css` | SVG 三层：fill（盒）/ stroke（盒内 inset 环，面板边界）/ edge（盒外 halo，`edgeOutset` 中心线）。绘制空间永远是 CSS 盒：`viewBox="0 0 1 1"` + `preserveAspectRatio="none"`（铺满 dest，对照投屏 fill≠contain）。量盒只把 token 半径/描边换成单位方分数；量滞后只偏曲率，禁止把量到的 px 写成第二套 viewBox 再 `meet` letterbox。内容裁切走 CSS `inset()` + token 半径，跟盒走，禁止量出来的 `path()`。色认 `--yohu-corner-fill` / `--yohu-corner-stroke` / `--yohu-corner-edge`。`__content` 切断这组 token，嵌套 Corner 从透明基线起步。禁止 edge 复用 fill 路径 |
 
 PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 20）；`card` / `dialog` = `Radius.Md` 16（手机弹出框 32）。层级正相关：弹出框 ≥ 卡片 > 按钮。
 
@@ -77,17 +77,17 @@ PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 2
 
 ## 清单行盒（`list-row/`，L2–L4）
 
-独立模块。Family B 数据网格行只负责格子：直角通栏 hairline + 底。不是 chip / `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
+独立模块。Family B（`tone=list`）数据网格行只负责格子：直角通栏 hairline + 底。`tone=document` 可选单选的悬浮/按压片与 `YoIndicator` fill 同一 `--yohu-ripple-radius`。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
-| L2 | `list-row-model.ts` | `resolveListRowChrome`（fill / radius=0）/`isListRowHot` / `listRowOwnsFill` | 不碰 DOM、不画框 |
-| L3 | `list-row-policy.ts` | `listRowHostAttrs`（`data-tone` / `data-fill` / `data-selectable`） | 不写 `data-ring` |
-| L4 | `ListRow.tsx` + `ListRow.css` | 直角盒：list hairline 通栏、选中/热态底 | 不挂 focus-ring、不画投放框 |
+| L2 | `list-row-model.ts` | `resolveListRowChrome`（fill / radius none\|chip）/`resolveListRowRadius` / `isListRowHot` / `listRowOwnsFill` | 不碰 DOM、不画框 |
+| L3 | `list-row-policy.ts` | `listRowHostAttrs`（`data-tone` / `data-fill` / `data-selectable` / `data-radius`） | 不写 `data-ring` |
+| L4 | `ListRow.tsx` + `ListRow.css` | list 直角通栏；document 可选单选 `data-radius=chip` 跟滑块同一 ripple-radius | 不挂 focus-ring、不画投放框 |
 
-`tone=list` 行自绘选中底。`tone=document` 单选底交给 `YoIndicator` fill。热态只改底（`fill=hot`）。L5 不导出 `YoListRow`。
+`tone=list` 行自绘选中底（radius=none）。`tone=document` 单选底交给 `YoIndicator` fill；行上悬浮必须同一 chip 半径，禁止方底配圆滑块。document 多选块（`selectedKeys.size>1`）行自绘底，仍直角。热态只改底（`fill=hot`）。L5 不导出 `YoListRow`。
 
-禁止：模块 `.yohu-files__row--drop`、行盒 `border-radius`、在行盒上画投放环。
+禁止：模块 `.yohu-files__row--drop`、Family B 行盒叠圆角、在行盒上画投放环。
 
 ---
 
@@ -107,85 +107,92 @@ PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 2
 
 ## 组件：YoButton（L0–L5）
 
-HarmonyOS 对照：Button。外形与语义色是两轴，不是一套 `primary | danger`。色值只消费语义 token，禁止引进 `antd` / Arco / Polaris / Primer。
+HarmonyOS 对照：ArkUI `Button.buttonStyle` / `controlSize` / `role`（[ts-basic-components-button](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-button.md)）。重要度是 EMPHASIZED > NORMAL > TEXTUAL。色走官方 `comp_background_emphasize` / `comp_background_gray` / `font_emphasize`，禁止引进 `antd` / Arco / Polaris / Primer。
 
 ### 设计前链路
 
 ```
-模块 props.variant: "primary" | "secondary" | "ghost" | "danger"
-  → Button.tsx classList yohu-button--${variant|primary}
-  → Button.css 每变体手写一套色
-  → danger hover 在 CSS 写 color-mix(88% / 76%)（散落硬编码）
+variant × tone 15 格 + data-paint（emphasized-on/soft/plate）
+  → NORMAL 吃 surface-2；hover 整块换成 state-hover
+  → success/warning 软底是第三套皮；徽章枚举绑死 Button
 ```
 
-问题：形（实心/描边/幽灵）与色（品牌/中性/警示）耦在同一枚举；模块用 `variant="danger"` 表达语义色；默认/按压/禁用的判定写在视图里。
+问题：涂装名与 `buttonStyle` 双轨；灰底不是官方 `comp_background_gray`；hover 把灰底洗掉。
 
 ### 设计后链路
 
 ```
-模块 props.variant + props.tone + props.size + disabled + loading
-  → L2 resolveButtonSpec / buttonPaintKind（15 格矩阵 → data-paint）
-  → L3 buttonHostAttrs（disabled∨loading、aria-busy、data-*）
-  → L4 Button.tsx 只绑属性；内容区 = spinner + 文案（纯文案走 YoSwap）；圆角走 YoCorner mode=paint 并声明描边几何；字在 `__label` hug，禁止 clip-path 裁字
-  → L4 Button.css 按 data-paint × data-tone 写 `--yohu-corner-fill` / `--yohu-corner-stroke`；字重 Medium（鸿蒙 Button 默认）；
-    弹出框：取消/破坏 NORMAL=`ghost+accent/danger`（灰底+语义字），建设确认 EMPHASIZED=`solid+accent`
-  → L0 Accent/Error/Success/Warn 的 hover·pressed（brandOverlay 5%/10%）
+模块 props.buttonStyle + props.tone + props.size + disabled + loading
+  → L2 resolveButtonSpec（emphasized | normal | textual × accent | neutral | danger）
+  → L3 buttonHostAttrs（disabled∨loading、aria-busy、data-style / data-tone / data-size）
+  → L4 Button.tsx 只绑属性；内容区 = spinner + 文案（纯文案走 YoSwap）；圆角走 YoCorner mode=paint
+  → L4 Button.css 只认 data-style × data-tone：
+      EMPHASIZED = `--yohu-accent`/`--yohu-error` + `fg-on`
+      NORMAL = `--yohu-comp-gray` + 语义字；hover/pressed 叠在灰底上
+      TEXTUAL = 无底 + 语义字
+  → L0 `--yohu-comp-gray`（浅 `background_tertiary`，深官方灰）；brand/error 的 hover·pressed（interactive 5%/10%）
 ```
 
-宿主只改 `YoButton` 公开 props。禁止 `variant="primary"` 别名，禁止模块自写第二套按钮皮，禁止点 `.yohu-button` / `[aria-pressed]`。
+宿主只改 `YoButton` 公开 props。禁止 `variant` / `outlined` / `data-paint` / `primary`，禁止模块自写第二套按钮皮。
 
 ### 分层与状态
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
-| L0 | `tokens/colors.ts` → `emit-theme.ts` → `theme.css` | 语义色与实心叠色 | 不写按钮几何 |
-| L1 | `motion/swap`、`.yohu-focus-ring`、`bindFocusModality`、`tokens/motion.css` `yohu-spin` | 换牌（先换目标字再插宽）、焦点环（Tab 激活、指针卸；`::after` 跟宿主圆角）、加载旋转 | 不复制进 Button；禁止 `outline` 直角环；禁止收到尽头再换字 |
-| L2 | `button-model.ts` | `variant × tone × size` 不变式；`buttonPaintKind` | 不碰 DOM / disabled |
-| L3 | `button-policy.ts` | 交互：`disabled \|\| loading`；组装 `data-*` | 不写色值、不画铬 |
-| L4 | `Button.tsx` + `Button.css` | 铬走 YoCorner paint 并声明描边几何；`__label` hug 文案/spinner；CSS 只上色 | 不在 TSX 里 if-else 上色；禁止宿主再写 border |
-| L5 | `index.ts` | `YoButton` + `YoButtonProps` / Variant / Tone / Size | 不导出 paint/policy |
+| L0 | `tokens/colors.ts` → `emit-theme.ts` → `theme.css` | `comp-gray` 与实心叠色 | 不写按钮几何 |
+| L1 | `motion/swap`、`.yohu-focus-ring`、`bindFocusModality`、`tokens/motion.css` `yohu-spin` | 换牌、焦点环、加载旋转 | 不复制进 Button |
+| L2 | `button-model.ts` | `buttonStyle × tone × size` | 不碰 DOM、不发明 paint 名 |
+| L3 | `button-policy.ts` | `disabled \|\| loading`；组装 `data-style` | 不写 `data-paint`、不写色值 |
+| L4 | `Button.tsx` + `Button.css` | 铬走 YoCorner；CSS 只上色 | 不在 TSX 里 if-else 上色 |
+| L5 | `index.ts` | `YoButton` + Style / Tone / Size | 不导出 paint；不导出 `YoButtonVariant` |
 
-运行时所有权：内容（children / 文案）在视图传入；外形与语义配置在 L2 解析后不可变；禁用/加载在 L3；按压 hover 是 CSS 瞬态，不进模型。无窗口监听；卸载即结束。`YoIconButton` 不是本控件的 variant。
+运行时所有权：内容在视图传入；重要度与 role 在 L2 解析后不可变；禁用/加载在 L3；按压 hover 是 CSS 瞬态。`YoIconButton` 不是本控件的 buttonStyle。徽章 success/warning 自持，不进 Button。
 
 ### 公开 API（一次替换，无双轨）
 
 ```ts
-variant?: "solid" | "outlined" | "ghost"   // 默认 solid
-tone?: "accent" | "neutral" | "danger" | "success" | "warning"  // 默认 accent
-size?: "sm" | "md"                         // 默认 md
+buttonStyle?: "emphasized" | "normal" | "textual"  // 默认 emphasized
+tone?: "accent" | "neutral" | "danger"             // 默认 accent；danger = ButtonRole.ERROR
+size?: "sm" | "md"                                 // md=NORMAL，sm=SMALL
 ```
 
-无 props = 今日主按钮（`solid` + `accent` → `data-paint=solid-on`）。
-
-旧调用一次迁完：
+无 props = EMPHASIZED + role NORMAL（宇宙蓝实底 + `fg-on`）。
 
 | 旧 | 新 |
 |----|----|
-| 无 / `primary` | 默认，或 `variant="solid"` |
-| `secondary` | `variant="outlined" tone="neutral"` |
-| `ghost` | `variant="ghost" tone="neutral"` |
-| `danger` | `tone="danger"`（variant 默认 solid） |
+| `variant=solid` / `data-paint=emphasized-on` | 默认，或 `buttonStyle="emphasized"` |
+| `outlined+neutral` / `emphasized+neutral` | `buttonStyle="normal" tone="neutral"` |
+| `ghost+accent/danger` | `buttonStyle="normal" tone="accent\|danger"` |
+| `ghost+neutral` | `buttonStyle="textual" tone="neutral"` |
+| `tone=success\|warning` | 删。确认绿/警示橙只给 Badge / 点，不进 Button |
 
-`outlined` / `ghost` 不写 `tone` 会落到 `accent`（彩色描边/幽灵），不是旧 secondary/ghost。
+禁止再写 `variant` / `data-paint`。`normal` / `textual` 不写 `tone` 落到 accent（灰底蓝字 / 蓝字无底）。
 
-### 涂装矩阵（L2，CSS 只消费 `data-paint`）
+### 场景配方（一次定，禁止第三套皮）
 
-| paint | 何时 | 视觉 |
-|-------|------|------|
-| `solid-on` | solid × accent/danger | 语义实底 + `fg-on`；hover/pressed 走 `*-hover/pressed` |
-| `solid-tone` | solid × success/warning | 软底 + 语义字。鸿蒙 confirm/alert 中明度，禁止反色字 |
-| `solid-neutral` | solid × neutral | `surface-2` + `fg`，不是黑底胶囊 |
-| `outlined-neutral` | outlined × neutral | 今日 secondary：`surface` + `border` + `fg` |
-| `outlined-tone` | outlined × 其余 | 语义描边与字，hover 软底 |
-| `ghost-neutral` | ghost × neutral | 今日 ghost：透明 + `fg-2` |
-| `ghost-tone` | ghost × 其余 | 鸿蒙 NORMAL：`surface-2` 灰底 + 语义字；hover/pressed 叠 state |
+| 场景 | 按钮 | 排版 |
+|------|------|------|
+| 弹出框脚钮 / 表单动作 | 取消 `normal+accent`；破坏 `normal+danger`；建设确认 **默认** | hug Dialog：AUTO。整页 `data-sized` 与栏内动作条：**靠右 hug** |
+| 页眉次要 | `normal+neutral` | 工具栏 |
+| 页眉主操作 | 默认 | 工具栏 |
+| 内容区弱操作 | `textual+neutral` | hug 或 `block`，不是脚钮 |
+
+### 色（官方 Token，CSS 只认 `data-style`）
+
+| style | 底 | 字 | hover |
+|-------|----|----|-------|
+| emphasized | `brand` / `warning`（danger） | `font_on_primary` | 底上叠 interactive 5%/10% |
+| normal | `--yohu-comp-gray`（浅 `background_tertiary`，深官方灰） | `font_emphasize` / `font_primary` / `warning` | 灰底上叠 5%/10%，禁止换成 `state-hover` |
+| textual | 透明 | 同上；neutral 用 `font_secondary` | `interactive_hover` 软底 |
+
+禁用：背板不变，字 `--yohu-fg-3`（40%）。禁止整钮改刷 `--yohu-disabled`。
 
 ### 不做
 
-- 不留 `primary` / `secondary` / `danger` 别名或适配函数
-- 不引进 Ant `generate()` 10 阶、Arco `lighten`、Polaris `--p-*`、Wave、中文插空格
-- 不把 `size` 冒充 `data-density`；密度仍走工作台设置
-- 不把揭示/滑动做成 Button variant
+- 不留 `variant` / `solid` / `outlined` / `ghost` / `data-paint` / `emphasized-soft` / `success` 按钮档
+- 不引进 Ant `generate()` 10 阶、Arco `lighten`、Polaris `--p-*`
+- 不把 `size` 冒充 `data-density`
+- 不把揭示/滑动做成 Button buttonStyle
 
 ---
 
@@ -219,16 +226,16 @@ HarmonyOS 对照：TextInput。盒内缀与盒外缀两清，status 一等。禁
     写入盒 `--yohu-text-field-line` = control-height − 2×hairline（L2 `textFieldLineBoxPx`）。
     单行 input 高与行高等于写入盒，禁止 `height: 100%` + `leading-ui`（Chromium 会把字/caret 顶到盒顶）。
     `multiline` 同一门面画 textarea：宿主 `data-multiline`，行高 leading-ui，`padding-block` 把第一行推到写入盒中线；
-    写入盒 `height: auto`，textarea `overflow: auto` + `resize: none`。弱多行按硬换行抬高：`rows` 是下限，`maxRows` 默认 6；可见行走 L2 `resolveTextFieldGrowRows`（不认软折行，禁止 `scrollHeight`）。宿主写 `--yohu-text-field-rows`，控件高 = 铬高 + (rows−1)×`--yohu-font-body`×leading（定值 calc），`transition: height` 走 `spatialSmall`。禁止 `height: auto` 冒充动画，禁止 `field-sizing`，禁止外包 YoTravel 量盒，禁止用 `1em` 当行距（控件未设字号）。禁止元素选择器 `textarea.yohu-text-field__input` 后门。
+    写入盒 `height: auto`，textarea `overflow: auto` + `resize: none`。弱多行用后高走 UA `field-sizing: content` + `contain: inline-size`（对照 AddressField 与 Chrome *form fields fit contents*）：粘贴、软折行、硬换行同一条排版；行宽钉在槽上，禁止 field-sizing 把写入盒撑出视口。`rows` 是下限，`maxRows` 默认 6 写成 `--yohu-text-field-max-rows` 帽；超过后写入盒滚动。盒高外包公开 `YoGrow`（缺省 `spatialGrow`）：量 `data-grow-used`（写入盒 body），不解宿主，只写宿主 `height` px（Web Animations，300ms 长尾弹簧）。铬绝对铺满锁行；铬绘制铺满锁行 CSS 盒（单位方 + none），禁止量 px viewBox + meet。行轴 `flex: 1 1 0%` 吃父级定宽，禁止 intrinsic basis。body 贴锁行底，顶边裁切揭开上一行。升降同一通路；`from` 读锁盒当前高（插值途中改目标），`finish` 锁 command 目标。`inline-end` 开行禁止 `min-content` / stretch。意图当拍（input / change / paste / 横向槽变走 DOM 口；受控值只在没有 DOM 意图时起程，同拍合并一次 command）。禁止把内容用后高塞进 `YoTravel`，禁止 `min-content` 顶祖先，禁止从字符串数 `\n`，禁止 `scrollHeight` 量高，禁止控件自写 `transition: height`，禁止模块再包 Grow / Travel。禁止元素选择器 `textarea.yohu-text-field__input` 后门。
     addon 在盒外。页面禁止再写 .yohu-text-field { width }
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
 | L1 | `icons.tsx` | `isIconName`：盒内缀图标名守卫 |
-| L2 | `textfield-model.ts` | 槽位占有；status 归一；涂装；width；multiline/rows/maxRows；弱多行 `countTextFieldLines` / `resolveTextFieldGrowRows`；写入盒 `textFieldLineBoxPx` |
-| L3 | `textfield-policy.ts` | 禁用与清除显隐；`data-*`（含 `data-tokens` / `data-multiline`） |
-| L4 | `TextField.tsx` + `TextField.css` | 铬 + 内容区；Token 槽 `display: contents`；input/textarea 吃剩余宽 |
+| L2 | `textfield-model.ts` | 槽位占有；status 归一；涂装；width；multiline/rows/maxRows；写入盒 `textFieldLineBoxPx` |
+| L3 | `textfield-policy.ts` | 禁用与清除显隐；`data-*`（含 `data-tokens` / `data-multiline`）；`rows` / `maxRows` 只是下限与帽 |
+| L4 | `TextField.tsx` + `TextField.css` + `textfield-grow.ts` | 铬 + 内容区；Token 槽 `display: contents`；input/textarea 吃剩余宽；弱多行 field-sizing + YoGrow |
 | L5 | `index.ts` | `YoTextField` + Props / Status / Affix / Control |
 
 ```ts
@@ -338,7 +345,7 @@ title / description / note / children
 
 ## 组件：YoIconButton（L0–L5）
 
-透明底图标钮，不是 YoButton 的 variant。`size?: "sm" | "md"`（默认 md），禁止魔法 px。
+透明底图标钮，不是 YoButton 的 buttonStyle。`size?: "sm" | "md"`（默认 md），禁止魔法 px。
 
 ```
 size / icon|children / disabled / loading / pressed
@@ -404,7 +411,7 @@ show(text, tone?)
 
 ## 组件：YoBadge（L0–L5）
 
-语义色与 Button 同一枚举：`accent | neutral | danger | success | warning`，默认 `neutral`。
+语义色自持：`accent | neutral | danger | success | warning`，默认 `neutral`。不跟 YoButton role 绑死。
 
 | 旧 | 新 |
 |----|----|
@@ -500,7 +507,7 @@ HarmonyOS 对照：AdvancedDialog / AlertDialog（API 20+）。开场 spatial，
 
 铬对照官方弹出框：标题居中（最多两行省略）、内容区必选、操作区 `DialogButtonDirection.AUTO`（≤1 居中 hug、2 左右铺满、≥3 从下至上）。三区之间不画分割线。电脑圆角走 `YoCorner role=dialog`（16vp）+ 获焦/失焦阴影。整页对话框（`data-sized`）按窗口铬：标题起排、操作区靠尾不铺满。
 
-盒对照 Fluent Dialog（Header/Footer 钉住，滚槽只在 Body；`bodyOverflow=auto` 只裁切，条由调用方组合 `YoScroller`）+ 鸿蒙 bindSheet/center popup `FIT_CONTENT`（内容低于帽则 hug，超过用帽；90% 是面板安全顶，不是内容预算）。`0fr/1fr` Collapse 只在高度不确定的流里成立；确定高 flex 剩余轨里 `1fr` = 剩余高，收回会把盒归零。fit 走 used-clip：面板外包公开 `YoTravel axes={["block"]}`，意图当拍锁用后 px。名单走 `YoReveal`（绘制轴始终绝对定位；行程中出流不自裁，落定由 Travel 祖先 `overflow: clip`，避免 abspos 撑 `scrollHeight`），行程中主槽 clip。hug 跟 Presence 寿命：关窗冻锁，出场只淡出缩放，内容区不改 fill-flex。滚条走公开 `YoScroller`（对照 ArkUI `ScrollBar` + `BarState.Auto`：无法滚动不显示；系统条关掉；滑块可拖；默认宽 4vp，距边 4vp 叠层，不预留侧轨）。禁止 hold+rAF、禁止 MutationObserver、禁止 Dialog 自持量高引擎、禁止把滑块叠回 Chip、禁止 ResizeObserver 盯插值盒、禁止边框去插 Collapse 固有高、禁止原生 `overflow` 硬切当滚条动画、禁止再套 panel 淡入冒充实收。
+盒对照 Fluent Dialog（Header/Footer 钉住，滚槽只在 Body；`bodyOverflow=auto` 只裁切，条由调用方组合 `YoScroller`）+ 鸿蒙 bindSheet/center popup `FIT_CONTENT`（内容低于帽则 hug，超过用帽；90% 是面板安全顶，不是内容预算）。`0fr/1fr` Collapse 只在高度不确定的流里成立；确定高 flex 剩余轨里 `1fr` = 剩余高，收回会把盒归零。fit 走 used-clip：面板外包公开 `YoTravel axes={["block"]}`，意图当拍锁用后 px。名单走 `YoReveal`（绘制轴始终绝对定位；行程中出流不自裁，落定由 Travel 祖先 `overflow: clip`，避免 abspos 撑 `scrollHeight`），行程中主槽 clip。hug 跟 Presence 寿命：关窗冻锁，出场只淡出缩放，内容区不改 fill-flex。滚条走公开 `YoScroller`（对照 ArkUI `ScrollBar` + `BarState.Auto`：无法滚动不显示；系统条关掉；滑块可拖；默认宽 4vp，距边 4vp；溢出让出 8vp 侧轨，内容不坐到条下）。禁止 hold+rAF、禁止 MutationObserver、禁止 Dialog 自持量高引擎、禁止把滑块叠回 Chip、禁止 ResizeObserver 盯插值盒、禁止边框去插 Collapse 固有高、禁止原生 `overflow` 硬切当滚条动画、禁止再套 panel 淡入冒充实收。
 
 曾用 body 原生 overflow:auto 当唯一滚轴，已撤回。
 
@@ -512,7 +519,7 @@ props
       / resolveDialogInitial / resolveDialogActionsLayout / resolveDialogExitLock
   → L3 resolveDialogOpen / attachDialog / dialogLayerStyle / dialogBodyAttrs / dialogExitLock
   → attachDialog = 卸 Tooltip Unique + pushDialog + dialogInitialFocus
-  → L4 只绑 Presence + YoTravel（fit ∧ open）+ data-box / data-sized + data-layout / data-overflow / data-pad / data-region
+  → L4 Portal(body) + Presence + YoTravel（仅 hug）+ data-box / data-sized + data-layout / data-overflow / data-pad / data-region
       + 标题 id / lead·视口槽·tail / 页脚
 ```
 
@@ -521,10 +528,10 @@ props
 | L0 | layout.ts | `DialogMax` 宽帽；`DialogBodyMax` hug 滚槽预算 |
 | L2 | dialog-model.ts；reveal-model.ts；travel-model.ts；scroller-model.ts | 盒 fit/fill/exit、内容区排列/溢出/垫、铬/滚槽分区、操作区 AUTO、首焦 auto/footer；Reveal 布局轴；Travel 用后 px；Scroller 溢出/滑块/拖位移（公共，不点 Dialog） |
 | L3 | dialog-stack.ts、dialog-focus.ts、dialog-policy.ts；travel-policy.ts；scroller-policy.ts | 单栈 Esc/Tab、可聚焦集合、skip 标记、initial=auto/footer、attach/detach、body data-*、读打开盒（面板 offset 布局宽高）；Travel 只有 traveling()/used 相；Scroller data-scroll / data-lane |
-| L4 | overlay/Dialog.tsx / Dialog.css；scroll/Scroller.tsx / Scroller.css | 内容区只认 data；标题居中；操作区只数 button；有标题走 `aria-labelledby`；fit 不吃 90%；split 视口是槽；fit 外包 `YoTravel`；滚条由调用方组合 `YoScroller`；面板填充/描边/裁切走 YoCorner |
+| L4 | overlay/Dialog.tsx / Dialog.css；scroll/Scroller.tsx / Scroller.css | 内容区只认 data；标题居中；操作区只数 button；有标题走 `aria-labelledby`；fit 不吃 90%；split 视口是槽；Portal 到 body；hug 外包 `YoTravel`，fill 不套；滚条由调用方组合 `YoScroller`；面板填充/描边/裁切走 YoCorner |
 | L5 | index.ts | YoDialog / YoScroller |
 
-公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `bodyLead` / `bodyTail` / `initial` / `onClose` / `onExitComplete` / `footer` / `children`。默认 stack + auto + lg + `initial=auto` + `region=plain`。`open` 只是 Presence 开关。`data-box`：fit hug、fill 显式高、exit 锁最后打开盒（inline 宽高，`max-height` 放开）。exit **不**把 body/__scroller 改成 `flex: 1 1 0`。fit 外包 `YoTravel`。`data-travel` 只属 `YoTravel`，不是 Dialog 公开 prop。panel 自写 `data-clip`（=`fit∧open` 或 `traveling()`，DialogChrome 订）。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / 点 `__content`。关窗 `enabled=false` 冻锁。载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。`data-overflow=auto` 只裁切视口槽（`overflow: hidden`），滚轴由调用方组合 `YoScroller`。fit 的滚槽预算是 `--yohu-layout-dialog-body-max`，不是 90% 视口；90% 只做面板安全顶。有 `bodyLead` / `bodyTail` 才 `data-region=split`：铅/尾钉住，视口槽给调用方的 `YoScroller`。Dialog 不 import Scroller。`YoReveal` 只许进视口，禁止嵌进预览网格当一格。删除其余名单走 `YoReveal`（绘制轴始终绝对定位），高度交给祖先 `YoTravel`，不插 0fr/1fr、不淡入；行程中不自裁，落定 clip。操作区只数页脚 `button` 槽，不认 Button 类名；取消/破坏 NORMAL=`ghost+accent/danger`（灰底+语义字），建设确认 EMPHASIZED=`solid+accent`。禁止脚钮 TEXTUAL 透明。模块禁止再套第二套 `overflow: auto`。`hidden` 只给自管填充的整页对话框（新建会话；命令管理再加 `bodyPad="none"`）。破坏性确认（文件删除）走缺省 auto + `initial="footer"` + lead/tail，首焦落取消。`data-dialog-skip` 只属于 Dialog，禁止 Chip 代写。显式 `height` 才 fill（内容区吃剩余高）；hug 内容区 `flex: 0 1 auto`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `__scroller` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
+公开 API：`open` / `title` / `width` / `height` / `bodyLayout` / `bodyOverflow` / `bodyPad` / `bodyLead` / `bodyTail` / `initial` / `onClose` / `onExitComplete` / `footer` / `children`。默认 stack + auto + lg + `initial=auto` + `region=plain`。`open` 只是 Presence 开关。`data-box`：fit hug、fill 显式高、exit 锁最后打开盒（inline 宽高，`max-height` 放开）。exit **不**把 body/__scroller 改成 `flex: 1 1 0`。层 Portal 到 `body`。hug 外包 `YoTravel`；fill 定高不套。`data-travel` 只属 `YoTravel`，不是 Dialog 公开 prop。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / 点 `__content`。关窗 `enabled=false` 冻锁。载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。`data-overflow=auto` 只裁切视口槽（`overflow: hidden`），滚轴由调用方组合 `YoScroller`。fit 的滚槽预算是 `--yohu-layout-dialog-body-max`，不是 90% 视口；90% 只做面板安全顶。有 `bodyLead` / `bodyTail` 才 `data-region=split`：铅/尾钉住，视口槽给调用方的 `YoScroller`。Dialog 不 import Scroller。`YoReveal` 只许进视口，禁止嵌进预览网格当一格。删除其余名单走 `YoReveal`（绘制轴始终绝对定位），高度交给祖先 `YoTravel`，不插 0fr/1fr、不淡入；行程中不自裁，落定 clip。操作区只数页脚 `button` 槽，不认 Button 类名；取消/破坏 NORMAL=`buttonStyle=normal` + accent/danger（`--yohu-comp-gray` + 语义字），建设确认 EMPHASIZED=默认。禁止脚钮 TEXTUAL 透明。模块禁止再套第二套 `overflow: auto`。`hidden` 只给自管填充的整页对话框（新建会话；命令管理再加 `bodyPad="none"`）。破坏性确认（文件删除）走缺省 auto + `initial="footer"` + lead/tail，首焦落取消。`data-dialog-skip` 只属于 Dialog，禁止 Chip 代写。显式 `height` 才 fill（内容区吃剩余高）；hug 内容区 `flex: 0 1 auto`。遮罩不关，只消费 `--yohu-scrim`。禁止模块点 `__body` / `__scroller` / `:has`。禁止 `Modal.confirm`、Wave、中文插空格。叠层走 `--yohu-z-dialog`。入栈必须 `dismissTooltipOverlay`：气泡 z 高于对话框，残留 Unique 会压在模态上。
 
 ---
 
@@ -534,20 +541,20 @@ props
 
 ```
 children + overflow + state + interactive + YoTravel.traveling() + YoCollapse.traveling() + railTraveling(phase)
-  → L2 resolveScrollerFlowChild / FlowSize / Overflow / BarState / Interactive / Phase / Thumb / ScrollTop / ThumbTop / WheelDelta / ClampedTop / PageTop / PageTowardPointer
+  → L2 resolveScrollerFlowChild / FlowSize / Overflow / Gutter / BarState / Interactive / Phase / Thumb / ScrollTop / ThumbTop / WheelDelta / ClampedTop / PageTop / PageTowardPointer
   → L3 scrollerHostAttrs / scrollerLaneAttrs / scrollerThumbAttrs
-  → L4 视口 overflow hidden + 滚轮改 scrollTop + 叠层 8vp 热区 + 可拖滑块 + Auto `MotionDuration.barHide` 隐藏 + 轨道翻页
+  → L4 视口 overflow hidden + 滚轮改 scrollTop + 溢出让出 8vp 侧轨 + 可拖滑块 + Auto `MotionDuration.barHide` 隐藏 + 轨道翻页
 ```
 
 | 层 | 文件 | 职责 |
 |----|------|------|
 | L0 | spacing / layout / motion | 4vp 条宽与边距、48vp 最短滑块、effects 显隐与 Hover 100ms |
-| L2 | scroller-model.ts | 溢出、相位（Auto/On/Off、idle/holding）、滑块、夹 top、翻页、滚轮 |
-| L3 | scroller-policy.ts | `data-scroll` / `data-bar` / `data-lane` / `data-pressed` / `data-interactive` |
-| L4 | Scroller.tsx / Scroller.css | 视口 hidden、叠层条、拖滑块、轨道翻页、键盘 Page/Home/End |
+| L2 | scroller-model.ts | 溢出、侧轨 gutter、相位（Auto/On/Off、idle/holding）、滑块、夹 top、翻页、滚轮 |
+| L3 | scroller-policy.ts | `data-scroll` / `data-bar` / `data-lane` / `data-gutter` / `data-pressed` / `data-interactive` |
+| L4 | Scroller.tsx / Scroller.css | 视口 hidden、溢出让出侧轨、拖滑块、轨道翻页、键盘 Page/Home/End |
 | L5 | index.ts | YoScroller / Handle / Props |
 
-公开 API：`overflow` / `state`（`auto` \| `on` \| `off`，默认 `auto`）/ `interactive`（默认 true）/ `children` / `viewRef` / `handle`（`scrollTo` / `scrollBy` / `scrollToStart` / `scrollToEnd` / `scrollPage` / `offset`）。无法滚动 `data-lane=off`。溢出只认 in-flow 子盒（`absolute` / `fixed` 出流），不认 Reveal abspos 的 `scrollHeight`。钉底走 `handle.scrollToEnd()`，禁止模块读 `scrollHeight`。滚口 `position: relative`，子级 `offsetTop` 相对滚口。视口只裁切，禁止 `overflow-y: auto` / `scrollbar-width` 藏条。滚轮 `preventDefault` 后改 `scrollTop`。`interactive=false` 不接手势，handle 仍可用。视口 `flex: 1 1 auto`：basis 跟 in-flow 内容，父级有帽才收缩；禁止 `1 1 0` 把 hug 列表压成 0。Dialog hug 只订自己的 flex 子项，禁止点 `__view`。订祖先 `YoTravel.traveling()`、`YoCollapse.traveling()` 与 `railTraveling(phase)`：插值中不新出条，`ResizeObserver` 行程中不改相位，落定同拍再量。收回 `out` 留上一拍滑块淡出。条叠在视口上：热区 8vp、滑块 4vp、距边 4vp，不占布局。滑块圆角是本族 L4 token（`--yohu-radius-xs`），不是 Corner。最短滑块 `Layout.IconPreview`。Auto：滚动/进入显示，停 `MotionDuration.barHide` 后 `effects-exit` 淡出；悬停或拖着不藏。`useScrollerPort` / `ScrollerPort` 只在同族 `scroller-port.ts`，L4 不二次导出。On：溢出则常驻。Off：不画条仍可滚。电脑点轨道翻一页，长按每 100ms 连翻直到滑块盖住指针。滑块 Hover `--yohu-fg-2`、Press `--yohu-fg`。禁止 Dialog 再画一套 `__scroll`。禁止 `closest([data-travel])`。禁止模块自写滚动条。`useTravel` / `useCollapseTravel` 不进 L5。不实现横滚、嵌套滚动、fling、边缘弹簧。
+公开 API：`overflow` / `state`（`auto` \| `on` \| `off`，默认 `auto`）/ `interactive`（默认 true）/ `children` / `viewRef` / `handle`（`scrollTo` / `scrollBy` / `scrollToStart` / `scrollToEnd` / `scrollPage` / `offset`）。无法滚动 `data-lane=off`。溢出只认 in-flow 子盒（`absolute` / `fixed` 出流），不认 Reveal abspos 的 `scrollHeight`。钉底走 `handle.scrollToEnd()`，禁止模块读 `scrollHeight`。滚口 `position: relative`，子级 `offsetTop` 相对滚口。视口只裁切，禁止 `overflow-y: auto` / `scrollbar-width` 藏条。滚轮 `preventDefault` 后改 `scrollTop`。`interactive=false` 不接手势，handle 仍可用。视口 `flex: 1 1 auto`：basis 跟 in-flow 内容，父级有帽才收缩；禁止 `1 1 0` 把 hug 列表压成 0。Dialog hug 只订自己的 flex 子项，禁止点 `__view`。订祖先 `YoTravel.traveling()`、`YoCollapse.traveling()` 与 `railTraveling(phase)`：插值中不新出条，`ResizeObserver` 行程中不改相位，落定同拍再量。收回 `out` 留上一拍滑块淡出。对照 ArkUI 内置 overlay + 官方 ScrollBar 示例右边距：溢出且未 Off 时 `data-gutter=on`，交叉轴让出 8vp 侧轨（热区），滑块 4vp、距边 4vp，画在轨里，内容不坐到条下。Auto 隐条也留槽，避免跳布局。滑块圆角是本族 L4 token（`--yohu-radius-xs`），不是 Corner。最短滑块 `Layout.IconPreview`。Auto：滚动/进入显示，停 `MotionDuration.barHide` 后 `effects-exit` 淡出；悬停或拖着不藏。`useScrollerPort` / `ScrollerPort` 只在同族 `scroller-port.ts`，L4 不二次导出。On：溢出则常驻。Off：不画条仍可滚。电脑点轨道翻一页，长按每 100ms 连翻直到滑块盖住指针。滑块 Hover `--yohu-fg-2`、Press `--yohu-fg`。禁止 Dialog 再画一套 `__scroll`。禁止 `closest([data-travel])`。禁止模块自写滚动条。`useTravel` / `useCollapseTravel` 不进 L5。不实现横滚、嵌套滚动、fling、边缘弹簧。
 
 ---
 
@@ -635,11 +642,11 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。缺省行高 `--yohu-row-height-nav`（命令库是层级导航，不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行导航尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。目录行 / 箭头 / Enter / 空格只开合，叶子才 `onSelect`。缺省行高 `--yohu-row-height-header`（命令库目录清单，比导航项再收一档；不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行 header 尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys
-  → L2 flattenVisible / treeKeyIntent
+  → L2 flattenVisible / treeActivateIntent / treeKeyIntent
   → L3 isTreeExpanded / treeRowAttrs
   → L4 内容区 = chevron + 图标 + 标签 + renderBadge 槽
 ```
@@ -745,7 +752,7 @@ items / selectedKey|selectedKeys / hotKey / onSelectRow / onReorder / tone
   → L4 槽位几何 + YoListRow + YoListFrame（hotKey）+ 条件 YoIndicator；源行只打 data-reorder=source
 ```
 
-`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（长列表 `state="on"` 常驻），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头不给叠层条让位，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：list 宿主 `overflow: hidden`（裁 fill 滑块过冲），项滚动走公开 `YoScroller`（视口 hidden，不留系统条，条叠在视口上），禁止模块再外包第二根。禁止再拆 `__scroll`。`For` 身份只有槽位 `0..poolSize-1`。槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选 fill 滑块 `decorate={false}`，用 `top`/`left` 落在 `__inner` 内容坐标；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
+`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（长列表 `state="on"` 常驻），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：list 宿主 `overflow: hidden`（裁 fill 滑块过冲），项滚动走公开 `YoScroller`（视口 hidden，不留系统条，溢出让出侧轨），禁止模块再外包第二根。禁止再拆 `__scroll`。`For` 身份只有槽位 `0..poolSize-1`。槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选 fill 滑块 `decorate={false}`，用 `top`/`left` 落在 `__inner` 内容坐标；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
 
 `onReorder` 对标鸿蒙 List `onMove` + Apple 列表插缝 + dnd-kit overlay：整行按下过 `Spacing.Sm` 后，overlay 挂不随 scrollTop 平移的平面（RL=`Port.plane()`=`.yohu-scroller`；VL 挂 `.yohu-virtual-list`），配方 `reorder-overlay`（跟指针，阴影浮起，`top` 走 `overlayOffset` 视口代数、不过渡）；源行 `data-reorder=source` 占位变淡；邻行 `translateY` 让位（`spatial-small`）；缝上配方 `reorder-bar` 只在离开原槽时展开。松手提交 `from`/`to`，Escape 取消。拖动中不改数组。一项不能拖。键盘 `Ctrl/Meta+↑/↓` 走 L3 `applyReorderKey` 夹取，两 L4 共用。指针会话在 `reorder-binder`（定高契约不变）。变高非虚拟列表走 `YoReorderList`。定高 / 变高预览共用 L2 `shiftForReorder` / `shiftPxForReorder`：位移只给邻行，源行不跟 dest，不 live-reorder。
 

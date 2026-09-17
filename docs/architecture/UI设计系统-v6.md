@@ -1,14 +1,29 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.30（2026-09-17，透明图标钮禁用四级字）
+> **状态：** v3.45（2026-09-17，页眉 NORMAL 与画布分色）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.45 变更（页眉 NORMAL 与画布分色）：** 浅色官方 `comp_background_gray` 与画布 `background_secondary` 同值 `#F1F3F5`，页眉贴画布时底板消失。桌面 `--yohu-comp-gray` 浅色改官方下一档 `background_tertiary` `#E5E5EA`；深色仍走官方 `comp_background_gray`。页眉次要（含文件「预览」）一律 `normal+neutral`，禁止再把页眉做成 TEXTUAL。CSS 仍只点 `--yohu-comp-gray`，禁止写 `--yohu-surface-2`。见 [youi.md](youi.md)。
+> **v3.44 变更（圆角绘制铺满 CSS 盒）：** 锁行 WAAPI 插高时，YoCorner 量出来的 px `viewBox` 冻在起点，默认 `meet` 把描边 letterbox，发送栏左右抖。绘制空间改成 CSS 盒：`viewBox="0 0 1 1"` + `preserveAspectRatio="none"`，路径在单位方，半径按轴换成分数；内容裁切走 CSS `inset()`。量盒只换算 token，不再当第二套世界。Grow 行轴 `flex: 1 1 0%` 吃父级定宽。`YoScroller` 订 `useGrow()` traveling，插值中不新出侧轨。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.43 变更（YoButton 官方灰底 / 清涂装债）：** NORMAL 底改走 `--yohu-comp-gray`，hover/pressed 叠在灰底上，禁止整块换成 `--yohu-state-hover`。删除 `data-paint` / Button `success|warning`。浅色当时仍用 `#F1F3F5`；现以 v3.44 为准。见 [youi.md](youi.md)。
+> **v3.42 变更（YoButton 对照鸿蒙 ButtonStyleMode）：** 公开轴从 Material 外形 `solid/outlined/ghost` 换成 ArkUI `buttonStyle`：EMPHASIZED / NORMAL / TEXTUAL。页眉次要与脚钮取消/破坏都走 `normal`，建设确认默认强调；内容区弱操作才 `textual`。废除 `outlined` 与 `YoButtonVariant`。灰底当时仍吃 `surface-2`；现以 v3.43 为准。见 [youi.md](youi.md)。
+> **v3.41 变更（弱多行抬高逐帧）：** `spatialGrow` 改感知 300ms + 32 停长尾弹簧（response 0.36 / ζ≈0.80）。文字贴锁行底，顶边裁切揭开上一行，光标与发送钮同一基线；禁止顶对齐把末行裁进 overflow。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.40 变更（Dialog 出树 / Corner 布局盒 / 命令管理薄 Dialog）：** `YoDialog` Portal 到 `body`，与菜单 / 气泡同一条「祖先 overflow / transform 不得裁 fixed」。hug 才外包 `YoTravel`；fill 定高（命令管理）不套 Travel、不开 `data-clip`。`YoCorner` 量盒改 `offsetWidth` / `offsetHeight`，禁止 `getBoundingClientRect`（会吃 Presence `scale-in`，裁切盒冻在 96%）。命令管理 Dialog 只留开窗 / 保存 / 菜单；三栏 + 键位收进 `manager/Workspace`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.38 变更（document 单选片圆角单源）：** 命令管理组栏等 `tone=document` 单选：选中走 `YoIndicator` fill（`--yohu-ripple-radius`），悬浮曾画在 `list-row` 直角盒上，两态圆角分叉。L2 `resolveListRowRadius` 按谁画选中底定族：滑块族写 `data-radius=chip`，与 fill 同一 token；`tone=list` / document 多选块仍直角通栏。禁止再给悬浮另写一套半径。见 [youi.md](youi.md)。
+> **v3.39 变更（内容用后高弹簧 / 铬跟锁行）：** 抖动来自铬跟 textarea 瞬切、锁行在插值。现铬绝对铺满 `YoGrow` 锁行，`body` 标 `data-grow-used` 才是量子盒。缺省 spec 从折叠用的 `spatialLocal` 换成 `spatialGrow`（感知 200ms + `springGrow` 微过冲）。输入任务 WAAPI 当拍绑 `document.timeline`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.37 变更（YoGrow 途中改目标 / WAAPI）：** 连续输入曾等结束用旧 from 重开。现 from 读宿主当前锁行，同拍改 to；DOM 意图与受控 value 只走一程。multiline 组禁止 stretch / `min-height:auto`。内容定高链里 CSS / `grid-template-rows` 的 used 不下行，升降同一 `element.animate` 写死 `height` from/to。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v3.36 变更（弱多行 YoGrow）：** 内容用后高与 Dialog 解锁量盒不是同一引擎。废除 `YoTravel fit=hug` 双轨（第二写属性、降程 snap、inline token）。公开 `YoGrow`：量槽内子盒，只插值 `grid-template-rows` px，`spatialLocal`，升降同一通路，`finish` 锁 command 目标。`YoTravel` 只保留 Dialog fill（`height`/`width`）。发送栏开行仍禁止 `min-content` / stretch。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.35 变更（弱多行高度单一权威）：** 发送栏上下抖：`inline-end` 开行 `min-content` / pane stretch 跟内容抢高；`height`/`min-height` 在 1fr/clip 里降程不起；`spatialSmall` 弹簧 `linear()` 过冲让降程卡在 from。当时仍把 hug 塞进 Travel。v3.36 拆出 `YoGrow`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.34 变更（弱多行 Travel hug 锁盒）：** hug 不再用 `min-content` 顶祖先（会和锁盒抢高，发送栏上下抖）。量盒读子盒 `offsetHeight`，锁盒不解。当时 `snapshot` 先挂 `data-travel`、抬高用 `min-height` 抗 clip；v3.35 改为只插值 `height`。同拍意图合并一次 `command`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.33 变更（弱多行用后高 / field-sizing）：** 废除 `\n` 计数 + calc 定值行高。`YoTextField multiline` 用后高走 UA `field-sizing: content` + `contain: inline-size`（粘贴 / 软折行 / 硬换行同一条排版；行宽钉在槽上，对照 AddressField 与 Chrome *form fields fit contents*）。`rows` 下限、`maxRows` 帽。盒高外包 `YoTravel axes={["block"]} spec="spatialSmall" fit="hug"`。当时 hug 误用 min-content 贡献，v3.34 改锁盒独占布局高。意图当拍。禁止 `scrollHeight` 量高、禁止控件自写 height 过渡、禁止模块再包 Travel。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.32 变更（滚条让出内容）：** 对照 ArkUI 内置条 overlay + 官方 ScrollBar 示例给内容右边距。溢出且未 Off 时 `data-gutter=on`，交叉轴让出 8vp 侧轨，条画在轨里，内容不坐到滑块下。Auto 隐条也留槽，避免跳布局。`YoColFrame` 表头跟 gutter 对齐。禁止 `scrollbar-gutter`。见 [youi.md](youi.md)。
+> **v3.31 变更（命令库树目录不入队）：** `YoTree` 目录行 / 箭头 / Enter / 空格只开合，不 `onSelect`。命令终端点组不入队，只点叶子入队。缺省行高改 `--yohu-row-height-header`（紧凑 28 / 舒适 32），仍禁止套数据行。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
 > **v3.30 变更（透明图标钮禁用四级字）：** `YoIconButton` 禁用油墨改 `--yohu-fg-4`。透明底没有禁用填，三级字与失焦描边/缀标同级会过跳；四级字仍能从深色 `surface-2` 分开。禁止再跟实心 `YoButton` 的 `--yohu-fg-3` 对齐。见 [youi.md](youi.md)。
-> **v3.29 变更（禁用油墨 / 弱多行抬高）：** `--yohu-disabled` 只作禁用底（深色 = `surface-2` = `#2E3033`）。透明图标钮禁用油墨禁止走禁用底（发送栏空态纸飞机会隐没）。`YoTextField multiline` 按硬换行抬高（`rows` 是下限，帽默认 6），盒高走写入盒 calc 定值 + `spatialSmall`；禁止 `height: auto` / `scrollHeight` / 模块自写过渡。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
+> **v3.29 变更（禁用油墨 / 弱多行抬高）：** `--yohu-disabled` 只作禁用底（深色 = `surface-2` = `#2E3033`）。透明图标钮禁用油墨禁止走禁用底（发送栏空态纸飞机会隐没）。当时弱多行按硬换行 calc 抬高；现用后高走 field-sizing + YoTravel（v3.33）。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[modules/terminal.md](modules/terminal.md)。
 > **v3.28 变更（滚轴贴底 / Port 几何 / barHide）：** `YoVirtualList` 贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。`YoReorderList` 行盒与指针坐标用 `port.scrollTop()`。`useScrollerPort` 只在 `scroller-port.ts`，L4 不二次导出。Auto 隐藏走 `MotionDuration.barHide`（2s）。贴底阈值走 `Spacing.TwoXl`。见 [youi.md](youi.md)。
 > **v3.27 变更（Dialog data-clip / Corner 公开槽 / RailIntent）：** `YoDialog` panel 自写 `data-clip`（=`fit∧open` 或 `traveling()`，DialogChrome 订），禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`；`data-travel` 只属 `YoTravel`。`YoCorner` 公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`，禁止消费方点 `__content`。`YoRail` 只留 `RailIntent`，禁止 `RailPresentation`。`YoSubheader.meta` 贴标题、`actions` 行尾；`YoScroller` 视口 `flex: 1 1 auto`，禁止 `1 1 0`。见 [youi.md](youi.md)。
 > **v3.26 变更（Subheader meta / Scroller hug 视口）：** `YoSubheader.meta` 贴标题，`actions` 只走行尾。设备栏徽章走 meta，刷新是标题行兄弟；展开时 heading 槽吃剩余宽，图标轨关流刷新留起边。`YoScroller` 视口 `flex: 1 1 auto`，禁止 `1 1 0` 把 hug 列表压成 0。Dialog 只订自己的 flex 子项，禁止点 `__view`。见 [youi.md](youi.md)。
@@ -367,7 +382,8 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 |------------|------------|-------|------|------|
 | `bg-base` | `background_secondary` | `#F1F3F5` 雪域灰 | `#191A1C` | 窗口底色（浅/深同构凹槽） |
 | `surface` | `comp_background_primary` | `#FFFFFF` | `#202224` | 面板/卡片 |
-| `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度） |
+| `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度）；禁止冒充普通按钮底 |
+| `comp-gray` / `-hover` / `-pressed` | 浅 `background_tertiary` / 深 `comp_background_gray` + `interactive` 5%/10% | `#E5E5EA` 叠黑 | `#E5E5EA` 叠白 | 普通按钮底；浅色不用与画布同值的 `comp_background_gray` |
 | `fg` / `fg-2` / `fg-3` / `fg-4` | `font_primary`…`fourth` | 黑 90/60/40/20% | 白 90/60/40/20% | 文本四级 |
 | `fg-on` | `font_on_primary` | `#FFFFFF` | `#FFFFFF` | 强调底上的反色字 |
 | `border` | `comp_divider` | 黑 20% | 白 20% | 常规边框/分割 |
@@ -439,8 +455,8 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `--yohu-control-height-sm` | 24 | 28 | 小按钮 |
 | `--yohu-row-height` | 22 | 26 | 日志/文件数据行 |
 | `--yohu-row-height-device` | 34 | 40 | 设备卡片 |
-| `--yohu-row-height-nav` | 32 | 36 | 导航项、命令库树 |
-| `--yohu-row-height-header` | 28 | 32 | 表头 |
+| `--yohu-row-height-nav` | 32 | 36 | 导航项 |
+| `--yohu-row-height-header` | 28 | 32 | 表头、命令库树 |
 | `--yohu-segment-single` | 28 | 40 | 分段按钮单行（V2 `singleline_background_height` / V1 最小 28） |
 | `--yohu-segment-hybrid` | 44 | 56 | 分段按钮图文（V2 `doubleline_background_height`） |
 | `--yohu-title-bar-height` | 40 | 40 | 窗口铬（页眉回内容区后走 HarmonyOS Compact；不再随内容密度抬到 56） |
@@ -510,14 +526,14 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 **载体**：`tokens/states.css` 的 `.yohu-interactive`。选中只用 `.yohu-interactive--selected`（**不要**用 `[aria-selected]` 上填充：`YoTabs` 的 `aria-selected` 表示下划线激活，不是选中填充）。键盘活动用 `.yohu-interactive--active`。禁止 Tree/Select/命令管理/壳再写选中字色。短列表单选软底由 `YoIndicator` 在项之间滑动。`YoVirtualList` listbox 行关掉 `isolation` / `::before`，多选底画在行上；单选 fill 仍由滑块画片。禁止虚拟列表再给每行开合成层。选中悬停/按压在软底上叠 `--yohu-state-hover` / `--yohu-state-pressed`，禁止改走 `--yohu-accent-hover`。
 
-- 实心底控件不走列表 ripple。`YoButton` 走 `data-paint` × `data-tone`：`solid-on`（accent/danger）用对应 `*-hover/pressed`；`solid-tone`（success/warning）用软底+语义字。`YoCheckbox` 选中走 `--yohu-accent-hover/pressed`。`YoSegmentedButton` 选中 hover/pressed 叠 `--yohu-state-*`，不换 accent-hover 实底。
-- **YoButton 两轴：** 外形 `variant` 与语义 `tone` 分轴。页眉主操作默认无 props。次要操作必须 `outlined` + `neutral`。弹出框脚钮对照鸿蒙 NORMAL：取消 `ghost+accent`、破坏 `ghost+danger`（灰底 + 语义字），建设确认 EMPHASIZED `solid+accent`。禁止脚钮再走 TEXTUAL 透明。禁止再写 `variant="primary|secondary|danger"`。
+- 实心底控件不走列表 ripple。`YoButton` 只认 `data-style` × `data-tone`：EMPHASIZED 用 `accent`/`error` 实底 + `fg-on`，hover/pressed 走对应 `*-hover/pressed`；NORMAL 用 `--yohu-comp-gray`，hover 叠在灰底上，禁止换成 `state-hover`。`YoCheckbox` 选中走 `--yohu-accent-hover/pressed`。`YoSegmentedButton` 选中 hover/pressed 叠 `--yohu-state-*`，不换 accent-hover 实底。
+- **YoButton 三档：** 公开 `buttonStyle` 对照鸿蒙 EMPHASIZED / NORMAL / TEXTUAL。`tone` 只有 `accent | neutral | danger`（danger = ButtonRole.ERROR）。页眉主操作默认无 props。次要操作 `normal+neutral`。弹出框脚钮：取消 `normal+accent`、破坏 `normal+danger`，建设确认默认强调。禁止脚钮再走 TEXTUAL。禁止再写 `variant` / `outlined` / `data-paint` / Button `success|warning`。禁用背板不变、字 `--yohu-fg-3`。
 - `YoSegmentedButton` 对齐官方三种：页签单选（tab 白选择块 + `shadow-xs` + `fg`）、胶囊单选（accent + `fg-on`）、胶囊多选（`multiple`，共轨连选，再点取消）。选中填缺省强调色，项 `fill` 可覆盖（级别 V–F）。默认 hug，`block` 铺满。`YoIndicator` 在轨内与项同父。电脑小圆角走 `YoCorner` paint。内容：文本 / 图标 / 图片 / 图文（图标在上）。不作一级导航、不承载删除/添加。级别筛选走胶囊多选，见 §4.1。
 - `YoTabs` 激活指示是 `YoIndicator` underline（底边 `--yohu-stroke-accent` 滑块），hover 仍走 ripple；不要把 Tab 激活画成选中填充。
 - 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
-- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。`YoVirtualList` listbox（文件清单 / 命令管理）行盒走 `list-row/`：直角通栏，hairline 贴齐左右。禁止在行盒上叠 `border-radius` / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
+- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。`YoVirtualList` `tone=list`（文件清单 / 命令管理中栏）行盒走 `list-row/`：直角通栏，hairline 贴齐左右。`tone=document` 单选（命令管理组栏）选中走 fill 滑块，行上悬浮写 `data-radius=chip`，与滑块同一 `--yohu-ripple-radius`。禁止在 Family B 行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
 
 **焦点环（单源）**
 
@@ -547,7 +563,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点一律 `YoPage`（`.yohu-page`：`padding: page-inset`、`gap: page-gap`）。`YoChrome` 是第一子节点。内容进 `YoPanel`（`variant=pane` 撑满）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。设置页分组走 `YoPanel` 默认 card，边距仍是 `page-margin`。
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏（展开与图标轨）与内容区之间画 hairline。模块分区 = `YoPanel`（surface + `YoCorner role=card` + 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行（`tone=list`）。对话框三区、设置行、日志级别槽不画分割线。路径栏与清单靠 canvas 分层，不另拉线。
 - **状态栏**：左「展示名 v版本」（`system.info.identity`）/ 中留白 / 右「设备 · 任务 · 状态」；任务悬停显示明细。状态槽由模块 `Status` 贡献（投屏出画后显示实测 fps）。透明贴合 canvas。Caption + leading-tight。
-- **对话框**：Title_S Bold；PC 圆角走 `YoCorner role=dialog`（`radius-md` 16）；宽 ≤400、高 ≤90%；**不要**把窗口最小 360×240 套到浮层确认框。三区不画分割线。panel 自写 `data-clip`（=`fit∧open` 或 `traveling()`，DialogChrome 订）；禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。
+- **对话框**：Title_S Bold；PC 圆角走 `YoCorner role=dialog`（`radius-md` 16）；宽 ≤400、高 ≤90%；**不要**把窗口最小 360×240 套到浮层确认框。三区不画分割线。层 Portal 到 `body`。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）；fill 定高不套 Travel、不开 clip。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。
 - **启动交接（Windows）**：用户看见的是原生 GDI 小窗，不是 `#yohu-boot`。小窗与主窗共用锁定的主屏工作区，不跟光标屏。画布色出口是 `window_boot::canvas_color` / `canvas_bgra`，对齐 `--yohu-bg-base`。`SplashPlacement` 锁定几何 + dark + corner；`BootSurface` 锁定 canvas 与 splash 半径（同屏 clip 终点 0）。paint 写入矩形 `BootFrame`（四角画布色）。小窗 RGN 只裁显示外形并 `DWMWCP_DONOTROUND`。同屏 overlay clip 从 Md 收到 0，铺满后目标 HWND 不透明；主窗 `host_corner`（`Radius.Sm`）揭窗后才出现，不进 overlay clip。overlay HWND `DWMWCP_DONOTROUND` + 整窗 extend frame。`Theme::System` 禁止再采 `win.theme()`。禁止从 HWND DC 抓像素，禁止把 RGB=0 补成画布（浅色标题就是黑），禁止铺满时 clip 出透明四角。hydrate 完成且双 rAF 之后卸掉 HTML 画布层，再 `boot.showMain`。主窗一次落到最终矩形但保持隐藏；同屏 Shared overlay 铺满之后才揭内容并淡出；异屏 Exit overlay 结束后才揭主窗。禁止 `center` 与光标屏第二套选屏。禁止插值 HWND 宽高、禁止 CSS 缩放主窗、禁止 HTML 启动层淡出、禁止第二 WebView splash。禁止 `yohu-motion` 持画布色。
 - **快捷键统一表（v6.1 目标）**：`Ctrl+K` 命令面板（模块跳转/刷新设备/开始采集…）；模块内快捷键不变。
 
@@ -575,7 +591,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel` + 右侧结果 `YoPanel`（间距 12vp）。页眉不放执行/取消。
-- 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-nav`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头即选中该组；选中/hover 走 `.yohu-interactive`。命令与命令块同级：命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
+- 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-header`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头只开合该组，不选中、不入队。选中/hover 走 `.yohu-interactive`（只有叶子选中）。命令与命令块同级：命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单行走 `YoVirtualList`，禁止自写圆角底或 `focus-ring`。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令或命令块。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。具体命令标签后括号说明 `{n}` 为独立参数；按钮「插入参数」在光标或选区写入下一个未用下标。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令自上而下（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与每个 `{n}`（有描述则跟在标签后），不展示预览；命令块一次填多步。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。时间默认 `HH:mm:ss.SSS`（设置 `terminal_time_format`，立即投影已画出的行）。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
@@ -607,7 +623,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位，块下不画分割线；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
-- `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400；面板安全顶 90%；hug 滚槽预算 `--yohu-layout-dialog-body-max`。标题 Title_S Bold；电脑圆角 `YoCorner role=dialog`（16）。三区不画分割线。panel 自写 `data-clip`（=`fit∧open` 或 `traveling()`，DialogChrome 订）；禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
+- `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400；面板安全顶 90%；hug 滚槽预算 `--yohu-layout-dialog-body-max`。标题 Title_S Bold；电脑圆角 `YoCorner role=dialog`（16）。三区不画分割线。层 Portal 到 `body`。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）；fill 定高不套 Travel。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
 - `YoToast`：描边；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。
 
 ---
@@ -619,7 +635,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | YoDialog | Esc 关；焦点陷阱；打开后 `dialogInitialFocus`；关闭后还原焦点 | `role=dialog aria-modal`；标题 `aria-labelledby` |
 | YoTabs | ←/→ 切换；Home/End；Delete 关闭（可关时）；Ctrl+Tab 循环 | `role=tablist/tab/tabpanel` |
 | YoSelect | 展开后 ↑/↓ 选项；Enter 选；Esc 关；Portal 上下展开；宽 hug（min=触发钮）；仅超出才纵向滚动 | `aria-haspopup=listbox aria-expanded aria-activedescendant` |
-| YoTree | ↑/↓ 移动；→ 展开/← 收起；Enter 选中 | `role=tree/treeitem aria-expanded` |
+| YoTree | ↑/↓ 移动；→ 展开/← 收起；Enter / 空格：目录开合、叶子选中 | `role=tree/treeitem aria-expanded` |
 | YoVirtualList | 选择模式：roving tabindex + ↑/↓/Home/End/Enter/Space | 选择模式 `role=listbox/option` + `aria-selected` |
 | YoContextMenuHost | 应用根唯一实例；Portal 到 body；同时只开一个场景。模块禁止自挂 List | `role=menu/menuitem`（Host 内 List） |
 | YoTooltip / YoTooltipHost | 只给无可见文案的铬；主题抬升指向气泡 + 箭头；落点离散；悬停或键盘焦点出示；指针点击后的程序移焦 / 按下 / 模态入栈立即卸；密集提示共一个 popup；无 Host 不画 | `role=tooltip` + `aria-describedby` |

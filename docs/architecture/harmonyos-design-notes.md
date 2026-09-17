@@ -394,7 +394,7 @@ Yohu 壳要的是常驻 232↔48 图标轨。因此：
 | 电脑设备 | 宽度固定不随父窗变；自带阴影（获焦/失焦区分层级）；最小 **360×240vp**，最大 ≤ 当前窗口 |
 | 电脑圆角 | 更小圆角（Yohu：`YoCorner role=dialog` = 16vp，手机 32vp） |
 
-YoDialog 落地：标题居中、无分割线、操作区 AUTO。官方确认框脚钮是 NORMAL（灰底 + 蓝取消 / 红删除字），不是 TEXTUAL 透明；带输入框时确认 EMPHASIZED，无内容置灰。圆角走独立 `corner/` 算法绘制（四分之一圆 + 内侧描边），禁止 CSS border 叠 overflow 出毛边。整页对话框（命令管理）不铺满按钮。YoButton 字重 Medium，圆角 `role=control` = 8vp。
+YoDialog 落地：标题居中、无分割线、操作区 AUTO。官方确认框脚钮是 NORMAL（`comp_background_gray` + 蓝取消 / 红删除字），不是 TEXTUAL 透明；带输入框时确认 EMPHASIZED，无内容置灰。圆角走独立 `corner/` 算法绘制（四分之一圆 + 内侧描边），禁止 CSS border 叠 overflow 出毛边。整页对话框（命令管理）不铺满按钮。YoButton 字重 Medium，圆角 `role=control` = 8vp。
 
 ### 6.7 半模态面板（Sheet）
 
@@ -513,6 +513,7 @@ YoDialog 落地：标题居中、无分割线、操作区 AUTO。官方确认框
 | `font_on_primary` | `--yohu-fg-on`（强调底反色字） |
 | `background_secondary` 雪域灰 / `#191A1C` | `--yohu-bg-base` |
 | `comp_background_primary` | `--yohu-surface` |
+| `comp_background_gray` `#F1F3F5` / `#E5E5EA` | 浅色与画布同值，桌面 `--yohu-comp-gray` 改 `background_tertiary` `#E5E5EA`；深色仍官方灰 |
 | `comp_emphasize_secondary` 20% | `--yohu-accent-soft`（徽章/芯片） |
 | `interactive_select` 品牌 20% | `--yohu-state-selected` + `--yohu-state-selected-fg`（列表/导航/树选中软底） |
 | `interactive_active` 品牌实底 | 按钮 / 开关 / 级别格按下，不进列表选中 |
