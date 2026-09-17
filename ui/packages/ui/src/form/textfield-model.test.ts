@@ -4,10 +4,14 @@ import { describe, expect, it } from "vitest";
 import { Density } from "../tokens/density";
 import { Stroke } from "../tokens/layout";
 import {
+  DEFAULT_TEXT_FIELD_MAX_ROWS,
   DEFAULT_TEXT_FIELD_ROWS,
   DEFAULT_TEXT_FIELD_STATUS,
+  countTextFieldLines,
   hasTextFieldSlot,
   resolveTextFieldActive,
+  resolveTextFieldGrowRows,
+  resolveTextFieldMaxRows,
   resolveTextFieldMultiline,
   resolveTextFieldRows,
   resolveTextFieldSpec,
@@ -127,5 +131,27 @@ describe("textfield-model", () => {
       multiline: true,
       rows: 2,
     });
+  });
+
+  it("弱多行按硬换行抬高，空串 1 行，帽默认 6", () => {
+    expect(countTextFieldLines(undefined)).toBe(1);
+    expect(countTextFieldLines("")).toBe(1);
+    expect(countTextFieldLines("adb")).toBe(1);
+    expect(countTextFieldLines("a\nb\nc")).toBe(3);
+    expect(countTextFieldLines("a\n")).toBe(2);
+    expect(resolveTextFieldMaxRows({ multiline: true, rows: 1 })).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
+    expect(resolveTextFieldMaxRows({ multiline: true, rows: 8 })).toBe(8);
+    expect(resolveTextFieldMaxRows({ multiline: true, rows: 1, maxRows: 4 })).toBe(4);
+    expect(resolveTextFieldMaxRows({ multiline: true, rows: 3, maxRows: 2 })).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
+    expect(resolveTextFieldGrowRows({ multiline: true, rows: 1, value: "" })).toBe(1);
+    expect(resolveTextFieldGrowRows({ multiline: true, rows: 1, value: "a\nb\nc" })).toBe(3);
+    expect(
+      resolveTextFieldGrowRows({
+        multiline: true,
+        rows: 1,
+        value: "1\n2\n3\n4\n5\n6\n7\n8",
+      }),
+    ).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
+    expect(resolveTextFieldGrowRows({ value: "a\nb" })).toBe(1);
   });
 });

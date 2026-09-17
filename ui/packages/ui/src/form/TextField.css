@@ -143,14 +143,25 @@
  * 禁止用元素选择器给 textarea 另开后门。
  */
 .yohu-text-field[data-multiline] .yohu-text-field__control {
-  height: auto;
+  /* 定值 calc：首行铬高 + 后续 body×leading。禁止 1em（控件未设字号时算不准）。 */
+  height: calc(
+    var(--yohu-control-height) + (var(--yohu-text-field-rows, 1) - 1) * var(--yohu-font-body) *
+      var(--yohu-font-leading-ui)
+  );
   min-height: var(--yohu-control-height);
   align-items: flex-start;
+  transition: height var(--yohu-motion-spatial-small);
+}
+
+.yohu-text-field[data-multiline] .yohu-text-field__chrome {
+  height: 100%;
 }
 
 .yohu-text-field[data-multiline] .yohu-text-field__input {
+  flex: 1 1 auto;
   height: auto;
   min-height: var(--yohu-text-field-line);
+  width: 100%;
   line-height: var(--yohu-font-leading-ui);
   padding-block: calc((var(--yohu-text-field-line) - 1em * var(--yohu-font-leading-ui)) / 2);
   overflow: auto;

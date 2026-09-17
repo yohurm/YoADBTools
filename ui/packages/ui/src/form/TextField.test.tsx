@@ -289,4 +289,31 @@ describe("YoTextField", () => {
     expect(src).not.toContain("yohu-corner__content");
     expect(css).not.toContain("yohu-corner__content");
   });
+
+  it("弱多行按换行抬高，盒高走 calc + spatialSmall，超过帽仍是 rows 帽", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const { unmount } = render(() => (
+      <YoTextField ariaLabel="命令" multiline rows={1} value={"a\nb\nc"} />
+    ));
+    expect((screen.getByLabelText("命令") as HTMLTextAreaElement).rows).toBe(3);
+    unmount();
+    render(() => (
+      <YoTextField
+        ariaLabel="长命令"
+        multiline
+        rows={1}
+        value={"1\n2\n3\n4\n5\n6\n7\n8"}
+      />
+    ));
+    expect((screen.getByLabelText("长命令") as HTMLTextAreaElement).rows).toBe(6);
+    expect(src).toContain("--yohu-text-field-rows");
+    expect(src).not.toContain("YoTravel");
+    expect(src).not.toContain("scrollHeight");
+    expect(css).toContain("transition: height var(--yohu-motion-spatial-small)");
+    expect(css).toContain("--yohu-text-field-rows");
+    expect(css).toContain("(var(--yohu-text-field-rows, 1) - 1)");
+    expect(css).toContain("var(--yohu-font-body)");
+    expect(css).not.toContain("field-sizing");
+    expect(css).not.toContain("yohu-travel");
+  });
 });

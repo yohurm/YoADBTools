@@ -105,6 +105,15 @@ describe("textfield-policy", () => {
     expect(attrs["data-multiline"]).toBe(true);
     expect(attrs.rows).toBe(1);
     expect(textFieldHostAttrs({ multiline: true, type: "number" })["data-width"]).toBe("hug");
+    expect(textFieldHostAttrs({ multiline: true, rows: 1, value: "a\nb\nc" }).rows).toBe(3);
+    expect(
+      textFieldHostAttrs({
+        multiline: true,
+        rows: 1,
+        maxRows: 4,
+        value: "1\n2\n3\n4\n5",
+      }).rows,
+    ).toBe(4);
   });
 
   it("font=mono 才写 data-font", () => {

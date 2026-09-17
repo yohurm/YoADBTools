@@ -2,6 +2,7 @@
  * YoTextField —— 输入框（L4 视图）。
  * 盒内缀 / 盒外缀 / status / active / 禁用 / 多行由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
  * HarmonyOS 对照：TextInput / TextArea 同一门面；status 边走语义 token，不引进 antd Input。
+ * 弱多行盒高走写入盒 calc 定值 + spatialSmall，禁止 height:auto 冒充动画。
  */
 import { Show, createMemo, createUniqueId } from "solid-js";
 import type { JSX } from "solid-js";
@@ -43,6 +44,8 @@ export interface YoTextFieldProps {
   multiline?: boolean;
   /** 多行可见行数。默认 2。 */
   rows?: number;
+  /** 弱多行抬高帽。默认 6。超过后写入盒滚动。 */
+  maxRows?: number;
   /** 盒内前缀（图标名或节点） */
   prefix?: YoTextFieldAffix;
   /** 盒内后缀（图标名或节点） */
@@ -134,6 +137,11 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-active={host()["data-active"]}
       data-multiline={host()["data-multiline"]}
       data-font={host()["data-font"]}
+      style={
+        host()["data-multiline"]
+          ? { "--yohu-text-field-rows": String(host().rows) }
+          : undefined
+      }
     >
       <Show when={props.label}>
         <label class="yohu-text-field__label" for={id}>
