@@ -137,7 +137,7 @@ export const DeviceRail: Component<{
                     deviceStore.state.lastError ? (
                       <YoButton
                         size="sm"
-                        variant="outlined"
+                        buttonStyle="normal"
                         tone="neutral"
                         onClick={() => void deviceStore.refresh()}
                       >

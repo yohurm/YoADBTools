@@ -280,7 +280,7 @@ export function SettingsForm(props: {
           {settingsStore.identity.version}
           <YoButton
             size="sm"
-            variant="outlined"
+            buttonStyle="normal"
             tone="neutral"
             loading={updateStore.checking()}
             disabled={updateStore.checking()}

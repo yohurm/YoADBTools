@@ -417,6 +417,12 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(css).toMatch(
       /\.yohu-device-rail\[data-stream="open"\] \.yohu-device-rail__heading\s*\{[^}]*flex:\s*1 1 auto/,
     );
+    expect(css).toMatch(
+      /\.yohu-device-rail:not\(\[data-stream="open"\]\) \.yohu-device-rail__header\s*\{[^}]*gap:\s*0/,
+    );
+    expect(decls("yohu-device-rail__header")).toMatch(
+      /transition:\s*gap\s+var\(--yohu-motion-spatial-rail\)/,
+    );
     expect(css).not.toContain(".yohu-device-rail__header > :last-child");
     expect(css).not.toContain(".yohu-device-rail__header .yohu-subheader");
     expect(css).not.toMatch(/max-height:\s*42%/);

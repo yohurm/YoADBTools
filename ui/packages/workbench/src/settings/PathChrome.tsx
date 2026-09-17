@@ -19,7 +19,7 @@ export function PathChrome(props: {
         <YoTextField block readOnly value={props.path} ariaLabel={props.label} />
       </div>
       <YoButton
-        variant="outlined"
+        buttonStyle="normal"
         tone="neutral"
         disabled={props.disabled}
         onClick={() => props.onAction()}

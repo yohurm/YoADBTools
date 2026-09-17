@@ -115,6 +115,8 @@
   display: flex;
   align-items: center;
   gap: var(--yohu-space-xs);
+  /* 关流槽仍在 flex 树（0fr，禁止 display:none）；gap 不随 0 宽项塌缩。 */
+  transition: gap var(--yohu-motion-spatial-rail);
 }
 
 .yohu-device-rail__heading {
@@ -123,6 +125,11 @@
 
 .yohu-device-rail[data-stream="open"] .yohu-device-rail__heading {
   flex: 1 1 auto;
+}
+
+/* 图标轨：两枚关流槽不再吃 gutter。刷新 32 落进 inset 后 32 槽，与导航 leading 同轴。 */
+.yohu-device-rail:not([data-stream="open"]) .yohu-device-rail__header {
+  gap: 0;
 }
 
 /* fill 只有一个直接子级：列表吃剩余高度，空态卡片 hug，避免两者各 flex:1。 */
