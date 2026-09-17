@@ -4,6 +4,7 @@
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { useRail, railStreamAttr } from "../motion/engines/rail";
 import { listItemHostAttrs } from "./list-item-policy";
 import type { YoListItemRing, YoListItemRole, YoListItemSize } from "./list-item-model";
 import "./ListItem.css";
@@ -34,6 +35,8 @@ export interface YoListItemProps {
 }
 
 export function YoListItem(props: YoListItemProps): JSX.Element {
+  const rail = useRail();
+  const stream = () => (rail ? railStreamAttr(rail.phase()) : undefined);
   const host = createMemo(() =>
     listItemHostAttrs({
       role: props.role,
@@ -41,10 +44,6 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
       ring: props.ring,
       selected: props.selected,
       current: props.current,
-      hasLeading: props.leading != null,
-      hasDescription: Boolean(props.description),
-      hasMeta: Boolean(props.meta),
-      hasTrailing: props.trailing != null,
     }),
   );
 
@@ -96,6 +95,7 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
           class={className()}
           classList={{ "yohu-interactive--selected": Boolean(host()["data-selected"]) }}
           data-size={host()["data-size"]}
+          data-stream={stream()}
           role="option"
           aria-selected={host()["aria-selected"]}
           aria-label={props.label}
@@ -112,6 +112,7 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
         class={className()}
         classList={{ "yohu-interactive--selected": Boolean(host()["data-selected"]) }}
         data-size={host()["data-size"]}
+        data-stream={stream()}
         aria-current={host()["aria-current"]}
         aria-label={props.label}
         tabIndex={props.tabIndex}

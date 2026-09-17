@@ -20,12 +20,6 @@
   height: 100%;
 }
 
-.yohu-icon-button__chrome .yohu-corner__content {
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-}
-
 .yohu-icon-button[data-size="sm"] {
   width: var(--yohu-control-height-sm);
   height: var(--yohu-control-height-sm);
@@ -46,6 +40,12 @@
   height: var(--yohu-layout-icon-md);
 }
 
+.yohu-icon-button[data-paint="window"] {
+  width: var(--yohu-layout-titlebar-caption);
+  height: 100%;
+  border-radius: var(--yohu-radius-none);
+}
+
 .yohu-icon-button:not(:disabled):hover {
   --yohu-corner-fill: var(--yohu-state-hover);
   color: var(--yohu-fg);
@@ -53,6 +53,18 @@
 
 .yohu-icon-button:not(:disabled):active {
   --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-icon-button[data-paint="window"]:not(:disabled):hover {
+  --yohu-corner-fill: transparent;
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-icon-button[data-paint="window"]:not(:disabled):active {
+  --yohu-corner-fill: transparent;
+  background-color: var(--yohu-state-pressed);
+  color: var(--yohu-fg);
 }
 
 .yohu-icon-button[data-pressed]:not(:disabled) {

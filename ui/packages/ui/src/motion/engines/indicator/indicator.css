@@ -86,3 +86,14 @@
 .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *:not(.yohu-badge):not(.yohu-badge *):not(.yohu-tone):not(.yohu-tone *):not(.yohu-list-item__info):not(.yohu-list-item__extra):not(.yohu-list-item__extra-inner):not(.yohu-list-item__extra-content):not(.yohu-list-item__end):not(.yohu-list-item__end-inner) {
   transition: color var(--yohu-motion-effects-fast);
 }
+
+/* L4 写 data-indicator-hot；只认属性 + 本配方滑块，禁止 :has list-row。 */
+[data-indicator-hot="hover"] .yohu-recipe-indicator--fill {
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
+}
+
+[data-indicator-hot="pressed"] .yohu-recipe-indicator--fill {
+  background: var(--yohu-state-selected);
+  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
+}

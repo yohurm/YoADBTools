@@ -7,6 +7,7 @@
 import {
   resolveIconButtonSpec,
   type IconButtonInput,
+  type YoIconButtonPaint,
   type YoIconButtonSize,
 } from "./icon-button-model";
 
@@ -41,6 +42,7 @@ export function resolveIconButtonAriaPressed(input: IconButtonInteractiveInput):
 
 export interface IconButtonHostAttrs {
   "data-size": YoIconButtonSize;
+  "data-paint": YoIconButtonPaint | undefined;
   "data-pressed": "" | undefined;
   "data-busy": "" | undefined;
   disabled: boolean;
@@ -55,6 +57,7 @@ export function iconButtonHostAttrs(
   const interactive = resolveIconButtonInteractive(input);
   return {
     "data-size": spec.size,
+    "data-paint": spec.paint,
     "data-pressed": interactive.pressed ? "" : undefined,
     "data-busy": interactive.busy ? "" : undefined,
     disabled: interactive.disabled,

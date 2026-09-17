@@ -6,7 +6,7 @@
 import { For, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
-import { YoPresence } from "../motion/presence";
+import { YoPresence } from "../motion/engines/presence";
 import type { ToastItem, ToastTone } from "./toast-model";
 import {
   beginDismissToast,
@@ -93,7 +93,7 @@ export function YoToast(props: YoToastProps): JSX.Element {
   const host = () => toastHostAttrs(props.toast);
   return (
     <div class="yohu-toast" data-tone={host()["data-tone"]} role={host().role}>
-      <YoCorner role="control" class="yohu-toast__chrome">
+      <YoCorner role="control" class="yohu-toast__chrome" pad="sm">
         {props.toast.text}
       </YoCorner>
     </div>

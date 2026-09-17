@@ -39,7 +39,7 @@ describe("YoChrome", () => {
 
   it("leading 落在标题后设备槽", () => {
     const { container } = render(() => <YoChrome title="文件管理" leading={<span>Moto X</span>} />);
-    expect(container.querySelector(".yohu-module-title")?.textContent).toBe("文件管理");
+    expect(container.querySelector(".yohu-chrome__heading")?.textContent).toBe("文件管理");
     expect(container.querySelector(".yohu-chrome__leading")?.textContent).toBe("Moto X");
   });
 
@@ -50,7 +50,8 @@ describe("YoChrome", () => {
 
   it("无操作时只显示标题区", () => {
     const { container } = render(() => <YoChrome title="投屏显示" />);
-    expect(container.querySelector(".yohu-chrome")?.getAttribute("data-layout")).toBe("title");
+    expect(container.querySelector(".yohu-chrome")?.hasAttribute("data-layout")).toBe(false);
+    expect(container.querySelector(".yohu-chrome__heading")?.textContent).toBe("投屏显示");
     expect(container.querySelector(".yohu-chrome__title")?.textContent).toBe("投屏显示");
     expect(container.querySelector(".yohu-chrome__bar")).toBeNull();
     expect(container.querySelector(".yohu-chrome__row")).toBeTruthy();
@@ -63,9 +64,12 @@ describe("YoChrome", () => {
       /\.yohu-chrome__title\s*\{[^}]*min-height:\s*var\(--yohu-control-height\)/,
     );
     expect(css).toMatch(/padding-bottom:\s*var\(--yohu-layout-chrome-pad\)/);
+    expect(css).toContain(".yohu-chrome__heading");
+    expect(css).not.toContain(".yohu-module-title");
     const chromeBlock = css.match(/\.yohu-chrome\s*\{[^}]+\}/)?.[0] ?? "";
     expect(chromeBlock).not.toMatch(/min-height/);
     expect(chromeBlock).not.toMatch(/border-bottom/);
+    expect(chromeBlock).not.toContain("data-layout");
   });
 
   it("extra 落在次行，不进主行功能栏", () => {
@@ -74,9 +78,7 @@ describe("YoChrome", () => {
         <button type="button">开始</button>
       </YoChrome>
     ));
-    expect(container.querySelector(".yohu-chrome")?.getAttribute("data-layout")).toBe(
-      "title-bar-extra",
-    );
+    expect(container.querySelector(".yohu-chrome")?.hasAttribute("data-layout")).toBe(false);
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).toContain("开始");
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).not.toContain("质量");
     expect(container.querySelector(".yohu-chrome__extra")?.textContent).toContain("质量");

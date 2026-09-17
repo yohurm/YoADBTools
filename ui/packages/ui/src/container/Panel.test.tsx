@@ -50,7 +50,7 @@ describe("YoPanel", () => {
 
   it("内容区布局走公开 data-*", () => {
     const { container } = render(() => (
-      <YoPanel variant="pane" align="center" gap="2xs" paddingBlock="xs" overflowX="visible">
+      <YoPanel variant="pane" align="center" gap="2xs" paddingBlock="xs">
         钮
       </YoPanel>
     ));
@@ -59,7 +59,7 @@ describe("YoPanel", () => {
     expect(panel?.getAttribute("data-gap")).toBe("2xs");
     expect(panel?.getAttribute("data-padding-block")).toBe("xs");
     expect(panel?.getAttribute("data-overflow")).toBe("hidden");
-    expect(panel?.getAttribute("data-overflow-x")).toBe("visible");
+    expect(panel?.hasAttribute("data-overflow-x")).toBe(false);
   });
 
   it("overflow hidden 两轴裁切，不写 overflow-x", () => {
@@ -107,10 +107,12 @@ describe("YoPanel", () => {
     expect(panelCss).toContain('[data-gap="2xs"] .yohu-panel__body');
     expect(panelCss).toContain('[data-gap="lg"] .yohu-panel__body');
     expect(panelCss).toContain('[data-padding-block="xs"] .yohu-panel__body');
-    expect(panelCss).toContain('[data-overflow-x="hidden"] .yohu-panel__body');
+    expect(panelCss).not.toContain("data-overflow-x");
+    expect(panelCss).not.toMatch(/overflow-[xy]\s*:/);
     expect(panelCss).not.toContain('[data-overflow="auto"]');
-    expect(panelCss).not.toContain("overflow-y: auto");
-    expect(panelCss).not.toContain("overflow-x: auto");
+    expect(panelCss).not.toContain("overflow: auto");
+    expect(panelSrc).not.toContain("overflowX");
+    expect(panelSrc).not.toContain("data-overflow-x");
     expect(panelSrc).not.toMatch(/from\s+["'][^"']*Scroller["']/);
     expect(panelCss).not.toMatch(
       /\[data-variant="pane"\]\s+\.yohu-panel__body\s*\{[^}]*overflow:\s*auto/,

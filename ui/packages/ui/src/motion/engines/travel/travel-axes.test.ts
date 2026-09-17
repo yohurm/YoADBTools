@@ -24,6 +24,10 @@ describe("travel axes", () => {
     const css = load("src/motion/engines/travel/travel.css");
     expect(css).toContain("height var(--yohu-motion-spatial-panel)");
     expect(css).toContain("width var(--yohu-motion-spatial-panel)");
+    expect(css).toContain(".yohu-travel__slot");
+    expect(css).toContain(".yohu-travel[data-ready] > .yohu-travel__slot");
+    expect(css).not.toMatch(/\.yohu-travel\[data-ready\]\s*>\s*\*/);
+    expect(css).not.toContain("> *");
     expect(css).not.toContain("--yohu-motion-spatial-local");
     expect(css).not.toContain("--yohu-motion-spatial-small");
     expect(css).not.toContain("animate(");

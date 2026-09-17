@@ -216,7 +216,8 @@ describe("YoTextField", () => {
     expect(controlRule).toContain("overflow: visible");
     expect(controlRule).not.toContain("overflow: hidden");
     expect(controlRule).not.toContain("overflow: auto");
-    expect(css).toContain(".yohu-text-field__chrome .yohu-corner__content");
+    expect(host?.querySelector(".yohu-text-field__chrome")).toBeTruthy();
+    expect(css).not.toContain(".yohu-corner__content");
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
     const multilineInput = css.slice(css.indexOf(".yohu-text-field[data-multiline] .yohu-text-field__input"));
     expect(multilineInput).toContain("overflow: auto");
@@ -266,5 +267,26 @@ describe("YoTextField", () => {
     expect(forwarded).toBe(area);
     fireEvent.input(area, { target: { value: "shell" } });
     expect(onInput).toHaveBeenCalledWith("shell", expect.anything());
+  });
+
+  it("font=mono 只绑 policy 的 data-font", () => {
+    const { container, unmount } = render(() => <YoTextField ariaLabel="命令" font="mono" />);
+    expect(container.querySelector(".yohu-text-field")?.getAttribute("data-font")).toBe("mono");
+    unmount();
+    const idle = render(() => <YoTextField ariaLabel="名称" />);
+    expect(idle.container.querySelector(".yohu-text-field")?.hasAttribute("data-font")).toBe(false);
+  });
+
+  it("写入盒 Corner 走公开 prop；L4 不手写 font、不点 __content", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    expect(src).toMatch(/overflow="hidden"/);
+    expect(src).toMatch(/direction="row"/);
+    expect(src).toMatch(/align="center"/);
+    expect(src).toMatch(/pad="inline-sm"/);
+    expect(src).toMatch(/gap="xs"/);
+    expect(src).toMatch(/host\(\)\["data-font"\]/);
+    expect(src).not.toMatch(/props\.font\s*===/);
+    expect(src).not.toContain("yohu-corner__content");
+    expect(css).not.toContain("yohu-corner__content");
   });
 });

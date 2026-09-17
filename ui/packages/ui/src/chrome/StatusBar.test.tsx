@@ -11,4 +11,11 @@ describe("YoStatusBar", () => {
     expect(footer?.className).toContain("yohu-status-bar");
     expect(footer?.getAttribute("data-role")).toBe("status");
   });
+
+  it("左右槽始终占位", () => {
+    const { container } = render(() => <YoStatusBar />);
+    expect(container.querySelector(".yohu-status-bar__left")).toBeTruthy();
+    expect(container.querySelector(".yohu-status-bar__right")).toBeTruthy();
+  });
 });
+

@@ -14,7 +14,7 @@ import { For } from "solid-js";
 import type { JSX } from "solid-js";
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
-import { YoIndicator } from "../motion/indicator";
+import { YoIndicator } from "../motion/engines/indicator";
 import { resolveTabsChrome, resolveTabsKeyAction, tabsTabAttrs } from "./tabs-policy";
 import "./Tabs.css";
 

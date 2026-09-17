@@ -1,13 +1,12 @@
 /**
  * 虚拟列表交互策略（L3）。
  * 键盘动作、贴底排放、聚焦确认与行/宿主 attrs 从快照组装。
- * 行铬在 list-row；本文件只出身份 / aria / 选区邻接，不写色值、不画铬。
+ * 行铬在 list-row；本文件只出身份 / aria，不写色值、不画铬。
  */
 
 import {
   VIRTUAL_DEFAULT_TONE,
   virtualKeyIntent,
-  virtualRowJoin,
   virtualRowTabIndex,
   type VirtualKeyIntent,
 } from "./virtuallist-model";
@@ -51,9 +50,6 @@ export interface VirtualRowAttrs {
   tabIndex: number | undefined;
   interactive: boolean;
   selected: boolean;
-  selStart: boolean;
-  selMid: boolean;
-  selEnd: boolean;
 }
 
 export function virtualRowAttrs(input: {
@@ -61,12 +57,9 @@ export function virtualRowAttrs(input: {
   selectable: boolean;
   selected: boolean;
   active: boolean;
-  prevSelected: boolean;
-  nextSelected: boolean;
   selectionEmpty: boolean;
   isFirstVisible: boolean;
 }): VirtualRowAttrs {
-  const join = virtualRowJoin(input.selected, input.prevSelected, input.nextSelected);
   return {
     "data-key": input.key,
     role: input.selectable ? "option" : undefined,
@@ -79,9 +72,6 @@ export function virtualRowAttrs(input: {
     }),
     interactive: input.selectable,
     selected: input.selectable && input.selected,
-    selStart: join === "start",
-    selMid: join === "middle",
-    selEnd: join === "end",
   };
 }
 

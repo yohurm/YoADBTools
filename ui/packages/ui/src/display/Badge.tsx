@@ -23,7 +23,15 @@ export function YoBadge(props: YoBadgeProps): JSX.Element {
   const host = createMemo(() => badgeHostAttrs(props));
   return (
     <span class="yohu-badge" data-tone={host()["data-tone"]} aria-label={host()["aria-label"]}>
-      <YoCorner role="control" radius={CornerPillRadius} class="yohu-badge__chrome">
+      <YoCorner
+        role="control"
+        radius={CornerPillRadius}
+        class="yohu-badge__chrome"
+        direction="row"
+        align="center"
+        overflow="hidden"
+        pad="inline-sm"
+      >
         {props.text}
       </YoCorner>
     </span>

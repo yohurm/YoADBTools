@@ -3,7 +3,7 @@
  * CSS 组件层通过 var(--yohu-dur-*) / var(--yohu-ease-*) / var(--yohu-motion-*) 消费。
  */
 
-/** 时长分级：100 / 150 / 160 / 200 / 300 / 350 / 400ms；loop 系循环指示；toast 上限 3s。 */
+/** 时长分级：100 / 150 / 160 / 200 / 300 / 350 / 400ms；loop 系循环指示；barHide 2s；toast 上限 3s。 */
 export const MotionDuration = {
   /** 100ms：hover / 按下反馈 */
   fast: "100ms",
@@ -23,6 +23,8 @@ export const MotionDuration = {
   loop: "800ms",
   /** 1.2s：不确定进度条扫动 */
   loopSlow: "1.2s",
+  /** 2s：HarmonyOS BarState.Auto 停滚后隐藏 */
+  barHide: "2s",
   /** 3s：Toast 最长展示 */
   toast: "3s",
 } as const;

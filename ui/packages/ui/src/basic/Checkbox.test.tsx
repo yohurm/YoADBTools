@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoCheckbox } from "./Checkbox";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Checkbox.css"), "utf-8");
 
 describe("YoCheckbox", () => {
   it("渲染标签与未勾选状态", () => {
@@ -39,5 +44,9 @@ describe("YoCheckbox", () => {
       "yohu-checkbox__box--checked",
     );
     expect(host?.querySelector(".yohu-checkbox__chrome")).toBeTruthy();
+    const slot = host?.querySelector(".yohu-corner__content");
+    expect(slot?.getAttribute("data-align")).toBe("center");
+    expect(slot?.getAttribute("data-justify")).toBe("center");
+    expect(css).not.toContain(".yohu-corner__content");
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Spacing } from "../tokens/spacing";
 import {
   VIRTUAL_STICK_THRESHOLD,
   isStuckToBottom,
@@ -8,18 +9,16 @@ import {
   isVirtualSelectable,
   isVirtualSelectionEmpty,
   virtualActiveKey,
-  virtualAdjacentSelected,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
   virtualIndexOfKey,
   virtualKeyIntent,
+  virtualNearestScrollTop,
   virtualPoolIndex,
   virtualPoolOrigin,
   virtualPoolSize,
   virtualPoolSlots,
-  virtualRange,
-  virtualRowJoin,
   virtualRowKey,
   virtualRowBoxStyle,
   virtualRowOffsetY,
@@ -27,19 +26,11 @@ import {
   virtualRowTop,
   virtualRowTransform,
   virtualTotalHeight,
-  virtualVisibleKeys,
-  virtualVisibleRows,
 } from "./virtuallist-model";
 
 describe("virtuallist-model", () => {
   it("总高度 = 行数 × 行高", () => {
     expect(virtualTotalHeight(10, 22)).toBe(220);
-  });
-
-  it("窗口含 overscan，夹在 [0, count]", () => {
-    expect(virtualRange(0, 100, 20, 50, 2)).toEqual({ start: 0, end: 7 });
-    expect(virtualRange(200, 100, 20, 50, 2)).toEqual({ start: 8, end: 17 });
-    expect(virtualRange(0, 100, 20, 3, 10)).toEqual({ start: 0, end: 3 });
   });
 
   it("槽位池大小随视口稳定，原点夹在数据范围内", () => {
@@ -55,9 +46,18 @@ describe("virtuallist-model", () => {
     expect(virtualPoolIndex(8, 9)).toBe(17);
     expect(virtualPoolSlots(3)).toEqual([0, 1, 2]);
     expect(virtualPoolSlots(0)).toEqual([]);
+    const midSize = virtualPoolSize(100, 20, 2, 50);
+    const midOrigin = virtualPoolOrigin(200, 20, 2, 50, midSize);
+    expect(virtualPoolSlots(midSize).map((slot) => virtualPoolIndex(midOrigin, slot))).toEqual([
+      8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+    ]);
+    const shortSize = virtualPoolSize(100, 20, 10, 3);
+    expect(virtualPoolOrigin(0, 20, 10, 3, shortSize)).toBe(0);
+    expect(virtualPoolSlots(shortSize)).toEqual([0, 1, 2]);
   });
 
   it("贴底阈值", () => {
+    expect(VIRTUAL_STICK_THRESHOLD).toBe(Spacing.TwoXl);
     expect(isStuckToBottom(1000, 200, 800)).toBe(true);
     expect(isStuckToBottom(1000, 200, 800 - VIRTUAL_STICK_THRESHOLD - 1)).toBe(false);
   });
@@ -65,16 +65,6 @@ describe("virtuallist-model", () => {
   it("行 key 默认 index，可自定义", () => {
     expect(virtualRowKey("a", 3)).toBe(3);
     expect(virtualRowKey("a", 3, (item) => `k-${item}`)).toBe("k-a");
-  });
-
-  it("可见行按窗口切片，遇空洞停止", () => {
-    const items = ["a", "b", "c", "d"];
-    expect(virtualVisibleRows(items, 1, 3, (item) => item)).toEqual([
-      { index: 1, item: "b", key: "b" },
-      { index: 2, item: "c", key: "c" },
-    ]);
-    expect(virtualVisibleRows(["a"], 0, 4)).toEqual([{ index: 0, item: "a", key: 0 }]);
-    expect(virtualVisibleKeys(virtualVisibleRows(items, 1, 3, (item) => item))).toEqual(["b", "c"]);
   });
 
   it("可选 / 多选 / 选中 / 空选", () => {
@@ -101,20 +91,6 @@ describe("virtuallist-model", () => {
     expect(virtualActiveKey(new Set(["a", "b"]), null, "b")).toBe("b");
     expect(virtualActiveKey(new Set(["a", "b"]), null, "z")).toBe("a");
     expect(virtualActiveKey(new Set(["a", "b"]), null, null)).toBe("a");
-  });
-
-  it("邻接布尔交给 adjacentJoin：连续块与孤立", () => {
-    const items = ["a", "b", "c", "d"];
-    const keys = new Set<string | number>(["b", "c"]);
-    expect(virtualAdjacentSelected(items, 1, true, keys, null, (item) => item)).toEqual({
-      prev: false,
-      next: true,
-    });
-    expect(virtualRowJoin(true, false, true)).toBe("start");
-    expect(virtualRowJoin(true, true, true)).toBe("middle");
-    expect(virtualRowJoin(true, true, false)).toBe("end");
-    expect(virtualRowJoin(true, false, false)).toBe("solo");
-    expect(virtualRowJoin(false, false, false)).toBeNull();
   });
 
   it("roving tabindex：活动行=0；空选首可视=0；否则 -1；不可选 undefined", () => {
@@ -172,6 +148,16 @@ describe("virtuallist-model", () => {
     expect(virtualIndicatorAnchor(["a", "b"], undefined, 22, 320)).toBeNull();
     expect(virtualIndexOfKey(["a", "b", "c"], "b", (item) => item)).toBe(1);
     expect(virtualIndexOfKey(["a"], "missing", (item) => item)).toBe(-1);
+  });
+
+  it("nearest 目标 top：已可见不动；上沿钉行顶、下沿钉行底", () => {
+    expect(virtualNearestScrollTop(40, 20, 100, 20)).toBe(20);
+    expect(virtualNearestScrollTop(40, 20, 100, 40)).toBe(40);
+    expect(virtualNearestScrollTop(120, 20, 100, 40)).toBe(40);
+    expect(virtualNearestScrollTop(0, 20, 100, 40)).toBe(0);
+    expect(virtualNearestScrollTop(200, 20, 100, 40)).toBe(120);
+    expect(virtualNearestScrollTop(80, 20, 0, 40)).toBe(40);
+    expect(virtualNearestScrollTop(80, 0, 100, 40)).toBe(40);
   });
 
   it("键盘目标下标夹紧；Enter/Space 是 commit", () => {

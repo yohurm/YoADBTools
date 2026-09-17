@@ -33,12 +33,17 @@ describe("icon-button-policy", () => {
   it("缺省宿主是 md 透明钮，没有 paint", () => {
     expect(iconButtonHostAttrs({ hasIcon: true })).toEqual({
       "data-size": "md",
+      "data-paint": undefined,
       "data-pressed": undefined,
       "data-busy": undefined,
       disabled: false,
       "aria-busy": undefined,
       "aria-pressed": undefined,
     });
+  });
+
+  it("paint=window 写成 data-paint", () => {
+    expect(iconButtonHostAttrs({ hasIcon: true, paint: "window" })["data-paint"]).toBe("window");
   });
 
   it("pressed 写入 data-pressed 与 aria-pressed", () => {

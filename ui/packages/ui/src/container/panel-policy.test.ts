@@ -51,14 +51,13 @@ describe("panel-policy", () => {
     });
   });
 
-  it("内容区轴溢出不同才写 data-overflow-x", () => {
+  it("内容区排布写成 data-*，永不写 data-overflow-x", () => {
     expect(
       panelHostAttrs({
         variant: "pane",
         align: "center",
         gap: "2xs",
         paddingBlock: "xs",
-        overflowX: "visible",
       }),
     ).toEqual({
       "data-variant": "pane",
@@ -67,12 +66,13 @@ describe("panel-policy", () => {
       "data-align": "center",
       "data-gap": "2xs",
       "data-overflow": "hidden",
-      "data-overflow-x": "visible",
       "data-padding-block": "xs",
     });
+    expect(panelHostAttrs({ overflow: "visible" })).not.toHaveProperty("data-overflow-x");
+    expect(panelHostAttrs({ overflow: "hidden" })).not.toHaveProperty("data-overflow-x");
   });
 
-  it("overflow hidden 不另写 overflow-x", () => {
+  it("overflow hidden 两轴同一 data-overflow", () => {
     expect(panelHostAttrs({ variant: "pane", overflow: "hidden" })).toEqual({
       "data-variant": "pane",
       "data-padding": "none",

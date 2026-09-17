@@ -8,12 +8,12 @@ import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { Icon, type IconName } from "../icons";
-import type { YoIconButtonSize } from "./icon-button-model";
+import type { YoIconButtonPaint, YoIconButtonSize } from "./icon-button-model";
 import { iconButtonHostAttrs } from "./icon-button-policy";
 import { YoTooltip } from "../overlay/Tooltip";
 import "./IconButton.css";
 
-export type { YoIconButtonSize };
+export type { YoIconButtonPaint, YoIconButtonSize };
 
 export interface YoIconButtonProps {
   /** 具名图标。有 children 时只作缺省内容 */
@@ -28,6 +28,8 @@ export interface YoIconButtonProps {
   loading?: boolean;
   /** 控件尺寸。禁止传 px */
   size?: YoIconButtonSize;
+  /** 窗铬：满高直角热区。标题栏 actions 用。缺省透明圆角钮。 */
+  paint?: YoIconButtonPaint;
   /** 点击回调 */
   onClick?: (event: MouseEvent) => void;
   /** 展开控件（侧栏等） */
@@ -43,6 +45,7 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
   const host = createMemo(() =>
     iconButtonHostAttrs({
       size: props.size,
+      paint: props.paint,
       hasIcon: props.icon != null,
       hasSlot: props.children != null,
       disabled: props.disabled,
@@ -57,6 +60,7 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
       type="button"
       class="yohu-icon-button yohu-focus-ring"
       data-size={host()["data-size"]}
+      data-paint={host()["data-paint"]}
       data-pressed={host()["data-pressed"]}
       data-busy={host()["data-busy"]}
       aria-label={props.title}
@@ -66,7 +70,13 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
       disabled={host().disabled}
       onClick={props.onClick}
     >
-      <YoCorner role="control" class="yohu-icon-button__chrome">
+      <YoCorner
+        role="control"
+        class="yohu-icon-button__chrome"
+        direction="row"
+        align="center"
+        justify="center"
+      >
         {props.children ?? (props.icon ? <Icon name={props.icon} /> : null)}
       </YoCorner>
     </button>

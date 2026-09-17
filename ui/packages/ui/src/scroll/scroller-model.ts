@@ -1,18 +1,28 @@
 /**
  * 滚动条领域模型（L2）。
  * 对照 OpenHarmony Scroll / ScrollBar：无法滚动则不显示；滑块高 = 视口² / 内容；
- * 默认条宽 4vp（Layout / Spacing.Xs）。不碰 DOM，不点 Dialog。
+ * 条宽 4vp（Spacing.Xs）；BarState.Auto 停滚 2s 后隐藏；电脑轨道点按翻页、长按 100ms 连翻。
  * 溢出只认 in-flow 盒，不认 abspos 撑的 scrollHeight。
  * traveling 由祖先 YoTravel 信号提供；插值中不新出条；收回留 out 直到淡出结束。
  */
 
 import { Layout } from "../tokens/layout";
+import { motionDurationMs } from "../tokens/motion";
 import { Spacing } from "../tokens/spacing";
 
 export type ScrollerPhase = "none" | "in" | "on" | "out";
 
-/** 滑块最小高：与预览/标题栏热区同值（Layout.IconPreview）。 */
+/** 对照 ArkUI BarState：Auto 滚动时显示，On 常驻，Off 不画条仍可滚。 */
+export type ScrollerBarState = "auto" | "on" | "off";
+
+/** 滑块最小高：鸿蒙滚动条最短 48vp（Layout.IconPreview）。 */
 export const SCROLLER_THUMB_MIN = Layout.IconPreview;
+
+/** HarmonyOS BarState.Auto：停止滚动后隐藏。 */
+export const SCROLLER_AUTO_HIDE_MS = motionDurationMs("barHide");
+
+/** HarmonyOS 电脑：轨道长按翻页间隔 = effectsFast（100ms）。 */
+export const SCROLLER_PAGE_REPEAT_MS = motionDurationMs("fast");
 
 export interface ScrollerThumb {
   top: number;
@@ -47,18 +57,35 @@ export function resolveScrollerOverflow(view: number, all: number): boolean {
   return view > 0 && all > view + SCROLLER_OVERFLOW_SLACK;
 }
 
+export function resolveScrollerBarState(state?: ScrollerBarState): ScrollerBarState {
+  return state ?? "auto";
+}
+
+/** enableScrollInteraction：缺省 true；false 仍可用控制器接口。 */
+export function resolveScrollerInteractive(interactive?: boolean): boolean {
+  return interactive !== false;
+}
+
 export function resolveScrollerPhase(input: {
   overflowing: boolean;
   traveling?: boolean;
+  barState?: ScrollerBarState;
+  idle?: boolean;
+  holding?: boolean;
   prev?: ScrollerPhase;
 }): ScrollerPhase {
-  if (input.overflowing) {
-    if (input.prev === "in" || input.prev === "on") return "on";
-    if (input.traveling) return input.prev === "out" ? "out" : "none";
-    return "in";
+  const bar = resolveScrollerBarState(input.barState);
+  const shown = input.prev === "in" || input.prev === "on";
+  const fading = shown || input.prev === "out";
+  if (!input.overflowing || bar === "off") {
+    return fading ? "out" : "none";
   }
-  if (input.prev === "in" || input.prev === "on" || input.prev === "out") return "out";
-  return "none";
+  if (input.traveling && !shown) {
+    return input.prev === "out" ? "out" : "none";
+  }
+  const keep = bar === "on" || input.holding === true || input.idle !== true;
+  if (keep) return shown ? "on" : "in";
+  return fading ? "out" : "none";
 }
 
 export function resolveScrollerThumb(input: {
@@ -105,4 +132,62 @@ export function resolveScrollerThumbTop(input: {
   room: number;
 }): number {
   return Math.min(input.room, Math.max(0, input.pointerY - input.trackTop - input.grab));
+}
+
+/** WheelEvent.deltaMode：0 像素 / 1 行 / 2 页。行高走 Spacing.Lg。 */
+export function resolveScrollerWheelDelta(input: {
+  deltaY: number;
+  deltaMode: number;
+  lineHeight?: number;
+  pageHeight: number;
+}): number {
+  if (input.deltaMode === 1) return input.deltaY * (input.lineHeight ?? Spacing.Lg);
+  if (input.deltaMode === 2) return input.deltaY * input.pageHeight;
+  return input.deltaY;
+}
+
+/** 滚轮/程序改 top：夹在 [0, 可滚距离]。 */
+export function resolveScrollerClampedTop(input: {
+  top: number;
+  view: number;
+  all: number;
+}): number {
+  return Math.min(resolveScrollerScrollEnd(input.view, input.all), Math.max(0, input.top));
+}
+
+/** 对照 Scroller.scrollPage：一页 = 视口高。 */
+export function resolveScrollerPageTop(input: {
+  view: number;
+  all: number;
+  top: number;
+  next: boolean;
+}): number {
+  return resolveScrollerClampedTop({
+    top: input.top + (input.next ? input.view : -input.view),
+    view: input.view,
+    all: input.all,
+  });
+}
+
+/** 电脑点轨道：指针在滑块上方翻上页，下方翻下页。 */
+export function resolveScrollerPageTowardPointer(input: {
+  pointerY: number;
+  trackTop: number;
+  thumbTop: number;
+  thumbHeight: number;
+}): boolean | undefined {
+  const pointer = input.pointerY - input.trackTop;
+  if (pointer < input.thumbTop) return false;
+  if (pointer > input.thumbTop + input.thumbHeight) return true;
+  return undefined;
+}
+
+/** 滑块已盖住指针时停止连翻。 */
+export function resolveScrollerThumbCoversPointer(input: {
+  pointerY: number;
+  trackTop: number;
+  thumbTop: number;
+  thumbHeight: number;
+}): boolean {
+  return resolveScrollerPageTowardPointer(input) === undefined;
 }

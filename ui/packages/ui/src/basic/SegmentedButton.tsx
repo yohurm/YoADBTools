@@ -11,7 +11,7 @@ import type { JSX } from "solid-js";
 
 import { YoCorner } from "../corner";
 import { Icon, isIconName, type IconName } from "../icons";
-import { YoIndicator } from "../motion/indicator";
+import { YoIndicator } from "../motion/engines/indicator";
 import type { SegmentedGraphic, YoSegmentedButtonSize, YoSegmentedType } from "./segmented-model";
 import {
   resolveSegmentedKeyAction,

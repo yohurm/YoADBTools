@@ -43,8 +43,6 @@ describe("dialog-focus", () => {
 
     expect(dialogInitialFocus(panel).id).toBe("expand");
     expect(dialogInitialFocus(panel, "footer").id).toBe("cancel");
-
-    cancel.setAttribute("data-dialog-initial", "");
-    expect(dialogInitialFocus(panel).id).toBe("cancel");
+    expect(dialogInitialFocus(panel, "auto").id).toBe("expand");
   });
 });

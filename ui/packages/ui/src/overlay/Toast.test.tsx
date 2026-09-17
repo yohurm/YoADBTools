@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { YoToaster, YoToast, createToaster, type ToasterHost } from "./Toast";
 import { toastHoldMs } from "./toast-policy";
+
+const toastCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Toast.css"), "utf-8");
 
 describe("createToaster + YoToaster", () => {
   it("show 后渲染 toast，且必须挂回 Host", () => {
@@ -75,5 +80,7 @@ describe("YoToast", () => {
     expect(el?.getAttribute("data-tone")).toBe("success");
     expect(el?.getAttribute("role")).toBe("status");
     expect(el?.querySelector(".yohu-toast__chrome")).toBeTruthy();
+    expect(el?.querySelector(".yohu-corner__content")?.getAttribute("data-pad")).toBe("sm");
+    expect(toastCss).not.toContain(".yohu-corner__content");
   });
 });

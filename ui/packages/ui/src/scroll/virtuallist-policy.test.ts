@@ -40,8 +40,6 @@ describe("virtuallist-policy", () => {
         selectable: true,
         selected: true,
         active: true,
-        prevSelected: false,
-        nextSelected: true,
         selectionEmpty: false,
         isFirstVisible: false,
       }),
@@ -52,9 +50,6 @@ describe("virtuallist-policy", () => {
       tabIndex: 0,
       interactive: true,
       selected: true,
-      selStart: true,
-      selMid: false,
-      selEnd: false,
     });
     expect(
       virtualRowAttrs({
@@ -62,8 +57,6 @@ describe("virtuallist-policy", () => {
         selectable: false,
         selected: false,
         active: false,
-        prevSelected: false,
-        nextSelected: false,
         selectionEmpty: true,
         isFirstVisible: true,
       }),
@@ -74,9 +67,6 @@ describe("virtuallist-policy", () => {
       tabIndex: undefined,
       interactive: false,
       selected: false,
-      selStart: false,
-      selMid: false,
-      selEnd: false,
     });
     expect(
       virtualRowAttrs({
@@ -84,8 +74,6 @@ describe("virtuallist-policy", () => {
         selectable: true,
         selected: true,
         active: false,
-        prevSelected: true,
-        nextSelected: false,
         selectionEmpty: false,
         isFirstVisible: false,
       }).tabIndex,

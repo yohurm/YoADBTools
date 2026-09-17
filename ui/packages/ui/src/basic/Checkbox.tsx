@@ -39,7 +39,7 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
       data-disabled={host()["data-disabled"]}
     >
       <span class="yohu-checkbox__box yohu-focus-host" data-paint={host()["data-paint"]}>
-        <YoCorner role="control" radius={Radius.Xs} class="yohu-checkbox__chrome">
+        <YoCorner role="control" radius={Radius.Xs} class="yohu-checkbox__chrome" align="center" justify="center">
           <input
             type="checkbox"
             class="yohu-checkbox__input"

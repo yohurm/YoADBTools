@@ -1,18 +1,16 @@
 .yohu-virtual-list {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
   background-color: transparent;
   font-family: var(--yohu-font-sans);
   box-sizing: border-box;
-}
-
-.yohu-virtual-list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 .yohu-virtual-list[data-tone="document"]:not([role="listbox"]):not([data-reordering]) {
@@ -33,16 +31,6 @@
 /* 单选 fill 在 inner 用 top/left 定位；隔离叠层让 z-index:-1 滑块垫在行下。禁止 overflow。 */
 .yohu-virtual-list[data-indicator="fill"] .yohu-virtual-list__inner {
   isolation: isolate;
-}
-
-.yohu-virtual-list[data-indicator="fill"]:has(.yohu-list-row[aria-selected="true"]:hover) .yohu-recipe-indicator--fill {
-  background: var(--yohu-state-selected);
-  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
-}
-
-.yohu-virtual-list[data-indicator="fill"]:has(.yohu-list-row[aria-selected="true"]:active) .yohu-recipe-indicator--fill {
-  background: var(--yohu-state-selected);
-  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 /* 槽位几何。行铬在 list-row，这里只钉 absolute 盒。 */

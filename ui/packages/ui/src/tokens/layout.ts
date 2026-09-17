@@ -101,8 +101,6 @@ export const Layout = {
   TitlebarCaption: 48,
   /** 右侧铬条贴合，无圆形底板间距。 */
   TitlebarCaptionGap: 0,
-  /** 关闭键贴窗口右缘（电脑去边距）。 */
-  TitlebarCloseMargin: 0,
   /** macOS Overlay 交通灯占位（左内边距，避开系统三键）。 */
   TitlebarTraffic: 80,
   /** 标题栏渐变模糊下延 32vp（沉浸光感） */

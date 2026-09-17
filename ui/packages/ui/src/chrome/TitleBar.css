@@ -78,16 +78,11 @@
   gap: var(--yohu-layout-titlebar-caption-gap);
 }
 
-.yohu-titlebar__captions {
-  margin-inline-end: var(--yohu-layout-titlebar-close-margin);
-}
-
 .yohu-titlebar__actions {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-.yohu-titlebar__actions .yohu-icon-button,
 .yohu-titlebar__caption {
   display: inline-flex;
   align-items: center;
@@ -105,13 +100,11 @@
   app-region: no-drag;
 }
 
-.yohu-titlebar__actions .yohu-icon-button:not(:disabled):hover,
 .yohu-titlebar__caption[data-paint="window"]:hover {
   background-color: var(--yohu-state-hover);
   color: var(--yohu-fg);
 }
 
-.yohu-titlebar__actions .yohu-icon-button:not(:disabled):active,
 .yohu-titlebar__caption[data-paint="window"]:active {
   background-color: var(--yohu-state-pressed);
   color: var(--yohu-fg);

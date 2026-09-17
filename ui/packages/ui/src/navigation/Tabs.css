@@ -5,7 +5,7 @@
   gap: var(--yohu-space-xs);
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
   font-family: var(--yohu-font-sans);
-  overflow-x: hidden;
+  overflow: hidden;
   box-sizing: border-box;
 }
 

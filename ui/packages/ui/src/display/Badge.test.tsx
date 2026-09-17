@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { YoBadge } from "./Badge";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Badge.css"), "utf-8");
 
 describe("YoBadge", () => {
   it("渲染文本与默认 neutral 色调", () => {
@@ -8,6 +13,12 @@ describe("YoBadge", () => {
     const badge = screen.getByText("默认").closest(".yohu-badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
     expect(badge?.className).not.toContain("yohu-badge--neutral");
+    const slot = badge?.querySelector(".yohu-corner__content");
+    expect(slot?.getAttribute("data-direction")).toBe("row");
+    expect(slot?.getAttribute("data-align")).toBe("center");
+    expect(slot?.getAttribute("data-overflow")).toBe("hidden");
+    expect(slot?.getAttribute("data-pad")).toBe("inline-sm");
+    expect(css).not.toContain(".yohu-corner__content");
   });
 
   it("应用指定色调，与 Button 同一枚举", () => {

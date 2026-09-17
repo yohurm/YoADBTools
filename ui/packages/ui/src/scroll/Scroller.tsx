@@ -1,36 +1,38 @@
 /**
  * YoScroller —— 公共滚条（L4）。
- * 对照 OpenHarmony ScrollBar：与视口一对一；无法滚动不显示；系统条关掉。
- * 溢出只量 in-flow 子盒。订 YoTravel.traveling()：插值中不新出条、RO 不改相位。
- * 收回留上一拍滑块淡出。滑块可拖，轨道可点。显隐走 effects 透明度，不是 travel。
+ * 对照 OpenHarmony Scroll + ScrollBar：一对一；无法滚动不显示；系统条不进盒。
+ * 只组合 binder：订 traveling()、写 attrs、开槽。度量/手势/相位定时在 scroller-binder。
  * 不知道 Dialog / Chip / Reveal。
  */
-import { children, createRenderEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { createRenderEffect, createUniqueId, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
-import { shouldSkipMotion } from "../motion/reduced";
-import { useTravel } from "../motion/travel";
-import {
-  resolveScrollerFlowChild,
-  resolveScrollerFlowSize,
-  resolveScrollerOverflow,
-  resolveScrollerPhase,
-  resolveScrollerScrollEnd,
-  resolveScrollerScrollTop,
-  resolveScrollerThumb,
-  resolveScrollerThumbTop,
-  type ScrollerPhase,
-  type ScrollerThumb,
-} from "./scroller-model";
-import { scrollerHostAttrs, scrollerLaneAttrs } from "./scroller-policy";
+import { useCollapseTravel } from "../motion/engines/collapse";
+import { useRail, railTraveling } from "../motion/engines/rail";
+import { useTravel } from "../motion/engines/travel";
+import { createScrollerBinder } from "./scroller-binder";
+import { resolveScrollerBarState, resolveScrollerInteractive, type ScrollerBarState } from "./scroller-model";
+import { scrollerHostAttrs, scrollerLaneAttrs, scrollerThumbAttrs } from "./scroller-policy";
+import { ScrollerPortContext, type ScrollerPort } from "./scroller-port";
 import "./Scroller.css";
 
+export type { ScrollerBarState } from "./scroller-model";
+
 export type YoScrollerHandle = {
+  scrollTo: (top: number) => void;
+  scrollBy: (delta: number) => void;
+  scrollToStart: () => void;
   scrollToEnd: () => void;
+  scrollPage: (next: boolean) => void;
+  offset: () => number;
 };
 
 export interface YoScrollerProps {
-  /** 视口溢出。默认 auto。hidden 不画条。 */
+  /** 视口溢出。默认 auto。hidden 不画条、不接滚轮。 */
   overflow?: "auto" | "hidden";
+  /** 对照 BarState。默认 auto。 */
+  state?: ScrollerBarState;
+  /** 对照 enableScrollInteraction。默认 true；false 仍可用 handle。 */
+  interactive?: boolean;
   /** 视口节点。钉底等只走 handle，禁止模块读原生内容高。 */
   viewRef?: (el: HTMLDivElement) => void;
   handle?: (api: YoScrollerHandle) => void;
@@ -40,223 +42,104 @@ export interface YoScrollerProps {
 
 export function YoScroller(props: YoScrollerProps): JSX.Element {
   const viewId = createUniqueId();
-  const kids = children(() => props.children);
   const travel = useTravel();
-  const [phase, setPhase] = createSignal<ScrollerPhase>("none");
-  const [thumb, setThumb] = createSignal<ScrollerThumb | undefined>();
-  let view: HTMLDivElement | undefined;
-  let lane: HTMLDivElement | undefined;
-  let last: ScrollerPhase | undefined;
-  let lastThumb: ScrollerThumb | undefined;
-  let dragging = false;
-  let grab = 0;
-
+  const collapse = useCollapseTravel();
+  const rail = useRail();
   const overflow = (): "auto" | "hidden" => props.overflow ?? "auto";
-  const traveling = (): boolean => travel?.traveling() === true;
-
-  const measureFlow = (el: HTMLElement): number => {
-    const boxes: { top: number; height: number }[] = [];
-    for (let i = 0; i < el.children.length; i += 1) {
-      const child = el.children[i];
-      if (!(child instanceof HTMLElement)) continue;
-      if (!resolveScrollerFlowChild(getComputedStyle(child).position)) continue;
-      const top = child.offsetParent === el ? child.offsetTop : 0;
-      boxes.push({ top, height: child.offsetHeight });
-    }
-    return resolveScrollerFlowSize(boxes);
-  };
-
-  const paint = (): void => {
-    const el = view;
-    if (!el || overflow() === "hidden") {
-      last = undefined;
-      lastThumb = undefined;
-      setPhase("none");
-      setThumb(undefined);
-      return;
-    }
-    const all = measureFlow(el);
-    const overflowing = resolveScrollerOverflow(el.clientHeight, all);
-    const measured = overflowing
-      ? resolveScrollerThumb({
-          view: el.clientHeight,
-          all,
-          top: el.scrollTop,
-        })
-      : undefined;
-    if (shouldSkipMotion()) {
-      last = overflowing ? "on" : undefined;
-      lastThumb = measured;
-      setPhase(overflowing ? "on" : "none");
-      setThumb(measured);
-      return;
-    }
-    const next = resolveScrollerPhase({ overflowing, traveling: traveling(), prev: last });
-    last = next === "none" ? undefined : next;
-    if (next === "none") {
-      lastThumb = undefined;
-      setThumb(undefined);
-    } else if (measured) {
-      lastThumb = measured;
-      setThumb(measured);
-    } else {
-      setThumb(lastThumb);
-    }
-    setPhase(next);
-  };
-
-  const scrollToEnd = (): void => {
-    const el = view;
-    if (!el) return;
-    el.scrollTop = resolveScrollerScrollEnd(el.clientHeight, measureFlow(el));
-    paint();
-  };
-
-  const applyTop = (thumbTop: number): void => {
-    const el = view;
-    const current = thumb();
-    if (!el || !current) return;
-    el.scrollTop = resolveScrollerScrollTop({
-      view: el.clientHeight,
-      all: measureFlow(el),
-      thumbHeight: current.height,
-      thumbTop,
-    });
-    paint();
-  };
-
-  const onLanePointerDown = (event: PointerEvent): void => {
-    const el = view;
-    const track = lane;
-    const current = thumb();
-    if (!el || !track || phase() === "none" || phase() === "out" || !current) return;
-    event.preventDefault();
-    const box = track.getBoundingClientRect();
-    const room = Math.max(0, el.clientHeight - current.height);
-    const onThumb =
-      event.target instanceof HTMLElement && event.target.classList.contains("yohu-scroller__thumb");
-    grab = onThumb ? event.clientY - (box.top + current.top) : current.height / 2;
-    applyTop(
-      resolveScrollerThumbTop({
-        pointerY: event.clientY,
-        trackTop: box.top,
-        grab,
-        room,
-      }),
-    );
-    dragging = true;
-    track.setPointerCapture(event.pointerId);
-  };
-
-  const onLanePointerMove = (event: PointerEvent): void => {
-    const el = view;
-    const track = lane;
-    const current = thumb();
-    if (!dragging || !el || !track || !current) return;
-    const box = track.getBoundingClientRect();
-    applyTop(
-      resolveScrollerThumbTop({
-        pointerY: event.clientY,
-        trackTop: box.top,
-        grab,
-        room: Math.max(0, el.clientHeight - current.height),
-      }),
-    );
-  };
-
-  const onLanePointerUp = (event: PointerEvent): void => {
-    if (!dragging) return;
-    dragging = false;
-    if (lane?.hasPointerCapture(event.pointerId)) lane.releasePointerCapture(event.pointerId);
-  };
-
-  const onThumbTransitionEnd = (event: TransitionEvent): void => {
-    if (event.target !== event.currentTarget) return;
-    if (event.propertyName !== "opacity") return;
-    if (phase() !== "out") return;
-    last = undefined;
-    lastThumb = undefined;
-    setPhase("none");
-    setThumb(undefined);
+  const barState = (): ScrollerBarState => resolveScrollerBarState(props.state);
+  const interactive = (): boolean => resolveScrollerInteractive(props.interactive);
+  const traveling = (): boolean =>
+    travel?.traveling() === true ||
+    collapse?.traveling() === true ||
+    (rail != null && railTraveling(rail.phase()));
+  const binder = createScrollerBinder({ overflow, barState, interactive, traveling });
+  const handle: YoScrollerHandle = {
+    scrollTo: binder.scrollTo,
+    scrollBy: binder.scrollBy,
+    scrollToStart: binder.scrollToStart,
+    scrollToEnd: binder.scrollToEnd,
+    scrollPage: binder.scrollPage,
+    offset: binder.offset,
   };
 
   createRenderEffect(() => {
-    kids();
+    props.children;
     overflow();
-    travel?.traveling();
-    paint();
+    barState();
+    interactive();
+    traveling();
+    binder.sync();
   });
 
-  const valueNow = (): number => {
-    const el = view;
-    if (!el) return 0;
-    const range = measureFlow(el) - el.clientHeight;
-    if (!(range > 0)) return 0;
-    return Math.round((el.scrollTop / range) * 100);
+  onCleanup(() => binder.destroy());
+
+  const host = () => scrollerHostAttrs(binder.phase(), barState(), interactive());
+  let planeEl: HTMLDivElement | undefined;
+  const port: ScrollerPort = {
+    view: () => binder.view(),
+    plane: () => planeEl,
+    scrollTop: () => binder.offset(),
+    clientHeight: () => binder.view()?.clientHeight ?? 0,
   };
 
   return (
-    <div
-      class={`yohu-scroller${props.class ? ` ${props.class}` : ""}`}
-      data-overflow={overflow()}
-      data-scroll={scrollerHostAttrs(phase())["data-scroll"]}
-    >
+    <ScrollerPortContext.Provider value={port}>
       <div
-        id={viewId}
-        class="yohu-scroller__view"
+        class={`yohu-scroller${props.class ? ` ${props.class}` : ""}`}
+        data-overflow={overflow()}
+        data-scroll={host()["data-scroll"]}
+        data-bar={host()["data-bar"]}
+        data-interactive={host()["data-interactive"]}
         ref={(el) => {
-          view = el;
-          props.viewRef?.(el);
-          props.handle?.({ scrollToEnd });
-          el.addEventListener("scroll", paint, { passive: true });
-          let ro: ResizeObserver | undefined;
-          if (typeof ResizeObserver !== "undefined") {
-            ro = new ResizeObserver(() => {
-              if (traveling()) return;
-              paint();
-            });
-            ro.observe(el);
-          }
-          onCleanup(() => {
-            el.removeEventListener("scroll", paint);
-            ro?.disconnect();
-          });
-          paint();
+          planeEl = el;
         }}
-      >
-        {kids()}
-      </div>
-      <div
-        class="yohu-scroller__lane"
-        data-lane={scrollerLaneAttrs(phase())["data-lane"]}
-        aria-hidden={phase() === "none" ? true : undefined}
-        ref={(el) => {
-          lane = el;
-        }}
-        onPointerDown={onLanePointerDown}
-        onPointerMove={onLanePointerMove}
-        onPointerUp={onLanePointerUp}
-        onPointerCancel={onLanePointerUp}
       >
         <div
-          class="yohu-scroller__thumb"
-          role="scrollbar"
-          aria-orientation="vertical"
-          aria-controls={viewId}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={valueNow()}
-          onTransitionEnd={onThumbTransitionEnd}
-          style={
-            thumb()
-              ? {
-                  height: `${thumb()!.height}px`,
-                  transform: `translateY(${thumb()!.top}px)`,
-                }
-              : undefined
-          }
-        />
+          id={viewId}
+          class="yohu-scroller__view"
+          tabindex={-1}
+          ref={(el) => {
+            binder.attachView(el);
+            props.viewRef?.(el);
+            props.handle?.(handle);
+            onCleanup(() => binder.destroy());
+          }}
+        >
+          {props.children}
+        </div>
+        <div
+          class="yohu-scroller__lane"
+          data-lane={scrollerLaneAttrs(binder.phase())["data-lane"]}
+          aria-hidden={binder.phase() === "none" ? true : undefined}
+          ref={binder.attachLane}
+          onPointerDown={binder.onLanePointerDown}
+          onPointerMove={binder.onLanePointerMove}
+          onPointerUp={binder.onLanePointerUp}
+          onPointerCancel={binder.onLanePointerUp}
+          onPointerEnter={binder.onLaneEnter}
+          onPointerLeave={binder.onLaneLeave}
+        >
+          <div
+            class="yohu-scroller__thumb"
+            role="scrollbar"
+            aria-orientation="vertical"
+            aria-controls={viewId}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={binder.valueNow()}
+            data-pressed={scrollerThumbAttrs(binder.pressed())["data-pressed"]}
+            onTransitionEnd={binder.onThumbTransitionEnd}
+            style={
+              binder.thumb()
+                ? {
+                    height: `${binder.thumb()!.height}px`,
+                    transform: `translateY(${binder.thumb()!.top}px)`,
+                  }
+                : undefined
+            }
+          />
+        </div>
       </div>
-    </div>
+    </ScrollerPortContext.Provider>
   );
 }

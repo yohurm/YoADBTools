@@ -34,7 +34,7 @@
   flex: 0 1 auto;
 }
 
-.yohu-module-title {
+.yohu-chrome__heading {
   font-size: var(--yohu-font-subtitle);
   font-weight: var(--yohu-font-weight-bold);
   color: var(--yohu-fg);

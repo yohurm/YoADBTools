@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  railBlockHidden,
-  railCopyOpaque,
-  railLayoutExpanded,
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
   railSlotOpen,
   railStreamAttr,
   railStreamOpen,
   railTooltipEnabled,
+  railTraveling,
   railWidthIntent,
   railWidthMatchesIntent,
 } from "./rail-model";
@@ -30,7 +28,7 @@ describe("YoRail 时序", () => {
     expect(railPhaseAfterWidthSettle("icons")).toBe("icons");
   });
 
-  it("文案流、槽、卡高同一拍：展开与展开行程开，收起当拍关", () => {
+  it("文案流四相位：展开与展开行程开，收起当拍关", () => {
     expect(railStreamOpen("expanded")).toBe(true);
     expect(railStreamOpen("expanding")).toBe(true);
     expect(railStreamOpen("collapsing")).toBe(false);
@@ -40,22 +38,18 @@ describe("YoRail 时序", () => {
     expect(railStreamAttr("collapsing")).toBe("closed");
     expect(railStreamAttr("icons")).toBe("closed");
     for (const phase of ["expanded", "expanding"] as const) {
-      expect(railCopyOpaque(phase)).toBe(true);
       expect(railSlotOpen(phase)).toBe(true);
-      expect(railLayoutExpanded(phase)).toBe(true);
     }
     for (const phase of ["collapsing", "icons"] as const) {
-      expect(railCopyOpaque(phase)).toBe(false);
       expect(railSlotOpen(phase)).toBe(false);
-      expect(railLayoutExpanded(phase)).toBe(false);
     }
   });
 
-  it("图标列强制列表开着", () => {
-    expect(railBlockHidden("expanded")).toBe(false);
-    expect(railBlockHidden("expanding")).toBe(true);
-    expect(railBlockHidden("icons")).toBe(true);
-    expect(railBlockHidden("collapsing")).toBe(true);
+  it("列宽插值中滚轴不算溢出", () => {
+    expect(railTraveling("expanding")).toBe(true);
+    expect(railTraveling("collapsing")).toBe(true);
+    expect(railTraveling("expanded")).toBe(false);
+    expect(railTraveling("icons")).toBe(false);
   });
 
   it("气泡跟关流同一拍", () => {

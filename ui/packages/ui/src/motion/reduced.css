@@ -27,7 +27,7 @@
   .yohu-recipe-reorder-bar[data-ready],
   .yohu-recipe-reorder-overlay[data-ready],
   .yohu-recipe-indicator[data-ready],
-  [data-reordering] > * > [data-key]:not([data-reorder="source"]),
+  [data-reordering] [data-key]:not([data-reorder="source"]),
   .yohu-tabs__tab,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *,

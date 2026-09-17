@@ -19,10 +19,6 @@ export interface ListItemInput {
   ring?: YoListItemRing;
   selected?: boolean;
   current?: boolean;
-  hasLeading?: boolean;
-  hasDescription?: boolean;
-  hasMeta?: boolean;
-  hasTrailing?: boolean;
 }
 
 export interface ListItemSpec {
@@ -31,10 +27,6 @@ export interface ListItemSpec {
   ring: YoListItemRing;
   selected: boolean;
   current: boolean;
-  hasLeading: boolean;
-  hasDescription: boolean;
-  hasMeta: boolean;
-  hasTrailing: boolean;
 }
 
 export function resolveListItemSpec(input: ListItemInput): ListItemSpec {
@@ -44,9 +36,5 @@ export function resolveListItemSpec(input: ListItemInput): ListItemSpec {
     ring: input.ring === "inset" ? "inset" : DEFAULT_LIST_ITEM_RING,
     selected: Boolean(input.selected),
     current: Boolean(input.current),
-    hasLeading: Boolean(input.hasLeading),
-    hasDescription: Boolean(input.hasDescription),
-    hasMeta: Boolean(input.hasMeta),
-    hasTrailing: Boolean(input.hasTrailing),
   };
 }

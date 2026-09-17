@@ -5,6 +5,7 @@
  */
 
 export type YoIconButtonSize = "sm" | "md";
+export type YoIconButtonPaint = "window";
 export type IconButtonContentKind = "icon" | "slot";
 
 export const ICON_BUTTON_SIZES = ["sm", "md"] as const;
@@ -12,12 +13,14 @@ export const DEFAULT_ICON_BUTTON_SIZE: YoIconButtonSize = "md";
 
 export interface IconButtonInput {
   size?: YoIconButtonSize;
+  paint?: YoIconButtonPaint;
   hasIcon?: boolean;
   hasSlot?: boolean;
 }
 
 export interface IconButtonSpec {
   size: YoIconButtonSize;
+  paint?: YoIconButtonPaint;
   content: IconButtonContentKind;
 }
 
@@ -25,6 +28,7 @@ export interface IconButtonSpec {
 export function resolveIconButtonSpec(input: IconButtonInput): IconButtonSpec {
   return {
     size: input.size ?? DEFAULT_ICON_BUTTON_SIZE,
+    paint: input.paint === "window" ? "window" : undefined,
     content: input.hasSlot ? "slot" : "icon",
   };
 }

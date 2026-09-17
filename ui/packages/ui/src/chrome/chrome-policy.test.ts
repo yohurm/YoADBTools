@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { chromeHostAttrs, resolveChromeSlots } from "./chrome-policy";
 
 describe("chrome-policy", () => {
-  it("无操作页仍是 title 布局", () => {
+  it("宿主只写投放，不写 data-layout", () => {
     expect(chromeHostAttrs({})).toEqual({
-      "data-layout": "title",
       "data-drop": undefined,
     });
+    expect(chromeHostAttrs({})).not.toHaveProperty("data-layout");
     expect(resolveChromeSlots({})).toEqual({
       showLeading: false,
       showBar: false,
@@ -16,7 +16,7 @@ describe("chrome-policy", () => {
 
   it("功能栏与次行分别开槽", () => {
     const input = { hasBar: true, hasExtra: true, hasLeading: true };
-    expect(chromeHostAttrs(input)["data-layout"]).toBe("title-bar-extra");
+    expect(chromeHostAttrs(input)).not.toHaveProperty("data-layout");
     expect(resolveChromeSlots(input)).toEqual({
       showLeading: true,
       showBar: true,

@@ -24,6 +24,10 @@
   white-space: nowrap;
 }
 
+.yohu-subheader[data-has-meta] .yohu-subheader__title {
+  flex: 0 1 auto;
+}
+
 .yohu-subheader[data-tone="list"] .yohu-subheader__title {
   font-size: var(--yohu-font-caption);
   font-weight: var(--yohu-font-weight-semibold);
@@ -36,9 +40,16 @@
   color: var(--yohu-fg);
 }
 
+.yohu-subheader__meta {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .yohu-subheader__actions {
   display: inline-flex;
   align-items: center;
   gap: var(--yohu-space-xs);
   flex-shrink: 0;
+  margin-inline-start: auto;
 }

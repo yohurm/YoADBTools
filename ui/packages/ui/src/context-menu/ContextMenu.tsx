@@ -15,7 +15,7 @@ import {
   nextTypeaheadQuery,
 } from "./menu-key-policy";
 import { YoCorner } from "../corner";
-import { YoPresence } from "../motion/presence";
+import { YoPresence } from "../motion/engines/presence";
 import "./ContextMenu.css";
 
 export type { YoMenuItem };
@@ -133,7 +133,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
         role="menu"
         style={{ left: `${props.x}px`, top: `${props.y}px` }}
       >
-        <YoCorner role="control" class="yohu-context-menu__chrome">
+        <YoCorner role="control" class="yohu-context-menu__chrome" overflow="auto" pad="block-xs">
           <For each={props.items}>
             {(item, index) => {
               const attrs = () => menuItemHostAttrs(item, index() === focusIndex());

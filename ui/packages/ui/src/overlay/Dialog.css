@@ -40,7 +40,7 @@
 
 /*
  * used-clip：盒高交给公开 YoTravel。名单走 YoReveal（始终绝对定位）。
- * 行程中主槽 clip。侧轨预留，横轴不 snap。
+ * panel 自写 data-clip。行程中主槽 clip。侧轨预留，横轴不 snap。
  */
 .yohu-dialog__panel > .yohu-travel {
   width: 100%;
@@ -52,18 +52,20 @@
   height: 100%;
 }
 
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__chrome {
+.yohu-dialog__panel[data-clip] .yohu-dialog__chrome {
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-corner__content,
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__body,
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-dialog__body[data-region="split"] .yohu-dialog__scroller,
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-scroller,
-.yohu-dialog__panel:has(.yohu-travel[data-travel]) .yohu-scroller__view {
+.yohu-dialog__panel[data-clip] .yohu-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yohu-dialog__panel[data-clip] .yohu-dialog__scroller {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
@@ -191,26 +193,14 @@
   overflow: hidden;
 }
 
-/*
- * hug 弹窗直接子级滚轴：跟内容，触顶后在 body 帽内缩并滚。
- * 禁止用 flex 1 1 0 把视口塌成 0。
- */
+/* hug 槽：子级滚轴跟内容、可在 body 帽内缩。这是 body 的 flex 子项，不点 __view。 */
 .yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) > .yohu-scroller {
-  flex: 0 1 auto;
-  min-height: 0;
-}
-
-.yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) > .yohu-scroller > .yohu-scroller__view {
   flex: 0 1 auto;
   min-height: 0;
 }
 
 .yohu-dialog__body[data-overflow="auto"][data-region="split"] {
   overflow: hidden;
-}
-
-.yohu-dialog__panel:has(.yohu-travel[data-travel="used"]) .yohu-scroller[data-overflow="auto"] > .yohu-scroller__view {
-  overflow-y: hidden;
 }
 
 .yohu-dialog__body[data-overflow="hidden"] {

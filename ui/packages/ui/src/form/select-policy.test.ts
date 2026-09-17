@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -91,5 +93,15 @@ describe("select-policy", () => {
       "data-disabled": "",
       "data-block": "",
     });
+  });
+
+  it("没有 applySelectHover 空政策", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/form/select-policy.ts"),
+      resolve(process.cwd(), "packages/ui/src/form/select-policy.ts"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    expect(src).not.toMatch(/\bapplySelectHover\b/);
   });
 });

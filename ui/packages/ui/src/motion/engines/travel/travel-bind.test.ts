@@ -28,6 +28,7 @@ describe("YoTravel binder", () => {
     expect(src).toContain('travel: "used"');
     expect(src).toContain("data-ready");
     expect(src).toContain("YoTravel");
+    expect(src).toContain("yohu-travel__slot");
     expect(src).toContain("ctl.command()");
     expect(src).toContain("onTraveling");
     expect(src).toContain("traveling");

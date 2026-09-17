@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 
-import { PRESENCE_EXIT_SAFETY_MS } from "../motion/recipes";
+import { PRESENCE_EXIT_SAFETY_MS } from "../motion/spec/recipes";
 import * as reduced from "../motion/reduced";
 import { motionSpecMs } from "../tokens/motion";
 import { YoTooltip, YoTooltipHost } from "./Tooltip";

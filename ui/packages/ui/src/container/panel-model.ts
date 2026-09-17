@@ -34,7 +34,6 @@ export interface PanelInput {
   align?: YoPanelAlign;
   gap?: YoPanelGap;
   overflow?: YoPanelOverflow;
-  overflowX?: YoPanelOverflow;
   edge?: YoPanelEdge;
 }
 
@@ -45,7 +44,6 @@ export interface PanelSpec {
   align: YoPanelAlign;
   gap: YoPanelGap;
   overflow: YoPanelOverflow;
-  overflowX: YoPanelOverflow;
   edge: YoPanelEdge;
 }
 
@@ -57,11 +55,6 @@ export function defaultPanelPadding(variant: YoPanelVariant): YoPanelPadding {
 /** pane 只裁切，滚轴由调用方组合 YoScroller；card 不裁、不另起滚动。 */
 export function defaultPanelOverflow(variant: YoPanelVariant): YoPanelOverflow {
   return variant === "pane" ? "hidden" : "visible";
-}
-
-/** 横轴缺省跟 overflow。禁止 auto，系统条不进面板。 */
-export function defaultPanelOverflowX(overflow: YoPanelOverflow): YoPanelOverflow {
-  return overflow;
 }
 
 export function resolvePanelEdge(edge?: YoPanelEdge): YoPanelEdge {
@@ -83,7 +76,6 @@ export function resolvePanelSpec(input: PanelInput): PanelSpec {
     align: input.align ?? DEFAULT_PANEL_ALIGN,
     gap: input.gap ?? DEFAULT_PANEL_GAP,
     overflow,
-    overflowX: input.overflowX ?? defaultPanelOverflowX(overflow),
     edge: resolvePanelEdge(input.edge),
   };
 }

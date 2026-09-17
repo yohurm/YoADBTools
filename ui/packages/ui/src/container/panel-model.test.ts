@@ -3,7 +3,6 @@ import { Spacing } from "../tokens/spacing";
 import { Stroke } from "../tokens/layout";
 import {
   defaultPanelOverflow,
-  defaultPanelOverflowX,
   defaultPanelPadding,
   resolvePanelEdgeOutset,
   resolvePanelSpec,
@@ -18,7 +17,6 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "visible",
-      overflowX: "visible",
       edge: "none",
     });
   });
@@ -26,8 +24,6 @@ describe("panel-model", () => {
   it("pane 默认 none 内边距、overflow hidden", () => {
     expect(defaultPanelPadding("pane")).toBe("none");
     expect(defaultPanelOverflow("pane")).toBe("hidden");
-    expect(defaultPanelOverflowX("hidden")).toBe("hidden");
-    expect(defaultPanelOverflowX("visible")).toBe("visible");
     expect(resolvePanelSpec({ variant: "pane" })).toEqual({
       variant: "pane",
       padding: "none",
@@ -35,7 +31,6 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "hidden",
-      overflowX: "hidden",
       edge: "none",
     });
   });
@@ -48,7 +43,6 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "hidden",
-      overflowX: "hidden",
       edge: "none",
     });
     expect(resolvePanelSpec({ padding: "lg" })).toEqual({
@@ -58,7 +52,6 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "visible",
-      overflowX: "visible",
       edge: "none",
     });
   });
@@ -70,7 +63,6 @@ describe("panel-model", () => {
         align: "center",
         gap: "2xs",
         paddingBlock: "xs",
-        overflowX: "hidden",
       }),
     ).toEqual({
       variant: "pane",
@@ -79,12 +71,11 @@ describe("panel-model", () => {
       align: "center",
       gap: "2xs",
       overflow: "hidden",
-      overflowX: "hidden",
       edge: "none",
     });
   });
 
-  it("overflow hidden 两轴一同裁切", () => {
+  it("overflow 两轴同一值，规格没有 overflowX", () => {
     expect(resolvePanelSpec({ variant: "pane", overflow: "hidden" })).toEqual({
       variant: "pane",
       padding: "none",
@@ -92,9 +83,10 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "hidden",
-      overflowX: "hidden",
       edge: "none",
     });
+    expect(resolvePanelSpec({})).not.toHaveProperty("overflowX");
+    expect(resolvePanelSpec({ overflow: "visible" })).not.toHaveProperty("overflowX");
   });
 
   it("edge drop 写入规格，缺省 none", () => {
@@ -108,7 +100,6 @@ describe("panel-model", () => {
       align: "stretch",
       gap: "none",
       overflow: "hidden",
-      overflowX: "hidden",
       edge: "drop",
     });
   });

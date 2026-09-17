@@ -177,12 +177,12 @@ describe("motion recipes", () => {
     expect(untilPreview).toContain("flex-basis var(--yohu-motion-spatial-rail)");
     expect(untilPreview).toContain("grid-template-rows var(--yohu-motion-spatial-rail)");
     expect(untilPreview).toContain("grid-template-columns var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("min-height var(--yohu-motion-spatial-rail)");
     expect(untilPreview).toContain("max-width var(--yohu-motion-spatial-rail)");
+    expect(untilPreview).not.toContain(".yohu-list-item");
     expect(untilPreview).toContain("opacity var(--yohu-motion-spatial-rail)");
     expect(untilPreview).toContain("transform var(--yohu-motion-spatial-rail)");
     expect(untilPreview).toContain("translateX(calc(-1 * var(--yohu-space-sm)))");
-    expect(untilPreview).toContain('[data-stream="open"]');
+    expect(untilPreview).toContain(".yohu-rail-slot:not([data-open]) .yohu-rail-slot__content");
     expect(untilPreview).toContain("overflow: hidden");
     expect(untilPreview).toContain(".yohu-rail-slot");
     expect(untilPreview).not.toContain("width var(--yohu-motion-spatial-panel)");
@@ -208,16 +208,21 @@ describe("motion recipes", () => {
     const chrome = css.slice(css.indexOf("配方换位行铬"));
     const untilReduce = chrome.slice(0, chrome.indexOf("reduced-motion"));
     expect(untilReduce).toContain("[data-reordering]");
+    expect(untilReduce).toContain("[data-reordering] [data-key]");
     expect(untilReduce).toContain("[data-reorder=\"source\"]");
-    expect(untilReduce).toContain("[data-reordering] > * > [data-key]:not([data-reorder=\"source\"])");
+    expect(untilReduce).toContain("[data-reordering] [data-key]:not([data-reorder=\"source\"])");
     expect(untilReduce).toContain("--yohu-motion-spatial-small");
     expect(untilReduce).toContain("--yohu-state-reorder-source");
+    expect(untilReduce).not.toContain("> * > [data-key]");
+    expect(untilReduce).not.toContain("__view");
     expect(untilReduce).not.toContain(".yohu-virtual-list");
     expect(untilReduce).not.toContain(".yohu-reorder-list");
     expect(untilReduce).not.toContain(".yohu-chip");
 
     const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduce).toContain("[data-reordering] > * > [data-key]:not([data-reorder=\"source\"])");
+    expect(reduce).toContain("[data-reordering] [data-key]:not([data-reorder=\"source\"])");
+    expect(reduce).not.toContain("> * > [data-key]");
+    expect(reduce).not.toContain("__view");
     expect(reduce).not.toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
     expect(reduce).toContain(".yohu-recipe-reorder-bar[data-ready]");
     expect(reduce).toContain(".yohu-recipe-reorder-overlay[data-ready]");

@@ -4,8 +4,11 @@
   flex-wrap: nowrap;
   flex-shrink: 0;
   min-height: var(--yohu-control-height);
-  overflow-x: hidden;
   box-sizing: border-box;
+}
+
+.yohu-toolbar[data-overflow="hidden"] {
+  overflow: hidden;
 }
 
 .yohu-toolbar[data-chrome="band"] .yohu-toolbar__chrome {
@@ -16,14 +19,6 @@
 .yohu-toolbar__chrome {
   flex: 1 1 auto;
   min-width: max-content;
-}
-
-.yohu-toolbar__chrome .yohu-corner__content {
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  min-height: var(--yohu-control-height);
 }
 
 .yohu-toolbar[data-pad="band"] {

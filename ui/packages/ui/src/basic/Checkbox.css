@@ -27,11 +27,6 @@
   height: 100%;
 }
 
-.yohu-checkbox__chrome .yohu-corner__content {
-  align-items: center;
-  justify-content: center;
-}
-
 .yohu-checkbox__input {
   position: absolute;
   inset: 0;

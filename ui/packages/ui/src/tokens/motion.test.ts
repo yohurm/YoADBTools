@@ -106,6 +106,7 @@ describe("动效 token 单一事实源契约", () => {
     expect(MotionDuration.slow).toBe("300ms");
     expect(MotionDuration.enter).toBe("350ms");
     expect(MotionDuration.progress).toBe("400ms");
+    expect(MotionDuration.barHide).toBe("2s");
     expect(MotionDuration.toast).toBe("3s");
   });
 

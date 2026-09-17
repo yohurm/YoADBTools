@@ -31,7 +31,14 @@ export function YoToolbar(props: YoToolbarProps): JSX.Element {
       data-overflow={host()["data-overflow"]}
       data-pad={host()["data-pad"]}
     >
-      <YoCorner role="control" class="yohu-toolbar__chrome">
+      <YoCorner
+        role="control"
+        class="yohu-toolbar__chrome"
+        direction="row"
+        align="center"
+        overflow="hidden"
+        gap="sm"
+      >
         {props.children}
       </YoCorner>
     </div>

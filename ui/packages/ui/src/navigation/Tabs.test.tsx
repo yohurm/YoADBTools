@@ -104,8 +104,10 @@ describe("YoTabs", () => {
     expect(onClose).toHaveBeenCalledWith("b");
   });
 
-  it("页签条横向裁切，不画系统条", () => {
-    expect(tabsCss).toMatch(/\.yohu-tabs \{[\s\S]*?overflow-x:\s*hidden;/);
-    expect(tabsCss).not.toMatch(/overflow-x:\s*auto/);
+  it("页签条两轴 overflow hidden，不画系统条", () => {
+    expect(tabsCss).toMatch(/\.yohu-tabs \{[\s\S]*?overflow:\s*hidden;/);
+    expect(tabsCss).not.toMatch(/overflow-x\s*:/);
+    expect(tabsCss).not.toMatch(/overflow-y\s*:/);
+    expect(tabsCss).not.toMatch(/overflow\s*:\s*auto/);
   });
 });

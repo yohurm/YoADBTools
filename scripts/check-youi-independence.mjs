@@ -65,7 +65,11 @@ for (const file of walk(UI_SRC)) {
   }
 
   if (rel.endsWith(".tsx") && CONTAINER_VIEWS.has(rel)) {
-    if (/\bfrom\s+["']\.\/(Subheader|Scroller|Badge|Tooltip|IconButton)["']/.test(text)) {
+    const sameFamilyScroll = rel === "scroll/VirtualList.tsx" || rel === "scroll/ReorderList.tsx";
+    const nested = sameFamilyScroll
+      ? /\bfrom\s+["']\.\/(Subheader|Badge|Tooltip|IconButton)["']/
+      : /\bfrom\s+["']\.\/(Subheader|Scroller|Badge|Tooltip|IconButton)["']/;
+    if (nested.test(text)) {
       fail(`${rel}: 容器不得同目录 import 产品 Yo*，改为调用方槽位组合`);
     }
     if (/\bYo(Subheader|Scroller|Badge|Tooltip|IconButton)\b/.test(text) && /from\s+["']\.\.\//.test(text)) {
@@ -94,11 +98,18 @@ for (const file of walk(UI_SRC)) {
 }
 
 const NO_NATIVE_BAR = [
-  ["container/Panel.css", /overflow-[xy]\s*:\s*auto/],
+  ["container/Panel.css", /overflow-[xy]\s*:/],
+  ["container/Panel.css", /data-overflow-x/],
   ["container/Panel.tsx", /from\s+["'][^"']*Scroller["']/],
-  ["container/Toolbar.css", /overflow-x\s*:\s*auto/],
-  ["overlay/Dialog.css", /\.yohu-dialog__body[^{]*\{[^}]*overflow-y\s*:\s*auto/],
+  ["container/Toolbar.css", /overflow-[xy]\s*:/],
+  ["container/Toolbar.css", /overflow\s*:\s*auto/],
+  ["navigation/Tabs.css", /overflow-[xy]\s*:/],
+  ["navigation/Tabs.css", /overflow\s*:\s*auto/],
+  ["overlay/Dialog.css", /overflow-y\s*:\s*auto/],
   ["overlay/Dialog.tsx", /from\s+["'][^"']*Scroller["']/],
+  ["scroll/Scroller.css", /overflow-y\s*:\s*auto/],
+  ["scroll/VirtualList.css", /overflow-y\s*:\s*auto/],
+  ["scroll/ReorderList.css", /overflow(-y)?\s*:\s*auto/],
 ];
 for (const [rel, re] of NO_NATIVE_BAR) {
   const text = readFileSync(join(UI_SRC, rel), "utf8");

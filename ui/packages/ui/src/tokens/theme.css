@@ -182,7 +182,6 @@
   --yohu-layout-switch-inset: 2px;
   --yohu-layout-titlebar-caption: 48px;
   --yohu-layout-titlebar-caption-gap: 0px;
-  --yohu-layout-titlebar-close-margin: 0px;
   --yohu-layout-titlebar-traffic: 80px;
   --yohu-layout-titlebar-blur: 32px;
   --yohu-layout-gutter: 16px;
@@ -200,6 +199,7 @@
   --yohu-dur-progress: 400ms;
   --yohu-dur-loop: 800ms;
   --yohu-dur-loop-slow: 1.2s;
+  --yohu-dur-bar-hide: 2s;
   --yohu-dur-toast: 3s;
   --yohu-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --yohu-ease-decel: cubic-bezier(0, 0, 0.4, 1);

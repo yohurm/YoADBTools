@@ -15,10 +15,6 @@
   flex: 1 1 auto;
 }
 
-.yohu-progress__chrome .yohu-corner__content {
-  overflow: hidden;
-}
-
 .yohu-progress__bar {
   height: 100%;
   background-color: var(--yohu-accent);

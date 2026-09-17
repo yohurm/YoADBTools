@@ -48,11 +48,18 @@
   box-sizing: border-box;
 }
 
+.yohu-travel__slot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
 .yohu-travel[data-ready] {
   overflow: hidden;
 }
 
-.yohu-travel[data-ready] > * {
+.yohu-travel[data-ready] > .yohu-travel__slot {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;

@@ -77,16 +77,19 @@
   visibility: hidden;
 }
 
-/* 内容区：默认裁切。仅 data-overflow-y 时纵滚；系统条关掉，横向永远 hidden。 */
+/* 内容区：默认裁切。仅 overflow=auto 时纵滚（Corner 藏条）；横向随内容 hug。 */
 .yohu-select__menu {
   --yohu-corner-fill: var(--yohu-surface);
   --yohu-corner-stroke: var(--yohu-border);
   position: relative;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   width: max-content;
   min-width: 100%;
   max-width: 100%;
   max-height: inherit;
+  min-height: 0;
   margin: 0;
   padding: 0;
   overflow: visible;
@@ -97,21 +100,9 @@
   box-shadow: var(--yohu-shadow-overlay);
 }
 
-.yohu-select__menu-chrome .yohu-corner__content {
-  padding: var(--yohu-space-xs) 0;
-  overflow-x: hidden;
-  overflow-y: hidden;
-}
-
-.yohu-select__layer[data-overflow-y] .yohu-select__menu-chrome .yohu-corner__content {
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-}
-
-.yohu-select__layer[data-overflow-y] .yohu-select__menu-chrome .yohu-corner__content::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+.yohu-select__menu-chrome {
+  min-height: 0;
+  max-height: 100%;
 }
 
 .yohu-select__option {

@@ -12,7 +12,6 @@ import { Stroke } from "../tokens/layout";
 
 export type YoTextFieldStatus = "none" | "error" | "warning";
 
-export const TEXT_FIELD_STATUSES = ["none", "error", "warning"] as const;
 export const DEFAULT_TEXT_FIELD_STATUS: YoTextFieldStatus = "none";
 /** multiline 时原生 rows 缺省。功能性配置，不是 size 轴。 */
 export const DEFAULT_TEXT_FIELD_ROWS = 2;
@@ -38,9 +37,6 @@ export interface TextFieldSlots {
   /** 写入盒内、input 之前。气泡是主轴 flex 子项，槽本身无盒。 */
   tokens: boolean;
 }
-
-/** 写入盒溢出：只 clip。铬高控件装不下系统横条。 */
-export const TEXT_FIELD_CONTROL_OVERFLOW = "hidden" as const;
 
 export interface TextFieldSpec {
   status: YoTextFieldStatus;

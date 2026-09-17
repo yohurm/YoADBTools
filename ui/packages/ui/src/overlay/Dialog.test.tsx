@@ -186,6 +186,7 @@ describe("YoDialog", () => {
     expect(dialogCss).toMatch(
       /data-overflow="auto"\]:not\(\[data-region="split"\]\)\s*>\s*\.yohu-scroller\s*\{[^}]*flex:\s*0 1 auto/,
     );
+    expect(dialogCss).not.toContain(".yohu-scroller__view");
   });
 
   it("bodyOverflow=hidden 保持 stack 与 lg 垫", () => {
@@ -243,9 +244,10 @@ describe("YoDialog", () => {
     ));
     const panel = container.querySelector(".yohu-dialog__panel") as HTMLElement;
     expect(panel.getAttribute("data-box")).toBe("fill");
+    expect(panel.hasAttribute("data-clip")).toBe(false);
     expect(dialogCss).toContain('.yohu-dialog__panel[data-box="fill"] .yohu-dialog__body');
     expect(dialogCss).toContain("flex: 1 1 0");
-    const fitBody = dialogCss.match(/\.yohu-dialog__body\s*\{[^}]*\}/)?.[0] ?? "";
+    const fitBody = dialogCss.match(/(?:^|\n)\.yohu-dialog__body\s*\{[^}]*\}/)?.[0] ?? "";
     expect(fitBody).toContain("flex: 0 1 auto");
     expect(fitBody).not.toContain("flex: 1 1 auto");
   });
@@ -290,6 +292,7 @@ describe("YoDialog", () => {
     ));
     const chrome = container.querySelector(".yohu-dialog__chrome");
     expect(chrome?.getAttribute("data-role")).toBe("dialog");
+    expect(chrome?.getAttribute("data-flex")).toBe("fill");
     const panelRule = dialogCss.match(/\.yohu-dialog__panel\s*\{[^}]*\}/)?.[0] ?? "";
     expect(panelRule).toContain("overflow: visible");
     expect(panelRule).not.toContain("overflow: hidden");
@@ -308,8 +311,20 @@ describe("YoDialog", () => {
   });
 
   it("fit used-clip：盒高交给 YoTravel，滚槽是调用方组合口", () => {
-    expect(dialogCss).toContain(".yohu-dialog__panel:has(.yohu-travel[data-travel])");
-    expect(dialogCss).toContain('[data-travel="used"]');
+    const { container } = render(() => (
+      <YoDialog open onClose={() => {}}>
+        内容
+      </YoDialog>
+    ));
+    expect(container.querySelector(".yohu-dialog__panel")?.getAttribute("data-clip")).toBe("on");
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__chrome");
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__body");
+    expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__scroller");
+    expect(dialogCss).toContain("> .yohu-scroller");
+    expect(dialogCss).not.toContain(".yohu-scroller__view");
+    expect(dialogCss).not.toContain(".yohu-corner__content");
+    expect(dialogCss).not.toContain(":has(.yohu-travel");
+    expect(dialogCss).not.toContain('[data-travel="used"]');
     expect(dialogCss).not.toContain('[data-travel="hold"]');
     expect(dialogCss).toContain("yohu-dialog__scroller");
     expect(dialogCss).toContain("yohu-scroller");
@@ -341,8 +356,7 @@ describe("YoDialog", () => {
     expect(body.getAttribute("data-region")).toBe("split");
     expect(container.querySelector(".yohu-dialog__lead")?.textContent).toBe("确定删除吗");
     expect(container.querySelector(".yohu-dialog__scroller")).not.toBeNull();
-    expect(container.querySelector(".yohu-scroller__view")?.textContent).toBe("名单");
-    expect(container.querySelector(".yohu-scroller")).not.toBeNull();
+    expect(container.querySelector(".yohu-scroller")?.textContent).toBe("名单");
     expect(container.querySelector(".yohu-dialog__tail")?.textContent).toBe("展开其余");
   });
 
@@ -395,9 +409,17 @@ describe("YoDialog", () => {
     ];
     const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
     expect(src).toContain("YoTravel");
+    expect(src).toContain("useTravel");
+    expect(src).toContain("data-clip");
+    expect(src).toContain('flex="fill"');
+    expect(src).toContain('overflow="hidden"');
     expect(src).not.toMatch(/from\s+["'][^"']*Scroller["']/);
     expect(src).toContain('axes={["block"]}');
-    expect(src).toContain("props.height === undefined && isOpen()");
+    expect(src).toContain("resolveDialogBox");
+    expect(src).toContain('kind === "fit" && isOpen()');
+    expect(src).toContain("travelOn() || trip()");
+    expect(src).not.toContain("props.height === undefined && isOpen()");
+    expect(src).not.toContain(".yohu-corner__content");
     expect(src).not.toContain("bindHugTravel");
     expect(src).not.toContain("bindTravel");
     expect(src).not.toContain("MutationObserver");

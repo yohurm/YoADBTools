@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { loadMotionLayerCss } from "../../css";
 import {
   COLLAPSE_INTERPOLATE_RECIPES,
+  COLLAPSE_TRIP_PROPERTY,
   DEFAULT_COLLAPSE_RECIPE,
   resolveCollapseRows,
   resolveCollapseSpec,
+  resolveCollapseTripOnToggle,
+  resolveCollapseTripSpec,
 } from "./collapse-model";
 import { collapseHostAttrs } from "./collapse-policy";
 
@@ -32,6 +35,15 @@ describe("collapse-model / policy", () => {
   it("行高只认 open", () => {
     expect(resolveCollapseRows(false)).toBe("0fr");
     expect(resolveCollapseRows(true)).toBe("1fr");
+  });
+
+  it("行程 spec 跟配方，减动效不当行程", () => {
+    expect(COLLAPSE_TRIP_PROPERTY).toBe("grid-template-rows");
+    expect(resolveCollapseTripSpec()).toBe("spatialLocal");
+    expect(resolveCollapseTripSpec("fill")).toBe("spatialLocal");
+    expect(resolveCollapseTripSpec("panel")).toBe("spatialStretch");
+    expect(resolveCollapseTripOnToggle(false)).toBe(true);
+    expect(resolveCollapseTripOnToggle(true)).toBe(false);
   });
 
   it("collapse/panel/fill 插值，hug 不是 recipe", () => {

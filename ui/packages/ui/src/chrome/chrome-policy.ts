@@ -8,11 +8,9 @@ import {
   resolveChromeSpec,
   type ChromeDrop,
   type ChromeInput,
-  type ChromeLayout,
 } from "./chrome-model";
 
 export interface ChromeHostAttrs {
-  "data-layout": ChromeLayout;
   "data-drop": ChromeDrop | undefined;
 }
 
@@ -25,7 +23,6 @@ export interface ChromeSlots {
 export function chromeHostAttrs(input: ChromeInput): ChromeHostAttrs {
   const spec = resolveChromeSpec(input);
   return {
-    "data-layout": spec.layout,
     "data-drop": spec.drop,
   };
 }

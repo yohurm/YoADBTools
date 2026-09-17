@@ -43,10 +43,8 @@ export interface YoPanelProps {
   align?: YoPanelAlign;
   /** 内容区间隙；默认 none */
   gap?: YoPanelGap;
-  /** 内容区溢出；pane 默认 hidden（只裁切），card 默认 visible。禁止系统条。 */
+  /** 内容区两轴溢出；pane 默认 hidden（只裁切），card 默认 visible。禁止分轴、禁止系统条。 */
   overflow?: YoPanelOverflow;
-  /** 内容区横向溢出；未设则跟 overflow。禁止 auto。 */
-  overflowX?: YoPanelOverflow;
   /** 默认 card */
   variant?: YoPanelVariant;
   /** 外壳高光；默认 none。drop = 填充盒外一圈虚线，不占用描边 */
@@ -67,7 +65,6 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       align: props.align,
       gap: props.gap,
       overflow: props.overflow,
-      overflowX: props.overflowX,
       edge: props.edge,
       header: Boolean(props.header),
       title: Boolean(props.title),
@@ -85,7 +82,6 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       data-align={host()["data-align"]}
       data-gap={host()["data-gap"]}
       data-overflow={host()["data-overflow"]}
-      data-overflow-x={host()["data-overflow-x"]}
       data-padding-block={host()["data-padding-block"]}
       data-edge={host()["data-edge"]}
       aria-label={props["aria-label"]}

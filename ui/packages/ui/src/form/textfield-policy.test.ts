@@ -38,6 +38,7 @@ describe("textfield-policy", () => {
       "data-readonly": undefined,
       "data-active": undefined,
       "data-multiline": undefined,
+      "data-font": undefined,
       disabled: false,
       readOnly: false,
       "aria-invalid": undefined,
@@ -104,5 +105,11 @@ describe("textfield-policy", () => {
     expect(attrs["data-multiline"]).toBe(true);
     expect(attrs.rows).toBe(1);
     expect(textFieldHostAttrs({ multiline: true, type: "number" })["data-width"]).toBe("hug");
+  });
+
+  it("font=mono 才写 data-font", () => {
+    expect(textFieldHostAttrs({})["data-font"]).toBeUndefined();
+    expect(textFieldHostAttrs({ font: "ui" })["data-font"]).toBeUndefined();
+    expect(textFieldHostAttrs({ font: "mono" })["data-font"]).toBe("mono");
   });
 });

@@ -17,8 +17,8 @@ import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
 import { Icon } from "../icons";
-import { YoIndicator } from "../motion/indicator";
-import { YoPresence } from "../motion/presence";
+import { YoIndicator } from "../motion/engines/indicator";
+import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
 import {
   findOption,
@@ -29,7 +29,6 @@ import {
 import { layoutSelectMenu, readSelectTrigger } from "./select-place";
 import {
   applySelectEscape,
-  applySelectHover,
   applySelectKey,
   idleSelectSession,
   selectHostAttrs,
@@ -39,6 +38,15 @@ import {
 import "./Select.css";
 
 export type { YoSelectOption };
+
+/** Solid `style` 走 setProperty，必须 kebab；L3 仍返回 popoverLayerStyle 原样。 */
+function selectLayerStyle(style: Record<string, string>): JSX.CSSProperties {
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(style)) {
+    next[key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)] = value;
+  }
+  return next;
+}
 
 export interface YoSelectProps {
   /** 选项列表 */
@@ -86,11 +94,10 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     const laid = layoutSelectMenu(
       readSelectTrigger(trigger),
       { optionCount: props.options.length, scrollHeight: menu.scrollHeight },
-      layer,
     );
     setPlacement(laid.placement);
     setOverflowY(laid.overflowY);
-    setMenuStyle(laid.style as JSX.CSSProperties);
+    setMenuStyle(selectLayerStyle(laid.style));
   };
 
   const commitValue = (value: string): void => {
@@ -130,7 +137,10 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
   });
 
   createEffect(() => {
-    if (!open()) return;
+    if (!open()) {
+      setMenuStyle({});
+      return;
+    }
     const frame = requestAnimationFrame(() => syncMenuPlace());
     const onRelayout = (): void => syncMenuPlace();
     window.addEventListener("resize", onRelayout);
@@ -198,6 +208,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
             class="yohu-select__layer"
             data-placement={placement()}
             data-overflow-y={overflowY() ? "" : undefined}
+            data-placed={menuStyle().position ? "true" : undefined}
             style={menuStyle()}
           >
             <div
@@ -209,7 +220,12 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
               data-placement={placement()}
               role="listbox"
             >
-              <YoCorner role="control" class="yohu-select__menu-chrome">
+              <YoCorner
+                role="control"
+                class="yohu-select__menu-chrome"
+                overflow={overflowY() ? "auto" : "hidden"}
+                pad="block-xs"
+              >
                 <YoIndicator follow={props.value} variant="fill" />
                 <For each={props.options}>
                   {(option, index) => (
@@ -222,7 +238,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
                       }}
                       role="option"
                       aria-selected={option.value === props.value}
-                      onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: applySelectHover(index()) }))}
+                      onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: index() }))}
                       onClick={() => commitValue(option.value)}
                     >
                       <span class="yohu-select__option-label">{option.label}</span>

@@ -1,6 +1,6 @@
 /**
  * 动效 CSS 桶。实现按层拆在 motion/engines 与 motion/recipes。
- * 关键帧只允许 motion/**/*.css。
+ * 关键帧只允许 motion 目录下的 CSS。
  */
 @import "../motion/engines/presence/keyframes.css";
 @import "../motion/engines/presence/presence.css";

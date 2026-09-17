@@ -6,6 +6,7 @@ import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoContextMenu } from "./ContextMenu";
 
 const menuCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ContextMenu.css"), "utf-8");
+const cornerCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../corner/Corner.css"), "utf-8");
 
 describe("YoContextMenu", () => {
   it("打开时渲染条目，点击触发 onSelect 并关闭", () => {
@@ -110,8 +111,13 @@ describe("YoContextMenu", () => {
   });
 
   it("菜单可滚，关系统条", () => {
-    expect(menuCss).toMatch(/\.yohu-context-menu__chrome \.yohu-corner__content \{[\s\S]*?overflow:\s*auto;/);
-    expect(menuCss).toMatch(/\.yohu-context-menu__chrome \.yohu-corner__content \{[\s\S]*?scrollbar-width:\s*none;/);
-    expect(menuCss).toContain(".yohu-context-menu__chrome .yohu-corner__content::-webkit-scrollbar");
+    expect(menuCss).not.toContain(".yohu-corner__content");
+    expect(cornerCss).toMatch(
+      /\.yohu-corner__content\[data-overflow="auto"\]\s*\{[\s\S]*?overflow:\s*auto;/,
+    );
+    expect(cornerCss).toMatch(
+      /\.yohu-corner__content\[data-overflow="auto"\]\s*\{[\s\S]*?scrollbar-width:\s*none;/,
+    );
+    expect(cornerCss).toContain('.yohu-corner__content[data-overflow="auto"]::-webkit-scrollbar');
   });
 });

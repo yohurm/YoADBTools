@@ -1,6 +1,6 @@
 /**
  * YoChrome —— 模块页眉（L4 视图）。
- * 布局 / 投放忽略由 chrome-model + chrome-policy 决定；本文件只绑属性与槽位。
+ * 投放忽略由 chrome-model + chrome-policy 决定；槽位显隐走 resolveChromeSlots + Show。
  * 设备名由调用方在 leading 组合 YoBadge。本容器不 import 产品 Yo*。
  * 主行高度走 --yohu-control-height；无按钮页也同一占位。
  */
@@ -35,12 +35,11 @@ export function YoChrome(props: YoChromeProps): JSX.Element {
   return (
     <header
       class="yohu-chrome"
-      data-layout={host()["data-layout"]}
       data-drop={host()["data-drop"]}
     >
       <div class="yohu-chrome__row">
         <div class="yohu-chrome__title">
-          <span class="yohu-module-title">{props.title}</span>
+          <span class="yohu-chrome__heading">{props.title}</span>
           <Show when={slots().showLeading}>
             <span class="yohu-chrome__leading">{props.leading}</span>
           </Show>

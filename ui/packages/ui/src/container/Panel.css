@@ -139,14 +139,6 @@
   overflow: visible;
 }
 
-.yohu-panel[data-overflow-x="hidden"] .yohu-panel__body {
-  overflow-x: hidden;
-}
-
-.yohu-panel[data-overflow-x="visible"] .yohu-panel__body {
-  overflow-x: visible;
-}
-
 .yohu-panel[data-padding="none"] .yohu-panel__body {
   padding: 0;
 }

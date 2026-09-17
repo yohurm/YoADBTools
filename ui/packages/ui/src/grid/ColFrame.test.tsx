@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
@@ -41,5 +44,14 @@ describe("YoColFrame", () => {
     const frame = container.querySelector(".yohu-col-frame") as HTMLElement;
     expect(frame.getAttribute("data-cell-pad")).toBe("none");
     expect(frame.style.getPropertyValue("--yohu-col-tracks")).toBe("20ch minmax(12ch, 1fr)");
+  });
+});
+
+describe("YoColFrame 侧轨", () => {
+  it("清单滚条叠层，表头不给侧轨让位，不写 scrollbar-gutter", () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
+    expect(css).not.toContain(":has(.yohu-scroller__lane");
+    expect(css).not.toContain("padding-inline-end: var(--yohu-space-sm)");
+    expect(css).not.toMatch(/scrollbar-gutter\s*:/);
   });
 });

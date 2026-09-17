@@ -12,7 +12,7 @@ import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { resolveText } from "../dom/text";
-import { YoSwap } from "../motion/swap";
+import { YoSwap } from "../motion/engines/swap";
 import type { YoButtonSize, YoButtonTone, YoButtonVariant } from "./button-model";
 import { buttonHostAttrs } from "./button-policy";
 import "./Button.css";

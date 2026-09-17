@@ -18,7 +18,6 @@ import {
 
 export interface ReorderPointerLayout {
   listTop: number;
-  scrollTop: number;
   viewportHeight: number;
   sourceTop: number;
   sourceHeight: number;

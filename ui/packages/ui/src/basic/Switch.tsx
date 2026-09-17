@@ -45,7 +45,7 @@ export function YoSwitch(props: YoSwitchProps): JSX.Element {
       disabled={host().disabled}
       onClick={handleClick}
     >
-      <YoCorner role="control" radius={CornerPillRadius} stroke={false} class="yohu-switch__chrome">
+      <YoCorner role="control" radius={CornerPillRadius} stroke={false} class="yohu-switch__chrome" overflow="hidden">
         <span class="yohu-switch__thumb" aria-hidden="true" />
       </YoCorner>
     </button>

@@ -45,7 +45,6 @@ export interface PanelHostAttrs {
   "data-align": YoPanelAlign;
   "data-gap": YoPanelGap;
   "data-overflow": YoPanelOverflow;
-  "data-overflow-x"?: YoPanelOverflow;
   "data-padding-block"?: YoPanelPadding;
   "data-edge"?: YoPanelEdge;
 }
@@ -59,7 +58,6 @@ export function panelHostAttrs(input: PanelInput & PanelHeaderInput): PanelHostA
     "data-align": spec.align,
     "data-gap": spec.gap,
     "data-overflow": spec.overflow,
-    ...(spec.overflowX !== spec.overflow ? { "data-overflow-x": spec.overflowX } : {}),
     ...(spec.paddingBlock ? { "data-padding-block": spec.paddingBlock } : {}),
     ...(spec.edge !== "none" ? { "data-edge": spec.edge } : {}),
   };

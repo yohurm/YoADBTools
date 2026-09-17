@@ -133,7 +133,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-readonly={host()["data-readonly"]}
       data-active={host()["data-active"]}
       data-multiline={host()["data-multiline"]}
-      data-font={props.font === "mono" ? "mono" : undefined}
+      data-font={host()["data-font"]}
     >
       <Show when={props.label}>
         <label class="yohu-text-field__label" for={id}>
@@ -147,6 +147,9 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
               role="control"
               class="yohu-text-field__addon-chrome"
               radii={{ tl: Radius.Sm, bl: Radius.Sm, tr: 0, br: 0 }}
+              direction="row"
+              align="center"
+              pad="inline-sm"
             >
               {props.addonBefore}
             </YoCorner>
@@ -164,7 +167,16 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             inputRef.focus();
           }}
         >
-          <YoCorner role="control" class="yohu-text-field__chrome" radii={chromeRadii()}>
+          <YoCorner
+            role="control"
+            class="yohu-text-field__chrome"
+            radii={chromeRadii()}
+            direction="row"
+            align="center"
+            overflow="hidden"
+            pad="inline-sm"
+            gap="xs"
+          >
             <Show when={host()["data-prefix"]}>
               <span class="yohu-text-field__affix" data-edge="start">
                 <TextFieldAffix value={props.prefix} />
@@ -233,6 +245,9 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
               role="control"
               class="yohu-text-field__addon-chrome"
               radii={{ tl: 0, bl: 0, tr: Radius.Sm, br: Radius.Sm }}
+              direction="row"
+              align="center"
+              pad="inline-sm"
             >
               {props.addonAfter}
             </YoCorner>

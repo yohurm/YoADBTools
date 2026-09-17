@@ -16,8 +16,8 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
-import { YoCollapse } from "../motion/collapse";
-import { YoIndicator } from "../motion/indicator";
+import { YoCollapse } from "../motion/engines/collapse";
+import { YoIndicator } from "../motion/engines/indicator";
 import { flattenVisible, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,

@@ -153,7 +153,7 @@ export { YoTree } from "./list/Tree";
 export type { YoTreeProps, TreeNode } from "./list/Tree";
 
 export { YoScroller } from "./scroll/Scroller";
-export type { YoScrollerProps, YoScrollerHandle } from "./scroll/Scroller";
+export type { YoScrollerProps, YoScrollerHandle, ScrollerBarState } from "./scroll/Scroller";
 
 export { YoVirtualList } from "./scroll/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";
@@ -214,7 +214,11 @@ export type { YoFormRowProps, YoFormRowLayout } from "./container/FormRow";
 export { YoCorner, CornerPillRadius } from "./corner";
 export type {
   YoCornerProps,
+  YoCornerAlign,
+  YoCornerDirection,
   YoCornerFlex,
+  YoCornerGap,
+  YoCornerJustify,
   YoCornerOverflow,
   YoCornerPad,
   CornerRadii,
@@ -307,15 +311,13 @@ export {
   YoRail,
   YoRailSlot,
   useRail,
-  railBlockHidden,
-  railCopyOpaque,
-  railLayoutExpanded,
   railSlotOpen,
   railStreamAttr,
   railStreamOpen,
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
   railTooltipEnabled,
+  railTraveling,
   railWidthIntent,
   railWidthMatchesIntent,
   prefersReducedMotion,
@@ -339,7 +341,6 @@ export type {
   RailSlotAxis,
   RailIntent,
   RailPhase,
-  RailPresentation,
   PresenceRecipe,
 } from "./motion";
 

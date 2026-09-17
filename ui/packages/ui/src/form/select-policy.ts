@@ -95,10 +95,6 @@ export function applySelectEscape(open: boolean, disabled?: boolean): SelectSess
   return closeSelect();
 }
 
-export function applySelectHover(index: number): number {
-  return index;
-}
-
 export function selectHostAttrs(input: { disabled?: boolean; block?: boolean }): {
   "data-disabled"?: "";
   "data-block"?: "";

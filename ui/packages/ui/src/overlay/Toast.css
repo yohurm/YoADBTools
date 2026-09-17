@@ -26,10 +26,6 @@
   box-sizing: border-box;
 }
 
-.yohu-toast__chrome .yohu-corner__content {
-  padding: var(--yohu-space-sm) var(--yohu-space-md);
-}
-
 .yohu-toast[data-tone="success"] {
   --yohu-corner-stroke: var(--yohu-success);
 }

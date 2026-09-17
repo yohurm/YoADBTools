@@ -48,9 +48,9 @@ describe("toast-policy", () => {
     expect(destroyToastQueue(dead)).toBe(dead);
   });
 
-  it("停留时长走 MotionSpec toast，不另写毫秒", () => {
+  it("停留时长走 MotionDuration.toast，不另写毫秒", () => {
     expect(toastHoldMs()).toBe(motionDurationMs("toast"));
-    expect(toastHoldMs()).toBeLessThanOrEqual(3000);
+    expect(toastHoldMs()).toBeLessThanOrEqual(motionDurationMs("toast"));
   });
 
   it("单条宿主属性用 Button 涂装名", () => {

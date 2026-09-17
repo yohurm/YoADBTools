@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { YoProgressBar } from "./ProgressBar";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ProgressBar.css"), "utf-8");
 
 describe("YoProgressBar", () => {
   it("确定态：宽度按 value 比例渲染", () => {
@@ -10,6 +15,8 @@ describe("YoProgressBar", () => {
     const host = screen.getByRole("progressbar");
     expect(host.getAttribute("aria-valuenow")).toBe("50");
     expect(host.getAttribute("data-mode")).toBe("determinate");
+    expect(host.querySelector(".yohu-corner__content")?.getAttribute("data-overflow")).toBe("hidden");
+    expect(css).not.toContain(".yohu-corner__content");
   });
 
   it("value 夹取到 0-100", () => {

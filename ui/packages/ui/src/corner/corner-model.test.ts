@@ -16,7 +16,7 @@ import {
   roundedRectPath,
   uniformCornerRadii,
 } from "./corner-model";
-import { resolveCornerHostSpec } from "./corner-policy";
+import { resolveCornerContentSpec, resolveCornerHostSpec } from "./corner-policy";
 
 describe("corner-model", () => {
   it("PC 角色半径对照鸿蒙：控件 8、卡片/弹出框 16", () => {
@@ -132,5 +132,46 @@ describe("corner-policy", () => {
     expect(paint.stroke).toBe(0);
     expect(paint.clip).toBe(false);
     expect(paint.radius).toBe(Radius.Sm);
+  });
+
+  it("内容槽缺省 column / stretch / start / visible / none", () => {
+    expect(resolveCornerContentSpec()).toEqual({
+      direction: "column",
+      align: "stretch",
+      justify: "start",
+      overflow: "visible",
+      pad: "none",
+      gap: "none",
+    });
+  });
+
+  it("内容槽公开轴原样落下，未知值归一", () => {
+    expect(
+      resolveCornerContentSpec({
+        direction: "row",
+        align: "center",
+        justify: "center",
+        overflow: "auto",
+        pad: "inline-sm",
+        gap: "sm",
+      }),
+    ).toEqual({
+      direction: "row",
+      align: "center",
+      justify: "center",
+      overflow: "auto",
+      pad: "inline-sm",
+      gap: "sm",
+    });
+    expect(
+      resolveCornerContentSpec({
+        direction: "grid" as never,
+        align: "end" as never,
+        justify: "between" as never,
+        overflow: "scroll" as never,
+        pad: "lg" as never,
+        gap: "xl" as never,
+      }),
+    ).toEqual(resolveCornerContentSpec());
   });
 });

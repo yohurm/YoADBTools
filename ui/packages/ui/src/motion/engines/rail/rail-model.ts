@@ -7,9 +7,6 @@
 
 export type RailIntent = "expanded" | "icons";
 
-/** 壳测试与设备卡仍用的双态别名。 */
-export type RailPresentation = RailIntent;
-
 export type RailPhase = "expanded" | "collapsing" | "icons" | "expanding";
 
 /** 点开合后的相位。减动效则当拍落到意图。 */
@@ -37,24 +34,14 @@ export function railStreamAttr(phase: RailPhase): "open" | "closed" {
   return railStreamOpen(phase) ? "open" : "closed";
 }
 
-/** 布局盒跟文案流同一拍。 */
-export function railLayoutExpanded(phase: RailPhase): boolean {
-  return railStreamOpen(phase);
-}
-
-/** 字还在流里时不透明；关流由 CSS 同一拍淡出+位移。 */
-export function railCopyOpaque(phase: RailPhase): boolean {
-  return railStreamOpen(phase);
-}
-
 /** 槽跟文案流同一拍（0fr / 1fr）。 */
 export function railSlotOpen(phase: RailPhase): boolean {
   return railStreamOpen(phase);
 }
 
-/** 图标列强制列表开着，状态点留在起边。 */
-export function railBlockHidden(phase: RailPhase): boolean {
-  return phase !== "expanded";
+/** 列宽/卡高插值中：YoScroller 不新出条。 */
+export function railTraveling(phase: RailPhase): boolean {
+  return phase === "expanding" || phase === "collapsing";
 }
 
 /** 文案关流后标题不可读，开气泡。 */

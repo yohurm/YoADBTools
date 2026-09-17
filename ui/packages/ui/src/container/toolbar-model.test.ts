@@ -26,4 +26,11 @@ describe("toolbar-model", () => {
       pad: "xs",
     });
   });
+
+  it("chrome / overflow 来自常量，不接受 input 覆写", () => {
+    expect(resolveToolbarSpec().chrome).toBe("band");
+    expect(resolveToolbarSpec().overflow).toBe("hidden");
+    expect(resolveToolbarSpec({ pad: "xs" }).chrome).toBe(DEFAULT_TOOLBAR_CHROME);
+    expect(resolveToolbarSpec({ pad: "xs" }).overflow).toBe(DEFAULT_TOOLBAR_OVERFLOW);
+  });
 });

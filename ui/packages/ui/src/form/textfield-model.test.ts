@@ -1,10 +1,11 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Density } from "../tokens/density";
 import { Stroke } from "../tokens/layout";
 import {
   DEFAULT_TEXT_FIELD_ROWS,
   DEFAULT_TEXT_FIELD_STATUS,
-  TEXT_FIELD_CONTROL_OVERFLOW,
   hasTextFieldSlot,
   resolveTextFieldActive,
   resolveTextFieldMultiline,
@@ -43,9 +44,19 @@ describe("textfield-model", () => {
   });
 
   it("写入盒只 clip，Token 算占槽", () => {
-    expect(TEXT_FIELD_CONTROL_OVERFLOW).toBe("hidden");
     expect(resolveTextFieldSpec({ tokens: true }).slots.tokens).toBe(true);
     expect(hasTextFieldSlot({})).toBe(true);
+  });
+
+  it("不再导出 TEXT_FIELD_STATUSES / TEXT_FIELD_CONTROL_OVERFLOW", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/form/textfield-model.ts"),
+      resolve(process.cwd(), "packages/ui/src/form/textfield-model.ts"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    expect(src).not.toMatch(/\bTEXT_FIELD_STATUSES\b/);
+    expect(src).not.toMatch(/\bTEXT_FIELD_CONTROL_OVERFLOW\b/);
   });
 
   it("空槽不算占位，非空缀与附加算占位", () => {

@@ -1,12 +1,11 @@
 /**
  * 下拉菜单落点（L3）。prefer=bottom、align=start、min=触发钮宽。
- * 只调 popover-place，不写第二套公式，不写色值。
+ * 只调 popover-place 算盒并返回 placement / overflowY / style。不写 DOM。
  */
 
 import { Density } from "../tokens/density";
 import { Spacing } from "../tokens/spacing";
 import {
-  applyPopoverBox,
   estimateMenuHeight,
   placePopover,
   popoverLayerStyle,
@@ -28,7 +27,6 @@ function selectRowHeight(trigger: SelectTriggerBox): number {
 export function layoutSelectMenu(
   trigger: SelectTriggerBox,
   measure: SelectMenuMeasure,
-  layer: HTMLElement,
   viewport: { width: number; height: number } = readViewport(),
 ): SelectMenuLayout {
   const menuHeight = Math.max(
@@ -47,7 +45,6 @@ export function layoutSelectMenu(
     gap: Spacing.Sm,
     maxHeightCap: Spacing.Xl * 10,
   });
-  applyPopoverBox(layer, box);
   return {
     placement: box.placement,
     overflowY: box.overflowY,

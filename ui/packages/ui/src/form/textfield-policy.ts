@@ -58,6 +58,7 @@ export interface TextFieldHostAttrs {
   "data-readonly": true | undefined;
   "data-active": true | undefined;
   "data-multiline": true | undefined;
+  "data-font": "mono" | undefined;
   disabled: boolean;
   readOnly: boolean;
   "aria-invalid": true | undefined;
@@ -72,6 +73,7 @@ export function textFieldHostAttrs(
       active?: boolean;
       multiline?: boolean;
       rows?: number;
+      font?: "ui" | "mono";
     },
 ): TextFieldHostAttrs {
   const spec = resolveTextFieldSpec(input);
@@ -90,6 +92,7 @@ export function textFieldHostAttrs(
     "data-readonly": interactive.readOnly ? true : undefined,
     "data-active": spec.active ? true : undefined,
     "data-multiline": spec.multiline ? true : undefined,
+    "data-font": input.font === "mono" ? "mono" : undefined,
     disabled: interactive.disabled,
     readOnly: interactive.readOnly,
     "aria-invalid": spec.status === "error" ? true : undefined,

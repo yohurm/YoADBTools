@@ -1,23 +1,17 @@
 /**
  * 定高虚拟列表模型（L2）。
- * 槽位池、窗口、选择投影与键盘目标下标是不变式；不碰 DOM / 不组装 aria。
+ * 槽位池、选择投影与键盘目标下标是不变式；不碰 DOM / 不组装 aria。
  */
 
-import { adjacentJoin, type SelectJoin } from "../keymap/selection";
+import { Spacing } from "../tokens/spacing";
 
-export const VIRTUAL_STICK_THRESHOLD = 32;
+export const VIRTUAL_STICK_THRESHOLD = Spacing.TwoXl;
 export const VIRTUAL_DEFAULT_ITEM_HEIGHT = 22;
 export const VIRTUAL_DEFAULT_OVERSCAN = 10;
 export const VIRTUAL_DEFAULT_TONE = "document";
 export const VIRTUAL_FOCUS_RETRY_LIMIT = 3;
 
 export type VirtualKeyIntent = { type: "move"; index: number } | { type: "commit" };
-
-export interface VirtualVisibleRow<T> {
-  index: number;
-  item: T;
-  key: string | number;
-}
 
 export interface VirtualIndicatorBox {
   x: number;
@@ -28,21 +22,6 @@ export interface VirtualIndicatorBox {
 
 export function virtualTotalHeight(count: number, itemHeight: number): number {
   return count * itemHeight;
-}
-
-/** 概念窗口（含对称 overscan），夹在 [0, count]。L4 渲染身份只走槽位池，不按这个切片挂载。 */
-export function virtualRange(
-  scrollTop: number,
-  viewportHeight: number,
-  itemHeight: number,
-  count: number,
-  overscan: number,
-): { start: number; end: number } {
-  if (itemHeight <= 0 || count <= 0) return { start: 0, end: 0 };
-  const start = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-  const visibleEnd = Math.ceil((scrollTop + viewportHeight) / itemHeight);
-  const end = Math.min(count, visibleEnd + overscan);
-  return { start, end };
 }
 
 /**
@@ -87,12 +66,12 @@ export function virtualPoolSlots(size: number): number[] {
 }
 
 export function isStuckToBottom(
-  scrollHeight: number,
+  contentExtent: number,
   clientHeight: number,
   scrollTop: number,
   threshold = VIRTUAL_STICK_THRESHOLD,
 ): boolean {
-  return scrollHeight - clientHeight - scrollTop <= threshold;
+  return contentExtent - clientHeight - scrollTop <= threshold;
 }
 
 export function virtualRowKey<T>(
@@ -101,26 +80,6 @@ export function virtualRowKey<T>(
   getItemKey?: (item: T, index: number) => string | number,
 ): string | number {
   return getItemKey ? getItemKey(item, index) : index;
-}
-
-export function virtualVisibleRows<T>(
-  items: readonly T[],
-  start: number,
-  end: number,
-  getItemKey?: (item: T, index: number) => string | number,
-): VirtualVisibleRow<T>[] {
-  const rows: VirtualVisibleRow<T>[] = [];
-  for (let i = start; i < end; i++) {
-    const item = items[i];
-    if (item === undefined) break;
-    rows.push({ index: i, item, key: virtualRowKey(item, i, getItemKey) });
-  }
-  return rows;
-}
-
-/** For 用的稳定 key。包装对象每次新建，不能当 For 身份。 */
-export function virtualVisibleKeys<T>(rows: readonly VirtualVisibleRow<T>[]): Array<string | number> {
-  return rows.map((row) => row.key);
 }
 
 export function isVirtualSelectable(
@@ -169,46 +128,6 @@ export function virtualActiveKey(
   return selectedKey ?? null;
 }
 
-export function virtualNeighborSelected<T>(
-  items: readonly T[],
-  index: number,
-  selectable: boolean,
-  selectedKeys?: ReadonlySet<string | number>,
-  selectedKey?: string | number | null,
-  getItemKey?: (item: T, index: number) => string | number,
-): boolean {
-  const item = items[index];
-  if (item === undefined) return false;
-  return isVirtualRowSelected(
-    virtualRowKey(item, index, getItemKey),
-    selectable,
-    selectedKeys,
-    selectedKey,
-  );
-}
-
-export function virtualAdjacentSelected<T>(
-  items: readonly T[],
-  index: number,
-  selectable: boolean,
-  selectedKeys?: ReadonlySet<string | number>,
-  selectedKey?: string | number | null,
-  getItemKey?: (item: T, index: number) => string | number,
-): { prev: boolean; next: boolean } {
-  return {
-    prev: virtualNeighborSelected(items, index - 1, selectable, selectedKeys, selectedKey, getItemKey),
-    next: virtualNeighborSelected(items, index + 1, selectable, selectedKeys, selectedKey, getItemKey),
-  };
-}
-
-export function virtualRowJoin(
-  selected: boolean,
-  prevSelected: boolean,
-  nextSelected: boolean,
-): SelectJoin | null {
-  return adjacentJoin(selected, prevSelected, nextSelected);
-}
-
 /** 活动行=0；空选时首可视行=0；否则 -1；不可选=undefined。禁止凡选中都 0（槽位回收会把焦点钉在槽上）。 */
 export function virtualRowTabIndex(input: {
   selectable: boolean;
@@ -238,6 +157,25 @@ export function virtualIndicatorFollow(
 
 export function virtualRowTop(index: number, itemHeight: number): number {
   return index * itemHeight;
+}
+
+/**
+ * block:nearest 的目标 scrollTop。
+ * 行已全可见则保持；上沿在视口之上则钉行顶；下沿在视口之下则钉行底。
+ * 不夹内容高度——可滚距离由 YoScroller.scrollTo 收口。
+ */
+export function virtualNearestScrollTop(
+  rowTop: number,
+  itemHeight: number,
+  view: number,
+  scrollTop: number,
+): number {
+  const start = Math.max(0, scrollTop);
+  if (!(itemHeight > 0) || !(view > 0)) return start;
+  const top = Math.max(0, rowTop);
+  if (top < start) return top;
+  if (top + itemHeight > start + view) return Math.max(0, top + itemHeight - view);
+  return start;
 }
 
 /** 内容坐标 Y：行位 + 换位让位（行数）。L4 用同一条 translate3d，禁止 top 与第二段 transform 叠跳。 */

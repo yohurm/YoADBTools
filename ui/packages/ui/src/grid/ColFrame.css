@@ -1,5 +1,5 @@
 /* 列轨宿主：一条 --yohu-col-tracks 驱动表头与行。
- * 表头行与虚拟列表预留同一条滚动槽，1fr 列才对齐。 */
+ * 清单滚条叠在视口上，表头不必为侧轨让位。禁止系统条槽。 */
 
 .yohu-col-frame {
   --yohu-col-tracks: none;
@@ -17,9 +17,4 @@
 
 .yohu-col-frame > .yohu-col-row {
   overflow: hidden;
-  scrollbar-gutter: stable;
-}
-
-.yohu-col-frame .yohu-virtual-list {
-  scrollbar-gutter: stable;
 }

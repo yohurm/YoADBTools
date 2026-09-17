@@ -23,6 +23,14 @@ describe("YoThemeToggle", () => {
     expect(btn.getAttribute("data-pressed")).toBeNull();
     expect(container.querySelector('svg[data-icon="display-on"]')).toBeTruthy();
     expect(container.querySelector('svg[data-icon="display-off"]')).toBeTruthy();
+    expect(btn.getAttribute("data-paint")).toBeNull();
+  });
+
+  it("paint=window 转发给 YoIconButton", () => {
+    render(() => <YoThemeToggle paint="window" />);
+    expect(screen.getByRole("button", { name: "切换到深色模式" }).getAttribute("data-paint")).toBe(
+      "window",
+    );
   });
 
   it("点击后切到深色并回调", async () => {

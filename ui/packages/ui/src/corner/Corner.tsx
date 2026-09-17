@@ -8,14 +8,32 @@
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { resolveCornerPaint, type CornerRadii, type CornerRole } from "./corner-model";
-import { resolveCornerHostSpec, type YoCornerMode } from "./corner-policy";
+import {
+  resolveCornerContentSpec,
+  resolveCornerHostSpec,
+  type YoCornerAlign,
+  type YoCornerDirection,
+  type YoCornerFlex,
+  type YoCornerGap,
+  type YoCornerJustify,
+  type YoCornerMode,
+  type YoCornerOverflow,
+  type YoCornerPad,
+} from "./corner-policy";
 import "./Corner.css";
 
-export type { CornerRadii, CornerRole, YoCornerMode };
-
-export type YoCornerFlex = "fill" | "hug";
-export type YoCornerOverflow = "visible" | "hidden";
-export type YoCornerPad = "none" | "xs" | "sm";
+export type {
+  CornerRadii,
+  CornerRole,
+  YoCornerAlign,
+  YoCornerDirection,
+  YoCornerFlex,
+  YoCornerGap,
+  YoCornerJustify,
+  YoCornerMode,
+  YoCornerOverflow,
+  YoCornerPad,
+};
 
 export interface YoCornerProps {
   role?: CornerRole;
@@ -28,10 +46,18 @@ export interface YoCornerProps {
   edgeOutset?: number;
   /** host 默认 fill；hug 不吃剩余高（校验条）。 */
   flex?: YoCornerFlex;
-  /** 内容槽溢出。默认 visible。清单定高用 hidden。 */
+  /** 内容槽主轴。默认 column。 */
+  direction?: YoCornerDirection;
+  /** 内容槽交叉轴。默认 stretch；行内徽章/图标钮/工具栏用 center。 */
+  align?: YoCornerAlign;
+  /** 内容槽主轴对齐。默认 start；图标钮/复选盒用 center。 */
+  justify?: YoCornerJustify;
+  /** 内容槽溢出。默认 visible。清单定高用 hidden；浮层可 auto（藏系统条）。 */
   overflow?: YoCornerOverflow;
   /** 内容槽垫。默认 none。 */
   pad?: YoCornerPad;
+  /** 内容槽间隙。默认 none。 */
+  gap?: YoCornerGap;
   class?: string;
   children?: JSX.Element;
 }
@@ -44,6 +70,16 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       stroke: props.stroke,
       clip: props.clip,
       mode: props.mode,
+    }),
+  );
+  const content = createMemo(() =>
+    resolveCornerContentSpec({
+      direction: props.direction,
+      align: props.align,
+      justify: props.justify,
+      overflow: props.overflow,
+      pad: props.pad,
+      gap: props.gap,
     }),
   );
 
@@ -115,8 +151,12 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       <Show when={spec().mode === "host"}>
         <div
           class="yohu-corner__content"
-          data-overflow={props.overflow ?? "visible"}
-          data-pad={props.pad ?? "none"}
+          data-direction={content().direction}
+          data-align={content().align}
+          data-justify={content().justify}
+          data-overflow={content().overflow}
+          data-pad={content().pad}
+          data-gap={content().gap}
           style={
             spec().clip && paint().clipPath !== "none"
               ? { "clip-path": paint().clipPath }

@@ -6,7 +6,9 @@ import { render, screen } from "@solidjs/testing-library";
 import { YoToolbar } from "./Toolbar";
 import { YoButton } from "../basic/Button";
 
-const toolbarCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Toolbar.css"), "utf-8");
+const here = dirname(fileURLToPath(import.meta.url));
+const toolbarCss = readFileSync(resolve(here, "Toolbar.css"), "utf-8");
+const toolbarSrc = readFileSync(resolve(here, "Toolbar.tsx"), "utf-8");
 
 describe("YoToolbar", () => {
   it("水平排列 children", () => {
@@ -21,6 +23,7 @@ describe("YoToolbar", () => {
     expect(toolbar.getAttribute("data-chrome")).toBe("band");
     expect(toolbar.getAttribute("data-overflow")).toBe("hidden");
     expect(toolbar.getAttribute("data-pad")).toBe("band");
+    expect(screen.getByRole("button", { name: "刷新" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "导出" })).toBeTruthy();
   });
 
@@ -39,8 +42,15 @@ describe("YoToolbar", () => {
     expect(toolbarCss).not.toMatch(/\[data-chrome="band"\]\s*\{[^}]*padding:/);
   });
 
-  it("横向裁切，不画系统条", () => {
-    expect(toolbarCss).toMatch(/\.yohu-toolbar \{[\s\S]*?overflow-x:\s*hidden;/);
-    expect(toolbarCss).not.toMatch(/overflow-x:\s*auto/);
+  it("两轴 overflow hidden，消费 data-overflow", () => {
+    expect(toolbarCss).toMatch(/\[data-overflow="hidden"\]\s*\{[^}]*overflow:\s*hidden/);
+    expect(toolbarCss).not.toMatch(/overflow-x\s*:/);
+    expect(toolbarCss).not.toMatch(/overflow-y\s*:/);
+    expect(toolbarCss).not.toMatch(/overflow\s*:\s*auto/);
+    expect(toolbarCss).not.toContain(".yohu-corner__content");
+    expect(toolbarSrc).toContain('direction="row"');
+    expect(toolbarSrc).toContain('align="center"');
+    expect(toolbarSrc).toContain('overflow="hidden"');
+    expect(toolbarSrc).toContain('gap="sm"');
   });
 });

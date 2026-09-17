@@ -35,11 +35,13 @@ describe("YoSwitch", () => {
   it("轨走 YoCorner 胶囊，宿主不再 overflow+底色叠圆角", () => {
     const { container } = render(() => <YoSwitch ariaLabel="自动刷新" checked={false} />);
     expect(container.querySelector(".yohu-switch__chrome")?.getAttribute("data-role")).toBe("control");
+    expect(container.querySelector(".yohu-corner__content")?.getAttribute("data-overflow")).toBe("hidden");
     const host = css.match(/^\.yohu-switch\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(host).toContain("overflow: visible");
     expect(host).toContain("background-color: transparent");
     expect(host).not.toContain("overflow: hidden");
     expect(host).toContain("--yohu-corner-fill: var(--yohu-switch-off)");
+    expect(css).not.toContain(".yohu-corner__content");
   });
 
   it("disabled 不触发 onChange", () => {

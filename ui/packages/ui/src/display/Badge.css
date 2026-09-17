@@ -18,13 +18,6 @@
   height: 100%;
 }
 
-.yohu-badge__chrome .yohu-corner__content {
-  flex-direction: row;
-  align-items: center;
-  padding: 0 var(--yohu-space-sm);
-  overflow: hidden;
-}
-
 .yohu-badge[data-tone="neutral"] {
   --yohu-corner-fill: var(--yohu-surface-2);
   --yohu-corner-stroke: var(--yohu-border);

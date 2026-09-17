@@ -15,7 +15,10 @@ export interface ReorderSession {
   key: string | number;
 }
 
-/** 变高列表行盒。top / height 是滚动内容坐标，不是视口。 */
+/**
+ * 变高列表行盒。L2 只认滚动内容坐标：相对 Port.view() 顶 + scrollTop。
+ * 不是视口 Y，也不是列表宿主 local。list 贴齐内容原点时与 inner 同值。
+ */
 export interface ReorderRowBox {
   top: number;
   height: number;
@@ -35,6 +38,7 @@ export function moveItemTo<T>(items: readonly T[], from: number, to: number): T[
 /**
  * 指针落到最近行缝（0..count）。对标 Apple / Atlassian closest-edge：
  * 上半插入该行之前，下半插入之后；可落到最后一行之后。
+ * listTop 必须是滚轴视口顶（Port.view() / viewRef），与 pointerContentY 同一代数。
  */
 export function insertIndexFromPointerY(
   listTop: number,
@@ -75,7 +79,7 @@ export function reorderBarOffset(insert: number, itemHeight: number): number {
   return Math.max(0, insert) * itemHeight;
 }
 
-/** 浮层相对滚动容器顶：跟着指针，扣住按下时的抓取偏移。 */
+/** 浮层相对视口顶（与 viewTop 对齐的非滚平面）：跟着指针，扣住按下时的抓取偏移。 */
 export function overlayOffset(pointerY: number, listTop: number, grabOffset: number, itemHeight: number, viewportHeight: number): number {
   const raw = pointerY - listTop - grabOffset;
   return Math.max(0, Math.min(Math.max(0, viewportHeight - itemHeight), raw));
@@ -87,7 +91,12 @@ export function rowTopInViewport(
   index: number,
   itemHeight: number,
 ): number {
-  return listTop + index * itemHeight - scrollTop;
+  return contentTopInViewport(listTop, scrollTop, index * itemHeight);
+}
+
+/** 内容坐标钉回视口 Y。与 pointerContentY 互逆；listTop 必须是 Port.view() 顶。 */
+export function contentTopInViewport(viewTop: number, scrollTop: number, contentTop: number): number {
+  return viewTop + contentTop - scrollTop;
 }
 
 /** 指针内容坐标落到最近行缝（0..count）。上半插入该行之前，下半之后。 */
@@ -112,6 +121,7 @@ export function shiftPxForReorder(index: number, from: number, to: number, sourc
   return shiftForReorder(index, from, to) * sourceHeight;
 }
 
+/** 视口 Y → 滚动内容坐标。listTop 必须是 Port.view() 顶，禁止列表宿主顶。 */
 export function pointerContentY(listTop: number, scrollTop: number, clientY: number): number {
   return clientY - listTop + scrollTop;
 }

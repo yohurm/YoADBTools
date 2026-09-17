@@ -10,20 +10,8 @@ export interface StatusBarHostAttrs {
   "data-role": StatusBarRole;
 }
 
-export interface StatusBarSlots {
-  hasLeft: boolean;
-  hasRight: boolean;
-}
-
 export function statusbarHostAttrs(): StatusBarHostAttrs {
   return {
     "data-role": resolveStatusBarSpec().role,
-  };
-}
-
-export function resolveStatusBarSlots(input: { left?: boolean; right?: boolean }): StatusBarSlots {
-  return {
-    hasLeft: Boolean(input.left),
-    hasRight: Boolean(input.right),
   };
 }

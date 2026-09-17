@@ -10,9 +10,10 @@
  *
  * 盒：`open` 只是 Presence 开关。fit hug、fill 显式高、exit 锁最后打开盒。
  * fit 外包公开 YoTravel；名单走 YoReveal（open 即接入）。
- * hug 跟 Presence 寿命。关窗冻锁。行程中主槽 clip。
+ * hug 跟 Presence 寿命。关窗冻锁。
+ * DialogChrome 订 useTravel()，panel 写 data-clip（`fit∧open` 或 `traveling()`）。
  * 滚槽是 children 槽：调用方组合 YoScroller。本容器不 import 产品 Yo*。
- * 禁止观察 DOM、禁止 hold+rAF、禁止模块自绑行程。
+ * 禁止观察 DOM、禁止 hold+rAF、禁止模块自绑行程。禁止 CSS 读 [data-travel]。
  * fit + overflow=auto 的滚槽预算是 `--yohu-layout-dialog-body-max`。
  * split（bodyLead / bodyTail）钉住铬，视口槽给调用方的 YoScroller；YoReveal 只进视口。
  * 载荷在 `onExitComplete` 再卸，禁止跟 `onClose` 同拍清。
@@ -35,8 +36,8 @@
 import { Show, children, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
 import { YoCorner } from "../corner";
-import { YoPresence } from "../motion/presence";
-import { YoTravel } from "../motion/travel";
+import { YoPresence } from "../motion/engines/presence";
+import { YoTravel, useTravel } from "../motion/engines/travel";
 import {
   resolveDialogBox,
   resolveDialogInitial,
@@ -91,6 +92,26 @@ export interface YoDialogProps {
 }
 
 /**
+ * Travel 子树里的铬。订 useTravel()，把行程态回传给 panel 的 data-clip。
+ * 圆角走公开 YoCorner（flex=fill、overflow=hidden），禁止点 __content。
+ */
+function DialogChrome(props: {
+  onTraveling: (traveling: boolean) => void;
+  children: JSX.Element;
+}): JSX.Element {
+  const travel = useTravel();
+  createEffect(() => {
+    props.onTraveling(travel?.traveling() === true);
+  });
+  onCleanup(() => props.onTraveling(false));
+  return (
+    <YoCorner role="dialog" class="yohu-dialog__chrome" flex="fill" overflow="hidden">
+      {props.children}
+    </YoCorner>
+  );
+}
+
+/**
  * 渲染一个带遮罩的模态对话框。
  */
 export function YoDialog(props: YoDialogProps): JSX.Element {
@@ -99,7 +120,17 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
   const footerKids = children(() => props.footer);
 
   const [panelEl, setPanelEl] = createSignal<HTMLDivElement | undefined>();
+  const [trip, setTrip] = createSignal(false);
   let lastOpenBox: DialogBoxLock | undefined;
+  const box = () =>
+    resolveDialogBox({
+      width: props.width,
+      height: props.height,
+      open: isOpen(),
+      lastOpen: isOpen() ? undefined : lastOpenBox,
+    });
+  const travelOn = (): boolean => box().kind === "fit" && isOpen();
+  const clip = (): boolean => travelOn() || trip();
 
   createEffect(() => {
     if (!isOpen()) return;
@@ -125,14 +156,6 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
     if (isOpen()) snap();
     onCleanup(snap);
   });
-
-  const box = () =>
-    resolveDialogBox({
-      width: props.width,
-      height: props.height,
-      open: isOpen(),
-      lastOpen: isOpen() ? undefined : lastOpenBox,
-    });
 
   const body = () =>
     dialogBodyAttrs({
@@ -165,10 +188,11 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
           ref={setPanelEl}
           data-box={box().kind}
           data-sized={box().sized ? "" : undefined}
+          data-clip={clip() ? "on" : undefined}
           style={box().style}
         >
-          <YoTravel axes={["block"]} enabled={props.height === undefined && isOpen()}>
-            <YoCorner role="dialog" class="yohu-dialog__chrome">
+          <YoTravel axes={["block"]} enabled={travelOn()}>
+            <DialogChrome onTraveling={setTrip}>
               {props.title ? (
                 <h3 id={titleId} class="yohu-dialog__title">
                   {props.title}
@@ -196,7 +220,7 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
                   {footerKids()}
                 </div>
               ) : null}
-            </YoCorner>
+            </DialogChrome>
           </YoTravel>
         </div>
       </div>

@@ -175,8 +175,8 @@ export const MotionCatalog = {
   scroller: {
     name: "scroller",
     engine: "implicit",
-    spec: ["effectsEnter", "effectsExit"],
-    properties: ["opacity"],
+    spec: ["effectsEnter", "effectsExit", "effectsFast"],
+    properties: ["opacity", "background-color"],
     interruptible: true,
   },
 } as const satisfies Record<string, MotionCatalogEntry>;

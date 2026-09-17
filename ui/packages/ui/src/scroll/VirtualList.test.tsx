@@ -4,15 +4,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { createSignal, type Component } from "solid-js";
+import { overlayOffset, pointerContentY, rowTopInViewport } from "./reorder-model";
 import { YoVirtualList } from "./VirtualList";
+import { virtualNearestScrollTop } from "./virtuallist-model";
 
-// jsdom 未实现 scrollIntoView（键盘导航滚入视野依赖它）
-const scrollIntoViewMock = vi.fn();
-Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-  value: scrollIntoViewMock,
-  writable: true,
-  configurable: true,
-});
 Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
   value: () => undefined,
   writable: true,
@@ -53,7 +48,7 @@ function options(container: HTMLElement): HTMLElement[] {
 }
 
 function scroller(container: HTMLElement): HTMLElement {
-  return container.querySelector(".yohu-virtual-list") as HTMLElement;
+  return container.querySelector(".yohu-scroller__view") as HTMLElement;
 }
 
 /** jsdom 无 PointerEvent；clientY / pointerId 直接写到 Event 上。 */
@@ -97,6 +92,27 @@ describe("YoVirtualList", () => {
     expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-tone")).toBe("list");
   });
 
+  it("自持 YoScroller：产品条在清单内，宿主不是滚口", () => {
+    const { container } = render(() => (
+      <YoVirtualList items={() => makeItems(8)} itemHeight={22} renderRow={TestRow} />
+    ));
+    expect(container.querySelector(".yohu-virtual-list .yohu-scroller")).not.toBeNull();
+    expect(container.querySelector(".yohu-scroller__thumb")?.getAttribute("role")).toBe("scrollbar");
+    expect(container.querySelector(".yohu-virtual-list")?.classList.contains("yohu-scroller")).toBe(false);
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
+    expect(src).toContain("from \"./Scroller\"");
+    expect(src).toContain('state="on"');
+    expect(src).not.toContain("onWheel");
+    expect(src).not.toContain("resolveScrollerWheelDelta");
+    expect(src).not.toContain("scrollHeight");
+    expect(src).not.toContain("container.scrollTop =");
+    expect(src).toContain("scrollToEnd");
+    expect(src).toContain("scrollTo(");
+    expect(src).toContain("virtualNearestScrollTop");
+    expect(src).toContain("preventScroll: true");
+    expect(src).not.toContain("scrollIntoView");
+  });
+
   it("VirtualList.css 只管槽位几何，行铬不在本文件", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.css"), "utf-8");
     expect(css).toMatch(/\.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*\}/);
@@ -107,10 +123,14 @@ describe("YoVirtualList", () => {
       /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
     expect(css).toMatch(/\[role="listbox"\]:not\(\[data-reordering\]\) \{\s*user-select: none;/);
-    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow-x:\s*hidden;/);
-    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow-y:\s*auto;/);
-    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?scrollbar-width:\s*none;/);
-    expect(css).toContain(".yohu-virtual-list::-webkit-scrollbar");
+    expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*hidden;/);
+    expect(css).not.toContain("!important");
+    expect(css).not.toContain(":has(.yohu-list-row");
+    expect(css).toContain("overscroll-behavior: contain");
+    expect(css).not.toMatch(/overflow-y\s*:\s*auto/);
+    expect(css).not.toContain("scrollbar-width");
+    expect(css).not.toContain("::-webkit-scrollbar");
+    expect(css).not.toContain("scrollbar-gutter");
     expect(css.match(/\.yohu-virtual-list__inner\s*\{[^}]*\}/)?.[0] ?? "").not.toContain("overflow");
     expect(css).not.toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*auto;/);
     expect(css).not.toContain("yohu-virtual-list__scroll");
@@ -213,10 +233,12 @@ describe("YoVirtualList", () => {
       />
     ));
     const list = scroller(container);
-    Object.defineProperty(list, "scrollHeight", { value: 22000, configurable: true, writable: true });
+    const inner = container.querySelector(".yohu-virtual-list__inner") as HTMLElement;
+    Object.defineProperty(list, "clientHeight", { value: 20, configurable: true });
+    Object.defineProperty(inner, "offsetHeight", { value: 66, configurable: true });
     setItems(["a", "b", "c"]);
     await Promise.resolve();
-    expect(list.scrollTop).toBe(22000);
+    expect(list.scrollTop).toBe(46);
   });
 
   it("离开底部 onAtBottomChange(false)，回到底部时 true", () => {
@@ -232,7 +254,6 @@ describe("YoVirtualList", () => {
     ));
     const list = scroller(container);
     Object.defineProperty(list, "clientHeight", { value: 200, configurable: true });
-    Object.defineProperty(list, "scrollHeight", { value: 2200, configurable: true });
     Object.defineProperty(list, "scrollTop", { value: 0, configurable: true, writable: true });
     fireEvent.scroll(list);
     expect(onAtBottom).toHaveBeenCalledWith(false);
@@ -281,6 +302,7 @@ describe("YoVirtualList", () => {
     expect(rows[0]?.getAttribute("aria-selected")).toBe("false");
     expect(container.querySelector(".yohu-virtual-list .yohu-recipe-indicator--fill")).toBeTruthy();
     expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-indicator")).toBe("fill");
+    expect(container.querySelector(".yohu-virtual-list")?.hasAttribute("data-indicator-hot")).toBe(false);
     expect(container.querySelector(".yohu-virtual-list")?.classList.contains("yohu-indicator-host")).toBe(false);
     expect(container.querySelector(".yohu-virtual-list__inner")?.classList.contains("yohu-indicator-host")).toBe(
       false,
@@ -314,13 +336,17 @@ describe("YoVirtualList", () => {
 
   it("Home/End 跳到首尾行：目标行在虚拟化外时滚动渲染后聚焦", async () => {
     const { container } = render(() => <SelectionHarness count={60} />);
+    const list = scroller(container);
+    const inner = container.querySelector(".yohu-virtual-list__inner") as HTMLElement;
+    Object.defineProperty(list, "clientHeight", { value: 200, configurable: true });
+    Object.defineProperty(inner, "offsetHeight", { value: 60 * 22, configurable: true });
     const rows = options(container);
     fireEvent.keyDown(rows[0] as HTMLElement, { key: "End" });
     await Promise.resolve();
     await Promise.resolve();
     const last = container.querySelector('[data-key="59"]');
     expect(last?.getAttribute("aria-selected")).toBe("true");
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(list.scrollTop).toBe(virtualNearestScrollTop(59 * 22, 22, 200, 0));
     expect(document.activeElement).toBe(last);
     fireEvent.keyDown(last as HTMLElement, { key: "Home" });
     await Promise.resolve();
@@ -328,6 +354,41 @@ describe("YoVirtualList", () => {
     const first = container.querySelector('[data-key="0"]');
     expect(first?.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(first);
+  });
+
+  it("中间视口键盘落到视口外：已滚过再 nearest，且无 scrollIntoView", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      writable: true,
+      configurable: true,
+    });
+    const intoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const { container } = render(() => <SelectionHarness count={60} />);
+    const list = scroller(container);
+    const inner = container.querySelector(".yohu-virtual-list__inner") as HTMLElement;
+    const itemHeight = 22;
+    const view = 200;
+    const mid = 20 * itemHeight;
+    Object.defineProperty(list, "clientHeight", { value: view, configurable: true });
+    Object.defineProperty(inner, "offsetHeight", { value: 60 * itemHeight, configurable: true });
+    Object.defineProperty(list, "scrollTop", { value: mid, configurable: true, writable: true });
+    fireEvent.scroll(list);
+    await Promise.resolve();
+    const inView = container.querySelector('[data-key="20"]') as HTMLElement;
+    fireEvent.click(inView);
+    await Promise.resolve();
+    expect(inView.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(inView, { key: "ArrowUp" });
+    await Promise.resolve();
+    await Promise.resolve();
+    const above = container.querySelector('[data-key="19"]');
+    const expected = virtualNearestScrollTop(19 * itemHeight, itemHeight, view, mid);
+    expect(expected).not.toBe(virtualNearestScrollTop(19 * itemHeight, itemHeight, view, 0));
+    expect(list.scrollTop).toBe(expected);
+    expect(above?.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(above);
+    expect(intoView).not.toHaveBeenCalled();
+    intoView.mockRestore();
   });
 
   it("多选行自绘直角底，不挂 chip 邻接 class，也不挂滑块", () => {
@@ -382,6 +443,33 @@ describe("YoVirtualList", () => {
     expect(container.querySelector(".yohu-list-frame")).toBeTruthy();
     expect(container.querySelector(".yohu-recipe-indicator--fill")).toBeNull();
     expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-indicator")).toBeNull();
+  });
+
+  it("选中行指针热态写 data-indicator-hot，不穿 :has list-row", async () => {
+    const indicatorCss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../motion/engines/indicator/indicator.css"),
+      "utf-8",
+    );
+    expect(indicatorCss).toContain('[data-indicator-hot="hover"] .yohu-recipe-indicator--fill');
+    expect(indicatorCss).toContain('[data-indicator-hot="pressed"] .yohu-recipe-indicator--fill');
+    expect(indicatorCss).not.toContain(":has(.yohu-list-row");
+
+    const { container } = render(() => <SelectionHarness />);
+    const rows = options(container);
+    fireEvent.click(rows[2] as HTMLElement);
+    await Promise.resolve();
+    const host = container.querySelector(".yohu-virtual-list") as HTMLElement;
+    fireEvent.pointerOver(rows[2] as HTMLElement);
+    expect(host.getAttribute("data-indicator-hot")).toBe("hover");
+    fireEvent.pointerOver(rows[0] as HTMLElement);
+    expect(host.hasAttribute("data-indicator-hot")).toBe(false);
+    fireEvent.pointerOver(rows[2] as HTMLElement);
+    fireEvent.pointerDown(rows[2] as HTMLElement);
+    expect(host.getAttribute("data-indicator-hot")).toBe("pressed");
+    fireEvent.pointerUp(rows[2] as HTMLElement);
+    expect(host.getAttribute("data-indicator-hot")).toBe("hover");
+    fireEvent.pointerOut(rows[2] as HTMLElement);
+    expect(host.hasAttribute("data-indicator-hot")).toBe(false);
   });
 
   it("未提供 onReorder 时不挂拖拽条", () => {
@@ -449,6 +537,66 @@ describe("YoVirtualList", () => {
     expect(host.hasAttribute("data-reordering")).toBe(false);
     expect(bar?.hasAttribute("data-open")).toBe(false);
     expect(container.querySelector(".yohu-recipe-reorder-overlay")).toBeNull();
+  });
+
+  it("换位：viewTop≠0 / scrollTop≠0 时插缝与 overlay 走视口代数", () => {
+    const onReorder = vi.fn();
+    const items = ["a", "b", "c"];
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => items}
+        itemHeight={22}
+        getItemKey={(item) => item}
+        selectedKey={() => "a"}
+        onSelectRow={() => undefined}
+        onReorder={onReorder}
+        renderRow={TestRow}
+      />
+    ));
+    const host = container.querySelector(".yohu-virtual-list") as HTMLElement;
+    const list = scroller(container);
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({
+      top: 80,
+      left: 0,
+      bottom: 146,
+      right: 100,
+      width: 100,
+      height: 66,
+      x: 0,
+      y: 80,
+      toJSON() {
+        return {};
+      },
+    });
+    Object.defineProperty(list, "scrollTop", { value: 40, configurable: true, writable: true });
+    Object.defineProperty(list, "clientHeight", { value: 66, configurable: true });
+    const bar = container.querySelector(".yohu-recipe-reorder-bar") as HTMLElement;
+    const row = container.querySelector('[data-key="a"]') as HTMLElement;
+    firePointer(row, "pointerdown", 44);
+    firePointer(window, "pointermove", 52);
+    expect(host.hasAttribute("data-reordering")).toBe(true);
+    firePointer(window, "pointermove", 100);
+    const overlay = container.querySelector(".yohu-recipe-reorder-overlay") as HTMLElement;
+    const viewTop = 80;
+    const scrollTop = 40;
+    const itemHeight = 22;
+    const viewportHeight = 66;
+    const startY = 44;
+    const grabOffset = startY - rowTopInViewport(viewTop, scrollTop, 0, itemHeight);
+    const overlayTopAt = (pointerY: number): { viewport: string; content: string } => ({
+      viewport: `${overlayOffset(pointerY, viewTop, grabOffset, itemHeight, viewportHeight)}px`,
+      content: `${pointerContentY(viewTop, scrollTop, pointerY) - grabOffset}px`,
+    });
+    expect(overlay.closest(".yohu-scroller__view")).toBeNull();
+    expect(overlay.closest(".yohu-virtual-list")).toBe(host);
+    expect(bar.hasAttribute("data-open")).toBe(true);
+    expect(bar.style.top).toBe("66px");
+    const at100 = overlayTopAt(100);
+    expect(at100.viewport).not.toBe(at100.content);
+    expect(overlay.style.top).toBe(at100.viewport);
+    expect(overlay.style.top).not.toBe(at100.content);
+    firePointer(window, "pointerup", 100);
+    expect(onReorder).toHaveBeenCalledWith(0, 2);
   });
 
   it("未过臂距不换位，点击仍选中", async () => {

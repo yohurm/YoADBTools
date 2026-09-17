@@ -28,7 +28,7 @@ export function YoProgressBar(props: YoProgressBarProps): JSX.Element {
       aria-valuemax={host()["aria-valuemax"]}
       aria-valuenow={host()["aria-valuenow"]}
     >
-      <YoCorner role="control" class="yohu-progress__chrome">
+      <YoCorner role="control" class="yohu-progress__chrome" overflow="hidden">
         <div class="yohu-progress__bar" style={width() ? { width: width() } : undefined} />
       </YoCorner>
     </div>

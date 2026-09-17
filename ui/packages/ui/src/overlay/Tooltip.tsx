@@ -7,11 +7,11 @@
  * Unique 卸了 Presence 还在播，空铬会再走一遍 popover 渐入渐出。
  * 禁止包已画出的字；省略号不靠气泡复述。图标钮走 YoIconButton.title。
  */
-import { createContext, createEffect, createMemo, createSignal, onCleanup, useContext } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
-import { YoPresence } from "../motion/presence";
+import { YoPresence } from "../motion/engines/presence";
 import type { MotionSpecName } from "../tokens/motion";
 import type { PopoverPlacement } from "./popover-place";
 import { allocTooltipId, tooltipDomId } from "./tooltip-model";
@@ -26,7 +26,6 @@ import {
   tooltipSessionOpen,
   tooltipUnique,
   type TooltipSession,
-  type TooltipUnique,
 } from "./tooltip-policy";
 import "./Tooltip.css";
 
@@ -46,35 +45,17 @@ export interface YoTooltipProps {
 }
 
 export interface YoTooltipHostProps {
-  /** 独立 Unique 槽（测试隔离）。不传则用缺省槽。 */
-  unique?: TooltipUnique;
-  /** 被 Unique 槽覆盖的锚点树。不传则只挂 popup（与缺省槽对接）。 */
+  /** 被缺省 Unique 槽覆盖的锚点树。不传则只挂 popup。 */
   children?: JSX.Element;
 }
 
-const TooltipUniqueContext = createContext<TooltipUnique>();
-
-/** Solid 的 children 在父作用域创建，吃不到 Host Provider；由 Host 登记当前槽。 */
-let hostedUnique: TooltipUnique = tooltipUnique;
-
-function useTooltipUnique(): TooltipUnique {
-  return useContext(TooltipUniqueContext) ?? hostedUnique;
-}
-
 /**
- * Unique 浮层树节点。应用根挂一份；密集提示共用这一个 popup。
+ * Unique 浮层树节点。应用根挂一份；密集提示共用缺省 popup。
  */
 export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
-  const unique = (): TooltipUnique => props.unique ?? tooltipUnique;
-
   createEffect(() => {
-    const slot = unique();
-    hostedUnique = slot;
     const unbindInput = bindTooltipInputModality();
-    onCleanup(() => {
-      unbindInput();
-      if (hostedUnique === slot) hostedUnique = tooltipUnique;
-    });
+    onCleanup(unbindInput);
   });
   const [placement, setPlacement] = createSignal<PopoverPlacement>("top");
   const [layerStyle, setLayerStyle] = createSignal<JSX.CSSProperties>({});
@@ -82,7 +63,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
   let layerRef: HTMLDivElement | undefined;
   let contentRef: HTMLDivElement | undefined;
 
-  const live = createMemo(() => unique().session());
+  const live = createMemo(() => tooltipUnique.session());
   const paint = createMemo(() => tooltipPaintSession(live(), held()));
   const open = createMemo(() => tooltipSessionOpen(live()));
   const paintId = createMemo(() => {
@@ -119,7 +100,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
   });
 
   return (
-    <TooltipUniqueContext.Provider value={unique()}>
+    <>
       {props.children}
       <Portal mount={document.body}>
         <YoPresence
@@ -160,7 +141,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
           </div>
         </YoPresence>
       </Portal>
-    </TooltipUniqueContext.Provider>
+    </>
   );
 }
 
@@ -168,7 +149,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
  * 锚点包装。只登记 Unique 槽；自己不建 Portal。
  */
 export function YoTooltip(props: YoTooltipProps): JSX.Element {
-  const unique = useTooltipUnique();
+  const unique = tooltipUnique;
   const id = allocTooltipId();
   let anchorRef: HTMLSpanElement | undefined;
 

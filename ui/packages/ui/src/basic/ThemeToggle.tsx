@@ -9,9 +9,9 @@ import {
   nextResolvedTheme,
   runThemeViewTransition,
   themeTransitionOriginFromElement,
-} from "../motion/theme-transition";
+} from "../motion/engines/theme";
 import { getTheme, onResolvedThemeChange, setTheme, type ThemeName } from "../tokens";
-import { YoIconButton } from "./IconButton";
+import { YoIconButton, type YoIconButtonPaint } from "./IconButton";
 import { THEME_TOGGLE_MOON, THEME_TOGGLE_SUN } from "./theme-toggle-model";
 import { themeToggleHostAttrs } from "./theme-toggle-policy";
 import "./ThemeToggle.css";
@@ -19,6 +19,8 @@ import "./ThemeToggle.css";
 export interface YoThemeToggleProps {
   /** 主题已应用到 document 后回调（壳用来 settings.set） */
   onThemeChange?: (theme: ThemeName) => void | Promise<void>;
+  /** 转发给 YoIconButton。标题栏 actions 传 window。 */
+  paint?: YoIconButtonPaint;
 }
 
 /** 渲染标题栏深浅色切换钮（当前浅色显示太阳，深色显示月亮）。 */
@@ -36,6 +38,7 @@ export function YoThemeToggle(props: YoThemeToggleProps): JSX.Element {
   return (
     <YoIconButton
       title={host().title}
+      paint={props.paint}
       aria-pressed={host()["aria-pressed"]}
       disabled={host().disabled}
       onClick={(event) => {

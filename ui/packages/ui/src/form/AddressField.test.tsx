@@ -128,6 +128,16 @@ describe("YoAddressField", () => {
     expect(css).toContain("clip-path: inset(0 100% 0 0)");
     expect(css).toContain("field-sizing: content");
     expect(css).not.toContain("yohu-text-field");
+    expect(css).not.toContain("yohu-corner__content");
+    expect(css).not.toContain("data-mode");
+    expect(css).not.toContain("__content");
+    expect(css).toMatch(/\.yohu-address__field-chrome\s*\{[^}]*height:\s*100%/);
+    expect(css).not.toMatch(/overflow-x:/);
+    expect(css).not.toMatch(/overflow-y:/);
+    const tsx = load("src/form/AddressField.tsx");
+    expect(tsx).toMatch(/flex="hug"/);
+    expect(tsx).not.toContain("data-mode");
+    expect(tsx).not.toContain("yohu-corner__content");
     expect(addressOpenCaret("/a")).toEqual({ start: 2, end: 2 });
     expect(addressCrumbPath(["sdcard", "DCIM"], 1)).toBe("/sdcard/DCIM");
   });

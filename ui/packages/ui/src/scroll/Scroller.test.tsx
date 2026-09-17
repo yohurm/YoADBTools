@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { render } from "@solidjs/testing-library";
 
-import { YoScroller } from "./Scroller";
+import { YoScroller, type YoScrollerHandle } from "./Scroller";
+import { useScrollerPort } from "./scroller-port";
 
 function load(rel: string): string {
   const candidates = [
@@ -26,27 +27,90 @@ describe("YoScroller", () => {
     expect(container.querySelector(".yohu-scroller__view")?.textContent).toBe("名单");
     expect(container.querySelector(".yohu-scroller__lane")?.getAttribute("data-lane")).toBe("off");
     expect(container.querySelector(".yohu-scroller__thumb")?.getAttribute("role")).toBe("scrollbar");
+    expect(container.querySelector(".yohu-scroller")?.getAttribute("data-bar")).toBe("auto");
   });
 
-  it("几何预留 8vp 侧轨，滑块可点，收回 out 才不接指针，不点 Dialog", () => {
+  it("几何叠在视口上，滑块可点，视口不留系统条", () => {
     const css = load("src/scroll/Scroller.css");
-    expect(css).toContain("flex: 0 0 var(--yohu-space-sm)");
-    expect(css).toContain("position: relative");
-    expect(css).toContain("scrollbar-width: none");
+    expect(css).toContain("position: absolute");
+    expect(css).toContain("inset-inline-end: var(--yohu-space-xs)");
+    expect(css).toContain("width: var(--yohu-space-xs)");
+    expect(css).toContain("background-color: var(--yohu-fg-3)");
+    expect(css).toContain(".yohu-scroller__view {");
+    expect(css).toContain("overflow: hidden");
+    expect(css).not.toContain("!important");
+    expect(css).toContain("flex: 1 1 auto");
+    expect(css).not.toContain("flex: 1 1 0");
+    expect(css).not.toContain('[data-overflow="auto"] > .yohu-scroller__view');
+    expect(css).toContain("overscroll-behavior: contain");
+    expect(css).not.toMatch(/overflow-y\s*:\s*auto/);
+    expect(css).not.toContain("scrollbar-width");
     expect(css).toContain("touch-action: none");
     expect(css).toContain('[data-scroll="out"]');
+    expect(css).not.toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).not.toContain("yohu-dialog");
     const src = load("src/scroll/Scroller.tsx");
-    expect(src).toContain("setPointerCapture");
-    expect(src).toContain("resolveScrollerFlowSize");
-    expect(src).toContain("resolveScrollerFlowChild");
+    const binder = load("src/scroll/scroller-binder.ts");
+    expect(src).toContain("createScrollerBinder");
     expect(src).toContain("useTravel");
+    expect(src).toContain("useCollapseTravel");
+    expect(src).toContain("useRail");
+    expect(src).toContain("railTraveling");
     expect(src).toContain("traveling()");
-    expect(src).toContain("lastThumb");
-    expect(src).toContain("resolveScrollerScrollEnd");
     expect(src).toContain("scrollToEnd");
+    expect(src).toContain("scrollToStart");
+    expect(src).toContain("scrollPage");
+    expect(src).toContain("ScrollerPortContext.Provider");
+    expect(src).toContain("plane:");
+    expect(src).toMatch(/const handle: YoScrollerHandle = \{[\s\S]*scrollTo: binder\.scrollTo/);
+    expect(src).not.toMatch(/const port: ScrollerPort = \{[\s\S]*scrollTo:/);
     expect(src).not.toContain("scrollHeight");
-    expect(src).not.toContain("closest(");
+    expect(src).not.toContain('closest("[data-travel]")');
     expect(src).not.toContain("yohu-dialog");
+    expect(src).not.toContain("export { useScrollerPort }");
+    expect(src).not.toContain("export type { ScrollerPort }");
+    expect(src).not.toContain('querySelector(".yohu-scroller__view")');
+    expect(src).not.toMatch(/overflow-y\s*:\s*auto/);
+    expect(binder).toContain("setPointerCapture");
+    expect(binder).toContain("resolveScrollerFlowSize");
+    expect(binder).toContain("resolveScrollerFlowChild");
+    expect(binder).toContain("resolveScrollerWheelDelta");
+    expect(binder).toContain("resolveScrollerPageTop");
+    expect(binder).toContain("SCROLLER_AUTO_HIDE_MS");
+    expect(binder).toContain("SCROLLER_PAGE_REPEAT_MS");
+    expect(binder).toContain("onWheel");
+    expect(binder).toContain("lastThumb");
+    expect(binder).toContain("ResizeObserver");
+    expect(binder).toContain("applyScrollTop");
+    expect(binder).not.toContain("scrollHeight");
+    expect(binder).not.toContain("yohu-dialog");
+    expect(binder).not.toMatch(/overflow-y\s*:\s*auto/);
+    expect(binder).not.toContain("!important");
+  });
+
+  it("同族经 ScrollerPort 读滚口，不 scrape class", () => {
+    let port: ReturnType<typeof useScrollerPort>;
+    let handle: YoScrollerHandle | undefined;
+    const Probe = () => {
+      port = useScrollerPort();
+      return <span>探针</span>;
+    };
+    const { container } = render(() => (
+      <YoScroller handle={(api) => {
+        handle = api;
+      }}>
+        <Probe />
+      </YoScroller>
+    ));
+    const view = container.querySelector(".yohu-scroller__view") as HTMLDivElement;
+    const plane = container.querySelector(".yohu-scroller") as HTMLDivElement;
+    expect(port?.view()).toBe(view);
+    expect(port?.plane()).toBe(plane);
+    expect(port?.plane()).not.toBe(view);
+    expect(plane.contains(view)).toBe(true);
+    expect(port?.scrollTop()).toBe(view.scrollTop);
+    expect(port?.clientHeight()).toBe(view.clientHeight);
+    expect(handle?.scrollTo).toBeTypeOf("function");
+    expect(port).not.toHaveProperty("scrollTo");
   });
 });

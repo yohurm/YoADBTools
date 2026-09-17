@@ -209,7 +209,7 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
             if (!open()) finishClose();
           }}
         >
-          <YoCorner role="control" class="yohu-address__field-chrome">
+          <YoCorner role="control" class="yohu-address__field-chrome" flex="hug" direction="row">
             <input
               ref={(el) => {
                 inputEl = el;

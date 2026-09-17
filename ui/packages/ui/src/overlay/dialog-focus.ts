@@ -8,7 +8,6 @@ export const DIALOG_FOCUSABLE =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 export const DIALOG_SKIP_ATTR = "data-dialog-skip";
-export const DIALOG_INITIAL_ATTR = "data-dialog-initial";
 
 export function isDialogFocusable(el: HTMLElement): boolean {
   return !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true";
@@ -18,10 +17,8 @@ export function dialogFocusables(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE)).filter(isDialogFocusable);
 }
 
-/** 入场首焦：显式标记 → footer 第一钮 → 第一个未 skip 的可聚焦 → 面板。 */
+/** 入场首焦：initial=footer 落页脚第一钮，否则第一个未 skip 的可聚焦，再否则面板。 */
 export function dialogInitialFocus(panel: HTMLElement, initial?: YoDialogInitial): HTMLElement {
-  const marked = panel.querySelector<HTMLElement>(`[${DIALOG_INITIAL_ATTR}]`);
-  if (marked && isDialogFocusable(marked)) return marked;
   if (resolveDialogInitial(initial) === "footer") {
     const footer = panel.querySelector<HTMLElement>(`.yohu-dialog__footer ${DIALOG_FOCUSABLE}`);
     if (footer && isDialogFocusable(footer)) return footer;

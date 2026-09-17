@@ -1,12 +1,14 @@
 /*
  * YoScroller 几何。显隐过渡在 motion.css。
- * 侧轨 8vp = 内容边 4vp + 滑块 4vp。无法滚动则收轨，不占布局。
+ * 对照鸿蒙：滑块 4vp、距容器边 4vp、热区 8vp，叠在视口上不占布局。
+ * 视口 flex-basis 跟 in-flow 内容；父级有帽才收缩。禁止 1 1 0 把 hug 列表压成 0。
+ * 视口只裁切，纵轴不得写成 auto（Windows 会画 overlay 条）。
  */
 
 .yohu-scroller {
+  position: relative;
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
@@ -14,48 +16,45 @@
 
 .yohu-scroller__view {
   position: relative;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-}
-
-.yohu-scroller[data-overflow="auto"] > .yohu-scroller__view {
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.yohu-scroller[data-overflow="auto"] > .yohu-scroller__view::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.yohu-scroller[data-overflow="hidden"] > .yohu-scroller__view {
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .yohu-scroller__lane {
-  position: relative;
-  flex: 0 0 0;
-  width: 0;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 1;
+  width: var(--yohu-space-sm);
   min-height: 0;
-  overflow: hidden;
+  pointer-events: none;
 }
 
 .yohu-scroller__lane[data-lane="on"] {
-  flex: 0 0 var(--yohu-space-sm);
-  width: var(--yohu-space-sm);
+  pointer-events: auto;
 }
 
-.yohu-scroller[data-scroll="out"] > .yohu-scroller__lane {
+.yohu-scroller[data-scroll="out"] > .yohu-scroller__lane,
+.yohu-scroller[data-interactive="off"] > .yohu-scroller__lane {
   pointer-events: none;
 }
 
 .yohu-scroller__thumb {
   position: absolute;
-  inset-inline-end: 0;
+  inset-inline-end: var(--yohu-space-xs);
   width: var(--yohu-space-xs);
   border-radius: var(--yohu-radius-xs);
-  background-color: var(--yohu-border);
+  background-color: var(--yohu-fg-3);
   touch-action: none;
+}
+
+.yohu-scroller__lane:hover .yohu-scroller__thumb {
+  background-color: var(--yohu-fg-2);
+}
+
+.yohu-scroller__thumb[data-pressed] {
+  background-color: var(--yohu-fg);
 }

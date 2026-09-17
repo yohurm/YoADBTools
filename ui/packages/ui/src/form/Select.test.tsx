@@ -235,10 +235,12 @@ describe("YoSelect 分层契约", () => {
     expect(src).not.toMatch(/\bplacePopover\b/);
     expect(src).not.toMatch(/\bestimateMenuHeight\b/);
     expect(src).not.toMatch(/\bapplyPopoverBox\b/);
+    expect(src).not.toMatch(/\bapplySelectHover\b/);
     expect(src).not.toMatch(/\bgetBoundingClientRect\b/);
     expect(src).not.toMatch(/\blayoutMenu\b/);
     expect(src).toMatch(/\blayoutSelectMenu\b/);
     expect(src).toMatch(/\breadSelectTrigger\b/);
+    expect(src).toMatch(/data-placed=/);
     expect(src).toMatch(/mode="paint"/);
     expect(src).toMatch(/class="yohu-select__chevron"/);
   });
@@ -261,16 +263,17 @@ describe("YoSelect 触发布局契约", () => {
     const chevron = css.match(/^\.yohu-select__chevron\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(chevron).toMatch(/flex:\s*0 0 auto/);
     expect(css).not.toContain(".yohu-select__chrome .yohu-corner__content");
+    expect(css).not.toContain(".yohu-corner__content");
   });
 
   it("下拉纵滚关系统条，不引进 YoScroller", () => {
     const candidates = [
-      resolve(process.cwd(), "src/form/Select.css"),
-      resolve(process.cwd(), "packages/ui/src/form/Select.css"),
+      resolve(process.cwd(), "src/corner/Corner.css"),
+      resolve(process.cwd(), "packages/ui/src/corner/Corner.css"),
     ];
     const css = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
-    const overflow = css.slice(css.indexOf(".yohu-select__layer[data-overflow-y]"));
-    expect(overflow).toContain("overflow-y: auto");
+    const overflow = css.slice(css.indexOf('.yohu-corner__content[data-overflow="auto"]'));
+    expect(overflow).toContain("overflow: auto");
     expect(overflow).toContain("scrollbar-width: none");
     expect(overflow).toContain("::-webkit-scrollbar");
     expect(overflow).toMatch(/width:\s*0/);

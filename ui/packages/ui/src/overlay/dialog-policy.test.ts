@@ -81,6 +81,17 @@ describe("dialog-policy", () => {
     expect(dialogExitLock(panel)).toEqual({ width: "400px", height: "320px" });
   });
 
+  it("读打开盒只认 panel offset，不 scrape Travel style", () => {
+    const panel = document.createElement("div");
+    Object.defineProperty(panel, "offsetWidth", { configurable: true, value: 400 });
+    Object.defineProperty(panel, "offsetHeight", { configurable: true, value: 320 });
+    const travel = document.createElement("div");
+    travel.className = "yohu-travel";
+    travel.style.height = "180px";
+    panel.append(travel);
+    expect(dialogExitLock(panel)).toEqual({ width: "400px", height: "320px" });
+  });
+
   it("入栈立即卸缺省 Tooltip Unique，不把气泡压到模态上", () => {
     vi.useFakeTimers();
     const panel = document.createElement("div");

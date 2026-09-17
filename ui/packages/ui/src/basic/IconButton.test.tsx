@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoIconButton } from "./IconButton";
+
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "IconButton.css"), "utf-8");
 
 describe("YoIconButton", () => {
   it("渲染图标与悬浮提示，默认 md 透明铬", () => {
@@ -13,6 +18,21 @@ describe("YoIconButton", () => {
     expect(btn.getAttribute("data-paint")).toBeNull();
     expect(btn.className).not.toContain("yohu-button");
     expect(container.querySelector("svg")).toBeTruthy();
+    const slot = btn.querySelector(".yohu-corner__content");
+    expect(slot?.getAttribute("data-direction")).toBe("row");
+    expect(slot?.getAttribute("data-align")).toBe("center");
+    expect(slot?.getAttribute("data-justify")).toBe("center");
+    expect(css).not.toContain(".yohu-corner__content");
+  });
+
+  it("paint=window 写 data-paint，窗铬在本 CSS", () => {
+    render(() => <YoIconButton icon="sidebar" title="侧栏" paint="window" />);
+    expect(screen.getByRole("button", { name: "侧栏" }).getAttribute("data-paint")).toBe("window");
+    expect(css).toContain('[data-paint="window"]');
+    expect(css).toContain("var(--yohu-layout-titlebar-caption)");
+    expect(css).toContain("var(--yohu-state-hover)");
+    expect(css).toContain("var(--yohu-state-pressed)");
+    expect(css).toContain("var(--yohu-radius-none)");
   });
 
   it("size=sm 写入 data-size，不接受魔法 px", () => {

@@ -116,13 +116,12 @@ describe("YoTitleBar", () => {
     expect(container.querySelector(".yohu-titlebar--native-captions")).toBeNull();
   });
 
-  it("中区可承载 children（不再挂模块通栏）", () => {
-    const { container } = render(() => (
-      <YoTitleBar title="窗">
-        <span>通栏</span>
-      </YoTitleBar>
-    ));
-    expect(container.querySelector(".yohu-titlebar__center")?.textContent).toContain("通栏");
+  it("中区存在且为空，只作拖动留白", () => {
+    const { container } = render(() => <YoTitleBar title="窗" />);
+    const center = container.querySelector(".yohu-titlebar__center");
+    expect(center).toBeTruthy();
+    expect(center?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(center?.textContent).toBe("");
   });
 
   it("三键贴边满高，关闭例外色走 error token", () => {
@@ -142,5 +141,7 @@ describe("YoTitleBar", () => {
     );
     expect(css.toLowerCase()).not.toContain(["#", "c42b1c"].join(""));
     expect(css).not.toMatch(/color-mix/);
+    expect(css).not.toContain("yohu-icon-button");
+    expect(css).not.toContain("titlebar-close-margin");
   });
 });

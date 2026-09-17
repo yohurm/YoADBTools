@@ -61,7 +61,7 @@ export function toastById(queue: ToastQueue, id: number): ToastItem | undefined 
   return queue.items.find((item) => item.id === id);
 }
 
-/** 停留时长对齐 MotionSpec toast，不含 Presence 出场。 */
+/** 停留时长对齐 MotionDuration toast，不含 Presence 出场。 */
 export function toastHoldMs(): number {
   return motionDurationMs("toast");
 }

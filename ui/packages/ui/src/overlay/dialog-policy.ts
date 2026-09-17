@@ -78,12 +78,9 @@ export function dialogActionsAttrs(count: number): DialogActionsAttrs {
   return { "data-layout": resolveDialogActionsLayout(count) };
 }
 
-/** 读面板最后一次打开盒。优先 Travel 锁高（目标 px），否则 offset 布局高。零盒不锁。 */
+/** 读打开盒：面板 offset 布局宽高。零盒不锁。禁止 scrape Travel。 */
 export function dialogExitLock(panel: HTMLElement): DialogBoxLock | undefined {
-  const travel = panel.querySelector(":scope > .yohu-travel") as HTMLElement | null;
-  const locked = travel?.style.height ? Number.parseFloat(travel.style.height) : 0;
-  const height = locked > 0 ? locked : panel.offsetHeight;
-  return resolveDialogExitLock(panel.offsetWidth, height);
+  return resolveDialogExitLock(panel.offsetWidth, panel.offsetHeight);
 }
 
 /** 入栈：先卸轻浮层，再在微任务里把焦点送进面板。返回 detach（出栈）。 */

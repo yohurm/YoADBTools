@@ -22,8 +22,6 @@ export interface YoTitleBarProps {
   icon?: IconName;
   /** 应用位图图标（安装包/关于页同源） */
   logoSrc?: string;
-  /** 中区留白（模块工具栏在内容区 YoChrome，不进标题栏） */
-  children?: JSX.Element;
   /** 三键左侧操作（最多 3 个图标） */
   actions?: JSX.Element;
   /** 是否最大化（切换还原图标） */
@@ -78,9 +76,7 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
         </Show>
         <span class="yohu-titlebar__title">{props.title}</span>
       </div>
-      <div class="yohu-titlebar__center" data-tauri-drag-region>
-        {props.children}
-      </div>
+      <div class="yohu-titlebar__center" data-tauri-drag-region />
       <div class="yohu-titlebar__trailing">
         <Show when={props.actions}>
           <div class="yohu-titlebar__actions">{props.actions}</div>
