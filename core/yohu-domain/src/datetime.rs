@@ -2,10 +2,16 @@
 //! 终端 IO 行只存毫秒，显示形状由设置投影，不在这里烘焙。
 //! 禁止把「只有时分」的原文补成秒或毫秒。
 
+use yohu_protocol::TerminalTimeFormat;
+
 /// `2026-09-10 17:20:45.123`
 pub const DATETIME_DISPLAY_LEN: usize = 23;
 /// `2026-09-10 17:20:45`
 pub const DATETIME_SECONDS_LEN: usize = 19;
+/// `17:20:45.123`
+pub const TIME_MILLIS_DISPLAY_LEN: usize = 12;
+/// `17:20:45`
+pub const TIME_DISPLAY_LEN: usize = 8;
 
 struct Parts {
     year: u32,
@@ -58,6 +64,57 @@ pub fn canonicalize_datetime(raw: &str) -> Option<String> {
 pub fn canonicalize_datetime_seconds(raw: &str) -> Option<String> {
     let p = parse_parts(raw)?;
     format_datetime_seconds(p.year, p.month, p.day, p.hour, p.minute, p.second)
+}
+
+/// 按显示形状投影墙钟部件。
+pub fn format_clock(
+    year: u32,
+    month: u32,
+    day: u32,
+    hour: u32,
+    minute: u32,
+    second: u32,
+    millis: u32,
+    format: TerminalTimeFormat,
+) -> Option<String> {
+    match format {
+        TerminalTimeFormat::TimeMillis => {
+            valid_parts(year, month, day, hour, minute, second, millis)?;
+            Some(format!(
+                "{hour:02}:{minute:02}:{second:02}.{millis:03}"
+            ))
+        }
+        TerminalTimeFormat::Time => {
+            valid_parts(year, month, day, hour, minute, second, 0)?;
+            Some(format!("{hour:02}:{minute:02}:{second:02}"))
+        }
+        TerminalTimeFormat::DatetimeMillis => {
+            format_datetime(year, month, day, hour, minute, second, millis)
+        }
+        TerminalTimeFormat::Datetime => {
+            format_datetime_seconds(year, month, day, hour, minute, second)
+        }
+    }
+}
+
+pub fn clock_display_len(format: TerminalTimeFormat) -> usize {
+    match format {
+        TerminalTimeFormat::TimeMillis => TIME_MILLIS_DISPLAY_LEN,
+        TerminalTimeFormat::Time => TIME_DISPLAY_LEN,
+        TerminalTimeFormat::DatetimeMillis => DATETIME_DISPLAY_LEN,
+        TerminalTimeFormat::Datetime => DATETIME_SECONDS_LEN,
+    }
+}
+
+/// 规范化墙钟投影成显示形状。解析失败给空串。
+pub fn format_log_ts(ts: &str, format: TerminalTimeFormat) -> String {
+    let Some(p) = parse_parts(ts) else {
+        return String::new();
+    };
+    format_clock(
+        p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis, format,
+    )
+    .unwrap_or_default()
 }
 
 fn valid_parts(
@@ -186,6 +243,23 @@ mod tests {
         canonicalize: Vec<CanonCase>,
         canonicalize_seconds: Vec<CanonCase>,
         format: Vec<FormatCase>,
+        #[serde(default)]
+        projection: Vec<ProjectionCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ProjectionCase {
+        year: u32,
+        month: u32,
+        day: u32,
+        hour: u32,
+        minute: u32,
+        second: u32,
+        millis: u32,
+        time_millis: String,
+        time: String,
+        datetime_millis: String,
+        datetime: String,
     }
 
     #[derive(serde::Deserialize)]
@@ -249,5 +323,77 @@ mod tests {
                 assert_eq!(text.len(), DATETIME_DISPLAY_LEN);
             }
         }
+        for (i, case) in fixture.projection.iter().enumerate() {
+            assert_eq!(
+                format_clock(
+                    case.year,
+                    case.month,
+                    case.day,
+                    case.hour,
+                    case.minute,
+                    case.second,
+                    case.millis,
+                    TerminalTimeFormat::TimeMillis
+                )
+                .as_deref(),
+                Some(case.time_millis.as_str()),
+                "time_millis {i}"
+            );
+            assert_eq!(
+                format_clock(
+                    case.year,
+                    case.month,
+                    case.day,
+                    case.hour,
+                    case.minute,
+                    case.second,
+                    case.millis,
+                    TerminalTimeFormat::Time
+                )
+                .as_deref(),
+                Some(case.time.as_str()),
+                "time {i}"
+            );
+            assert_eq!(
+                format_clock(
+                    case.year,
+                    case.month,
+                    case.day,
+                    case.hour,
+                    case.minute,
+                    case.second,
+                    case.millis,
+                    TerminalTimeFormat::DatetimeMillis
+                )
+                .as_deref(),
+                Some(case.datetime_millis.as_str()),
+                "datetime_millis {i}"
+            );
+            assert_eq!(
+                format_clock(
+                    case.year,
+                    case.month,
+                    case.day,
+                    case.hour,
+                    case.minute,
+                    case.second,
+                    case.millis,
+                    TerminalTimeFormat::Datetime
+                )
+                .as_deref(),
+                Some(case.datetime.as_str()),
+                "datetime {i}"
+            );
+            assert_eq!(
+                format_log_ts(&case.datetime_millis, TerminalTimeFormat::Time),
+                case.time
+            );
+            assert_eq!(
+                clock_display_len(TerminalTimeFormat::TimeMillis),
+                TIME_MILLIS_DISPLAY_LEN
+            );
+        }
+        assert!(format_clock(2026, 13, 1, 0, 0, 0, 0, TerminalTimeFormat::TimeMillis).is_none());
+        assert!(format_log_ts("raw", TerminalTimeFormat::Time).is_empty());
     }
 }

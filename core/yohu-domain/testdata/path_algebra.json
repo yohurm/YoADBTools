@@ -1,0 +1,15 @@
+[
+  { "op": "join", "dir": "/", "name": "sdcard", "path": "/sdcard" },
+  { "op": "join", "dir": "/sdcard/", "name": "DCIM", "path": "/sdcard/DCIM" },
+  { "op": "parent", "path": "/", "parent": null },
+  { "op": "parent", "path": "/sdcard", "parent": "/" },
+  { "op": "parent", "path": "/sdcard/DCIM/", "parent": "/sdcard" },
+  { "op": "segments", "path": "/sdcard/DCIM", "segments": ["sdcard", "DCIM"] },
+  { "op": "segments", "path": "/", "segments": [] },
+  { "op": "parent_within", "path": "/sdcard/DCIM", "parent": "/sdcard" },
+  { "op": "parent_within", "path": "/sdcard", "parent": null },
+  { "op": "parent_within", "path": "/", "parent": null },
+  { "op": "descendant", "path": "/sdcard/DCIM/a.jpg", "ok": true },
+  { "op": "descendant", "path": "/sdcard", "ok": false },
+  { "op": "descendant", "path": "/storage", "ok": false }
+]

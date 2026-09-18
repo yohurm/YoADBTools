@@ -30,10 +30,24 @@ pub struct CommandDefinition {
     pub params: Vec<CommandParam>,
 }
 
-/// 命令块里的一步（一行 ADB 正文）。
+/// 命令块里的一步（一行 ADB 正文）。`{n}` 只在本步内独立。
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommandStep {
     pub template: String,
+    pub params: Vec<CommandParam>,
+}
+
+/// 命令块填参槽：第 `step` 步（从 1 计）的 `{index}`，标签 `1-0`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepParamSlot {
+    pub step: usize,
+    pub index: usize,
+}
+
+impl StepParamSlot {
+    pub fn label(self) -> String {
+        format!("{}-{}", self.step, self.index)
+    }
 }
 
 /// 命令块：与命令同级，顺序执行多步，步间使用块级间隔。
@@ -43,8 +57,6 @@ pub struct CommandBlock {
     pub name: String,
     pub gap_ms: u64,
     pub steps: Vec<CommandStep>,
-    /// 全步共享的 `{n}` 说明。
-    pub params: Vec<CommandParam>,
 }
 
 /// 命令组下的叶子（命令或命令块）。
@@ -227,20 +239,21 @@ impl LibraryEntry {
 
 impl CommandBlock {
     pub fn from_dto(b: &CommandBlockDto) -> Self {
-        let steps: Vec<CommandStep> = b
-            .steps
-            .iter()
-            .map(|s| CommandStep {
-                template: s.template.clone(),
-            })
-            .collect();
-        let slots = templates_slots(steps.iter().map(|s| s.template.as_str()));
         Self {
             id: b.id.clone(),
             name: b.name.clone(),
             gap_ms: b.gap_ms,
-            steps,
-            params: align_params(&slots, &params_from_dto(&b.params)),
+            steps: b
+                .steps
+                .iter()
+                .map(|s| CommandStep {
+                    template: s.template.clone(),
+                    params: align_params(
+                        &placeholder_slots(&s.template),
+                        &params_from_dto(&s.params),
+                    ),
+                })
+                .collect(),
         }
     }
 
@@ -254,9 +267,9 @@ impl CommandBlock {
                 .iter()
                 .map(|s| CommandStepDto {
                     template: s.template.clone(),
+                    params: params_to_dto(&placeholder_slots(&s.template), &s.params),
                 })
                 .collect(),
-            params: params_to_dto(&self.placeholder_slots(), &self.params),
         }
     }
 
@@ -281,20 +294,21 @@ impl CommandBlock {
         Ok(())
     }
 
-    pub fn placeholder_slots(&self) -> Vec<usize> {
-        templates_slots(self.steps.iter().map(|s| s.template.as_str()))
+    pub fn param_slots(&self) -> Vec<StepParamSlot> {
+        step_param_slots(self.steps.iter().map(|s| s.template.as_str()))
     }
 
     pub fn placeholder_arity(&self) -> usize {
-        self.placeholder_slots().len()
+        self.param_slots().len()
     }
 
     pub fn needs_values(&self) -> bool {
         self.placeholder_arity() > 0
     }
 
+    /// 按步拼接填值：`1-0`、`1-1`、`2-0`…。每步只吃本步 `{n}`，不与邻步并集。
     pub fn fill(&self, values: &[String]) -> Result<Self, LibraryError> {
-        let slots = self.placeholder_slots();
+        let slots = self.param_slots();
         if values.len() != slots.len() {
             return Err(LibraryError::FillValueMismatch {
                 id: self.id.clone(),
@@ -302,15 +316,19 @@ impl CommandBlock {
                 actual: values.len(),
             });
         }
-        let bound = bind_values(&slots, values);
+        let mut offset = 0usize;
+        let mut steps = Vec::with_capacity(self.steps.len());
+        for step in &self.steps {
+            let local = placeholder_slots(&step.template);
+            let slice = &values[offset..offset + local.len()];
+            offset += local.len();
+            steps.push(CommandStep {
+                template: apply_values(&step.template, &bind_values(&local, slice)),
+                params: step.params.clone(),
+            });
+        }
         Ok(Self {
-            steps: self
-                .steps
-                .iter()
-                .map(|s| CommandStep {
-                    template: apply_values(&s.template, &bound),
-                })
-                .collect(),
+            steps,
             ..self.clone()
         })
     }
@@ -377,26 +395,31 @@ pub struct PlaceholderToken {
 
 /// 模板中实际出现的独立 `{n}`，按索引升序（同一 n 只一次）。
 pub fn placeholder_slots(template: &str) -> Vec<usize> {
-    templates_slots(std::iter::once(template))
-}
-
-/// 多段模板的独立 `{n}` 并集，按索引升序。
-pub fn templates_slots<I, S>(templates: I) -> Vec<usize>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    let mut slots: Vec<usize> = templates
+    let mut slots: Vec<usize> = placeholder_tokens(template)
         .into_iter()
-        .flat_map(|template| {
-            placeholder_tokens(template.as_ref())
-                .into_iter()
-                .map(|token| token.index)
-        })
+        .map(|token| token.index)
         .collect();
     slots.sort_unstable();
     slots.dedup();
     slots
+}
+
+/// 多步模板按步展开填参槽：第 1 步 `{0}` → `1-0`，第 2 步 `{0}` → `2-0`。
+pub fn step_param_slots<I, S>(templates: I) -> Vec<StepParamSlot>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    templates
+        .into_iter()
+        .enumerate()
+        .flat_map(|(offset, template)| {
+            let step = offset + 1;
+            placeholder_slots(template.as_ref())
+                .into_iter()
+                .map(move |index| StepParamSlot { step, index })
+        })
+        .collect()
 }
 
 /// 独立 `{n}` 的个数；不是最大下标 + 1。
@@ -601,9 +624,9 @@ mod tests {
                 .iter()
                 .map(|t| CommandStep {
                     template: (*t).into(),
+                    params: vec![],
                 })
                 .collect(),
-            params: vec![],
         }
     }
 
@@ -872,20 +895,58 @@ mod tests {
     }
 
     #[test]
-    fn block_fill_uses_union_slots_across_steps() {
-        let b = block("b1", 0, &["ping {0}", "getprop {1}"]);
-        assert_eq!(b.placeholder_slots(), vec![0, 1]);
-        assert_eq!(b.placeholder_arity(), 2);
-        let filled = b
+    fn block_fill_is_per_step_slots() {
+        let shared = block("b1", 0, &["ping {0}", "getprop {0}"]);
+        assert_eq!(
+            shared.param_slots(),
+            vec![
+                StepParamSlot { step: 1, index: 0 },
+                StepParamSlot { step: 2, index: 0 },
+            ]
+        );
+        assert_eq!(shared.param_slots()[0].label(), "1-0");
+        assert_eq!(shared.param_slots()[1].label(), "2-0");
+        assert_eq!(shared.placeholder_arity(), 2);
+        let filled = shared
             .fill(&["8.8.8.8".into(), "ro.product.model".into()])
             .unwrap();
         assert_eq!(filled.steps[0].template, "ping 8.8.8.8");
         assert_eq!(filled.steps[1].template, "getprop ro.product.model");
+
         let sparse = block("b2", 0, &["ping {13}", "echo {0}"]);
-        assert_eq!(sparse.placeholder_slots(), vec![0, 13]);
-        let filled = sparse.fill(&["hi".into(), "8.8.8.8".into()]).unwrap();
+        assert_eq!(
+            sparse.param_slots(),
+            vec![
+                StepParamSlot { step: 1, index: 13 },
+                StepParamSlot { step: 2, index: 0 },
+            ]
+        );
+        let filled = sparse.fill(&["8.8.8.8".into(), "hi".into()]).unwrap();
         assert_eq!(filled.steps[0].template, "ping 8.8.8.8");
         assert_eq!(filled.steps[1].template, "echo hi");
+
+        let described = CommandBlock {
+            id: "b3".into(),
+            name: "块b3".into(),
+            gap_ms: 0,
+            steps: vec![
+                CommandStep {
+                    template: "ping {0}".into(),
+                    params: vec![CommandParam {
+                        index: 0,
+                        description: "主机".into(),
+                    }],
+                },
+                CommandStep {
+                    template: "echo {0}".into(),
+                    params: vec![CommandParam {
+                        index: 0,
+                        description: "文本".into(),
+                    }],
+                },
+            ],
+        };
+        assert_eq!(CommandBlock::from_dto(&described.to_dto()), described);
     }
 
     #[test]

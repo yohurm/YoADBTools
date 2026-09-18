@@ -1,0 +1,7 @@
+[
+  { "input": "shell getprop ro.build.version", "args": ["shell", "getprop", "ro.build.version"] },
+  { "input": "shell \"echo hello world\" getprop", "args": ["shell", "echo hello world", "getprop"] },
+  { "input": "shell echo \\\"hi\\\"", "args": ["shell", "echo", "\"hi\""] },
+  { "input": "shell \"a\\\"b\"", "args": ["shell", "a\"b"] },
+  { "input": "   ", "args": [] }
+]

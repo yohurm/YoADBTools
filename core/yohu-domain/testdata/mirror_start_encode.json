@@ -1,0 +1,26 @@
+[
+  {
+    "connection": "usb",
+    "touched": false,
+    "encode": "usb",
+    "force_forward": false
+  },
+  {
+    "connection": "tcp:192.168.1.8:5555",
+    "touched": false,
+    "encode": "wifi",
+    "force_forward": true
+  },
+  {
+    "connection": "tcp:1.1.1.1:5555",
+    "touched": true,
+    "encode": "settings",
+    "force_forward": true
+  },
+  {
+    "connection": "t:19",
+    "touched": false,
+    "encode": "usb",
+    "force_forward": false
+  }
+]

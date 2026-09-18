@@ -19,7 +19,7 @@ pub fn is_log_level_letter(token: &str) -> bool {
 
 /// ASCII 忽略大小写的子串匹配（ADR-v6-006：关键字 = OrdinalIgnoreCase 包含）。
 /// 用字节级 `eq_ignore_ascii_case`，避免 Unicode `to_lowercase()` 对非 ASCII 的语义偏差。
-fn contains_ascii_ignore_case(haystack: &str, needle: &str) -> bool {
+pub(crate) fn contains_ascii_ignore_case(haystack: &str, needle: &str) -> bool {
     let h = haystack.as_bytes();
     let n = needle.as_bytes();
     if n.is_empty() {
@@ -47,13 +47,48 @@ fn is_tag_needle_sep(c: char) -> bool {
 }
 
 /// 拆 `tag_contains`；空段丢掉。空结果 = 不限 Tag。空白留在针内。
-fn tag_needles(spec: &str) -> impl Iterator<Item = &str> {
+pub fn parse_tag_needles(spec: &str) -> Vec<&str> {
     spec.split(is_tag_needle_sep)
         .map(str::trim)
         .filter(|part| !part.is_empty())
+        .collect()
 }
 
-fn equals_ascii_ignore_case(a: &str, b: &str) -> bool {
+/// 有有效针才写进 wire `tag_contains`。
+pub fn tag_filter_active(spec: &str) -> bool {
+    !parse_tag_needles(spec).is_empty()
+}
+
+/// 只保留 [`LOG_LEVEL_LETTERS`]，去重并按 V→F。空 = 不限级别。
+pub fn normalize_log_levels<S, I>(input: I) -> Vec<char>
+where
+    S: AsRef<str>,
+    I: IntoIterator<Item = S>,
+{
+    let mut seen = [false; LOG_LEVEL_LETTERS.len()];
+    for raw in input {
+        if !is_log_level_letter(raw.as_ref()) {
+            continue;
+        }
+        let letter = raw
+            .as_ref()
+            .chars()
+            .next()
+            .expect("is_log_level_letter")
+            .to_ascii_uppercase();
+        if let Some(i) = LOG_LEVEL_LETTERS.iter().position(|&item| item == letter) {
+            seen[i] = true;
+        }
+    }
+    LOG_LEVEL_LETTERS
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| seen[*i])
+        .map(|(_, c)| *c)
+        .collect()
+}
+
+pub(crate) fn equals_ascii_ignore_case(a: &str, b: &str) -> bool {
     a.len() == b.len()
         && a.as_bytes()
             .iter()
@@ -62,11 +97,13 @@ fn equals_ascii_ignore_case(a: &str, b: &str) -> bool {
 }
 
 fn tag_allowed(line_tag: &str, spec: &str) -> bool {
-    let mut needles = tag_needles(spec).peekable();
-    if needles.peek().is_none() {
+    let needles = parse_tag_needles(spec);
+    if needles.is_empty() {
         return true;
     }
-    needles.any(|needle| equals_ascii_ignore_case(line_tag, needle))
+    needles
+        .into_iter()
+        .any(|needle| equals_ascii_ignore_case(line_tag, needle))
 }
 
 /// 单行匹配。`Package { pids: [] }` 不命中任何行。

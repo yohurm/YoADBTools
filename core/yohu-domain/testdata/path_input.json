@@ -1,0 +1,18 @@
+[
+  { "raw": "/sdcard//DCIM/./Camera/", "current": "/sdcard", "ok": true, "path": "/sdcard//DCIM/./Camera/" },
+  { "raw": "\\sdcard\\DCIM", "current": "/sdcard", "ok": true, "path": "/sdcard/DCIM", "applied": ["separators"] },
+  { "raw": "\"/sdcard/My Photos\"", "current": "/sdcard", "ok": true, "path": "/sdcard/My Photos", "applied": ["unquote"] },
+  { "raw": "file:///sdcard/DCIM", "current": "/sdcard", "ok": true, "path": "/sdcard/DCIM", "applied": ["file-uri"] },
+  { "raw": "file://sdcard/DCIM", "current": "/sdcard", "ok": true, "path": "/sdcard/DCIM" },
+  { "raw": "~", "current": "/storage/emulated/0", "ok": true, "path": "/sdcard", "applied": ["alias"] },
+  { "raw": "sdcard/DCIM", "current": "/storage/emulated/0", "ok": true, "path": "/sdcard/DCIM" },
+  { "raw": "/mnt/sdcard/DCIM", "current": "/sdcard", "ok": true, "path": "/sdcard/DCIM" },
+  { "raw": "DCIM", "current": "/sdcard", "ok": true, "path": "/sdcard/DCIM", "applied": ["relative"] },
+  { "raw": "../Pictures", "current": "/sdcard/DCIM", "ok": true, "path": "/sdcard/DCIM/../Pictures" },
+  { "raw": ".", "current": "/sdcard/DCIM", "ok": true, "path": "/sdcard/DCIM/." },
+  { "raw": "C:\\\\Users\\\\me", "current": "/sdcard", "ok": false, "reason": "不是设备路径" },
+  { "raw": "\\\\server\\share", "current": "/sdcard", "ok": false, "reason": "不是设备路径" },
+  { "raw": "   ", "current": "/sdcard", "ok": false, "reason": "路径为空" },
+  { "raw": "../x", "current": "/sdcard", "ok": true, "path": "/sdcard/../x" },
+  { "raw": "/sdcard/../data/x", "current": "/sdcard", "ok": true, "path": "/sdcard/../data/x" }
+]

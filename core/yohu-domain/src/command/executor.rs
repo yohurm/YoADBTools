@@ -333,6 +333,20 @@ mod tests {
     use std::sync::Mutex;
 
     #[test]
+    fn split_shared_fixture() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            input: String,
+            args: Vec<String>,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../testdata/command_split.json")).expect("fixture");
+        for (i, case) in cases.iter().enumerate() {
+            assert_eq!(split_command_line(&case.input), case.args, "split {i}");
+        }
+    }
+
+    #[test]
     fn split_plain() {
         assert_eq!(
             split_command_line("shell getprop ro.build.version"),
@@ -545,12 +559,13 @@ mod tests {
             steps: vec![
                 super::super::library::CommandStep {
                     template: "echo a".into(),
+                    params: vec![],
                 },
                 super::super::library::CommandStep {
                     template: "echo b".into(),
+                    params: vec![],
                 },
             ],
-            params: vec![],
         };
         let steps = block.scheduled_steps();
         assert_eq!(steps.len(), 2);

@@ -1,0 +1,81 @@
+{
+  "rebind": [
+    {
+      "prev": { "current": [], "history": [] },
+      "index": [
+        { "pid": 10, "name": "com.foo" },
+        { "pid": 11, "name": "com.foo:remote" },
+        { "pid": 20, "name": "other.app" }
+      ],
+      "pkg": "com.foo",
+      "include_child": false,
+      "current": [10],
+      "history": [10],
+      "pid_set": [10]
+    },
+    {
+      "prev": { "current": [], "history": [] },
+      "index": [
+        { "pid": 10, "name": "com.foo" },
+        { "pid": 11, "name": "com.foo:remote" },
+        { "pid": 20, "name": "other.app" }
+      ],
+      "pkg": "com.foo",
+      "include_child": true,
+      "current": [10, 11],
+      "history": [10, 11],
+      "pid_set": [10, 11]
+    },
+    {
+      "prev": { "current": [10], "history": [10] },
+      "index": [{ "pid": 99, "name": "com.foo" }],
+      "pkg": "com.foo",
+      "include_child": false,
+      "current": [99],
+      "history": [10, 99],
+      "pid_set": [99, 10]
+    }
+  ],
+  "history_cap": {
+    "cap": 3,
+    "pids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "pkg": "com.foo",
+    "pid_set_len": 3,
+    "current0": 10
+  },
+  "wire": [
+    {
+      "levels": ["W"],
+      "tag_contains": "",
+      "keyword": "",
+      "scope": { "kind": "package" },
+      "pid_set": [],
+      "expect": { "levels": ["W"], "scope": { "kind": "package", "pids": [] } }
+    },
+    {
+      "levels": [],
+      "tag_contains": "",
+      "keyword": "",
+      "scope": { "kind": "pid", "pid": 42 },
+      "pid_set": [],
+      "expect": { "scope": { "kind": "pid", "pid": 42 } }
+    },
+    {
+      "levels": [],
+      "tag_contains": " , ， ",
+      "keyword": "",
+      "scope": { "kind": "all" },
+      "pid_set": [],
+      "omit_tag": true
+    },
+    {
+      "levels": [],
+      "tag_contains": "hfl, adbd",
+      "keyword": "boom",
+      "scope": { "kind": "all" },
+      "pid_set": [],
+      "expect_tag": "hfl, adbd",
+      "expect_message": "boom"
+    }
+  ]
+}

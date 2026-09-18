@@ -1,0 +1,86 @@
+[
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "E",
+      "tag": "AndroidRuntime",
+      "msg": "FATAL EXCEPTION: main"
+    },
+    "kind": "crash"
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "I",
+      "tag": "T",
+      "msg": "ANR in com.foo"
+    },
+    "kind": "anr"
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "I",
+      "tag": "T",
+      "msg": "am_anr: com.foo"
+    },
+    "kind": "anr"
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "I",
+      "tag": "T",
+      "msg": "normal"
+    },
+    "kind": null
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "E",
+      "tag": "AndroidRuntime",
+      "msg": "Process: com.foo"
+    },
+    "kind": null
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 12,
+      "tid": 1,
+      "level": "I",
+      "tag": "ActivityManager",
+      "msg": "Process com.foo (pid 12) has died"
+    },
+    "kind": null
+  },
+  {
+    "line": {
+      "seq": 0,
+      "ts": "2026-01-01 00:00:00.000",
+      "pid": 100,
+      "tid": 1,
+      "level": "I",
+      "tag": "T",
+      "msg": "socket is not responding yet"
+    },
+    "kind": null
+  }
+]

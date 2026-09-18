@@ -52,5 +52,20 @@
       "second": 0,
       "millis": 0
     }
+  ],
+  "projection": [
+    {
+      "year": 2026,
+      "month": 9,
+      "day": 11,
+      "hour": 16,
+      "minute": 45,
+      "second": 7,
+      "millis": 89,
+      "time_millis": "16:45:07.089",
+      "time": "16:45:07",
+      "datetime_millis": "2026-09-11 16:45:07.089",
+      "datetime": "2026-09-11 16:45:07"
+    }
   ]
 }

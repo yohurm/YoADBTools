@@ -99,16 +99,30 @@ mod tests {
 
     #[test]
     fn tcp_uses_wifi_unless_session_touched() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            connection: String,
+            touched: bool,
+            encode: String,
+            force_forward: bool,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../testdata/mirror_start_encode.json"))
+                .expect("fixture");
         let s = AppSettings::default();
-        assert_eq!(start_encode(&s, "usb", false), USB_ENCODE);
-        assert_eq!(start_encode(&s, "tcp:192.168.1.8:5555", false), WIFI_ENCODE);
-        assert_eq!(
-            start_encode(&s, "tcp:1.1.1.1:5555", true).max_size,
-            s.mirror_max_size
-        );
-        assert!(start_force_forward(&s, "tcp:1.1.1.1:5555"));
-        assert!(!start_force_forward(&s, "usb"));
-        assert_eq!(start_encode(&s, "t:19", false), USB_ENCODE);
-        assert!(!start_force_forward(&s, "t:19"));
+        for (i, case) in cases.iter().enumerate() {
+            let got = start_encode(&s, &case.connection, case.touched);
+            match case.encode.as_str() {
+                "usb" => assert_eq!(got, USB_ENCODE, "encode {i}"),
+                "wifi" => assert_eq!(got, WIFI_ENCODE, "encode {i}"),
+                "settings" => assert_eq!(got.max_size, s.mirror_max_size, "settings {i}"),
+                other => panic!("unknown encode {other}"),
+            }
+            assert_eq!(
+                start_force_forward(&s, &case.connection),
+                case.force_forward,
+                "forward {i}"
+            );
+        }
     }
 }
