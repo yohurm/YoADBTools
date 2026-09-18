@@ -3,10 +3,16 @@
  * 零 IPC。错码与文案只在 fault.ts。
  */
 
-import { SAFETY_ROOTS } from "@yohu/api";
+import {
+  joinPath,
+  parentOf,
+  parentWithinSafety,
+  splitPath,
+  validateEntryName,
+} from "@yohu/api";
 import { colTrackTemplate, defaultColWidths, type YoColWidths } from "@yohu/ui";
 
-import { isWithinSafety } from "./path-guard";
+export { joinPath, parentOf, parentWithinSafety, splitPath, validateEntryName };
 
 export type ListingKind = "dir" | "file" | "symlink" | "other";
 
@@ -16,39 +22,6 @@ export interface ListingEntry {
   size: number;
   permission: string;
   mtime: string;
-}
-
-export function joinPath(dir: string, name: string): string {
-  if (dir === "/") return `/${name}`;
-  return `${dir.replace(/\/+$/, "")}/${name}`;
-}
-
-export function parentOf(path: string): string | null {
-  const trimmed = path.replace(/\/+$/, "");
-  if (trimmed === "" || trimmed === "/") return null;
-  const idx = trimmed.lastIndexOf("/");
-  if (idx <= 0) return "/";
-  return trimmed.slice(0, idx);
-}
-
-/** 与 domain SafetyRoot::default 一致；上级停在根上，不逃到 `/`。 */
-export function parentWithinSafety(path: string, roots: readonly string[] = SAFETY_ROOTS): string | null {
-  const parent = parentOf(path);
-  if (parent === null || parent === "/") return null;
-  return isWithinSafety(parent, roots) ? parent : null;
-}
-
-export function splitPath(path: string): string[] {
-  return path.split("/").filter((segment) => segment.length > 0);
-}
-
-/** 空 / `.` / `..` / 分隔符 → 错误文案；合法返回 null。 */
-export function validateEntryName(name: string): string | null {
-  const trimmed = name.trim();
-  if (!trimmed) return "名称为空";
-  if (trimmed === "." || trimmed === "..") return trimmed;
-  if (/[/\\]/.test(trimmed) || trimmed.includes("\0")) return "含路径分隔符";
-  return null;
 }
 
 export function childPath(dir: string, name: string): string {

@@ -1,6 +1,5 @@
 /**
- * files/model.ts 路径安全镜像：validateEntryName 与 core SafetyRoot::validate_entry_name
- * 共用同一套 testdata/entry_name.json 向量（布尔有效性），防止语义漂移。
+ * files/model.ts 展示层：排序 / 体积 / 列尺。路径规则在 @yohu/api。
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,29 +13,11 @@ import {
   fileColTemplate,
   fileTypeLabel,
   formatSize,
-  joinPath,
-  parentOf,
-  parentWithinSafety,
   sortEntries,
   splitPath,
   validateEntryName,
   type ListingEntry,
 } from "./model";
-
-describe("validateEntryName（与 domain testdata/entry_name.json 同一套向量）", () => {
-  const testdata = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../core/yohu-domain/testdata/entry_name.json",
-  );
-  const fixture: { name: string; valid: boolean }[] = JSON.parse(readFileSync(testdata, "utf8")) as {
-    name: string;
-    valid: boolean;
-  }[];
-
-  it.each(fixture)("name=$name -> valid=$valid", (c) => {
-    expect(validateEntryName(c.name) === null).toBe(c.valid);
-  });
-});
 
 describe("model 零 IPC", () => {
   it("不认错码、不转导出 errorText", () => {
@@ -45,41 +26,11 @@ describe("model 零 IPC", () => {
     expect(src).not.toContain("ipcErrorCode");
     expect(src).not.toContain("isCancelledError");
     expect(src).not.toContain("isNotFoundError");
-    expect(src).toContain("isWithinSafety");
+    expect(src).toContain("parentWithinSafety");
     expect(src).toContain("ListingEntry");
     expect(src).not.toContain("fileCategory");
     expect(src).not.toContain("FileCategory");
     expect(src).not.toContain("RemoteEntry");
-  });
-});
-
-describe("joinPath", () => {
-  it("根目录拼接", () => {
-    expect(joinPath("/", "DCIM")).toBe("/DCIM");
-  });
-  it("普通目录拼接（去尾斜杠）", () => {
-    expect(joinPath("/sdcard/", "a")).toBe("/sdcard/a");
-    expect(joinPath("/sdcard", "a")).toBe("/sdcard/a");
-  });
-});
-
-describe("parentOf", () => {
-  it("根目录无上级", () => {
-    expect(parentOf("/")).toBeNull();
-    expect(parentOf("/sdcard")).toBe("/");
-  });
-  it("多级返回上级", () => {
-    expect(parentOf("/sdcard/DCIM/Camera")).toBe("/sdcard/DCIM");
-    expect(parentOf("/sdcard/DCIM/")).toBe("/sdcard");
-  });
-});
-
-describe("parentWithinSafety", () => {
-  it("停在安全根，不逃到 /", () => {
-    expect(parentWithinSafety("/sdcard")).toBeNull();
-    expect(parentWithinSafety("/storage")).toBeNull();
-    expect(parentWithinSafety("/sdcard/DCIM")).toBe("/sdcard");
-    expect(parentWithinSafety("/storage/emulated/0")).toBe("/storage/emulated");
   });
 });
 
