@@ -50,6 +50,14 @@ describe("Icon", () => {
     expect(back?.getAttribute("fill-rule")).toBe("evenodd");
   });
 
+  it("刷新走官网 HarmonyOS Symbol arrow_clockwise", () => {
+    const { container } = render(() => <Icon name="refresh" />);
+    const svg = container.querySelector('svg[data-icon="refresh"]');
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 1024 1024");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(svg?.querySelector("path")?.getAttribute("d") ?? "").toContain("M534.528 43.008");
+  });
+
   it("设备操作栏用三键导航与控制中心语义，不用眼睛/房屋/回车箭头", () => {
     const { container } = render(() => (
       <>
@@ -69,8 +77,8 @@ describe("Icon", () => {
     expect(d("display-off")).not.toContain("463.384");
   });
 
-  it("含窗口三键与水平发送图标", () => {
-    expect(ICON_NAMES).toEqual(expect.arrayContaining(["window-max", "window-min", "window-restore", "send"]));
+  it("含窗口三键、水平发送与命令块图标", () => {
+    expect(ICON_NAMES).toEqual(expect.arrayContaining(["window-max", "window-min", "window-restore", "send", "block"]));
     expect(ICON_NAMES).toEqual(
       expect.arrayContaining([
         "nav-back",
@@ -83,8 +91,15 @@ describe("Icon", () => {
         "brightness-up",
       ]),
     );
-    const { container } = render(() => <Icon name="send" />);
+    const { container } = render(() => (
+      <>
+        <Icon name="send" />
+        <Icon name="block" />
+      </>
+    ));
     expect(container.querySelector('svg[data-icon="send"] path')?.getAttribute("d") ?? "").toContain("M3.714");
+    expect(container.querySelector('svg[data-icon="block"] rect')).not.toBeNull();
+    expect(container.querySelectorAll('svg[data-icon="block"] path')).toHaveLength(2);
   });
 
   it("isIconName 只认清单内字符串", () => {

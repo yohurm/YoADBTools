@@ -11,12 +11,12 @@ import "./icons.css";
 
 /** 图标名（组件库图标集，模块注册表只允许使用这些名字） */
 export type IconName =
-  | "refresh"
   | "settings"
   | "terminal"
   | "folder"
   | "log"
   | "list"
+  | "block"
   | "grip"
   | "mirror"
   | "close"
@@ -52,13 +52,6 @@ const FILLED: ReadonlySet<IconName> = new Set(["play", "pause", "grip"]);
 
 /** 图标路径工厂。描边 24×24；鸿蒙符号见 `HARMONY_GLYPHS`（1024 填充）。 */
 const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
-  refresh: () => (
-    <>
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </>
-  ),
   settings: () => (
     <>
       <circle cx="12" cy="12" r="3" />
@@ -88,6 +81,15 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
       <line x1="3" y1="6" x2="3.01" y2="6" />
       <line x1="3" y1="12" x2="3.01" y2="12" />
       <line x1="3" y1="18" x2="3.01" y2="18" />
+    </>
+  ),
+  // Lucide square-stack（ISC）：叠方块=命令块，16px 仍能和清单点分开。
+  // https://github.com/lucide-icons/lucide/blob/main/icons/square-stack.svg
+  block: () => (
+    <>
+      <path d="M4 10c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
+      <path d="M10 16c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
+      <rect width="8" height="8" x="14" y="14" rx="2" />
     </>
   ),
   grip: () => (
