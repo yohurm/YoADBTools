@@ -25,6 +25,7 @@ describe("YoSearch 模块公开面", () => {
     }
     expect((search as Record<string, unknown>).loweredChars).toBeUndefined();
     expect((search as Record<string, unknown>).findChars).toBeUndefined();
+    expect((search as Record<string, unknown>).findPinyinSpan).toBeUndefined();
     expect((search as Record<string, unknown>).kindScore).toBeUndefined();
   });
 });

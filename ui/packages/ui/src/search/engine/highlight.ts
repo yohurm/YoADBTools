@@ -1,4 +1,5 @@
 import { findChars, loweredChars } from "./chars";
+import { findPinyinSpan } from "./pinyin";
 import { normalizeSearchQuery, tokenizeSearchQuery } from "./token";
 import type { SearchRange } from "./types";
 
@@ -32,6 +33,14 @@ function tokenRanges(text: string, token: string): SearchRange[] {
     ranges.push({ start, end });
     from = start + Math.max(n.length, 1);
     if (from > hay.length) break;
+  }
+  let pinyinFrom = 0;
+  while (pinyinFrom <= hay.length) {
+    const span = findPinyinSpan(hay, needle, pinyinFrom);
+    if (!span) break;
+    ranges.push({ start: span[0], end: span[1] });
+    pinyinFrom = Math.max(span[1], span[0] + 1);
+    if (pinyinFrom > hay.length) break;
   }
   return ranges;
 }

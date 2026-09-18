@@ -1,6 +1,6 @@
 /**
- * YoSearch 引擎层。与 core/yohu-search 同一套 testdata/search.json。
- * 不碰 DOM、不写色。
+ * YoSearch 引擎层。与 core/yohu-search 同一套 testdata/search.json + data/pinyin.tsv。
+ * 不碰 DOM、不写色。`pinyin` 不进公开面。
  */
 
 export type {

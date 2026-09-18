@@ -16,10 +16,15 @@ import {
   type SearchOptions,
   type SearchRange,
 } from "./index";
+import { PINYIN_TSV } from "./pinyin-table";
 
 const testdata = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../../../core/yohu-search/testdata/search.json",
+);
+const pinyinTsv = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../../../core/yohu-search/data/pinyin.tsv",
 );
 
 type Fixture = {
@@ -34,6 +39,10 @@ type Fixture = {
 const fixture = JSON.parse(readFileSync(testdata, "utf8")) as Fixture;
 
 describe("YoSearch 引擎（与 yohu-search testdata/search.json 同一套向量）", () => {
+  it("拼音表与 core/yohu-search/data/pinyin.tsv 同一份", () => {
+    expect(PINYIN_TSV.replace(/\r\n/g, "\n")).toBe(readFileSync(pinyinTsv, "utf8").replace(/\r\n/g, "\n"));
+  });
+
   it.each(fixture.tokenize)("tokenize $query", (c) => {
     expect(normalizeSearchQuery(c.query)).toBe(c.normalized);
     expect(tokenizeSearchQuery(c.query)).toEqual(c.tokens);
