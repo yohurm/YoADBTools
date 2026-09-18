@@ -14,7 +14,7 @@
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
 | `terminal.eval` / `terminal.exec` / `block.run` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；`block.run` 跑组下同级命令块（步间按块级间隔）；组编排；取消兼取消块 |
-| `commandlib.load` / `save` | 命令库；损坏备份后默认库 |
+| `commandlib.load` / `save` | 命令库 schemaVersion 3 only；缺文件写默认库；损坏或其他 schema 则备份后写默认库 |
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。设备侧 `ls`/`rm`/`push` 失败由 `yohu-files::file_error_from_adb` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等；未分类 BadExit → `RemoteFailed(path)`，不带 stderr。`FileError` 不 `From<AdbError>`。拖出树触顶 `TreeLimit(项)` / `TreeDepth(层)` fail-closed，禁止当成功截断。壳 `ipc_file`：远端不存在 → `not_found`，本地不存在与其余路径类（含 `TreeLimit` / `TreeDepth`）→ `invalid_args`，`Adb` → `ipc_adb`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI；UI 禁止再扫 stderr |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
