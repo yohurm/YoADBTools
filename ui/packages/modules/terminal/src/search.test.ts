@@ -52,4 +52,16 @@ describe("命令库检索", () => {
   it("无命中为空数组", () => {
     expect(filterLibraryGroups(groups, "不存在的词")).toEqual([]);
   });
+
+  it("拼音全拼 / 首字母命中中文名与组名", () => {
+    expect(entryMatchesQuery(groups[0]!.entries[0]!, "xh")).toBe(true);
+    expect(entryMatchesQuery(groups[0]!.entries[0]!, "xinghao")).toBe(true);
+    expect(filterLibraryGroups(groups, "shebei").map((group) => group.id)).toEqual(["g-device"]);
+    expect(filterLibraryGroups(groups, "lszl").map((group) => group.entries.map((entry) => entry.id))).toEqual([
+      ["b-wake"],
+    ]);
+    expect(filterLibraryGroups(groups, "wlltx").map((group) => group.entries.map((entry) => entry.id))).toEqual([
+      ["c-ping"],
+    ]);
+  });
 });
