@@ -1,10 +1,10 @@
 /* HarmonyOS SegmentButton：单行 40vp / 图文 56vp；compact 落到 V1 最小 28vp。
- * 电脑小圆角走 YoCorner role=control paint。轨 surface-2，选中块距轨 4vp。
+ * 电脑小圆角走 YoCorner role=control paint。轨 comp-gray（button_normal），选中块距轨 4vp。
  * 默认 hug；block 才铺满。单选选择块是填充滑块；多选共轨、选中项自绘底并并角。
  * 填归属只消费 data-fill-owner / data-selected / 交互伪类，不按类型把已选 hover 写成 transparent。 */
 
 .yohu-segmented {
-  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-fill: var(--yohu-comp-gray);
   --yohu-corner-stroke: transparent;
   --yohu-segmented-ink: var(--yohu-fg-2);
   --yohu-segmented-on: var(--yohu-fg);

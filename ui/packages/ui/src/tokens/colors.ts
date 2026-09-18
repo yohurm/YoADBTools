@@ -9,7 +9,12 @@
  * 深色 background_primary 表值 #E5E5E5 与正文「页面默认黑」冲突，primitive 仍记 #000000。
  * 桌面画布不消费那档纯黑：浅/深都映射 background_secondary（雪域灰 / #191A1C），
  * 与卡片 comp_background_primary 形成凹槽。#191A1C 禁止再当 surface-2
- * （低于卡片明度）；次级表面走 background_fourth。见 harmonyos-design-notes.md §1.4 / §1.6。
+ * （低于卡片明度）；次级表面走 background_fourth。
+ *
+ * 展示类底板（普通按钮 / 搜索框）走基础色 Container，不是 `comp_background_gray`。
+ * 色彩.md：Container = 普通按钮/搜索框底；默认与 Primary 同级（浅黑 / 深白）。
+ * Theme Colors API 26：`compBackgroundTertiary` 浅 = Container 5%，深 = Container 10%。
+ * 见 harmonyos-design-notes.md §1.4 / §1.6。
  */
 
 /** HarmonyOS ARGB `#AARRGGBB` → CSS `#RRGGBB` / `#RRGGBBAA`。 */
@@ -28,6 +33,11 @@ function fromArgb(argb: string): string {
  * 键名对齐鸿蒙 `brand` / `font_*` / `background_*` / `comp_*`。
  */
 export const Harmony = {
+  /** 基础色：默认与 Container 同级。浅黑 / 深白。 */
+  primary: { light: fromArgb("#ff000000"), dark: fromArgb("#ffffffff") },
+  onPrimary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ff000000") },
+  /** 展示类容器原色。普通按钮/搜索框底由此叠加透明度。 */
+  container: { light: fromArgb("#ff000000"), dark: fromArgb("#ffffffff") },
   brand: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
   warning: { light: fromArgb("#ffe84026"), dark: fromArgb("#ffd94838") },
   alert: { light: fromArgb("#ffed6f21"), dark: fromArgb("#ffdb6b42") },
@@ -47,9 +57,15 @@ export const Harmony = {
   backgroundEmphasize: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
 
   compBackgroundPrimary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ff202224") },
+  /** 灰色背景。色彩.md 全量表原值；Theme Colors：暂无组件使用。 */
   compBackgroundGray: { light: fromArgb("#fff1f3f5"), dark: fromArgb("#ffe5e5ea") },
-  /** 控件二级底；Switch 关闭轨默认（API 20：浅 10% 黑 / 深 10% 白）。 */
+  /** Container 10%。Switch 关闭轨、Slider 轨。 */
   compBackgroundSecondary: { light: fromArgb("#19000000"), dark: fromArgb("#19ffffff") },
+  /**
+   * Container 洗。Theme Colors：Button / Chip / Select / TextInput / Search。
+   * 浅 = 表内 5% 黑 `#0c000000`；深 = API 26 的 Container 10% `#19ffffff`（不是表内 5% 白）。
+   */
+  compBackgroundTertiary: { light: fromArgb("#0c000000"), dark: fromArgb("#19ffffff") },
   compEmphasizeSecondary: { light: fromArgb("#330a59f7"), dark: fromArgb("#33317af7") },
   compEmphasizeTertiary: { light: fromArgb("#190a59f7"), dark: fromArgb("#19317af7") },
   compDivider: { light: fromArgb("#33000000"), dark: fromArgb("#33ffffff") },
@@ -97,13 +113,12 @@ export const Colors = {
   Surface: Harmony.compBackgroundPrimary.light,
   Surface2: Harmony.backgroundTertiary.light,
   /**
-   * 普通按钮底。浅色官方 `comp_background_gray` 与画布 `background_secondary` 同值，
-   * 页眉贴在画布上会看不见底板；桌面改用官方下一档 `background_tertiary`。
-   * 禁止 CSS 再点 `--yohu-surface-2`。
+   * 展示类底板 = Container 洗（色彩.md / Theme Colors），不是 `comp_background_gray` 实灰。
+   * 浅 5% 黑；深 10% 白。禁止 CSS 再点 `--yohu-surface-2`。
    */
-  CompGray: Harmony.backgroundTertiary.light,
-  CompGrayHover: brandOverlay(Harmony.backgroundTertiary.light, "#000000", 5),
-  CompGrayPressed: brandOverlay(Harmony.backgroundTertiary.light, "#000000", 10),
+  CompGray: Harmony.compBackgroundTertiary.light,
+  CompGrayHover: brandOverlay(Harmony.compBackgroundTertiary.light, "#000000", 5),
+  CompGrayPressed: brandOverlay(Harmony.compBackgroundTertiary.light, "#000000", 10),
   Fg: Harmony.fontPrimary.light,
   Fg2: Harmony.fontSecondary.light,
   Fg3: Harmony.fontTertiary.light,
@@ -163,9 +178,9 @@ export const DarkColors: Record<SemanticColorName, string> = {
   Surface: Harmony.compBackgroundPrimary.dark,
   /** 深色灰阶随层级抬升：画布 #191A1C → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
   Surface2: Harmony.backgroundFourth.dark,
-  CompGray: Harmony.compBackgroundGray.dark,
-  CompGrayHover: brandOverlay(Harmony.compBackgroundGray.dark, "#FFFFFF", 5),
-  CompGrayPressed: brandOverlay(Harmony.compBackgroundGray.dark, "#FFFFFF", 10),
+  CompGray: Harmony.compBackgroundTertiary.dark,
+  CompGrayHover: brandOverlay(Harmony.compBackgroundTertiary.dark, "#FFFFFF", 5),
+  CompGrayPressed: brandOverlay(Harmony.compBackgroundTertiary.dark, "#FFFFFF", 10),
   Fg: Harmony.fontPrimary.dark,
   Fg2: Harmony.fontSecondary.dark,
   Fg3: Harmony.fontTertiary.dark,

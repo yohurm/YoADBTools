@@ -8,7 +8,7 @@
 }
 
 .yohu-progress__chrome {
-  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-fill: var(--yohu-comp-gray);
   --yohu-corner-stroke: transparent;
   width: 100%;
   height: 100%;

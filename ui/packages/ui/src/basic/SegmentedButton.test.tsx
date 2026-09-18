@@ -116,7 +116,7 @@ describe("YoSegmentedButton", () => {
     expect(corner?.getAttribute("data-mode")).toBe("paint");
     expect(hostEl?.querySelector(".yohu-segmented__chrome")).toBeNull();
     const host = css.match(/^\.yohu-segmented\s*\{([^}]*)\}/m)?.[1] ?? "";
-    expect(host).toContain("--yohu-corner-fill: var(--yohu-surface-2)");
+    expect(host).toContain("--yohu-corner-fill: var(--yohu-comp-gray)");
     expect(host).toContain("padding: var(--yohu-space-xs)");
     expect(host).not.toContain("border-radius:");
     expect(host).not.toContain("background:");

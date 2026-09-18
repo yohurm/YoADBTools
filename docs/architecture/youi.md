@@ -107,7 +107,7 @@ PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 2
 
 ## 组件：YoButton（L0–L5）
 
-HarmonyOS 对照：ArkUI `Button.buttonStyle` / `controlSize` / `role`（[ts-basic-components-button](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-button.md)）。重要度是 EMPHASIZED > NORMAL > TEXTUAL。色走官方 `comp_background_emphasize` / `comp_background_gray` / `font_emphasize`，禁止引进 `antd` / Arco / Polaris / Primer。
+HarmonyOS 对照：ArkUI `Button.buttonStyle` / `controlSize` / `role`（[ts-basic-components-button](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-basic-components-button.md)）。重要度是 EMPHASIZED > NORMAL > TEXTUAL。色走官方 `comp_background_emphasize` / Container 洗 `comp_background_tertiary` / `font_emphasize`，禁止引进 `antd` / Arco / Polaris / Primer。
 
 ### 设计前链路
 
@@ -117,7 +117,7 @@ variant × tone 15 格 + data-paint（emphasized-on/soft/plate）
   → success/warning 软底是第三套皮；徽章枚举绑死 Button
 ```
 
-问题：涂装名与 `buttonStyle` 双轨；灰底不是官方 `comp_background_gray`；hover 把灰底洗掉。
+问题：涂装名与 `buttonStyle` 双轨；灰底不是官方 Container 洗；hover 把灰底洗掉。
 
 ### 设计后链路
 
@@ -128,9 +128,9 @@ variant × tone 15 格 + data-paint（emphasized-on/soft/plate）
   → L4 Button.tsx 只绑属性；内容区 = spinner + 文案（纯文案走 YoSwap）；圆角走 YoCorner mode=paint
   → L4 Button.css 只认 data-style × data-tone：
       EMPHASIZED = `--yohu-accent`/`--yohu-error` + `fg-on`
-      NORMAL = `--yohu-comp-gray` + 语义字；hover/pressed 叠在灰底上
+      NORMAL = `--yohu-comp-gray` + 语义字；hover/pressed 叠在底上
       TEXTUAL = 无底 + 语义字
-  → L0 `--yohu-comp-gray`（浅 `background_tertiary`，深官方灰）；brand/error 的 hover·pressed（interactive 5%/10%）
+  → L0 `--yohu-comp-gray`（Container 洗：浅 5% 黑 / 深 10% 白）；brand/error 的 hover·pressed（interactive 5%/10%）
 ```
 
 宿主只改 `YoButton` 公开 props。禁止 `variant` / `outlined` / `data-paint` / `primary`，禁止模块自写第二套按钮皮。
@@ -182,7 +182,7 @@ size?: "sm" | "md"                                 // md=NORMAL，sm=SMALL
 | style | 底 | 字 | hover |
 |-------|----|----|-------|
 | emphasized | `brand` / `warning`（danger） | `font_on_primary` | 底上叠 interactive 5%/10% |
-| normal | `--yohu-comp-gray`（浅 `background_tertiary`，深官方灰） | `font_emphasize` / `font_primary` / `warning` | 灰底上叠 5%/10%，禁止换成 `state-hover` |
+| normal | `--yohu-comp-gray`（Container 洗：浅 5% 黑 / 深 10% 白） | `font_emphasize` / `font_primary` / `warning` | 底上叠 5%/10%，禁止换成 `state-hover` |
 | textual | 透明 | 同上；neutral 用 `font_secondary` | `interactive_hover` 软底 |
 
 禁用：背板不变，字 `--yohu-fg-3`（40%）。禁止整钮改刷 `--yohu-disabled`。

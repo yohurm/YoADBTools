@@ -97,7 +97,7 @@
   --yohu-corner-fill: var(--yohu-button-fill-pressed);
 }
 
-/* NORMAL：comp_background_gray + 语义字。hover 叠在灰底上，禁止换成 state-hover。 */
+/* NORMAL：Container 洗（comp_background_tertiary）+ 语义字。hover 叠在底上，禁止换成 state-hover。 */
 .yohu-button[data-style="normal"] {
   --yohu-corner-fill: var(--yohu-comp-gray);
   color: var(--yohu-button-ink);

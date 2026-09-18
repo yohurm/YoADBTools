@@ -34,7 +34,7 @@
 }
 
 .yohu-chip[data-tone="neutral"] {
-  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-corner-fill: var(--yohu-comp-gray);
   color: var(--yohu-fg);
 }
 

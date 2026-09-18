@@ -4,9 +4,9 @@
   --yohu-bg-base: #F1F3F5;
   --yohu-surface: #FFFFFF;
   --yohu-surface-2: #E5E5EA;
-  --yohu-comp-gray: #E5E5EA;
-  --yohu-comp-gray-hover: color-mix(in srgb, #000000 5%, #E5E5EA);
-  --yohu-comp-gray-pressed: color-mix(in srgb, #000000 10%, #E5E5EA);
+  --yohu-comp-gray: #0000000C;
+  --yohu-comp-gray-hover: color-mix(in srgb, #000000 5%, #0000000C);
+  --yohu-comp-gray-pressed: color-mix(in srgb, #000000 10%, #0000000C);
   --yohu-fg: #000000E5;
   --yohu-fg-2: #00000099;
   --yohu-fg-3: #00000066;
@@ -230,9 +230,9 @@
   --yohu-bg-base: #191A1C;
   --yohu-surface: #202224;
   --yohu-surface-2: #2E3033;
-  --yohu-comp-gray: #E5E5EA;
-  --yohu-comp-gray-hover: color-mix(in srgb, #FFFFFF 5%, #E5E5EA);
-  --yohu-comp-gray-pressed: color-mix(in srgb, #FFFFFF 10%, #E5E5EA);
+  --yohu-comp-gray: #FFFFFF19;
+  --yohu-comp-gray-hover: color-mix(in srgb, #FFFFFF 5%, #FFFFFF19);
+  --yohu-comp-gray-pressed: color-mix(in srgb, #FFFFFF 10%, #FFFFFF19);
   --yohu-fg: #FFFFFFE5;
   --yohu-fg-2: #FFFFFF99;
   --yohu-fg-3: #FFFFFF66;
