@@ -3,7 +3,7 @@
  */
 
 import { For, createEffect, onCleanup, onMount } from "solid-js";
-import { AndroidKey, errorText, ModuleTitle, type DeviceSession } from "@yohu/api";
+import { AndroidKey, errorText, ModuleTitle, type DeviceSession, type MirrorPointerKind } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -21,7 +21,7 @@ import {
   type IconName,
 } from "@yohu/ui";
 
-import { clientZoneRect } from "./layout";
+import { clientPointerPx, clientZoneRect } from "./layout";
 import {
   FPS_OPTIONS,
   PROTOCOL_OPTIONS,
@@ -95,11 +95,13 @@ export function MirrorView(props: DeviceSession) {
   });
   onCleanup(() => {
     if (layoutRaf !== 0) window.cancelAnimationFrame(layoutRaf);
+    layoutRaf = 0;
     zoneObserver?.disconnect();
     stopTheme?.();
     window.removeEventListener("scroll", onWin, true);
     window.removeEventListener("keydown", onEsc);
     document.removeEventListener("visibilitychange", onVis);
+    mirrorStore.leaveAvail();
   });
 
   function onWin(): void {
@@ -112,6 +114,24 @@ export function MirrorView(props: DeviceSession) {
     if (e.key !== "Escape" || !mirrorStore.state.fullscreen) return;
     e.preventDefault();
     mirrorStore.setFullscreen(false);
+  }
+
+  function reportAvailPointer(event: PointerEvent, kind: MirrorPointerKind): void {
+    if (!canControl()) return;
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    if (kind === "down") {
+      target.setPointerCapture(event.pointerId);
+    } else if ((kind === "up" || kind === "leave") && target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const vv = window.visualViewport;
+    const pt = clientPointerPx(event.clientX, event.clientY, dpr, {
+      left: vv?.offsetLeft ?? 0,
+      top: vv?.offsetTop ?? 0,
+    });
+    mirrorStore.reportPointer(kind, pt.x, pt.y);
   }
 
   createEffect(() => {
@@ -233,6 +253,11 @@ export function MirrorView(props: DeviceSession) {
               avail = el;
             }}
             class="yohu-mirror__avail"
+            onPointerDown={(event) => reportAvailPointer(event, "down")}
+            onPointerMove={(event) => reportAvailPointer(event, "move")}
+            onPointerUp={(event) => reportAvailPointer(event, "up")}
+            onPointerCancel={(event) => reportAvailPointer(event, "leave")}
+            onPointerLeave={(event) => reportAvailPointer(event, "leave")}
           >
             <div class="yohu-mirror__hole" aria-hidden="true" />
           </div>

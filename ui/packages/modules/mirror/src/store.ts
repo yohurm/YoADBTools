@@ -12,6 +12,7 @@ import {
   mirrorCloseControl,
   mirrorInject,
   mirrorLayout,
+  mirrorPointer,
   mirrorScreenshot,
   mirrorStart,
   mirrorStop,
@@ -21,6 +22,7 @@ import {
   settingsSet,
   type AppSettings,
   type MirrorControlMessage,
+  type MirrorPointerKind,
   type MirrorProtocol,
   type MirrorSessionState,
   type SettingKey,
@@ -181,6 +183,12 @@ export function createMirrorStore() {
     flushLayout();
   }
 
+  /** avail 离 DOM。隐藏必须上报；不去重清键当 HWND 修复。 */
+  function leaveAvail(): void {
+    if (!lastAvail) return;
+    reportAvail({ ...lastAvail, visible: false });
+  }
+
   /** 质量来自壳注入的 DeviceSession.settings，不另订 settings/changed。 */
   function applySettings(
     settings: Pick<
@@ -281,6 +289,12 @@ export function createMirrorStore() {
     const serial = state.serial;
     if (!serial || state.phase !== "live" || state.readOnly) return;
     await mirrorInject({ serial, message });
+  }
+
+  function reportPointer(kind: MirrorPointerKind, x: number, y: number): void {
+    const serial = state.serial;
+    if (!serial || state.phase !== "live" || state.readOnly || !state.control) return;
+    void mirrorPointer({ serial, kind, x, y });
   }
 
   async function setReadOnly(next: boolean): Promise<void> {
@@ -431,6 +445,8 @@ export function createMirrorStore() {
     saveScreenshot,
     setDeviceNight,
     reportAvail,
+    leaveAvail,
+    reportPointer,
     setPaused,
     setFullscreen,
   };

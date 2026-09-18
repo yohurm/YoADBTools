@@ -9,7 +9,16 @@ vi.mock("@yohu/api", () => ({
 
 import { MIRROR_MIN_LAYOUT_PX } from "@yohu/api";
 
-import { clientZoneRect, assembleMirrorLayout, layoutInsetKey, layoutIsPresentable, shouldReportLayout } from "./layout";
+import { clientPointerPx, clientZoneRect, assembleMirrorLayout, layoutInsetKey, layoutIsPresentable, shouldReportLayout } from "./layout";
+
+describe("clientPointerPx", () => {
+  it("与 avail 同一套物理坐标，不加屏幕原点", () => {
+    expect(clientPointerPx(10, 20, 1.5)).toEqual({
+      x: Math.round(10 * 1.5),
+      y: Math.round(20 * 1.5),
+    });
+  });
+});
 
 describe("clientZoneRect", () => {
   it("把 CSS 盒乘 DPR，不加屏幕原点", () => {
@@ -28,6 +37,17 @@ describe("clientZoneRect", () => {
       width: 0,
       height: 0,
     });
+  });
+
+  it("先取整四边，宽高由边导出", () => {
+    const css = { left: 10.4, top: 20.4, width: 200.4, height: 300.4 };
+    const dpr = 1.5;
+    const rect = clientZoneRect(css, dpr);
+    expect(rect.x).toBe(Math.round(10.4 * 1.5));
+    expect(rect.y).toBe(Math.round(20.4 * 1.5));
+    expect(rect.x + rect.width).toBe(Math.round((10.4 + 200.4) * 1.5));
+    expect(rect.y + rect.height).toBe(Math.round((20.4 + 300.4) * 1.5));
+    expect(rect.width).not.toBe(Math.round(200.4 * 1.5));
   });
 
   it("把 visualViewport 偏移加进客户区原点", () => {
@@ -119,8 +139,11 @@ describe("MirrorView 滚轴", () => {
     const avail = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__avail"'), viewSrc.indexOf('class="yohu-mirror__ops"'));
     expect(avail).not.toContain("YoScroller");
     expect(avail).toContain("yohu-mirror__hole");
+    expect(avail).toContain("onPointerDown");
+    expect(avail).toContain("onPointerLeave");
     expect(viewSrc).not.toContain("deviceLabel");
     expect(viewSrc).toContain("onCleanup(() => toaster.destroy())");
+    expect(viewSrc).toContain("leaveAvail");
     expect(viewSrc).not.toContain("Toast.success");
     expect(statusSrc).toContain("YoBadge");
     expect(statusSrc).not.toMatch(/<span[\s>]/);

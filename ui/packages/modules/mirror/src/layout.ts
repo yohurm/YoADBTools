@@ -41,8 +41,25 @@ export interface LayoutFlags {
 
 /**
  * 可用区相对 WebView 视口（= 主窗客户区）的物理像素。
+ * 先取整四边再导出宽高，右边 / 底边守恒。禁止独立 round 宽高。
  * HWND 是 WS_CHILD，禁止再加 `screenX`。
  */
+/** 指针与 avail 同一套：CSS 客户区坐标 × dpr，不加 screenX。 */
+export function clientPointerPx(
+  clientX: number,
+  clientY: number,
+  devicePixelRatio: number,
+  viewportOffset: ViewportOffset = { left: 0, top: 0 },
+): { x: number; y: number } {
+  const dpr = devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const left = clientX + (Number.isFinite(viewportOffset.left) ? viewportOffset.left : 0);
+  const top = clientY + (Number.isFinite(viewportOffset.top) ? viewportOffset.top : 0);
+  return {
+    x: Math.round(left * dpr),
+    y: Math.round(top * dpr),
+  };
+}
+
 export function clientZoneRect(
   css: CssRect,
   devicePixelRatio: number,
@@ -51,11 +68,15 @@ export function clientZoneRect(
   const dpr = devicePixelRatio > 0 ? devicePixelRatio : 1;
   const left = css.left + (Number.isFinite(viewportOffset.left) ? viewportOffset.left : 0);
   const top = css.top + (Number.isFinite(viewportOffset.top) ? viewportOffset.top : 0);
+  const x = Math.round(left * dpr);
+  const y = Math.round(top * dpr);
+  const right = Math.round((left + css.width) * dpr);
+  const bottom = Math.round((top + css.height) * dpr);
   return {
-    x: Math.round(left * dpr),
-    y: Math.round(top * dpr),
-    width: Math.max(0, Math.round(css.width * dpr)),
-    height: Math.max(0, Math.round(css.height * dpr)),
+    x,
+    y,
+    width: Math.max(0, right - x),
+    height: Math.max(0, bottom - y),
   };
 }
 

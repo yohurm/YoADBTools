@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   mirrorInject: vi.fn(),
   mirrorCloseControl: vi.fn(),
   mirrorLayout: vi.fn(),
+  mirrorPointer: vi.fn(),
   mirrorScreenshot: vi.fn(),
   deviceSetNightMode: vi.fn(),
   settingsSet: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock("@yohu/api", () => ({
   mirrorInject: (...a: unknown[]) => mocks.mirrorInject(...a),
   mirrorCloseControl: (...a: unknown[]) => mocks.mirrorCloseControl(...a),
   mirrorLayout: (...a: unknown[]) => mocks.mirrorLayout(...a),
+  mirrorPointer: (...a: unknown[]) => mocks.mirrorPointer(...a),
   mirrorScreenshot: (...a: unknown[]) => mocks.mirrorScreenshot(...a),
   deviceSetNightMode: (...a: unknown[]) => mocks.deviceSetNightMode(...a),
   settingsSet: (...a: unknown[]) => mocks.settingsSet(...a),
@@ -64,6 +66,8 @@ describe("mirror store", () => {
     mocks.mirrorCloseControl.mockReset();
     mocks.mirrorLayout.mockReset();
     mocks.mirrorLayout.mockResolvedValue(undefined);
+    mocks.mirrorPointer.mockReset();
+    mocks.mirrorPointer.mockResolvedValue(undefined);
     mocks.mirrorScreenshot.mockReset();
     mocks.deviceSetNightMode.mockReset();
     mocks.settingsSet.mockReset();
@@ -413,6 +417,37 @@ describe("mirror store", () => {
     store.reportAvail(avail);
     store.reportAvail(avail);
     expect(mocks.mirrorLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("离开可用区上报隐藏，再入座同 avail 仍上报", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    await store.bindSerial("S1");
+    const avail = {
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 600,
+      visible: true,
+      dpr: 1,
+      dark: false,
+    };
+    store.reportAvail(avail);
+    store.leaveAvail();
+    expect(mocks.mirrorLayout.mock.calls[1]?.[0]).toMatchObject({
+      serial: "S1",
+      visible: false,
+      width: 300,
+      height: 600,
+    });
+    mocks.mirrorLayout.mockClear();
+    store.reportAvail(avail);
+    expect(mocks.mirrorLayout).toHaveBeenCalledTimes(1);
+    expect(mocks.mirrorLayout.mock.calls[0]?.[0]).toMatchObject({
+      visible: true,
+      width: 300,
+      height: 600,
+    });
   });
 
   it("可见且小于最小像素不上报；隐藏仍上报", async () => {
