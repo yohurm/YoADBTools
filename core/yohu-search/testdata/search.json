@@ -40,7 +40,15 @@
     { "text": "设备信息", "token": "设备", "kind": "prefix", "start": 0, "end": 2 },
     { "text": "shell getprop", "token": "getprop", "kind": "prefix", "start": 6, "end": 13 },
     { "text": "ro.product.model", "token": "product", "kind": "contains", "start": 3, "end": 10 },
-    { "text": "型号", "token": "wifi" }
+    { "text": "型号", "token": "wifi" },
+    { "text": "型号", "token": "xh", "kind": "exact", "start": 0, "end": 2 },
+    { "text": "型号", "token": "xinghao", "kind": "exact", "start": 0, "end": 2 },
+    { "text": "型号", "token": "xingh", "kind": "exact", "start": 0, "end": 2 },
+    { "text": "设备信息", "token": "sb", "kind": "prefix", "start": 0, "end": 2 },
+    { "text": "设备信息", "token": "xx", "kind": "contains", "start": 2, "end": 4 },
+    { "text": "连上再亮", "token": "lszl", "kind": "exact", "start": 0, "end": 4 },
+    { "text": "西安", "token": "xi'an", "kind": "exact", "start": 0, "end": 2 },
+    { "text": "女", "token": "nv", "kind": "exact", "start": 0, "end": 1 }
   ],
   "search": [
     { "query": "  ", "ids": ["c-model", "c-ping", "b-wake"] },
@@ -50,12 +58,19 @@
     { "query": "shell", "ids": ["c-model", "c-ping", "b-wake"] },
     { "query": "型号", "ids": ["c-model"], "score0": 300 },
     { "query": "wifi", "ids": [] },
-    { "query": "wifi ping", "options": { "combine": "or" }, "ids": ["c-ping"] }
+    { "query": "wifi ping", "options": { "combine": "or" }, "ids": ["c-ping"] },
+    { "query": "xh", "ids": ["c-model"], "score0": 300 },
+    { "query": "xinghao", "ids": ["c-model"], "score0": 300 },
+    { "query": "shebei", "ids": ["c-model", "c-ping"], "score0": 80 },
+    { "query": "lszl", "ids": ["b-wake"], "score0": 300 },
+    { "query": "wl", "ids": ["c-ping"], "score0": 120 }
   ],
   "expand": [
     { "query": "设备", "ids": ["c-model", "c-ping"] },
     { "query": "设备信息", "ids": ["c-model", "c-ping"] },
-    { "query": "getprop", "ids": ["c-model"] }
+    { "query": "getprop", "ids": ["c-model"] },
+    { "query": "shebei", "ids": ["c-model", "c-ping"] },
+    { "query": "dy", "ids": ["b-wake"] }
   ],
   "highlight": [
     { "text": "shell ping -c 3", "query": "ping", "ranges": [{ "start": 6, "end": 10 }] },
@@ -67,6 +82,9 @@
         { "start": 0, "end": 3 },
         { "start": 8, "end": 11 }
       ]
-    }
+    },
+    { "text": "型号", "query": "xh", "ranges": [{ "start": 0, "end": 2 }] },
+    { "text": "设备信息", "query": "xx", "ranges": [{ "start": 2, "end": 4 }] },
+    { "text": "连上再亮", "query": "lszl", "ranges": [{ "start": 0, "end": 4 }] }
   ]
 }

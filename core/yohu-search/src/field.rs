@@ -1,6 +1,7 @@
 //! 单字段对单语的第一次命中。下标是 Unicode 标量。
 
 use crate::chars::{find_chars, lowered_chars};
+use crate::pinyin::find_pinyin_span;
 use crate::token::normalize_search_query;
 use crate::types::SearchHitKind;
 
@@ -21,8 +22,21 @@ pub fn search_field_hit(text: &str, token: &str) -> Option<(usize, usize, Search
     }
     let hay = lowered_chars(text);
     let n: Vec<char> = needle.chars().collect();
-    let start = find_chars(&hay, &n, 0)?;
-    Some((start, start + n.len(), hit_kind(&hay, &n, start)))
+    if let Some(start) = find_chars(&hay, &n, 0) {
+        return Some((start, start + n.len(), hit_kind(&hay, &n, start)));
+    }
+    let (start, end) = find_pinyin_span(&hay, &needle, 0)?;
+    Some((start, end, span_kind(&hay, start, end)))
+}
+
+fn span_kind(hay: &[char], start: usize, end: usize) -> SearchHitKind {
+    if start == 0 && end == hay.len() {
+        return SearchHitKind::Exact;
+    }
+    if start == 0 || hay[start - 1].is_whitespace() {
+        return SearchHitKind::Prefix;
+    }
+    SearchHitKind::Contains
 }
 
 #[cfg(test)]

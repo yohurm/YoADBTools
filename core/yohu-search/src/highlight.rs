@@ -1,6 +1,7 @@
 //! 查询词高亮区间。
 
 use crate::chars::{find_chars, lowered_chars};
+use crate::pinyin::find_pinyin_span;
 use crate::token::{normalize_search_query, tokenize_search_query};
 use crate::types::SearchRange;
 
@@ -36,6 +37,14 @@ fn token_ranges(text: &str, token: &str) -> Vec<SearchRange> {
         ranges.push(SearchRange { start, end });
         from = start + n.len().max(1);
         if from > hay.len() {
+            break;
+        }
+    }
+    let mut pinyin_from = 0;
+    while let Some((start, end)) = find_pinyin_span(&hay, &needle, pinyin_from) {
+        ranges.push(SearchRange { start, end });
+        pinyin_from = end.max(start + 1);
+        if pinyin_from > hay.len() {
             break;
         }
     }
