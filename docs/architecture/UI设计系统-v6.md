@@ -1,12 +1,14 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.49（2026-09-17，壳侧栏展开收窄）
+> **状态：** v3.51（2026-09-17，投屏 HWND 铺满主窗客户区）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.51 变更（投屏 HWND 铺满主窗客户区）：** Windows 合成目标是主窗客户区，不是 avail/dest 卡片。占用 Fill=avail、Dest=contain，只走 DComp clip + 回缓冲绘制；侧栏改 avail 禁止 `SetWindowPos`。卡片外像素预乘透明；HWND 创建即 `WS_DISABLED`，不参与命中。出处：`CreateTargetForHwnd` 裁在窗口可见区；官方初始化用 Visual `SetOffsetX/Y`，不靠移窗。见 [ADR-v6-024](adr/ADR-v6-024.md)、[ADR-v6-026](adr/ADR-v6-026.md)、[ADR-v6-027](adr/ADR-v6-027.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v3.50 变更（展示类底板走 Container 洗）：** 色彩.md：普通按钮/搜索框底是基础色 Container（默认与 Primary 同级：浅黑/深白），不是 `comp_background_gray` 实灰。Theme Colors：Button / Chip / Select / TextInput / Search 走 `compBackgroundTertiary`；API 26 浅 = Container 5%、深 = Container 10%。`--yohu-comp-gray` 浅 `#0000000C` / 深 `#FFFFFF19`。Chip / Segmented 轨 / Progress 轨跟这条。`comp_background_gray` Dark `#E5E5EA` 仍记在 primitive，组件不消费。见 [youi.md](youi.md)、[harmonyos-design-notes.md](harmonyos-design-notes.md)。
 > **v3.49 变更（壳侧栏展开收窄）：** `--yohu-layout-shell-nav` 232→200（与质量栏 / 命令组上限同档，8vp 栅格）。收起仍是 48 图标轨。禁止再写裸 232。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v3.48 变更（终端命令库栏标题 + 收窄）：** 左右分栏都走 `YoPanel title`（命令库 / 执行结果），对照鸿蒙电脑标题栏 Compact + `titleStyle` 一级字，禁止左栏无标题。`--yohu-layout-sidebar` 280→240（与预览同档，效率型 B 栏 ≤ 窗口 40%）。命令管理三栏仍是 Toolbar + Subheader（有图标钮）。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
 > **v3.47 变更（标题文本色自底而上）：** 对照鸿蒙 `titleStyle`：主标题 / Dialog / 内容型 SubHeader = `font_primary`；列表型 SubHeader / 副标题 = `font_secondary`。`YoSubheader tone=list` 从 `--yohu-fg-3` 改 `--yohu-fg-2`（白底标题 ≥3:1，与图标钮同级）。`YoDialog` 标题显式一级字。禁止三级字当标题。见 [youi.md](youi.md)。
@@ -97,6 +99,7 @@
 > **v2.64 变更（日志 Tag 多针筛选）：** Tag 框逗号 / 分号 / `|` 分隔多个针（OR），当时子串；现精确命中（v2.65，libc 不命中 libcomposer_ext）。空白留在针内。空或仅分隔符 = 不限。过滤生效走公开 `active`。导出与 UI 同一套 `log_filter.json`。禁止正则。见 [modules/logs.md](modules/logs.md)。
 > **v2.63 变更（命令参数插入与填参弹窗）：** 命令管理具体命令标签为 `具体命令（{n}代表使用命令时需要填入的独立参数）`，按钮「插入参数」。每个实际出现的 `{n}` 是独立参数（`{13}` 不带出 `{0}`…`{12}`），可编描述（`params`，空不落盘）。填参弹窗列出原始命令与带描述的实际 `{n}`，不展示预览。见 [modules/terminal.md](modules/terminal.md)。
 > **v2.62 变更（换位浮层 + 让位 + 插缝）：** 对标鸿蒙 List 浮起占位、Apple 水平插缝、dnd-kit overlay。过臂距后：浮层跟指针、源行淡占位、邻行让位、插入条只出现在行缝（最近中线）。Escape 取消。禁止只画一条钉在行顶的线当换位。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v2.62 变更（占用卡片是 HWND）：** Dest 落地后 HWND=contain dest，clip 铺满客户区。Fill↔Dest 才 DComp clip。侧栏只 `SetWindowPos` 卡片，禁止槽 HWND + clip.left 双轨。见 [ADR-v6-027](adr/ADR-v6-027.md)。
 > **v2.61 变更（VirtualList 统一换位）：** `onReorder` 收口几何；v2.62 补齐浮层与让位。撤回 v2.60 常驻手柄。
 > **v2.60 变更（已撤回）：** 曾用模块内 `ReorderGrip` 常驻手柄；v2.61 升到 VirtualList。
 > **v2.59 变更（fill 滑块宿主两轴 hidden）：** `YoIndicator` fill 宿主必须 `overflow: hidden`（两轴裁切、不画条）。禁止只写 `overflow-x: hidden`——CSS Overflow 会把另一轴 `visible` 算成 `auto`，弹簧过冲在 Windows 弹出右侧纵条（命令管理组切换同症）。`YoVirtualList` 当时宿主滚轴 `overflow-x: hidden` + `overflow-y: auto`（与 `YoColFrame` `scrollbar-gutter` 同契约）；现已撤回，内组合 `YoScroller`。设备栏 / 导航 / 设置 / 终端名单纵滚走 `YoScroller`（v3.10 / v3.15 / v3.18）；list 宿主只 `overflow: hidden`。禁止在滑块宿主上写 `overflow: auto`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
@@ -387,7 +390,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `bg-base` | `background_secondary` | `#F1F3F5` 雪域灰 | `#191A1C` | 窗口底色（浅/深同构凹槽） |
 | `surface` | `comp_background_primary` | `#FFFFFF` | `#202224` | 面板/卡片 |
 | `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度）；禁止冒充普通按钮底 |
-| `comp-gray` / `-hover` / `-pressed` | 浅 `background_tertiary` / 深 `comp_background_gray` + `interactive` 5%/10% | `#E5E5EA` 叠黑 | `#E5E5EA` 叠白 | 普通按钮底；浅色不用与画布同值的 `comp_background_gray` |
+| `comp-gray` / `-hover` / `-pressed` | Container 洗 `comp_background_tertiary` + `interactive` 5%/10% | 黑 5% | 白 10% | 展示类底板（按钮/搜索/分段轨）；浅深都从 Container 推，不是实灰 |
 | `fg` / `fg-2` / `fg-3` / `fg-4` | `font_primary`…`fourth` | 黑 90/60/40/20% | 白 90/60/40/20% | 文本四级 |
 | `fg-on` | `font_on_primary` | `#FFFFFF` | `#FFFFFF` | 强调底上的反色字 |
 | `border` | `comp_divider` | 黑 20% | 白 20% | 常规边框/分割 |
@@ -615,7 +618,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 舞台像素由 HWND 独占（空态/加载/暂停/视频都画在 HWND 上，ADR-v6-026/027）；WebView 只留透明占位上报 avail。禁止 WebView overlay 与 HWND XOR。`Stage.mode` 决定回缓冲主人：铬模式每拍画填充+文案+描边，视频模式每拍画帧+描边。填充走工作台 surface（`dark` = `data-theme`，不是设备夜览）。描边走 `--yohu-border-strong`，画在当前可见 clip 内侧。空态图标 `fg` + `surface-2` 井。禁止 dirty 一次画完、禁止动画期跳过描边。空态只写终态（未选择设备 / 未开始 / 启动失败），不把模块名再写一遍。Live 不等于已出画：首帧 Present 前舞台保持加载，避免黑屏空等。上次编码尺寸留在 present，`stop` 不清零。占用 fill↔dest 走 DComp clip 动画。禁止 CSS 占用宽高过渡、禁止 UI 运行时 contain。切走投屏由工作台先关舞台再淡出网页；禁止 View 观察 Presence。按下后指针离开占用面立刻抬起（`TOUCH_UP`），禁止拖出画面后设备仍按着。
 - 页眉主行 ≤6：开始/停止、暂停画面、截图、面板内全屏、**仅显示**（按下=只看；默认未按=可操作）。**面板内全屏**只藏操作栏与功能栏，舞台吃满页眉以下；页眉「退出全屏」与 Esc 始终可点。禁止 `position:fixed; inset:0` 盖住工作台。**设备操作栏**（宽 `--yohu-layout-mirror-ops`，在画面与设置栏之间，非常驻于全屏）：返回 / Home / 多任务 / 音量± / 电源 / **设备深浅色（月亮=设备当前深色、太阳=浅色，同一钮，读 `deviceStatuses.night`）** / 亮度±，鸿蒙符号 `YoIconButton`。非全屏时导航/音量/电源/亮度在不可操作时禁用，不把栏藏起来以免布局跳动；深浅色钮跟连接设备，不跟工作台 theme，禁止本页轮询 dumpsys。**右侧功能栏**（宽 `--yohu-layout-mirror-func`，`YoPanel`）：**质量**（投屏协议 USB/无线 / 长边 / 码率 / 帧率上限，**下次开始生效**）。禁止再把这些控件放进页眉 extra、设置页或通道开关。禁止把导航键放回设置栏。
 - 实测 fps 在状态栏右下角（1s 窗口已 Present 帧），不是画面角标，也不是质量栏的编码器上限。
-- 面板贴合：`mirror.layout` 报 `.yohu-mirror__avail` 客户区物理矩形 + 会话旗标。舞台透明洞稳定；HWND 铺满 avail；可见卡片 DComp clip = contain dest。fill↔dest 走 `IDCompositionAnimation`。禁止 `screenX` 跟窗。主窗不得小于 `Layout.WindowMin*`（1024×768），否则竖屏画面会塌成不可读的窄条。
+- 面板贴合：`mirror.layout` 报 `.yohu-mirror__avail` 客户区物理矩形 + 会话旗标。舞台透明洞稳定。Windows：HWND 铺满主窗客户区；可见卡片是 DComp clip（Fill=avail，Dest=contain）。Fill↔Dest 才走 `IDCompositionAnimation`。侧栏只改 clip，禁止 `SetWindowPos` 跟弹簧。禁止 `screenX` 跟窗。主窗不得小于 `Layout.WindowMin*`（1024×768），否则竖屏画面会塌成不可读的窄条。
 
 ### 4.5 设置
 
