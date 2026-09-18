@@ -1,17 +1,20 @@
 /**
  * 输入框交互策略（L3）。
- * 禁用与清除显隐是同一写入口；宿主 data-* 从模型快照组装。
+ * 禁用与清除显隐、数字步进显隐与触边禁用是同一写入口；宿主 data-* 从模型快照组装。
  * 不写色值、不画铬。
  */
 
 import {
+  canStepTextFieldNumber,
   resolveTextFieldMaxRows,
   resolveTextFieldRows,
   resolveTextFieldSpec,
   resolveTextFieldStatus,
+  resolveTextFieldStepper,
   textFieldPaintKind,
   type TextFieldPaintKind,
   type TextFieldSlotInput,
+  type TextFieldStepDirection,
   type TextFieldWidthKind,
   type YoTextFieldStatus,
 } from "./textfield-model";
@@ -60,6 +63,7 @@ export interface TextFieldHostAttrs {
   "data-readonly": true | undefined;
   "data-active": true | undefined;
   "data-multiline": true | undefined;
+  "data-stepper": true | undefined;
   "data-font": "mono" | undefined;
   disabled: boolean;
   readOnly: boolean;
@@ -82,6 +86,7 @@ export function textFieldHostAttrs(
 ): TextFieldHostAttrs {
   const spec = resolveTextFieldSpec(input);
   const interactive = resolveTextFieldInteractive(input);
+  const stepper = resolveTextFieldStepper(input);
   return {
     "data-status": spec.status,
     "data-paint": textFieldPaintKind(spec.status),
@@ -96,6 +101,7 @@ export function textFieldHostAttrs(
     "data-readonly": interactive.readOnly ? true : undefined,
     "data-active": spec.active ? true : undefined,
     "data-multiline": spec.multiline ? true : undefined,
+    "data-stepper": stepper ? true : undefined,
     "data-font": input.font === "mono" ? "mono" : undefined,
     disabled: interactive.disabled,
     readOnly: interactive.readOnly,
@@ -106,5 +112,42 @@ export function textFieldHostAttrs(
       rows: spec.rows,
       maxRows: input.maxRows,
     }),
+  };
+}
+
+export interface TextFieldStepperInput {
+  type?: string;
+  multiline?: boolean;
+  disabled?: boolean;
+  readOnly?: boolean;
+  value?: string;
+  min?: number;
+  max?: number;
+}
+
+export interface TextFieldStepperState {
+  show: boolean;
+  incrementDisabled: boolean;
+  decrementDisabled: boolean;
+}
+
+function stepperLocked(input: TextFieldStepperInput): boolean {
+  return Boolean(input.disabled) || Boolean(input.readOnly);
+}
+
+function stepperDirDisabled(input: TextFieldStepperInput, direction: TextFieldStepDirection): boolean {
+  return stepperLocked(input) || !canStepTextFieldNumber({ ...input, direction });
+}
+
+/** 步进柱显隐与两向禁用。触边、禁用、只读都关对应钮。不写色。 */
+export function textFieldStepperState(input: TextFieldStepperInput): TextFieldStepperState {
+  const show = resolveTextFieldStepper(input);
+  if (!show) {
+    return { show: false, incrementDisabled: true, decrementDisabled: true };
+  }
+  return {
+    show: true,
+    incrementDisabled: stepperDirDisabled(input, 1),
+    decrementDisabled: stepperDirDisabled(input, -1),
   };
 }

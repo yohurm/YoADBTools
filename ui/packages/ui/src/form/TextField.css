@@ -224,11 +224,11 @@
   margin-block-start: calc((var(--yohu-text-field-line) - var(--yohu-layout-icon-inline)) / 2);
 }
 
-/* 数字：去掉 UA 步进钮；值贴尾缘，避免短数字在槽里看起来居中。 */
+/* 数字：去掉 UA 步进；值贴起缘，右槽留给步进柱。 */
 .yohu-text-field__input[type="number"] {
   appearance: textfield;
   font-variant-numeric: tabular-nums;
-  text-align: end;
+  text-align: start;
 }
 
 .yohu-text-field__input[type="number"]::-webkit-outer-spin-button,
@@ -270,7 +270,51 @@
 }
 
 .yohu-text-field[data-disabled] .yohu-text-field__input,
-.yohu-text-field[data-disabled] .yohu-text-field__affix {
+.yohu-text-field[data-disabled] .yohu-text-field__affix,
+.yohu-text-field[data-disabled] .yohu-text-field__step {
+  color: var(--yohu-disabled);
+  cursor: not-allowed;
+}
+
+.yohu-text-field__stepper {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--yohu-layout-text-field-stepper);
+  align-self: stretch;
+  width: var(--yohu-layout-text-field-stepper);
+  margin-inline-end: calc(var(--yohu-space-sm) * -1);
+  border-inline-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  box-sizing: border-box;
+}
+
+.yohu-text-field__step {
+  display: inline-flex;
+  flex: 1 1 0%;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: pointer;
+}
+
+.yohu-text-field__step + .yohu-text-field__step {
+  border-block-start: var(--yohu-stroke-hairline) solid var(--yohu-border);
+}
+
+.yohu-text-field__step:hover:not(:disabled) {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-text-field__step:active:not(:disabled) {
+  background-color: var(--yohu-state-pressed);
+}
+
+.yohu-text-field__step:disabled {
   color: var(--yohu-disabled);
   cursor: not-allowed;
 }

@@ -12,19 +12,18 @@
 }
 
 .yohu-select__trigger {
-  --yohu-corner-fill: var(--yohu-surface);
-  --yohu-corner-stroke: var(--yohu-border);
+  --yohu-corner-fill: var(--yohu-comp-gray);
+  --yohu-corner-stroke: transparent;
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--yohu-space-sm);
+  gap: var(--yohu-space-xs);
   box-sizing: border-box;
   width: max-content;
   max-width: 100%;
-  /* min-width 必须在触发钮上：写在根上时短文案 hug 触发钮靠左，右侧留出空白，表单行看起来没贴右。 */
-  min-width: calc(var(--yohu-space-xl) * 5);
   height: var(--yohu-control-height);
-  padding: 0 var(--yohu-space-sm);
+  padding-block: 0;
+  padding-inline: var(--yohu-space-sm);
   overflow: visible;
   border: none;
   background-color: transparent;
@@ -41,18 +40,27 @@
 }
 
 .yohu-select__trigger:not(:disabled):hover {
-  --yohu-corner-stroke: var(--yohu-splitter-hover);
+  --yohu-corner-fill: var(--yohu-comp-gray-hover);
+}
+
+.yohu-select__trigger:not(:disabled):active,
+.yohu-select__trigger[aria-expanded="true"] {
+  --yohu-corner-fill: var(--yohu-comp-gray-pressed);
 }
 
 .yohu-select__value {
   position: relative;
   z-index: 1;
   min-width: 0;
-  flex: 1 1 auto;
-  text-align: left;
+  flex: 0 1 auto;
+  text-align: start;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.yohu-select[data-block] .yohu-select__value {
+  flex: 1 1 auto;
 }
 
 .yohu-select__value[data-placeholder] {
@@ -62,7 +70,15 @@
 .yohu-select__chevron {
   position: relative;
   z-index: 1;
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  color: var(--yohu-fg-2);
+  transition: transform var(--yohu-motion-effects-fast);
+}
+
+.yohu-select__trigger[aria-expanded="true"] .yohu-select__chevron {
+  transform: rotate(180deg);
 }
 
 /* 铬：落点与夹紧。内容 hug，禁止写死 width。叠层走 popover-place overlay token。 */
@@ -130,4 +146,8 @@
   --yohu-corner-fill: var(--yohu-surface-2);
   color: var(--yohu-disabled);
   cursor: not-allowed;
+}
+
+.yohu-select[data-disabled] .yohu-select__chevron {
+  color: inherit;
 }

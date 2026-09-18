@@ -32,8 +32,13 @@ export const Layout = {
   SettingsLabelMax: 240,
   /** 设置页路径类控件上限，避免输入框横向拉满。 */
   SettingsControlMax: 360,
-  /** 数字输入 hug 宽（YoTextField type=number；设置行消费同一槽）。 */
-  SettingsNumberW: 96,
+  /**
+   * 数字输入默认宽（YoTextField type=number；设置行同一槽）。
+   * 左 5 位 tabular + 右步进柱；旧 96 是无步进、值贴尾的空槽。
+   */
+  SettingsNumberW: 80,
+  /** 数字框右侧步进柱（上下箭叠放）。与 IconSm 同档，不是图标尺寸别名。 */
+  TextFieldStepper: 16,
   OutputMax: 260,
   CrumbMax: 160,
   CmGroupMin: 168,

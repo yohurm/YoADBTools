@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveTextFieldInteractive, textFieldHostAttrs } from "./textfield-policy";
+import { resolveTextFieldInteractive, textFieldHostAttrs, textFieldStepperState } from "./textfield-policy";
 
 describe("textfield-policy", () => {
   it("默认可改、不显示清除、status=none", () => {
@@ -38,6 +38,7 @@ describe("textfield-policy", () => {
       "data-readonly": undefined,
       "data-active": undefined,
       "data-multiline": undefined,
+      "data-stepper": undefined,
       "data-font": undefined,
       disabled: false,
       readOnly: false,
@@ -122,5 +123,21 @@ describe("textfield-policy", () => {
     expect(textFieldHostAttrs({})["data-font"]).toBeUndefined();
     expect(textFieldHostAttrs({ font: "ui" })["data-font"]).toBeUndefined();
     expect(textFieldHostAttrs({ font: "mono" })["data-font"]).toBe("mono");
+  });
+
+  it("type=number 写 data-stepper；multiline 不写", () => {
+    expect(textFieldHostAttrs({})["data-stepper"]).toBeUndefined();
+    expect(textFieldHostAttrs({ type: "number" })["data-stepper"]).toBe(true);
+    expect(textFieldHostAttrs({ type: "number", multiline: true })["data-stepper"]).toBeUndefined();
+  });
+
+  it("步进钮：禁用/只读/触边关掉对应方向", () => {
+    expect(textFieldStepperState({ type: "text" }).show).toBe(false);
+    const idle = textFieldStepperState({ type: "number", value: "5", min: 0, max: 10 });
+    expect(idle).toEqual({ show: true, incrementDisabled: false, decrementDisabled: false });
+    expect(textFieldStepperState({ type: "number", value: "0", min: 0 }).decrementDisabled).toBe(true);
+    expect(textFieldStepperState({ type: "number", value: "10", max: 10 }).incrementDisabled).toBe(true);
+    expect(textFieldStepperState({ type: "number", value: "1", disabled: true }).incrementDisabled).toBe(true);
+    expect(textFieldStepperState({ type: "number", value: "1", readOnly: true }).decrementDisabled).toBe(true);
   });
 });

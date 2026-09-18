@@ -12,11 +12,18 @@ import {
   resolveTextFieldMaxRows,
   resolveTextFieldMultiline,
   resolveTextFieldRows,
+  canStepTextFieldNumber,
+  parseTextFieldNumber,
+  resolveTextFieldBound,
   resolveTextFieldSpec,
   resolveTextFieldStatus,
+  resolveTextFieldStep,
+  resolveTextFieldStepper,
   resolveTextFieldWidthKind,
+  stepTextFieldNumber,
   textFieldLineBoxPx,
   textFieldPaintKind,
+  DEFAULT_TEXT_FIELD_STEP,
 } from "./textfield-model";
 
 describe("textfield-model", () => {
@@ -145,5 +152,33 @@ describe("textfield-model", () => {
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 1, maxRows: 4 })).toBe(4);
     expect(resolveTextFieldMaxRows({ multiline: true, rows: 3, maxRows: 2 })).toBe(DEFAULT_TEXT_FIELD_MAX_ROWS);
     expect(resolveTextFieldMaxRows({ value: "a\nb" } as { multiline?: boolean })).toBe(1);
+  });
+
+  it("单行 number 才画步进，multiline 不当数字槽", () => {
+    expect(resolveTextFieldStepper({})).toBe(false);
+    expect(resolveTextFieldStepper({ type: "text" })).toBe(false);
+    expect(resolveTextFieldStepper({ type: "number" })).toBe(true);
+    expect(resolveTextFieldStepper({ type: "number", multiline: true })).toBe(false);
+  });
+
+  it("步进：空值当 0，默认步长 1，触边夹取", () => {
+    expect(resolveTextFieldStep()).toBe(DEFAULT_TEXT_FIELD_STEP);
+    expect(resolveTextFieldStep(0)).toBe(DEFAULT_TEXT_FIELD_STEP);
+    expect(resolveTextFieldStep(-2)).toBe(DEFAULT_TEXT_FIELD_STEP);
+    expect(resolveTextFieldStep(0.5)).toBe(0.5);
+    expect(resolveTextFieldBound()).toBeUndefined();
+    expect(resolveTextFieldBound(Number.NaN)).toBeUndefined();
+    expect(parseTextFieldNumber("")).toBeUndefined();
+    expect(parseTextFieldNumber("12")).toBe(12);
+    expect(stepTextFieldNumber({ value: "", direction: 1 })).toBe("1");
+    expect(stepTextFieldNumber({ value: "0", direction: 1 })).toBe("1");
+    expect(stepTextFieldNumber({ value: "1", direction: -1, min: 0 })).toBe("0");
+    expect(stepTextFieldNumber({ value: "0", direction: -1, min: 0 })).toBe("0");
+    expect(stepTextFieldNumber({ value: "10", direction: 1, max: 10 })).toBe("10");
+    expect(stepTextFieldNumber({ value: "1", direction: 1, step: 0.5 })).toBe("1.5");
+    expect(canStepTextFieldNumber({ value: "0", direction: -1, min: 0 })).toBe(false);
+    expect(canStepTextFieldNumber({ value: "10", direction: 1, max: 10 })).toBe(false);
+    expect(canStepTextFieldNumber({ value: "", direction: -1, min: 0 })).toBe(true);
+    expect(canStepTextFieldNumber({ value: "5", direction: 1, max: 10 })).toBe(true);
   });
 });

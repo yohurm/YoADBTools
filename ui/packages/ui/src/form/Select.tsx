@@ -2,8 +2,9 @@
  * YoSelect —— 自绘下拉选择框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：Select。落点在 select-place → popover-place；选中在 select-model；开合/键盘/禁用在 select-policy。
  * 受控 API：options / value / onChange / disabled / placeholder / block。
- * 默认 hug 选中文案；最小宽在触发钮上（禁止写在根上，否则短文案按钮靠左）。
- * 宿主是 button；YoCorner 只 paint。文案与箭头在钮上，禁止 clip-path 裁箭头。
+ * 默认 hug 文案簇（字 + 箭头）；禁止给 hug 写 min-width（短文案会被拉开）。
+ * block 才让文案吃剩余、箭头贴尾。宿主是 button；YoCorner 只 paint。
+ * 文案与箭头在钮上，禁止 clip-path 裁箭头。
  *
  * 交互：
  * - 点击展开、点击外部关闭、Esc 关闭（逐层退出）
@@ -187,7 +188,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         onClick={openMenu}
         onKeyDown={onTriggerKeyDown}
       >
-        <YoCorner mode="paint" role="control" stroke class="yohu-select__chrome" />
+        <YoCorner mode="paint" role="control" class="yohu-select__chrome" />
         <span
           class="yohu-select__value"
           data-placeholder={selected() ? undefined : ""}

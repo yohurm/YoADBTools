@@ -146,7 +146,8 @@
   --yohu-layout-settings-label-min: 160px;
   --yohu-layout-settings-label-max: 240px;
   --yohu-layout-settings-control-max: 360px;
-  --yohu-layout-settings-number-w: 96px;
+  --yohu-layout-settings-number-w: 80px;
+  --yohu-layout-text-field-stepper: 16px;
   --yohu-layout-output-max: 260px;
   --yohu-layout-crumb-max: 160px;
   --yohu-layout-cm-group-min: 168px;

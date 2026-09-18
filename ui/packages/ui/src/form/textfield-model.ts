@@ -8,6 +8,7 @@
  * multiline 走同一门面，禁止模块再挂 textarea.yohu-text-field__input。
  * 弱多行用后高是 UA 排版（field-sizing），L2 只给 rows 下限与 maxRows 帽。
  * 禁止从字符串数 `\n` 冒充可见行。
+ * type=number 步进（加减 / 夹取 / 触边）在本文件；L4 只画柱，不重算。
  */
 
 import { Stroke } from "../tokens/layout";
@@ -19,8 +20,11 @@ export const DEFAULT_TEXT_FIELD_STATUS: YoTextFieldStatus = "none";
 export const DEFAULT_TEXT_FIELD_ROWS = 2;
 /** 弱多行抬高帽。超过后写入盒滚动，不再长高。 */
 export const DEFAULT_TEXT_FIELD_MAX_ROWS = 6;
+/** type=number 步进缺省。功能性配置，不是 size 轴。 */
+export const DEFAULT_TEXT_FIELD_STEP = 1;
 
 export type TextFieldPaintKind = "neutral" | "error" | "warning";
+export type TextFieldStepDirection = 1 | -1;
 
 /** 宽度契约。fill=铺满父级宽（不沿栏高 stretch）；number=数字 hug；hug=默认最小宽。不是 size 轴。 */
 export type TextFieldWidthKind = "hug" | "fill" | "number";
@@ -116,6 +120,81 @@ export function resolveTextFieldMaxRows(input: {
 /** 未写或 falsy 归一成 false。不是 status，不进涂装。 */
 export function resolveTextFieldActive(active?: boolean): boolean {
   return Boolean(active);
+}
+
+/** 单行 type=number 才画步进柱。multiline 不当数字槽。 */
+export function resolveTextFieldStepper(input: { type?: string; multiline?: boolean }): boolean {
+  return !resolveTextFieldMultiline(input.multiline) && input.type === "number";
+}
+
+export function resolveTextFieldStep(step?: number): number {
+  if (typeof step === "number" && Number.isFinite(step) && step > 0) return step;
+  return DEFAULT_TEXT_FIELD_STEP;
+}
+
+/** 未写或非有限数不算边界。 */
+export function resolveTextFieldBound(value?: number): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return undefined;
+}
+
+/** 空串 / 非数字不算当前值。步进时当 0。 */
+export function parseTextFieldNumber(value?: string): number | undefined {
+  if (value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function textFieldStepPlaces(step: number): number {
+  const text = String(step);
+  const dot = text.indexOf(".");
+  if (dot === -1) return 0;
+  return text.length - dot - 1;
+}
+
+function formatTextFieldNumber(value: number, step: number): string {
+  const places = textFieldStepPlaces(step);
+  if (places <= 0) return String(value);
+  return value.toFixed(places).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+/** 空值当 0 再加减。触边夹取，不循环。 */
+export function stepTextFieldNumber(input: {
+  value?: string;
+  direction: TextFieldStepDirection;
+  min?: number;
+  max?: number;
+  step?: number;
+}): string {
+  const step = resolveTextFieldStep(input.step);
+  const min = resolveTextFieldBound(input.min);
+  const max = resolveTextFieldBound(input.max);
+  const current = parseTextFieldNumber(input.value) ?? 0;
+  let next = current + input.direction * step;
+  if (min !== undefined) next = Math.max(next, min);
+  if (max !== undefined) next = Math.min(next, max);
+  const places = textFieldStepPlaces(step);
+  if (places > 0) {
+    const factor = 10 ** places;
+    next = Math.round(next * factor) / factor;
+  }
+  return formatTextFieldNumber(next, step);
+}
+
+/** 已在上/下界则对应方向不可点。空值可往两边走（再由 step 夹取）。 */
+export function canStepTextFieldNumber(input: {
+  value?: string;
+  direction: TextFieldStepDirection;
+  min?: number;
+  max?: number;
+}): boolean {
+  const current = parseTextFieldNumber(input.value);
+  if (current === undefined) return true;
+  const min = resolveTextFieldBound(input.min);
+  const max = resolveTextFieldBound(input.max);
+  if (input.direction > 0 && max !== undefined && current >= max) return false;
+  if (input.direction < 0 && min !== undefined && current <= min) return false;
+  return true;
 }
 
 export function resolveTextFieldSpec(

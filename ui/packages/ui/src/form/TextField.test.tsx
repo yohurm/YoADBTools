@@ -138,21 +138,67 @@ describe("YoTextField", () => {
     expect(areaRule).toContain("resize: none");
   });
 
-  it("内容区重置 UA 盒模型，数字去掉原生步进", () => {
+  it("内容区重置 UA 盒模型，数字去掉原生步进、自绘右柱", () => {
     expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?box-sizing: border-box/);
     expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?padding: 0/);
     expect(css).toMatch(/\.yohu-text-field__input \{[\s\S]*?appearance: none/);
     expect(css).toContain('appearance: textfield');
-    expect(css).toContain("text-align: end");
+    expect(css).toContain("text-align: start");
+    expect(css).not.toContain("text-align: end");
     expect(css).toContain("::-webkit-inner-spin-button");
     expect(css).toContain('[data-width="number"]');
     expect(css).toContain('[data-width="fill"]');
+    expect(css).toContain("--yohu-layout-text-field-stepper");
     expect(css).not.toContain("[data-block]");
     render(() => <YoTextField ariaLabel="缓冲最大行数" type="number" value="10000" />);
     const input = screen.getByLabelText("缓冲最大行数") as HTMLInputElement;
+    const host = input.closest(".yohu-text-field");
     expect(input.type).toBe("number");
     expect(input.size).toBe(1);
-    expect(input.closest(".yohu-text-field")?.getAttribute("data-width")).toBe("number");
+    expect(host?.getAttribute("data-width")).toBe("number");
+    expect(host?.getAttribute("data-stepper")).toBe("true");
+    expect(host?.querySelector(".yohu-text-field__stepper")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "增加" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "减少" })).toBeTruthy();
+  });
+
+  it("数字步进钮增减并夹取", () => {
+    const onInput = vi.fn();
+    const [value, setValue] = createSignal("0");
+    render(() => (
+      <YoTextField
+        ariaLabel="间隔"
+        type="number"
+        min={0}
+        max={2}
+        value={value()}
+        onInput={(next) => {
+          setValue(next);
+          onInput(next);
+        }}
+      />
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "增加" }));
+    expect(onInput).toHaveBeenCalledWith("1");
+    fireEvent.click(screen.getByRole("button", { name: "增加" }));
+    expect(onInput).toHaveBeenCalledWith("2");
+    expect((screen.getByRole("button", { name: "增加" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "减少" }));
+    expect(onInput).toHaveBeenLastCalledWith("1");
+  });
+
+  it("数字步进在禁用或只读时不可点", () => {
+    const { unmount } = render(() => (
+      <YoTextField ariaLabel="禁用数字" type="number" value="3" disabled />
+    ));
+    expect((screen.getByRole("button", { name: "增加" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "减少" }) as HTMLButtonElement).disabled).toBe(true);
+    unmount();
+    render(() => <YoTextField ariaLabel="只读数字" type="number" value="3" readOnly />);
+    expect((screen.getByRole("button", { name: "增加" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByLabelText("只读数字").closest(".yohu-text-field")?.getAttribute("data-stepper")).toBe(
+      "true",
+    );
   });
 
   it("inputRef 转发内部 input，不挖宿主 DOM", () => {

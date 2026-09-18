@@ -1,6 +1,6 @@
 /**
  * YoTextField —— 输入框（L4 视图）。
- * 盒内缀 / 盒外缀 / status / active / 禁用 / 多行由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
+ * 盒内缀 / 盒外缀 / status / active / 禁用 / 多行 / 数字步进由 textfield-model + textfield-policy 决定；本文件只绑属性与槽位。
  * HarmonyOS 对照：TextInput / TextArea 同一门面；status 边走语义 token，不引进 antd Input。
  * 弱多行用后高走 UA field-sizing；盒高交给公开 YoGrow。禁止从 `\n` 推行数。
  */
@@ -12,8 +12,8 @@ import { GROW_USED_ATTR, YoGrow, growUsedAttrs, useGrow } from "../motion/engine
 import { Layout } from "../tokens/layout";
 import { Radius } from "../tokens/radius";
 import { bindTextFieldGrow } from "./textfield-grow";
-import type { YoTextFieldStatus } from "./textfield-model";
-import { textFieldHostAttrs } from "./textfield-policy";
+import { stepTextFieldNumber, type TextFieldStepDirection, type YoTextFieldStatus } from "./textfield-model";
+import { textFieldHostAttrs, textFieldStepperState } from "./textfield-policy";
 import "./TextField.css";
 
 export type { YoTextFieldStatus };
@@ -40,8 +40,14 @@ export interface YoTextFieldProps {
   readOnly?: boolean;
   /** 有值时显示清除按钮 */
   clearable?: boolean;
-  /** 输入类型，默认 text。multiline 时忽略。 */
+  /** 输入类型，默认 text。multiline 时忽略。type=number 左侧写数字、右侧叠步进箭。 */
   type?: string;
+  /** 数字下限。仅 type=number。 */
+  min?: number;
+  /** 数字上限。仅 type=number。 */
+  max?: number;
+  /** 步进。仅 type=number。默认 1。 */
+  step?: number;
   /** 多行。同一门面，不是 YoTextArea。 */
   multiline?: boolean;
   /** 多行可见行数下限。默认 2。 */
@@ -86,10 +92,12 @@ function TextFieldBody(props: {
   id: string;
   host: ReturnType<typeof textFieldHostAttrs>;
   field: YoTextFieldProps;
+  stepper: ReturnType<typeof textFieldStepperState>;
   bind: (el: YoTextFieldControl) => void;
   onInput: (event: InputEvent) => void;
   onChange: (event: Event) => void;
   onClear: () => void;
+  onStep: (direction: TextFieldStepDirection) => void;
 }): JSX.Element {
   return (
     <>
@@ -114,6 +122,9 @@ function TextFieldBody(props: {
             placeholder={props.field.placeholder ?? ""}
             aria-label={props.field.ariaLabel ?? props.field.label}
             aria-invalid={props.host["aria-invalid"]}
+            min={props.field.min}
+            max={props.field.max}
+            step={props.field.step}
             disabled={props.host.disabled}
             readOnly={props.host.readOnly}
             onInput={props.onInput}
@@ -153,6 +164,34 @@ function TextFieldBody(props: {
           <Icon name="close" size={Layout.IconInline} />
         </button>
       </Show>
+      <Show when={props.stepper.show}>
+        <div class="yohu-text-field__stepper" data-no-focus>
+          <button
+            type="button"
+            class="yohu-text-field__step"
+            data-dir="up"
+            tabindex="-1"
+            aria-label="增加"
+            disabled={props.stepper.incrementDisabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => props.onStep(1)}
+          >
+            <Icon name="chevron-up" size={Layout.IconTiny} />
+          </button>
+          <button
+            type="button"
+            class="yohu-text-field__step"
+            data-dir="down"
+            tabindex="-1"
+            aria-label="减少"
+            disabled={props.stepper.decrementDisabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => props.onStep(-1)}
+          >
+            <Icon name="chevron-down" size={Layout.IconTiny} />
+          </button>
+        </div>
+      </Show>
     </>
   );
 }
@@ -162,10 +201,12 @@ function TextFieldControl(props: {
   host: ReturnType<typeof textFieldHostAttrs>;
   chromeRadii: { tl?: number; bl?: number; tr?: number; br?: number } | undefined;
   field: YoTextFieldProps;
+  stepper: ReturnType<typeof textFieldStepperState>;
   bindControl: (el: YoTextFieldControl) => void;
   onInput: (event: InputEvent) => void;
   onChange: (event: Event) => void;
   onClear: () => void;
+  onStep: (direction: TextFieldStepDirection) => void;
 }): JSX.Element {
   const grow = useGrow();
   let inputEl: YoTextFieldControl | undefined;
@@ -211,10 +252,14 @@ function TextFieldControl(props: {
       return props.host;
     },
     field: props.field,
+    get stepper() {
+      return props.stepper;
+    },
     bind,
     onInput: props.onInput,
     onChange: props.onChange,
     onClear: props.onClear,
+    onStep: props.onStep,
   };
 
   return (
@@ -253,11 +298,22 @@ function TextFieldControl(props: {
   );
 }
 
-/** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input/textarea + 清除；圆角走 YoCorner。 */
+/** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input/textarea + 清除 + number 步进柱；圆角走 YoCorner。 */
 export function YoTextField(props: YoTextFieldProps): JSX.Element {
   const id = createUniqueId();
   let inputRef: YoTextFieldControl | undefined;
   const host = createMemo(() => textFieldHostAttrs(props));
+  const stepper = createMemo(() =>
+    textFieldStepperState({
+      type: props.type,
+      multiline: props.multiline,
+      disabled: props.disabled,
+      readOnly: props.readOnly,
+      value: props.value,
+      min: props.min,
+      max: props.max,
+    }),
+  );
   const chromeRadii = createMemo(() => {
     const before = Boolean(host()["data-addon-before"]);
     const after = Boolean(host()["data-addon-after"]);
@@ -293,6 +349,24 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
     props.onInput?.("", new InputEvent("input"));
   };
 
+  const handleStep = (direction: TextFieldStepDirection): void => {
+    if (!stepper().show || host().disabled || host().readOnly) return;
+    if (direction > 0 ? stepper().incrementDisabled : stepper().decrementDisabled) return;
+    const current = props.value ?? inputRef?.value ?? "";
+    const next = stepTextFieldNumber({
+      value: current,
+      direction,
+      min: props.min,
+      max: props.max,
+      step: props.step,
+    });
+    if (inputRef) {
+      inputRef.value = next;
+      inputRef.focus();
+    }
+    props.onInput?.(next, new InputEvent("input"));
+  };
+
   const controlProps = {
     id,
     get host() {
@@ -302,10 +376,14 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       return chromeRadii();
     },
     field: props,
+    get stepper() {
+      return stepper();
+    },
     bindControl,
     onInput: handleInput,
     onChange: handleChange,
     onClear: handleClear,
+    onStep: handleStep,
   };
 
   return (
@@ -324,6 +402,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-readonly={host()["data-readonly"]}
       data-active={host()["data-active"]}
       data-multiline={host()["data-multiline"]}
+      data-stepper={host()["data-stepper"]}
       data-font={host()["data-font"]}
       style={
         host()["data-multiline"]

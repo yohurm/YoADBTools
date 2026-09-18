@@ -247,7 +247,7 @@ describe("YoSelect 分层契约", () => {
 });
 
 describe("YoSelect 触发布局契约", () => {
-  it("min-width 写在触发钮，不写在根上，避免短文案按钮偏左", () => {
+  it("hug 跟文案簇，不写 min-width；block 才让文案吃剩余、箭头贴尾", () => {
     const candidates = [
       resolve(process.cwd(), "src/form/Select.css"),
       resolve(process.cwd(), "packages/ui/src/form/Select.css"),
@@ -257,9 +257,14 @@ describe("YoSelect 触发布局契约", () => {
     const root = css.match(/^\.yohu-select\s*\{([^}]*)\}/m)?.[1] ?? "";
     const trigger = css.match(/^\.yohu-select__trigger\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(root).not.toMatch(/min-width/);
-    expect(trigger).toMatch(/min-width:\s*calc\(var\(--yohu-space-xl\) \* 5\)/);
+    expect(trigger).not.toMatch(/min-width/);
+    expect(trigger).toMatch(/gap:\s*var\(--yohu-space-xs\)/);
+    expect(trigger).toMatch(/--yohu-corner-fill:\s*var\(--yohu-comp-gray\)/);
     const value = css.match(/^\.yohu-select__value\s*\{([^}]*)\}/m)?.[1] ?? "";
-    expect(value).toMatch(/flex:\s*1 1 auto/);
+    expect(value).toMatch(/flex:\s*0 1 auto/);
+    expect(css).toMatch(
+      /\.yohu-select\[data-block\] \.yohu-select__value\s*\{[^}]*flex:\s*1 1 auto/,
+    );
     const chevron = css.match(/^\.yohu-select__chevron\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(chevron).toMatch(/flex:\s*0 0 auto/);
     expect(css).not.toContain(".yohu-select__chrome .yohu-corner__content");
