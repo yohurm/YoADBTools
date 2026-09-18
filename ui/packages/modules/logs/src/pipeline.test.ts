@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import type { LogFilter, LogLine } from "@yohu/api";
+import type { LogLine } from "@yohu/api";
+import { rebindPids as apiRebindPids, scanSignal as apiScanSignal } from "@yohu/api";
 
 import { emptyBinding, pidSetOf, rebindPids } from "./binding";
 import {
@@ -12,7 +10,6 @@ import {
   levelKey,
   levelLabel,
   matchesLine,
-  matchesWireFilter,
   normalizeLevels,
   parseTagNeedles,
   removeTagNeedle,
@@ -74,17 +71,7 @@ describe("levelKey（着色键，与 --yohu-level-* / data-level 对齐）", () 
   });
 });
 
-describe("LEVELS（与 domain testdata/log_levels.json 同一张字母表）", () => {
-  const testdata = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../core/yohu-domain/testdata/log_levels.json",
-  );
-  const fixture: string[] = JSON.parse(readFileSync(testdata, "utf8")) as string[];
-
-  it("筛选选项与 testdata 同一向量", () => {
-    expect([...LEVELS]).toEqual(fixture);
-  });
-
+describe("LEVELS 铬", () => {
   it("字母说明文案跟 LEVELS 对齐", () => {
     expect(LEVELS.map(levelLabel)).toEqual(["Verbose", "Debug", "Info", "Warn", "Error", "Fatal"]);
   });
@@ -184,56 +171,9 @@ describe("parseTagNeedles", () => {
   });
 });
 
-describe("matchesWireFilter（与 domain testdata/log_filter.json 同一套向量）", () => {
-  const testdata = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../core/yohu-domain/testdata/log_filter.json",
-  );
-  const fixture: { line: LogLine; filter: LogFilter; expect: boolean }[] = JSON.parse(
-    readFileSync(testdata, "utf8"),
-  ) as { line: LogLine; filter: LogFilter; expect: boolean }[];
-
-  it.each(fixture)("case %#", (c) => {
-    expect(matchesWireFilter(c.line, c.filter)).toBe(c.expect);
-  });
-});
-
 describe("PidBinding 包名重绑（含历史集）", () => {
-  const index = [
-    { pid: 10, name: "com.foo" },
-    { pid: 11, name: "com.foo:remote" },
-    { pid: 20, name: "other.app" },
-  ];
-
-  it("精确进程名（不含子进程）", () => {
-    const b = rebindPids(emptyBinding(), index, "com.foo", false);
-    expect(pidSetOf(b)).toEqual([10]);
-  });
-
-  it("包含子进程前缀匹配", () => {
-    const b = rebindPids(emptyBinding(), index, "com.foo", true);
-    expect(pidSetOf(b)).toEqual([10, 11]);
-  });
-
-  it("崩溃重启后保留历史 PID（当前在前，历史在后）", () => {
-    const first = rebindPids(emptyBinding(), index, "com.foo", false);
-    const b = rebindPids(first, [{ pid: 99, name: "com.foo" }], "com.foo", false);
-    expect(pidSetOf(b)).toEqual([99, 10]);
-    expect(b.current).toEqual([99]);
-  });
-
-  it("历史集上限", () => {
-    let b = emptyBinding();
-    for (let pid = 1; pid <= 10; pid++) {
-      b = rebindPids(b, [{ pid, name: "com.foo" }], "com.foo", false, 3);
-    }
-    const set = pidSetOf(b);
-    expect(set).toHaveLength(3);
-    expect(set[0]).toBe(10);
-    expect(set.slice(1).sort()).toEqual([8, 9]);
-  });
-
-  it("空绑定无命中", () => {
+  it("模块转发 @yohu/api", () => {
+    expect(rebindPids).toBe(apiRebindPids);
     expect(pidSetOf(emptyBinding())).toEqual([]);
   });
 
@@ -283,14 +223,8 @@ describe("PidBinding 包名重绑（含历史集）", () => {
 });
 
 describe("scanSignal", () => {
-  it("崩溃与 ANR", () => {
-    expect(scanSignal(line({ tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }))?.kind).toBe("crash");
-    expect(scanSignal(line({ msg: "ANR in com.foo" }))?.kind).toBe("anr");
-    expect(scanSignal(line({ msg: "am_anr: com.foo" }))?.kind).toBe("anr");
-    expect(scanSignal(line({ msg: "normal" }))).toBeNull();
-    expect(scanSignal(line({ tag: "AndroidRuntime", msg: "Process: com.foo" }))).toBeNull();
-    expect(scanSignal(line({ tag: "ActivityManager", msg: "Process com.foo (pid 12) has died" }))).toBeNull();
-    expect(scanSignal(line({ msg: "socket is not responding yet" }))).toBeNull();
+  it("模块转发 @yohu/api", () => {
+    expect(scanSignal).toBe(apiScanSignal);
   });
 });
 

@@ -25,12 +25,14 @@ const mocks = vi.hoisted(() => ({
   settingsChangedHandlers: [] as ((e: { key: string; settings: { buffer_capacity: number } }) => void)[],
 }));
 
-vi.mock("@yohu/api", () => {
+vi.mock("@yohu/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@yohu/api")>();
   const noop = (): void => undefined;
   const notConfigured = vi.fn(async () => {
     throw new Error("测试未配置该命令 mock");
   });
   return {
+    ...actual,
     APP_SETTINGS_DEFAULT: { buffer_capacity: 10_000 },
     DATETIME_DISPLAY_LEN: 23,
     TIME_DISPLAY_LEN: 8,

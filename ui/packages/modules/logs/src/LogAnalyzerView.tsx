@@ -29,7 +29,7 @@ import {
   closeContextMenu,
   createToaster,
   openContextMenu,
-  type YoTextFieldControl,
+  type YoSearchControl,
 } from "@yohu/ui";
 
 import {
@@ -131,7 +131,7 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
 
-  let keywordRef: YoTextFieldControl | undefined;
+  let keywordRef: YoSearchControl | undefined;
 
   createEffect(() => {
     const serial = props.selectedSerials[0] ?? null;

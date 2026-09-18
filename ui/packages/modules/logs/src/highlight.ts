@@ -3,7 +3,7 @@
  * 查找与过滤同一套 ASCII A–Z 折叠；切片取原文。
  */
 
-import { indexOfAsciiIgnoreCase } from "./filter";
+import { indexOfAsciiIgnoreCase } from "@yohu/api";
 
 export type HighlightPart = string | { mark: string };
 

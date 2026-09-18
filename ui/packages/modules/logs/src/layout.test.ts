@@ -194,6 +194,7 @@ describe("日志显示列", () => {
     expect(filter).toContain('recipe="chip"');
     expect(filter).toContain("YoChip");
     expect(filter).toContain("YoTextField");
+    expect(filter).toContain("YoSearch");
     expect(filter).not.toMatch(/<(input|select|textarea)\b/);
     expect(filter).not.toContain("__body");
     expect(doc).not.toMatch(/<(input|select|textarea|button)\b/);

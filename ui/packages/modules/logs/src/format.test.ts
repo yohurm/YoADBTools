@@ -1,28 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import type { LogLine } from "@yohu/api";
+import { formatLogLine } from "@yohu/api";
 
-import {
-  formatLogLine,
-  formatLogLineParts,
-  joinLogLineParts,
-} from "./format";
+import { formatLogLineParts, joinLogLineParts } from "./format";
 
-describe("formatLogLine（与 domain testdata/format_log_line.json 同一套向量）", () => {
-  const testdata = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../core/yohu-domain/testdata/format_log_line.json",
-  );
-  const fixture: { line: LogLine; expect: string }[] = JSON.parse(readFileSync(testdata, "utf8")) as {
-    line: LogLine;
-    expect: string;
-  }[];
+const line = (over: Partial<LogLine> = {}): LogLine => ({
+  seq: 1,
+  ts: "2026-09-11 16:45:07.089",
+  pid: 123,
+  tid: 45,
+  level: "I",
+  tag: "Tag",
+  msg: "hello",
+  ...over,
+});
 
-  it.each(fixture)("case %#", (c) => {
-    expect(formatLogLine(c.line)).toBe(c.expect);
-    expect(joinLogLineParts(formatLogLineParts(c.line))).toBe(c.expect);
+describe("formatLogLineParts（清单切段；join === api 文档行）", () => {
+  it("无 uid 时 join 与 formatLogLine 同文", () => {
+    const row = line();
+    expect(joinLogLineParts(formatLogLineParts(row))).toBe(formatLogLine(row));
+  });
+
+  it("有 uid 时切段含 uid，join 仍是文档行", () => {
+    const row = line({ uid: "1000" });
+    const parts = formatLogLineParts(row);
+    expect(parts.some((part) => part.kind === "uid")).toBe(true);
+    expect(joinLogLineParts(parts)).toBe(formatLogLine(row));
   });
 });

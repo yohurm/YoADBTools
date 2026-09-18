@@ -19,9 +19,10 @@ import {
   YoIndicator,
   YoLoading,
   YoSegmentedButton,
+  YoSearch,
   YoSelect,
-  YoTextField,
   YoVirtualList,
+  searchDocuments,
 } from "@yohu/ui";
 
 import type { SessionScope } from "./filter";
@@ -119,19 +120,31 @@ export function NewSessionDialog(props: {
   });
 
   const pickerItems = createMemo((): PickerItem[] => {
-    const q = query().trim().toLowerCase();
+    const q = query();
     if (mode() === "package") {
-      const names = packageNames();
-      const filtered = q ? names.filter((n) => n.toLowerCase().includes(q)) : names;
-      return filtered.map((name) => ({ key: name, name }));
+      return searchDocuments(
+        packageNames().map((name) => ({
+          id: name,
+          item: { key: name, name },
+          fields: [{ key: "name", text: name, weight: 1 }],
+        })),
+        q,
+      ).flatMap((match) => (match.item ? [match.item] : []));
     }
     const entries = [...processEntries()].sort(
       (a, b) => a.name.localeCompare(b.name) || a.pid - b.pid,
     );
-    const filtered = q
-      ? entries.filter((e) => e.name.toLowerCase().includes(q) || String(e.pid).includes(q))
-      : entries;
-    return filtered.map((e) => ({ key: String(e.pid), name: e.name, pid: e.pid }));
+    return searchDocuments(
+      entries.map((entry) => ({
+        id: String(entry.pid),
+        item: { key: String(entry.pid), name: entry.name, pid: entry.pid },
+        fields: [
+          { key: "name", text: entry.name, weight: 2 },
+          { key: "pid", text: String(entry.pid), weight: 1 },
+        ],
+      })),
+      q,
+    ).flatMap((match) => (match.item ? [match.item] : []));
   });
 
   const deviceOptions = createMemo(() =>
@@ -257,12 +270,9 @@ export function NewSessionDialog(props: {
         </div>
 
         <div class="yohu-logs__new-search">
-          <YoTextField
-            block
-            prefix="search"
+          <YoSearch
             ariaLabel={mode() === "package" ? "过滤或输入包名" : "过滤进程或输入 PID"}
             value={query()}
-            clearable
             status={error() ? "error" : undefined}
             placeholder={mode() === "package" ? "过滤或输入包名" : "过滤进程或输入 PID"}
             onInput={(v) => {

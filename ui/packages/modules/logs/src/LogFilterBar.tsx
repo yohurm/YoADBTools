@@ -8,9 +8,10 @@ import {
   YoBadge,
   YoChip,
   YoListPresence,
+  YoSearch,
   YoSegmentedButton,
   YoTextField,
-  type YoTextFieldControl,
+  type YoSearchControl,
 } from "@yohu/ui";
 
 import {
@@ -90,7 +91,7 @@ const LEVEL_ITEMS = LEVELS.map((letter) => {
 
 export function LogFilterBar(props: {
   session: LogSessionState;
-  keywordRef: (el: YoTextFieldControl) => void;
+  keywordRef: (el: YoSearchControl) => void;
 }): JSX.Element {
   return (
     <div class="yohu-logs__filter">
@@ -111,14 +112,10 @@ export function LogFilterBar(props: {
         <TagFilterField session={props.session} />
       </span>
       <span class="yohu-logs__search yohu-logs__field">
-        <YoTextField
-          block
-          prefix="search"
+        <YoSearch
           ariaLabel="关键字"
           placeholder="检索消息"
           value={props.session.keyword}
-          clearable
-          active={props.session.keyword.length > 0}
           inputRef={props.keywordRef}
           onInput={(v) => logStore.patchFilter(props.session.id, { keyword: v })}
         />

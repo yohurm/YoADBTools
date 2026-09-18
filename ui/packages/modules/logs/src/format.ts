@@ -1,19 +1,17 @@
 /**
- * 导出文档：与 `yohu-domain::format_log_line` 同一 testdata。
- * 清单选区 / 列表复制走 `doc.ts` 的 formatLogDoc，不走这里。
+ * 清单/选区切段。整行导出文档走 @yohu/api `formatLogLine`（镜像 domain）。
  */
 
+import { formatLogLine } from "@yohu/api";
 import type { LogLine } from "@yohu/api";
+
+export { formatLogLine };
 
 export type LogLinePartKind = "ts" | "uid" | "pid" | "tid" | "level" | "tag" | "msg" | "sep";
 
 export interface LogLinePart {
   kind: LogLinePartKind;
   text: string;
-}
-
-export function formatLogLine(line: LogLine): string {
-  return joinLogLineParts(formatLogLineParts(line));
 }
 
 export function joinLogLineParts(parts: readonly LogLinePart[]): string {
