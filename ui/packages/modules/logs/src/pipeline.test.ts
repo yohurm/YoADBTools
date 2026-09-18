@@ -44,11 +44,11 @@ const filter = (over: Partial<SessionFilter>): SessionFilter => ({
   ...over,
 });
 
-describe("levelPaint（反色 / 消息同色，色相仍走 --yohu-level-*）", () => {
-  it("Fatal 反色；Error 与 Fatal 消息同 ink", () => {
-    expect(levelPaint("f")).toEqual({ invert: true, tintMessage: true });
-    expect(levelPaint("e")).toEqual({ invert: false, tintMessage: true });
-    expect(levelPaint("w")).toEqual({ invert: false, tintMessage: false });
+describe("levelPaint（反色；消息同色走行上 data-level）", () => {
+  it("只有 Fatal 反色；paint 不再分消息是否着色", () => {
+    expect(levelPaint("f")).toEqual({ invert: true });
+    expect(levelPaint("e")).toEqual({ invert: false });
+    expect(levelPaint("w")).toEqual({ invert: false });
   });
 
   it("ink 样式只引用 token 名", () => {

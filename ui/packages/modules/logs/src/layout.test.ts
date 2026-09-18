@@ -81,6 +81,14 @@ describe("日志表头布局契约", () => {
     expect(dialog).toContain("YoEmptyState");
     expect(dialog).toContain("YoLoading");
     expect(dialog).toContain("block");
+    expect(dialog).toContain("yohu-logs__new-bar");
+    expect(dialog).toContain("devicePickerFields");
+    expect(dialog).toContain('flex="fill"');
+    expect(dialog).not.toContain("<YoIndicator");
+    expect(dialog).not.toContain('tone="list"');
+    expect(dialog).not.toContain("YoFormRow");
+    expect(dialog).not.toMatch(/<YoSegmentedButton[\s\S]*?\bblock\b/);
+    expect(logsCss).toMatch(/\.yohu-logs__new-list\s*\{[^}]*flex-direction:\s*column/);
     expect(dialog).not.toContain("yohu-logs__new-empty");
     expect(dialog).not.toContain("yohu-logs__new-hint");
     expect(dialog).not.toContain("yohu-logs__new-error");
@@ -200,6 +208,9 @@ describe("日志显示列", () => {
     expect(doc).not.toMatch(/<(input|select|textarea|button)\b/);
     expect(doc).not.toContain("__body");
     expect(doc).not.toContain("yohu-logs__row--raw");
+    expect(doc).not.toContain("data-tint-msg");
+    expect(doc).not.toContain("tintMessage");
+    expect(doc).toContain('classList={{ "yohu-tone": Boolean(key) }}');
     expect(view).not.toContain("__body");
     expect(filter).toContain("YoSegmentedButton");
     expect(filter).toContain('type="capsule"');
@@ -251,11 +262,11 @@ describe("日志级别色单源", () => {
     expect(logsCss).not.toMatch(/\[data-level="[vdiwe]"\]/);
     expect(logsCss).not.toContain("--yohu-level-f-bg");
     expect(logsCss).toContain('[data-paint="invert"]');
-    expect(logsCss).toContain("[data-tint-msg]");
+    expect(logsCss).not.toContain("[data-tint-msg]");
     expect(logsCss).toContain(".yohu-logs__row-tag {");
     expect(logsCss).toContain("color: var(--yohu-log-ink)");
     expect(logsCss).not.toMatch(/\.yohu-logs__row-level\s*\{[^}]*text-align:\s*center/);
-    expect(logsCss).toContain("[data-tint-msg] .yohu-logs__row-msg");
+    expect(logsCss).toContain("[data-level] .yohu-logs__row-msg");
     expect(logsCss).not.toContain(".yohu-logs__level--");
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");

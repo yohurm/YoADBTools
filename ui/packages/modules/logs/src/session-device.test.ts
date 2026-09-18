@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { DeviceInfo, DeviceStatus } from "@yohu/api";
 
-import { devicePickerLabel, formatSessionDevice, shortSerial } from "./session-device";
+import {
+  deviceConnectionLabel,
+  devicePickerDescription,
+  devicePickerFields,
+  devicePickerLabel,
+  formatSessionDevice,
+  shortSerial,
+} from "./session-device";
 
 const device = (serial: string, model?: string): DeviceInfo => ({
   serial,
@@ -28,6 +35,39 @@ describe("devicePickerLabel", () => {
   it("有型号则拼短号，无名则整串 serial", () => {
     expect(devicePickerLabel(device("ABCDEFGH", "edge"))).toBe("edge · EFGH");
     expect(devicePickerLabel(device("S1"))).toBe("S1");
+  });
+});
+
+describe("deviceConnectionLabel", () => {
+  it("usb / tcp 收成 USB / 无线", () => {
+    expect(deviceConnectionLabel("usb")).toBe("USB");
+    expect(deviceConnectionLabel("usb:1-2")).toBe("USB");
+    expect(deviceConnectionLabel("tcp:192.168.1.8:5555")).toBe("无线");
+    expect(deviceConnectionLabel("wifi")).toBe("无线");
+    expect(deviceConnectionLabel("")).toBe("");
+  });
+});
+
+describe("devicePickerFields", () => {
+  it("主文案型号，次文案短号与连接", () => {
+    expect(devicePickerFields(device("ABCDEFGH", "edge"))).toEqual({
+      label: "edge",
+      description: "EFGH · USB",
+    });
+    expect(devicePickerDescription(device("ABCDEFGH", "edge"))).toBe("EFGH · USB");
+  });
+
+  it("无名则主文案整串 serial，次文案只留连接", () => {
+    expect(devicePickerFields(device("S1"))).toEqual({
+      label: "S1",
+      description: "USB",
+    });
+  });
+
+  it("tcp 连接标无线", () => {
+    expect(
+      devicePickerFields({ ...device("ABCDEFGH", "edge"), connection: "tcp:1" }).description,
+    ).toBe("EFGH · 无线");
   });
 });
 

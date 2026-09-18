@@ -9,7 +9,7 @@
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
  * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
- * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
+ * 左条 / 级别字 / Tag / 已知级别消息共用 ink；解析失败消息走 fg。Fatal 字母反色块（data-paint=invert，字走 fg-on）。
  * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
  * ========================================================================== */
 
@@ -208,7 +208,7 @@
   min-width: 0;
 }
 
-.yohu-logs__row[data-tint-msg] .yohu-logs__row-msg {
+.yohu-logs__row[data-level] .yohu-logs__row-msg {
   color: var(--yohu-log-ink);
 }
 
@@ -260,17 +260,43 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   gap: var(--yohu-space-sm);
 }
 
+.yohu-logs__new-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.yohu-logs__new-device {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.yohu-logs__new-device-hint {
+  display: block;
+  min-width: 0;
+  color: var(--yohu-fg-3);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-ui);
+}
+
 .yohu-logs__new-seg {
+  flex: 0 0 auto;
   min-width: 0;
 }
 
 .yohu-logs__new-search {
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .yohu-logs__new-list {
@@ -278,13 +304,17 @@
   --yohu-corner-stroke: var(--yohu-border);
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
 .yohu-logs__new-list-chrome {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
 }
 
 .yohu-logs__new-item {

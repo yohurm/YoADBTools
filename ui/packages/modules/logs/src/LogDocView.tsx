@@ -48,7 +48,7 @@ function LogLineDoc(props: { row: ViewRow; keyword: string; layout: Accessor<Log
             return (
               <span
                 class="yohu-logs__row-msg"
-                classList={{ "yohu-tone": key ? levelPaint(key).tintMessage : false }}
+                classList={{ "yohu-tone": Boolean(key) }}
               >
                 <Show when={props.keyword} keyed fallback={part.text}>
                   {(keyword) => (
@@ -101,7 +101,6 @@ export function LogRow(props: { item: ViewRow; index: number }) {
       data-seq={String(props.item.line.seq)}
       data-level={key() ?? undefined}
       data-paint={paint()?.invert ? "invert" : undefined}
-      data-tint-msg={paint()?.tintMessage ? "" : undefined}
       style={key() ? (levelInkStyle(key()!) as JSX.CSSProperties) : undefined}
       classList={{
         "yohu-logs__row--signal": props.item.signal !== undefined,
