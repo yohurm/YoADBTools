@@ -68,8 +68,7 @@ pub fn apply_setting(
             settings.data_root = must_str(key, value)?;
         }
         SettingKey::DevicesAutoRefresh => {
-            let n = must_u64(key, value)?;
-            settings.devices_auto_refresh = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
+            settings.devices_auto_refresh = must_bool(key, value)?;
         }
         SettingKey::BufferCapacity => {
             let n = must_u64(key, value)?;
@@ -172,6 +171,18 @@ mod tests {
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();
         assert_eq!(s.mirror_max_fps, 15);
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
+    }
+
+    #[test]
+    fn devices_auto_refresh_applies_bool() {
+        let mut s = AppSettings::default();
+        assert!(s.devices_auto_refresh);
+        apply_setting(&mut s, SettingKey::DevicesAutoRefresh, &json!(false)).unwrap();
+        assert!(!s.devices_auto_refresh);
+        apply_setting(&mut s, SettingKey::DevicesAutoRefresh, &json!(true)).unwrap();
+        assert!(s.devices_auto_refresh);
+        let err = apply_setting(&mut s, SettingKey::DevicesAutoRefresh, &json!(30)).unwrap_err();
+        assert!(matches!(err, SettingError::ExpectBool(_)));
     }
 
     #[test]
