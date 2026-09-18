@@ -33,6 +33,9 @@ $RECYCLE.BIN/
 /tmp/
 # 根 testdata/dialog-review 是真机联调脚本/截图。crate 内 testdata/*.json 仍入库。
 /testdata/dialog-review/
+/testdata/repro/
+/testdata/mirror-device-test/
+/tmp-*
 
 # —— 日志（仅仓库根 Logs/；勿写成 logs/ 以免误伤 ui/packages/modules/logs/） ——
 *.log
