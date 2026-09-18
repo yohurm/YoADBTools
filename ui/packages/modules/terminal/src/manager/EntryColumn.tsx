@@ -43,7 +43,7 @@ export function EntryColumn(props: {
       <YoToolbar pad="xs">
         <YoSubheader title="条目" pad="flush" />
         <YoIconButton icon="plus" title="新增命令" onClick={() => props.store.addCommand()} />
-        <YoIconButton icon="list" title="新增命令块" onClick={() => props.store.addBlock()} />
+        <YoIconButton icon="block" title="新增命令块" onClick={() => props.store.addBlock()} />
         <YoIconButton icon="trash" title="删除条目" onClick={() => props.store.removeEntries()} />
       </YoToolbar>
     }>

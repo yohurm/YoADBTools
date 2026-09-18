@@ -39,7 +39,7 @@ export function CommandTree(props: {
           : {
               key: `b:${entry.id}`,
               label: entry.name,
-              icon: "list" as const,
+              icon: "block" as const,
               data: entry,
               title: `${entry.steps.length} 条 · 间隔 ${commandBlockGapLabel(entry.gap_ms)}`,
             },

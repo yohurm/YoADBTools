@@ -210,6 +210,12 @@ describe("命令终端动效接线", () => {
     expect(load("manager/GroupColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
     expect(load("manager/EntryColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
     expect(load("manager/EntryColumn.tsx")).toContain('tone="list"');
+    expect(load("manager/EntryColumn.tsx")).toContain('icon="block"');
+    expect(load("manager/EntryColumn.tsx")).toContain('title="新增命令块"');
+    expect(load("manager/EntryColumn.tsx")).not.toContain('icon="list"');
+    expect(load("CommandTree.tsx")).toContain('icon: "block"');
+    expect(load("CommandTree.tsx")).not.toContain('icon: "list"');
+    expect(load("Composer.tsx")).toContain('return "block"');
     expect(load("manager/BlockSteps.tsx")).toContain("YoSubheader");
     expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__caption");
     expect(load("CommandManager.tsx")).toContain("YoBadge");

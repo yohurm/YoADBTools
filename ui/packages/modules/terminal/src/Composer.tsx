@@ -11,8 +11,8 @@ import { commandBlockGapLabel } from "./block-gap";
 import { formatAdbLine } from "./command-line";
 import { terminalStore, type QueuedSend } from "./store";
 
-function queuedLeading(item: QueuedSend): "terminal" | "list" | "folder" {
-  if (item.kind === "block") return "list";
+function queuedLeading(item: QueuedSend): "terminal" | "block" | "folder" {
+  if (item.kind === "block") return "block";
   if (item.kind === "group") return "folder";
   return "terminal";
 }
