@@ -10,11 +10,12 @@ import {
   type LibraryEntryDto,
 } from "@yohu/api";
 
-import { alignParams, placeholderSlots, templatesSlots } from "./command-line";
+import { alignParams, placeholderSlots } from "./command-line";
 
 export interface DraftStep {
   id: string;
   template: string;
+  params: CommandParamDto[];
 }
 
 export type DraftCommand = {
@@ -30,7 +31,6 @@ export type DraftBlock = {
   name: string;
   gap_ms: number;
   steps: DraftStep[];
-  params: CommandParamDto[];
 };
 export type DraftEntry = DraftCommand | DraftBlock;
 
@@ -52,7 +52,7 @@ export const emptyCommand = (id: string): DraftCommand => ({
   params: [],
 });
 
-export const emptyStep = (id: string): DraftStep => ({ id, template: "" });
+export const emptyStep = (id: string): DraftStep => ({ id, template: "", params: [] });
 
 export const emptyBlock = (id: string, stepId: string): DraftBlock => ({
   kind: "block",
@@ -60,7 +60,6 @@ export const emptyBlock = (id: string, stepId: string): DraftBlock => ({
   name: "",
   gap_ms: 0,
   steps: [emptyStep(stepId)],
-  params: [],
 });
 
 export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", entries: [] });
@@ -106,8 +105,11 @@ function entryToDraft(entry: LibraryEntryDto): DraftEntry {
     id: entry.id,
     name: entry.name,
     gap_ms: entry.gap_ms,
-    steps: entry.steps.map((step) => ({ id: nextDraftId("s"), template: step.template })),
-    params: entry.params ?? [],
+    steps: entry.steps.map((step) => ({
+      id: nextDraftId("s"),
+      template: step.template,
+      params: step.params ?? [],
+    })),
   };
 }
 
@@ -122,16 +124,17 @@ function entryFromDraft(entry: DraftEntry): LibraryEntryDto {
       ...(params.length > 0 ? { params } : {}),
     };
   }
-  const params = alignParams(
-    templatesSlots(entry.steps.map((step) => step.template)),
-    entry.params,
-  );
   return {
     kind: "block",
     id: entry.id,
     name: entry.name,
     gap_ms: entry.gap_ms,
-    steps: entry.steps.map((step) => ({ template: step.template })),
-    ...(params.length > 0 ? { params } : {}),
+    steps: entry.steps.map((step) => {
+      const params = alignParams(placeholderSlots(step.template), step.params);
+      return {
+        template: step.template,
+        ...(params.length > 0 ? { params } : {}),
+      };
+    }),
   };
 }

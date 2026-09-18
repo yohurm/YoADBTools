@@ -18,10 +18,13 @@ function isGroup(data: LibraryEntryDto | CommandGroupDto | undefined): data is C
 }
 
 export function CommandTree(props: {
+  groups: CommandGroupDto[];
+  sourceEmpty: boolean;
+  expandedKeys?: string[];
   onNeedValues: (entry: LibraryEntryDto) => void;
 }) {
   const treeData = createMemo<TreeNode<LibraryEntryDto | CommandGroupDto>[]>(() =>
-    terminalStore.library.groups.map((group) => ({
+    props.groups.map((group) => ({
       key: `g:${group.id}`,
       label: group.name,
       icon: "folder" as const,
@@ -47,6 +50,8 @@ export function CommandTree(props: {
     })),
   );
 
+  const expandedKeys = createMemo(() => props.groups.map((group) => `g:${group.id}`));
+
   const onSelect = (_key: string, node: TreeNode<LibraryEntryDto | CommandGroupDto>): void => {
     if (isGroup(node.data)) return;
     const entry = node.data;
@@ -66,12 +71,18 @@ export function CommandTree(props: {
     <Show
       when={treeData().length > 0}
       fallback={
-        <YoEmptyState fill icon="terminal" title="命令库为空" description="点击「命令管理」添加命令" />
+        <YoEmptyState
+          fill
+          icon="terminal"
+          title={props.sourceEmpty ? "命令库为空" : "无匹配命令"}
+          description={props.sourceEmpty ? "点击「命令管理」添加命令" : "换个关键词试试"}
+        />
       }
     >
       <YoTree
         data={treeData()}
-        defaultExpandedKeys={terminalStore.library.groups.map((g) => `g:${g.id}`)}
+        expandedKeys={props.expandedKeys}
+        defaultExpandedKeys={expandedKeys()}
         onSelect={onSelect}
         renderBadge={(text) => <YoBadge text={text} />}
       />

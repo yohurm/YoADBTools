@@ -39,7 +39,7 @@ describe("命令终端动效接线", () => {
     expect(view).toContain("chevron-right");
     expect(view).toContain("chevron-left");
     expect(view).not.toContain("yohu-recipe-xor");
-    expect(view).not.toContain("YoCollapse");
+    expect(load("Composer.tsx")).not.toContain("YoCollapse");
     expect(view).not.toContain("Show when={!composerOpen()}");
     expect(css).toContain("container-type: inline-size");
     expect(load("Composer.tsx")).toContain("YoButton");
@@ -74,21 +74,37 @@ describe("命令终端动效接线", () => {
 
   it("左右分栏都走 YoPanel 栏标题，命令库宽走 sidebar token", () => {
     const terminalView = load("TerminalView.tsx");
-    expect(terminalView).toContain('title="命令库"');
+    const library = load("LibraryPane.tsx");
+    expect(library).toContain('title="命令库"');
     expect(terminalView).toContain('title="执行结果"');
-    const commandPane = terminalView.slice(
-      terminalView.indexOf("<YoPanel variant=\"pane\" padding=\"sm\""),
-      terminalView.indexOf("<CommandTree"),
-    );
-    expect(commandPane).toContain('title="命令库"');
+    expect(terminalView).toContain("LibraryPane");
     expect(css).toContain("var(--yohu-layout-sidebar)");
     expect(css).not.toMatch(/grid-template-columns:\s*280px/);
+  });
+
+  it("命令库检索走 YoSearch，模块不自叠 Collapse / TextField", () => {
+    const library = load("LibraryPane.tsx");
+    expect(library).toContain("YoSearch");
+    expect(library).toContain('slot="entry"');
+    expect(library).toContain('slot="bar"');
+    expect(library).toContain("filterLibraryGroups");
+    expect(library).toContain('placeholder="搜索命令"');
+    expect(library).not.toContain("YoIconButton");
+    expect(library).not.toContain("YoCollapse");
+    expect(library).not.toContain("YoTextField");
+    expect(library).not.toContain("usedSlots");
+    expect(css).not.toContain(".yohu-terminal__library-search");
+    expect(load("search.ts")).toContain("searchDocuments");
+    expect(load("search.ts")).toContain("expandSearchGroups");
+    expect(load("CommandTree.tsx")).toContain("groups:");
+    expect(load("CommandTree.tsx")).not.toContain("terminalStore.library.groups.map");
   });
 
   it("结果流与命令树走 YoScroller，钉底不读原生内容高", () => {
     expect(load("ResultStream.tsx")).toContain("YoScroller");
     expect(load("ResultStream.tsx")).toContain("scrollToEnd");
     expect(load("ResultStream.tsx")).not.toMatch(/\.\s*scrollHeight/);
+    expect(load("LibraryPane.tsx")).toContain("YoScroller");
     expect(load("TerminalView.tsx")).toContain("YoScroller");
     expect(load("TerminalView.tsx")).toContain('overflow="hidden"');
     expect(load("manager/EditorColumn.tsx")).toContain("YoScroller");
@@ -143,6 +159,7 @@ describe("命令终端动效接线", () => {
     expect(params).toContain("YoSubheader");
     expect(params).toContain("原始命令");
     expect(params).toContain("填写参数");
+    expect(params).toContain("entryFillFields");
     expect(params).not.toContain("params-caption");
     expect(params).not.toContain("params-line");
     expect(params).not.toContain("预览");
@@ -153,14 +170,32 @@ describe("命令终端动效接线", () => {
     expect(load("manager/CommandEditor.tsx")).toContain("commandTemplateLabel");
     expect(load("manager/CommandEditor.tsx")).toContain("ParamDescriptions");
     expect(load("manager/CommandEditor.tsx")).toContain("TemplateField");
-    expect(load("manager/BlockEditor.tsx")).toContain("ParamDescriptions");
     expect(load("manager/BlockEditor.tsx")).toContain("BlockSteps");
     expect(load("manager/EditorColumn.tsx")).toContain("editorTarget");
     expect(load("manager/EditorColumn.tsx")).toContain("createMemo");
     expect(load("manager/EditorColumn.tsx")).not.toContain("entry.kind ===");
     expect(load("manager/EditorColumn.tsx")).not.toContain("<Switch");
     expect(load("manager/TemplateField.tsx")).toContain("insertPlaceholderAtDisplay");
+    expect(load("manager/TemplateField.tsx")).not.toContain("onPlace");
+    expect(load("manager/TemplateField.tsx")).not.toContain("usedSlots");
+    expect(load("manager/TemplateField.tsx")).not.toContain("插入参数位置");
+    expect(load("manager/store.ts")).toContain("updateBlockStepParams");
+    expect(load("manager/store.ts")).not.toContain("placePlaceholder");
+    expect(load("manager/store.ts")).not.toContain("entrySlots");
+    expect(load("manager/CommandEditor.tsx")).toContain("placeholderSlots");
+    expect(load("manager/CommandEditor.tsx")).not.toContain("entrySlots");
+    expect(load("manager/BlockEditor.tsx")).not.toContain("ParamDescriptions");
+    expect(load("manager/BlockEditor.tsx")).toContain("BlockSteps");
+    expect(load("manager/BlockEditor.tsx")).not.toContain("templatesSlots");
     expect(load("manager/BlockSteps.tsx")).toContain("TemplateField");
+    expect(load("manager/BlockSteps.tsx")).toContain("ParamDescriptions");
+    expect(load("manager/BlockSteps.tsx")).toContain("stepParamLabel");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("placePlaceholder");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("templatesSlots");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("usedSlots");
+    expect(load("manager/BlockSteps.tsx")).toContain("label={`步骤 ${stepNo()}`}");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("YoListPresence");
+    expect(load("manager/BlockSteps.tsx")).not.toContain("YoPresence");
     expect(load("manager/ParamDescriptions.tsx")).toContain("YoListPresence");
     expect(load("manager/ParamDescriptions.tsx")).toContain('recipe="list"');
     expect(load("manager/ParamDescriptions.tsx")).not.toContain("<For");

@@ -24,8 +24,7 @@ const block: DraftBlock = {
   id: "b1",
   name: "连上再看",
   gap_ms: 200,
-  steps: [{ id: "s1", template: "wait-for-device" }],
-  params: [],
+  steps: [{ id: "s1", template: "wait-for-device", params: [] }],
 };
 
 describe("editorTarget", () => {

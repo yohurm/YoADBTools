@@ -7,11 +7,14 @@
  *   定高组/条目 YoVirtualList.onReorder → moveGroupTo / moveEntryTo
  *   变高步骤 YoReorderList.onReorder（及 Ctrl/Meta+↑/↓）→ moveBlockStepTo
  *   三者都只调 @yohu/ui moveItemTo。禁止 shift 包装、禁止第二套几何。
+ * 设计后链路（占位符）：
+ *   `{n}` 只活在一条模板上。命令改 template / params；块改该步 template / params。
+ *   块填参身份是 (step, index)，标签 `1-0`。禁止条目级并集。
  */
 
 import { createStore } from "solid-js/store";
 
-import type { CommandLibraryDto } from "@yohu/api";
+import type { CommandLibraryDto, CommandParamDto } from "@yohu/api";
 import { moveItemTo, nextKeys, type SelectMode } from "@yohu/ui";
 
 import {
@@ -196,12 +199,20 @@ export function createCommandManagerStore() {
     }) as DraftEntry);
   }
 
-  function updateBlockStep(stepId: string, template: string): void {
+  function patchBlockStep(stepId: string, patch: { template?: string; params?: CommandParamDto[] }): void {
     const entry = selectedEntry();
     if (!entry || entry.kind !== "block") return;
     updateEntry({
-      steps: entry.steps.map((step) => (step.id === stepId ? { ...step, template } : step)),
+      steps: entry.steps.map((step) => (step.id === stepId ? { ...step, ...patch } : step)),
     });
+  }
+
+  function updateBlockStep(stepId: string, template: string): void {
+    patchBlockStep(stepId, { template });
+  }
+
+  function updateBlockStepParams(stepId: string, params: CommandParamDto[]): void {
+    patchBlockStep(stepId, { params });
   }
 
   function addBlockStep(): void {
@@ -250,6 +261,7 @@ export function createCommandManagerStore() {
     removeEntries,
     updateEntry,
     updateBlockStep,
+    updateBlockStepParams,
     addBlockStep,
     removeBlockStep,
     moveBlockStepTo,

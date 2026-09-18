@@ -122,6 +122,40 @@ describe("命令管理 store", () => {
     expect(store.selectedGroup()?.name).toBe("设备信息");
   });
 
+  it("块步骤各自持有 {n} 与描述，换位带着走", () => {
+    const store = createCommandManagerStore();
+    store.load(sample);
+    store.selectEntry("b1", "replace");
+    const block = () => {
+      const entry = store.selectedEntry();
+      if (entry?.kind !== "block") throw new Error("expected block");
+      return entry;
+    };
+    const first = block().steps[0]!;
+    const second = block().steps[1]!;
+    store.updateBlockStep(first.id, "wait-for-device {0}");
+    store.updateBlockStepParams(first.id, [{ index: 0, description: "等待" }]);
+    store.updateBlockStep(second.id, "shell getprop {0}");
+    store.updateBlockStepParams(second.id, [{ index: 0, description: "属性" }]);
+    expect(block().steps.map((step) => step.template)).toEqual([
+      "wait-for-device {0}",
+      "shell getprop {0}",
+    ]);
+    expect(block().steps.map((step) => step.params)).toEqual([
+      [{ index: 0, description: "等待" }],
+      [{ index: 0, description: "属性" }],
+    ]);
+    store.moveBlockStepTo(0, 1);
+    expect(block().steps.map((step) => step.template)).toEqual([
+      "shell getprop {0}",
+      "wait-for-device {0}",
+    ]);
+    expect(block().steps.map((step) => step.params)).toEqual([
+      [{ index: 0, description: "属性" }],
+      [{ index: 0, description: "等待" }],
+    ]);
+  });
+
   it("块步骤排序只改当前选中块", () => {
     const store = createCommandManagerStore();
     store.load(sample);

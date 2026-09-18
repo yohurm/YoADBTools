@@ -1,55 +1,37 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
+import { toExecLine as apiToExecLine } from "@yohu/api";
 
 import {
   adbDisplayPrefix,
-  alignParams,
-  combineOutput,
-  commandBody,
   commandCopyText,
   commandCopyLines,
   commandNeedsInput,
   commandTemplateLabel,
+  blockFillFields,
+  commandFillFields,
   entryArity,
+  entryFillFields,
   entryNeedsInput,
-  entryParams,
-  entrySlots,
   entryStepCount,
   entryTemplates,
-  fillTemplate,
   groupStepCount,
-  placeholderSlots,
   formatAdbLine,
-  insertPlaceholder,
   insertPlaceholderAtDisplay,
-  nextPlaceholderIndex,
   paramDescription,
-  placeholderArity,
-  placeholderTokens,
-  previewFill,
   setParamDescription,
+  stepParamLabel,
+  stepParamSlots,
   toExecLine,
 } from "./command-line";
 
 describe("command-line", () => {
-  it("placeholderSlots 只收实际出现的独立 {n}", () => {
-    expect(placeholderSlots("shell getprop")).toEqual([]);
-    expect(placeholderSlots("shell ping {0}")).toEqual([0]);
-    expect(placeholderSlots("{0} {1}")).toEqual([0, 1]);
-    expect(placeholderSlots("{2}")).toEqual([2]);
-    expect(placeholderSlots("shell ping -c 3 {13}")).toEqual([13]);
-    expect(placeholderArity("{2}")).toBe(1);
-    expect(placeholderArity("shell ping -c 3 {13}")).toBe(1);
-  });
-
   it("commandNeedsInput 看占位符", () => {
     expect(commandNeedsInput("shell ls")).toBe(false);
     expect(commandNeedsInput("shell ping {0}")).toBe(true);
   });
 
-  it("entrySlots 取命令或块内全步独立槽位并集", () => {
+  it("块填参按步展开 1-0 / 2-0，同号 {n} 各占一格", () => {
     expect(
       entryArity({ kind: "command", id: "c", name: "ls", template: "shell ls" }),
     ).toBe(0);
@@ -59,7 +41,7 @@ describe("command-line", () => {
         id: "b",
         name: "ping",
         gap_ms: 0,
-        steps: [{ template: "shell echo {0}" }, { template: "shell ping {1}" }],
+        steps: [{ template: "shell echo {0}" }, { template: "shell ping {0}" }],
       }),
     ).toBe(true);
     expect(
@@ -68,57 +50,29 @@ describe("command-line", () => {
         id: "b",
         name: "ping",
         gap_ms: 0,
-        steps: [{ template: "shell echo {0}" }, { template: "shell ping {1}" }],
+        steps: [{ template: "shell echo {0}" }, { template: "shell ping {0}" }],
       }),
     ).toBe(2);
+    expect(stepParamLabel({ step: 1, index: 0 })).toBe("1-0");
+    expect(stepParamSlots(["shell ping {13}", "shell echo {0}"])).toEqual([
+      { step: 1, index: 13 },
+      { step: 2, index: 0 },
+    ]);
     expect(
-      entrySlots({
+      entryFillFields({
         kind: "block",
         id: "b",
         name: "ping",
         gap_ms: 0,
-        steps: [{ template: "shell ping {13}" }, { template: "shell echo {0}" }],
+        steps: [
+          { template: "shell ping {0}", params: [{ index: 0, description: "主机" }] },
+          { template: "shell echo {0}", params: [{ index: 0, description: "文本" }] },
+        ],
       }),
-    ).toEqual([0, 13]);
-  });
-
-  it("占位符槽位 / 插入 / 预览与 domain testdata/command_placeholders.json 同一套向量", () => {
-    const testdata = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../../core/yohu-domain/testdata/command_placeholders.json",
-    );
-    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
-      tokens: {
-        template: string;
-        arity: number;
-        slots: number[];
-        next: number;
-        tokens: { index: number; start: number; end: number }[];
-      }[];
-      insert: {
-        template: string;
-        start: number;
-        end: number;
-        result: string;
-        caret: number;
-      }[];
-      preview: { template: string; values: string[]; preview: string }[];
-    };
-    for (const c of fixture.tokens) {
-      expect(placeholderArity(c.template)).toBe(c.arity);
-      expect(placeholderSlots(c.template)).toEqual(c.slots);
-      expect(nextPlaceholderIndex(c.template)).toBe(c.next);
-      expect(placeholderTokens(c.template)).toEqual(c.tokens);
-    }
-    for (const c of fixture.insert) {
-      expect(insertPlaceholder(c.template, c.start, c.end)).toEqual({
-        template: c.result,
-        caret: c.caret,
-      });
-    }
-    for (const c of fixture.preview) {
-      expect(previewFill(c.template, c.values)).toBe(c.preview);
-    }
+    ).toEqual([
+      { key: "1-0", label: "1-0", description: "主机" },
+      { key: "2-0", label: "2-0", description: "文本" },
+    ]);
   });
 
   it("insertPlaceholderAtDisplay 把 adb 前缀映射回正文", () => {
@@ -142,30 +96,15 @@ describe("command-line", () => {
     expect(commandTemplateLabel()).toBe("具体命令（{n}代表使用命令时需要填入的独立参数）");
   });
 
-  it("alignParams 与 domain testdata/align_params.json 同一套向量", () => {
-    const testdata = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../../core/yohu-domain/testdata/align_params.json",
-    );
-    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
-      slots: number[];
-      params: { index: number; description: string }[];
-      aligned: { index: number; description: string }[];
-    }[];
-    for (const c of fixture) {
-      expect(alignParams(c.slots, c.params)).toEqual(c.aligned);
-    }
+  it("填参栏字段跟模板走", () => {
     const params = setParamDescription([], 0, "主机");
     expect(paramDescription(params, 0)).toBe("主机");
-    expect(
-      entryParams({
-        kind: "command",
-        id: "c",
-        name: "ping",
-        template: "ping {0}",
-        params: [{ index: 0, description: "主机" }],
-      }),
-    ).toEqual([{ index: 0, description: "主机" }]);
+    expect(commandFillFields("ping {0}", params)).toEqual([
+      { key: "0", label: "{0}", description: "主机" },
+    ]);
+    expect(blockFillFields([{ template: "ping {0}", params }])).toEqual([
+      { key: "1-0", label: "1-0", description: "主机" },
+    ]);
   });
 
   it("entryStepCount / groupStepCount 按叶子步数计进度", () => {
@@ -210,39 +149,6 @@ describe("command-line", () => {
     ).toEqual(["echo {0}", "ping {1}"]);
   });
 
-  it("fillTemplate 与 domain testdata/command_fill.json 同一套向量", () => {
-    const testdata = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../../core/yohu-domain/testdata/command_fill.json",
-    );
-    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
-      template: string;
-      values: string[];
-      arity: number;
-      filled?: string;
-      error?: string;
-    }[];
-    for (const c of fixture) {
-      expect(placeholderArity(c.template)).toBe(c.arity);
-      if (c.error === "arity") {
-        expect(() => fillTemplate(c.template, c.values)).toThrow(/填充值数量不一致/);
-        continue;
-      }
-      expect(fillTemplate(c.template, c.values)).toBe(c.filled);
-    }
-  });
-
-  it("commandBody 与 domain testdata/command_body.json 同一套向量", () => {
-    const testdata = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../../core/yohu-domain/testdata/command_body.json",
-    );
-    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as { input: string; body: string }[];
-    for (const c of fixture) {
-      expect(commandBody(c.input)).toBe(c.body);
-    }
-  });
-
   it("formatAdbLine 始终带 adb", () => {
     expect(formatAdbLine("ABC", "shell getprop")).toBe("adb -s ABC shell getprop");
     expect(formatAdbLine("ABC", "adb shell ls")).toBe("adb -s ABC shell ls");
@@ -259,25 +165,8 @@ describe("command-line", () => {
     expect(commandCopyLines(["shell ls", "  ", "shell pwd"])).toBe("adb shell ls\nadb shell pwd");
   });
 
-  it("toExecLine 仅开关打开时补 adb", () => {
-    expect(toExecLine("shell ls", false)).toBe("shell ls");
-    expect(toExecLine("shell ls", true)).toBe("adb shell ls");
-    expect(toExecLine("adb shell ls", true)).toBe("adb shell ls");
-    expect(toExecLine("ADB.exe devices", true)).toBe("adb devices");
+  it("toExecLine 转发 @yohu/api", () => {
+    expect(toExecLine).toBe(apiToExecLine);
   });
 
-  it("combineOutput 与 domain testdata/combine_output.json 同一套向量", () => {
-    const testdata = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../../../core/yohu-domain/testdata/combine_output.json",
-    );
-    const fixture = JSON.parse(readFileSync(testdata, "utf8")) as {
-      stdout: string;
-      stderr: string;
-      text: string;
-    }[];
-    for (const c of fixture) {
-      expect(combineOutput(c.stdout, c.stderr)).toBe(c.text);
-    }
-  });
 });

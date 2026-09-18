@@ -20,7 +20,10 @@ const sample: CommandLibraryDto = {
           id: "b1",
           name: "连上再看",
           gap_ms: 200,
-          steps: [{ template: "wait-for-device" }, { template: "shell getprop {0}" }],
+          steps: [
+            { template: "wait-for-device" },
+            { template: "shell getprop {0}", params: [{ index: 0, description: "属性名" }] },
+          ],
         },
       ],
     },
@@ -45,6 +48,8 @@ describe("EditorColumn 选区", () => {
 
     store.selectEntry("b1", "replace");
     expect(screen.getByLabelText("命令块名称")).toBeTruthy();
+    expect(screen.getByLabelText("2-0")).toBeTruthy();
+    expect(screen.queryByLabelText("{0}")).toBeNull();
     expect(screen.queryByLabelText("命令名称")).toBeNull();
 
     store.selectEntry("c1", "toggle");

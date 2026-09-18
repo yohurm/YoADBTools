@@ -77,6 +77,40 @@ describe("命令管理草稿（DTO ↔ 草稿）", () => {
     });
   });
 
+  it("步骤参数描述往返，块级旧 params 不进草稿", () => {
+    const withStepParams: CommandLibraryDto = {
+      ...sample,
+      groups: [
+        {
+          ...sample.groups[0]!,
+          entries: [
+            {
+              kind: "block",
+              id: "b1",
+              name: "连上再看型号",
+              gap_ms: 500,
+              steps: [
+                { template: "wait-for-device {0}", params: [{ index: 0, description: "等待" }] },
+                { template: "shell getprop {0}", params: [{ index: 0, description: "属性" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(fromDraft(toDraft(withStepParams))).toEqual(withStepParams);
+    const draft = toDraft(withStepParams);
+    const block = draft.groups[0]!.entries[0];
+    expect(block?.kind).toBe("block");
+    if (block?.kind === "block") {
+      expect(block).not.toHaveProperty("params");
+      expect(block.steps.map((step) => step.params)).toEqual([
+        [{ index: 0, description: "等待" }],
+        [{ index: 0, description: "属性" }],
+      ]);
+    }
+  });
+
   it("组下命令与命令块同级往返", () => {
     const draft = toDraft(sample);
     expect(draft.groups[0]!.entries.map((e) => e.kind)).toEqual(["command", "command", "block"]);

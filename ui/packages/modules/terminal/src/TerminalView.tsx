@@ -9,11 +9,10 @@ import type { DeviceSession, LibraryEntryDto } from "@yohu/api";
 import { ModuleTitle } from "@yohu/api";
 
 import { CommandManager } from "./CommandManager";
-import { CommandTree } from "./CommandTree";
+import { LibraryPane } from "./LibraryPane";
 import { Composer } from "./Composer";
 import { ParameterDialog } from "./ParameterDialog";
 import { ResultStream } from "./ResultStream";
-import { entryParams, entrySlots, entryTemplates } from "./command-line";
 import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
 import "./terminal.css";
@@ -23,18 +22,6 @@ export function TerminalView(props: DeviceSession) {
   const [inputOpen, setInputOpen] = createSignal(false);
   const dialogEntry = createMemo<LibraryEntryDto | null>((prev) => inputEntry() ?? prev ?? null);
   const dialogTitle = (): string => dialogEntry()?.name ?? "";
-  const dialogTemplates = (): string[] => {
-    const entry = dialogEntry();
-    return entry ? entryTemplates(entry) : [];
-  };
-  const dialogParams = (): ReturnType<typeof entryParams> => {
-    const entry = dialogEntry();
-    return entry ? entryParams(entry) : [];
-  };
-  const dialogSlots = (): number[] => {
-    const entry = dialogEntry();
-    return entry ? entrySlots(entry) : [];
-  };
 
   onMount(() => {
     void terminalStore.load();
@@ -68,16 +55,12 @@ export function TerminalView(props: DeviceSession) {
       </YoChrome>
 
       <div class="yohu-terminal__body">
-        <YoPanel variant="pane" padding="sm" overflow="hidden" title="命令库">
-          <YoScroller>
-            <CommandTree
-              onNeedValues={(entry) => {
-                setInputEntry(entry);
-                setInputOpen(true);
-              }}
-            />
-          </YoScroller>
-        </YoPanel>
+        <LibraryPane
+          onNeedValues={(entry) => {
+            setInputEntry(entry);
+            setInputOpen(true);
+          }}
+        />
 
         <YoPanel
           variant="pane"
@@ -101,9 +84,7 @@ export function TerminalView(props: DeviceSession) {
 
       <ParameterDialog
         title={dialogTitle()}
-        templates={dialogTemplates()}
-        params={dialogParams()}
-        slots={dialogSlots()}
+        entry={dialogEntry()}
         open={inputOpen}
         onClose={() => {
           setInputOpen(false);

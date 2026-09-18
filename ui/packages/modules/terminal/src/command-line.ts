@@ -1,8 +1,36 @@
 /**
- * 命令行展示与占位符填充（与 core `placeholder_slots` / `fill` / `strip_leading_adb` 对齐）。
+ * 命令行展示铬：`adb` 前缀、填参栏字段、复制。
+ * `{n}` / 拆行 / 去前导 adb / 拼输出在 @yohu/api（镜像 yohu-domain）。
  */
 
+import {
+  commandBody,
+  insertPlaceholder,
+  paramDescription,
+  placeholderArity,
+  placeholderSlots,
+  type StepParamSlot,
+} from "@yohu/api";
 import type { CommandParamDto, LibraryEntryDto } from "@yohu/api";
+
+export {
+  alignParams,
+  combineOutput,
+  commandBody,
+  fillTemplate,
+  insertPlaceholder,
+  nextPlaceholderIndex,
+  paramDescription,
+  placeholderArity,
+  placeholderSlots,
+  placeholderTokens,
+  previewFill,
+  splitCommandLine,
+  stepParamSlots,
+  toExecLine,
+  type PlaceholderToken,
+  type StepParamSlot,
+} from "@yohu/api";
 
 /** 具体命令标签后的占位说明。`{n}` 是独立参数，不是 0..n 的个数。 */
 export const COMMAND_PLACEHOLDER_HINT = "{n}代表使用命令时需要填入的独立参数";
@@ -11,130 +39,8 @@ export function commandTemplateLabel(): string {
   return `具体命令（${COMMAND_PLACEHOLDER_HINT}）`;
 }
 
-/** 模板中一处 `{n}`。`start` / `end` 是字符偏移（含花括号）。 */
-export type PlaceholderToken = {
-  index: number;
-  start: number;
-  end: number;
-};
-
-/** 按出现顺序列出全部 `{n}`。`{abc}` 等非数字片段跳过。 */
-export function placeholderTokens(template: string): PlaceholderToken[] {
-  const tokens: PlaceholderToken[] = [];
-  let rest = template;
-  let base = 0;
-  while (true) {
-    const pos = rest.indexOf("{");
-    if (pos < 0) break;
-    const after = rest.slice(pos + 1);
-    const end = after.indexOf("}");
-    if (end < 0) break;
-    const inner = after.slice(0, end);
-    const tokenChars = inner.length + 2;
-    if (/^\d+$/.test(inner)) {
-      tokens.push({
-        index: Number.parseInt(inner, 10),
-        start: base + pos,
-        end: base + pos + tokenChars,
-      });
-    }
-    rest = after.slice(end + 1);
-    base += pos + tokenChars;
-  }
-  return tokens;
-}
-
-/** 模板中实际出现的独立 `{n}`，按索引升序。 */
-export function placeholderSlots(template: string): number[] {
-  return templatesSlots([template]);
-}
-
-/** 多段模板的独立 `{n}` 并集，按索引升序。 */
-export function templatesSlots(templates: readonly string[]): number[] {
-  const slots = new Set<number>();
-  for (const template of templates) {
-    for (const token of placeholderTokens(template)) slots.add(token.index);
-  }
-  return [...slots].sort((a, b) => a - b);
-}
-
-/** 独立 `{n}` 的个数；不是最大下标 + 1。 */
-export function placeholderArity(template: string): number {
-  return placeholderSlots(template).length;
-}
-
-/** 下一个可插入的独立 `{n}`：已用下标里最小的空号。 */
-export function nextPlaceholderIndex(template: string): number {
-  const used = placeholderSlots(template);
-  for (let index = 0; ; index += 1) {
-    if (!used.includes(index)) return index;
-  }
-}
-
-/** 在字符区间 `[start, end)` 插入下一个 `{n}`。 */
-export function insertPlaceholder(
-  template: string,
-  start: number,
-  end: number,
-): { template: string; caret: number } {
-  const len = [...template].length;
-  const from = Math.min(Math.max(0, start), len);
-  const to = Math.min(Math.max(from, end), len);
-  const chars = [...template];
-  const pad = from > 0 && !/\s/.test(chars[from - 1] ?? "");
-  const token = `${pad ? " " : ""}{${nextPlaceholderIndex(template)}}`;
-  const next = `${chars.slice(0, from).join("")}${token}${chars.slice(to).join("")}`;
-  return { template: next, caret: from + token.length };
-}
-
-function bindValues(slots: readonly number[], values: readonly string[]): Map<number, string> {
-  const bound = new Map<number, string>();
-  for (let i = 0; i < slots.length && i < values.length; i += 1) {
-    bound.set(slots[i]!, values[i]!);
-  }
-  return bound;
-}
-
-function applyPlaceholders(
-  template: string,
-  byIndex: ReadonlyMap<number, string>,
-  skipEmpty: boolean,
-): string {
-  let out = "";
-  let rest = template;
-  while (true) {
-    const pos = rest.indexOf("{");
-    if (pos < 0) {
-      out += rest;
-      break;
-    }
-    out += rest.slice(0, pos);
-    const after = rest.slice(pos + 1);
-    const end = after.indexOf("}");
-    if (end >= 0) {
-      const inner = after.slice(0, end);
-      if (/^\d+$/.test(inner)) {
-        const n = Number.parseInt(inner, 10);
-        const value = byIndex.get(n);
-        if (value !== undefined && (!skipEmpty || value.length > 0)) {
-          out += value;
-          rest = after.slice(end + 1);
-          continue;
-        }
-        out += `{${inner}}`;
-        rest = after.slice(end + 1);
-        continue;
-      }
-    }
-    out += "{";
-    rest = after;
-  }
-  return out;
-}
-
-/** 预览填充：空值或缺席的槽位原样保留 `{n}`。值按独立槽位顺序。 */
-export function previewFill(template: string, values: readonly string[]): string {
-  return applyPlaceholders(template, bindValues(placeholderSlots(template), values), true);
+export function stepParamLabel(slot: StepParamSlot): string {
+  return `${slot.step}-${slot.index}`;
 }
 
 /** `formatAdbLine("-", body)` 里正文之前的前缀长度（含空格）。 */
@@ -143,7 +49,7 @@ export function adbDisplayPrefix(input: string): number {
   return formatAdbLine("-", body).length - body.length;
 }
 
-/** 展示行（`adb …`）光标映射回正文后插入。 */
+/** 展示行（`adb …`）光标映射回正文后插入下一个 `{n}`。 */
 export function insertPlaceholderAtDisplay(
   body: string,
   displayStart: number,
@@ -163,12 +69,35 @@ export function entryTemplates(entry: LibraryEntryDto): string[] {
   return entry.steps.map((step) => step.template);
 }
 
-export function entryParams(entry: LibraryEntryDto): CommandParamDto[] {
-  return entry.params ?? [];
+/** 填参栏一行。命令标签 `{n}`；块标签 `1-0`。 */
+export type FillField = {
+  key: string;
+  label: string;
+  description: string;
+};
+
+export function commandFillFields(template: string, params: readonly CommandParamDto[]): FillField[] {
+  return placeholderSlots(template).map((index) => {
+    const description = paramDescription(params, index).trim();
+    return { key: String(index), label: `{${index}}`, description };
+  });
 }
 
-export function paramDescription(params: readonly CommandParamDto[], index: number): string {
-  return params.find((param) => param.index === index)?.description ?? "";
+export function blockFillFields(
+  steps: readonly { template: string; params?: readonly CommandParamDto[] }[],
+): FillField[] {
+  return steps.flatMap((step, offset) => {
+    const stepNo = offset + 1;
+    return placeholderSlots(step.template).map((index) => {
+      const description = paramDescription(step.params ?? [], index).trim();
+      return { key: stepParamLabel({ step: stepNo, index }), label: stepParamLabel({ step: stepNo, index }), description };
+    });
+  });
+}
+
+export function entryFillFields(entry: LibraryEntryDto): FillField[] {
+  if (entry.kind === "command") return commandFillFields(entry.template, entry.params ?? []);
+  return blockFillFields(entry.steps);
 }
 
 export function setParamDescription(
@@ -184,37 +113,12 @@ export function setParamDescription(
   return next.sort((a, b) => a.index - b.index);
 }
 
-export function alignParams(
-  slots: readonly number[],
-  params: readonly CommandParamDto[],
-): CommandParamDto[] {
-  const allowed = new Set(slots);
-  const seen = new Set<number>();
-  const out: CommandParamDto[] = [];
-  for (const param of [...params].sort((a, b) => a.index - b.index)) {
-    const description = param.description.trim();
-    if (!allowed.has(param.index) || description.length === 0 || seen.has(param.index)) continue;
-    seen.add(param.index);
-    out.push({ index: param.index, description });
-  }
-  return out;
-}
-
 export function commandNeedsInput(template: string): boolean {
   return placeholderArity(template) > 0;
 }
 
-export function templatesArity(templates: readonly string[]): number {
-  return templatesSlots(templates).length;
-}
-
-export function entrySlots(entry: LibraryEntryDto): number[] {
-  if (entry.kind === "command") return placeholderSlots(entry.template);
-  return templatesSlots(entry.steps.map((step) => step.template));
-}
-
 export function entryArity(entry: LibraryEntryDto): number {
-  return entrySlots(entry).length;
+  return entryFillFields(entry).length;
 }
 
 export function entryNeedsInput(entry: LibraryEntryDto): boolean {
@@ -228,30 +132,6 @@ export function entryStepCount(entry: LibraryEntryDto): number {
 
 export function groupStepCount(group: { entries: readonly LibraryEntryDto[] }): number {
   return group.entries.reduce((count, entry) => count + entryStepCount(entry), 0);
-}
-
-/** 按独立槽位顺序替换 `{n}`；值本身含 `{n}` 样文本按字面量保留。个数必须与 domain `fill` 一致。 */
-export function fillTemplate(template: string, values: readonly string[]): string {
-  const slots = placeholderSlots(template);
-  if (values.length !== slots.length) {
-    throw new Error(`填充值数量不一致：需要 ${slots.length} 个，实际 ${values.length}`);
-  }
-  return applyPlaceholders(template, bindValues(slots, values), false);
-}
-
-/** 规范正文：去掉前导 `adb` / `adb.exe`。库、队列、发送共用这一形态。 */
-export function commandBody(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed.toLowerCase().startsWith("adb.exe")) {
-    return trimmed.slice(7).trimStart();
-  }
-  if (trimmed.toLowerCase().startsWith("adb")) {
-    const rest = trimmed.slice(3);
-    if (rest.length === 0 || /^\s/.test(rest)) {
-      return rest.trimStart();
-    }
-  }
-  return trimmed;
 }
 
 /** 展示用完整行：始终 `adb [-s SERIAL] <正文>`。队列预览 / 树 title / IO 输入行同一源。 */
@@ -272,19 +152,4 @@ export function commandCopyLines(templates: readonly string[]): string {
     .filter((template) => commandBody(template).length > 0)
     .map(commandCopyText)
     .join("\n");
-}
-
-/** 交给 `terminal.exec` 的载荷；仅设置打开时补 `adb`。 */
-export function toExecLine(input: string, prependAdb: boolean): string {
-  const body = commandBody(input);
-  if (!prependAdb) return body;
-  return body ? `adb ${body}` : "adb";
-}
-
-/** stdout / stderr 拼成一段输出。与 domain `combine_output` 同一语义，无第三参。 */
-export function combineOutput(stdout: string, stderr: string): string {
-  if (stdout && stderr) return `${stdout}\n${stderr}`;
-  if (stdout) return stdout;
-  if (stderr) return stderr;
-  return "";
 }
