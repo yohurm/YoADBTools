@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render } from "@solidjs/testing-library";
-import type { Component } from "solid-js";
+import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { createSignal, type Component } from "solid-js";
 import { YoReorderList } from "./ReorderList";
 import {
   contentTopInViewport,
@@ -212,7 +212,7 @@ describe("YoReorderList", () => {
     expect(src).toMatch(/<Portal[\s\S]*<ReorderOverlay/);
     expect(src).toContain("port.scrollTop()");
     expect(src).toContain("pointerContentY(viewTop");
-    expect(src).toContain("tabIndex={-1}");
+    expect(src).toContain("tabIndex={slot.present ? -1 : undefined}");
     expect(src).toContain("preventScroll");
     expect(src).not.toContain("scrollIntoView");
     expect(src).not.toContain("host.scrollTop");
@@ -221,6 +221,26 @@ describe("YoReorderList", () => {
     expect(src).not.toContain("resolveScrollerWheelDelta");
     expect(src).not.toContain("container.scrollTop =");
     expect(src).not.toContain("yohu-scroller__view");
+    expect(src).toContain("useListPresenceSlots");
+    expect(src).toContain('recipe="list"');
+    expect(src).toContain("YoPresence");
+    expect(src).toContain(":not([data-exiting])");
+    expect(src).not.toContain("YoListPresence");
+    expect(src).not.toContain("reconcileListPresenceSlots");
+  });
+
+  it("增删走行内 Presence list，浮层不套第二份", () => {
+    const [items, setItems] = createSignal(["a"]);
+    const { container } = render(() => (
+      <YoReorderList items={items} getItemKey={(item) => item} onReorder={() => undefined} renderRow={TestRow} />
+    ));
+    expect(container.querySelectorAll('.yohu-presence[data-recipe="list"]').length).toBe(1);
+    setItems(["a", "b"]);
+    expect(screen.getByText("b")).toBeTruthy();
+    expect(container.querySelectorAll('.yohu-presence[data-recipe="list"]').length).toBe(2);
+    setItems(["b"]);
+    expect(screen.queryByText("a")).toBeNull();
+    expect(screen.getByText("b")).toBeTruthy();
   });
 
   it("Ctrl/Meta+方向键换位，无常驻手柄", () => {

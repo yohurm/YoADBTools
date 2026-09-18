@@ -37,6 +37,38 @@ describe("reconcileListPresenceSlots", () => {
     expect(keep.present).toBe(true);
   });
 
+  it("已在场 key 跟随 keys 换位，保持同一对象", () => {
+    const a = slot("a", 1);
+    const b = slot("b", 2);
+    const c = slot("c", 3);
+    const next = reconcileListPresenceSlots({
+      prev: [a, b, c],
+      items: [1, 3, 2],
+      keys: ["a", "c", "b"],
+      allowExit: true,
+    });
+    expect(next.map((entry) => entry.key)).toEqual(["a", "c", "b"]);
+    expect(next[0]).toBe(a);
+    expect(next[1]).toBe(c);
+    expect(next[2]).toBe(b);
+  });
+
+  it("删中间项时出场槽插在旧邻项之后", () => {
+    const a = slot("a", 1);
+    const b = slot("b", 2);
+    const c = slot("c", 3);
+    const next = reconcileListPresenceSlots({
+      prev: [a, b, c],
+      items: [1, 3],
+      keys: ["a", "c"],
+      allowExit: true,
+    });
+    expect(next.map((entry) => entry.key)).toEqual(["a", "b", "c"]);
+    expect(next[1]).toBe(b);
+    expect(b.present).toBe(false);
+    expect(c.present).toBe(true);
+  });
+
   it("exit=false 直切删槽", () => {
     const next = reconcileListPresenceSlots({
       prev: [slot("0", 0), slot("1", 1)],

@@ -22,38 +22,42 @@ export function reconcileListPresenceSlots<T>(input: {
   allowExit: boolean;
 }): ListPresenceSlot<T>[] {
   const { items, keys, allowExit } = input;
+  const prevByKey = new Map(input.prev.map((slot) => [slot.key, slot]));
+  const incoming = new Set(keys);
   const next: ListPresenceSlot<T>[] = [];
-  const kept = new Set<string>();
-
-  for (const slot of input.prev) {
-    const nextIndex = keys.indexOf(slot.key);
-    if (nextIndex >= 0) {
-      slot.item = items[nextIndex]!;
-      slot.present = true;
-      next.push(slot);
-      kept.add(slot.key);
-    } else if (allowExit) {
-      slot.present = false;
-      next.push(slot);
-    }
-  }
 
   keys.forEach((key, index) => {
-    if (kept.has(key) || next.some((slot) => slot.key === key)) {
+    const existing = prevByKey.get(key);
+    if (existing) {
+      existing.item = items[index]!;
+      existing.present = true;
+      next.push(existing);
       return;
     }
-    const slot: ListPresenceSlot<T> = { key, item: items[index]!, present: true };
+    next.push({ key, item: items[index]!, present: true });
+  });
+
+  if (!allowExit) return next;
+
+  for (const slot of input.prev) {
+    if (incoming.has(slot.key)) continue;
+    slot.present = false;
+    const oldIndex = input.prev.indexOf(slot);
     let insertAt = next.length;
-    for (let look = index - 1; look >= 0; look--) {
-      const neighbor = keys[look]!;
-      const neighborIndex = next.findIndex((entry) => entry.key === neighbor);
-      if (neighborIndex >= 0) {
-        insertAt = neighborIndex + 1;
-        break;
+    if (oldIndex === 0) {
+      insertAt = 0;
+    } else {
+      for (let look = oldIndex - 1; look >= 0; look -= 1) {
+        const neighbor = input.prev[look]!.key;
+        const neighborIndex = next.findIndex((entry) => entry.key === neighbor);
+        if (neighborIndex >= 0) {
+          insertAt = neighborIndex + 1;
+          break;
+        }
       }
     }
     next.splice(insertAt, 0, slot);
-  });
+  }
 
   return next;
 }
