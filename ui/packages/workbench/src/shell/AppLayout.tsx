@@ -7,6 +7,7 @@ import { type Component, Show, createEffect, createMemo, createSignal, onMount }
 
 import { APP_ICON_SRC } from "../app-identity";
 import { selectedDeviceLabel } from "./device-label";
+import { ModuleId } from "@yohu/api";
 import {
   YoContextMenuHost,
   YoTooltipHost,
@@ -20,7 +21,7 @@ import {
 } from "@yohu/ui";
 
 import { modules, type ModuleDescriptor } from "../registry";
-import { deviceStore, mirrorPresentShouldBeActive, navStore, settingsStore, windowStore } from "../stores";
+import { deviceStore, navStore, settingsStore, windowStore } from "../stores";
 import { DeviceRail } from "./DeviceRail";
 import { NavList } from "./NavList";
 import { StatusBar } from "./StatusBar";
@@ -56,15 +57,13 @@ const ModuleStage: Component<{
 
   createEffect(() => {
     const next = props.current;
+    void navStore.setMirrorPresent(next?.id);
     const cur = shown();
     if (next?.id === cur?.id) return;
-    if (cur && !mirrorPresentShouldBeActive(next?.id)) {
-      void navStore.setMirrorPresent(next?.id);
-    }
-    if (!cur || shouldSkipMotion()) {
+    const mirrorInvolved = next?.id === ModuleId.Mirror || cur?.id === ModuleId.Mirror;
+    if (!cur || shouldSkipMotion() || mirrorInvolved) {
       setShown(next);
       setGate(true);
-      if (mirrorPresentShouldBeActive(next?.id)) void navStore.setMirrorPresent(next?.id);
       return;
     }
     setGate(false);
@@ -77,7 +76,6 @@ const ModuleStage: Component<{
       onExitComplete={() => {
         setShown(props.current);
         setGate(true);
-        void navStore.setMirrorPresent(props.current?.id);
       }}
     >
       <Show when={shown()} keyed>

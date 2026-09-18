@@ -155,7 +155,7 @@ registerModule({
   title: ModuleTitle.Mirror,
   icon: "mirror",
   selectionMode: "singleRequired",
-  Component: () => null,
+  Component: () => <div data-testid="mirror-stage">mirror</div>,
   Status: () => <span>12 fps</span>,
 });
 registerModule({
@@ -1013,6 +1013,48 @@ describe("AppLayout 窗口铬", () => {
     await waitFor(() => {
       expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
     });
+  });
+
+  it("从其他模块切回投屏时同一拍打开 HWND", async () => {
+    navStore.navigate(ModuleId.Terminal);
+    render(() => <AppLayout />);
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Mirror);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+    });
+    expect(screen.getByTestId("mirror-stage")).toBeTruthy();
+  });
+
+  it("离投屏同一拍关闭 HWND", async () => {
+    navStore.navigate(ModuleId.Mirror);
+    render(() => <AppLayout />);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+    });
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Terminal);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false);
+    });
+  });
+
+  it("淡出未结束时再切回投屏仍打开 HWND", async () => {
+    navStore.navigate(ModuleId.Mirror);
+    render(() => <AppLayout />);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+    });
+    navStore.navigate(ModuleId.Terminal);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false);
+    });
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Mirror);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+    });
+    expect(screen.getByTestId("mirror-stage")).toBeTruthy();
   });
 });
 

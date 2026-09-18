@@ -68,8 +68,9 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
         system.info 失败：YoLog.warn + errorText，lastError 仍是主错误
         DeviceRail 只展示 lastError，不拼 hint
 切模块：NavList 事件 → navStore.navigate
-        ModuleStage 动画后 → navStore.setMirrorPresent(id)
-          → mirror.present.setActive（只认 ModuleId.Mirror）
+        ModuleStage 身份变化同一拍 → navStore.setMirrorPresent(id)
+          → mirror.present.setActive（只认 ModuleId.Mirror；进投屏立刻建表面，不跟淡出）
+        进出投屏同一拍挂载/卸载 MirrorView，不跟 YoPresence 淡出；其它模块仍 fade
 选择：DeviceRail 事件 → deviceStore.selectDevice → DeviceSession
 设置：SettingsForm 事件 → settingsStore.set / browseAdbPath / browseDataRoot / browseExportPath / openLogsDir
         整段十进制整数字符串 → JSON number；非法串原样
