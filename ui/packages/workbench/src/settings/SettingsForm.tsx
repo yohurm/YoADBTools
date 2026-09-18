@@ -117,12 +117,11 @@ export function SettingsForm(props: {
           />
         </YoFormRow>
 
-        <YoFormRow title="设备自动刷新间隔（秒，0 = 关）" note={<EffectBadge text="重启生效" />}>
-          <YoTextField
-            type="number"
-            value={String(settingsStore.state.devices_auto_refresh)}
-            ariaLabel="设备自动刷新间隔"
-            onInput={(v) => props.save("devices_auto_refresh", v, "已保存（重启生效）")}
+        <YoFormRow title="设备自动刷新" note={<EffectBadge text="立即生效" />}>
+          <YoSwitch
+            ariaLabel="设备自动刷新"
+            checked={settingsStore.state.devices_auto_refresh}
+            onChange={(v) => props.save("devices_auto_refresh", v, "已保存（立即生效）")}
           />
         </YoFormRow>
       </YoPanel>
@@ -168,6 +167,7 @@ export function SettingsForm(props: {
         >
           <YoTextField
             type="number"
+            min={1}
             value={String(settingsStore.state.buffer_capacity)}
             ariaLabel="缓冲最大行数"
             onInput={(v) =>

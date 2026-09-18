@@ -5,7 +5,7 @@
 
 import type { SettingKey, SettingValue } from "@yohu/api";
 
-const INTEGER_KEYS: ReadonlySet<SettingKey> = new Set(["devices_auto_refresh", "buffer_capacity"]);
+const INTEGER_KEYS: ReadonlySet<SettingKey> = new Set(["buffer_capacity"]);
 
 /** 整段可选负号 + 十进制数字，不含前缀、小数、空白、科学计数。 */
 const DECIMAL_INTEGER = /^-?\d+$/;

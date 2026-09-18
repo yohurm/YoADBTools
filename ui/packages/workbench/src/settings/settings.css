@@ -1,5 +1,5 @@
 /* 设置页：页眉铺满内容区；标题与分组卡片共用 page-margin 左缘。
- * 表单项排布走 YoFormRow（右槽 hug 贴尾）；数字宽走 YoTextField type=number。
+ * 表单项排布走 YoFormRow（右槽 hug 贴尾）；数字走 YoTextField type=number（左值右步进）。
  * 路径槽只约束宽，铬走 YoTextField。 */
 
 .yohu-settings {

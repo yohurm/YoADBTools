@@ -48,4 +48,12 @@ describe("设置页滚轴", () => {
     expect(css).not.toMatch(/overflow-y:\s*auto/);
     expect(css).not.toMatch(/overflow-y:\s*scroll/);
   });
+
+  it("设备自动刷新是开关，无间隔秒数字段", () => {
+    expect(form).toContain('title="设备自动刷新"');
+    expect(form).toContain('ariaLabel="设备自动刷新"');
+    expect(form).not.toContain("自动刷新间隔");
+    expect(form).not.toContain("间隔（秒");
+    expect(form).not.toContain("0 = 关");
+  });
 });

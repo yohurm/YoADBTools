@@ -819,11 +819,26 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
 
   it("启用项为 YoSwitch，无「启用」字样", () => {
     render(() => <SettingsView />);
+    expect(screen.getByRole("switch", { name: "设备自动刷新" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "开始采集前清空设备缓冲（logcat -c）" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "输入命令默认加上 adb" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "拖入时指向文件夹" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "强制 ADB forward（跳过 reverse）" })).toBeTruthy();
     expect(screen.queryByText("启用")).toBeNull();
+    expect(screen.queryByText("自动刷新间隔")).toBeNull();
+    expect(screen.queryByText(/间隔（秒/)).toBeNull();
+    expect(screen.queryByText(/0 = 关/)).toBeNull();
+  });
+
+  it("设备自动刷新立即写入布尔值", async () => {
+    render(() => <SettingsView />);
+    fireEvent.click(screen.getByRole("switch", { name: "设备自动刷新" }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("devices_auto_refresh", false);
+    });
+    await waitFor(() => {
+      expect(screen.getByText("已保存（立即生效）")).toBeTruthy();
+    });
   });
 
   it("页眉与分组卡片分列：标题不进滚动容器", () => {
