@@ -58,6 +58,15 @@ describe("Icon", () => {
     expect(svg?.querySelector("path")?.getAttribute("d") ?? "").toContain("M534.528 43.008");
   });
 
+  it("搜索走 HarmonyOS Symbol hm-search", () => {
+    const { container } = render(() => <Icon name="search" />);
+    const svg = container.querySelector('svg[data-icon="search"]');
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 1024 1024");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(svg?.querySelector("path")?.getAttribute("d") ?? "").toContain("M744.758 704.861");
+    expect(svg?.querySelector("circle")).toBeNull();
+  });
+
   it("设备操作栏用三键导航与控制中心语义，不用眼睛/房屋/回车箭头", () => {
     const { container } = render(() => (
       <>
@@ -98,8 +107,8 @@ describe("Icon", () => {
       </>
     ));
     expect(container.querySelector('svg[data-icon="send"] path')?.getAttribute("d") ?? "").toContain("M3.714");
-    expect(container.querySelector('svg[data-icon="block"] rect')).not.toBeNull();
-    expect(container.querySelectorAll('svg[data-icon="block"] path')).toHaveLength(2);
+    expect(container.querySelector('svg[data-icon="block"] polyline')?.getAttribute("points") ?? "").toContain("4 17");
+    expect(container.querySelectorAll('svg[data-icon="block"] line')).toHaveLength(3);
   });
 
   it("isIconName 只认清单内字符串", () => {

@@ -25,7 +25,6 @@ export type IconName =
   | "chevron-left"
   | "chevron-right"
   | "chevron-up"
-  | "search"
   | "play"
   | "pause"
   | "clear"
@@ -83,13 +82,14 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
       <line x1="3" y1="18" x2="3.01" y2="18" />
     </>
   ),
-  // Lucide square-stack（ISC）：叠方块=命令块，16px 仍能和清单点分开。
-  // https://github.com/lucide-icons/lucide/blob/main/icons/square-stack.svg
+  // 与 terminal 同族：同一只提示符，右侧三行=按序步骤。描边几何跟 plus/trash 对齐，
+  // 禁止再借 Lucide square-stack（碎角、重心偏右下，16px 发虚）。
   block: () => (
     <>
-      <path d="M4 10c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
-      <path d="M10 16c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
-      <rect width="8" height="8" x="14" y="14" rx="2" />
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="7" x2="20" y2="7" />
+      <line x1="12" y1="12" x2="20" y2="12" />
+      <line x1="12" y1="17" x2="20" y2="17" />
     </>
   ),
   grip: () => (
@@ -124,12 +124,6 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
   "chevron-left": () => <polyline points="15 18 9 12 15 6" />,
   "chevron-right": () => <polyline points="9 18 15 12 9 6" />,
   "chevron-up": () => <polyline points="18 15 12 9 6 15" />,
-  search: () => (
-    <>
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </>
-  ),
   play: () => <polygon points="5 3 19 12 5 21 5 3" />,
   pause: () => (
     <>

@@ -172,6 +172,7 @@ export const FAMILY_STEMS = {
 export const ALLOWED_CROSS = {
   "basic/IconButton.tsx": ["overlay/Tooltip"],
   "form/AddressField.tsx": ["overlay/Tooltip"],
+  "search/Search.tsx": ["overlay/Tooltip"],
 };
 
 export const CONTAINER_VIEWS = new Set([

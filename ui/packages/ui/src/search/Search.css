@@ -1,0 +1,179 @@
+.yohu-search {
+  --yohu-search-edge: var(--yohu-border);
+  --yohu-text-field-line: calc(var(--yohu-control-height) - 2 * var(--yohu-stroke-hairline));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--yohu-font-sans);
+}
+
+.yohu-search[data-slot="entry"] {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.yohu-search[data-width="fill"] {
+  width: 100%;
+}
+
+.yohu-search[data-collapsible][data-slot="bar"] .yohu-search__bar {
+  padding-block-end: var(--yohu-space-sm);
+}
+
+.yohu-search[data-active] {
+  --yohu-search-edge: var(--yohu-accent);
+}
+
+.yohu-search[data-paint="error"] {
+  --yohu-search-edge: var(--yohu-error);
+}
+
+.yohu-search[data-paint="warning"] {
+  --yohu-search-edge: var(--yohu-warn);
+}
+
+.yohu-search[data-paint="neutral"] .yohu-search__control:focus-within {
+  --yohu-search-edge: var(--yohu-accent);
+}
+
+.yohu-search__entry {
+  --yohu-corner-fill: transparent;
+  --yohu-corner-stroke: transparent;
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: center;
+  width: var(--yohu-control-height);
+  height: var(--yohu-control-height);
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background-color: transparent;
+  color: var(--yohu-fg-2);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: color var(--yohu-motion-effects-fast);
+}
+
+.yohu-search__entry-chrome {
+  width: 100%;
+  height: 100%;
+}
+
+.yohu-search__entry .yohu-icon {
+  width: var(--yohu-layout-icon-md);
+  height: var(--yohu-layout-icon-md);
+}
+
+.yohu-search__entry:not(:disabled):hover {
+  --yohu-corner-fill: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-search__entry:not(:disabled):active {
+  --yohu-corner-fill: var(--yohu-state-pressed);
+}
+
+.yohu-search__entry[data-pressed]:not(:disabled) {
+  --yohu-corner-fill: var(--yohu-accent-soft);
+  color: var(--yohu-accent);
+}
+
+.yohu-search__entry:disabled {
+  color: var(--yohu-fg-4);
+  cursor: not-allowed;
+}
+
+.yohu-search__bar {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.yohu-search__control {
+  --yohu-corner-fill: var(--yohu-comp-gray);
+  --yohu-corner-stroke: var(--yohu-search-edge);
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: var(--yohu-control-height);
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+.yohu-search__chrome {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 0;
+}
+
+.yohu-search__affix {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--yohu-fg-3);
+}
+
+.yohu-search__input {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: auto;
+  height: var(--yohu-text-field-line);
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent;
+  color: var(--yohu-fg);
+  font-family: inherit;
+  font-size: var(--yohu-font-body);
+  line-height: var(--yohu-text-field-line);
+}
+
+.yohu-search__input::placeholder {
+  color: var(--yohu-fg-3);
+}
+
+.yohu-search__input[type="search"]::-webkit-search-cancel-button,
+.yohu-search__input[type="search"]::-webkit-search-decoration {
+  appearance: none;
+}
+
+.yohu-search__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: pointer;
+}
+
+.yohu-search__clear:hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}
+
+.yohu-search[data-disabled] .yohu-search__control {
+  --yohu-corner-fill: var(--yohu-surface-2);
+  --yohu-search-edge: var(--yohu-border);
+}
+
+.yohu-search[data-disabled] .yohu-search__input,
+.yohu-search[data-disabled] .yohu-search__affix {
+  color: var(--yohu-disabled);
+  cursor: not-allowed;
+}

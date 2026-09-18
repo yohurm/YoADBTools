@@ -139,6 +139,35 @@ export type {
   AddressScrollPin,
 } from "./form/address-field-model";
 
+export {
+  YoSearch,
+  createSearchEngine,
+  expandSearchGroups,
+  mergeSearchRanges,
+  normalizeSearchQuery,
+  searchDocuments,
+  searchFieldHit,
+  searchHighlightRanges,
+  tokenizeSearchQuery,
+} from "./search";
+export type {
+  YoSearchCancel,
+  YoSearchControl,
+  YoSearchProps,
+  YoSearchSlot,
+  YoSearchStatus,
+  SearchCombine,
+  SearchDocument,
+  SearchEmpty,
+  SearchEngine,
+  SearchField,
+  SearchHit,
+  SearchHitKind,
+  SearchMatch,
+  SearchOptions,
+  SearchRange,
+} from "./search";
+
 export { YoProgressBar } from "./display/ProgressBar";
 export type { YoProgressBarProps } from "./display/ProgressBar";
 

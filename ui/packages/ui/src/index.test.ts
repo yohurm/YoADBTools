@@ -24,6 +24,7 @@ const YO_PUBLIC = [
   "YoListItem",
   "YoDescriptionList",
   "YoAddressField",
+  "YoSearch",
   "YoProgressBar",
   // 容器 / 列表 / 滚动 / 栅格 / 导航
   "YoToolbar",
@@ -77,6 +78,16 @@ const ADDRESS_PUBLIC = [
   "isAddressVacantClick",
 ] as const;
 
+const SEARCH_PUBLIC = [
+  "createSearchEngine",
+  "expandSearchGroups",
+  "normalizeSearchQuery",
+  "searchDocuments",
+  "searchFieldHit",
+  "searchHighlightRanges",
+  "tokenizeSearchQuery",
+] as const;
+
 describe("@yohu/ui 公开组件清单", () => {
   it("分组导出的 Yo* 均为函数", () => {
     for (const name of YO_PUBLIC) {
@@ -89,9 +100,12 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(ui.YoTitleBar).toBeTypeOf("function");
   });
 
-  it("公开地址策略与 YoRail", () => {
+  it("公开地址策略、搜索引擎与 YoRail", () => {
     expect(ui.YoRail).toBeTypeOf("function");
     for (const name of ADDRESS_PUBLIC) {
+      expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
+    }
+    for (const name of SEARCH_PUBLIC) {
       expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
     }
   });
@@ -240,12 +254,28 @@ describe("@yohu/ui 公开组件清单", () => {
       "textFieldHostAttrs",
       "DEFAULT_TEXT_FIELD_STATUS",
       "DEFAULT_TEXT_FIELD_ROWS",
+      "searchHostAttrs",
+      "resolveSearchSlot",
+      "searchShowsEntry",
+      "searchShowsBar",
+      "resolveSearchOpen",
+      "resolveSearchCancel",
+      "resolveSearchStatus",
+      "searchPaintKind",
+      "resolveSearchWidth",
+      "searchShowClear",
+      "resolveSearchActive",
+      "searchEntryPressed",
     ] as const;
     for (const name of locked) {
       expect((ui as Record<string, unknown>)[name], name).toBeUndefined();
       expect(index, name).not.toContain(name);
     }
     for (const name of ADDRESS_PUBLIC) {
+      expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
+      expect(index).toContain(name);
+    }
+    for (const name of SEARCH_PUBLIC) {
       expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
       expect(index).toContain(name);
     }
