@@ -30,6 +30,9 @@ pub struct CommandDto {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandStepDto {
     pub template: String,
+    /// 本步 `{n}` 的说明；缺省空。空项不落盘。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<CommandParamDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,9 +42,6 @@ pub struct CommandBlockDto {
     #[serde(default)]
     pub gap_ms: u64,
     pub steps: Vec<CommandStepDto>,
-    /// 全步共享的 `{n}` 说明；缺省空。
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<CommandParamDto>,
 }
 
 /// 命令组下的同级叶子：单条命令或命令块。
@@ -135,13 +135,30 @@ mod tests {
             gap_ms: 1000,
             steps: vec![CommandStepDto {
                 template: "shell echo 1".into(),
+                params: vec![],
             }],
-            params: vec![],
         });
         let json = serde_json::to_value(&block).unwrap();
         assert_eq!(json["kind"], "block");
         assert_eq!(json["gap_ms"], 1000);
         assert_eq!(json["steps"][0]["template"], "shell echo 1");
         assert!(json.get("Block").is_none());
+    }
+
+    #[test]
+    fn leftover_block_params_are_ignored_step_params_keep() {
+        let parsed: LibraryEntryDto = serde_json::from_str(
+            r#"{"kind":"block","id":"b1","name":"自检","gap_ms":0,"params":[{"index":0,"description":"旧并集"}],"steps":[{"template":"ping {0}","params":[{"index":0,"description":"主机"}]}]}"#,
+        )
+        .unwrap();
+        match parsed {
+            LibraryEntryDto::Block(CommandBlockDto { ref steps, .. }) => {
+                assert_eq!(steps[0].params[0].description, "主机");
+            }
+            LibraryEntryDto::Command(_) => panic!("expected block"),
+        }
+        let json = serde_json::to_value(&parsed).unwrap();
+        assert!(json.get("params").is_none());
+        assert_eq!(json["steps"][0]["params"][0]["description"], "主机");
     }
 }
