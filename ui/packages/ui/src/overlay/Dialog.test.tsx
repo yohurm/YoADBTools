@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
+import { YoButton } from "../basic/Button";
 import { YoDialog } from "./Dialog";
 import { YoScroller } from "../scroll/Scroller";
 
@@ -89,6 +90,32 @@ describe("YoDialog", () => {
     ));
     fireEvent.click(dialogRoot().querySelector(".yohu-dialog__backdrop") as HTMLElement);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("footer 钮 disabled 跟随信号，点击不丢", () => {
+    const [blocked, setBlocked] = createSignal(true);
+    const onCreate = vi.fn();
+    render(() => (
+      <YoDialog
+        open
+        onClose={() => {}}
+        footer={
+          <YoButton disabled={blocked()} onClick={onCreate}>
+            创建
+          </YoButton>
+        }
+      >
+        <button type="button" onClick={() => setBlocked(false)}>
+          pick
+        </button>
+      </YoDialog>
+    ));
+    const createBtn = screen.getByRole("button", { name: "创建" }) as HTMLButtonElement;
+    expect(createBtn.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "pick" }));
+    expect(createBtn.disabled).toBe(false);
+    fireEvent.click(createBtn);
+    expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
   it("渲染 footer 按钮区", () => {

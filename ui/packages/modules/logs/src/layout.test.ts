@@ -89,6 +89,8 @@ describe("日志表头布局契约", () => {
     expect(dialog).not.toContain("YoFormRow");
     expect(dialog).not.toMatch(/<YoSegmentedButton[\s\S]*?\bblock\b/);
     expect(logsCss).toMatch(/\.yohu-logs__new-list\s*\{[^}]*flex-direction:\s*column/);
+    expect(dialog).toContain("onSubmit");
+    expect(dialog).toContain("onCreated");
     expect(dialog).not.toContain("yohu-logs__new-empty");
     expect(dialog).not.toContain("yohu-logs__new-hint");
     expect(dialog).not.toContain("yohu-logs__new-error");
@@ -232,6 +234,7 @@ describe("日志显示列", () => {
     expect(view).toContain("layout: docLayout");
     expect(doc).toContain("layout={bind.layout}");
     expect(view).not.toContain("layout={docLayout()}");
+    expect(view).toContain("onCreated={beginCapture}");
     expect(view).toContain("onCleanup(() => toaster.destroy())");
     expect(view).not.toContain("Toast.success");
   });

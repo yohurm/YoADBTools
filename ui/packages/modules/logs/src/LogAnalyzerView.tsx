@@ -550,6 +550,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       <NewSessionDialog
         open={newOpen}
         onClose={() => setNewOpen(false)}
+        onCreated={beginCapture}
         devices={props.devices}
         focusSerial={props.focusSerial}
       />
