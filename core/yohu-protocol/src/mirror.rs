@@ -64,6 +64,25 @@ pub struct MirrorInjectRequest {
     pub message: MirrorControlMessage,
 }
 
+/// 舞台指针（与 `mirror.layout` 同一套主窗客户区物理坐标）。UI 不算 dest。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MirrorPointerKind {
+    Down,
+    Move,
+    Up,
+    Leave,
+}
+
+/// `mirror.pointer`：HWND 不参与命中，操作由 avail 上报。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirrorPointer {
+    pub serial: String,
+    pub kind: MirrorPointerKind,
+    pub x: i32,
+    pub y: i32,
+}
+
 /// 舞台内容模式（壳 chrome 仍用）。文案与色值在壳 chrome，不进 layout。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -223,5 +242,24 @@ mod tests {
         let layout: MirrorLayout = serde_json::from_value(v).expect("layout");
         assert_eq!(layout.dpr, 1.0);
         assert!(layout.error.is_empty());
+    }
+
+    #[test]
+    fn pointer_kind_is_snake_case() {
+        let p = MirrorPointer {
+            serial: "S1".into(),
+            kind: MirrorPointerKind::Down,
+            x: 10,
+            y: 20,
+        };
+        assert_eq!(
+            serde_json::to_value(&p).unwrap(),
+            serde_json::json!({
+                "serial": "S1",
+                "kind": "down",
+                "x": 10,
+                "y": 20
+            })
+        );
     }
 }
