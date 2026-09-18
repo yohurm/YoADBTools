@@ -350,11 +350,11 @@ title / description / note / children
 
 ## 模块：YoSearch（`search/`，独立）
 
-公共检索模块，**不是** `yohu-domain`、**不是** `@yohu/api`、**不是** form 族里一个文件。对照 `motion/` / `corner/`：自己的目录、内部分层、模块 `index.ts` 才是 API。算法权威在 `core/yohu-search`（与 `yohu-motion` 并列，零产品类型）；本目录镜像 testdata。禁止命令库 / logcat / 路径进引擎。
+公共检索模块，**不是** `yohu-domain`、**不是** `@yohu/api`、**不是** form 族里一个文件。对照 `motion/` / `corner/`：自己的目录、内部分层、模块 `index.ts` 才是 API。算法权威在 `core/yohu-search`（与 `yohu-motion` 并列，零产品类型）；本目录镜像 testdata 与 `data/pinyin.tsv`。禁止命令库 / logcat / 路径进引擎。拼音在引擎内（全拼 / 音节前缀 / 首字母），禁止模块自写一份。
 
 ```
 产品模块文档表 / query
-  → engine/token · field · score · query · expand · highlight · engine
+  → engine/token · pinyin · field · score · query · expand · highlight · engine
   → search-policy（slot / open / cancel / paint / fill）
   → Search.tsx（入口钮 + 栏；折叠走 YoCollapse）
   → search/index.ts → @yohu/ui L5
@@ -362,7 +362,7 @@ title / description / note / children
 
 | 层 | 位置 | 职责 |
 |----|------|------|
-| 引擎 | `search/engine/{types,token,chars,field,score,query,expand,highlight,engine}.ts` | 归一 / 分词 / 字段命中 / 加权 / 检索 / 组扩展 / 高亮 / 快照。`chars` 不进公开面 |
+| 引擎 | `search/engine/{types,token,chars,pinyin,field,score,query,expand,highlight,engine}.ts` | 归一 / 分词 / 拼音 / 字段命中 / 加权 / 检索 / 组扩展 / 高亮 / 快照。`chars` / `pinyin` 不进公开面 |
 | 铬策略 | `search-policy.ts` | 入口与栏槽、折叠开闭、CancelButtonStyle、data-* |
 | 铬视图 | `Search.tsx` + `Search.css` | HarmonyOS Search：左图标、右 INPUT 清除、可折叠；不是 TextField 叠 prefix |
 | API | `search/index.ts` | 只转发引擎公开函数 + `YoSearch` |

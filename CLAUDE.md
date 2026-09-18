@@ -7,7 +7,7 @@
 - 架构：`docs/architecture/README.md`（分层/IPC/模块/ADR-v6-001～029）；右键菜单见 `docs/architecture/右键菜单-v6.md`
 
 ## 技术栈
-- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）∥ `yohu-motion`（时长/曲线；Windows DComp 采样，仅壳消费）∥ `yohu-search`（目录级检索引擎，零产品类型）← `yohu-domain`（命令库/安全根/过滤；禁止持检索引擎）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）。`yohu-motion` / `yohu-search` 禁止进 runtime 与 domain，禁止含启动 overlay / 投屏 clip
+- **核心**：Rust（tokio），Cargo workspace：`yohu-runtime`（进程/原子写/OS 根）∥ `yohu-protocol`（wire，零 IO）∥ `yohu-motion`（时长/曲线；Windows DComp 采样，仅壳消费）∥ `yohu-search`（目录级检索引擎：分词/命中/拼音/评分/组扩展/高亮，零产品类型）← `yohu-domain`（命令库/安全根/过滤；禁止持检索引擎）← `yohu-adb`（设备运输）← `yohu-logsrv` / `yohu-files` / `yohu-mirror`；`yohu-update` 只依赖 protocol+runtime。**core 零 Tauri 依赖**（ADR-v6-005）。`yohu-motion` / `yohu-search` 禁止进 runtime 与 domain，禁止含启动 overlay / 投屏 clip
 - **桌面壳**：Tauri 2（窗口/sidecar/升级；IPC = invoke 命令 + 批量事件）；`app/yohu-adbtools` 是唯一引用 Tauri 的 crate；`commands/` 只转发，编排在 `device_catalog` / `library_store` / `group_runs`；设备运行时状态在 `yohu-adb::DeviceStatusHub`
 - **UI**：TypeScript + SolidJS + Vite，pnpm workspace（`--filter`，含 `ui/turbo.json` 任务声明）：`@yohu/api`（类型化 IPC）→ `@yohu/ui`（YoUI）→ `@yohu/workbench`（壳）+ `@yohu/modules/*`
 - **组件库**：YoUI / `@yohu/ui` 第一公民（公开组件 `Yo*` 标注；token 单源；lint 禁硬编码色值/字号/动效时长/圆角）；见 `docs/architecture/youi.md`
@@ -46,7 +46,7 @@ core/
 ├── yohu-runtime/                       # 宿主：process / persist / os_paths（零产品类型）
 ├── yohu-protocol/                      # wire 类型（serde，无 IO）：DeviceInfo/LogLine/LogBatch/AppEvent…
 ├── yohu-motion/                        # 动效原语：时长/曲线；Windows 时钟与 DComp 采样（零产品 HWND、零 Tauri）
-├── yohu-search/                        # 检索引擎：分词/命中/评分/组扩展/高亮（零产品类型、零 Tauri、零 domain）
+├── yohu-search/                        # 检索引擎：分词/命中/拼音/评分/组扩展/高亮（零产品类型、零 Tauri、零 domain）
 ├── yohu-domain/                        # 纯领域：命令库/GroupExecutor/RemotePath/SafetyRoot/设置模型
 ├── yohu-adb/                           # ADB 客户端：tool(sidecar)/client/parse/DeviceStatusHub（进程在 runtime）
 ├── yohu-logsrv/                        # 采集服务：CaptureService/RingBuffer/Batcher/ProcessIndexService

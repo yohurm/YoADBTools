@@ -1,12 +1,13 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.63（2026-09-18，YoSearch 独立模块）
+> **状态：** v3.64（2026-09-18，YoSearch 拼音）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.64 变更（YoSearch 拼音）：** 检索引擎对汉字走全拼 / 音节前缀 / 首字母（`ü`→`v`）。权威在 `yohu-search` `data/pinyin.tsv`；YoUI 镜像同一份。高亮回标汉字区间。禁止模块自写拼音。见 [youi.md](youi.md)。
 > **v3.63 变更（YoSearch 独立模块）：** 检索引擎从 form / domain / api 单文件拆出。权威在 `core/yohu-search`；YoUI `search/` 自持引擎分层 + 铬 + 模块 API。产品模块只接线。见 [youi.md](youi.md)。
 > **v3.62 变更（Yo 搜索引擎）：** 当时 `@yohu/ui` 把引擎塞进 `form/search-model`。现收进独立 `search/` 模块，见 v3.63。
 > **v3.61 变更（命令库折叠搜索）：** 当时命令库栏标题右侧搜索钮走 HarmonyOS Symbol `hm-search`。现收进 `YoSearch` 入口槽，见 v3.62。

@@ -36,7 +36,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 |-------|------|------|
 | `yohu-runtime` | `process` / `persist` / `os_paths` | 产品类型、设备路径、HTTP、Tauri |
 | `yohu-motion` | MotionSpec 时长/曲线；Windows 合成器时钟与 `IDCompositionAnimation` 采样 | 产品 HWND 树、Tauri、wire、设备 |
-| `yohu-search` | 目录级检索引擎（分词 / 命中 / 评分 / 组扩展 / 高亮） | 产品类型、命令库、logcat、路径、Tauri、domain |
+| `yohu-search` | 目录级检索引擎（分词 / 命中 / 拼音 / 评分 / 组扩展 / 高亮） | 产品类型、命令库、logcat、路径、Tauri、domain |
 | `yohu-protocol` | serde DTO、身份、事件名 | IO、判定、正则 |
 | `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri、检索引擎 |
 | `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、实现 `Runner` | 日志会话、文件浏览用例、投屏 demux |
@@ -60,7 +60,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 
 ## `yohu-search`
 
-与 runtime / protocol / motion 并列，互不依赖。公开面是分词 / 字段命中 / 文档检索 / 组扩展 / 高亮 / `SearchEngine`。YoUI `search/engine` 镜像 `testdata/search.json`。内存线性扫描，不做倒排、不做编辑距离。下标按 Unicode 标量。禁止产品类型、命令库、logcat、路径、Tauri、进 domain。产品模块只把 DTO 编成 `SearchDocument`。
+与 runtime / protocol / motion 并列，互不依赖。公开面是分词 / 字段命中 / 文档检索 / 组扩展 / 高亮 / `SearchEngine`。汉字另走全拼 / 音节前缀 / 首字母（`ü`→`v`，表在 `data/pinyin.tsv`）。YoUI `search/engine` 镜像 `testdata/search.json` 与拼音表。内存线性扫描，不做倒排、不做编辑距离。下标按 Unicode 标量。禁止产品类型、命令库、logcat、路径、Tauri、进 domain。产品模块只把 DTO 编成 `SearchDocument`。
 
 ## 产品规则镜像
 
