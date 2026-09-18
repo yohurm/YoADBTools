@@ -6,15 +6,16 @@
 
 import type { Component } from "solid-js";
 
-import type { DeviceSession } from "@yohu/api";
+import type { DeviceSession, SelectionMode } from "@yohu/api";
 import type { IconName } from "@yohu/ui";
+
+export type { SelectionMode };
 
 /** 模块对设备的选择模式（与 core yohu-domain::SelectionMode 一致；目标解析见 resolveTargetSerials）。
  *  none：不消费设备。singleRequired：轨单击；执行目标=在线焦点。
  *  multiOptional：轨可加选；执行目标=勾选∩在线，空则回退焦点（仅终端并行）。
  *  日志多窗口绑设备走会话模型，轨用 singleRequired。
  */
-export type SelectionMode = "none" | "singleRequired" | "multiOptional";
 
 /** 导航分区：workspace=模块列表；system=侧栏底栏（设置，与模块横线隔开）。 */
 export type ModuleKind = "workspace" | "system";
