@@ -101,7 +101,7 @@ describe("YoVirtualList", () => {
     expect(container.querySelector(".yohu-virtual-list")?.classList.contains("yohu-scroller")).toBe(false);
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
     expect(src).toContain("from \"./Scroller\"");
-    expect(src).toContain('state="on"');
+    expect(src).not.toContain('state="on"');
     expect(src).not.toContain("onWheel");
     expect(src).not.toContain("resolveScrollerWheelDelta");
     expect(src).not.toContain("scrollHeight");
@@ -109,6 +109,7 @@ describe("YoVirtualList", () => {
     expect(src).toContain("scrollToEnd");
     expect(src).toContain("scrollTo(");
     expect(src).toContain("virtualNearestScrollTop");
+    expect(src).toContain("virtualContentWidth");
     expect(src).toContain("preventScroll: true");
     expect(src).not.toContain("scrollIntoView");
   });

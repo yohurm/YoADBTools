@@ -48,12 +48,13 @@ describe("L3 recipe CSS", () => {
     expect(css).toContain("yohu-recipe-tree-chevron--open");
   });
 
-  it("scroller 滑块只过渡透明度与 Hover 色", () => {
+  it("scroller 滑块只过渡透明度、Hover 色与 GROW 宽", () => {
     const css = loadMotionLayerCss("recipes/scroller.css");
     expect(css).toContain(".yohu-scroller__thumb");
     expect(css).toContain("opacity var(--yohu-motion-effects-enter)");
     expect(css).toContain("opacity var(--yohu-motion-effects-exit)");
     expect(css).toContain("background-color var(--yohu-motion-effects-fast)");
+    expect(css).toContain("width var(--yohu-motion-effects-fast)");
     expect(css).not.toContain("height");
     expect(css).not.toContain("transform");
   });

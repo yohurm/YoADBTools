@@ -34,11 +34,13 @@ describe("YoScroller", () => {
     const css = load("src/scroll/Scroller.css");
     expect(css).toContain("flex-direction: column");
     expect(css).toContain('[data-gutter="on"] > .yohu-scroller__view');
-    expect(css).toContain("padding-inline-end: var(--yohu-space-sm)");
+    expect(css).toContain("padding-inline-end: var(--yohu-space-lg)");
     expect(css).toContain("inset-inline-end: 0");
-    expect(css).toContain("width: var(--yohu-space-sm)");
+    expect(css).toContain(".yohu-scroller__lane");
+    expect(css).toContain("width: var(--yohu-space-lg)");
     expect(css).toContain("inset-inline-end: var(--yohu-space-xs)");
     expect(css).toContain("width: var(--yohu-space-xs)");
+    expect(css).toContain("width: var(--yohu-space-sm)");
     expect(css).toContain("background-color: var(--yohu-fg-3)");
     expect(css).toContain(".yohu-scroller__view {");
     expect(css).toContain("overflow-x: clip");
@@ -84,6 +86,7 @@ describe("YoScroller", () => {
     expect(binder).toContain("resolveScrollerWheelDelta");
     expect(binder).toContain("resolveScrollerPageTop");
     expect(binder).toContain("SCROLLER_AUTO_HIDE_MS");
+    expect(binder).toContain("SCROLLER_PAGE_HOLD_MS");
     expect(binder).toContain("SCROLLER_PAGE_REPEAT_MS");
     expect(binder).toContain("onWheel");
     expect(binder).toContain("lastThumb");

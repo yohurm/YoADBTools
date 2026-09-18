@@ -51,7 +51,7 @@ describe("YoColFrame 侧轨", () => {
   it("清单溢出让出侧轨时表头跟 gutter 对齐，不写 scrollbar-gutter", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
     expect(css).toContain(':has(.yohu-scroller[data-gutter="on"])');
-    expect(css).toContain("padding-inline-end: var(--yohu-space-sm)");
+    expect(css).toContain("padding-inline-end: var(--yohu-space-lg)");
     expect(css).not.toMatch(/scrollbar-gutter\s*:/);
   });
 });

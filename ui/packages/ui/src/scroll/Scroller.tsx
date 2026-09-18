@@ -1,7 +1,8 @@
 /**
  * YoScroller —— 公共滚条（L4）。
  * 对照 OpenHarmony Scroll + ScrollBar：一对一；无法滚动不显示；系统条不进盒。
- * 内置条 overlay。溢出时视口 padding-inline-end 让出 8vp（data-gutter），条叠在槽里。
+ * 内置条 overlay。溢出时视口 padding-inline-end 让出 16vp（data-gutter，官方 hoverWidth），条叠在槽里。
+ * Hover/Press GROW 4vp→8vp。默认 BarState.Auto。
  * 禁止侧轨进交叉轴夺滚动口宽。
  * 只组合 binder：订 traveling()（Travel / Collapse / Grow / Rail）、写 attrs、开槽。度量/手势/相位定时在 scroller-binder。
  * 不知道 Dialog / Chip / Reveal。

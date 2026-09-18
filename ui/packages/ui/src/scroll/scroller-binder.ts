@@ -23,6 +23,7 @@ import {
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
   SCROLLER_AUTO_HIDE_MS,
+  SCROLLER_PAGE_HOLD_MS,
   SCROLLER_PAGE_REPEAT_MS,
   type ScrollerBarState,
   type ScrollerPhase,
@@ -78,6 +79,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   let holding = false;
   let pageY = 0;
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
+  let pageHold: ReturnType<typeof setTimeout> | undefined;
   let pageTimer: ReturnType<typeof setInterval> | undefined;
   let ro: ResizeObserver | undefined;
 
@@ -101,6 +103,10 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const stopPage = (): void => {
     paging = false;
+    if (pageHold !== undefined) {
+      clearTimeout(pageHold);
+      pageHold = undefined;
+    }
     if (pageTimer === undefined) return;
     clearInterval(pageTimer);
     pageTimer = undefined;
@@ -353,8 +359,12 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       pageY = event.clientY;
       paging = true;
       pageToward(event.clientY);
-      if (pageTimer !== undefined) clearInterval(pageTimer);
-      pageTimer = setInterval(() => pageToward(pageY), SCROLLER_PAGE_REPEAT_MS);
+      if (paging) {
+        pageHold = setTimeout(() => {
+          pageHold = undefined;
+          pageTimer = setInterval(() => pageToward(pageY), SCROLLER_PAGE_REPEAT_MS);
+        }, SCROLLER_PAGE_HOLD_MS);
+      }
     }
     track.setPointerCapture(event.pointerId);
   };

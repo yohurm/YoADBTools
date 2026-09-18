@@ -1,5 +1,5 @@
 /* 列轨宿主：一条 --yohu-col-tracks 驱动表头与行。
- * 清单溢出让出 8vp 侧轨时，表头跟 data-gutter 对齐。禁止系统条槽。 */
+ * 清单溢出让出 16vp 侧轨时，表头跟 data-gutter 对齐。禁止系统条槽。 */
 
 .yohu-col-frame {
   --yohu-col-tracks: none;
@@ -20,5 +20,5 @@
 }
 
 .yohu-col-frame:has(.yohu-scroller[data-gutter="on"]) > .yohu-col-row {
-  padding-inline-end: var(--yohu-space-sm);
+  padding-inline-end: var(--yohu-space-lg);
 }

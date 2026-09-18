@@ -213,6 +213,11 @@ export function virtualRowBoxStyle(
   };
 }
 
+/** 视口内容宽：clientWidth 含 padding，行 / 投放框 / fill 只吃内容盒，不进侧轨。 */
+export function virtualContentWidth(clientWidth: number, paddingInline = 0): number {
+  return Math.max(0, clientWidth - Math.max(0, paddingInline));
+}
+
 export function virtualIndicatorBox(
   index: number,
   itemHeight: number,

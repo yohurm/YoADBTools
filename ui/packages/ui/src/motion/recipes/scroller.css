@@ -1,11 +1,13 @@
 /*
  * YoScroller 滑块：显隐只走透明度。叠层条不跟 Travel 抢插值。
  * 几何（高/位移）不过渡，跟视口溢出走。对照 ArkUI BarState 用 opacity。
- * Hover/Press 色走 effects-fast。
+ * Hover/Press 色与 GROW 宽走 effects-fast。
  */
 .yohu-scroller__thumb {
   opacity: 0;
-  transition: background-color var(--yohu-motion-effects-fast);
+  transition:
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
 }
 
 .yohu-scroller[data-scroll="in"] .yohu-scroller__thumb,
@@ -13,12 +15,14 @@
   opacity: 1;
   transition:
     opacity var(--yohu-motion-effects-enter),
-    background-color var(--yohu-motion-effects-fast);
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
 }
 
 .yohu-scroller[data-scroll="out"] .yohu-scroller__thumb {
   opacity: 0;
   transition:
     opacity var(--yohu-motion-effects-exit),
-    background-color var(--yohu-motion-effects-fast);
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
 }

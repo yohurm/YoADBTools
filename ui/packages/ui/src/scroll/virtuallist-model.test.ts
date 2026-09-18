@@ -9,6 +9,7 @@ import {
   isVirtualSelectable,
   isVirtualSelectionEmpty,
   virtualActiveKey,
+  virtualContentWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
@@ -138,6 +139,9 @@ describe("virtuallist-model", () => {
       transform: "translate3d(0, 66px, 0)",
     });
     expect(virtualRowBoxStyle(1, 28, 0, false).visibility).toBe("hidden");
+    expect(virtualContentWidth(400)).toBe(400);
+    expect(virtualContentWidth(400, 16)).toBe(384);
+    expect(virtualContentWidth(400, -4)).toBe(400);
     expect(virtualIndicatorBox(3, 22, 400)).toEqual({ x: 0, y: 66, width: 400, height: 22 });
     expect(virtualIndicatorAnchor(["a", "b", "c"], "1", 22, 320)).toEqual({
       x: 0,

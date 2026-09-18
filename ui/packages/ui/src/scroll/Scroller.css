@@ -1,7 +1,8 @@
 /*
  * YoScroller 几何。显隐过渡在 motion.css。
- * 对照 ArkUI：滑块 4vp、距边 4vp、热区 8vp。内置条 overlay，不夺滚动口宽。
- * 溢出且未 Off：视口 padding-inline-end 让出 8vp，内容回流，条叠在这槽里。
+ * 对照 ArkUI：滑块 4vp、距边 4vp、热区 hoverWidth=16vp（active 8 + margin×2）；Hover/Press GROW 到 8vp。
+ * 内置条 overlay，不夺滚动口宽。
+ * 溢出且未 Off：视口 padding-inline-end 让出 16vp，内容回流，条叠在这槽里（不贴内容右沿）。
  * Auto 隐条也留槽，避免跳布局。禁止 flex 兄弟夺视口（焦点会横滚裁首字）。
  * 视口 flex-basis 跟 in-flow 内容；父级有帽才收缩。禁止 1 1 0 把 hug 列表压成 0。
  * 只纵滚：overflow-x clip（不是滚动口），纵轴 hidden（禁止 auto 留系统条）。
@@ -30,14 +31,14 @@
 }
 
 .yohu-scroller[data-gutter="on"] > .yohu-scroller__view {
-  padding-inline-end: var(--yohu-space-sm);
+  padding-inline-end: var(--yohu-space-lg);
 }
 
 .yohu-scroller__lane {
   position: absolute;
   inset-block: 0;
   inset-inline-end: 0;
-  width: var(--yohu-space-sm);
+  width: var(--yohu-space-lg);
   min-height: 0;
   overflow: hidden;
   pointer-events: none;
@@ -60,6 +61,11 @@
   border-radius: var(--yohu-radius-xs);
   background-color: var(--yohu-fg-3);
   touch-action: none;
+}
+
+.yohu-scroller__lane:hover .yohu-scroller__thumb,
+.yohu-scroller__thumb[data-pressed] {
+  width: var(--yohu-space-sm);
 }
 
 .yohu-scroller__lane:hover .yohu-scroller__thumb {

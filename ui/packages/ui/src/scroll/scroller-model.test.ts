@@ -7,8 +7,15 @@ import {
   SCROLLER_AUTO_HIDE_MS,
   SCROLLER_LANE,
   SCROLLER_OVERFLOW_SLACK,
+  SCROLLER_PAGE_HOLD_MS,
   SCROLLER_PAGE_REPEAT_MS,
+  SCROLLER_SMALL_REGION,
+  SCROLLER_THUMB,
+  SCROLLER_THUMB_ACTIVE,
+  SCROLLER_THUMB_END,
   SCROLLER_THUMB_MIN,
+  SCROLLER_THUMB_MIN_RATIO,
+  SCROLLER_THUMB_MIN_SMALL,
   resolveScrollerBarState,
   resolveScrollerFlowChild,
   resolveScrollerFlowSize,
@@ -20,6 +27,7 @@ import {
   resolveScrollerScrollTop,
   resolveScrollerThumb,
   resolveScrollerThumbCoversPointer,
+  resolveScrollerThumbMin,
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
   resolveScrollerClampedTop,
@@ -46,7 +54,11 @@ describe("scroller-model", () => {
   });
 
   it("溢出且未 Off 才让出侧轨，Auto 隐条也留槽", () => {
-    expect(SCROLLER_LANE).toBe(Spacing.Sm);
+    expect(SCROLLER_THUMB_END).toBe(Spacing.Xs);
+    expect(SCROLLER_LANE).toBe(SCROLLER_THUMB_ACTIVE + SCROLLER_THUMB_END * 2);
+    expect(SCROLLER_LANE).toBe(Spacing.Lg);
+    expect(SCROLLER_THUMB + SCROLLER_THUMB_END).toBeLessThan(SCROLLER_LANE);
+    expect(SCROLLER_THUMB_ACTIVE + SCROLLER_THUMB_END).toBeLessThanOrEqual(SCROLLER_LANE);
     expect(resolveScrollerGutter({ overflowing: false })).toBe(false);
     expect(resolveScrollerGutter({ overflowing: true })).toBe(true);
     expect(resolveScrollerGutter({ overflowing: true, barState: "auto" })).toBe(true);
@@ -58,6 +70,7 @@ describe("scroller-model", () => {
     expect(resolveScrollerBarState()).toBe("auto");
     expect(resolveScrollerBarState("on")).toBe("on");
     expect(SCROLLER_AUTO_HIDE_MS).toBe(motionDurationMs("barHide"));
+    expect(SCROLLER_PAGE_HOLD_MS).toBe(500);
     expect(SCROLLER_PAGE_REPEAT_MS).toBe(motionDurationMs("fast"));
     expect(resolveScrollerInteractive()).toBe(true);
     expect(resolveScrollerInteractive(false)).toBe(false);
@@ -90,11 +103,20 @@ describe("scroller-model", () => {
     expect(resolveScrollerPhase({ overflowing: false, traveling: true, prev: "on" })).toBe("out");
   });
 
-  it("滑块高 = 视口² / 内容，最短 IconPreview", () => {
+  it("滑块高 = 视口² / 内容；短轨按官方 20%/8vp 取最短", () => {
+    expect(SCROLLER_THUMB).toBe(Spacing.Xs);
+    expect(SCROLLER_THUMB_ACTIVE).toBe(Spacing.Sm);
     expect(SCROLLER_THUMB_MIN).toBe(Layout.IconPreview);
+    expect(SCROLLER_SMALL_REGION).toBe(Layout.Preview);
+    expect(SCROLLER_THUMB_MIN_SMALL).toBe(Spacing.Sm);
+    expect(SCROLLER_THUMB_MIN_RATIO).toBe(0.2);
+    expect(resolveScrollerThumbMin(0)).toBe(SCROLLER_THUMB_MIN);
+    expect(resolveScrollerThumbMin(80)).toBe(16);
+    expect(resolveScrollerThumbMin(240)).toBe(SCROLLER_THUMB_MIN);
     expect(resolveScrollerThumb({ view: 200, all: 400, top: 0 })).toEqual({ top: 0, height: 100 });
     expect(resolveScrollerThumb({ view: 200, all: 400, top: 200 })).toEqual({ top: 100, height: 100 });
-    expect(resolveScrollerThumb({ view: 80, all: 800, top: 0 })?.height).toBe(SCROLLER_THUMB_MIN);
+    expect(resolveScrollerThumb({ view: 80, all: 800, top: 0 })?.height).toBe(16);
+    expect(resolveScrollerThumb({ view: 400, all: 4000, top: 0 })?.height).toBe(SCROLLER_THUMB_MIN);
   });
 
   it("钉底只认 in-flow 底边", () => {

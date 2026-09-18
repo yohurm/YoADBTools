@@ -6,6 +6,7 @@
  * 泛型组件：`.yohu-virtual-list` 只裁切；纵滚与产品条内组合 YoScroller
  *（视口 overflow hidden，滚轮改 scrollTop）。`__inner` 只撑总高。
  * 与 YoColFrame 表头共用视口：溢出让出侧轨，禁止 scrollbar-gutter。
+ * fill / 投放框宽走视口内容盒（clientWidth 减 gutter padding），不进侧轨。
  * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
  *（absolute + translate3d）。行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
  * 滚动改 transform / data-key / 行 props，不拆行节点。
@@ -56,6 +57,7 @@ import {
   isVirtualSelectable,
   isVirtualSelectionEmpty,
   virtualActiveKey,
+  virtualContentWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
@@ -236,12 +238,22 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       ? undefined
       : virtualIndicatorFollow(selectable(), selectedKeys(), selectedKey());
 
+  const viewContentWidth = (): number => {
+    const el = container;
+    if (!el) return 0;
+    const style = getComputedStyle(el);
+    const pad =
+      (Number.parseFloat(style.paddingInlineStart) || 0) +
+      (Number.parseFloat(style.paddingInlineEnd) || 0);
+    return virtualContentWidth(el.clientWidth, pad);
+  };
+
   const indicatorAnchor = (): IndicatorBox | null =>
     virtualIndicatorAnchor(
       props.items(),
       followKey(),
       itemHeight(),
-      container?.clientWidth ?? 0,
+      viewContentWidth(),
       props.getItemKey,
     );
 
@@ -252,7 +264,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     if (key == null || !container) return null;
     const index = virtualIndexOfKey(props.items(), key, props.getItemKey);
     if (index < 0) return null;
-    return listFrameBox(virtualIndicatorBox(index, itemHeight(), container.clientWidth));
+    return listFrameBox(virtualIndicatorBox(index, itemHeight(), viewContentWidth()));
   };
 
   const rowSnapshot = (row: { index: number; key: string | number }) => {
@@ -574,7 +586,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       aria-multiselectable={host()["aria-multiselectable"]}
     >
       <YoScroller
-        state="on"
         handle={(api) => {
           scrollerHandle = api;
         }}
