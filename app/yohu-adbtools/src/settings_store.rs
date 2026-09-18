@@ -74,6 +74,7 @@ mod tests {
         let _guard = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(false)
             .share_mode(0)
             .open(&path)
             .expect("lock settings file");

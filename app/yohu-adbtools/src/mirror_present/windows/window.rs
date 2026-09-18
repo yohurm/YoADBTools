@@ -1,4 +1,6 @@
 //! 投屏 WS_CHILD：类注册、创建、泵消息、wndproc。不持舞台状态。
+//! HWND 只合成：创建即 `WS_DISABLED`。`WindowFromPoint` 跳过 disabled，
+//! 不会把 `WM_NCHITTEST` 同步派到呈现线程。操作走 `mirror.pointer`。
 
 #![cfg(windows)]
 
@@ -6,28 +8,21 @@ use std::sync::{Mutex, Once};
 
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{
-    GetLastError, ERROR_CLASS_ALREADY_EXISTS, HWND, LPARAM, LRESULT, POINT, WPARAM,
+    GetLastError, ERROR_CLASS_ALREADY_EXISTS, HWND, LPARAM, LRESULT, WPARAM,
 };
-use windows::Win32::Graphics::Gdi::{ScreenToClient, UpdateWindow, ValidateRect};
+use windows::Win32::Graphics::Gdi::{UpdateWindow, ValidateRect};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, LoadCursorW, PeekMessageW, RegisterClassExW,
-    SetCursor, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HTTRANSPARENT,
-    HWND_TOP, IDC_ARROW, MSG, PM_REMOVE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_HIDE,
-    WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_RBUTTONDOWN,
-    WM_RBUTTONUP, WM_SETCURSOR, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_EX_NOACTIVATE,
-    WS_EX_NOREDIRECTIONBITMAP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, LoadCursorW, PeekMessageW,
+    RegisterClassExW, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HWND_TOP,
+    IDC_ARROW, MSG, PM_REMOVE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_HIDE, WM_DESTROY,
+    WM_PAINT, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_DISABLED, WS_EX_NOACTIVATE,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TRANSPARENT,
 };
 
 use crate::limits::{PRESENT_BOOTSTRAP_PX, PRESENT_PUMP_BATCH};
 
-use super::host;
-use super::host::PointerWatch;
-
 const CLASS: PCWSTR = w!("YohuMirrorPresent");
-/// `WM_MOUSELEAVE`（windows 0.61 只在 Controls feature）。
-const WM_MOUSELEAVE: u32 = 0x02A3;
 
 pub fn register_class() -> Result<(), String> {
     static ONCE: Once = Once::new();
@@ -72,10 +67,10 @@ pub fn create_child(owner: HWND) -> Result<HWND, String> {
     unsafe {
         let hinstance = GetModuleHandleW(None).map_err(|e| e.to_string())?;
         let hwnd = CreateWindowExW(
-            WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP,
+            WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TRANSPARENT,
             CLASS,
             w!("Yohu Mirror"),
-            WS_CHILD | WS_CLIPSIBLINGS,
+            WS_CHILD | WS_CLIPSIBLINGS | WS_DISABLED,
             0,
             0,
             PRESENT_BOOTSTRAP_PX as i32,
@@ -123,12 +118,6 @@ unsafe extern "system" fn wnd_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
-        WM_SETCURSOR => {
-            unsafe {
-                let _ = SetCursor(LoadCursorW(None, IDC_ARROW).ok());
-            }
-            LRESULT(1)
-        }
         WM_PAINT => {
             // DXGI Present 会使 HWND 失效。不能 BeginPaint：Present 同步派发
             // WM_PAINT 时会和交换链死锁，呈现线程卡在首帧之后。
@@ -137,55 +126,8 @@ unsafe extern "system" fn wnd_proc(
             }
             LRESULT(0)
         }
-        WM_SIZE => {
-            host::with_host(hwnd, |h| h.sync_host_size(hwnd));
-            LRESULT(0)
-        }
-        WM_NCHITTEST => occupancy_hit_test(hwnd, lparam),
+        WM_SIZE => LRESULT(0),
         WM_DESTROY => LRESULT(0),
-        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_MOUSEMOVE | WM_RBUTTONDOWN | WM_RBUTTONUP => {
-            let x = ((lparam.0 as i32) & 0xFFFF) as i16 as i32;
-            let y = (((lparam.0 as i32) >> 16) & 0xFFFF) as i16 as i32;
-            let watch = host::with_host(hwnd, |h| h.handle_pointer(msg, x, y))
-                .unwrap_or(PointerWatch::None);
-            if watch == PointerWatch::Leave {
-                watch_leave(hwnd);
-            }
-            LRESULT(0)
-        }
-        WM_MOUSELEAVE => {
-            host::with_host(hwnd, |h| h.handle_leave());
-            LRESULT(0)
-        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
-    }
-}
-
-fn occupancy_hit_test(hwnd: HWND, lparam: LPARAM) -> LRESULT {
-    let mut pt = POINT {
-        x: (lparam.0 as u16) as i16 as i32,
-        y: ((lparam.0 >> 16) as u16) as i16 as i32,
-    };
-    unsafe {
-        let _ = ScreenToClient(hwnd, &mut pt);
-    }
-    let inside = host::with_host(hwnd, |h| h.hit_test(pt.x, pt.y)).unwrap_or(true);
-    if inside {
-        unsafe { DefWindowProcW(hwnd, WM_NCHITTEST, WPARAM(0), lparam) }
-    } else {
-        LRESULT(HTTRANSPARENT as isize)
-    }
-}
-
-/// 必须在放下 Host 锁之后调用。USER32 可能同步派消息，持锁再进 wndproc 会卡死呈现泵。
-fn watch_leave(hwnd: HWND) {
-    let mut tme = TRACKMOUSEEVENT {
-        cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
-        dwFlags: TME_LEAVE,
-        hwndTrack: hwnd,
-        dwHoverTime: 0,
-    };
-    unsafe {
-        let _ = TrackMouseEvent(&mut tme);
     }
 }

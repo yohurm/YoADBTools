@@ -15,8 +15,6 @@ use windows::Win32::Graphics::Dxgi::{
 };
 
 use super::d3d::D3dDevice;
-use super::tex::even_px;
-
 pub struct Present {
     device: ID3D11Device,
     context: ID3D11DeviceContext,
@@ -28,8 +26,8 @@ pub struct Present {
 
 impl Present {
     pub fn new(d3d: &D3dDevice, width: u32, height: u32) -> WinResult<Self> {
-        let width = even_px(width);
-        let height = even_px(height);
+        let width = width.max(1);
+        let height = height.max(1);
         let device = d3d.device.clone();
         let context = d3d.context.clone();
         let dxgi: IDXGIDevice = device.cast()?;
@@ -77,7 +75,7 @@ impl Present {
     }
 
     pub fn even_host(width: u32, height: u32) -> (u32, u32) {
-        (even_px(width.max(1)), even_px(height.max(1)))
+        (width.max(1), height.max(1))
     }
 
     pub fn matches_host(&self, width: u32, height: u32) -> bool {
@@ -86,8 +84,8 @@ impl Present {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) -> WinResult<()> {
-        let width = even_px(width);
-        let height = even_px(height);
+        let width = width.max(1);
+        let height = height.max(1);
         if width == self.buf_w && height == self.buf_h {
             return Ok(());
         }

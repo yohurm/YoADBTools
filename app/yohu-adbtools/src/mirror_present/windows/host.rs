@@ -1,4 +1,8 @@
 //! HWND 宿主：交换链 + [`Stage`] + 输入。不持有解码座。
+//!
+//! Host 锁只护 Stage 与 Gpu 所有权。`wndproc` 不进这把锁。
+//! `SetWindowPos` / `ShowWindow` / `ResizeBuffers` / DComp Commit / DXGI Present
+//! 在锁外跑：它们会泵消息，`Mutex` 不能重入。
 
 #![cfg(windows)]
 
@@ -9,27 +13,41 @@ use tokio::sync::mpsc as tokio_mpsc;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetWindowLongPtrW, SetWindowLongPtrW, ShowWindow, GWLP_USERDATA,
-    SW_SHOWNOACTIVATE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_RBUTTONUP,
+    SW_SHOWNOACTIVATE,
 };
 use yohu_mirror::MirrorService;
 use yohu_protocol::{
-    AppEvent, MirrorControlMessage, MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX,
+    AppEvent, MirrorControlMessage, MirrorLayout, MirrorPointerKind, MirrorStageMode,
+    MIRROR_MIN_LAYOUT_PX,
 };
 
 use super::follow::GeomHost;
 use super::gpu::Gpu;
 use super::mf::DecodedPicture;
-use crate::mirror_present::pointer::{PointerGesture, PointerKind, TouchOut, TOUCH_DOWN};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PointerWatch {
-    #[default]
-    None,
-    Leave,
-}
+use crate::mirror_present::pointer::{PointerGesture, PointerKind, TouchOut};
 use crate::mirror_present::scale::map_client_to_video;
-use crate::mirror_present::stage::Stage;
+use crate::mirror_present::stage::{OccupancyMotion, Stage};
 use crate::mirror_present::{screenshot_from_pixels, PresentError};
+
+struct ClipJob {
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+    radius: u32,
+    motion: OccupancyMotion,
+}
+
+struct GpuJob {
+    gpu: Gpu,
+    resize: Option<(u32, u32)>,
+    clip: Option<ClipJob>,
+    replay: Option<(crate::mirror_present::scale::Letterbox, u32)>,
+}
+
+struct Slot {
+    host: Mutex<Host>,
+}
 
 pub struct Host {
     pub stage: Stage,
@@ -88,7 +106,6 @@ impl Host {
             video_h = self.stage.video_size().1,
             "投屏可用区已交给几何宿主"
         );
-        self.place_occupancy();
         if !self.stage.control() {
             self.end_press();
         }
@@ -107,7 +124,14 @@ impl Host {
             generation,
             "投屏解码管道已绑定"
         );
-        self.place_occupancy();
+    }
+
+    /// 表面重建时槽里已有同代画面：直接进 Video，禁止再走 Loading→Fill。
+    pub fn resume_live_frame(&mut self, content_w: u32, content_h: u32) {
+        self.adopt_encoded_size(content_w, content_h);
+        if self.stage.bound() && content_w > 0 && content_h > 0 {
+            self.stage.mark_frame();
+        }
     }
 
     pub fn unbind(&mut self, target: &str) -> bool {
@@ -118,7 +142,6 @@ impl Host {
         let serial = self.stage.serial.clone();
         self.stage.unbind();
         tracing::info!(serial = %serial, "投屏解码管道已解开，舞台改画 chrome");
-        self.place_occupancy();
         true
     }
 
@@ -130,93 +153,28 @@ impl Host {
                 height,
                 "投屏记下 session 内容尺寸"
             );
-            self.place_occupancy();
         }
     }
 
-    pub fn sync_host_size(&mut self, hwnd: HWND) {
-        let mut rc = RECT::default();
-        unsafe {
-            if GetClientRect(hwnd, &mut rc).is_err() {
-                return;
-            }
-        }
-        let w = (rc.right - rc.left).max(0) as u32;
-        let h = (rc.bottom - rc.top).max(0) as u32;
-        if !self.stage.set_host_size(w, h) {
-            return;
-        }
-        {
-            let Some(gpu) = self.gpu.as_mut() else {
-                return;
-            };
-            if w < MIRROR_MIN_LAYOUT_PX || h < MIRROR_MIN_LAYOUT_PX {
-                return;
-            }
-            if !gpu.matches_host(w, h) {
-                if let Err(e) = gpu.resize(w, h) {
-                    tracing::error!(error = %e, w, h, "投屏 swapchain resize 失败");
-                    return;
-                }
-            }
-        }
-        self.clip_occupancy(false);
-        if !self.stage.shows_video() {
-            return;
-        }
-        let dest = self.stage.dest();
-        let letterbox = self.stage.letterbox_argb();
-        if let Some(gpu) = self.gpu.as_mut() {
-            gpu.set_letterbox_argb(letterbox);
-            if let Err(e) = gpu.replay_last(dest) {
-                tracing::debug!(error = %e, "投屏 resize 后重画上一帧失败");
-            }
+    pub fn handle_wire_pointer(&mut self, kind: MirrorPointerKind, x: i32, y: i32) {
+        match kind {
+            MirrorPointerKind::Leave => self.handle_leave(),
+            MirrorPointerKind::Down => self.feed_pointer(PointerKind::Down, x, y),
+            MirrorPointerKind::Move => self.feed_pointer(PointerKind::Move, x, y),
+            MirrorPointerKind::Up => self.feed_pointer(PointerKind::Up, x, y),
         }
     }
 
-    pub fn screenshot(&mut self, path: &str) -> Result<(), PresentError> {
-        let Some(gpu) = self.gpu.as_mut() else {
-            return screenshot_from_pixels(path, None);
-        };
-        let pixels = gpu
-            .screenshot_bgra()
-            .map_err(|e| PresentError::Internal(e.to_string()))?;
-        screenshot_from_pixels(path, pixels)
-    }
-
-    pub fn hit_test(&self, x: i32, y: i32) -> bool {
-        if self.gesture.pressing() {
-            return true;
-        }
-        let d = self.stage.dest();
-        let w = d.width as i32;
-        let h = d.height as i32;
-        x >= d.x && y >= d.y && x < d.x + w && y < d.y + h
-    }
-
-    pub fn handle_pointer(&mut self, msg: u32, x: i32, y: i32) -> PointerWatch {
+    fn feed_pointer(&mut self, kind: PointerKind, x: i32, y: i32) {
         if !self.stage.control() {
             self.end_press();
-            return PointerWatch::None;
+            return;
         }
-        let kind = match msg {
-            WM_LBUTTONDOWN | WM_RBUTTONDOWN => PointerKind::Down,
-            WM_MOUSEMOVE => PointerKind::Move,
-            WM_LBUTTONUP | WM_RBUTTONUP => PointerKind::Up,
-            _ => return PointerWatch::None,
-        };
         let (video_w, video_h) = self.stage.video_size();
         let mapped = map_client_to_video(x, y, self.stage.dest(), video_w, video_h);
-        let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) else {
-            return PointerWatch::None;
-        };
-        let watch = if out.action == TOUCH_DOWN {
-            PointerWatch::Leave
-        } else {
-            PointerWatch::None
-        };
-        self.inject_touch(out);
-        watch
+        if let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) {
+            self.inject_touch(out);
+        }
     }
 
     pub fn handle_leave(&mut self) {
@@ -246,45 +204,47 @@ impl Host {
         });
     }
 
-    fn place_occupancy(&mut self) {
-        let (ax, ay, aw, ah) = self.stage.avail();
+    fn write_geom_visible(&mut self) {
         self.geom
-            .set_occupancy(&self.stage.serial, ax, ay, aw, ah, self.stage.visible());
+            .set_visible(&self.stage.serial, self.stage.visible());
         let (stroke_px, border) = self.stage.panel_stroke();
         let radius = self.stage.corner_radius();
         if let Some(gpu) = self.gpu.as_mut() {
             gpu.set_panel_chrome(radius, stroke_px, border);
         }
-        self.clip_occupancy(true);
     }
 
-    fn clip_occupancy(&mut self, animate: bool) {
-        let (w, h) = self.stage.host_size();
+    fn plan_gpu(&mut self, hwnd: HWND, motion: OccupancyMotion) -> Option<GpuJob> {
+        let (w, h) = client_px(hwnd)?;
+        self.stage.set_host_size(w, h);
         if w < MIRROR_MIN_LAYOUT_PX || h < MIRROR_MIN_LAYOUT_PX {
-            return;
+            return None;
         }
-        let (cx, cy, cw, ch) = self.stage.occupancy();
-        let radius = self.stage.corner_radius();
-        let Some(gpu) = self.gpu.as_mut() else {
-            return;
+        let gpu = self.gpu.take()?;
+        let resize = if gpu.matches_host(w, h) {
+            None
+        } else {
+            Some((w, h))
         };
-        let animate = animate && yohu_motion::motion_allowed();
-        match gpu.set_occupancy_clip(cx, cy, cw, ch, radius, animate) {
-            Ok(true) if animate => tracing::info!(
-                serial = %self.stage.serial,
-                bound = self.stage.bound(),
-                mode = ?self.stage.mode(),
-                video_w = self.stage.video_size().0,
-                video_h = self.stage.video_size().1,
-                clip_x = cx,
-                clip_y = cy,
-                clip_w = cw,
-                clip_h = ch,
-                "投屏占用盒 DComp clip"
-            ),
-            Ok(_) => {}
-            Err(e) => tracing::warn!(error = %e, "投屏占用 clip 失败"),
-        }
+        let (cx, cy, cw, ch) = self.stage.occupancy();
+        let replay = if self.stage.shows_video() {
+            Some((self.stage.dest(), self.stage.letterbox_argb()))
+        } else {
+            None
+        };
+        Some(GpuJob {
+            gpu,
+            resize,
+            clip: Some(ClipJob {
+                x: cx,
+                y: cy,
+                w: cw,
+                h: ch,
+                radius: self.stage.corner_radius(),
+                motion,
+            }),
+            replay,
+        })
     }
 
     fn gpu_matches_host(&self) -> bool {
@@ -297,9 +257,7 @@ impl Host {
         width: u32,
         height: u32,
     ) -> Option<(Gpu, crate::mirror_present::scale::Letterbox, u32)> {
-        if self.stage.set_video_size(width, height) {
-            self.place_occupancy();
-        }
+        let _ = self.stage.set_video_size(width, height);
         if !self.stage.presentable() {
             let (lw, lh) = self.stage.host_size();
             let key = (self.stage.visible(), lw, lh);
@@ -381,20 +339,113 @@ impl Host {
     }
 }
 
-pub fn with_host<R>(hwnd: HWND, f: impl FnOnce(&mut Host) -> R) -> Option<R> {
+fn client_px(hwnd: HWND) -> Option<(u32, u32)> {
+    let mut rc = RECT::default();
+    unsafe {
+        GetClientRect(hwnd, &mut rc).ok()?;
+    }
+    Some((
+        (rc.right - rc.left).max(0) as u32,
+        (rc.bottom - rc.top).max(0) as u32,
+    ))
+}
+
+fn run_gpu_job(mut job: GpuJob) -> Gpu {
+    if let Some((w, h)) = job.resize {
+        if let Err(e) = job.gpu.resize(w, h) {
+            tracing::error!(error = %e, w, h, "投屏 swapchain resize 失败");
+        }
+    }
+    if let Some(c) = job.clip {
+        match job
+            .gpu
+            .set_occupancy_clip(c.x, c.y, c.w, c.h, c.radius, c.motion)
+        {
+            Ok(true) if c.motion.interpolates() => tracing::info!(
+                clip_x = c.x,
+                clip_y = c.y,
+                clip_w = c.w,
+                clip_h = c.h,
+                ?c.motion,
+                spec = ?c.motion.spec(),
+                "投屏占用盒 DComp clip"
+            ),
+            Ok(_) => {}
+            Err(e) => tracing::warn!(error = %e, "投屏占用 clip 失败"),
+        }
+    }
+    if let Some((dest, letterbox)) = job.replay {
+        job.gpu.set_letterbox_argb(letterbox);
+        if let Err(e) = job.gpu.replay_last(dest) {
+            tracing::debug!(error = %e, "投屏 resize 后重画上一帧失败");
+        }
+    }
+    job.gpu
+}
+
+fn finish_gpu(hwnd: HWND, gpu: Gpu) {
+    let _ = with_host(hwnd, |h| h.gpu = Some(gpu));
+}
+
+pub fn follow_host_size(hwnd: HWND) {
+    let job = with_host(hwnd, |h| h.plan_gpu(hwnd, OccupancyMotion::Follow)).flatten();
+    if let Some(job) = job {
+        finish_gpu(hwnd, run_gpu_job(job));
+    }
+}
+
+/// 侧栏只改 DComp clip；HWND 只在主窗客户区变化时 SetWindowPos。
+pub fn flush_occupancy(hwnd: HWND) {
+    let Some((geom, serial, motion)) = with_host(hwnd, |h| {
+        let motion = h.stage.occupancy_motion();
+        h.write_geom_visible();
+        (Arc::clone(&h.geom), h.stage.serial.clone(), motion)
+    }) else {
+        return;
+    };
+    geom.place_owned(&serial);
+    let job = with_host(hwnd, |h| h.plan_gpu(hwnd, motion)).flatten();
+    if let Some(job) = job {
+        finish_gpu(hwnd, run_gpu_job(job));
+    }
+}
+
+pub fn apply_pointer(hwnd: HWND, kind: MirrorPointerKind, x: i32, y: i32) {
+    let _ = with_host(hwnd, |h| h.handle_wire_pointer(kind, x, y));
+}
+
+pub fn screenshot_hwnd(hwnd: HWND, path: &str) -> Result<(), PresentError> {
+    let gpu = with_host(hwnd, |h| h.gpu.take()).flatten();
+    let Some(mut gpu) = gpu else {
+        return screenshot_from_pixels(path, None);
+    };
+    let pixels = gpu
+        .screenshot_bgra()
+        .map_err(|e| PresentError::Internal(e.to_string()));
+    let _ = with_host(hwnd, |h| h.gpu = Some(gpu));
+    screenshot_from_pixels(path, pixels?)
+}
+
+fn slot_of(hwnd: HWND) -> Option<&'static Slot> {
     unsafe {
         let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
         if ptr == 0 {
             return None;
         }
-        let mutex = &*(ptr as *const Mutex<Host>);
-        let mut guard = mutex.lock().ok()?;
-        Some(f(&mut guard))
+        Some(&*(ptr as *const Slot))
     }
 }
 
+pub fn with_host<R>(hwnd: HWND, f: impl FnOnce(&mut Host) -> R) -> Option<R> {
+    let slot = slot_of(hwnd)?;
+    let mut guard = slot.host.lock().ok()?;
+    Some(f(&mut guard))
+}
+
 pub fn install(hwnd: HWND, host: Host) {
-    let state = Box::new(Mutex::new(host));
+    let state = Box::new(Slot {
+        host: Mutex::new(host),
+    });
     unsafe {
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
     }
@@ -407,8 +458,8 @@ pub fn uninstall(hwnd: HWND) -> Option<String> {
         if ptr == 0 {
             return None;
         }
-        let boxed = Box::from_raw(ptr as *mut Mutex<Host>);
-        let host = boxed.into_inner().unwrap_or_else(|p| p.into_inner());
+        let boxed = Box::from_raw(ptr as *mut Slot);
+        let host = boxed.host.into_inner().unwrap_or_else(|p| p.into_inner());
         Some(host.stage.serial)
     }
 }
@@ -421,6 +472,11 @@ pub fn present_picture(
     picture_h: u32,
     picture: DecodedPicture,
 ) -> bool {
+    let size_changed =
+        with_host(hwnd, |h| h.stage.set_video_size(content_w, content_h)).unwrap_or(false);
+    if size_changed {
+        flush_occupancy(hwnd);
+    }
     let prepared = with_host(hwnd, |h| h.prepare_video(content_w, content_h)).flatten();
     let Some((mut gpu, dest, letterbox)) = prepared else {
         return false;
@@ -451,22 +507,23 @@ pub fn present_picture(
 }
 
 pub fn present_chrome(hwnd: HWND, spin: f32) {
-    let Some(draw) = with_host(hwnd, |h| h.prepare_chrome()).flatten() else {
+    let prepared = with_host(hwnd, |h| {
+        let draw = h.prepare_chrome()?;
+        let gpu = h.gpu.take()?;
+        Some((draw, gpu))
+    })
+    .flatten();
+    let Some((draw, mut gpu)) = prepared else {
         return;
     };
     let spec = draw.spec(spin);
-    let ok = with_host(hwnd, |h| match h.gpu.as_mut() {
-        Some(gpu) => {
-            if let Err(e) = gpu.present_chrome(&spec) {
-                tracing::warn!(error = %e, "投屏 chrome Present 失败");
-                false
-            } else {
-                true
-            }
-        }
-        None => false,
-    })
-    .unwrap_or(false);
+    let ok = if let Err(e) = gpu.present_chrome(&spec) {
+        tracing::warn!(error = %e, "投屏 chrome Present 失败");
+        false
+    } else {
+        true
+    };
+    let _ = with_host(hwnd, |h| h.gpu = Some(gpu));
     if ok {
         unsafe {
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);

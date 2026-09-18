@@ -5,11 +5,9 @@ use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
-use yohu_protocol::{AppEvent, MirrorControlMessage, MirrorLayout};
+use yohu_protocol::{AppEvent, MirrorControlMessage, MirrorLayout, MirrorPointerKind};
 
-use super::super::pointer::{
-    PointerGesture, PointerKind, TouchOut, TOUCH_DOWN, TOUCH_MOVE, TOUCH_UP,
-};
+use super::super::pointer::{PointerGesture, PointerKind, TouchOut};
 use super::super::scale::{map_client_to_video, Letterbox};
 use super::super::stage::{stage_copy, stage_palette, stage_type_px, Stage};
 use super::vt::Picture;
@@ -167,8 +165,8 @@ impl Host {
             avail_h,
             dpr: self.stage.dpr(),
             host_h,
-            occ: self.stage.occupancy(),
-            dest: self.stage.dest(),
+            occ: self.stage.occupancy_in_avail(),
+            dest: self.stage.dest_in_avail(),
             content_w,
             content_h,
             radius: self.stage.corner_radius() as f32,
@@ -189,17 +187,20 @@ impl Host {
         }
     }
 
-    pub fn handle_pointer(&mut self, action: u8, x: i32, y: i32) {
+    pub fn handle_wire_pointer(&mut self, kind: MirrorPointerKind, x: i32, y: i32) {
+        match kind {
+            MirrorPointerKind::Leave => self.handle_leave(),
+            MirrorPointerKind::Down => self.feed_parent_pointer(PointerKind::Down, x, y),
+            MirrorPointerKind::Move => self.feed_parent_pointer(PointerKind::Move, x, y),
+            MirrorPointerKind::Up => self.feed_parent_pointer(PointerKind::Up, x, y),
+        }
+    }
+
+    fn feed_parent_pointer(&mut self, kind: PointerKind, x: i32, y: i32) {
         if !self.stage.control() {
             self.end_press();
             return;
         }
-        let kind = match action {
-            TOUCH_DOWN => PointerKind::Down,
-            TOUCH_MOVE => PointerKind::Move,
-            TOUCH_UP => PointerKind::Up,
-            _ => return,
-        };
         let (video_w, video_h) = self.stage.video_size();
         let mapped = map_client_to_video(x, y, self.stage.dest(), video_w, video_h);
         if let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) {
@@ -273,14 +274,4 @@ impl Host {
         }
         self.stage.visible() && self.stage.shows_video()
     }
-}
-
-pub const fn touch_down() -> u8 {
-    TOUCH_DOWN
-}
-pub const fn touch_up() -> u8 {
-    TOUCH_UP
-}
-pub const fn touch_move() -> u8 {
-    TOUCH_MOVE
 }

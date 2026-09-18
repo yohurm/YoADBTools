@@ -6,7 +6,7 @@
 use std::sync::mpsc::Sender;
 
 use yohu_mirror::FramePipe;
-use yohu_protocol::MirrorLayout;
+use yohu_protocol::{MirrorLayout, MirrorPointerKind};
 
 use super::PresentError;
 
@@ -36,6 +36,11 @@ pub enum Cmd {
     Screenshot {
         path: String,
         reply: Sender<Result<(), PresentError>>,
+    },
+    Pointer {
+        kind: MirrorPointerKind,
+        x: i32,
+        y: i32,
     },
     Shutdown,
 }

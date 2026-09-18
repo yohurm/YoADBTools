@@ -1,10 +1,10 @@
-//! 投屏 HWND 几何：铺满舞台 avail。占用卡片由 DComp clip 裁，不改 HWND 尺寸。
+//! 投屏 HWND 几何：铺满主窗客户区。占用卡片只由 DComp clip 裁。
 //!
-//! HWND 是主窗的 **WS_CHILD**。拖动主窗由 USER32 带着走。
-//! WebView 舞台是透明洞。可见卡片是 composition clip（圆角 + 描边），不是窗口外框。
-//! `CreateSwapChainForComposition` 强制 `DXGI_SCALING_STRETCH`：禁止用 `SetWindowPos`
-//! 改子窗尺寸冒充占用过渡（DWM 会拉扁上一帧）。fill↔dest 走 `IDCompositionAnimation`。
-//! 本模块只在 avail / 主窗尺寸变化时 `SetWindowPos`。禁止 `SWP_NOCOPYBITS`；跨线程 `SWP_ASYNCWINDOWPOS`。
+//! HWND 是主窗的 **WS_CHILD**。`CreateTargetForHwnd` 把合成树绑在这块稳定目标上；
+//! 官方用 Visual Offset / RectangleClip，不靠每帧 `SetWindowPos` 跟 CSS 弹簧。
+//! `CreateSwapChainForComposition` 强制 `DXGI_SCALING_STRETCH`：侧栏改 avail 时禁止改子窗尺寸。
+//! 主窗改尺寸由 owner `WM_WINDOWPOSCHANGING` 跨线程 `SWP_ASYNCWINDOWPOS`。
+//! 禁止 `SWP_NOCOPYBITS`。禁止持锁跨 `SetWindowPos`。
 
 #![cfg(windows)]
 
@@ -14,27 +14,20 @@ use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClientRect, GetWindowRect, PostMessageW, SetWindowPos, ShowWindowAsync, HWND_TOP,
-    SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOSIZE, SW_HIDE, WINDOWPOS, WM_APP,
-    WM_NCDESTROY, WM_WINDOWPOSCHANGING,
+    GetClientRect, GetWindowRect, SetWindowPos, ShowWindowAsync, HWND_TOP, SWP_ASYNCWINDOWPOS,
+    SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOSIZE, SW_HIDE, WINDOWPOS, WM_NCDESTROY,
+    WM_WINDOWPOSCHANGING,
 };
 
 use yohu_protocol::MIRROR_MIN_LAYOUT_PX;
 
 const SUBCLASS_ID: usize = 0x594F4855;
-const WM_LAYOUT: u32 = WM_APP + 0x4D;
 
 #[derive(Clone, Copy)]
 struct Slot {
     hwnd: isize,
-    inset_l: i32,
-    inset_t: i32,
-    inset_r: i32,
-    inset_b: i32,
     visible: bool,
     has_cur: bool,
-    cur_x: i32,
-    cur_y: i32,
     cur_w: u32,
     cur_h: u32,
 }
@@ -106,30 +99,31 @@ impl GeomHost {
             .remove(serial);
     }
 
-    /// 可用区相对主窗客户区。HWND 始终铺满该区；占用 contain 不在这里改尺寸。
-    pub fn set_occupancy(
-        &self,
-        serial: &str,
-        x: i32,
-        y: i32,
-        width: u32,
-        height: u32,
-        visible: bool,
-    ) {
+    pub fn set_visible(&self, serial: &str, visible: bool) {
         let mut g = self.inner.lock().expect("geom lock poisoned");
-        let owner = g.owner;
         let Some(slot) = g.slots.get_mut(serial) else {
             return;
         };
         slot.visible = visible;
-        if let Some((cw, ch)) = client_size(owner) {
-            slot.inset_l = x.max(0);
-            slot.inset_t = y.max(0);
-            slot.inset_r = (cw as i32 - x - width as i32).max(0);
-            slot.inset_b = (ch as i32 - y - height as i32).max(0);
-        }
+    }
+
+    /// 子窗铺满主窗客户区。调用方不得持 Host 锁。
+    pub fn place_owned(&self, serial: &str) {
+        let mut g = self.inner.lock().expect("geom lock poisoned");
+        let owner = g.owner;
+        let Some((cw, ch)) = client_size(owner) else {
+            return;
+        };
+        let Some(mut slot) = g.slots.get(serial).copied() else {
+            return;
+        };
+        let cmd = step_slot(&mut slot, cw, ch);
+        g.slots.insert(serial.to_string(), slot);
         drop(g);
-        post_layout(owner);
+        if let Some(PlaceCmd::Pos { w, h, .. }) = cmd {
+            tracing::info!(serial, w, h, "HWND 铺满主窗客户区");
+        }
+        apply_cmd(cmd, PlaceKind::Owned);
     }
 }
 
@@ -137,26 +131,11 @@ impl Slot {
     fn new(hwnd: isize) -> Self {
         Self {
             hwnd,
-            inset_l: 0,
-            inset_t: 0,
-            inset_r: 0,
-            inset_b: 0,
             visible: false,
             has_cur: false,
-            cur_x: 0,
-            cur_y: 0,
             cur_w: 0,
             cur_h: 0,
         }
-    }
-}
-
-fn post_layout(owner: isize) {
-    if owner == 0 {
-        return;
-    }
-    unsafe {
-        let _ = PostMessageW(Some(HWND(owner as *mut _)), WM_LAYOUT, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -190,13 +169,13 @@ fn predicted_client_size(owner: isize, wp: &WINDOWPOS) -> Option<(u32, u32)> {
 
 enum PlaceCmd {
     Hide(isize),
-    Pos {
-        hwnd: isize,
-        x: i32,
-        y: i32,
-        w: u32,
-        h: u32,
-    },
+    Pos { hwnd: isize, w: u32, h: u32 },
+}
+
+#[derive(Clone, Copy)]
+enum PlaceKind {
+    Owned,
+    CrossThread,
 }
 
 fn place_all(host: &GeomHost, client_w: u32, client_h: u32) {
@@ -209,41 +188,30 @@ fn place_all(host: &GeomHost, client_w: u32, client_h: u32) {
             continue;
         };
         if let Some(cmd) = step_slot(&mut slot, client_w, client_h) {
-            if let PlaceCmd::Pos { x, y, w, h, .. } = cmd {
-                logs.push((k.clone(), x, y, w, h));
+            if let PlaceCmd::Pos { w, h, .. } = cmd {
+                logs.push((k.clone(), w, h));
             }
             cmds.push(cmd);
         }
         g.slots.insert(k, slot);
     }
     drop(g);
-    for (serial, x, y, w, h) in logs {
-        tracing::info!(serial = %serial, x, y, w, h, "HWND 铺满 avail");
+    for (serial, w, h) in logs {
+        tracing::info!(serial = %serial, w, h, "HWND 铺满主窗客户区");
     }
     for cmd in cmds {
-        match cmd {
-            PlaceCmd::Hide(hwnd) => unsafe {
-                let _ = ShowWindowAsync(HWND(hwnd as *mut _), SW_HIDE);
-            },
-            PlaceCmd::Pos { hwnd, x, y, w, h } => apply_pos(HWND(hwnd as *mut _), x, y, w, h),
-        }
+        apply_cmd(Some(cmd), PlaceKind::CrossThread);
     }
 }
 
-fn target_rect(slot: &Slot, client_w: u32, client_h: u32) -> Option<(i32, i32, u32, u32)> {
+fn target_size(slot: &Slot, client_w: u32, client_h: u32) -> Option<(u32, u32)> {
     if !slot.visible {
         return None;
     }
-    let zone_w = client_w
-        .saturating_sub(slot.inset_l.max(0) as u32)
-        .saturating_sub(slot.inset_r.max(0) as u32);
-    let zone_h = client_h
-        .saturating_sub(slot.inset_t.max(0) as u32)
-        .saturating_sub(slot.inset_b.max(0) as u32);
-    if zone_w < MIRROR_MIN_LAYOUT_PX || zone_h < MIRROR_MIN_LAYOUT_PX {
+    if client_w < MIRROR_MIN_LAYOUT_PX || client_h < MIRROR_MIN_LAYOUT_PX {
         return None;
     }
-    Some((slot.inset_l, slot.inset_t, zone_w, zone_h))
+    Some((client_w, client_h))
 }
 
 fn step_slot(slot: &mut Slot, client_w: u32, client_h: u32) -> Option<PlaceCmd> {
@@ -252,35 +220,38 @@ fn step_slot(slot: &mut Slot, client_w: u32, client_h: u32) -> Option<PlaceCmd> 
         return None;
     }
     let hwnd = slot.hwnd;
-    let Some((x, y, w, h)) = target_rect(slot, client_w, client_h) else {
+    let Some((w, h)) = target_size(slot, client_w, client_h) else {
         slot.has_cur = false;
         return Some(PlaceCmd::Hide(hwnd));
     };
-    let same =
-        slot.has_cur && slot.cur_x == x && slot.cur_y == y && slot.cur_w == w && slot.cur_h == h;
+    let same = slot.has_cur && slot.cur_w == w && slot.cur_h == h;
     slot.has_cur = true;
-    slot.cur_x = x;
-    slot.cur_y = y;
     slot.cur_w = w;
     slot.cur_h = h;
     if same {
         None
     } else {
-        Some(PlaceCmd::Pos { hwnd, x, y, w, h })
+        Some(PlaceCmd::Pos { hwnd, w, h })
     }
 }
 
-fn apply_pos(hwnd: HWND, x: i32, y: i32, w: u32, h: u32) {
+fn apply_cmd(cmd: Option<PlaceCmd>, kind: PlaceKind) {
+    match cmd {
+        Some(PlaceCmd::Hide(hwnd)) => unsafe {
+            let _ = ShowWindowAsync(HWND(hwnd as *mut _), SW_HIDE);
+        },
+        Some(PlaceCmd::Pos { hwnd, w, h }) => apply_pos(HWND(hwnd as *mut _), w, h, kind),
+        None => {}
+    }
+}
+
+fn apply_pos(hwnd: HWND, w: u32, h: u32, kind: PlaceKind) {
+    let mut flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+    if matches!(kind, PlaceKind::CrossThread) {
+        flags |= SWP_ASYNCWINDOWPOS;
+    }
     unsafe {
-        let _ = SetWindowPos(
-            hwnd,
-            Some(HWND_TOP),
-            x,
-            y,
-            w as i32,
-            h as i32,
-            SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS,
-        );
+        let _ = SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, w as i32, h as i32, flags);
     }
 }
 
@@ -301,12 +272,6 @@ unsafe extern "system" fn subclass_proc(
                     place_all(host, cw, ch);
                 }
             }
-        }
-        WM_LAYOUT => {
-            if let Some((cw, ch)) = client_size(hwnd.0 as isize) {
-                place_all(host, cw, ch);
-            }
-            return LRESULT(0);
         }
         WM_NCDESTROY => unsafe {
             let _ = RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID);

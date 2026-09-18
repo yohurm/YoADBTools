@@ -114,6 +114,11 @@ fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) 
                 .screenshot(&path);
             let _ = reply.send(result);
         }
+        Cmd::Pointer { kind, x, y } => {
+            host.lock()
+                .expect("present lock poisoned")
+                .handle_wire_pointer(kind, x, y);
+        }
         Cmd::Shutdown => {}
     }
 }

@@ -6,7 +6,7 @@
 
 use windows::core::Result as WinResult;
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_F,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1RenderTarget, D2D1_CAP_STYLE_ROUND,
@@ -47,6 +47,7 @@ impl ChromePainter {
         &self,
         context: &ID3D11DeviceContext,
         swapchain: &IDXGISwapChain1,
+        dest: crate::mirror_present::scale::Letterbox,
         spec: &ChromeSpec<'_>,
     ) -> WinResult<()> {
         unsafe {
@@ -69,8 +70,7 @@ impl ChromePainter {
         unsafe {
             rt.BeginDraw();
         }
-        let size = unsafe { rt.GetSize() };
-        draw(&rt, &self.dwrite, size, spec)?;
+        draw(&rt, &self.dwrite, dest, spec)?;
         unsafe {
             rt.EndDraw(None, None)?;
         }
@@ -126,7 +126,7 @@ fn color(c: u32) -> D2D1_COLOR_F {
 fn draw(
     rt: &ID2D1RenderTarget,
     dwrite: &IDWriteFactory,
-    size: D2D_SIZE_F,
+    dest: crate::mirror_present::scale::Letterbox,
     spec: &ChromeSpec<'_>,
 ) -> WinResult<()> {
     let canvas = color(spec.canvas_argb);
@@ -135,18 +135,35 @@ fn draw(
     let icon_c = color(spec.icon_argb);
     let well_c = color(spec.well_argb);
     unsafe {
-        rt.Clear(Some(&canvas));
+        rt.Clear(Some(&D2D1_COLOR_F {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.0,
+        }));
     }
-    let w = size.width.max(1.0);
-    let h = size.height.max(1.0);
+    let left = dest.x as f32;
+    let top = dest.y as f32;
+    let w = dest.width.max(1) as f32;
+    let h = dest.height.max(1) as f32;
+    let panel = D2D_RECT_F {
+        left,
+        top,
+        right: left + w,
+        bottom: top + h,
+    };
+    let canvas_brush = unsafe { rt.CreateSolidColorBrush(&canvas, None)? };
+    unsafe {
+        rt.FillRectangle(&panel, &canvas_brush);
+    }
     let icon = spec.icon_px as f32;
     let title_px = spec.title_px as f32;
     let body_px = spec.body_px as f32;
     let stack = chrome_stack(icon, title_px, body_px);
     let gap = stack.gap;
     let block = stack.block;
-    let mut y = ((h - block) * 0.5).max(0.0);
-    let cx = w * 0.5;
+    let mut y = top + ((h - block) * 0.5).max(0.0);
+    let cx = left + w * 0.5;
     let cy = y + icon * 0.5;
     draw_icon_well(rt, cx, cy, icon * 0.56, &well_c)?;
 
@@ -167,17 +184,17 @@ fn draw(
 
     let title_min = stack.row_min.max(1.0);
     let title_rect = D2D_RECT_F {
-        left: stack.title_inset,
+        left: left + stack.title_inset,
         top: y,
-        right: (w - stack.title_inset).max(stack.title_inset + title_min),
+        right: (left + w - stack.title_inset).max(left + stack.title_inset + title_min),
         bottom: y + stack.title_box,
     };
     draw_text(rt, title, &title_fmt, &title_rect, &title_brush)?;
     y = title_rect.bottom + stack.after_title;
     let desc_rect = D2D_RECT_F {
-        left: stack.body_inset,
+        left: left + stack.body_inset,
         top: y,
-        right: (w - stack.body_inset).max(stack.body_inset + title_min),
+        right: (left + w - stack.body_inset).max(left + stack.body_inset + title_min),
         bottom: y + stack.body_box,
     };
     draw_text(rt, desc, &body_fmt, &desc_rect, &body_brush)?;

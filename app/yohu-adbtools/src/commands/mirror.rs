@@ -5,7 +5,7 @@ use tauri::State;
 use crate::commands::{ipc_mirror, ipc_present};
 use crate::state::AppState;
 use yohu_protocol::{
-    IpcError, MirrorInjectRequest, MirrorLayout, MirrorScreenshotRequest, MirrorStart,
+    IpcError, MirrorInjectRequest, MirrorLayout, MirrorPointer, MirrorScreenshotRequest, MirrorStart,
     MirrorStartRequest,
 };
 
@@ -54,6 +54,12 @@ pub fn mirror_present_set_active(state: State<'_, AppState>, active: bool) -> Re
 #[tauri::command(rename = "mirror.layout")]
 pub async fn mirror_layout(state: State<'_, AppState>, req: MirrorLayout) -> Result<(), IpcError> {
     state.present.layout(req);
+    Ok(())
+}
+
+#[tauri::command(rename = "mirror.pointer")]
+pub fn mirror_pointer(state: State<'_, AppState>, req: MirrorPointer) -> Result<(), IpcError> {
+    state.present.pointer(req);
     Ok(())
 }
 

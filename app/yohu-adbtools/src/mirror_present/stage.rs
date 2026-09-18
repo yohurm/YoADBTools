@@ -3,6 +3,7 @@
 //! 解码是否绑定（`bound`）是管道投影，只在 BindPipe/UnbindPipe 时写入，禁止另开 bool 双轨。
 #![cfg_attr(not(windows), allow(dead_code))]
 
+use yohu_motion::MotionSpec;
 use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
 
 use super::scale::{present_dest, Letterbox};
@@ -96,6 +97,54 @@ pub fn chrome_stack(icon: f32, title: f32, body: f32) -> ChromeStack {
     }
 }
 
+/// 占用盒子种类：铺满 avail，或 contain dest。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OccupancyKind {
+    Fill,
+    Dest,
+}
+
+impl OccupancyKind {
+    pub fn of(bound: bool, video_w: u32, video_h: u32) -> Self {
+        if bound && video_w > 0 && video_h > 0 {
+            Self::Dest
+        } else {
+            Self::Fill
+        }
+    }
+}
+
+/// 占用运动：同 kind 跟 avail；Fill→Dest 与 Dest→Fill 分进场/出场规格。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OccupancyMotion {
+    Follow,
+    FillToDest,
+    DestToFill,
+}
+
+impl OccupancyMotion {
+    pub fn from_kind_change(prev: Option<OccupancyKind>, next: OccupancyKind) -> Self {
+        match (prev, next) {
+            (Some(OccupancyKind::Fill), OccupancyKind::Dest) => Self::FillToDest,
+            (Some(OccupancyKind::Dest), OccupancyKind::Fill) => Self::DestToFill,
+            _ => Self::Follow,
+        }
+    }
+
+    pub fn interpolates(self) -> bool {
+        matches!(self, Self::FillToDest | Self::DestToFill)
+    }
+
+    /// Fill→Dest 是共享容器换形；Dest→Fill 是空态进场，不共用标准曲线。
+    pub fn spec(self) -> Option<MotionSpec> {
+        match self {
+            Self::Follow => None,
+            Self::FillToDest => Some(MotionSpec::SpatialPanel),
+            Self::DestToFill => Some(MotionSpec::SpatialEnter),
+        }
+    }
+}
+
 /// 舞台可见性寿命上的状态（HWND 在）；解码寿命只体现在 `bound` / 画面尺寸。
 pub struct Stage {
     pub serial: String,
@@ -120,6 +169,7 @@ pub struct Stage {
     video_h: u32,
     has_frame: bool,
     mode: MirrorStageMode,
+    last_occupancy_kind: Option<OccupancyKind>,
 }
 
 impl Stage {
@@ -147,6 +197,7 @@ impl Stage {
             video_h: 0,
             has_frame: false,
             mode: MirrorStageMode::Empty,
+            last_occupancy_kind: None,
         }
     }
 
@@ -256,6 +307,7 @@ impl Stage {
         (self.host_w, self.host_h)
     }
 
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub fn avail(&self) -> (i32, i32, u32, u32) {
         (self.avail_x, self.avail_y, self.avail_w, self.avail_h)
     }
@@ -293,19 +345,84 @@ impl Stage {
         (d.x, d.y, d.width, d.height)
     }
 
-    pub fn dest(&self) -> Letterbox {
+    /// 占用盒相对 avail 原点。macOS 舞台洞就是 avail，卡片 frame 用这份。
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub fn occupancy_in_avail(&self) -> (i32, i32, u32, u32) {
+        let (x, y, w, h) = self.occupancy();
+        (x - self.avail_x, y - self.avail_y, w, h)
+    }
+
+    /// 有内容尺寸时 contain(avail)。解绑后 dest 是 Fill；DComp 从上一拍 clip 插值到 avail。
+    pub fn contain_content(&self) -> Letterbox {
+        present_dest(self.avail_w, self.avail_h, self.video_w, self.video_h)
+    }
+
+    /// Fit：contain(avail, 内容)，相对 avail 原点。Compose 不得再算一遍。
+    pub fn fit(&self) -> Letterbox {
         if self.bound && self.video_w > 0 && self.video_h > 0 {
-            present_dest(self.host_w, self.host_h, self.video_w, self.video_h)
+            self.contain_content()
         } else {
             Letterbox {
                 x: 0,
                 y: 0,
-                width: self.host_w.max(1),
-                height: self.host_h.max(1),
+                width: self.avail_w.max(1),
+                height: self.avail_h.max(1),
                 nearest: false,
                 crop_w: 0,
                 crop_h: 0,
             }
+        }
+    }
+
+    pub fn occupancy_kind(&self) -> OccupancyKind {
+        OccupancyKind::of(self.bound, self.video_w, self.video_h)
+    }
+
+    pub fn occupancy_motion(&mut self) -> OccupancyMotion {
+        let next = self.occupancy_kind();
+        let motion = OccupancyMotion::from_kind_change(self.last_occupancy_kind, next);
+        self.last_occupancy_kind = Some(next);
+        motion
+    }
+
+    /// 占用 / Present dest，主窗客户区坐标。Fill=avail；Dest=contain。
+    pub fn dest(&self) -> Letterbox {
+        let fit = self.fit();
+        if self.occupancy_kind() == OccupancyKind::Fill {
+            Letterbox {
+                x: self.avail_x,
+                y: self.avail_y,
+                width: self.avail_w.max(1),
+                height: self.avail_h.max(1),
+                nearest: fit.nearest,
+                crop_w: fit.crop_w,
+                crop_h: fit.crop_h,
+            }
+        } else {
+            Letterbox {
+                x: self.avail_x + fit.x,
+                y: self.avail_y + fit.y,
+                width: fit.width.max(1),
+                height: fit.height.max(1),
+                nearest: fit.nearest,
+                crop_w: fit.crop_w,
+                crop_h: fit.crop_h,
+            }
+        }
+    }
+
+    /// dest 相对 avail 原点。macOS 触控与视频层在 avail 洞内。
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub fn dest_in_avail(&self) -> Letterbox {
+        let d = self.dest();
+        Letterbox {
+            x: d.x - self.avail_x,
+            y: d.y - self.avail_y,
+            width: d.width,
+            height: d.height,
+            nearest: d.nearest,
+            crop_w: d.crop_w,
+            crop_h: d.crop_h,
         }
     }
 
@@ -431,15 +548,16 @@ mod tests {
     }
 
     #[test]
-    fn unbound_occupancy_fills_host() {
+    fn unbound_occupancy_fills_avail() {
         let mut s = Stage::new("S1".into());
         s.apply_layout(&layout());
-        s.set_host_size(900, 950);
+        s.set_host_size(800, 600);
         assert!(!s.bound());
         assert_eq!(s.mode(), MirrorStageMode::Empty);
         assert!(s.shows_chrome());
         assert!(!s.control());
-        assert_eq!(s.occupancy(), (0, 0, 900, 950));
+        assert_eq!(s.occupancy(), (10, 20, 900, 950));
+        assert_eq!(s.occupancy_in_avail(), (0, 0, 900, 950));
         assert_eq!(s.letterbox_argb(), 0xFF202224);
     }
 
@@ -465,11 +583,10 @@ mod tests {
         assert!(s.shows_video());
         assert!(s.control());
         let (x, y, w, h) = s.occupancy();
-        assert_eq!(h, 950);
-        assert!(w < 900);
-        assert!(x > 0);
+        assert_eq!((x, y, w, h), (244, 20, 431, 950));
         let dest = s.dest();
         assert_eq!((dest.x, dest.y, dest.width, dest.height), (x, y, w, h));
+        assert_eq!(s.occupancy_in_avail(), (234, 0, 431, 950));
         assert!(!dest.nearest);
         assert_eq!((dest.width, dest.height), (431, 950));
     }
@@ -477,8 +594,10 @@ mod tests {
     #[test]
     fn dest_is_contain_not_integer_third() {
         let mut s = Stage::new("S1".into());
-        s.apply_layout(&layout());
-        s.set_host_size(1008, 991);
+        let mut l = layout();
+        l.width = 1008;
+        l.height = 991;
+        s.apply_layout(&l);
         s.bind("S1".into(), 1);
         s.set_video_size(1220, 2712);
         s.mark_frame();
@@ -489,8 +608,96 @@ mod tests {
             (occ.0, occ.1, occ.2, occ.3)
         );
         assert_eq!((dest.width, dest.height), (446, 991));
+        assert_eq!(dest.x, 10 + (1008 - 446) / 2);
+        assert_eq!(dest.y, 20);
         assert_eq!((dest.crop_w, dest.crop_h), (1220, 2712));
         assert!(!dest.nearest);
+    }
+
+    #[test]
+    fn layout_avail_recenters_dest_in_parent() {
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        s.bind("S1".into(), 1);
+        s.set_video_size(1088, 2400);
+        let (x1, y1, w1, h1) = s.occupancy();
+        assert_eq!((x1, y1, w1, h1), (244, 20, 431, 950));
+        let mut wider = layout();
+        wider.x = 10 - 152;
+        wider.width = 900 + 152;
+        s.apply_layout(&wider);
+        s.set_host_size(1200, 1000);
+        let (x2, y2, w2, h2) = s.occupancy();
+        assert_eq!((y2, h2), (20, 950));
+        assert_eq!(w2, w1);
+        assert_eq!(x2, -142 + (1052 - w2 as i32) / 2);
+        assert_ne!(x2, x1);
+        assert_eq!(s.occupancy_in_avail(), ((1052 - w2 as i32) / 2, 0, w2, h2));
+    }
+
+    #[test]
+    fn occupancy_kind_is_fill_until_content() {
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        assert_eq!(s.occupancy_kind(), OccupancyKind::Fill);
+        s.bind("S1".into(), 1);
+        assert_eq!(s.occupancy_kind(), OccupancyKind::Fill);
+        s.set_video_size(1088, 2400);
+        assert_eq!(s.occupancy_kind(), OccupancyKind::Dest);
+    }
+
+    #[test]
+    fn occupancy_motion_follows_kind_not_avail() {
+        assert_eq!(
+            OccupancyMotion::from_kind_change(None, OccupancyKind::Fill),
+            OccupancyMotion::Follow
+        );
+        assert_eq!(
+            OccupancyMotion::from_kind_change(Some(OccupancyKind::Fill), OccupancyKind::Dest),
+            OccupancyMotion::FillToDest
+        );
+        assert_eq!(
+            OccupancyMotion::from_kind_change(Some(OccupancyKind::Dest), OccupancyKind::Dest),
+            OccupancyMotion::Follow
+        );
+        assert_eq!(
+            OccupancyMotion::from_kind_change(Some(OccupancyKind::Dest), OccupancyKind::Fill),
+            OccupancyMotion::DestToFill
+        );
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::Follow);
+        s.bind("S1".into(), 1);
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::Follow);
+        s.set_video_size(1088, 2400);
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::FillToDest);
+        let mut wider = layout();
+        wider.width = 1052;
+        s.apply_layout(&wider);
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::Follow);
+        s.unbind();
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::DestToFill);
+        assert_eq!(OccupancyMotion::Follow.spec(), None);
+        assert_eq!(
+            OccupancyMotion::FillToDest.spec(),
+            Some(MotionSpec::SpatialPanel)
+        );
+        assert_eq!(
+            OccupancyMotion::DestToFill.spec(),
+            Some(MotionSpec::SpatialEnter)
+        );
+        assert!(MotionSpec::SpatialEnter.duration_ms() > MotionSpec::SpatialPanel.duration_ms());
+    }
+
+    #[test]
+    fn resume_same_beat_is_follow_not_fill_dest() {
+        let mut s = Stage::new("S1".into());
+        s.apply_layout(&layout());
+        s.bind("S1".into(), 1);
+        s.set_video_size(1088, 2400);
+        s.mark_frame();
+        assert_eq!(s.occupancy_kind(), OccupancyKind::Dest);
+        assert_eq!(s.occupancy_motion(), OccupancyMotion::Follow);
     }
 
     #[test]

@@ -1,4 +1,5 @@
 //! NSView 舞台：铺满 avail；卡片 occupancy + 圆角；画面在 dest。
+//! 视图不参与命中（`hitTest:` 恒空），操作由 avail 走 `mirror.pointer`。
 
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
@@ -6,10 +7,10 @@ use std::sync::{Arc, Mutex};
 use dispatch2::DispatchQueue;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::MainThreadMarker;
+use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSColor, NSEvent, NSFont, NSProgressIndicator, NSProgressIndicatorStyle, NSTextAlignment,
-    NSTextField, NSView, NSWindowOrderingMode,
+    NSColor, NSFont, NSProgressIndicator, NSProgressIndicatorStyle, NSTextAlignment, NSTextField,
+    NSView, NSWindowOrderingMode,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::{kCAGravityResize, CATransaction};
@@ -22,18 +23,31 @@ use super::super::stage::{argb_to_rgba, chrome_stack};
 use super::host::{Host, LayoutSnap};
 use super::vt::ImageRef;
 
+define_class!(
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "YohuMirrorPassView"]
+    struct MirrorPassView;
+
+    impl MirrorPassView {
+        #[unsafe(method(hitTest:))]
+        fn hit_test(&self, _point: NSPoint) -> *mut NSView {
+            std::ptr::null_mut()
+        }
+    }
+);
+
 thread_local! {
     pub(super) static VIEWS: RefCell<Option<Views>> = const { RefCell::new(None) };
 }
 
 pub(super) struct Views {
-    pub(super) root: Retained<NSView>,
+    pub(super) root: Retained<MirrorPassView>,
     card: Retained<NSView>,
     video: Retained<NSView>,
     spin: Retained<NSProgressIndicator>,
     title: Retained<NSTextField>,
     body: Retained<NSTextField>,
-    pub(super) monitor: Option<Retained<AnyObject>>,
     pub(super) host: Arc<Mutex<Host>>,
 }
 
@@ -99,7 +113,9 @@ pub fn attach(owner: isize, host: Arc<Mutex<Host>>) {
             return;
         };
         let min = MIRROR_MIN_LAYOUT_PX as f64;
-        let root = NSView::initWithFrame(mtm.alloc(), ns_rect(0.0, 0.0, min, min));
+        let root: Retained<MirrorPassView> = unsafe {
+            msg_send![MirrorPassView::alloc(mtm), initWithFrame: ns_rect(0.0, 0.0, min, min)]
+        };
         root.setWantsLayer(true);
         let card = NSView::initWithFrame(mtm.alloc(), ns_rect(0.0, 0.0, min, min));
         card.setWantsLayer(true);
@@ -126,17 +142,15 @@ pub fn attach(owner: isize, host: Arc<Mutex<Host>>) {
         card.addSubview(&title);
         card.addSubview(&body);
         parent.addSubview_positioned_relativeTo(&root, NSWindowOrderingMode::Above, Some(&web));
-        let mut views = Views {
+        let views = Views {
             root,
             card,
             video,
             spin,
             title,
             body,
-            monitor: None,
             host,
         };
-        views.install_monitor();
         VIEWS.with(|slot| *slot.borrow_mut() = Some(views));
     });
 }
@@ -145,9 +159,6 @@ pub fn detach() {
     on_main(|| {
         VIEWS.with(|slot| {
             if let Some(views) = slot.borrow_mut().take() {
-                if let Some(mon) = views.monitor.as_ref() {
-                    unsafe { NSEvent::removeMonitor(mon) };
-                }
                 views.root.removeFromSuperview();
             }
         });

@@ -357,6 +357,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::mirror::mirror_close_control,
             commands::mirror::mirror_present_set_active,
             commands::mirror::mirror_layout,
+            commands::mirror::mirror_pointer,
             commands::mirror::mirror_screenshot,
             commands::settings::settings_set,
             commands::system::system_info,

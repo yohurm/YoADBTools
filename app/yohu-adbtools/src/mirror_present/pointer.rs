@@ -28,10 +28,6 @@ pub struct PointerGesture {
 }
 
 impl PointerGesture {
-    pub fn pressing(&self) -> bool {
-        self.pressing
-    }
-
     pub fn feed(
         &mut self,
         kind: PointerKind,
@@ -147,7 +143,7 @@ mod tests {
             .expect("up");
         assert_eq!(up.action, TOUCH_UP);
         assert_eq!((up.x, up.y), (12, 22));
-        assert!(!g.pressing());
+        assert!(!g.pressing);
     }
 
     #[test]
@@ -168,7 +164,7 @@ mod tests {
                 height: 200,
             }
         );
-        assert!(!g.pressing());
+        assert!(!g.pressing);
         assert!(g.feed(PointerKind::Move, None, 100, 200).is_none());
     }
 
@@ -179,7 +175,7 @@ mod tests {
         let up = g.feed(PointerKind::Leave, None, 0, 0).expect("leave");
         assert_eq!(up.action, TOUCH_UP);
         assert_eq!((up.x, up.y), (10, 20));
-        assert!(!g.pressing());
+        assert!(!g.pressing);
     }
 
     #[test]
@@ -195,7 +191,7 @@ mod tests {
     fn down_outside_is_ignored() {
         let mut g = PointerGesture::default();
         assert!(g.feed(PointerKind::Down, None, 100, 200).is_none());
-        assert!(!g.pressing());
+        assert!(!g.pressing);
     }
 
     #[test]

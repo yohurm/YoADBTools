@@ -257,14 +257,11 @@ impl PresentHost {
             );
             return;
         }
-        {
+        if layout_replayable(&layout) {
             let mut inner = self.inner.lock().expect("present lock poisoned");
             inner.last_layout = Some(layout.clone());
         }
-        if !layout.visible
-            || layout.width < MIRROR_MIN_LAYOUT_PX
-            || layout.height < MIRROR_MIN_LAYOUT_PX
-        {
+        if !layout_replayable(&layout) {
             tracing::info!(
                 serial = %layout.serial,
                 visible = layout.visible,
@@ -275,11 +272,11 @@ impl PresentHost {
             self.shutdown();
             return;
         }
-        match self.ensure_surface(&layout.serial) {
+        let created = match self.ensure_surface(&layout.serial) {
             SurfaceEnsure::Failed => return,
-            SurfaceEnsure::Created => self.flush_live_bind(),
-            SurfaceEnsure::Ready => {}
-        }
+            SurfaceEnsure::Created => true,
+            SurfaceEnsure::Ready => false,
+        };
         let tx = {
             let mut inner = self.inner.lock().expect("present lock poisoned");
             inner.stage_serial = Some(layout.serial.clone());
@@ -287,6 +284,31 @@ impl PresentHost {
         };
         if let Some(tx) = tx {
             let _ = tx.send(Cmd::Layout(layout));
+        }
+        // 先 Layout：Stage 可呈现后再 Bind，resume 才能立刻 Present。
+        if created {
+            self.flush_live_bind();
+        }
+    }
+
+    /// avail 上报的指针，主窗客户区物理坐标。HWND 不参与命中。
+    pub fn pointer(&self, req: yohu_protocol::MirrorPointer) {
+        let tx = {
+            let inner = self.inner.lock().expect("present lock poisoned");
+            if !inner.active {
+                return;
+            }
+            if inner.stage_serial.as_deref() != Some(req.serial.as_str()) {
+                return;
+            }
+            inner.surface.clone()
+        };
+        if let Some(tx) = tx {
+            let _ = tx.send(Cmd::Pointer {
+                kind: req.kind,
+                x: req.x,
+                y: req.y,
+            });
         }
     }
 
@@ -431,6 +453,12 @@ enum SurfaceEnsure {
     Failed,
 }
 
+fn layout_replayable(layout: &MirrorLayout) -> bool {
+    layout.visible
+        && layout.width >= MIRROR_MIN_LAYOUT_PX
+        && layout.height >= MIRROR_MIN_LAYOUT_PX
+}
+
 fn send_bind(tx: &Sender<Cmd>, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
     let _ = tx.send(Cmd::BindPipe {
         serial: serial.to_string(),
@@ -500,9 +528,10 @@ fn spawn_backend_surface(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_pending_unbind, assert_screenshot_serial, probe, screenshot_from_pixels,
-        screenshot_host_reply, PresentError,
+        apply_pending_unbind, assert_screenshot_serial, layout_replayable, probe,
+        screenshot_from_pixels, screenshot_host_reply, PresentError,
     };
+    use yohu_protocol::MirrorLayout;
 
     #[test]
     fn screenshot_rejects_mismatched_serial() {
@@ -560,6 +589,33 @@ mod tests {
         let mut live = Some(("A".to_string(), 1u64, ()));
         apply_pending_unbind(&mut live, "B");
         assert_eq!(live.as_ref().map(|(s, ..)| s.as_str()), Some("A"));
+    }
+
+    #[test]
+    fn hidden_layout_is_not_replayable() {
+        let mut layout = MirrorLayout {
+            serial: "S1".into(),
+            x: 10,
+            y: 20,
+            width: 800,
+            height: 600,
+            visible: true,
+            dpr: 1.5,
+            fullscreen: false,
+            paused: false,
+            control: true,
+            has_device: true,
+            failed: false,
+            error: String::new(),
+            dark: false,
+        };
+        assert!(layout_replayable(&layout));
+        layout.visible = false;
+        assert!(!layout_replayable(&layout));
+        layout.visible = true;
+        layout.width = 1;
+        layout.height = 1;
+        assert!(!layout_replayable(&layout));
     }
 
     #[test]

@@ -90,16 +90,36 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
     let mut spin = 0.0_f32;
     loop {
         window::pump_messages(hwnd);
-        host::with_host(hwnd, |h| h.sync_host_size(hwnd));
+        host::follow_host_size(hwnd);
+        let mut live = None;
+        let mut dirty = false;
         match rx.recv_timeout(PRESENT_IDLE) {
             Ok(Cmd::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
-            Ok(cmd) => dispatch(hwnd, cmd, &pictures),
+            Ok(cmd) => {
+                live = dispatch(hwnd, cmd, &pictures);
+                dirty = true;
+            }
             Err(RecvTimeoutError::Timeout) => {}
         }
-        if !drain_cmds(&rx, hwnd, &pictures) {
-            break;
+        match drain_cmds(&rx, hwnd, &pictures, &mut live) {
+            None => break,
+            Some(more) => dirty |= more,
         }
-        host::with_host(hwnd, |h| h.sync_host_size(hwnd));
+        // 一拍 Cmd 排空后再占用：切回 bank 命中是 None→Dest Follow，不是 Fill 后再 FillToDest。
+        if dirty {
+            host::flush_occupancy(hwnd);
+        }
+        if let Some(frame) = live {
+            host::present_picture(
+                hwnd,
+                frame.content_w,
+                frame.content_h,
+                frame.picture_w,
+                frame.picture_h,
+                frame.picture,
+            );
+        }
+        host::follow_host_size(hwnd);
         tick_picture(hwnd, &pictures, &mut pic_seq);
         if host::loading(hwnd) && spin_at.elapsed() >= PRESENT_SPIN_STEP {
             spin_at = Instant::now();
@@ -116,7 +136,7 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
     Ok(())
 }
 
-fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) {
+fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) -> Option<super::slot::ReadyFrame> {
     match cmd {
         Cmd::Layout(layout) => {
             let applied = host::with_host(hwnd, |h| h.apply_layout(hwnd, &layout));
@@ -128,41 +148,68 @@ fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) {
                     "投屏 layout 丢弃：HWND 尚未就绪"
                 );
             }
+            None
         }
         Cmd::BindPipe {
             serial,
             generation,
             pipe: _,
         } => {
-            host::with_host(hwnd, |h| {
-                h.bind(hwnd, serial, generation);
-                if let Some((_, frame)) = pictures.latest() {
-                    h.adopt_encoded_size(frame.content_w, frame.content_h);
+            let live = pictures.latest().and_then(|(_, frame)| {
+                if frame.serial == serial && frame.generation == generation {
+                    Some(frame)
+                } else {
+                    None
                 }
             });
+            host::with_host(hwnd, |h| {
+                h.bind(hwnd, serial, generation);
+                if let Some(frame) = live.as_ref() {
+                    h.resume_live_frame(frame.content_w, frame.content_h);
+                }
+            });
+            live
         }
         Cmd::UnbindPipe { serial } => {
             let _ = host::with_host(hwnd, |h| h.unbind(&serial));
+            None
         }
         Cmd::AdoptContent { width, height } => {
             host::with_host(hwnd, |h| h.adopt_encoded_size(width, height));
+            None
         }
         Cmd::Screenshot { path, reply } => {
-            let result = crate::mirror_present::screenshot_host_reply(host::with_host(hwnd, |h| {
-                h.screenshot(&path)
-            }));
+            let result = crate::mirror_present::screenshot_host_reply(Some(
+                host::screenshot_hwnd(hwnd, &path),
+            ));
             let _ = reply.send(result);
+            None
         }
-        Cmd::Shutdown => {}
+        Cmd::Pointer { kind, x, y } => {
+            host::apply_pointer(hwnd, kind, x, y);
+            None
+        }
+        Cmd::Shutdown => None,
     }
 }
 
-fn drain_cmds(rx: &Receiver<Cmd>, hwnd: HWND, pictures: &PictureBank) -> bool {
+fn drain_cmds(
+    rx: &Receiver<Cmd>,
+    hwnd: HWND,
+    pictures: &PictureBank,
+    live: &mut Option<super::slot::ReadyFrame>,
+) -> Option<bool> {
+    let mut more = false;
     loop {
         match rx.try_recv() {
-            Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return false,
-            Err(TryRecvError::Empty) => return true,
-            Ok(cmd) => dispatch(hwnd, cmd, pictures),
+            Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return None,
+            Err(TryRecvError::Empty) => return Some(more),
+            Ok(cmd) => {
+                more = true;
+                if let Some(frame) = dispatch(hwnd, cmd, pictures) {
+                    *live = Some(frame);
+                }
+            }
         }
     }
 }

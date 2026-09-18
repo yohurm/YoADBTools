@@ -1,4 +1,5 @@
-//! 占用卡片 = DComp rectangle clip。HWND / 交换链保持 avail 尺寸。
+//! 占用卡片是 HWND 上的 DComp clip，坐标相对主窗客户区。
+//! HWND 铺满主窗；clip 只在 Fill→Dest / Dest→Fill 时插值。是否插值只认 [`OccupancyMotion`]。
 
 use std::time::Instant;
 
@@ -11,6 +12,8 @@ use windows::Win32::Graphics::DirectComposition::{
 use windows::Win32::Graphics::Dxgi::{IDXGIDevice, IDXGISwapChain1};
 use yohu_motion::{ease_at, eased_anim, MotionSpec};
 
+use crate::mirror_present::stage::OccupancyMotion;
+
 pub struct DcompTree {
     device: IDCompositionDevice,
     _target: IDCompositionTarget,
@@ -20,6 +23,7 @@ pub struct DcompTree {
     clip_to: (f32, f32, f32, f32),
     clip_radius: f32,
     clip_anim_at: Option<Instant>,
+    clip_spec: MotionSpec,
 }
 
 pub fn attach_dcomp(
@@ -48,6 +52,7 @@ pub fn attach_dcomp(
         clip_to: (-1.0, -1.0, -1.0, -1.0),
         clip_radius: -1.0,
         clip_anim_at: None,
+        clip_spec: MotionSpec::SpatialPanel,
     };
     apply_occupancy_clip(
         &mut tree,
@@ -56,7 +61,7 @@ pub fn attach_dcomp(
         width.max(1) as f32,
         height.max(1) as f32,
         radius,
-        false,
+        OccupancyMotion::Follow,
     )?;
     Ok(tree)
 }
@@ -68,16 +73,14 @@ fn clip_close(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
         && (a.3 - b.3).abs() < 0.5
 }
 
-const OCCUPANCY: MotionSpec = MotionSpec::SpatialPanel;
-
 fn clip_progress(tree: &DcompTree) -> Option<f32> {
     let at = tree.clip_anim_at?;
-    let u =
-        (at.elapsed().as_secs_f32() / (OCCUPANCY.duration_ms() as f32 / 1000.0)).clamp(0.0, 1.0);
+    let u = (at.elapsed().as_secs_f32() / (tree.clip_spec.duration_ms() as f32 / 1000.0))
+        .clamp(0.0, 1.0);
     Some(u)
 }
 
-fn clip_animating(tree: &DcompTree) -> bool {
+pub fn clip_animating(tree: &DcompTree) -> bool {
     clip_progress(tree).is_some_and(|u| u < 1.0)
 }
 
@@ -85,7 +88,7 @@ pub fn clip_now(tree: &DcompTree) -> (f32, f32, f32, f32) {
     let Some(at) = tree.clip_anim_at else {
         return tree.clip_to;
     };
-    let e = ease_at(OCCUPANCY, at.elapsed());
+    let e = ease_at(tree.clip_spec, at.elapsed());
     if e >= 1.0 {
         return tree.clip_to;
     }
@@ -103,8 +106,9 @@ fn animate_scalar(
     device: &IDCompositionDevice,
     from: f32,
     to: f32,
+    spec: MotionSpec,
 ) -> WinResult<IDCompositionAnimation> {
-    eased_anim(device, from, to, OCCUPANCY).ok_or_else(|| windows::core::Error::from(E_FAIL))
+    eased_anim(device, from, to, spec).ok_or_else(|| windows::core::Error::from(E_FAIL))
 }
 
 fn apply_clip_radius(clip: &IDCompositionRectangleClip, r: f32) -> WinResult<()> {
@@ -128,8 +132,10 @@ pub fn apply_occupancy_clip(
     right: f32,
     bottom: f32,
     radius: u32,
-    animate: bool,
+    motion: OccupancyMotion,
 ) -> WinResult<bool> {
+    let spec = motion.spec();
+    let animate = spec.is_some() && yohu_motion::motion_allowed();
     let to = (left, top, right, bottom);
     let r = radius as f32;
     let radius_changed = (tree.clip_radius - r).abs() >= 0.5;
@@ -159,11 +165,11 @@ pub fn apply_occupancy_clip(
     apply_clip_radius(&tree.clip, r)?;
     tree.clip_radius = r;
     unsafe {
-        if animate && !clip_close(from, to) {
-            let left_a = animate_scalar(&tree.device, from.0, to.0)?;
-            let top_a = animate_scalar(&tree.device, from.1, to.1)?;
-            let right_a = animate_scalar(&tree.device, from.2, to.2)?;
-            let bottom_a = animate_scalar(&tree.device, from.3, to.3)?;
+        if let (true, Some(spec)) = (animate && !clip_close(from, to), spec) {
+            let left_a = animate_scalar(&tree.device, from.0, to.0, spec)?;
+            let top_a = animate_scalar(&tree.device, from.1, to.1, spec)?;
+            let right_a = animate_scalar(&tree.device, from.2, to.2, spec)?;
+            let bottom_a = animate_scalar(&tree.device, from.3, to.3, spec)?;
             tree.clip.SetLeft(&left_a)?;
             tree.clip.SetTop(&top_a)?;
             tree.clip.SetRight(&right_a)?;
@@ -171,12 +177,14 @@ pub fn apply_occupancy_clip(
             tree.clip_from = from;
             tree.clip_to = to;
             tree.clip_anim_at = Some(Instant::now());
+            tree.clip_spec = spec;
             tracing::info!(
                 left = to.0,
                 top = to.1,
                 right = to.2,
                 bottom = to.3,
-                "占用盒 DComp clip spatial-panel"
+                ?spec,
+                "占用盒 DComp clip"
             );
         } else {
             tree.clip.SetLeft2(left)?;

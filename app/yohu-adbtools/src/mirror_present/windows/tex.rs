@@ -3,10 +3,6 @@
 use windows::core::Result as WinResult;
 use windows::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11Texture2D, D3D11_TEXTURE2D_DESC};
 
-pub fn even_px(n: u32) -> u32 {
-    n.max(2) & !1
-}
-
 pub fn create_texture(
     device: &ID3D11Device,
     desc: &D3D11_TEXTURE2D_DESC,

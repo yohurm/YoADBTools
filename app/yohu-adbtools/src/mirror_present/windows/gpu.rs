@@ -14,8 +14,7 @@ use super::occupancy::{apply_occupancy_clip, attach_dcomp, clip_now, DcompTree};
 use super::present::Present;
 use super::scale::RgbScale;
 use crate::mirror_present::scale::Letterbox;
-use crate::mirror_present::stage::argb_to_rgba;
-use crate::tokens::STAGE_LIGHT_SURFACE;
+use crate::mirror_present::stage::OccupancyMotion;
 
 pub struct Gpu {
     convert: YuvConvert,
@@ -23,7 +22,6 @@ pub struct Gpu {
     present: Present,
     dcomp: DcompTree,
     chrome: Option<ChromePainter>,
-    letterbox_argb: u32,
     panel_r: u32,
     panel_stroke: f32,
     panel_border: u32,
@@ -42,7 +40,6 @@ impl Gpu {
             present,
             dcomp,
             chrome: None,
-            letterbox_argb: STAGE_LIGHT_SURFACE,
             panel_r: 0,
             panel_stroke: 0.0,
             panel_border: 0,
@@ -50,7 +47,6 @@ impl Gpu {
     }
 
     pub fn set_letterbox_argb(&mut self, argb: u32) {
-        self.letterbox_argb = argb;
         self.convert.set_letterbox_argb(argb);
     }
 
@@ -67,7 +63,12 @@ impl Gpu {
         let Some(painter) = self.chrome.as_ref() else {
             return Err(windows::core::Error::from_win32());
         };
-        painter.present(self.present.context(), self.present.swapchain(), spec)?;
+        painter.present(
+            self.present.context(),
+            self.present.swapchain(),
+            self.visible_card(),
+            spec,
+        )?;
         self.commit_frame()
     }
 
@@ -83,7 +84,7 @@ impl Gpu {
         self.present.resize(width, height)
     }
 
-    /// 占用卡片 = DComp rectangle clip。HWND / 交换链保持 avail 尺寸。
+    /// 占用 clip 用主窗客户区坐标。Fill↔Dest 才插值。
     pub fn set_occupancy_clip(
         &mut self,
         x: i32,
@@ -91,13 +92,13 @@ impl Gpu {
         w: u32,
         h: u32,
         radius: u32,
-        animate: bool,
+        motion: OccupancyMotion,
     ) -> WinResult<bool> {
-        let left = x.max(0) as f32;
-        let top = y.max(0) as f32;
+        let left = x as f32;
+        let top = y as f32;
         let right = left + w.max(1) as f32;
         let bottom = top + h.max(1) as f32;
-        apply_occupancy_clip(&mut self.dcomp, left, top, right, bottom, radius, animate)
+        apply_occupancy_clip(&mut self.dcomp, left, top, right, bottom, radius, motion)
     }
 
     pub fn present_cpu_nv12(
@@ -186,11 +187,11 @@ impl Gpu {
             &srv,
             dest,
             (src_w, src_h),
-            argb_to_rgba(self.letterbox_argb),
+            [0.0, 0.0, 0.0, 0.0],
         )
     }
 
-    fn visible_card(&self) -> Letterbox {
+    pub fn visible_card(&self) -> Letterbox {
         let (left, top, right, bottom) = clip_now(&self.dcomp);
         Letterbox {
             x: left.round() as i32,
