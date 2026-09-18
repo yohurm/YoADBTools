@@ -1,12 +1,17 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.64（2026-09-18，YoSearch 拼音）
+> **状态：** v3.69（2026-09-18，新建窗清单选中底归 VL）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.69 变更（新建窗清单选中底归 VL）：** 包名/PID 清单不再模块自挂 `YoIndicator`，也不走 `tone=list`。选中底由 `YoVirtualList` 默认 document 单选 fill 自持；铬 `YoCorner flex=fill`，列表槽纵向吃剩余。过滤变短后 VL 再量滚轴，收回 16vp 侧轨，禁止选中条右侧留空。禁止 `bodyLead`（确认句居中）。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
+> **v3.68 变更（新建窗设备与划分左右排）：** 设备 `YoSelect block` 与包名/PID 分段同一行：左槽吃剩余，分段 hug 贴尾。禁止再拆成两行，禁止 `YoFormRow` 横排把 Select 收成胶囊。`YoSelectOption.description` 仍是次文案。见 [modules/logs.md](modules/logs.md)。
+> **v3.67 变更（新建窗设备行 stacked Select）：** 当时用 `YoFormRow stacked` 让 Select 铺满。v3.68 起设备与划分共一行，不再单独占一行。`description` 次文案仍有效。见 [youi.md](youi.md)。
+> **v3.66 变更（等宽走 Consolas）：** `--yohu-font-mono` 只走系统字体。对照 AS Logcat 默认 JetBrains Mono，Win10/11 收件箱最接近的是 Consolas（Vista 起）。禁止内嵌 JetBrains Mono。Cascadia Mono 不是 Win10 默认收件箱，不作首项。macOS 回退 Menlo。见 §2.2。
+> **v3.65 变更（日志消息同 ink）：** 已知级别的消息与左条 / 级别字 / Tag 共用 `--yohu-log-ink`（行上 `data-level`）。解析失败仍走 `--yohu-fg`。paint 只留 Fatal `invert`。删除 `tintMessage` / `data-tint-msg`。见 [modules/logs.md](modules/logs.md)。
 > **v3.64 变更（YoSearch 拼音）：** 检索引擎对汉字走全拼 / 音节前缀 / 首字母（`ü`→`v`）。权威在 `yohu-search` `data/pinyin.tsv`；YoUI 镜像同一份。高亮回标汉字区间。禁止模块自写拼音。见 [youi.md](youi.md)。
 > **v3.63 变更（YoSearch 独立模块）：** 检索引擎从 form / domain / api 单文件拆出。权威在 `core/yohu-search`；YoUI `search/` 自持引擎分层 + 铬 + 模块 API。产品模块只接线。见 [youi.md](youi.md)。
 > **v3.62 变更（Yo 搜索引擎）：** 当时 `@yohu/ui` 把引擎塞进 `form/search-model`。现收进独立 `search/` 模块，见 v3.63。
@@ -458,7 +463,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 ### 2.2 排版
 
 - 界面字体：`"Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif`
-- 数据/等宽：`"Cascadia Mono", Consolas, "Courier New", monospace`（`font-variant-numeric: tabular-nums`）
+- 数据/等宽：`"Consolas", Menlo, "Courier New", monospace`（只走系统字体；对照 AS Logcat / JetBrains Mono 的收件箱近似。`font-variant-numeric: tabular-nums`）
 - 字号阶梯（默认 = 鸿蒙 PC）：Caption_M 10 / Caption 12 / Body 14 / BodyStrong 14 / Subtitle_M 14 / Subtitle 16 / Title_S 18；**compact 覆盖** 10 / 11 / 12.5 / 13.5 / 13 / 15 / 18
 - 字重：Light 300 / Regular 400 / Medium 500 / Semibold 600 / Bold 700（Title Bold、Subtitle Medium、Body Regular）
 - 行高：`--yohu-font-leading-tight: 1.25`（铬条/标题）/ `ui: 1.55`（正文）/ `data: 1.4`（日志/serial）
@@ -551,7 +556,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **YoButton 三档：** 公开 `buttonStyle` 对照鸿蒙 EMPHASIZED / NORMAL / TEXTUAL。`tone` 只有 `accent | neutral | danger`（danger = ButtonRole.ERROR）。页眉主操作默认无 props。次要操作 `normal+neutral`。弹出框脚钮：取消 `normal+accent`、破坏 `normal+danger`，建设确认默认强调。禁止脚钮再走 TEXTUAL。禁止再写 `variant` / `outlined` / `data-paint` / Button `success|warning`。禁用背板不变、字 `--yohu-fg-3`。
 - `YoSegmentedButton` 对齐官方三种：页签单选（tab 白选择块 + `shadow-xs` + `fg`）、胶囊单选（accent + `fg-on`）、胶囊多选（`multiple`，共轨连选，再点取消）。选中填缺省强调色，项 `fill` 可覆盖（级别 V–F）。默认 hug，`block` 铺满。`YoIndicator` 在轨内与项同父。电脑小圆角走 `YoCorner` paint。内容：文本 / 图标 / 图片 / 图文（图标在上）。不作一级导航、不承载删除/添加。级别筛选走胶囊多选，见 §4.1。
 - `YoTabs` 激活指示是 `YoIndicator` underline（底边 `--yohu-stroke-accent` 滑块），hover 仍走 ripple；不要把 Tab 激活画成选中填充。
-- 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
+- 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag / 已知级别消息，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
 - **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。`YoVirtualList` `tone=list`（文件清单 / 命令管理中栏）行盒走 `list-row/`：直角通栏，hairline 贴齐左右。`tone=document` 单选（命令管理组栏）选中走 fill 滑块，行上悬浮写 `data-radius=chip`，与滑块同一 `--yohu-ripple-radius`。禁止在 Family B 行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
@@ -596,13 +601,13 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
 - **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 `formatLogDoc`。表头铬层可拖宽，行是连续文档，不是文件清单那种格子。禁止把 Family B 的行块拖选套到日志上。
-- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：时间列按设置 `log_time_format` 投影（默认完整墙钟）。`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。`LogLine.ts` 仍是完整墙钟 `YYYY-MM-DD HH:mm:ss.SSS`；清单时间按 `log_time_format` 投影（默认 `datetime_millis`）。解析失败（level=`?`）整行只有消息。级别色：`levelKey` → View 写 `--yohu-log-ink: var(--yohu-level-${key})`；左条 / 级别字 / Tag 共用 ink。Error/Fatal 消息同色（`data-tint-msg`）。Fatal 字母反色块（`data-paint=invert`，字走 `--yohu-fg-on`，底走 ink）。禁止 CSS 再列 `[data-level]` ink 表，禁止 `--yohu-level-f-bg`。反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、Error/Fatal 消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel` + `--yohu-text-sel-fg`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
+- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：时间列按设置 `log_time_format` 投影（默认完整墙钟）。`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。`LogLine.ts` 仍是完整墙钟 `YYYY-MM-DD HH:mm:ss.SSS`；清单时间按 `log_time_format` 投影（默认 `datetime_millis`）。解析失败（level=`?`）整行只有消息（字走 `--yohu-fg`）。级别色：`levelKey` → View 写 `--yohu-log-ink: var(--yohu-level-${key})`；左条 / 级别字 / Tag / 已知级别消息共用 ink（行上 `data-level`）。Fatal 字母反色块（`data-paint=invert`，字走 `--yohu-fg-on`，底走 ink）。禁止 CSS 再列 `[data-level="v"]` 这类 ink 表，禁止 `--yohu-level-f-bg`，禁止 `data-tint-msg`。反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、已知级别消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel` + `--yohu-text-sel-fg`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
 - **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题默认靠左，列垫 `list` = 左 md / 右 sm；UID/PID/TID `align=end` 与文档 `padStart` 同一 `LOG_COLUMNS.align`；无排序；元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。列序时间 / PID / Tag / 级别 / 消息。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
 - 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别独立切换（V–F 精确集合，可多选；全部弹起不限）走 `YoSegmentedButton` `type=capsule` `multiple` `size=sm`；未选字色 `item.ink=var(--yohu-level-*)`；选中填 `item.fill=var(--yohu-level-*)`。禁止自造 `YoCorner`+flush Button、禁止 `.yohu-ink`、禁止点库内部 class。 / Tag（逗号分隔多针，精确命中；提交后 `YoChip` 走 `YoListPresence recipe=chip` 丝滑入场，流内右侧垂直居中删除；过滤生效走 `active`） / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
 - 会话 Tab：标题 + 采集绿点/信号红点 + 关闭 × + 新建 +；Tab 溢出可横向滚动；右键菜单（关闭其他/重命名/复制会话）走 `logs.tab` 场景。
 - 日志行：原生选区走文档字符。从 Tag 左缘拖过 pad 空格只选 Tag 段（前列是文档里更早的字符，不会被「格子命中」带上）。列垫 `data-log-pad` 不进双击选词；三击选行交给浏览器；禁止对 `pointerdown` `preventDefault`。Ctrl+A 整表 `visible`。右键走 `logs.row`（有选区复制切片，否则该行文档）。与 Ctrl+C 同一 `serializeLogCopy`。折叠徽章 `data-log-chrome` 不进文档。禁止在本页再挂 `YoContextMenu`。禁止 `Selection.toString()` 当跨行唯一载荷。
-- 新建窗口：设备走 `YoSelect block`（触发钮显示选中设备，菜单独立定位层 Portal；禁止芯片/空触发钮）；划分用 `YoSegmentedButton`（包名 / PID，无左侧标题；高度走 `--yohu-segment-single`）。
+- 新建窗口：设备与划分同一行（`yohu-logs__new-bar`）。左 `YoSelect block`（型号吃剩余，次文案短号·连接贴箭头；菜单 Portal）；右 `YoSegmentedButton` hug（包名 / PID，无左侧标题，高度 `--yohu-segment-single`）。禁止芯片/空触发钮，禁止 `YoFormRow` 横排把 Select 收成胶囊，禁止再拆成两行。清单铬 `YoCorner flex=fill`；选中底只走 `YoVirtualList` document 单选 fill。禁止模块 `YoIndicator`，禁止 `tone=list`。
 - 状态行：`采集指示（绿点/灰点）· 设备 · 缓冲 n · 可见 n · 信号 n · 进程索引 n s 前 · 滞后回补提示`。
 - 空态：未采集 → 插画图标 + 「点击开始采集」主按钮；启动采集 / 采集中空 → `YoLoading`；过滤无命中 → 「无匹配日志，调整过滤条件」。采集中空态与 pending 互斥：空面板保持跟滚，禁止「等待设备输出」和「N 条新日志」同时出现。
 - **采集可见性**：点「开始」新开流时清空 UI 镜像与本窗口面板，core 同步 `ring.clear()`，只展示本流 logcat。同窗口在 core 仍 Live 时点开始是 adopt 续采：保留已画出的行，从环补洞。**新窗口第一次点开始**：`fromSeq=0`，按窗口过滤从当前环补齐（包名窗口开始前打 `ps` 绑 PID），不要从尾 seq 空等下一次输出。失败 toast 出错误。显示面板常驻：设备无输出、掉线、停采都不冲刷。过滤 / 入镜 / 重绑共用 `fromSeq`；清空推进游标，禁止镜像旧行回填。空闲后不得落到「等待设备输出」并把旧行冲掉。
@@ -655,7 +660,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 |------|------|------|
 | YoDialog | Esc 关；焦点陷阱；打开后 `dialogInitialFocus`；关闭后还原焦点 | `role=dialog aria-modal`；标题 `aria-labelledby` |
 | YoTabs | ←/→ 切换；Home/End；Delete 关闭（可关时）；Ctrl+Tab 循环 | `role=tablist/tab/tabpanel` |
-| YoSelect | 展开后 ↑/↓ 选项；Enter 选；Esc 关；Portal 上下展开；触发钮 hug 文案簇；菜单宽 hug（min=触发钮）；仅超出才纵向滚动 | `aria-haspopup=listbox aria-expanded aria-activedescendant` |
+| YoSelect | 展开后 ↑/↓ 选项；Enter 选；Esc 关；Portal 上下展开；触发钮 hug 文案簇；`block` 主文案吃剩余、次文案贴尾；菜单宽 hug（min=触发钮）；仅超出才纵向滚动 | `aria-haspopup=listbox aria-expanded aria-activedescendant` |
 | YoTree | ↑/↓ 移动；→ 展开/← 收起；Enter / 空格：目录开合、叶子选中 | `role=tree/treeitem aria-expanded` |
 | YoVirtualList | 选择模式：roving tabindex + ↑/↓/Home/End/Enter/Space | 选择模式 `role=listbox/option` + `aria-selected` |
 | YoContextMenuHost | 应用根唯一实例；Portal 到 body；同时只开一个场景。模块禁止自挂 List | `role=menu/menuitem`（Host 内 List） |
@@ -663,7 +668,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | YoIconButton | 激活执行；`loading` 时不可激活；可见提示走 YoTooltip | `aria-label`（title）+ `aria-busy` |
 | YoSearch | 栏可输入；Enter 提交；Esc 先清再关折叠；入口切换折叠 | 栏 `role=search` + `searchbox`；入口 `aria-expanded` / `aria-controls` |
 | YoLoading | 非交互；减动效时环静止 | `role=status aria-busy aria-live=polite` |
-| YoFormRow | 非交互容器；左侧标题栈与右侧控件垂直居中 | 无；控件自带 ARIA |
+| YoFormRow | 非交互容器；默认左标题右控件 hug；`stacked` 纵排铺满 | 无；控件自带 ARIA |
 | YoSegmentedButton | 单选：←/→/↑/↓ 循环选中，Home/End 首尾。多选：方向键只移焦，空格/点击切换 | 单选 `radiogroup/radio` + `aria-checked`；多选 `group` + `aria-pressed` + `aria-multiselectable` |
 
 ---
