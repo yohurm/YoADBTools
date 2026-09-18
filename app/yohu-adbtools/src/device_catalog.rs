@@ -4,12 +4,15 @@
 //! 启动预热与 UI `device.refresh` 共用一趟扫描，禁止并行抢 adb daemon。
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::state::AppState;
 use yohu_domain::{catalog_after_scan, start_force_forward};
 use yohu_protocol::{AppEvent, DeviceInfo, DeviceState};
 use yohu_runtime::atomic_write;
+
+/// 设备目录自动刷新周期。用户只开关，不设间隔。与 DeviceStatusHub 采样同拍。
+pub const AUTO_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
 type CatalogResult = Result<Vec<DeviceInfo>, String>;
 

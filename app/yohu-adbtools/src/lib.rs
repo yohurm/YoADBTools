@@ -38,7 +38,6 @@ mod window_boot;
 mod yolog;
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use tauri::{Manager, RunEvent};
 use tokio::sync::mpsc;
@@ -287,30 +286,31 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             });
 
-            // 6) 可选设备自动刷新（settings 冻结快照决定）
-            if snapshot.devices_auto_refresh > 0 {
-                let handle = handle.clone();
-                let interval_secs = snapshot.devices_auto_refresh as u64;
-                tauri::async_runtime::spawn(async move {
-                    let cancel = handle.state::<AppState>().root_cancel.clone();
-                    let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
-                    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-                    // 首 tick 立即触发，会与启动预热扫描叠一次；跳过。
-                    ticker.tick().await;
-                    loop {
-                        tokio::select! {
-                            biased;
-                            _ = cancel.cancelled() => break,
-                            _ = ticker.tick() => {
-                                let state = handle.state::<AppState>();
-                                if let Err(e) = crate::device_catalog::refresh(&state).await {
-                                    tracing::warn!("自动刷新失败: {e}");
-                                }
+            // 6) 设备自动刷新：周期固定，开关读即时快照（立即生效）
+            let refresh_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let cancel = refresh_handle.state::<AppState>().root_cancel.clone();
+                let mut ticker =
+                    tokio::time::interval(crate::device_catalog::AUTO_REFRESH_INTERVAL);
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                // 首 tick 立即触发，会与启动预热扫描叠一次；跳过。
+                ticker.tick().await;
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => break,
+                        _ = ticker.tick() => {
+                            let state = refresh_handle.state::<AppState>();
+                            if !state.settings.snapshot().devices_auto_refresh {
+                                continue;
+                            }
+                            if let Err(e) = crate::device_catalog::refresh(&state).await {
+                                tracing::warn!("自动刷新失败: {e}");
                             }
                         }
                     }
-                });
-            }
+                }
+            });
 
             tracing::info!(
                 ms = crate::window_boot::elapsed_ms(),

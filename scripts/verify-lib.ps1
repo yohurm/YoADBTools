@@ -28,11 +28,13 @@ function Write-AppSettings {
         行为与旧硬编码哈希完全一致（settings 契约测试锁死默认值）。
     .PARAMETER AdbPath
         自定义 adb 路径；空 = 自动解析（用户设置 -> 应用旁 -> 内置解压）。
+    .PARAMETER DevicesAutoRefresh
+        设备目录自动刷新开关（JSON boolean，默认开）。周期 2 秒是产品常量，不写进设置。
     #>
     param(
         [string]$AdbPath = "",
         [string]$DataRoot = "",
-        [int]$DevicesAutoRefresh = 0,
+        [bool]$DevicesAutoRefresh = $true,
         [int]$BufferCapacity = 50000,
         [bool]$ClearDeviceOnStart = $false,
         [string]$Theme = "light",
@@ -45,7 +47,7 @@ function Write-AppSettings {
     $options = @{
         adb_path              = $AdbPath
         data_root             = $DataRoot
-        devices_auto_refresh  = $DevicesAutoRefresh
+        devices_auto_refresh  = [bool]$DevicesAutoRefresh
         buffer_capacity       = $BufferCapacity
         clear_device_on_start = $ClearDeviceOnStart
         theme                 = $Theme
