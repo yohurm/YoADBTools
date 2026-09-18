@@ -110,7 +110,7 @@ export type TerminalTimeFormat = "time_millis" | "time" | "datetime_millis" | "d
 export interface AppSettings {
   adb_path: string;
   data_root: string;
-  devices_auto_refresh: number;
+  devices_auto_refresh: boolean;
   buffer_capacity: number;
   clear_device_on_start: boolean;
   theme: Theme;

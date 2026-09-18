@@ -332,7 +332,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       settings: {
         adb_path: "",
         data_root: "",
-        devices_auto_refresh: 0,
+        devices_auto_refresh: true,
         buffer_capacity: 50,
         clear_device_on_start: true,
         theme: "system",
@@ -489,5 +489,6 @@ export type _SettingValue_Theme = Expect<Equal<SettingValue<"theme">, Theme>>;
 export type _SettingValue_Density = Expect<Equal<SettingValue<"density">, Density>>;
 export type _SettingValue_Number = Expect<Equal<SettingValue<"buffer_capacity">, number>>;
 export type _SettingValue_Bool = Expect<Equal<SettingValue<"clear_device_on_start">, boolean>>;
+export type _SettingValue_DevicesAutoRefresh = Expect<Equal<SettingValue<"devices_auto_refresh">, boolean>>;
 export type _SettingValue_Object = Expect<Equal<SettingValue<"log_display_columns">, LogDisplayColumns>>;
 export type _SettingValue_MirrorProtocol = Expect<Equal<SettingValue<"mirror_protocol">, "usb" | "wifi">>;

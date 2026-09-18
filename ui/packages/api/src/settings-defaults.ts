@@ -8,7 +8,7 @@ import type { AppSettings } from "./types";
 export const APP_SETTINGS_DEFAULT: AppSettings = {
   adb_path: "",
   data_root: "",
-  devices_auto_refresh: 0,
+  devices_auto_refresh: true,
   buffer_capacity: 10000,
   clear_device_on_start: true,
   theme: "system",
