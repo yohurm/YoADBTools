@@ -7,6 +7,7 @@
  *（视口 overflow hidden，滚轮改 scrollTop）。`__inner` 只撑总高。
  * 与 YoColFrame 表头共用视口：溢出让出侧轨，禁止 scrollbar-gutter。
  * fill / 投放框宽走视口内容盒（clientWidth 减 gutter padding），不进侧轨。
+ * 总高变化后 handle.sync() 再量侧轨，过滤变短必须收回 gutter。
  * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
  *（absolute + translate3d）。行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
  * 滚动改 transform / data-key / 行 props，不拆行节点。
@@ -199,6 +200,13 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   };
 
   const totalHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
+
+  createEffect(() => {
+    void totalHeight();
+    const api = scrollerHandle;
+    if (!api) return;
+    queueMicrotask(() => api.sync());
+  });
 
   const poolSize = createMemo(() =>
     virtualPoolSize(viewportHeight(), itemHeight(), overscan(), props.items().length),

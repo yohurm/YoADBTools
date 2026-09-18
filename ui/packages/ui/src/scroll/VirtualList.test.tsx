@@ -110,6 +110,7 @@ describe("YoVirtualList", () => {
     expect(src).toContain("scrollTo(");
     expect(src).toContain("virtualNearestScrollTop");
     expect(src).toContain("virtualContentWidth");
+    expect(src).toContain("queueMicrotask(() => api.sync())");
     expect(src).toContain("preventScroll: true");
     expect(src).not.toContain("scrollIntoView");
   });

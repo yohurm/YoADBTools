@@ -28,6 +28,8 @@ export type YoScrollerHandle = {
   scrollToEnd: () => void;
   scrollPage: (next: boolean) => void;
   offset: () => number;
+  /** 内容总高变了再量一次：过滤变短后收回侧轨，禁止留下 16vp 空白。 */
+  sync: () => void;
 };
 
 export interface YoScrollerProps {
@@ -66,6 +68,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
     scrollToEnd: binder.scrollToEnd,
     scrollPage: binder.scrollPage,
     offset: binder.offset,
+    sync: binder.sync,
   };
 
   createRenderEffect(() => {

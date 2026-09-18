@@ -71,6 +71,7 @@ describe("YoScroller", () => {
     expect(src).toContain("ScrollerPortContext.Provider");
     expect(src).toContain("plane:");
     expect(src).toMatch(/const handle: YoScrollerHandle = \{[\s\S]*scrollTo: binder\.scrollTo/);
+    expect(src).toContain("sync: binder.sync");
     expect(src).not.toMatch(/const port: ScrollerPort = \{[\s\S]*scrollTo:/);
     expect(src).not.toContain("scrollHeight");
     expect(src).not.toContain('closest("[data-travel]")');
