@@ -12,7 +12,7 @@ import { DEFAULT_BROWSE_ROOT, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./iden
 import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION } from "./library";
 import { AndroidKey, MIRROR_MIN_LAYOUT_PX } from "./scrcpy";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -140,6 +140,16 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       control: false,
       connection: "usb",
       session_quality_touched: false,
+    });
+  });
+
+  it("MirrorPointer 为 avail 指针，snake_case kind", () => {
+    const pointer: MirrorPointer = { serial: "S1", kind: "down", x: 10, y: 20 };
+    expect(JSON.parse(JSON.stringify(pointer))).toEqual({
+      serial: "S1",
+      kind: "down",
+      x: 10,
+      y: 20,
     });
   });
 

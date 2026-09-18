@@ -454,6 +454,17 @@ export interface MirrorInjectRequest {
 /** 舞台内容模式（壳 chrome 仍用）。文案与色值在壳 chrome，不进 layout。 */
 export type MirrorStageMode = "empty" | "loading" | "paused" | "video";
 
+/** 舞台指针种类（`mirror.pointer`）。 */
+export type MirrorPointerKind = "down" | "move" | "up" | "leave";
+
+/** 与 `mirror.layout` 同一套主窗客户区物理坐标。UI 不算 dest。 */
+export interface MirrorPointer {
+  serial: string;
+  kind: MirrorPointerKind;
+  x: number;
+  y: number;
+}
+
 /** 可用区相对主窗客户区的物理像素矩形（`mirror.layout`）。占用与 chrome 不在本 DTO。 */
 export interface MirrorLayout {
   serial: string;

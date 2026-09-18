@@ -42,6 +42,7 @@ import type {
   MirrorStartRequest,
   MirrorInjectRequest,
   MirrorLayout,
+  MirrorPointer,
   MirrorScreenshotRequest,
 } from "./types";
 
@@ -145,6 +146,8 @@ export const mirrorPresentSetActive = (active: boolean) =>
   invoke<void>("mirror.present.setActive", { active });
 
 export const mirrorLayout = (req: MirrorLayout) => invoke<void>("mirror.layout", { req });
+
+export const mirrorPointer = (req: MirrorPointer) => invoke<void>("mirror.pointer", { req });
 
 export const mirrorScreenshot = (req: MirrorScreenshotRequest) =>
   invoke<void>("mirror.screenshot", { req });
