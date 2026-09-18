@@ -345,6 +345,8 @@ export interface CommandDto {
 
 export interface CommandStepDto {
   template: string;
+  /** 本步 `{n}` 的说明；缺省空。 */
+  params?: CommandParamDto[];
 }
 
 export interface CommandBlockDto {
@@ -352,7 +354,6 @@ export interface CommandBlockDto {
   name: string;
   gap_ms: number;
   steps: CommandStepDto[];
-  params?: CommandParamDto[];
 }
 
 export type LibraryEntryDto =

@@ -36,6 +36,19 @@ type Fixture = {
     millis: number;
     expect?: string | null;
   }[];
+  projection: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+    millis: number;
+    time_millis: string;
+    time: string;
+    datetime_millis: string;
+    datetime: string;
+  }[];
 };
 
 describe("datetime（与 domain testdata/datetime.json 同一套向量）", () => {
@@ -61,25 +74,24 @@ describe("datetime（与 domain testdata/datetime.json 同一套向量）", () =
     expect(formatDateTimeFromMs(Date.now())).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
   });
 
-  it("formatClock 按终端显示形状投影，不改部件", () => {
-    const args = [2026, 9, 11, 16, 45, 7, 89] as const;
-    expect(formatClock(...args, "time_millis")).toBe("16:45:07.089");
-    expect(formatClock(...args, "time")).toBe("16:45:07");
-    expect(formatClock(...args, "datetime_millis")).toBe("2026-09-11 16:45:07.089");
-    expect(formatClock(...args, "datetime")).toBe("2026-09-11 16:45:07");
+  it.each(fixture.projection)("projection $datetime_millis", (c) => {
+    const args = [c.year, c.month, c.day, c.hour, c.minute, c.second, c.millis] as const;
+    expect(formatClock(...args, "time_millis")).toBe(c.time_millis);
+    expect(formatClock(...args, "time")).toBe(c.time);
+    expect(formatClock(...args, "datetime_millis")).toBe(c.datetime_millis);
+    expect(formatClock(...args, "datetime")).toBe(c.datetime);
     expect(formatClock(...args, "time_millis")?.length).toBe(TIME_MILLIS_DISPLAY_LEN);
     expect(formatClock(...args, "time")?.length).toBe(TIME_DISPLAY_LEN);
-    expect(formatClock(2026, 13, 1, 0, 0, 0, 0, "time_millis")).toBeNull();
+    expect(formatLogTs(c.datetime_millis, "datetime_millis")).toBe(c.datetime_millis);
+    expect(formatLogTs(c.datetime_millis, "datetime")).toBe(c.datetime);
+    expect(formatLogTs(c.datetime_millis, "time_millis")).toBe(c.time_millis);
+    expect(formatLogTs(c.datetime_millis, "time")).toBe(c.time);
   });
 
-  it("formatLogTs 投影规范化墙钟；默认 datetime_millis 不改原文", () => {
-    const ts = "2026-09-11 16:45:07.089";
-    expect(formatLogTs(ts, "datetime_millis")).toBe(ts);
-    expect(formatLogTs(ts, "datetime")).toBe("2026-09-11 16:45:07");
-    expect(formatLogTs(ts, "time_millis")).toBe("16:45:07.089");
-    expect(formatLogTs(ts, "time")).toBe("16:45:07");
+  it("投影失败不回脏原文", () => {
+    expect(formatClock(2026, 13, 1, 0, 0, 0, 0, "time_millis")).toBeNull();
+    expect(formatLogTs("raw", "time")).toBe("");
     expect(clockDisplayLen("datetime_millis")).toBe(DATETIME_DISPLAY_LEN);
     expect(clockDisplayLen("time_millis")).toBe(TIME_MILLIS_DISPLAY_LEN);
-    expect(formatLogTs("raw", "time")).toBe("");
   });
 });
