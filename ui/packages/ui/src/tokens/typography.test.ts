@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FontLeading, FontSizes, FontSizesCompact, FontWeights } from "./typography";
+import { FontFamilies, FontLeading, FontSizes, FontSizesCompact, FontWeights } from "./typography";
 
 describe("HarmonyOS PC 排版 token", () => {
   it("默认字号对齐电脑表：Caption 12 / Body 14 / Subtitle 16 / Title_S 18", () => {
@@ -28,5 +28,11 @@ describe("HarmonyOS PC 排版 token", () => {
     expect(FontLeading.Tight).toBe(1.25);
     expect(FontLeading.Ui).toBe(1.55);
     expect(FontLeading.Data).toBe(1.4);
+  });
+
+  it("等宽只走系统字体：Consolas 对照 Logcat，不内嵌、不抢 Cascadia", () => {
+    expect(FontFamilies.Mono).toBe('"Consolas", "Menlo", "Courier New", monospace');
+    expect(FontFamilies.Mono).not.toContain("JetBrains");
+    expect(FontFamilies.Mono).not.toContain("Cascadia");
   });
 });

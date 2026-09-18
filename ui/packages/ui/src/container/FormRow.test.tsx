@@ -68,6 +68,16 @@ describe("YoFormRow", () => {
     expect(css).toMatch(/\[data-layout="stacked"\] \.yohu-form-row__control\s*\{[^}]*width:\s*100%/);
   });
 
+  it("flush 去掉行垫，stacked 控件仍铺满", () => {
+    const { container } = render(() => (
+      <YoFormRow title="设备" layout="stacked" pad="flush">
+        <span>select</span>
+      </YoFormRow>
+    ));
+    expect(container.querySelector(".yohu-form-row")?.getAttribute("data-pad")).toBe("flush");
+    expect(css).toMatch(/\[data-pad="flush"\]\s*\{[^}]*padding:\s*0/);
+  });
+
   it("相邻行不画分割线", () => {
     expect(css).not.toContain(".yohu-form-row + .yohu-form-row");
     expect(css).not.toMatch(/border-top:\s*var\(--yohu-stroke-hairline\)/);

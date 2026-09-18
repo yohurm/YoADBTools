@@ -5,7 +5,9 @@
  */
 
 export type YoFormRowLayout = "row" | "stacked";
+export type YoFormRowPad = "md" | "flush";
 export const DEFAULT_FORM_ROW_LAYOUT: YoFormRowLayout = "row";
+export const DEFAULT_FORM_ROW_PAD: YoFormRowPad = "md";
 
 export interface FormRowSlotInput {
   description?: unknown;
@@ -14,6 +16,10 @@ export interface FormRowSlotInput {
 
 export function resolveFormRowLayout(layout?: YoFormRowLayout): YoFormRowLayout {
   return layout === "stacked" ? "stacked" : DEFAULT_FORM_ROW_LAYOUT;
+}
+
+export function resolveFormRowPad(pad?: YoFormRowPad): YoFormRowPad {
+  return pad === "flush" ? "flush" : DEFAULT_FORM_ROW_PAD;
 }
 
 export interface FormRowSlots {

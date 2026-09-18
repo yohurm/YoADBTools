@@ -222,6 +222,33 @@ describe("YoSelect", () => {
     const { container } = render(() => <YoSelect block options={OPTIONS} value="a" />);
     expect(container.querySelector(".yohu-select")?.hasAttribute("data-block")).toBe(true);
   });
+
+  it("block 触发钮主文案吃剩余，次文案贴箭头", () => {
+    render(() => (
+      <YoSelect
+        block
+        options={[{ value: "s", label: "edge 60 pro", description: "0106 · USB" }]}
+        value="s"
+      />
+    ));
+    const trigger = screen.getByRole("button", { name: "edge 60 pro 0106 · USB" });
+    expect(trigger.querySelector(".yohu-select__value")?.textContent).toBe("edge 60 pro");
+    expect(trigger.querySelector(".yohu-select__description")?.textContent).toBe("0106 · USB");
+  });
+
+  it("hug 触发钮不画次文案，菜单项才画", () => {
+    render(() => (
+      <YoSelect
+        options={[{ value: "s", label: "edge 60 pro", description: "0106 · USB" }]}
+        value="s"
+      />
+    ));
+    const trigger = screen.getByRole("button", { name: "edge 60 pro" });
+    expect(trigger.querySelector(".yohu-select__description")).toBeNull();
+    fireEvent.click(trigger);
+    const option = screen.getByRole("option", { name: "edge 60 pro 0106 · USB" });
+    expect(option.querySelector(".yohu-select__description")?.textContent).toBe("0106 · USB");
+  });
 });
 
 describe("YoSelect 分层契约", () => {
@@ -264,6 +291,9 @@ describe("YoSelect 触发布局契约", () => {
     expect(value).toMatch(/flex:\s*0 1 auto/);
     expect(css).toMatch(
       /\.yohu-select\[data-block\] \.yohu-select__value\s*\{[^}]*flex:\s*1 1 auto/,
+    );
+    expect(css).toMatch(
+      /\.yohu-select\[data-block\] \.yohu-select__description\s*\{[^}]*flex:\s*0 0 auto/,
     );
     const chevron = css.match(/^\.yohu-select__chevron\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(chevron).toMatch(/flex:\s*0 0 auto/);

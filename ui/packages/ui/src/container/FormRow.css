@@ -83,3 +83,7 @@
   margin-inline-start: 0;
   justify-content: stretch;
 }
+
+.yohu-form-row[data-pad="flush"] {
+  padding: 0;
+}

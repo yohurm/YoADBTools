@@ -238,7 +238,7 @@ export { YoPage } from "./container/Page";
 export type { YoPageProps } from "./container/Page";
 
 export { YoFormRow } from "./container/FormRow";
-export type { YoFormRowProps, YoFormRowLayout } from "./container/FormRow";
+export type { YoFormRowProps, YoFormRowLayout, YoFormRowPad } from "./container/FormRow";
 
 export { YoCorner, CornerPillRadius } from "./corner";
 export type {

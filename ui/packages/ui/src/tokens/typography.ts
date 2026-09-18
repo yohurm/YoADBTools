@@ -53,6 +53,10 @@ export const FontLeading = {
 export const FontFamilies = {
   /** 界面正文（西文优先 Segoe UI，中文回退雅黑） */
   Sans: '"Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif',
-  /** 等宽（日志 / 终端 / serial / PID / 数字，tabular-nums 列对齐） */
-  Mono: '"Cascadia Mono", "Consolas", "Courier New", monospace',
+  /**
+   * 等宽（日志 / 终端 / serial / PID / 数字，tabular-nums 列对齐）。
+   * 只走系统字体。对照 AS Logcat 默认 JetBrains Mono：Win10/11 收件箱最接近的是 Consolas（Vista 起）；
+   * Cascadia Mono 只在 Win11 / Terminal 上才有，不作首项。macOS 回退 Menlo。禁止内嵌字体。
+   */
+  Mono: '"Consolas", "Menlo", "Courier New", monospace',
 } as const;

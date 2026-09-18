@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { edgeIndex, findOption, optionDomId, selectedIndex, selectKeyIntent, stepIndex } from "./select-model";
+import {
+  edgeIndex,
+  findOption,
+  optionDescription,
+  optionDomId,
+  selectedIndex,
+  selectKeyIntent,
+  stepIndex,
+} from "./select-model";
 
 const OPTIONS = [
   { value: "a", label: "A" },
@@ -18,6 +26,13 @@ describe("select-model", () => {
     expect(findOption(OPTIONS, "b")?.label).toBe("B");
     expect(findOption(OPTIONS, "")?.label).toBe("全部");
     expect(findOption(OPTIONS, "missing")).toBeUndefined();
+  });
+
+  it("次文案去空白；空串不算", () => {
+    expect(optionDescription({ value: "a", label: "A", description: "  USB  " })).toBe("USB");
+    expect(optionDescription({ value: "a", label: "A", description: "   " })).toBeUndefined();
+    expect(optionDescription({ value: "a", label: "A" })).toBeUndefined();
+    expect(optionDescription(undefined)).toBeUndefined();
   });
 
   it("选中下标；未命中为 -1", () => {

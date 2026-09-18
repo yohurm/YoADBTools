@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hasFormRowSlot, resolveFormRowLayout, resolveFormRowSlots } from "./formrow-model";
+import {
+  hasFormRowSlot,
+  resolveFormRowLayout,
+  resolveFormRowPad,
+  resolveFormRowSlots,
+} from "./formrow-model";
 
 describe("formrow-model", () => {
   it("缺省两槽皆空", () => {
@@ -17,6 +22,12 @@ describe("formrow-model", () => {
     expect(resolveFormRowLayout()).toBe("row");
     expect(resolveFormRowLayout("row")).toBe("row");
     expect(resolveFormRowLayout("stacked")).toBe("stacked");
+  });
+
+  it("缺省 md 行垫，flush 才去垫", () => {
+    expect(resolveFormRowPad()).toBe("md");
+    expect(resolveFormRowPad("md")).toBe("md");
+    expect(resolveFormRowPad("flush")).toBe("flush");
   });
 
   it("非空说明与备注算占槽", () => {

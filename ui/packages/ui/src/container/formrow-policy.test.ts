@@ -20,4 +20,9 @@ describe("formrow-policy", () => {
     expect(formRowHostAttrs({ layout: "row" })).not.toHaveProperty("data-layout");
     expect(formRowHostAttrs({ layout: "stacked" })["data-layout"]).toBe("stacked");
   });
+
+  it("flush 才写 data-pad", () => {
+    expect(formRowHostAttrs({ pad: "md" })).not.toHaveProperty("data-pad");
+    expect(formRowHostAttrs({ pad: "flush" })["data-pad"]).toBe("flush");
+  });
 });

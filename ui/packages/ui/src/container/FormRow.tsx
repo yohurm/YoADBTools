@@ -6,17 +6,19 @@
  */
 import type { JSX } from "solid-js";
 import { Show, createMemo } from "solid-js";
-import { hasFormRowSlot, type YoFormRowLayout } from "./formrow-model";
+import { hasFormRowSlot, type YoFormRowLayout, type YoFormRowPad } from "./formrow-model";
 import { formRowHostAttrs } from "./formrow-policy";
 import "./FormRow.css";
 
-export type { YoFormRowLayout };
+export type { YoFormRowLayout, YoFormRowPad };
 
 export interface YoFormRowProps {
   /** 标题 */
   title: string;
   /** 排布。默认 row（左信息右控件）；stacked 用于窄栏纵排 */
   layout?: YoFormRowLayout;
+  /** 行垫。默认 md（设置卡）；flush 给对话框里已有 gap 的纵排字段 */
+  pad?: YoFormRowPad;
   /** 副标题 / 说明 */
   description?: JSX.Element;
   /** 备注（生效徽章等），跟在标题同一行后面 */
@@ -39,6 +41,7 @@ export function YoFormRow(props: YoFormRowProps): JSX.Element {
       data-has-description={host()["data-has-description"]}
       data-has-note={host()["data-has-note"]}
       data-layout={host()["data-layout"]}
+      data-pad={host()["data-pad"]}
     >
       <div class="yohu-form-row__info">
         <div class="yohu-form-row__heading">
