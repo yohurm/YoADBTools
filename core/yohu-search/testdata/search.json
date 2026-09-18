@@ -1,0 +1,72 @@
+{
+  "docs": [
+    {
+      "id": "c-model",
+      "group": "g-device",
+      "fields": [
+        { "key": "name", "text": "型号", "weight": 3 },
+        { "key": "template", "text": "shell getprop ro.product.model", "weight": 1 },
+        { "key": "group", "text": "设备信息", "weight": 2 }
+      ]
+    },
+    {
+      "id": "c-ping",
+      "group": "g-device",
+      "fields": [
+        { "key": "name", "text": "网络连通性", "weight": 3 },
+        { "key": "template", "text": "shell ping -c 3 {0}", "weight": 1 },
+        { "key": "group", "text": "设备信息", "weight": 2 }
+      ]
+    },
+    {
+      "id": "b-wake",
+      "group": "g-power",
+      "fields": [
+        { "key": "name", "text": "连上再亮", "weight": 3 },
+        { "key": "template", "text": "wait-for-device\nshell input keyevent 224", "weight": 1 },
+        { "key": "group", "text": "电源", "weight": 2 }
+      ]
+    }
+  ],
+  "tokenize": [
+    { "query": "  PING  ", "normalized": "ping", "tokens": ["ping"] },
+    { "query": "shell ping", "normalized": "shell ping", "tokens": ["shell", "ping"] },
+    { "query": "com.android.systemui", "normalized": "com.android.systemui", "tokens": ["com.android.systemui"] },
+    { "query": "wait-for-device", "normalized": "wait-for-device", "tokens": ["wait-for-device"] },
+    { "query": "   ", "normalized": "", "tokens": [] }
+  ],
+  "field_hits": [
+    { "text": "型号", "token": "型号", "kind": "exact", "start": 0, "end": 2 },
+    { "text": "设备信息", "token": "设备", "kind": "prefix", "start": 0, "end": 2 },
+    { "text": "shell getprop", "token": "getprop", "kind": "prefix", "start": 6, "end": 13 },
+    { "text": "ro.product.model", "token": "product", "kind": "contains", "start": 3, "end": 10 },
+    { "text": "型号", "token": "wifi" }
+  ],
+  "search": [
+    { "query": "  ", "ids": ["c-model", "c-ping", "b-wake"] },
+    { "query": "", "options": { "empty": "none" }, "ids": [] },
+    { "query": "getprop", "ids": ["c-model"] },
+    { "query": "shell ping", "ids": ["c-ping"] },
+    { "query": "shell", "ids": ["c-model", "c-ping", "b-wake"] },
+    { "query": "型号", "ids": ["c-model"], "score0": 300 },
+    { "query": "wifi", "ids": [] },
+    { "query": "wifi ping", "options": { "combine": "or" }, "ids": ["c-ping"] }
+  ],
+  "expand": [
+    { "query": "设备", "ids": ["c-model", "c-ping"] },
+    { "query": "设备信息", "ids": ["c-model", "c-ping"] },
+    { "query": "getprop", "ids": ["c-model"] }
+  ],
+  "highlight": [
+    { "text": "shell ping -c 3", "query": "ping", "ranges": [{ "start": 6, "end": 10 }] },
+    { "text": "AbcAbc", "query": "abc", "ranges": [{ "start": 0, "end": 6 }] },
+    {
+      "text": "foo bar foo",
+      "query": "foo",
+      "ranges": [
+        { "start": 0, "end": 3 },
+        { "start": 8, "end": 11 }
+      ]
+    }
+  ]
+}

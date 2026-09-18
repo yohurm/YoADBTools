@@ -4,6 +4,7 @@ members = [
   "core/yohu-runtime",
   "core/yohu-protocol",
   "core/yohu-motion",
+  "core/yohu-search",
   "core/yohu-domain",
   "core/yohu-adb",
   "core/yohu-logsrv",
@@ -38,6 +39,7 @@ time = { version = "0.3", features = ["formatting", "local-offset"] }
 yohu-runtime = { path = "core/yohu-runtime" }
 yohu-protocol = { path = "core/yohu-protocol" }
 yohu-motion = { path = "core/yohu-motion" }
+yohu-search = { path = "core/yohu-search" }
 yohu-domain = { path = "core/yohu-domain" }
 yohu-adb = { path = "core/yohu-adb" }
 yohu-logsrv = { path = "core/yohu-logsrv" }

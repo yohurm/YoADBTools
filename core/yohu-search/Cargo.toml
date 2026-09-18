@@ -1,0 +1,12 @@
+[package]
+name = "yohu-search"
+description = "Yohu — 目录级检索引擎（零产品类型、零 Tauri、零 domain）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json.workspace = true

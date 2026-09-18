@@ -5202,6 +5202,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "yohu-search"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "yohu-update"
 version = "0.1.0"
 dependencies = [
