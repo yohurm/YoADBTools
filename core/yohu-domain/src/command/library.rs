@@ -1,6 +1,7 @@
-//! 命令库领域模型与校验（schemaVersion 3）。
+//! 命令库领域模型与校验（当前 [`CommandLibrary::SCHEMA_VERSION`]）。
 //!
 //! wire 结构（DTO）在 yohu-protocol；本模块持有领域语义（校验/占位符填充）。
+//! [`CommandLibrary::from_dto`] 与 [`CommandLibrary::validate`] 只认当前 schema。
 //! 命令组下命令与命令块同级。命令只描述一行；命令块描述多步 + 块级间隔。
 //! 不配置成功/失败正则、组内延时、失败中断。
 
@@ -923,7 +924,7 @@ mod tests {
     }
 
     #[test]
-    fn from_dto_rejects_non_schema_3() {
+    fn from_dto_rejects_unsupported_schema() {
         let dto = CommandLibraryDto {
             schema_version: 2,
             groups: vec![],
@@ -931,7 +932,7 @@ mod tests {
         assert!(matches!(
             CommandLibrary::from_dto(&dto),
             Err(LibraryError::UnsupportedSchema {
-                expected: 3,
+                expected: CommandLibrary::SCHEMA_VERSION,
                 actual: 2
             })
         ));
@@ -965,7 +966,7 @@ mod tests {
         assert!(matches!(
             lib.validate(),
             Err(LibraryError::UnsupportedSchema {
-                expected: 3,
+                expected: CommandLibrary::SCHEMA_VERSION,
                 actual: 2
             })
         ));

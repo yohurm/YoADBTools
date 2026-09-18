@@ -1,16 +1,16 @@
 //! 命令库落盘：采纳只走 domain `from_dto`；
-//! 本层只做原子写、损坏备份与 schema 2→3 一次性线形迁移。
-//! 磁盘与 IPC 共用 [`CommandLibraryDto`]；加载成功后只认 schema 3。
+//! 本层只做原子写与损坏备份。
+//! 磁盘与 IPC 共用 [`CommandLibraryDto`]；只认当前 schema。
 
 use std::fs;
 use std::path::Path;
 
-use serde::Deserialize;
 use yohu_domain::CommandLibrary;
-use yohu_protocol::{CommandDto, CommandGroupDto, CommandLibraryDto, LibraryEntryDto};
+use yohu_protocol::CommandLibraryDto;
 use yohu_runtime::{atomic_write, backup_corrupt};
 
-/// 加载命令库（缺失 → 默认库；schema 2 → 迁到 3；其余不匹配或校验失败 → 备份后写默认库）。
+/// 加载命令库：缺失 → 默认库；当前 schema → `from_dto`；
+/// 其它 schema_version 或解析/校验失败 → 备份后写默认库。
 pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
     match fs::read_to_string(file) {
         Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
@@ -21,7 +21,6 @@ pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
                         Err(_) => restore_default(file, &text, "JSON 解析失败"),
                     }
                 }
-                Some(2) => migrate_v2(file, &text),
                 _ => restore_default(file, &text, "schema 不受支持"),
             },
             Err(_) => restore_default(file, &text, "JSON 解析失败"),
@@ -58,72 +57,11 @@ fn restore_default(file: &Path, text: &str, reason: &str) -> Result<CommandLibra
     write_default(file)
 }
 
-fn migrate_v2(file: &Path, text: &str) -> Result<CommandLibrary, String> {
-    let v2: LibraryV2 = match serde_json::from_str(text) {
-        Ok(v2) => v2,
-        Err(_) => return restore_default(file, text, "schema 2 无法解析"),
-    };
-    let dto = CommandLibraryDto {
-        schema_version: CommandLibrary::SCHEMA_VERSION,
-        groups: v2
-            .groups
-            .into_iter()
-            .map(|g| CommandGroupDto {
-                id: g.id,
-                name: g.name,
-                entries: g
-                    .commands
-                    .into_iter()
-                    .map(|c| {
-                        LibraryEntryDto::Command(CommandDto {
-                            id: c.id,
-                            name: c.name,
-                            template: c.template,
-                            params: vec![],
-                        })
-                    })
-                    .collect(),
-            })
-            .collect(),
-    };
-    match CommandLibrary::from_dto(&dto) {
-        Ok(library) => {
-            save(file, &library)?;
-            tracing::info!(
-                "命令库已从 schema 2 迁到 {}",
-                CommandLibrary::SCHEMA_VERSION
-            );
-            Ok(library)
-        }
-        Err(_) => restore_default(file, text, "校验失败"),
-    }
-}
-
 fn write_default(file: &Path) -> Result<CommandLibrary, String> {
     let library = yohu_domain::default_library();
     save(file, &library)?;
     tracing::info!("已写入默认命令库: {}", file.display());
     Ok(library)
-}
-
-#[derive(Deserialize)]
-struct LibraryV2 {
-    groups: Vec<GroupV2>,
-}
-
-#[derive(Deserialize)]
-struct GroupV2 {
-    id: String,
-    name: String,
-    #[serde(default)]
-    commands: Vec<CommandV2>,
-}
-
-#[derive(Deserialize)]
-struct CommandV2 {
-    id: String,
-    name: String,
-    template: String,
 }
 
 #[cfg(test)]
@@ -154,6 +92,17 @@ mod tests {
     }
 
     #[test]
+    fn current_schema_adopts_from_dto() {
+        let file = temp_file("current");
+        let expected = yohu_domain::default_library();
+        save(&file, &expected).unwrap();
+        let lib = load_or_default(&file).unwrap();
+        assert_eq!(lib, expected);
+        assert!(!has_corrupt_backup(file.parent().unwrap()));
+        let _ = fs::remove_dir_all(file.parent().unwrap());
+    }
+
+    #[test]
     fn corrupt_json_is_backed_up() {
         let file = temp_file("corrupt");
         fs::write(&file, "{not json").unwrap();
@@ -165,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_2_migrates_commands_to_entries() {
+    fn schema_2_unsupported_restores_default() {
         let file = temp_file("v2");
         fs::write(
             &file,
@@ -173,16 +122,9 @@ mod tests {
         )
         .unwrap();
         let lib = load_or_default(&file).unwrap();
-        assert_eq!(lib.schema_version, 3);
-        assert_eq!(lib.groups[0].entries.len(), 1);
-        assert_eq!(
-            lib.command("c1").map(|c| c.template.as_str()),
-            Some("shell getprop")
-        );
-        let saved = fs::read_to_string(&file).unwrap();
-        assert!(saved.contains("\"schema_version\": 3"));
-        assert!(saved.contains("\"kind\": \"command\""));
-        assert!(!saved.contains("\"commands\""));
+        assert_eq!(lib, yohu_domain::default_library());
+        assert!(lib.command("c1").is_none());
+        assert!(has_corrupt_backup(file.parent().unwrap()));
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 
@@ -206,20 +148,6 @@ mod tests {
         fs::write(
             &file,
             r#"{"schema_version":3,"groups":[{"id":"g1","name":"g","entries":[{"kind":"block","id":"b1","name":"自检","gap_ms":300,"steps":[{"template":"echo 1"}]}]}]}"#,
-        )
-        .unwrap();
-        let lib = load_or_default(&file).unwrap();
-        assert_eq!(lib, yohu_domain::default_library());
-        assert!(has_corrupt_backup(file.parent().unwrap()));
-        let _ = fs::remove_dir_all(file.parent().unwrap());
-    }
-
-    #[test]
-    fn schema_2_invalid_restores_default() {
-        let file = temp_file("v2-bad");
-        fs::write(
-            &file,
-            r#"{"schema_version":2,"groups":[{"id":"g1","name":"g","commands":[{"id":"c1","name":"空","template":"  "}]}]}"#,
         )
         .unwrap();
         let lib = load_or_default(&file).unwrap();

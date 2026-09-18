@@ -7,7 +7,7 @@ use crate::state::AppState;
 use yohu_domain::CommandLibrary;
 use yohu_protocol::{CommandLibraryDto, IpcError, IpcErrorCode};
 
-/// `commandlib.load`：加载命令库（缺失或 schema 不匹配 → 备份后写默认库）。
+/// `commandlib.load`：缺失 → 默认库；当前 schema → `from_dto`；其余 schema / 解析校验失败 → 备份后写默认库。
 #[tauri::command(rename = "commandlib.load")]
 pub fn commandlib_load(state: State<'_, AppState>) -> Result<CommandLibraryDto, IpcError> {
     let library =
