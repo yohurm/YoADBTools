@@ -1,5 +1,5 @@
 /**
- * 投屏质量档（离开 View）。USB/WIFI 默认数字与 domain testdata/mirror_encode.json 对齐。
+ * 投屏质量档（离开 View）。USB/WIFI 默认数字读 `@yohu/api` `USB_ENCODE` / `WIFI_ENCODE`。
  */
 
 export interface QualityOption {
