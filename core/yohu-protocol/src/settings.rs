@@ -61,9 +61,9 @@ pub struct AppSettings {
     /// 数据目录；空 = 默认 `%LOCALAPPDATA%\<DATA_DIR_NAME>\data`（重启生效）
     #[serde(default)]
     pub data_root: String,
-    /// 设备自动刷新间隔（秒），0 = 关
-    #[serde(default)]
-    pub devices_auto_refresh: u32,
+    /// 设备目录自动刷新。默认开；周期是产品常量，不设间隔。
+    #[serde(default = "crate::default_true")]
+    pub devices_auto_refresh: bool,
     /// 设备共享环形缓冲行数（core 环 + UI 镜像 + 可见区同一上限；采集环下次启动生效）
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: usize,
@@ -171,7 +171,7 @@ impl Default for AppSettings {
         Self {
             adb_path: String::new(),
             data_root: String::new(),
-            devices_auto_refresh: 0,
+            devices_auto_refresh: true,
             buffer_capacity: default_buffer_capacity(),
             clear_device_on_start: default_clear_device(),
             theme: Theme::System,
@@ -253,6 +253,7 @@ mod tests {
         let s = AppSettings::default();
         assert_eq!(s.theme, Theme::System);
         assert_eq!(s.density, Density::Comfortable);
+        assert!(s.devices_auto_refresh);
         assert_eq!(s.buffer_capacity, 10_000);
         assert!(s.clear_device_on_start);
         assert!(s.export_ask_every_time);
@@ -279,7 +280,7 @@ mod tests {
         let json = r#"{
             "adb_path": "",
             "data_root": "",
-            "devices_auto_refresh": 0,
+            "devices_auto_refresh": true,
             "buffer_capacity": 50000,
             "display_limit": 2000,
             "clear_device_on_start": true,
@@ -400,7 +401,7 @@ mod tests {
         let json = r#"{
             "adb_path": "",
             "data_root": "",
-            "devices_auto_refresh": 0,
+            "devices_auto_refresh": true,
             "buffer_capacity": 10000,
             "clear_device_on_start": true
         }"#;
@@ -429,6 +430,19 @@ mod tests {
             serde_json::to_value(TerminalTimeFormat::Datetime).unwrap(),
             serde_json::json!("datetime")
         );
+    }
+
+    #[test]
+    fn devices_auto_refresh_defaults_on_and_reads_bool() {
+        assert!(AppSettings::default().devices_auto_refresh);
+        let missing: AppSettings = serde_json::from_str(r#"{}"#).expect("missing");
+        assert!(missing.devices_auto_refresh);
+        let off: AppSettings =
+            serde_json::from_str(r#"{"devices_auto_refresh":false}"#).expect("false");
+        assert!(!off.devices_auto_refresh);
+        let on: AppSettings =
+            serde_json::from_str(r#"{"devices_auto_refresh":true}"#).expect("true");
+        assert!(on.devices_auto_refresh);
     }
 
     #[test]
