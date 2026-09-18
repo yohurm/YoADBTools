@@ -89,7 +89,7 @@ AddressSlot Enter
   → listingStore.goTo(原文)                         ← 只这一次 resolveRemotePath
        path-parse：unquote / file-uri / separators / host-reject / alias / relative
                   保留 // . .. ；无 collapseDotSegments
-       path-guard：向量 = testdata/safety_root.json
+       path-guard：向量在 `@yohu/api` `safety.test` ↔ testdata/safety_root.json
        失败：notifyError，不改 path，不关输入
        成功：loadListing → ++listGen → files.list → ListingEntry
 面包屑 / 上级

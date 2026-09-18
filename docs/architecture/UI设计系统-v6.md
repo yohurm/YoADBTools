@@ -1,12 +1,19 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.56（2026-09-18，滚动条侧轨 hoverWidth 16vp）
+> **状态：** v3.63（2026-09-18，YoSearch 独立模块）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.63 变更（YoSearch 独立模块）：** 检索引擎从 form / domain / api 单文件拆出。权威在 `core/yohu-search`；YoUI `search/` 自持引擎分层 + 铬 + 模块 API。产品模块只接线。见 [youi.md](youi.md)。
+> **v3.62 变更（Yo 搜索引擎）：** 当时 `@yohu/ui` 把引擎塞进 `form/search-model`。现收进独立 `search/` 模块，见 v3.63。
+> **v3.61 变更（命令库折叠搜索）：** 当时命令库栏标题右侧搜索钮走 HarmonyOS Symbol `hm-search`。现收进 `YoSearch` 入口槽，见 v3.62。
+> **v3.60 变更（命令块按步填参 1-0）：** `{n}` 只活在一条模板上。命令填参标签 `{n}`；块按步展开 `1-0` / `2-0`（步从 1 计、本步下标从 0 计），描述跟步骤走。落盘仍是 schema 3 的 `{n}`，不存 `{1-0}`。填值仍是按槽顺序的 `string[]`。旧块级 `params` 忽略。见 [modules/terminal.md](modules/terminal.md)。
+> **v3.59 变更（命令块占位符作用域）：** 已废。条目级 `PlaceholderScope` / `entrySlots` / 「插入参数位置」不再使用。
+> **v3.58 变更（命令块步骤进出场）：** 新增/删除步骤与参数描述同一套 Presence 配方 `list`（`YoReorderList` 行内播出，让位 `translateY` 留在行宿主）。短列表身份槽 `useListPresenceSlots` 由 YoListPresence 与 YoReorderList 共用。全步 `{n}` 并集已废，见 v3.60。见 [modules/terminal.md](modules/terminal.md)、[youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v3.57 变更（命令块图标）：** `block` 改与 `terminal` 同族：同一只提示符 + 右侧三行。禁止清单点 `list`，禁止 Lucide `square-stack` 碎角落。新增命令块钮、命令库树叶子、发送队列 Chip 同一字形。见 [modules/terminal.md](modules/terminal.md)。
 > **v3.56 变更（滚动条侧轨按官方 hoverWidth）：** 对照 ArkUI `SetHoverWidth`：热区 / 内容让位 = `activeWidth + margin×2` = 16vp，不再用空闲条 4vp + 边 4vp = 8vp（那会让滑块贴死日期列）。静置 [8vp 空][4vp 条][4vp 边]；Hover GROW 8vp 仍落在槽内。`YoColFrame` 表头跟 16vp gutter 对齐。清单 fill / 投放框宽走视口内容盒，不进侧轨。见 [youi.md](youi.md)。
 > **v3.55 变更（滚动条 Hover GROW / List Auto）：** 对照 ArkUI 内置条：unset 宽 Hover/Press `PlayScrollBarGrowAnimation` 4vp→8vp；短轨（<240vp）最短 `max(轨×20%, 8vp)`；点轨道先翻一页，500ms 后再 100ms 连翻。官方 List/Grid/Scroll 默认 `BarState.Auto`，`YoVirtualList` 不再强制 On。色仍走 40% `--yohu-fg-3`（官方默认 `#182431` @ 40%）。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v3.54 变更（命令块图标）：** 命令块身份从通用 `list`（清单点）换成 `block`（叠方块，Lucide `square-stack`）。新增命令块钮、命令库树叶子、发送队列 Chip 同一字形。禁止再用 `list` 冒充命令块。见 [modules/terminal.md](modules/terminal.md)。
@@ -497,7 +504,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **文件类型图标**：`<YoFileIcon name kind size>`。L2 `fileGlyphFor` 选字形；L4 SVG 只绑 `data-fill`，色走 Harmony FileIcon 板 token。模块禁止内联文件 SVG。禁止 Material hex，禁止纪律脚本豁免。分层见 [youi.md](youi.md)。
 - **禁止**：模块内再写一份 SVG、emoji 当图标、静态对象缓存 JSX 节点。
 - **风格**：24×24 viewBox、描边 2、`currentColor`；`play`/`pause` 实心。新增通用图标只改 `icons.tsx` 的 `ICON_GLYPHS`。
-- **命令块**：身份字形是 `block`（叠方块）。新增命令块钮、命令库树叶子、发送队列 Chip 共用。禁止再用 `list`（清单点）冒充命令块。
+- **命令块**：身份字形是 `block`（提示符 + 三行，与 `terminal` 同族）。新增命令块钮、命令库树叶子、发送队列 Chip 共用。禁止 `list`、禁止碎角叠方块。
 
 ### 2.6 圆角阶梯
 
@@ -604,8 +611,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel title="命令库"`（宽 `--yohu-layout-sidebar` 240vp）+ 右侧结果 `YoPanel title="执行结果"`（间距 12vp）。两栏标题走面板 `title`（鸿蒙 Compact 栏 + 一级字），禁止左栏无标题、禁止再套 Toolbar 灰带。页眉不放执行/取消。
-- 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-header`，禁止套数据行 `--yohu-row-height`。点击组行或展开箭头只开合该组，不选中、不入队。选中/hover 走 `.yohu-interactive`（只有叶子选中）。命令与命令块同级：命令图标 `terminal`，命令块图标 `block`；命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
-- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。栏标题 `YoToolbar pad=xs` 贴栏素底，与清单名 12vp 同缘，禁止再嵌 control 灰带。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单行走 `YoVirtualList`，禁止自写圆角底或 `focus-ring`。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令（`plus`）或命令块（`block`，禁止 `list`）。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。具体命令标签后括号说明 `{n}` 为独立参数；按钮「插入参数」在光标或选区写入下一个未用下标。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令自上而下（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与每个 `{n}`（有描述则跟在标签后），不展示预览；命令块一次填多步。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
+- 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-header`，禁止套数据行 `--yohu-row-height`。栏标题右侧 `YoSearch slot=entry`，栏下 `slot=bar` 折叠；过滤走 YoSearch 引擎（组名命中保留整组）。点击组行或展开箭头只开合该组，不选中、不入队。选中/hover 走 `.yohu-interactive`（只有叶子选中）。命令与命令块同级：命令图标 `terminal`，命令块图标 `block`；命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
+- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。栏标题 `YoToolbar pad=xs` 贴栏素底，与清单名 12vp 同缘，禁止再嵌 control 灰带。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单行走 `YoVirtualList`，禁止自写圆角底或 `focus-ring`。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令（`plus`）或命令块（`block`，禁止 `list`）。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。`{n}` 只活在一条模板上；按钮「插入参数」在本行光标写入下一个未用下标。命令描述标签 `{n}`；块描述与填参标签 `1-0` / `2-0`，跟步骤走，换位带着描述。禁止条目级并集。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令/该步（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；增删步骤走 `YoReorderList` 行内 Presence `list`（与参数描述同一 `useListPresenceSlots`）；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与填参栏（命令 `{n}`，块 `1-0`；有描述则跟在标签后），不展示预览；命令块一次按步序填多格。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。时间默认 `HH:mm:ss.SSS`（设置 `terminal_time_format`，立即投影已画出的行）。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；Chip leading 命令 `terminal` / 块 `block` / 组 `folder`；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
@@ -653,6 +660,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | YoContextMenuHost | 应用根唯一实例；Portal 到 body；同时只开一个场景。模块禁止自挂 List | `role=menu/menuitem`（Host 内 List） |
 | YoTooltip / YoTooltipHost | 只给无可见文案的铬；主题抬升指向气泡 + 箭头；落点离散；悬停或键盘焦点出示；指针点击后的程序移焦 / 按下 / 模态入栈立即卸；密集提示共一个 popup；无 Host 不画 | `role=tooltip` + `aria-describedby` |
 | YoIconButton | 激活执行；`loading` 时不可激活；可见提示走 YoTooltip | `aria-label`（title）+ `aria-busy` |
+| YoSearch | 栏可输入；Enter 提交；Esc 先清再关折叠；入口切换折叠 | 栏 `role=search` + `searchbox`；入口 `aria-expanded` / `aria-controls` |
 | YoLoading | 非交互；减动效时环静止 | `role=status aria-busy aria-live=polite` |
 | YoFormRow | 非交互容器；左侧标题栈与右侧控件垂直居中 | 无；控件自带 ARIA |
 | YoSegmentedButton | 单选：←/→/↑/↓ 循环选中，Home/End 首尾。多选：方向键只移焦，空格/点击切换 | 单选 `radiogroup/radio` + `aria-checked`；多选 `group` + `aria-pressed` + `aria-multiselectable` |

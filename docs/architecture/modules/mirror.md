@@ -1,6 +1,7 @@
 # 模块：投屏
 
 - 能力：`yohu-mirror` 解复用 + 槽位；壳 `mirror_present` 编译期系统硬解呈现（ADR-v6-024/026/027/028/032；Windows = MF）
+- 编码默认档：domain `USB_ENCODE` / `WIFI_ENCODE` + `@yohu/api` `mirror`（`testdata/mirror_encode.json`）。`start_encode` / `start_force_forward` 只在 core 展开（`mirror_start_encode.json`）。模块 `quality.ts` 只做档位文案与选项表
 - 官方未改 `scrcpy-server` 4.1 sidecar；禁止拉起 `scrcpy.exe`（ADR-v6-015）
 - 槽位与采集同构：仅 Live adopt；`mirror/state` 必达；首帧 `mirror/painted`
 - 长驻 `app_process` 的杀树走 `yohu_runtime::kill_tree`

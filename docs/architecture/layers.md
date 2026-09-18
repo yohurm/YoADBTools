@@ -24,8 +24,8 @@ files / logsrv / mirror / update     capability
 yohu-adb                       设备运输（官方 adb sidecar）
         ↓
 yohu-domain                    规则（无 IO）
-yohu-runtime ∥ yohu-protocol ∥ yohu-motion
-  宿主过程/持久化/OS 根  ∥  wire  ∥  动效时长/曲线/DComp 采样
+yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
+  宿主过程/持久化/OS 根  ∥  wire  ∥  动效时长/曲线/DComp 采样  ∥  检索引擎
 ```
 
 不建名为 `yohu-foundation` 的杂烩 crate。
@@ -36,8 +36,9 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 |-------|------|------|
 | `yohu-runtime` | `process` / `persist` / `os_paths` | 产品类型、设备路径、HTTP、Tauri |
 | `yohu-motion` | MotionSpec 时长/曲线；Windows 合成器时钟与 `IDCompositionAnimation` 采样 | 产品 HWND 树、Tauri、wire、设备 |
+| `yohu-search` | 目录级检索引擎（分词 / 命中 / 评分 / 组扩展 / 高亮） | 产品类型、命令库、logcat、路径、Tauri、domain |
 | `yohu-protocol` | serde DTO、身份、事件名 | IO、判定、正则 |
-| `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri |
+| `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri、检索引擎 |
 | `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、实现 `Runner` | 日志会话、文件浏览用例、投屏 demux |
 | `yohu-files` / `logsrv` / `mirror` | 各自用例 | capability 互引；绕过 SafetyRoot |
 | `yohu-update` | 更新检查 / 下载 / 覆盖安装（GitHub Releases） | 依赖 adb |
@@ -55,12 +56,20 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion
 
 ## `yohu-motion`
 
-与 runtime / protocol 并列，互不依赖。公开面是 `MotionSpec`（与 `@yohu/ui` `tokens/motion.ts` 同名同值，`testdata/motion_spec.json` 锁死名→ms+控制点）：`duration_ms()` + `ease()`。Windows 另含 DWM 时钟、单 HWND 消息泵、`IDCompositionAnimation` 采样（入口收 `MotionSpec`）。屏幕 RECT 算术在壳 `native_splash/geometry`，不进本 crate。弹簧物理只在 CSS 采样；原生弹簧槽位回退标准贝塞尔。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只点规格名，禁止再写散落毫秒。
+与 runtime / protocol / search 并列，互不依赖。公开面是 `MotionSpec`（与 `@yohu/ui` `tokens/motion.ts` 同名同值，`testdata/motion_spec.json` 锁死名→ms+控制点）：`duration_ms()` + `ease()`。Windows 另含 DWM 时钟、单 HWND 消息泵、`IDCompositionAnimation` 采样（入口收 `MotionSpec`）。屏幕 RECT 算术在壳 `native_splash/geometry`，不进本 crate。弹簧物理只在 CSS 采样；原生弹簧槽位回退标准贝塞尔。禁止启动 overlay、投屏 clip、产品类型、Tauri。壳内 `native_splash` 与 `mirror_present` 各自建 HWND 树，只点规格名，禁止再写散落毫秒。
+
+## `yohu-search`
+
+与 runtime / protocol / motion 并列，互不依赖。公开面是分词 / 字段命中 / 文档检索 / 组扩展 / 高亮 / `SearchEngine`。YoUI `search/engine` 镜像 `testdata/search.json`。内存线性扫描，不做倒排、不做编辑距离。下标按 Unicode 标量。禁止产品类型、命令库、logcat、路径、Tauri、进 domain。产品模块只把 DTO 编成 `SearchDocument`。
+
+## 产品规则镜像
+
+产品判定权威在 `yohu-domain` + testdata。`@yohu/api` 持 TS 镜像（`datetime` / `path-input` / `safety` / `log-filter` / `log-bind` / `log-format` / `log-signal` / `command-line` / `focus` / `device` / `mirror`）。模块与壳只做铬与接线，禁止再写一份匹配 / 占位符 / 拆行 / 焦点收敛 / 信号扫描 / USB·WIFI 默认档。公共引擎（search / motion）不进 domain、不进 api。不另建 `yohu-foundation`。墙钟、POSIX 拼接、`{n}`、argv 拆行都是本产品规则，不是第二套公共 crate。路径代数在 domain `path`，安全根在 `safety`，同一 crate。`start_encode` 只在 core 展开，不进 View。
 
 ## 仓库布局
 
 ```text
-core/yohu-{runtime,protocol,motion,domain,adb,files,logsrv,mirror,update}
+core/yohu-{runtime,protocol,motion,search,domain,adb,files,logsrv,mirror,update}
 app/yohu-adbtools
 ui/packages/{api,ui,workbench} + modules/* + apps/shell
 tools/  adb sidecar + scrcpy-server + fake-adb

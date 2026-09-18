@@ -24,9 +24,10 @@
 | 窗口框架 | `chrome/` | Chrome / TitleBar / StatusBar |
 | 菜单 | `context-menu/` | Host + List（页面不直接挂 Menu） |
 | 动画 / 图形绘制 | `motion/` / `corner/` | 基础设施，不是产品兄弟件 |
+| 检索 | `search/` | YoSearch（引擎 + 铬；不是 form 族） |
 | 视口夹紧 | `placement/` | `readViewport`；`overlay/popover-place` 与右键 `place.ts` 共用。不是 `components/` |
 
-**独立：** 每个 Yo* 自己的 L2/L3/L4 只依赖 token / icons / corner / motion。容器（Page / Panel / Toolbar / Dialog / Chrome / TitleBar / Scroller / Tree 等）只开槽，禁止 import 另一个产品 Yo*。调用方组合：`YoToolbar` 里放 `YoSubheader`，`YoDialog` children 里放 `YoScroller`，`YoChrome.leading` 放 `YoBadge`，`YoTree.renderBadge` 放 `YoBadge`。对照鸿蒙 `bindPopup`：只有 `YoIconButton.title` 与地址铬短热区可内挂 `YoTooltip`。
+**独立：** 每个 Yo* 自己的 L2/L3/L4 只依赖 token / icons / corner / motion。容器（Page / Panel / Toolbar / Dialog / Chrome / TitleBar / Scroller / Tree 等）只开槽，禁止 import 另一个产品 Yo*。调用方组合：`YoToolbar` 里放 `YoSubheader`，`YoDialog` children 里放 `YoScroller`，`YoChrome.leading` 放 `YoBadge`，`YoTree.renderBadge` 放 `YoBadge`。对照鸿蒙 `bindPopup`：只有 `YoIconButton.title`、`YoSearch` 入口 `title` 与地址铬短热区可内挂 `YoTooltip`。
 
 **滚轴：** 产品条只有 `YoScroller`。视口只纵滚（`overflow-x: clip`，`overflow-y: hidden`），滚轮改 `scrollTop`，禁止 `overflow-y: auto` 留系统条。侧轨 overlay，溢出时视口 `padding-inline-end` 让出 16vp（官方 hoverWidth），禁止 flex 兄弟夺滚动口宽。`YoPanel` / `YoDialog` / `YoToolbar` / `YoTabs` 不画系统条（pane 默认 hidden；`YoPanel` 两轴同一 overflow，禁止 `overflow-x` / `data-overflow-x`；Dialog `bodyOverflow=auto` 只裁切；`YoToolbar` 两轴 `overflow: hidden`，消费 `data-overflow`，禁止只写 `overflow-x`；`YoTabs` 页签条两轴 `overflow: hidden`，禁止只写 `overflow-x`）。模块自己组合 `YoScroller`。清单体 `YoVirtualList` **内组合** `YoScroller`（宿主只裁切，`hostRef` 指向内嵌 YoScroller 视口）；`YoReorderList` 读祖先滚口走同族 ScrollerPort（不进 L5）。禁止模块再外包第二根。传输坞 / 整页 Dialog（`bodyOverflow=hidden`）自管高度，不加第二根。浮层（Select / ContextMenu / 多行 TextField）可 `overflow: auto`，但必须 `scrollbar-width: none`。`scripts/check-youi-independence.mjs` 锁 Panel.css / Toolbar.css / Tabs.css 的 `overflow-[xy]` 与 `auto`；Dialog / Scroller / VirtualList / ReorderList 仍锁 `overflow-y: auto`；Panel / Dialog 禁止 import Scroller。
 
@@ -41,7 +42,7 @@
 
 禁止模块自挂 `YoContextMenu`。YoUI **零 IPC、零产品业务**。
 
-L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplate` / `defaultColWidths`、`moveItemTo` / `insertIndexFromPointerY` / `insertIndexFromRowBoxes` / `moveIndexFromInsert` / `shiftForReorder`、keymap、菜单（`open` / `close` / `refine`）、`Toaster`（`show` / `dismiss` / `destroy`）、`shouldSkipMotion`、`DISMISS_HOLD_DURATION`、`YoRail` / `useRail` / `rail*`、`YoCorner`（`flex` / `overflow` / `pad` / `direction` / `align` / `justify` / `gap`）/ `CornerPillRadius`、`YoScroller`、`address-field-model`（`addressClickKind` / `addressDismissOutside` / `addressOpenCaret` / `addressScrollPin` / `addressCrumbPath` / `isAddressVacantClick`）、`getTheme` / `onResolvedThemeChange`、`bindFocusModality`。`bindFocusModality` 在 token 入口已绑，壳不必再调用。不导出 `YOHU_FOCUS_*` / glyph / wipe 帧 / resize session / `ColResizePhase` / `ReorderBar` / `ReorderOverlay` / `ReorderSession` / `dropIndexFromCenters` / `YoListRow` / `YoListFrame` / list-row / list-frame 模型 / 菜单 Session / `ToastItem` / Unique 工厂 / 分段上限常量 / 圆角路径函数 / `useTravel` / `useCollapseTravel` / `useScrollerPort` / `ScrollerPort` / `resolveScrollerScrollEnd`。模块铬面可包 `YoCorner`；禁止再 `border` + `overflow:hidden` 叠圆角，禁止再点 `__content`。宿主只依赖组件、列宽写入与换位纯函数。
+L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplate` / `defaultColWidths`、`moveItemTo` / `insertIndexFromPointerY` / `insertIndexFromRowBoxes` / `moveIndexFromInsert` / `shiftForReorder`、keymap、菜单（`open` / `close` / `refine`）、`Toaster`（`show` / `dismiss` / `destroy`）、`shouldSkipMotion`、`DISMISS_HOLD_DURATION`、`YoRail` / `useRail` / `rail*`、`YoCorner`（`flex` / `overflow` / `pad` / `direction` / `align` / `justify` / `gap`）/ `CornerPillRadius`、`YoScroller`、`address-field-model`（`addressClickKind` / `addressDismissOutside` / `addressOpenCaret` / `addressScrollPin` / `addressCrumbPath` / `isAddressVacantClick`）、`search/`（`YoSearch` + `normalizeSearchQuery` / `tokenizeSearchQuery` / `searchFieldHit` / `searchDocuments` / `expandSearchGroups` / `searchHighlightRanges` / `createSearchEngine`）、`getTheme` / `onResolvedThemeChange`、`bindFocusModality`。`bindFocusModality` 在 token 入口已绑，壳不必再调用。不导出 `YOHU_FOCUS_*` / glyph / wipe 帧 / resize session / `ColResizePhase` / `ReorderBar` / `ReorderOverlay` / `ReorderSession` / `dropIndexFromCenters` / `YoListRow` / `YoListFrame` / list-row / list-frame 模型 / 菜单 Session / `ToastItem` / Unique 工厂 / 分段上限常量 / 圆角路径函数 / `useTravel` / `useCollapseTravel` / `useScrollerPort` / `ScrollerPort` / `resolveScrollerScrollEnd`。模块铬面可包 `YoCorner`；禁止再 `border` + `overflow:hidden` 叠圆角，禁止再点 `__content`。宿主只依赖组件、列宽写入与换位纯函数。
 
 列拖拽不是 `YoTable`。清单体仍是 `YoVirtualList`。公共层：
 
@@ -71,7 +72,7 @@ HarmonyOS 对照：官方「圆角半径控制圆弧曲率」= **四分之一圆
 
 PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 20）；`card` / `dialog` = `Radius.Md` 16（手机弹出框 32）。层级正相关：弹出框 ≥ 卡片 > 按钮。
 
-消费面：`YoDialog` / `YoButton` / `YoIconButton` / `YoPanel` / `YoSelect` / `YoContextMenu` / `YoTooltip` / `YoTextField` / `YoToast` / `YoCheckbox` / `YoChip` / `YoBadge` / `YoStatusDot` / `YoDivider` / `YoSubheader` / `YoListItem` / `YoDescriptionList` / `YoAddressField` / `YoToolbar` / `YoProgressBar`。`YoCorner` 已进 L5；不进 L5 的只是 `corner/` 路径函数。公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。内容槽 `box-sizing: border-box`，pad 是槽内 inset。禁止消费方点 `__content`。开关 thumb / 正圆点仍走 token；气泡胶囊走 `CornerPillRadius`。`YoScroller` 不在消费面。
+消费面：`YoDialog` / `YoButton` / `YoIconButton` / `YoPanel` / `YoSelect` / `YoContextMenu` / `YoTooltip` / `YoTextField` / `YoSearch` / `YoToast` / `YoCheckbox` / `YoChip` / `YoBadge` / `YoStatusDot` / `YoDivider` / `YoSubheader` / `YoListItem` / `YoDescriptionList` / `YoAddressField` / `YoToolbar` / `YoProgressBar`。`YoCorner` 已进 L5；不进 L5 的只是 `corner/` 路径函数。公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。内容槽 `box-sizing: border-box`，pad 是槽内 inset。禁止消费方点 `__content`。开关 thumb / 正圆点仍走 token；气泡胶囊走 `CornerPillRadius`。`YoScroller` 不在消费面。
 
 ---
 
@@ -347,6 +348,29 @@ title / description / note / children
 
 ---
 
+## 模块：YoSearch（`search/`，独立）
+
+公共检索模块，**不是** `yohu-domain`、**不是** `@yohu/api`、**不是** form 族里一个文件。对照 `motion/` / `corner/`：自己的目录、内部分层、模块 `index.ts` 才是 API。算法权威在 `core/yohu-search`（与 `yohu-motion` 并列，零产品类型）；本目录镜像 testdata。禁止命令库 / logcat / 路径进引擎。
+
+```
+产品模块文档表 / query
+  → engine/token · field · score · query · expand · highlight · engine
+  → search-policy（slot / open / cancel / paint / fill）
+  → Search.tsx（入口钮 + 栏；折叠走 YoCollapse）
+  → search/index.ts → @yohu/ui L5
+```
+
+| 层 | 位置 | 职责 |
+|----|------|------|
+| 引擎 | `search/engine/{types,token,chars,field,score,query,expand,highlight,engine}.ts` | 归一 / 分词 / 字段命中 / 加权 / 检索 / 组扩展 / 高亮 / 快照。`chars` 不进公开面 |
+| 铬策略 | `search-policy.ts` | 入口与栏槽、折叠开闭、CancelButtonStyle、data-* |
+| 铬视图 | `Search.tsx` + `Search.css` | HarmonyOS Search：左图标、右 INPUT 清除、可折叠；不是 TextField 叠 prefix |
+| API | `search/index.ts` | 只转发引擎公开函数 + `YoSearch` |
+
+公开铬：`value` / `onInput` / `onSubmit` / `placeholder` / `ariaLabel` / `title`（只给入口气泡）/ `disabled` / `block`（栏默认铺宽）/ `status` / `active`（未写则有查询即亮）/ `cancel`（`input` \| `constant` \| `invisible`）/ `collapsible` / `open` / `onOpenChange` / `slot`（`entry` \| `bar` \| `both`）/ `id`（分槽共用）/ `inputRef`。Enter 提交；Esc 先清再关折叠。禁止模块再叠 `YoIconButton` + `YoCollapse` + `YoTextField` 冒充搜索。业务字段怎么编文档、组树怎么还原留在产品模块。
+
+---
+
 ## 组件：YoIconButton（L0–L5）
 
 透明底图标钮，不是 YoButton 的 buttonStyle。`size?: "sm" | "md"`（默认 md），禁止魔法 px。
@@ -584,7 +608,7 @@ YoTooltip(content, children, delay?: MotionSpecName)
 | L4 | Tooltip.tsx / Tooltip.css | Presence + `__content` + `__arrow`；未 placed 先透明；进场只在落点后 |
 | L5 | index.ts | YoTooltip、YoTooltipHost（不导出 Unique 工厂） |
 
-公开 API：`content` / `children` / `delay?: MotionSpecName`（缺省 `effectsEnter`）/ `disabled` / `block`（无文案铬铺满主轴）/ `stretch`（无文案铬铺交叉轴）。无 `Tooltip.show`。无 Host 不画。壳根与 `YoContextMenuHost` 并列挂一份 `YoTooltipHost`。只给无可见文案的铬：`YoIconButton.title`、地址铬短热区、方向图标、空热区。标题栏三键只走 `aria-label`。已画出的字（表格格、路径、树标签、Select 值、设备卡、表头）禁止包本组件，省略号不靠气泡复述；多出来的信息画在界面上或只走 `aria-label`。禁止模块再写原生 `title` 冒充提示，禁止点 `__anchor`。`Tree` / `Select` / `ColHeader` 不内包本组件。
+公开 API：`content` / `children` / `delay?: MotionSpecName`（缺省 `effectsEnter`）/ `disabled` / `block`（无文案铬铺满主轴）/ `stretch`（无文案铬铺交叉轴）。无 `Tooltip.show`。无 Host 不画。壳根与 `YoContextMenuHost` 并列挂一份 `YoTooltipHost`。只给无可见文案的铬：`YoIconButton.title`、`YoSearch` 入口 `title`、地址铬短热区、方向图标、空热区。标题栏三键只走 `aria-label`。已画出的字（表格格、路径、树标签、Select 值、设备卡、表头）禁止包本组件，省略号不靠气泡复述；多出来的信息画在界面上或只走 `aria-label`。禁止模块再写原生 `title` 冒充提示，禁止点 `__anchor`。`Tree` / `Select` / `ColHeader` 不内包本组件。
 
 出示：悬停，或键盘模态下的焦点（Host 记 pointerdown / keydown）。禁止把点击后的程序 `.focus()`（对话框首焦）当悬停。按下锚点与模态 `attachDialog` 立即卸 Unique，不跟隐藏延迟。L5 不导出 Unique / 模态 / `dismissTooltipOverlay`。Presence 仍走 `popover`。落点禁止 `top/left` 过渡（首帧 `auto→px` 会冒充从左滑入，Unique 换到关闭键更明显）。未 `data-placed` 先 `opacity: 0`（不用 `visibility: hidden`，以免 hug 测宽为 0），进场 `yohu-tip-*` 只在落点后播；换锚只改坐标与文案。标题栏贴顶翻下。右缘夹 6vp，箭头跟着锚点。
 
@@ -809,7 +833,7 @@ onReorder?: (from: number, to: number) => void  // 可选；浮层+让位+插缝
 
 ## 组件：YoReorderList（L0–L5）
 
-变高、非虚拟换位列表。命令块步骤等跟内容变高的短列表走这里，不定高 `YoVirtualList`。整行按住过臂距后同一套浮层 / 占位 / 让位 / 插缝；行内 input/button 不抢换位。禁止常驻手柄。宿主 `overflow: hidden`。读祖先滚口走同族 ScrollerPort（不进 L5）：行盒与指针坐标用 `port.scrollTop()`，禁止再读宿主 `scrollTop`。滚轮单源祖先 `YoScroller`。禁止 `overflow: auto` 留系统条。
+变高、非虚拟换位列表。命令块步骤等跟内容变高的短列表走这里，不定高 `YoVirtualList`。整行按住过臂距后同一套浮层 / 占位 / 让位 / 插缝；行内 input/button 不抢换位。禁止常驻手柄。宿主 `overflow: hidden`。读祖先滚口走同族 ScrollerPort（不进 L5）：行盒与指针坐标用 `port.scrollTop()`，禁止再读宿主 `scrollTop`。滚轮单源祖先 `YoScroller`。禁止 `overflow: auto` 留系统条。身份槽与 `YoListPresence` 共用 L3 `useListPresenceSlots`（一份 reconcile）。Presence 配方 `list` 挂在行内，让位 `translateY` 留在 `.yohu-reorder-list__row`，禁止把行塞进 clip。浮层仍直接画 `renderRow`。量盒跳过 `data-exiting`。禁止模块再包一层 `YoListPresence`，禁止 ReorderList 再自写一套 store/splice。
 
 ### 设计后链路
 
@@ -909,7 +933,7 @@ size?: number   // 默认 Layout.IconSm
 
 ## 原语：YoListPresence
 
-短列表 insert/remove。对照 Vue `TransitionGroup`：enter/leave 只属于插入/删除的 key。clip 出生 `closed`（0fr），双 rAF 后 `open`；已在场项不重挂。当前树上第一槽（含出场中）在 Presence 宿主写 `data-first`。模块用 `[data-first]` 消首距，禁止点 `.yohu-presence`。清屏 `exit={false}` 直切。默认配方 `list`（纵向高度）。写入盒 Token 用 `recipe="chip"`（横向宽度 + scale，不撑 `--yohu-control-height`）。禁止模块自写进出场。
+短列表 insert/remove。对照 Vue `TransitionGroup`：enter/leave 只属于插入/删除的 key。身份槽走 L3 `useListPresenceSlots`（与 `YoReorderList` 同一份）。clip 出生 `closed`（0fr），双 rAF 后 `open`；已在场项不重挂。当前树上第一槽（含出场中）在 Presence 宿主写 `data-first`。模块用 `[data-first]` 消首距，禁止点 `.yohu-presence`。清屏 `exit={false}` 直切。默认配方 `list`（纵向高度）。写入盒 Token 用 `recipe="chip"`（横向宽度 + scale，不撑 `--yohu-control-height`）。禁止模块自写进出场。
 
 ---
 

@@ -28,8 +28,8 @@
 
 ```text
 UI → @yohu/api → IPC ← commands ← core
-yohu-runtime ∥ yohu-protocol ∥ yohu-motion（互不依赖）
-yohu-domain → yohu-protocol
+yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search（互不依赖）
+yohu-domain → yohu-protocol（禁止 yohu-search）
 yohu-adb → yohu-runtime + protocol + domain
 yohu-{files,logsrv,mirror} → yohu-adb（设备运输）
 yohu-update → protocol + runtime（禁止 adb）
