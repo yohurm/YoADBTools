@@ -6,8 +6,9 @@
  */
 
 import type { LogColorScheme } from "./log-color-scheme";
+import type { LogLineLayout } from "./log-line-layout";
 
-export type { LogColorScheme };
+export type { LogColorScheme, LogLineLayout };
 
 // ===== device =====
 
@@ -124,6 +125,7 @@ export interface AppSettings {
   log_display_columns: LogDisplayColumns;
   log_time_format: TerminalTimeFormat;
   log_color_scheme: LogColorScheme;
+  log_line_layout: LogLineLayout;
   mirror_max_size: number;
   mirror_video_bit_rate: number;
   mirror_max_fps: number;
@@ -157,6 +159,7 @@ export type SettingKey =
   | "log_display_columns"
   | "log_time_format"
   | "log_color_scheme"
+  | "log_line_layout"
   | "mirror_max_size"
   | "mirror_video_bit_rate"
   | "mirror_max_fps"
