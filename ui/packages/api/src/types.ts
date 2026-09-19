@@ -41,6 +41,8 @@ export interface LogLine {
   pid: number;
   tid: number;
   uid?: string;
+  /** 对照 LogcatHeader.applicationId。long 头不打印此列；采集缺省，清单 Formatter 用进程索引填 */
+  app?: string;
   level: string;
   tag: string;
   msg: string;
@@ -136,14 +138,15 @@ export interface AppSettings {
   terminal_time_format: TerminalTimeFormat;
 }
 
-/** 日志清单元数据列开关；消息列始终显示。 */
+/** 日志清单元数据列开关；消息列始终显示。默认对齐官方 STANDARD。 */
 export interface LogDisplayColumns {
   ts: boolean;
   uid: boolean;
   pid: boolean;
   tid: boolean;
-  level: boolean;
   tag: boolean;
+  app: boolean;
+  level: boolean;
 }
 
 export type SettingKey =

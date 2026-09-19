@@ -1,7 +1,7 @@
 /**
- * 日志清单长文本方案表。
- * 身份在 wire（settings.log_line_layout）；画法只在模块 editor/view。
- * Formatter / Document 禁止认本表。设置项与清单只认本表，禁止各写一份 id / 文案。
+ * 日志清单长文本方案表。对照官方 Soft-Wrap。
+ * 身份在 wire（settings.log_line_layout）。
+ * Formatter 认 softWrap；Document 只 append；View 只按文档硬 \\n 切可视行。
  */
 
 export type LogLineLayout = "clip" | "wrap";
@@ -16,12 +16,13 @@ export const LOG_LINE_LAYOUT_CATALOG: readonly {
   {
     value: "clip",
     label: "单行（LogCat，默认）",
-    description: "对照 LogCat Soft-Wrap 关：不按视口折，硬换行仍切行，超宽底栏横滑。",
+    description:
+      "对照 LogCat Soft-Wrap 关：硬换行写入 headerWidth 空格，无硬换行的超长行不折，超宽底栏横滑。",
   },
   {
     value: "wrap",
     label: "超宽换行",
-    description: "只折消息；前缀不拆，续行悬挂对齐消息列。",
+    description: "对照 LogCat Soft-Wrap 开：文档不垫悬挂空格，续行从第 0 列起，按视口软折。",
   },
 ];
 

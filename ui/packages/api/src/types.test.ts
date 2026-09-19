@@ -324,14 +324,15 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   });
 
   it("LogDisplayColumns 字段为 snake_case 布尔开关", () => {
-    const cols: LogDisplayColumns = { ts: true, uid: false, pid: true, tid: true, level: true, tag: false };
+    const cols: LogDisplayColumns = { ts: true, uid: false, pid: true, tid: true, tag: false, app: true, level: true };
     expect(JSON.parse(JSON.stringify(cols))).toEqual({
       ts: true,
       uid: false,
       pid: true,
       tid: true,
-      level: true,
       tag: false,
+      app: true,
+      level: true,
     });
   });
 
@@ -349,7 +350,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         density: "comfortable",
         export_default_path: "",
         export_ask_every_time: true,
-        log_display_columns: { ts: true, uid: false, pid: true, tid: true, level: true, tag: true },
+        log_display_columns: { ts: true, uid: false, pid: true, tid: true, tag: true, app: true, level: true },
         log_time_format: "datetime_millis",
         log_color_scheme: "yohu",
         log_line_layout: "clip",
