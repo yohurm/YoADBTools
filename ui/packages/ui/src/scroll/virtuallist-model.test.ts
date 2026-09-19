@@ -146,6 +146,15 @@ describe("virtuallist-model", () => {
       height: "22px",
       transform: "translate3d(0, 66px, 0)",
     });
+    expect(virtualRowBoxStyle(3, 22, 0, true, 1200)).toEqual({
+      position: "absolute",
+      top: "0px",
+      left: "0px",
+      right: "auto",
+      width: "1200px",
+      height: "22px",
+      transform: "translate3d(0, 66px, 0)",
+    });
     expect(virtualRowBoxStyle(1, 28, 0, false).visibility).toBe("hidden");
     expect(virtualContentWidth(400)).toBe(400);
     expect(virtualContentWidth(400, 16)).toBe(384);

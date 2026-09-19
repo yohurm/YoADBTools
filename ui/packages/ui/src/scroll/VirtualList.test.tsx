@@ -114,6 +114,7 @@ describe("YoVirtualList", () => {
     expect(src).toContain("contentWidth");
     expect(src).toContain("onInlineOffset");
     expect(src).toContain('axis={scrollerAxis()}');
+    expect(src).toContain("innerWidth()");
     expect(src).toContain("queueMicrotask(() => api.sync())");
     expect(src).toContain("preventScroll: true");
     expect(src).not.toContain("scrollIntoView");

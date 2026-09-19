@@ -561,7 +561,13 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           const drag = reorder.session();
           const shift =
             drag && current ? shiftForReorder(current.index, drag.from, previewDest(drag)) : 0;
-          return virtualRowBoxStyle(current?.index ?? 0, itemHeight(), shift, current != null);
+          return virtualRowBoxStyle(
+            current?.index ?? 0,
+            itemHeight(),
+            shift,
+            current != null,
+            innerWidth(),
+          );
         })()}
         onPointerDown={(event) => {
           const current = bound();

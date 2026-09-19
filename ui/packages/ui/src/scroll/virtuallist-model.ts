@@ -193,11 +193,13 @@ export function virtualRowBoxStyle(
   itemHeight: number,
   shiftRows = 0,
   visible = true,
+  widthPx = 0,
 ): {
   position: "absolute";
   top: "0px";
   left: "0px";
-  right: "0px";
+  right?: "0px" | "auto";
+  width?: string;
   height: string;
   transform: string;
   visibility?: "hidden";
@@ -206,7 +208,7 @@ export function virtualRowBoxStyle(
     position: "absolute",
     top: "0px",
     left: "0px",
-    right: "0px",
+    ...(widthPx > 0 ? { width: `${widthPx}px`, right: "auto" as const } : { right: "0px" as const }),
     height: `${itemHeight}px`,
     transform: virtualRowTransform(index, itemHeight, shiftRows),
     ...(visible ? {} : { visibility: "hidden" as const }),
