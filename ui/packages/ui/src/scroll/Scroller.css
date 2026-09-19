@@ -5,7 +5,8 @@
  * 溢出且未 Off：视口 padding-inline-end 让出 16vp，内容回流，条叠在这槽里（不贴内容右沿）。
  * Auto 隐条也留槽，避免跳布局。禁止 flex 兄弟夺视口（焦点会横滚裁首字）。
  * 视口 flex-basis 跟 in-flow 内容；父级有帽才收缩。禁止 1 1 0 把 hug 列表压成 0。
- * 只纵滚：overflow-x clip（不是滚动口），纵轴 hidden（禁止 auto 留系统条）。
+ * 默认只纵滚：overflow-x clip（不是滚动口），纵轴 hidden（禁止 auto 留系统条）。
+ * data-axis=both 才把 overflow-x 改 hidden，程序改 scrollLeft，底轨 overlay。
  */
 
 .yohu-scroller {
@@ -30,19 +31,45 @@
   box-sizing: border-box;
 }
 
+.yohu-scroller[data-axis="both"] > .yohu-scroller__view {
+  overflow-x: hidden;
+}
+
 .yohu-scroller[data-gutter="on"] > .yohu-scroller__view {
   padding-inline-end: var(--yohu-space-lg);
 }
 
+.yohu-scroller[data-gutter-inline="on"] > .yohu-scroller__view {
+  padding-block-end: var(--yohu-space-lg);
+}
+
 .yohu-scroller__lane {
   position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.yohu-scroller__lane[data-orient="block"] {
   inset-block: 0;
   inset-inline-end: 0;
   width: var(--yohu-space-lg);
   min-height: 0;
-  overflow: hidden;
-  pointer-events: none;
-  box-sizing: border-box;
+}
+
+.yohu-scroller[data-gutter-inline="on"] > .yohu-scroller__lane[data-orient="block"] {
+  inset-block-end: var(--yohu-space-lg);
+}
+
+.yohu-scroller__lane[data-orient="inline"] {
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: var(--yohu-space-lg);
+  min-width: 0;
+}
+
+.yohu-scroller[data-gutter="on"] > .yohu-scroller__lane[data-orient="inline"] {
+  inset-inline-end: var(--yohu-space-lg);
 }
 
 .yohu-scroller__lane[data-lane="on"] {
@@ -56,16 +83,29 @@
 
 .yohu-scroller__thumb {
   position: absolute;
-  inset-inline-end: var(--yohu-space-xs);
-  width: var(--yohu-space-xs);
   border-radius: var(--yohu-radius-xs);
   background-color: var(--yohu-fg-3);
   touch-action: none;
 }
 
-.yohu-scroller__lane:hover .yohu-scroller__thumb,
-.yohu-scroller__thumb[data-pressed] {
+.yohu-scroller__lane[data-orient="block"] .yohu-scroller__thumb {
+  inset-inline-end: var(--yohu-space-xs);
+  width: var(--yohu-space-xs);
+}
+
+.yohu-scroller__lane[data-orient="inline"] .yohu-scroller__thumb {
+  inset-block-end: var(--yohu-space-xs);
+  height: var(--yohu-space-xs);
+}
+
+.yohu-scroller__lane[data-orient="block"]:hover .yohu-scroller__thumb,
+.yohu-scroller__lane[data-orient="block"] .yohu-scroller__thumb[data-pressed] {
   width: var(--yohu-space-sm);
+}
+
+.yohu-scroller__lane[data-orient="inline"]:hover .yohu-scroller__thumb,
+.yohu-scroller__lane[data-orient="inline"] .yohu-scroller__thumb[data-pressed] {
+  height: var(--yohu-space-sm);
 }
 
 .yohu-scroller__lane:hover .yohu-scroller__thumb {

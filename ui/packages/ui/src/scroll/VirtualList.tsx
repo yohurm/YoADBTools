@@ -59,6 +59,7 @@ import {
   isVirtualSelectionEmpty,
   virtualActiveKey,
   virtualContentWidth,
+  virtualInnerWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
@@ -80,6 +81,7 @@ import {
   virtualHostAttrs,
   virtualRowAttrs,
 } from "./virtuallist-policy";
+import "./doc-sel.css";
 import "./VirtualList.css";
 
 export type YoVirtualListTone = "document" | "list";
@@ -131,6 +133,13 @@ export interface YoVirtualListProps<T> {
    * 松手提交 from/to；原槽或 Escape 不回调。键盘 Ctrl/Meta+↑/↓ 同一入口。
    */
   onReorder?: (from: number, to: number) => void;
+  /**
+   * 文档行宽（px）。abspos 行不撑 scrollWidth，inner 必须显式宽。
+   * >0 时 YoScroller axis=both，溢出才出底轨。0 / 缺省 = 只纵滚。
+   */
+  contentWidth?: Accessor<number>;
+  /** 横滚偏移。表头跟文档一起滑。纵滚贴底不看这个。 */
+  onInlineOffset?: (left: number) => void;
 }
 
 /**
@@ -203,9 +212,16 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   createEffect(() => {
     void totalHeight();
+    void innerWidth();
     const api = scrollerHandle;
     if (!api) return;
     queueMicrotask(() => api.sync());
+  });
+
+  createEffect(() => {
+    if (scrollerAxis() === "block") {
+      props.onInlineOffset?.(0);
+    }
   });
 
   const poolSize = createMemo(() =>
@@ -255,6 +271,10 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       (Number.parseFloat(style.paddingInlineEnd) || 0);
     return virtualContentWidth(el.clientWidth, pad);
   };
+
+  const innerWidth = (): number => virtualInnerWidth(props.contentWidth?.() ?? 0, viewContentWidth());
+
+  const scrollerAxis = (): "block" | "both" => (innerWidth() > 0 ? "both" : "block");
 
   const indicatorAnchor = (): IndicatorBox | null =>
     virtualIndicatorAnchor(
@@ -455,6 +475,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     if (!container) return;
     setScrollTop(container.scrollTop);
     setViewportHeight(container.clientHeight);
+    props.onInlineOffset?.(container.scrollLeft);
     emitAtBottom();
   };
 
@@ -594,6 +615,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       aria-multiselectable={host()["aria-multiselectable"]}
     >
       <YoScroller
+        axis={scrollerAxis()}
         handle={(api) => {
           scrollerHandle = api;
         }}
@@ -606,7 +628,13 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           });
         }}
       >
-      <div class="yohu-virtual-list__inner" style={{ height: `${totalHeight()}px` }}>
+      <div
+        class="yohu-virtual-list__inner"
+        style={{
+          height: `${totalHeight()}px`,
+          ...(innerWidth() > 0 ? { width: `${innerWidth()}px`, "min-width": "100%" } : {}),
+        }}
+      >
         <Show when={followKey() != null && reorder.session() === null}>
           <YoIndicator decorate={false} follow={followKey()} variant="fill" anchor={indicatorAnchor} />
         </Show>

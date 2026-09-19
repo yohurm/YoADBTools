@@ -58,6 +58,7 @@ const EXPECTED_LIGHT: Record<string, string> = {
   SwitchOff: "#00000019",
   TextSel: "#0A59F7",
   TextSelFg: "#FFFFFF",
+  DocSel: "color-mix(in srgb, var(--yohu-accent) 32%, var(--yohu-bg-base))",
   Scrim: "#00000019",
 };
 
@@ -74,6 +75,7 @@ const EXPECTED_DARK: Record<string, string> = {
   SwitchOff: "#FFFFFF19",
   TextSel: "#317AF7",
   TextSelFg: "#FFFFFF",
+  DocSel: "color-mix(in srgb, var(--yohu-accent) 55%, var(--yohu-bg-base))",
   Scrim: "#00000066",
 };
 
@@ -254,6 +256,15 @@ describe("HarmonyOS 对比度门禁（§1.6）", () => {
     expect(contrast(DarkColors.TextSel, DarkColors.Surface)).toBeGreaterThanOrEqual(3);
     expect(contrast(DarkColors.TextSelFg, DarkColors.TextSel)).toBeGreaterThanOrEqual(3);
   });
+
+  it("文档选区底是画布混品牌，不洗白 ink", () => {
+    expect(Colors.DocSel).toContain("color-mix");
+    expect(Colors.DocSel).toContain("var(--yohu-accent)");
+    expect(Colors.DocSel).toContain("var(--yohu-bg-base)");
+    expect(DarkColors.DocSel).toContain("55%");
+    expect(Colors.DocSel).not.toBe(Colors.TextSel);
+    expect(Colors.DocSel).not.toBe(Colors.AccentSoft);
+  });
 });
 
 describe("Yohu 级别板（复用鸿蒙语义色）", () => {
@@ -428,6 +439,7 @@ describe("theme.css 变量", () => {
     expect(themeCss).not.toContain("--yohu-state-selected-rule:");
     expect(themeCss).toContain("--yohu-text-sel:");
     expect(themeCss).toContain("--yohu-text-sel-fg:");
+    expect(themeCss).toContain("--yohu-doc-sel:");
     expect(themeCss).toContain("::selection");
     expect(themeCss).toContain("--yohu-ripple-inset: 0");
     expect(themeCss).toContain("--yohu-space-3xl: 40px");

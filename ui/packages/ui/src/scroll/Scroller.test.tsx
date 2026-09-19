@@ -45,6 +45,10 @@ describe("YoScroller", () => {
     expect(css).toContain(".yohu-scroller__view {");
     expect(css).toContain("overflow-x: clip");
     expect(css).toContain("overflow-y: hidden");
+    expect(css).toContain('[data-axis="both"] > .yohu-scroller__view');
+    expect(css).toContain('[data-gutter-inline="on"] > .yohu-scroller__view');
+    expect(css).toContain('[data-orient="block"]');
+    expect(css).toContain('[data-orient="inline"]');
     expect(css).not.toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).not.toContain("!important");
     expect(css).toContain("flex: 1 1 auto");
@@ -68,6 +72,9 @@ describe("YoScroller", () => {
     expect(src).toContain("scrollToEnd");
     expect(src).toContain("scrollToStart");
     expect(src).toContain("scrollPage");
+    expect(src).toContain("scrollToInline");
+    expect(src).toContain("offsetInline");
+    expect(src).toContain('data-orient="inline"');
     expect(src).toContain("ScrollerPortContext.Provider");
     expect(src).toContain("plane:");
     expect(src).toMatch(/const handle: YoScrollerHandle = \{[\s\S]*scrollTo: binder\.scrollTo/);
@@ -93,7 +100,9 @@ describe("YoScroller", () => {
     expect(binder).toContain("lastThumb");
     expect(binder).toContain("ResizeObserver");
     expect(binder).toContain("applyScrollTop");
+    expect(binder).toContain("applyScrollLeft");
     expect(binder).toContain("scrollLeft = 0");
+    expect(binder).toContain('host.axis() === "block"');
     expect(binder).not.toContain("scrollHeight");
     expect(binder).not.toContain("yohu-dialog");
     expect(binder).not.toMatch(/overflow-y\s*:\s*auto/);

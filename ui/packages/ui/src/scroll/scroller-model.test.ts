@@ -30,12 +30,23 @@ import {
   resolveScrollerThumbMin,
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
+  resolveScrollerAxis,
+  resolveScrollerViewSize,
   resolveScrollerClampedTop,
   resolveScrollerPageTop,
   resolveScrollerPageTowardPointer,
 } from "./scroller-model";
 
 describe("scroller-model", () => {
+  it("默认只纵滚，both 才开横轴", () => {
+    expect(resolveScrollerAxis()).toBe("block");
+    expect(resolveScrollerAxis("block")).toBe("block");
+    expect(resolveScrollerAxis("both")).toBe("both");
+    expect(resolveScrollerViewSize(200, 0, 16)).toBe(184);
+    expect(resolveScrollerViewSize(200, 8, 8)).toBe(184);
+    expect(resolveScrollerViewSize(10, 8, 8)).toBe(0);
+  });
+
   it("无法滚动则不溢出，滑块为空", () => {
     expect(SCROLLER_OVERFLOW_SLACK).toBe(Spacing.Xs);
     expect(resolveScrollerOverflow(200, 200)).toBe(false);
