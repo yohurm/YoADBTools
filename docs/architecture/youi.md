@@ -29,7 +29,7 @@
 
 **独立：** 每个 Yo* 自己的 L2/L3/L4 只依赖 token / icons / corner / motion。容器（Page / Panel / Toolbar / Dialog / Chrome / TitleBar / Scroller / Tree 等）只开槽，禁止 import 另一个产品 Yo*。调用方组合：`YoToolbar` 里放 `YoSubheader`，`YoDialog` children 里放 `YoScroller`，`YoChrome.leading` 放 `YoBadge`，`YoTree.renderBadge` 放 `YoBadge`。对照鸿蒙 `bindPopup`：只有 `YoIconButton.title`、`YoSearch` 入口 `title` 与地址铬短热区可内挂 `YoTooltip`。
 
-**滚轴：** 产品条只有 `YoScroller`。视口只纵滚（`overflow-x: clip`，`overflow-y: hidden`），滚轮改 `scrollTop`，禁止 `overflow-y: auto` 留系统条。侧轨 overlay，溢出时视口 `padding-inline-end` 让出 16vp（官方 hoverWidth），禁止 flex 兄弟夺滚动口宽。`YoPanel` / `YoDialog` / `YoToolbar` / `YoTabs` 不画系统条（pane 默认 hidden；`YoPanel` 两轴同一 overflow，禁止 `overflow-x` / `data-overflow-x`；Dialog `bodyOverflow=auto` 只裁切；`YoToolbar` 两轴 `overflow: hidden`，消费 `data-overflow`，禁止只写 `overflow-x`；`YoTabs` 页签条两轴 `overflow: hidden`，禁止只写 `overflow-x`）。模块自己组合 `YoScroller`。清单体 `YoVirtualList` **内组合** `YoScroller`（宿主只裁切，`hostRef` 指向内嵌 YoScroller 视口）；`YoReorderList` 读祖先滚口走同族 ScrollerPort（不进 L5）。禁止模块再外包第二根。传输坞 / 整页 Dialog（`bodyOverflow=hidden`）自管高度，不加第二根。浮层（Select / ContextMenu / 多行 TextField）可 `overflow: auto`，但必须 `scrollbar-width: none`。`scripts/check-youi-independence.mjs` 锁 Panel.css / Toolbar.css / Tabs.css 的 `overflow-[xy]` 与 `auto`；Dialog / Scroller / VirtualList / ReorderList 仍锁 `overflow-y: auto`；Panel / Dialog 禁止 import Scroller。
+**滚轴：** 产品条只有 `YoScroller`。默认只纵滚（`overflow-x: clip`，`overflow-y: hidden`，`paint` 置 `scrollLeft=0`）。`axis=both` 才开底轨横滚（视口 `overflow-x: hidden`，程序改 `scrollLeft`，溢出让出 16vp 底槽）。滚轮改 `scrollTop`（both 时 Shift / `deltaX` 改 `scrollLeft`），禁止 `overflow-y: auto` 留系统条。侧轨 overlay，溢出时视口 `padding-inline-end` 让出 16vp（官方 hoverWidth），禁止 flex 兄弟夺滚动口宽。`YoPanel` / `YoDialog` / `YoToolbar` / `YoTabs` 不画系统条（pane 默认 hidden；`YoPanel` 两轴同一 overflow，禁止 `overflow-x` / `data-overflow-x`；Dialog `bodyOverflow=auto` 只裁切；`YoToolbar` 两轴 `overflow: hidden`，消费 `data-overflow`，禁止只写 `overflow-x`；`YoTabs` 页签条两轴 `overflow: hidden`，禁止只写 `overflow-x`）。模块自己组合 `YoScroller`。清单体 `YoVirtualList` **内组合** `YoScroller`（宿主只裁切，`hostRef` 指向内嵌 YoScroller 视口）；`YoReorderList` 读祖先滚口走同族 ScrollerPort（不进 L5）。禁止模块再外包第二根。传输坞 / 整页 Dialog（`bodyOverflow=hidden`）自管高度，不加第二根。浮层（Select / ContextMenu / 多行 TextField）可 `overflow: auto`，但必须 `scrollbar-width: none`。`scripts/check-youi-independence.mjs` 锁 Panel.css / Toolbar.css / Tabs.css 的 `overflow-[xy]` 与 `auto`；Dialog / Scroller / VirtualList / ReorderList 仍锁 `overflow-y: auto`；Panel / Dialog 禁止 import Scroller。
 
 共享交互（不是业务模块）：
 
@@ -47,12 +47,12 @@ L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplat
 列拖拽不是 `YoTable`。清单体仍是 `YoVirtualList`。公共层：
 
 1. `col-model`：`YoColSpec` / clamp / `colTrackTemplate`
-2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单溢出让出侧轨时表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。日志文档把同一左垫收进 `padLeftChars`，禁止 `cellPad=none` 把标题贴边。
+2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单溢出让出侧轨时表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。日志表头是铬层；文档轨道走各 Format `width()`，禁止再为对齐标题把 `Spacing.Md` 写进 Document.text。
 3. `YoColRow` / `YoColHeader` / `YoColResizer`：表头行
 4. `YoColTrack` / `YoColCell`：Family B 清单行（`span` 通栏，不改 template）
-5. `YoVirtualList`：只虚拟化。行盒是 `list-row/`（`YoListRow`），投放框是 `list-frame/`（`YoListFrame`）。`tone` 默认 `document`（不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。投放命中走 `hotKey`，禁止模块再挂 `--drop` / `focus-ring`。命令管理中栏只借这条 hairline 画条目名之间的分割线，不是文件表。禁止默认画线再让日志去关。开启选择（`selectedKey` / `selectedKeys`）后宿主 `role=listbox`，`user-select: none`，禁止模块再自挂 `ul` 选区。禁止再为连续选中另画项间线。`onReorder` 开启整行按住拖动换位：过 `Spacing.Sm` 臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 `from`/`to`。变高非虚拟列表走 `YoReorderList`（同一套 L2 行盒几何 + binder）。禁止模块再写第二套换位几何或常驻手柄。
+5. `YoVirtualList`：只虚拟化。行盒是 `list-row/`（`YoListRow`），投放框是 `list-frame/`（`YoListFrame`）。`tone` 默认 `document`（不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。投放命中走 `hotKey`，禁止模块再挂 `--drop` / `focus-ring`。命令管理中栏只借这条 hairline 画条目名之间的分割线，不是文件表。禁止默认画线再让日志去关。开启选择（`selectedKey` / `selectedKeys`）后宿主 `role=listbox`，`user-select: none`，禁止模块再自挂 `ul` 选区。禁止再为连续选中另画项间线。Family A 文档选区带是 L2 `docSelBandStyle` + L4 `.yohu-doc-sel`（`--yohu-doc-sel`），VL 入口引入 `doc-sel.css`；禁止 VL 再写 `*::selection` 铺色。`onReorder` 开启整行按住拖动换位：过 `Spacing.Sm` 臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 `from`/`to`。变高非虚拟列表走 `YoReorderList`（同一套 L2 行盒几何 + binder）。禁止模块再写第二套换位几何或常驻手柄。
 
-`col-resize` 从 `startX` 重算绝对宽，禁止每帧累加 `dx`。模块只存 `colWidths` 并 `setColWidth(key, px)`，禁止再写 `grid-template-columns` 或第二份列垫。文件清单走 `YoColTrack` / `YoColCell`。日志表头走同一套 `YoColRow` / `YoColHeader`，轨道是 Formatter `trackTemplate` 的 `ch`，与 Document.text 同一把尺；行是文档不是格子。拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。
+`col-resize` 从 `startX` 重算绝对宽，禁止每帧累加 `dx`。模块只存 `colWidths` 并 `setColWidth(key, px)`，禁止再写 `grid-template-columns` 或第二份列垫。文件清单走 `YoColTrack` / `YoColCell`。日志表头走同一套 `YoColRow` / `YoColHeader`，轨道是各官方 Format `width()` 的 `ch`，与 Document.text 同一把尺；行是文档不是格子。只有 Tag 可拖。拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。
 
 `YoColHeader` 标题默认靠左（HarmonyOS PC / Finder 列表）。缺省 `align=start` / `ariaSort=none` 在 L2 `col-header-model`。列垫 `--yohu-col-cell-pad: 0 space-sm 0 space-md` 由 Frame 写入；表头 `--yohu-col-header-content-pad` 继承它。`pad="none"` 写 `data-pad` 并清列垫（日志级别 4ch 官方轨道）。`align` 只覆盖 center/end。库一律包 `__label`（无 `onSort` 的标题也有垫与对齐）。有 `onSort` 时库内渲染 `.yohu-interactive` + `__label` + chevron（`Icon` 单源）。排序字色走宿主 `aria-sort`（`ascending` / `descending` = `--yohu-fg` + semibold），CSS 留在库里。模块只传标题 / `onSort`；`__label` 不是模块 class，禁止再点 `.yohu-col-header` / `__label` 或自绘第二套排序钮。禁止给表头包 `YoTooltip`。`ColResizePhase` 在 L2 `col-model`，供 `onWidthChange` 回调使用，不进公开入口。`YoColResizer` 对照 AG Grid Quartz resize handle：热区透明，可见铬是居中短柄（宽 `--yohu-stroke-accent`、高 30%、空闲 `--yohu-border`）；悬停加长并改 accent；拖中铺满表头高。禁止把命中区整块涂 accent，禁止表头再画 `::after` 列分割线。
 
@@ -573,7 +573,7 @@ props
 children + overflow + state + interactive + YoTravel.traveling() + YoCollapse.traveling() + railTraveling(phase)
   → L2 resolveScrollerFlowChild / FlowSize / Overflow / Gutter / BarState / Interactive / Phase / Thumb / ScrollTop / ThumbTop / WheelDelta / ClampedTop / PageTop / PageTowardPointer
   → L3 scrollerHostAttrs / scrollerLaneAttrs / scrollerThumbAttrs
-  → L4 视口 overflow-x clip / overflow-y hidden + 滚轮改 scrollTop + 溢出视口 padding-end 让出 16vp + overlay 侧轨 + 可拖滑块 + Hover GROW 8vp + Auto `MotionDuration.barHide` 隐藏 + 轨道翻页 / 500ms 后再连翻
+  → L4 默认 overflow-x clip / overflow-y hidden + 滚轮改 scrollTop；axis=both 时 overflow-x hidden + 底轨 + Shift/deltaX 改 scrollLeft + 溢出视口 padding-end / padding-block-end 让出 16vp + overlay 侧轨 / 底轨 + 可拖滑块 + Hover GROW 8vp + Auto `MotionDuration.barHide` 隐藏 + 轨道翻页 / 500ms 后再连翻
 ```
 
 | 层 | 文件 | 职责 |
@@ -584,7 +584,7 @@ children + overflow + state + interactive + YoTravel.traveling() + YoCollapse.tr
 | L4 | Scroller.tsx / Scroller.css | 视口 hidden、溢出让出侧轨、拖滑块、Hover GROW、轨道翻页、键盘 Page/Home/End |
 | L5 | index.ts | YoScroller / Handle / Props |
 
-公开 API：`overflow` / `state`（`auto` \| `on` \| `off`，默认 `auto`）/ `interactive`（默认 true）/ `children` / `viewRef` / `handle`（`scrollTo` / `scrollBy` / `scrollToStart` / `scrollToEnd` / `scrollPage` / `offset` / `sync`）。无法滚动 `data-lane=off`。溢出只认 in-flow 子盒（`absolute` / `fixed` 出流），不认 Reveal abspos 的 `scrollHeight`。钉底走 `handle.scrollToEnd()`，禁止模块读 `scrollHeight`。滚口 `position: relative`，子级 `offsetTop` 相对滚口。视口只裁切，禁止 `overflow-y: auto` / `scrollbar-width` 藏条。滚轮 `preventDefault` 后改 `scrollTop`。`interactive=false` 不接手势，handle 仍可用。视口 `flex: 1 1 auto`：basis 跟 in-flow 内容，父级有帽才收缩；禁止 `1 1 0` 把 hug 列表压成 0。Dialog hug 只订自己的 flex 子项，禁止点 `__view`。订祖先 `YoTravel.traveling()`、`YoCollapse.traveling()` 与 `railTraveling(phase)`：插值中不新出条，`ResizeObserver` 行程中不改相位，落定同拍再量。收回 `out` 留上一拍滑块淡出。对照 ArkUI 内置 overlay + `SetHoverWidth`（`activeWidth + margin×2`）+ 官方 ScrollBar 示例右边距：溢出且未 Off 时 `data-gutter=on`，视口 `padding-inline-end` 让出 16vp 侧轨（热区），滑块 4vp、距边 4vp，条 overlay 叠在槽里，内容与滑块之间留空，不贴内容右沿。禁止侧轨当 flex 兄弟夺滚动口宽（焦点横滚会裁首字）。视口 `overflow-x: clip`，不是横轴滚动口。Auto 隐条也留槽，避免跳布局。滑块圆角是本族 L4 token（`--yohu-radius-xs`），不是 Corner。最短滑块 `Layout.IconPreview`。Auto：滚动/进入显示，停 `MotionDuration.barHide` 后 `effects-exit` 淡出；悬停或拖着不藏。`useScrollerPort` / `ScrollerPort` 只在同族 `scroller-port.ts`，L4 不二次导出。On：溢出则常驻。Off：不画条仍可滚。电脑点轨道翻一页，500ms 后再每 100ms 连翻直到滑块盖住指针。滑块 Hover/Press GROW 到 8vp；Hover `--yohu-fg-2`、Press `--yohu-fg`。List / Grid / Scroll 官方默认 `BarState.Auto`，`YoVirtualList` 不再强制 On。禁止 Dialog 再画一套 `__scroll`。禁止 `closest([data-travel])`。禁止模块自写滚动条。`useTravel` / `useCollapseTravel` 不进 L5。不实现横滚、嵌套滚动、fling、边缘弹簧。
+公开 API：`overflow` / `state`（`auto` \| `on` \| `off`，默认 `auto`）/ `interactive`（默认 true）/ `axis`（`block` \| `both`，默认 `block`）/ `children` / `viewRef` / `handle`（`scrollTo` / `scrollBy` / `scrollToStart` / `scrollToEnd` / `scrollPage` / `scrollToInline` / `offset` / `offsetInline` / `sync`）。无法滚动 `data-lane=off`。溢出只认 in-flow 子盒（`absolute` / `fixed` 出流），不认 Reveal abspos 的 `scrollHeight`。钉底走 `handle.scrollToEnd()`，禁止模块读 `scrollHeight`。滚口 `position: relative`，子级 `offsetTop` 相对滚口。视口只裁切，禁止 `overflow-y: auto` / `scrollbar-width` 藏条。滚轮 `preventDefault` 后改 `scrollTop`。`interactive=false` 不接手势，handle 仍可用。视口 `flex: 1 1 auto`：basis 跟 in-flow 内容，父级有帽才收缩；禁止 `1 1 0` 把 hug 列表压成 0。Dialog hug 只订自己的 flex 子项，禁止点 `__view`。订祖先 `YoTravel.traveling()`、`YoCollapse.traveling()` 与 `railTraveling(phase)`：插值中不新出条，`ResizeObserver` 行程中不改相位，落定同拍再量。收回 `out` 留上一拍滑块淡出。对照 ArkUI 内置 overlay + `SetHoverWidth`（`activeWidth + margin×2`）+ 官方 ScrollBar 示例右边距：溢出且未 Off 时 `data-gutter=on`，视口 `padding-inline-end` 让出 16vp 侧轨（热区），滑块 4vp、距边 4vp，条 overlay 叠在槽里，内容与滑块之间留空，不贴内容右沿。禁止侧轨当 flex 兄弟夺滚动口宽（焦点横滚会裁首字）。默认视口 `overflow-x: clip`，不是横轴滚动口；`axis=both` 才改 `hidden` 并画底轨（`data-orient=inline`，`data-gutter-inline`）。Auto 隐条也留槽，避免跳布局。滑块圆角是本族 L4 token（`--yohu-radius-xs`），不是 Corner。最短滑块 `Layout.IconPreview`。Auto：滚动/进入显示，停 `MotionDuration.barHide` 后 `effects-exit` 淡出；悬停或拖着不藏。`useScrollerPort` / `ScrollerPort` 只在同族 `scroller-port.ts`，L4 不二次导出。On：溢出则常驻。Off：不画条仍可滚。电脑点轨道翻一页，500ms 后再每 100ms 连翻直到滑块盖住指针。滑块 Hover/Press GROW 到 8vp；Hover `--yohu-fg-2`、Press `--yohu-fg`。List / Grid / Scroll 官方默认 `BarState.Auto`，`YoVirtualList` 不再强制 On。禁止 Dialog 再画一套 `__scroll`。禁止 `closest([data-travel])`。禁止模块自写滚动条。`useTravel` / `useCollapseTravel` 不进 L5。默认不横滚。`axis=both` 才开底轨。不实现嵌套滚动、fling、边缘弹簧。
 
 ---
 
@@ -695,7 +695,7 @@ data / expandedKeys
 模块各自写 grid-template-columns
   → 表头与行两套轨道 / 两份列垫
   → 拖宽每帧累加 dx
-  → 日志另做适配层或 cellPad=none 把标题贴边
+  → 日志把表头 cellPad 写进 Document.text 冒充列垫
 ```
 
 问题：轨道与列垫双源；拖宽漂移；文档列表标题贴格边。
@@ -746,7 +746,7 @@ children                     // 标题文案；库包 __label
 onWidthChange?: (width, phase) // phase 类型在 col-model，不从包入口再导出
 ```
 
-无 `cellPad` = `list`（左 md / 右 sm）。日志文档把同一左垫收进 `padLeftChars`，禁止 `cellPad=none`。文件清单走 `YoColTrack` / `YoColCell`；日志行是文档不是格子。
+无 `cellPad` = `list`（左 md / 右 sm）。日志文档不收表头列垫；文件清单走 `YoColTrack` / `YoColCell`；日志行是文档不是格子。
 
 ### 不做
 
@@ -782,7 +782,7 @@ items / selectedKey|selectedKeys / hotKey / onSelectRow / onReorder / tone
   → L4 槽位几何 + YoListRow + YoListFrame（hotKey）+ 条件 YoIndicator；源行只打 data-reorder=source
 ```
 
-`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（对照官方 List 默认 `BarState.Auto`），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。内容总高变化后 `handle.sync()` 再量侧轨，过滤变短必须收回 gutter，禁止模块再包一层 `YoIndicator`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：list 宿主 `overflow: hidden`（裁 fill 滑块过冲），项滚动走公开 `YoScroller`（视口 hidden，不留系统条，溢出让出侧轨），禁止模块再外包第二根。禁止再拆 `__scroll`。`For` 身份只有槽位 `0..poolSize-1`。槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选 fill 滑块 `decorate={false}`，用 `top`/`left` 落在 `__inner` 内容坐标；fill / 投放框宽走 `virtualContentWidth`（视口 clientWidth 减 padding，不进侧轨）；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
+`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字，绘制走 `docSelBandStyle` / `.yohu-doc-sel`，禁止 VL 靠 `::selection` 铺色。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（对照官方 List 默认 `BarState.Auto`），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。`contentWidth>0` 时 inner 显式宽（abspos 行不撑 `scrollWidth`），`YoScroller axis=both`，`onInlineOffset` 给表头跟滚。内容总高 / 行宽变化后 `handle.sync()` 再量侧轨与底轨，过滤变短必须收回 gutter，禁止模块再包一层 `YoIndicator`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：list 宿主 `overflow: hidden`（裁 fill 滑块过冲），项滚动走公开 `YoScroller`（视口 hidden，不留系统条，溢出让出侧轨），禁止模块再外包第二根。禁止再拆 `__scroll`。`For` 身份只有槽位 `0..poolSize-1`。槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选 fill 滑块 `decorate={false}`，用 `top`/`left` 落在 `__inner` 内容坐标；fill / 投放框宽走 `virtualContentWidth`（视口 clientWidth 减 padding，不进侧轨）；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
 
 `onReorder` 对标鸿蒙 List `onMove` + Apple 列表插缝 + dnd-kit overlay：整行按下过 `Spacing.Sm` 后，overlay 挂不随 scrollTop 平移的平面（RL=`Port.plane()`=`.yohu-scroller`；VL 挂 `.yohu-virtual-list`），配方 `reorder-overlay`（跟指针，阴影浮起，`top` 走 `overlayOffset` 视口代数、不过渡）；源行 `data-reorder=source` 占位变淡；邻行 `translateY` 让位（`spatial-small`）；缝上配方 `reorder-bar` 只在离开原槽时展开。松手提交 `from`/`to`，Escape 取消。拖动中不改数组。一项不能拖。键盘 `Ctrl/Meta+↑/↓` 走 L3 `applyReorderKey` 夹取，两 L4 共用。指针会话在 `reorder-binder`（定高契约不变）。变高非虚拟列表走 `YoReorderList`。定高 / 变高预览共用 L2 `shiftForReorder` / `shiftPxForReorder`：位移只给邻行，源行不跟 dest，不 live-reorder。
 
@@ -790,12 +790,12 @@ items / selectedKey|selectedKeys / hotKey / onSelectRow / onReorder / tone
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
-| L0 | `--yohu-row-height` / `--yohu-border` / `--yohu-state-*` / `--yohu-state-reorder-source` / `--yohu-stroke-accent` / `--yohu-accent` | 行高、源行占位、条色宽 | 不算窗口、不画行铬 |
+| L0 | `--yohu-row-height` / `--yohu-border` / `--yohu-state-*` / `--yohu-state-reorder-source` / `--yohu-stroke-accent` / `--yohu-accent` / `--yohu-doc-sel` | 行高、源行占位、条色宽、文档选区底 | 不算窗口、不画行铬 |
 | L1 | `YoIndicator`、`keymap/selection` | document 单选滑块、邻接代数 | 不画 list 行盒 |
-| L2 | `virtuallist-model.ts` + `reorder-model.ts` | 槽位池 + 选择代数 + 换位几何（`shiftForReorder` 邻行让位）+ `virtualRowBoxStyle` + `virtualContentWidth` | 不碰 DOM / 键盘；无行铬；无中线落点 |
+| L2 | `virtuallist-model.ts` + `reorder-model.ts` + `doc-sel-model.ts` | 槽位池 + 选择代数 + 换位几何（`shiftForReorder` 邻行让位）+ `virtualRowBoxStyle` + `virtualContentWidth` + `docSelBandStyle`（hang 加在 left） | 不碰 DOM / 键盘；无行铬；无中线落点 |
 | L3 | `virtuallist-policy.ts` + `reorder-policy.ts` + `reorder-binder.ts` | 键盘 / 贴底 / 行身份 attrs / `applyReorderKey` / 换位开合 | 不写色值、不画 fill/ring |
-| L4 | `VirtualList.tsx` + `VirtualList.css` + 内组合 `YoScroller` + `YoListRow` + `YoListFrame` + 内部 `ReorderOverlay` / `ReorderBar` | 组合滚轴/行盒/投放框、条件 Indicator、浮层、条 | 不在 TSX 里算窗口或按键意图；不挂 focus-ring；不自绘第二套滑块 |
-| L5 | `index.ts` | `YoVirtualList` + Props / Tone + 插缝族 / `moveItemTo` / `shiftForReorder` | 不导出 `YoListRow` / `YoListFrame` / `ReorderBar` / `ReorderOverlay` / `dropIndexFromCenters` |
+| L4 | `VirtualList.tsx` + `VirtualList.css` + `doc-sel.css` + 内组合 `YoScroller` + `YoListRow` + `YoListFrame` + 内部 `ReorderOverlay` / `ReorderBar` | 组合滚轴/行盒/投放框、条件 Indicator、浮层、条、选区带 | 不在 TSX 里算窗口或按键意图；不挂 focus-ring；不自绘第二套滑块；不写 `::selection` 铺色 |
+| L5 | `index.ts` | `YoVirtualList` + Props / Tone + 插缝族 / `moveItemTo` / `shiftForReorder` / `docSelBandStyle` | 不导出 `YoListRow` / `YoListFrame` / `ReorderBar` / `ReorderOverlay` / `dropIndexFromCenters` |
 
 运行时所有权：数据、选中 key 与 `hotKey` 在调用方；槽位池、选择代数与行盒 style 在 L2；键盘/贴底/行身份 attrs 在 L3；行铬在 `list-row`；投放框在 `list-frame`；滚动度量与条件 Indicator 在 L4。`For` 只按槽位下标做身份。行几何必须 inline。`renderRow` 必须是模块级组件（禁止在 View 里每次 new 函数）。未开选择模式时行不进焦点序列。`tone=list` 选中/热态底由 `YoListRow` 自绘，投放框由 `YoListFrame` 叠加；document 单选才走 `YoIndicator` fill。选中片行级禁动。换位时邻行 `transform` 让位（与行位同一条 `translate3d`）；浮层与插入条是独立绝对定位层。roving tabindex 只有活动行是 0（多选不是凡选中都 0）。
 
