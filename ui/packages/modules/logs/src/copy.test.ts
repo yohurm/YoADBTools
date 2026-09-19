@@ -16,7 +16,7 @@ import {
   serializeLogCopy,
   textOffsetInDoc,
 } from "./copy";
-import { defaultFormatOptions, formatMessage, formatParts, hangChars, wrapMessage } from "./editor";
+import { defaultFormatOptions, formatMessage, formatParts, headerWidth, wrapMessage } from "./editor";
 import { ALL_LOG_DISPLAY_COLUMNS } from "./layout";
 
 const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS, "yohu");
@@ -208,7 +208,7 @@ describe("documentCopyText", () => {
         bar: formatted.bar,
         line: item,
       },
-      hangChars(options) + 10,
+      headerWidth(options) + 10,
     );
     expect(visuals.length).toBeGreaterThan(1);
     const list = document.createElement("div");

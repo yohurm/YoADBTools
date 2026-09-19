@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { Density, setColWidth } from "@yohu/ui";
-import { defaultFormatOptions, trackTemplate } from "./editor";
+import { defaultFormatOptions, headerWidth } from "./editor";
 import {
   ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
@@ -32,15 +32,14 @@ const logsCss = loadSrc("logs.css");
 describe("日志表头布局契约", () => {
   it("表头钉在虚拟列表外，不随行滚动", () => {
     expect(logsCss).toMatch(/\.yohu-logs__list\s*\{[^}]*display:\s*flex/);
-    expect(logsCss).toMatch(/\.yohu-logs__cols--head\s*\{[^}]*flex-shrink:\s*0/);
-    expect(logsCss).toContain("var(--yohu-row-height-header)");
+    expect(logsCss).not.toContain("yohu-logs__cols--head");
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
     expect(logsCss).toMatch(/\.yohu-logs__status\s*\{[^}]*flex-shrink:\s*0/);
     expect(logsCss).not.toMatch(/overflow-y:\s*(auto|scroll)/);
     expect(logsCss).not.toMatch(/overflow:\s*(auto|scroll)/);
   });
 
-  it("列轨道不在模块 CSS 写死，交给 YoColFrame", () => {
+  it("列轨道不在模块 CSS 写死，行是文档不是格子", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
@@ -106,42 +105,41 @@ describe("日志表头布局契约", () => {
 });
 
 describe("日志显示列", () => {
-  it("默认不含 UID/TID，列序时间/PID/Tag/级别/消息", () => {
-    expect(trackTemplate(defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(
-      "24ch 6ch 24ch 4ch minmax(10ch, 1fr)",
-    );
+  it("默认 STANDARD：时间/BOTH/Tag/App/级别，headerWidth=100", () => {
+    expect(headerWidth(defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(100);
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
       "pid",
       "tag",
+      "app",
       "level",
       "msg",
     ]);
   });
 
-  it("PID+TID 合成 ProcessThread BOTH，表头不另开 TID 轨", () => {
+  it("PID+TID 合成 ProcessThread BOTH，打开 UID 后 header 加 9", () => {
     expect(visibleLogColumns(ALL_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
       "uid",
       "pid",
       "tag",
+      "app",
       "level",
       "msg",
     ]);
-    expect(trackTemplate(defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS))).toBe(
-      "24ch 9ch 12ch 24ch 4ch minmax(10ch, 1fr)",
-    );
+    expect(headerWidth(defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS))).toBe(109);
   });
 
-  it("关闭元数据列后消息仍在，轨道只留可见列", () => {
-    const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
+  it("关闭元数据列后消息仍在", () => {
+    const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false, app: false };
     expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
-    expect(trackTemplate(defaultFormatOptions(display))).toBe("6ch 4ch minmax(10ch, 1fr)");
+    expect(headerWidth(defaultFormatOptions(display))).toBe(12 + 4);
   });
 
   it("全部元数据关闭只剩消息", () => {
-    const display = { ts: false, uid: false, pid: false, tid: false, level: false, tag: false };
-    expect(trackTemplate(defaultFormatOptions(display))).toBe("minmax(10ch, 1fr)");
+    const display = { ts: false, uid: false, pid: false, tid: false, tag: false, app: false, level: false };
+    expect(headerWidth(defaultFormatOptions(display))).toBe(0);
+    expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["msg"]);
   });
 
   it("只有 Tag 可拖；级别 / 时间 / PID 固定官方宽", () => {
@@ -197,9 +195,9 @@ describe("日志显示列", () => {
       /<YoScroller>\s*<YoTextField/,
     );
     expect(view).not.toMatch(/<YoScroller[\s\S]*?<YoVirtualList/);
-    expect(view).toContain("visibleLogColumns(displayColumns())");
-    expect(view).toContain("logColResizable(col)");
-    expect(view).toContain('pad={col.key === "level" ? "none" : undefined}');
+    expect(view).not.toContain("visibleLogColumns");
+    expect(view).not.toContain("YoColFrame");
+    expect(view).not.toContain("YoColHeader");
     expect(logsCss).not.toContain("yohu-logs__head-level");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
@@ -226,7 +224,6 @@ describe("日志显示列", () => {
     expect(filter).not.toContain("YoButton");
     expect(view).toContain("action=");
     expect(view).toContain("text={`信号 ${session.signalCount}`}");
-    expect(view).toContain("width={col.key === \"tag\" ? logStore.state.colWidths.tag : col.defaultWidth}");
     expect(view).toContain("EditorView");
     expect(view).not.toContain("YoVirtualList");
     expect(editorView).toContain("YoVirtualList");
@@ -237,11 +234,13 @@ describe("日志显示列", () => {
     expect(editorView).toContain("selectionchange");
     expect(view).toContain("itemHeight={dataRowHeight()}");
     expect(view).not.toContain("hangChars");
-    expect(editorView).toContain("wrapBody");
+    expect(editorView).not.toContain("wrapBody");
+    expect(editorView).not.toContain("VisualBoard");
     expect(editorView).toContain("clipMessage");
     expect(editorView).toContain("data-layout");
     expect(editorView).not.toContain("log_line_layout");
     expect(formatter).not.toContain("log_line_layout");
+    expect(formatter).toContain("softWrap");
     expect(formatter).not.toContain("clipMessage");
     expect(formatter).not.toContain("wrapMessage");
     expect(documentSrc).not.toContain("log_line_layout");
@@ -251,13 +250,15 @@ describe("日志显示列", () => {
     expect(view).toContain('log_line_layout !== "wrap"');
     expect(formatter).not.toContain("log-line-layout");
     expect(documentSrc).not.toContain("log-line-layout");
-    expect(logsCss).toContain("--yohu-log-hang");
-    expect(logsCss).toContain("[data-wrap]");
-    expect(logsCss).not.toContain('[data-layout="wrap"] .yohu-logs__row[data-wrap]');
+    expect(logsCss).not.toContain("--yohu-log-hang");
+    expect(logsCss).not.toContain("--yohu-log-board");
+    expect(logsCss).toContain('[data-layout="clip"]');
+    expect(editorView).not.toContain("--yohu-log-board");
     expect(editorView).toContain("contentWidth");
     expect(editorView).toContain("chPx");
-    expect(view).toContain("onInlineOffset");
+    expect(view).not.toContain("onInlineOffset");
     expect(view).toContain("chPx={chPx}");
+    expect(view).toContain("softWrap");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*pre-wrap/);
     expect(view).toContain("onCreated={beginCapture}");
     expect(view).toContain("onCleanup(() => toaster.destroy())");

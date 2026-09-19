@@ -3,7 +3,7 @@
  * 清单走 editor/{format,document,view}；过滤条 / 复制手势分文件。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
 import { dialogSaveFile, errorText, ipcErrorCode, ModuleTitle, systemOpenPath } from "@yohu/api";
@@ -11,9 +11,6 @@ import {
   YoBadge,
   YoButton,
   YoChrome,
-  YoColFrame,
-  YoColHeader,
-  YoColRow,
   YoDialog,
   YoEmptyState,
   YoLoading,
@@ -43,7 +40,6 @@ import {
   DEFAULT_CH_PX,
   EditorView,
   EMPTY_ROWS,
-  trackTemplate,
   type FormatOptions,
   type LogDocument,
 } from "./editor";
@@ -53,9 +49,7 @@ import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./key
 import {
   DEFAULT_LOG_DISPLAY_COLUMNS,
   dataRowHeight,
-  logColResizable,
   measureChPx,
-  visibleLogColumns,
 } from "./layout";
 import { LogFilterBar } from "./LogFilterBar";
 import { logsRowMenu, logsTabMenu } from "./menu";
@@ -141,7 +135,6 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
   const [rowChars, setRowChars] = createSignal(0);
-  const [inlineOffset, setInlineOffset] = createSignal(0);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
 
   let keywordRef: YoSearchControl | undefined;
@@ -199,24 +192,27 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
-  const formatOpts = createMemo((): FormatOptions => ({
-    display: displayColumns(),
-    tagWidthPx: logStore.state.colWidths.tag,
-    timeFormat: props.settings.log_time_format,
-    scheme: props.settings.log_color_scheme,
-  }));
+  const formatOpts = createMemo((): FormatOptions => {
+    const serial = active()?.serial ?? windowSerial();
+    const names: Record<number, string> = {};
+    for (const entry of deviceSlice(logStore.state, serial).processEntries) {
+      names[entry.pid] = entry.name;
+    }
+    return {
+      display: displayColumns(),
+      tagWidthPx: logStore.state.colWidths.tag,
+      timeFormat: props.settings.log_time_format,
+      scheme: props.settings.log_color_scheme,
+      softWrap: props.settings.log_line_layout === "wrap",
+      appNames: names,
+    };
+  });
 
   createEffect(() => {
     props.settings.density;
     const host = listEl();
     if (host) {
       setChPx(measureChPx(host));
-    }
-  });
-
-  createEffect(() => {
-    if (props.settings.log_line_layout !== "clip") {
-      setInlineOffset(0);
     }
   });
 
@@ -470,29 +466,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                 }}
               />
 
-              <YoColFrame
-                class="yohu-logs__list"
-                template={trackTemplate(formatOpts())}
-              >
-                <YoColRow
-                  class="yohu-logs__cols yohu-logs__cols--head"
-                  style={{ transform: `translate3d(${-inlineOffset()}px, 0, 0)` }}
-                >
-                  <For each={visibleLogColumns(displayColumns())}>
-                    {(col) => (
-                      <YoColHeader
-                        pad={col.key === "level" ? "none" : undefined}
-                        resizable={logColResizable(col)}
-                        resizeLabel={col.resizeLabel}
-                        width={col.key === "tag" ? logStore.state.colWidths.tag : col.defaultWidth}
-                        minWidth={col.minWidth}
-                        onWidthChange={(width) => logStore.setColWidth(col.key, width)}
-                      >
-                        {col.header}
-                      </YoColHeader>
-                    )}
-                  </For>
-                </YoColRow>
+              <div class="yohu-logs__list">
                 <div
                   class="yohu-logs__list-body"
                   ref={(el) => { setListEl(el); }}
@@ -505,7 +479,6 @@ export function LogAnalyzerView(props: DeviceSession) {
                     layout={() => props.settings.log_line_layout}
                     rowChars={rowChars}
                     chPx={chPx}
-                    onInlineOffset={setInlineOffset}
                     itemHeight={dataRowHeight()}
                     keyword={() =>
                       logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""
@@ -565,7 +538,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     </YoButton>
                   </div>
                 </Show>
-              </YoColFrame>
+              </div>
 
               <div class="yohu-logs__status">
                 <span class="yohu-logs__status-capture">

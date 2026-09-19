@@ -1,18 +1,7 @@
 /* ============================================================================
- * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 表头是铬层：YoColFrame cellPad=list + ch 轨道（Formatter trackTemplate = 各 Format.width()）。
- * 文档走官方 Timestamp / ProcessThread / Tag / Level，每段自带尾空格。禁止再把 Spacing.Md 写进 Document.text。
- * 级别是官方 LevelFormat `" L "` + 1 个未着色空格。表头「级别」走 YoColHeader pad=none，贴 4ch 轨道。
- * 行是一份 white-space:pre 文档。长文本 clip / wrap 只在 EditorView，禁止整行 pre-wrap。
- * 续行 hang 走 --yohu-log-hang（前缀 ch），不进复制表面。clip 不按视口折，硬 \\n 仍切行。
- * 选区手势仍是原生 Selection；绘制是 EditorView 的 .yohu-doc-sel 带（--yohu-doc-sel）。
- * 禁止再靠 ::selection 给 [data-tone=ink] 铺色。Ctrl+A = sel all 整条可视行带。
- * 列间空白是各 Format 尾空格，全部可选。禁止再把列垫标成不可选。禁止洗白级别 ink，禁止 accent-soft 冒充选字。
- * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
- * 行 --yohu-log-ink 由 Document barInk 写入，禁止再列 V–F 六条映射。
- * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
- * 着色只认 data-tone=ink|wash 与 data-bar。LevelFormat 是 data-box=line 行盒，禁止圆角徽章 / padding / 负 margin。
- * 解析失败消息走 fg。信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
+ * 日志分析模块。官方 Document + Soft-Wrap：一行文档 = 一行可视。
+ * hang 空格只在 Formatter 写入 Document（Soft-Wrap 关）。禁止 CSS hang / 表头 1fr。
+ * clip 超宽横滑；wrap 视口软折续行第 0 列。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -115,24 +104,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 模块铬：等宽、左条。表头轨道由 YoColFrame 承担；行是文档。 */
+/* 模块铬：等宽、左条。行是 Document 文本，不是列架格子。 */
 .yohu-logs__cols {
   padding: 0;
   border-left: var(--yohu-stroke-emphasis) solid transparent;
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
-}
-
-.yohu-logs__cols--head {
-  flex-shrink: 0;
-  height: var(--yohu-row-height-header);
-  align-items: stretch;
-  background: var(--yohu-canvas);
-  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  color: var(--yohu-fg-2);
-  font-weight: var(--yohu-font-weight-regular);
-  user-select: none;
 }
 
 .yohu-logs__row {
@@ -150,16 +128,17 @@
   border-left-color: transparent;
 }
 
+/* clip：行宽跟文档自然宽。hang 已在文档空格里。 */
+.yohu-logs__view[data-layout="clip"] .yohu-logs__row {
+  width: max-content;
+  min-width: 100%;
+}
+
 .yohu-logs__row[data-bar="level"] {
   border-left-color: var(--yohu-log-ink);
 }
 
-/* 续行只含消息切片；hang 对齐消息列起笔。禁止写进文档空格。clip / wrap 同一把尺。 */
-.yohu-logs__view .yohu-logs__row[data-wrap]:not([data-wrap="0"]) {
-  padding-left: calc(var(--yohu-log-hang, 0) * 1ch);
-}
-
-/* 原生 ::selection 只当手势。色由 .yohu-doc-sel 带画，避免 WebView2 只在行尾画出一条并洗白 ink。 */
+/* 原生 ::selection 只当手势。色由 .yohu-doc-sel / --yohu-doc-sel 带画，避免 WebView2 只在行尾画出一条并洗白 ink。 */
 .yohu-logs__view ::selection,
 .yohu-logs__view *::selection {
   background-color: transparent;

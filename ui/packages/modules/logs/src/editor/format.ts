@@ -1,11 +1,9 @@
 /**
- * Formatter：对照 AS logcat/messages
- *   MessageFormatter + FormattingOptions + TextAccumulator
- *   TimestampFormat / ProcessThreadFormat / TagFormat / LevelFormat
- * 一行一次 accumulate：文本即复制面，着色 range 当时挂上。
- * 每段 Format 自带 width() 与尾空格，禁止表格列垫、gutter、不可选空白 span。
- * 禁止 import Document / View / store / CSS。
- * 长文本 clip / wrap 不进本层，只在 EditorView。
+ * Formatter：对照 AS MessageFormatter + FormattingOptions + TextAccumulator。
+ * 顺序：Timestamp → Uid（扩展）→ ProcessThread → Tag → AppName → Level → message。
+ * Soft-Wrap 关：msg 里的 \\n 换成 \\n + headerWidth 空格，写入文档。
+ * Soft-Wrap 开：裸 \\n，续行第 0 列。
+ * 禁止表格 1fr、禁止 CSS hang、禁止 import Document / View / store。
  */
 
 import {
@@ -23,27 +21,26 @@ import {
 } from "@yohu/api";
 import { defaultColWidths } from "@yohu/ui";
 
-/** 设计尺：1 字段字符 = 8px。Tag 拖宽换算用这把尺，不跟 measureChPx。 */
 export const DEFAULT_CH_PX = 8;
 
-/** TimestampFormat.width() = 显示长度 + 尾空格。DATETIME=24 TIME=13。 */
 export function timestampWidth(format: TerminalTimeFormat): number {
   return clockDisplayLen(format) + 1;
 }
 
-/** ProcessThreadFormat：PID `%-5d ` = 6；BOTH `%5d-%-5d ` = 12。 */
 export const PROCESS_PID_WIDTH = 6;
 export const PROCESS_BOTH_WIDTH = 12;
 
-/** TagFormat.DEFAULT_LENGTH / MIN_LENGTH；width() = maxLength + 1。 */
 export const TAG_DEFAULT_MAX = 23;
 export const TAG_MIN_LENGTH = 10;
 export const TAG_ELLIPSIS = "...";
 
-/** LevelFormat.width() = `" L "` + 未着色空格。 */
+export const APP_DEFAULT_MAX = 35;
+export const APP_MIN_LENGTH = 10;
+export const APP_PREFIX_KEEP = 6;
+export const APP_FORMAT_WIDTH = APP_DEFAULT_MAX + 1;
+
 export const LEVEL_FORMAT_WIDTH = 4;
 
-/** 我们的扩展：threadtime,uid。官方 FormattingOptions 没有 UID，写法对齐「定宽 + 尾空格」。 */
 export const UID_BODY_CHARS = 8;
 export const UID_FORMAT_WIDTH = UID_BODY_CHARS + 1;
 
@@ -52,6 +49,7 @@ export type LogColKey = LogMetaColKey | "msg";
 export type LogColWidths = Record<LogColKey, number>;
 export type LogFieldKind = LogColKey;
 export type ProcessThreadStyle = "off" | "pid" | "tid" | "both";
+export type AppNameMap = Readonly<Record<number, string>>;
 
 export interface LogColumnSpec {
   key: LogColKey;
@@ -72,8 +70,9 @@ export const ALL_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
   uid: true,
   pid: true,
   tid: true,
-  level: true,
   tag: true,
+  app: true,
+  level: true,
 };
 
 const LOG_TAG_DEFAULT_CHARS = TAG_DEFAULT_MAX + 1;
@@ -130,6 +129,15 @@ export const LOG_COLUMNS: readonly LogColumnSpec[] = [
     flex: false,
   },
   {
+    key: "app",
+    header: "应用",
+    resizeLabel: "调节应用列宽",
+    defaultWidth: fieldPx(APP_FORMAT_WIDTH),
+    minWidth: fieldPx(APP_MIN_LENGTH + 1),
+    flex: false,
+    resize: false,
+  },
+  {
     key: "level",
     header: "级别",
     resizeLabel: "调节级别列宽",
@@ -175,10 +183,6 @@ export function processThreadWidth(style: ProcessThreadStyle): number {
   return 0;
 }
 
-/**
- * PID+TID 合成官方 BOTH，表头只留 PID 轨。
- * 单独开 TID 时才出现 TID 列。
- */
 export function visibleLogColumns(display: LogDisplayColumns): LogColumnSpec[] {
   return LOG_COLUMNS.filter((col) => {
     if (col.key === "msg") {
@@ -221,12 +225,14 @@ export type FormatRange = {
   style?: TokenStyle;
 };
 
-/** 清单文档选项。长文本 clip / wrap 不进这里，只在 EditorView。 */
 export type FormatOptions = {
   display: LogDisplayColumns;
   tagWidthPx: number;
   timeFormat: TerminalTimeFormat;
   scheme?: string;
+  /** 对照 MessageFormatter.softWrapEnabled */
+  softWrap?: boolean;
+  appNames?: AppNameMap;
 };
 
 export type FormattedMessage = {
@@ -284,7 +290,7 @@ const yohuEngine: ColorEngine = {
     if (kind === "ts" || kind === "uid") {
       return ink("var(--yohu-fg-3)");
     }
-    if (kind === "pid" || kind === "tid") {
+    if (kind === "pid" || kind === "tid" || kind === "app") {
       return ink("var(--yohu-fg-2)");
     }
     const key = levelSwatch(line.level);
@@ -319,7 +325,7 @@ const logcatEngine: ColorEngine = {
     return undefined;
   },
   token(kind, line) {
-    if (kind === "ts" || kind === "uid" || kind === "pid" || kind === "tid") {
+    if (kind === "ts" || kind === "uid" || kind === "pid" || kind === "tid" || kind === "app") {
       return unstyled();
     }
     if (kind === "tag") {
@@ -354,6 +360,7 @@ export function defaultFormatOptions(display: LogDisplayColumns, scheme?: string
     tagWidthPx: defaultLogColWidths().tag,
     timeFormat: APP_SETTINGS_DEFAULT.log_time_format,
     scheme,
+    softWrap: false,
   };
 }
 
@@ -362,12 +369,14 @@ export function formatOptionsKey(options: FormatOptions): string {
   return [
     options.timeFormat,
     options.scheme ?? "",
+    options.softWrap ? "1" : "0",
     Number(d.ts),
     Number(d.uid),
     Number(d.pid),
     Number(d.tid),
-    Number(d.level),
     Number(d.tag),
+    Number(d.app),
+    Number(d.level),
     options.tagWidthPx,
   ].join("|");
 }
@@ -376,7 +385,6 @@ function fieldChars(px: number, min: number): number {
   return Math.max(min, Math.floor(px / DEFAULT_CH_PX));
 }
 
-/** TagFormat.maxLength：只跟 Tag 轨像素 / 设计尺，不跟 measureChPx。 */
 export function tagMaxLength(options: FormatOptions): number {
   return Math.max(TAG_MIN_LENGTH, fieldChars(options.tagWidthPx, TAG_MIN_LENGTH + 1) - 1);
 }
@@ -396,6 +404,8 @@ function segmentWidth(key: LogMetaColKey, options: FormatOptions): number {
       return processThreadWidth(processThreadStyle(options.display)) || PROCESS_PID_WIDTH;
     case "tag":
       return tagFormatWidth(options);
+    case "app":
+      return APP_FORMAT_WIDTH;
     case "level":
       return LEVEL_FORMAT_WIDTH;
   }
@@ -410,14 +420,8 @@ export function formatColumns(options: FormatOptions): FormatColumn[] {
   });
 }
 
-export function trackTemplate(options: FormatOptions): string {
-  return formatColumns(options)
-    .map((col) => (col.width == null ? `minmax(${LOG_MSG_MIN_CHARS}ch, 1fr)` : `${col.width}ch`))
-    .join(" ");
-}
-
-/** 前缀轨道合计 = 各 Format.width() 之和。续行 hang 与首行消息起笔同一把尺。 */
-export function hangChars(options: FormatOptions): number {
+/** 对照 FormattingOptions.getHeaderWidth()。不含消息。 */
+export function headerWidth(options: FormatOptions): number {
   let n = 0;
   for (const col of formatColumns(options)) {
     if (col.key === "msg") {
@@ -471,12 +475,34 @@ export function formatProcessThread(line: { pid: number; tid: number }, style: P
 export function formatTag(tag: string, maxLength: number): string {
   const width = Math.max(TAG_MIN_LENGTH, maxLength) + 1;
   if (!tag) {
-    return "<no-tag>".padEnd(width);
+    return " ".padEnd(width);
   }
   if (tag.length > maxLength) {
     return `${shortenTextWithEllipsis(tag, maxLength, Math.floor((maxLength - TAG_ELLIPSIS.length) / 2))} `;
   }
   return tag.padEnd(width);
+}
+
+export function appNameOf(line: LogLine, names?: AppNameMap): string {
+  if (line.app) {
+    return line.app;
+  }
+  const mapped = names?.[line.pid];
+  if (mapped) {
+    return mapped;
+  }
+  if (line.pid === 0) {
+    return "kernel";
+  }
+  return `pid-${line.pid}`;
+}
+
+export function formatAppName(name: string, maxLength = APP_DEFAULT_MAX): string {
+  const width = Math.max(APP_MIN_LENGTH, maxLength) + 1;
+  if (name.length > maxLength) {
+    return `${shortenTextWithEllipsis(name, maxLength, maxLength - APP_PREFIX_KEEP)} `;
+  }
+  return name.padEnd(width);
 }
 
 type Accumulator = {
@@ -504,7 +530,6 @@ function paintOf(engine: ColorEngine, kind: LogFieldKind, line: LogLine): TokenP
   return engine.token(kind, line);
 }
 
-/** 一行 → 文本 + range。hang 不写入空格。顺序对齐官方 MessageFormatter。 */
 export function formatMessage(line: LogLine, options: FormatOptions): FormattedMessage {
   const engine = contentColor(options.scheme);
   if (line.level === "?") {
@@ -534,12 +559,16 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
   if (display.tag) {
     accumulate(buf, formatTag(line.tag, tagMaxLength(options)), "tag", paintOf(engine, "tag", line));
   }
+  if (display.app) {
+    accumulate(buf, formatAppName(appNameOf(line, options.appNames)), "app", paintOf(engine, "app", line));
+  }
   if (display.level) {
     accumulate(buf, ` ${line.level} `, "level", paintOf(engine, "level", line));
     accumulate(buf, " ", "level");
   }
   const headerChars = buf.text.length;
-  accumulate(buf, line.msg, "msg", paintOf(engine, "msg", line));
+  const newline = options.softWrap ? "\n" : `\n${" ".repeat(headerChars)}`;
+  accumulate(buf, line.msg.replaceAll("\n", newline), "msg", paintOf(engine, "msg", line));
   return {
     text: buf.text,
     ranges: buf.ranges,

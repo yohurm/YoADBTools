@@ -1,9 +1,8 @@
 /**
- * EditorView：长文本 clip / wrap 与定高视口内聚。
- * 只读 Document，禁止回头调 Formatter。
- * clip / wrap 只在本层分支，不进 FormatOptions / Document。
- * clip = 官方 Soft-Wrap 关：不按视口折，硬 \\n 仍切行；hang 走 CSS，不进文档空格。
- * wrap = 视口折消息（Yohu 设计，续行 hang）。
+ * EditorView：1 可视行 = 1 条文档行（只认硬 \\n）。
+ * clip = Soft-Wrap 关：文档已含 hang 空格，超长行不按视口拆。
+ * wrap = Soft-Wrap 开：文档无 hang 空格；超长行按视口切到第 0 列。
+ * 禁止视口预切进文档、禁止 CSS hang、禁止回调 Formatter。
  */
 
 import {
@@ -53,49 +52,6 @@ export type VisualLine = {
 
 const EMPTY_VISUAL: VisualLine[] = [];
 
-export type WrapSlice = { text: string; from: number };
-
-export function wrapBody(text: string, width: number): WrapSlice[] {
-  const w = Math.max(1, Math.floor(width));
-  const n = text.length;
-  if (n === 0) {
-    return [{ text: "", from: 0 }];
-  }
-  const slices: WrapSlice[] = [];
-  let i = 0;
-  while (i < n) {
-    if (text[i] === "\n") {
-      slices.push({ text: "", from: i });
-      i += 1;
-      continue;
-    }
-    const nl = text.indexOf("\n", i);
-    const end = nl < 0 ? n : nl;
-    let j = i;
-    while (j < end) {
-      const remain = end - j;
-      if (remain <= w) {
-        slices.push({ text: text.slice(j, end), from: j });
-        j = end;
-        break;
-      }
-      const window = text.slice(j, j + w);
-      const space = window.lastIndexOf(" ");
-      const take = space > 0 ? space + 1 : w;
-      slices.push({ text: text.slice(j, j + take), from: j });
-      j += take;
-    }
-    if (nl < 0) {
-      break;
-    }
-    i = nl + 1;
-    if (i === n) {
-      slices.push({ text: "", from: nl });
-    }
-  }
-  return slices;
-}
-
 function sliceRanges(ranges: readonly FormatRange[], from: number, to: number): FormatRange[] {
   const out: FormatRange[] = [];
   for (const range of ranges) {
@@ -109,20 +65,81 @@ function sliceRanges(ranges: readonly FormatRange[], from: number, to: number): 
   return out;
 }
 
-function bodyWidth(headerChars: number, rowChars: number): number {
-  if (!(rowChars > headerChars)) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-  return Math.max(1, rowChars - headerChars);
+function lineOf(
+  message: DocMessage,
+  wrapIndex: number,
+  docFrom: number,
+  text: string,
+  last: boolean,
+): VisualLine {
+  return {
+    seq: message.seq,
+    wrapIndex,
+    docFrom,
+    hang: 0,
+    text,
+    ranges: sliceRanges(message.ranges, docFrom, docFrom + text.length),
+    bar: message.bar,
+    barInk: message.barInk,
+    signal: message.signal,
+    collapsedAfter: last ? message.collapsedAfter : undefined,
+    line: message.line,
+  };
 }
 
-/** 对照官方 Soft-Wrap 关：只在硬 \\n 切开，行宽不封顶。 */
+/** 只按文档硬 \\n 切开。hang 已在 Document 空格里。 */
+export function documentLines(message: DocMessage): VisualLine[] {
+  const parts = message.text.split("\n");
+  let offset = 0;
+  const last = parts.length - 1;
+  return parts.map((text, wrapIndex) => {
+    const row = lineOf(message, wrapIndex, offset, text, wrapIndex === last);
+    offset += text.length + (wrapIndex === last ? 0 : 1);
+    return row;
+  });
+}
+
 export function clipMessage(message: DocMessage): VisualLine[] {
-  return wrapMessage(message, Number.MAX_SAFE_INTEGER);
+  return documentLines(message);
+}
+
+function wrapDocumentLine(text: string, from: number, width: number): { text: string; from: number }[] {
+  const w = Math.max(1, Math.floor(width));
+  if (text.length === 0) {
+    return [{ text: "", from }];
+  }
+  if (!(w < text.length)) {
+    return [{ text, from }];
+  }
+  const out: { text: string; from: number }[] = [];
+  for (let i = 0; i < text.length; i += w) {
+    out.push({ text: text.slice(i, i + w), from: from + i });
+  }
+  return out;
+}
+
+/** Soft-Wrap 开：文档行再按视口切，续行第 0 列。 */
+export function wrapMessage(message: DocMessage, rowChars: number): VisualLine[] {
+  const width = Math.max(1, Math.floor(rowChars) || Number.MAX_SAFE_INTEGER);
+  const rows: VisualLine[] = [];
+  const parts = message.text.split("\n");
+  let offset = 0;
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i]!;
+    const slices = wrapDocumentLine(part, offset, width);
+    for (const slice of slices) {
+      rows.push(lineOf(message, rows.length, slice.from, slice.text, false));
+    }
+    offset += part.length + (i === parts.length - 1 ? 0 : 1);
+  }
+  if (rows.length > 0) {
+    rows[rows.length - 1] = { ...rows[rows.length - 1]!, collapsedAfter: message.collapsedAfter };
+  }
+  return rows.length > 0 ? rows : [lineOf(message, 0, 0, "", true)];
 }
 
 export function visualLineChars(line: VisualLine): number {
-  return line.hang + line.text.length;
+  return line.text.length;
 }
 
 export function visualBoardChars(lines: readonly VisualLine[]): number {
@@ -137,47 +154,7 @@ function projectMessage(message: DocMessage, rowChars: number, layout: LogLineLa
   return layout === "wrap" ? wrapMessage(message, rowChars) : clipMessage(message);
 }
 
-export function wrapMessage(message: DocMessage, rowChars: number): VisualLine[] {
-  const header = message.headerChars;
-  const prefix = message.text.slice(0, header);
-  const body = message.text.slice(header);
-  const slices = wrapBody(body, bodyWidth(header, rowChars));
-  const last = slices.length - 1;
-  return slices.map((slice, wrapIndex) => {
-    if (wrapIndex === 0) {
-      const text = `${prefix}${slice.text}`;
-      return {
-        seq: message.seq,
-        wrapIndex,
-        docFrom: 0,
-        hang: 0,
-        text,
-        ranges: sliceRanges(message.ranges, 0, text.length),
-        bar: message.bar,
-        barInk: message.barInk,
-        signal: message.signal,
-        collapsedAfter: last === 0 ? message.collapsedAfter : undefined,
-        line: message.line,
-      };
-    }
-    const from = header + slice.from;
-    return {
-      seq: message.seq,
-      wrapIndex,
-      docFrom: from,
-      hang: header,
-      text: slice.text,
-      ranges: sliceRanges(message.ranges, from, from + slice.text.length),
-      bar: message.bar,
-      barInk: message.barInk,
-      signal: message.signal,
-      collapsedAfter: wrapIndex === last ? message.collapsedAfter : undefined,
-      line: message.line,
-    };
-  });
-}
-
-export class VisualBoard {
+export class LineBoard {
   private messages: readonly DocMessage[] | null = null;
   private rowChars = -1;
   private layout: LogLineLayout = "clip";
@@ -282,13 +259,13 @@ function VisualRow(props: { item: VisualLine; index: number }) {
   const paint = createMemo(() => {
     const sel = bind.docSel();
     if (!sel) {
-      return { fromCh: 0, chars: 0, hang: item().hang };
+      return { fromCh: 0, chars: 0, hang: 0 };
     }
     return (
-      selSlice({ seq: item().seq, docFrom: item().docFrom, text: item().text, hang: item().hang }, sel) ?? {
+      selSlice({ seq: item().seq, docFrom: item().docFrom, text: item().text, hang: 0 }, sel) ?? {
         fromCh: 0,
         chars: 0,
-        hang: item().hang,
+        hang: 0,
       }
     );
   });
@@ -300,10 +277,7 @@ function VisualRow(props: { item: VisualLine; index: number }) {
       data-doc-from={String(item().docFrom)}
       data-bar={item().bar}
       style={
-        {
-          ...(item().barInk ? { "--yohu-log-ink": item().barInk } : {}),
-          ...(item().hang > 0 ? { "--yohu-log-hang": item().hang } : {}),
-        } as JSX.CSSProperties
+        (item().barInk ? { "--yohu-log-ink": item().barInk } : {}) as JSX.CSSProperties
       }
       classList={{
         "yohu-logs__row--signal": item().signal !== undefined,
@@ -312,7 +286,7 @@ function VisualRow(props: { item: VisualLine; index: number }) {
       <span
         class="yohu-doc-sel"
         data-log-chrome
-        style={docSelBandStyle(paint().fromCh, paint().chars, paint().hang) as JSX.CSSProperties}
+        style={docSelBandStyle(paint().fromCh, paint().chars, 0) as JSX.CSSProperties}
       />
       <For each={item().ranges}>
         {(range) => (
@@ -341,11 +315,10 @@ export function EditorView(props: {
   paused: Accessor<boolean>;
   onAtBottomChange: (atBottom: boolean) => void;
   onRowContextMenu: (row: { line: LogLine }, event: MouseEvent) => void;
-  onInlineOffset?: (left: number) => void;
   documentRef?: (doc: LogDocument) => void;
 }) {
   const logDoc = new LogDocument();
-  const board = new VisualBoard();
+  const board = new LineBoard();
   const [rev, setRev] = createSignal(0);
   const [docSel, setDocSel] = createSignal<DocSel | "all" | null>(null);
   let host: HTMLDivElement | undefined;
@@ -396,7 +369,7 @@ export function EditorView(props: {
     if (!(px > 0)) {
       return 0;
     }
-    return visualBoardChars(items()) * px;
+    return Math.ceil((visualBoardChars(items()) + 1) * px);
   });
 
   return (
@@ -406,13 +379,16 @@ export function EditorView(props: {
         docSel,
       }}
     >
-      <div class="yohu-logs__view" data-layout={props.layout()} ref={(el) => { host = el; }}>
+      <div
+        class="yohu-logs__view"
+        data-layout={props.layout()}
+        ref={(el) => { host = el; }}
+      >
         <YoVirtualList<VisualLine>
           items={items}
           itemHeight={props.itemHeight}
           getItemKey={visualRowKey}
           contentWidth={contentWidth}
-          onInlineOffset={props.onInlineOffset}
           autoScrollToBottom={() => props.following() && !props.paused()}
           onAtBottomChange={props.onAtBottomChange}
           ariaLabel="日志列表"

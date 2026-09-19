@@ -12,6 +12,7 @@ export {
   DEFAULT_LOG_DISPLAY_COLUMNS,
   LOG_COLUMNS,
   defaultLogColWidths,
+  headerWidth,
   logColResizable,
   visibleLogColumns,
   type LogColKey,
