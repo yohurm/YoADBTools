@@ -30,8 +30,7 @@ pub enum LogColorScheme {
     Logcat,
 }
 
-/// 日志清单长文本。`clip` = LogCat Soft-Wrap 关（不按视口折，硬换行仍切，超宽横滑）；`wrap` = 超宽只折消息。
-/// 身份在设置；画法只在 UI EditorView。禁止进 Formatter / Document。
+/// 日志清单长文本。对照官方 Soft-Wrap：`clip` = 关（硬 `\n` 写入 headerWidth 空格，超宽横滑）；`wrap` = 开（裸 `\n`，续行第 0 列）。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLineLayout {
@@ -41,7 +40,7 @@ pub enum LogLineLayout {
 }
 
 /// 日志清单显示哪些元数据列（消息列始终显示）。
-/// 缺字段回落 Default：UID / TID 默认关，其余默认开。
+/// 缺字段回落 Default：对齐官方 STANDARD（UID 关，PID+TID / AppName 开）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogDisplayColumns {
     #[serde(default = "crate::default_true")]
@@ -50,12 +49,14 @@ pub struct LogDisplayColumns {
     pub uid: bool,
     #[serde(default = "crate::default_true")]
     pub pid: bool,
-    #[serde(default)]
+    #[serde(default = "crate::default_true")]
     pub tid: bool,
     #[serde(default = "crate::default_true")]
-    pub level: bool,
-    #[serde(default = "crate::default_true")]
     pub tag: bool,
+    #[serde(default = "crate::default_true")]
+    pub app: bool,
+    #[serde(default = "crate::default_true")]
+    pub level: bool,
 }
 
 impl Default for LogDisplayColumns {
@@ -64,9 +65,10 @@ impl Default for LogDisplayColumns {
             ts: true,
             uid: false,
             pid: true,
-            tid: false,
-            level: true,
+            tid: true,
             tag: true,
+            app: true,
+            level: true,
         }
     }
 }
@@ -507,10 +509,10 @@ mod tests {
     }
 
     #[test]
-    fn partial_log_display_columns_defaults_missing_uid_tid_off() {
+    fn partial_log_display_columns_defaults_missing_uid_off_tid_app_on() {
         let s: LogDisplayColumns =
             serde_json::from_str(r#"{"uid":false,"tag":false}"#).expect("部分列开关");
-        assert!(s.ts && s.pid && s.level);
-        assert!(!s.uid && !s.tid && !s.tag);
+        assert!(s.ts && s.pid && s.tid && s.app && s.level);
+        assert!(!s.uid && !s.tag);
     }
 }

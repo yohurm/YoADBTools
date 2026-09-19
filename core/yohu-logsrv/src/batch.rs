@@ -156,6 +156,7 @@ mod tests {
             pid: 1,
             tid: 1,
             uid: None,
+            app: None,
             level: 'I',
             tag: "T".into(),
             msg: format!("line {i}"),

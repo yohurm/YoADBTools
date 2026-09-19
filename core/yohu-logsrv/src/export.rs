@@ -101,6 +101,7 @@ mod tests {
             pid,
             tid: 1,
             uid: None,
+            app: None,
             level: 'I',
             tag: "T".into(),
             msg: msg.into(),

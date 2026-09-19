@@ -2,24 +2,44 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 一条已解析的 logcat 行。
+/// 一条已解析的 logd 记录（对照 AS `LogcatMessage`）。
 ///
 /// `seq` 由 core 的共享环形缓冲单调分配（设备内递增），
 /// 是 UI 回补（`log.replay`）与溢出检测（`log.overflow`）的锚点。
+/// `msg` 可含硬 `\n`（一条记录的多行正文），不是 adb 物理行。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogLine {
     pub seq: u64,
-    /// 墙钟文本（`YYYY-MM-DD HH:mm:ss.SSS`；采集自 `logcat -v threadtime,uid,year`）
+    /// 墙钟文本（`YYYY-MM-DD HH:mm:ss.SSS`；采集自 `logcat -v long,uid,year`）
     pub ts: String,
     pub pid: u32,
     pub tid: u32,
-    /// `logcat -v threadtime,uid,year` 的 UID：数字或名（`root`/`shell`）；缺列时为 None
+    /// AOSP `FORMAT_LONG`+`uid` 的 UID（`%5s:` / `%5d:`）：数字或短名；未开 uid 为 None
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
+    /// 应用/进程名（对照 `LogcatHeader.applicationId`）。long 头不打印此列；采集为 None，清单 Formatter 用进程索引填 AppName
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
     /// 级别字母：V/D/I/W/E/F；解析失败时为 '?'
     pub level: char,
     pub tag: String,
     pub msg: String,
+}
+
+impl Default for LogLine {
+    fn default() -> Self {
+        Self {
+            seq: 0,
+            ts: String::new(),
+            pid: 0,
+            tid: 0,
+            uid: None,
+            app: None,
+            level: '?',
+            tag: String::new(),
+            msg: String::new(),
+        }
+    }
 }
 
 /// 一个批量推送（ADR-v6-007：100–200ms 聚合，禁逐行）。
@@ -150,7 +170,7 @@ mod tests {
         assert_eq!(v["levels"], serde_json::json!(["W", "E"]));
         assert!(v.get("min_level").is_none());
 
-        let empty = serde_json::to_value(&LogFilter::default()).unwrap();
+        let empty = serde_json::to_value(LogFilter::default()).unwrap();
         assert!(empty.get("levels").is_none());
     }
 }

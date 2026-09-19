@@ -12,9 +12,10 @@
     "ts": true,
     "uid": false,
     "pid": true,
-    "tid": false,
-    "level": true,
-    "tag": true
+    "tid": true,
+    "tag": true,
+    "app": true,
+    "level": true
   },
   "log_time_format": "datetime_millis",
   "log_color_scheme": "yohu",

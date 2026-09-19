@@ -1,20 +1,32 @@
-//! 跟流泵：`adb logcat -v threadtime,uid,year` → 解析 → 入环 → 批量器。
+//! 跟流泵：`adb logcat -v long,uid,year` → `MessageAssembler` → 入环 → 批量器。
+//!
+//! 格式修饰对齐 AOSP `FORMAT_LONG` + `uid` + `year`。
+//! 组装对照 AS `LogcatServiceImpl.readLogcatText` + `LogcatMessageAssembler`：
+//! 下一条头结束上一条；批末空闲 100ms flush 最后一条；流结束再 take 一次。
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use crate::assembler::MessageAssembler;
 use crate::batch::Batcher;
-use crate::parse::parse_threadtime;
 use crate::ring::RingBuffer;
 use crate::task::AbortOnDrop;
 use yohu_adb::AdbClient;
+use yohu_protocol::LogLine;
 
-const LOGCAT_FORMAT: &str = "threadtime,uid,year";
+const LOGCAT_FORMAT: &str = "long,uid,year";
+const LAST_MESSAGE_DELAY: Duration = Duration::from_millis(100);
 
 fn follow_argv() -> Vec<String> {
     vec!["logcat".into(), "-v".into(), LOGCAT_FORMAT.into()]
+}
+
+async fn emit(ring: &RingBuffer, batcher: &Batcher, mut line: LogLine) -> Result<(), ()> {
+    line.seq = ring.push(line.clone());
+    batcher.feed(line).await.map_err(|_| ())
 }
 
 pub(crate) async fn run_follow(
@@ -26,16 +38,30 @@ pub(crate) async fn run_follow(
 ) {
     let (line_tx, mut line_rx) = mpsc::channel::<String>(1024);
     let pump = AbortOnDrop::new(tokio::spawn(async move {
-        while let Some(raw) = line_rx.recv().await {
-            let Some(mut line) = parse_threadtime(&raw) else {
-                continue;
-            };
-            // 单调 seq 由环分配：让送入批量器/推送链路的行也带上同一 seq，
-            // 否则 UI 的 seq 去重/回补锚点全为 0（数据被误判为重复而丢弃）。
-            line.seq = ring.push(line.clone());
-            if batcher.feed(line).await.is_err() {
-                break;
+        let mut assembler = MessageAssembler::new();
+        loop {
+            tokio::select! {
+                raw = line_rx.recv() => {
+                    let Some(raw) = raw else {
+                        break;
+                    };
+                    for line in assembler.ingest(&raw) {
+                        if emit(&ring, &batcher, line).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(LAST_MESSAGE_DELAY), if assembler.has_pending() => {
+                    if let Some(line) = assembler.take() {
+                        if emit(&ring, &batcher, line).await.is_err() {
+                            return;
+                        }
+                    }
+                }
             }
+        }
+        if let Some(line) = assembler.take() {
+            let _ = emit(&ring, &batcher, line).await;
         }
     }));
 

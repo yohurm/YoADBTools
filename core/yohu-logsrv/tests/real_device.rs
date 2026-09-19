@@ -1,6 +1,6 @@
 //! 真实设备集成测试（第二层：yohu-logsrv 采集服务全链路）。
 //!
-//! 覆盖：真实 logcat 单流采集 → threadtime 解析 → 环形缓冲 → 批量事件；
+//! 覆盖：真实 logcat 单流采集 → long 头组装 → 环形缓冲 → 批量事件；
 //! 停止保留缓冲；清设备缓冲（logcat -c）后重采；设备切换清缓冲语义。
 //! 无在线设备时自动跳过。
 
@@ -105,7 +105,7 @@ async fn real_capture_stream_batch_and_ring() {
         "采集时间戳应已是统一墙钟: {}",
         sample.ts
     );
-    // threadtime 解析质量：多数行应有时间戳与级别
+    // long 组装质量：多数记录应有时间戳与级别
     let parsed_ok = lines
         .iter()
         .filter(|l| !l.ts.is_empty() && l.level != '?')

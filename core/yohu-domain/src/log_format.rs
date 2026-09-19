@@ -2,7 +2,7 @@
 
 use yohu_protocol::LogLine;
 
-/// 还原为 logcat threadtime 风格的一行文本。
+/// 导出 testdata 用的一行文本（threadtime 形）。不是 AOSP FORMAT_LONG，不驱动清单。
 pub fn format_log_line(line: &LogLine) -> String {
     match &line.uid {
         Some(uid) => format!(
