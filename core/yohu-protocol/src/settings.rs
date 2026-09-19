@@ -21,6 +21,15 @@ pub enum Density {
     Comfortable,
 }
 
+/// 日志清单内容配色。`yohu` = 鸿蒙语义级别板；`logcat` = 官方 Android Studio Logcat V2。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogColorScheme {
+    #[default]
+    Yohu,
+    Logcat,
+}
+
 /// 日志清单显示哪些元数据列（消息列始终显示）。
 /// 缺字段回落 Default：UID / TID 默认关，其余默认开。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,6 +96,9 @@ pub struct AppSettings {
     /// 日志清单时间显示形状。立即生效；默认日期+时分秒.毫秒（与当前清单一致）。
     #[serde(default = "default_log_time_format")]
     pub log_time_format: TerminalTimeFormat,
+    /// 日志清单内容配色。立即生效；默认 Yohu（鸿蒙语义板）。
+    #[serde(default)]
+    pub log_color_scheme: LogColorScheme,
     /// 投屏长边上限（像素）；0 = 设备原始。下次启动生效。
     #[serde(default = "default_mirror_max_size")]
     pub mirror_max_size: u32,
@@ -180,6 +192,7 @@ impl Default for AppSettings {
             export_ask_every_time: default_export_ask(),
             log_display_columns: LogDisplayColumns::default(),
             log_time_format: default_log_time_format(),
+            log_color_scheme: LogColorScheme::Yohu,
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
@@ -207,6 +220,7 @@ pub enum SettingKey {
     ExportAskEveryTime,
     LogDisplayColumns,
     LogTimeFormat,
+    LogColorScheme,
     MirrorMaxSize,
     MirrorVideoBitRate,
     MirrorMaxFps,
@@ -232,6 +246,7 @@ impl SettingKey {
             SettingKey::ExportAskEveryTime => "export_ask_every_time",
             SettingKey::LogDisplayColumns => "log_display_columns",
             SettingKey::LogTimeFormat => "log_time_format",
+            SettingKey::LogColorScheme => "log_color_scheme",
             SettingKey::MirrorMaxSize => "mirror_max_size",
             SettingKey::MirrorVideoBitRate => "mirror_video_bit_rate",
             SettingKey::MirrorMaxFps => "mirror_max_fps",
@@ -259,6 +274,7 @@ mod tests {
         assert!(s.export_ask_every_time);
         assert!(s.export_default_path.is_empty());
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
+        assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
         assert_eq!(s.mirror_max_size, 0);
         assert_eq!(s.mirror_video_bit_rate, 16_000_000);
         assert_eq!(s.mirror_max_fps, 0);
@@ -348,6 +364,7 @@ mod tests {
             SettingKey::ExportAskEveryTime,
             SettingKey::LogDisplayColumns,
             SettingKey::LogTimeFormat,
+            SettingKey::LogColorScheme,
             SettingKey::MirrorMaxSize,
             SettingKey::MirrorVideoBitRate,
             SettingKey::MirrorMaxFps,
@@ -410,6 +427,19 @@ mod tests {
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
+        assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+    }
+
+    #[test]
+    fn log_color_scheme_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_value(LogColorScheme::Yohu).unwrap(),
+            serde_json::json!("yohu")
+        );
+        assert_eq!(
+            serde_json::to_value(LogColorScheme::Logcat).unwrap(),
+            serde_json::json!("logcat")
+        );
     }
 
     #[test]

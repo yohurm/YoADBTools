@@ -17,6 +17,7 @@
     "tag": true
   },
   "log_time_format": "datetime_millis",
+  "log_color_scheme": "yohu",
   "mirror_max_size": 0,
   "mirror_video_bit_rate": 16000000,
   "mirror_max_fps": 0,
