@@ -1,12 +1,20 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.69（2026-09-18，新建窗清单选中底归 VL）
+> **状态：** v3.78（2026-09-19，清单三件套编辑器）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.78 变更（清单三件套编辑器）：** 抛弃 `layout→doc→wrap→color→projector→LogList→Row`。对照 AS `logcat/messages/` 只留 Formatter / Document / EditorView。着色写入时挂 range；软折行只在 View；复制面是 Document.text。见 [modules/logs.md](modules/logs.md)。
+> **v3.76 变更（Logcat 软折行）：** 当时软折行在 `wrap.ts`。v3.78 起折行只在 EditorView，逻辑文档是 Document.text。见 [modules/logs.md](modules/logs.md)。
+> **v3.75 变更（LevelFormat 文档流）：** 对照官方 `TagFormat` → `LevelFormat` → 消息：级别不是带左右垫的表格列。文档是 `" L "` + 1 空格；Tag 在级别可见时 gutter=0；消息 padLeft=0。默认轨道 `26ch 8ch 26ch 4ch 1fr`。表头「级别」贴 4ch（去列垫），禁止拖开。见 [modules/logs.md](modules/logs.md)。
+> **v3.74 变更（LevelFormat 行盒）：** 对照编辑器 `TextAttributes.BACKGROUND`：级别段是行盒洗色，不是圆角徽章。L2 增加 `box=line|glyph`；`wash` 取代 `badge`。CSS `[data-box=line]` 铺满 `--yohu-row-height`，邻行相贴；禁止 `border-radius` / padding。行 `line-height` 跟行高，不再用 caption leading 把洗色收成芯片。见 [modules/logs.md](modules/logs.md)。
+> **v3.73 变更（清单着色收口）：** 铬层色由引擎下发，不再写 `.yohu-logs__row-ts/pid` 这类字段色。Yohu：ts/uid=`--yohu-fg-3`，pid/tid=`--yohu-fg-2`。Logcat：时间/PID 对照官方 `TimestampFormat` / `ProcessThreadFormat` 无色键，继承行 `--yohu-fg`，禁止自造官方 hex。Tag 一律 `--yohu-log-ink`。`padLeft` 固定 `LOG_PAD_LEFT_CHARS`，不跟 `measureChPx`。见 [modules/logs.md](modules/logs.md)。
+> **v3.72 变更（清单文档 Accumulator）：** 对照官方 Logcat `MessageFormatter` / `LevelFormat`。当时 `formatLogDocTokens` 产出 pad / field；级别 field 是 `" L "`（3ch），着色铺在这三个字符格上。当时 `color/` 只查 `token` / `bar` / `barInk`。当时 View 入口是 `paintLogLine`（取代 v3.71 的 `contentColor`）。CSS 只认 `data-tone=ink|badge` / `data-bar`。删除行 style 袋、`invert`、`data-scheme`、`color/logcat.css`、0.5ch 借 pad。见 [modules/logs.md](modules/logs.md)。
+> **v3.71 变更（日志内容配色分层）：** 方案身份在 `@yohu/api` `LOG_COLOR_SCHEME_CATALOG`；Yohu 级别板留 `colors.ts`；官方 Logcat V2 RGB 与 `--yohu-logcat-*` 排出在 `tokens/logcat.ts`；当时模块 `color/` 每方案一引擎，View 只调 `contentColor(id)`。设置项不自写 id/文案。筛选钮不换板。禁止社区紫 Assert。见 [modules/logs.md](modules/logs.md)。
+> **v3.70 变更（日志 LogCat 配色）：** 设置 `log_color_scheme`（立即，默认 `yohu`）。`yohu` 仍是鸿蒙语义板：已知级别消息 / 左条 / 级别字 / Tag 共用 `--yohu-log-ink`。`logcat` 对照官方 Android Studio Logcat V2。色值分层见 v3.71。筛选钮不换板。禁止社区紫 Assert。见 [modules/logs.md](modules/logs.md)。
 > **v3.69 变更（新建窗清单选中底归 VL）：** 包名/PID 清单不再模块自挂 `YoIndicator`，也不走 `tone=list`。选中底由 `YoVirtualList` 默认 document 单选 fill 自持；铬 `YoCorner flex=fill`，列表槽纵向吃剩余。过滤变短后 VL 再量滚轴，收回 16vp 侧轨，禁止选中条右侧留空。禁止 `bodyLead`（确认句居中）。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
 > **v3.68 变更（新建窗设备与划分左右排）：** 设备 `YoSelect block` 与包名/PID 分段同一行：左槽吃剩余，分段 hug 贴尾。禁止再拆成两行，禁止 `YoFormRow` 横排把 Select 收成胶囊。`YoSelectOption.description` 仍是次文案。见 [modules/logs.md](modules/logs.md)。
 > **v3.67 变更（新建窗设备行 stacked Select）：** 当时用 `YoFormRow stacked` 让 Select 铺满。v3.68 起设备与划分共一行，不再单独占一行。`description` 次文案仍有效。见 [youi.md](youi.md)。
@@ -158,15 +166,15 @@
 > **v2.24 变更（反馈 / 图标分段 / 页铬）：** Toast 队列进 L3，必须挂 `YoToaster`，禁止静态 API。Badge tone 与 Button 对齐（`warning`/`danger`，无 `warn`/`error` 别名）。IconButton `size` 改为 `sm|md`，减动效钩子改 `[data-busy]`。分段默认 tab 白块，选择块只走 `YoIndicator`。ThemeToggle 只组合 IconButton。Panel/Page/Chrome/TitleBar/StatusBar 拆 L2/L3；关闭键按下走 `--yohu-error-pressed`。分层见 [youi.md](youi.md)。
 > **v2.23 变更（表单输入族）：** `YoTextField` 盒内 `prefix/suffix`、盒外 `addonBefore/addonAfter`、`status` 一等（`none|error|warning`）。Checkbox / Switch / FormRow 拆 L2/L3，视图只绑 `data-*`。Switch 关闭轨叠态收进 `--yohu-switch-off-hover/pressed`。禁止 YoForm 引擎。分层见 [youi.md](youi.md)。
 > **v2.22 变更（YoButton 两轴）：** `variant` 只表示外形 `solid | outlined | ghost`，语义色另轴 `tone`：`accent | neutral | danger | success | warning`。默认 `solid+accent` 即原主按钮。删除 `primary | secondary | danger` 变体与 `yohu-button--*` 类。涂装由 L2 `buttonPaintKind` 写成 `data-paint`，CSS 不写 88%/76%。confirm/alert 中明度：`solid+success/warning` 走软底+语义字，禁止 `fg-on`。实心叠色收进 `--yohu-{success,warn,error}-{hover,pressed}`。分层与调用对照见 [youi.md](youi.md)「YoButton」。
-> **v2.21 变更（日志单尺）：** 表头与行禁止两套几何。`logDocColumns` 是唯一尺：文档与表头轨道都是 `(padLeft+chars+gutter)ch`。列垫 `padLeftChars` 与 `cellPad=list` 同一 `Spacing.Md`，禁止 `cellPad=none` 把标题贴边。`YoVirtualList` 默认 `tone=document`（不画行线）；文件清单显式 `tone=list`。Fatal/检索高亮禁止加 padding 挪进宽。禁止再把 `colTrackTemplate` 的 px 格子套到日志行上。
-> **v2.20 变更（日志文档行）：** 对照 AS Logcat 完整链（`MessageFormatter` → `TextAccumulator` → `Document`）。行不再用 `YoColTrack`/`YoColCell`。列间/字段后空白是 `formatLogDoc` 的 pad 空格，不是 CSS 格子剩余。选区恢复原生 `::selection`；现成对 `--yohu-text-sel` + `--yohu-text-sel-fg`（v2.69）。清单复制切这份文档；`formatLogLine` 只给导出 testdata。删除 `selection.ts`。禁止 `pointerdown.detail`、禁止对 `pointerdown` `preventDefault`、禁止 Highlight/overlay 按格描选区。
+> **v2.21 变更（日志单尺）：** 表头与行禁止两套几何。当时 `logDocColumns` 是唯一尺：文档与表头轨道都是 `(padLeft+chars+gutter)ch`。列垫 `padLeftChars` 与 `cellPad=list` 同一 `Spacing.Md`，禁止 `cellPad=none` 把标题贴边。`YoVirtualList` 默认 `tone=document`（不画行线）；文件清单显式 `tone=list`。Fatal/检索高亮禁止加 padding 挪进宽。禁止再把 `colTrackTemplate` 的 px 格子套到日志行上。
+> **v2.20 变更（日志文档行）：** 对照 AS Logcat 完整链（`MessageFormatter` → `TextAccumulator` → `Document`）。行不再用 `YoColTrack`/`YoColCell`。当时列间/字段后空白是 `formatLogDoc` 的 pad 空格，不是 CSS 格子剩余。选区恢复原生 `::selection`；现成对 `--yohu-text-sel` + `--yohu-text-sel-fg`（v2.69）。当时清单复制切这份文档；现 Document.text（v3.78）。`formatLogLine` 只给导出 testdata。删除 `selection.ts`。禁止 `pointerdown.detail`、禁止对 `pointerdown` `preventDefault`、禁止 Highlight/overlay 按格描选区。
 > **v2.19 变更（日志选字色）：** 当时文档选区用 `--yohu-text-sel`（品牌 45%）；现 `--yohu-text-sel` = background_emphasize 实底，`--yohu-text-sel-fg` = font_on_primary（v2.69），禁止 20%/45% 品牌。v2.20 起改走原生 `::selection`，不再用字形 overlay。禁止 `accent-soft` / `state-selected` 冒充选字。
 > **v2.18 变更（日志文档选区）：** 曾自管 `DocRange` + 整表 `user-select: none` + `::highlight`。v2.20 撤回：格子模型选不中空白，且 `pointerdown.detail` 规范为 0 导致双击失效。
 > **v2.17 变更（路径错误走 YoToast）：** 路径/浏览失败不再在路径栏上方挂错误卡片。统一 `YoToaster`（`toast` 进出场，≤ `--yohu-dur-toast`）。目录不存在文案：没有这个目录，请重新输入。
 > **v2.16 变更（路径异常不跳转）：** 路径提交先 `files.list`，失败不改当前目录、不关输入。禁止 `ls` 退出码原文。v2.17 撤回页内错误条。
 > **v2.15 变更（路径输入跟内容固有宽）：** 当时 `min-width: 100%`；现 `field-sizing: content` + `width: max-content` + `max-width: 100%`（v2.42）。去掉 `flex: 1` / `min-width: 0`（flex 会把盒缩回槽宽）。禁止 JS 测宽。槽是视野。当时全选看开头；现展开不预选、光标在末尾（v2.43）。揭开/收回仍只动 `clip-path`。
 > **v2.14 变更（路径输入不抖）：** 曾锁死槽宽、只靠 input 内滑。长路径看起来像挤在槽里。v2.15 改走固有宽。
-> **v2.13 变更（清单列架收口 YoUI）：** 表头与行不再各写一套 `grid-template-columns`。`YoColFrame` 只写 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；当时日志也走格子；现只有文件清单走 `YoColTrack`/`YoColCell`，日志行是 pre 文档 `formatLogDoc`，禁止格子（v2.20）。禁止模块再做 LogColFrame 一类适配层，禁止再写第二份列垫。PID/TID/级别默认宽要放下标题与六位数字。
+> **v2.13 变更（清单列架收口 YoUI）：** 表头与行不再各写一套 `grid-template-columns`。`YoColFrame` 只写 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；当时日志也走格子；现只有文件清单走 `YoColTrack`/`YoColCell`，当时日志行是 pre 文档 `formatLogDoc`，禁止格子（v2.20）；现 Document.text（v3.78）。禁止模块再做 LogColFrame 一类适配层，禁止再写第二份列垫。PID/TID/级别默认宽要放下标题与六位数字。
 > **v2.12 变更（路径输入伸长）：** 曾按文字宽伸长输入盒；会抖。v2.13 撤回。
 > **v2.11 变更（路径槽 clip 倒放）：** 收回按展开倒放同一条 `clip-path`（`spatial-local`）。去掉 leaving / 淡出分轨。当时展开全选；现光标在末尾、不预选（v2.43）。
 > **v2.10 变更（路径槽收回淡出）：** 曾把收回改成满尺寸淡出。v2.11 按倒放撤回。
@@ -182,10 +190,10 @@
 > **v2.00 变更（文件路径栏对照资源管理器）：** 撤回 v1.99 的放大镜、建议列表与 `path-suggest`。曾把整条地址槽当 XOR；v2.01 改为分区。
 > **v1.99 变更（文件路径栏）：** 曾加放大镜与前缀补全；v2.00 撤回。解析策略（引号 / `file:` URI / 反斜杠 / 别名 / 相对 / `.` `..` + 安全根）仍留给提交。
 >
-> **v1.98 变更（日志文档行）：** 展示面板分两族。Family A（日志/控制台/终端 IO）是一份格式化文档，选区只有字符 Range；Family B（文件清单 / AG Grid）才是单元格/行块，且与选字互斥、不中途换挡。当时日志行 DOM 文本 === `formatLogLine`（空格是字符，对照 Logcat Formatter）；现 `formatLogDoc`（v2.20）。禁止 Grid 列盒 + 拖选切行块。表头仍是铬层可拖宽，不驱动行几何。
+> **v1.98 变更（日志文档行）：** 展示面板分两族。Family A（日志/控制台/终端 IO）是一份格式化文档，选区只有字符 Range；Family B（文件清单 / AG Grid）才是单元格/行块，且与选字互斥、不中途换挡。当时日志行 DOM 文本 === `formatLogLine`（空格是字符，对照 Logcat Formatter）；当时 `formatLogDoc`（v2.20）；现 Document.text（v3.78）。禁止 Grid 列盒 + 拖选切行块。表头仍是铬层可拖宽，不驱动行几何。
 > **v1.97 变更（日志选区双模式）：** 曾对照 Logcat 做 `text`/`rows` 中途切换；v1.98 撤回。该做法不属于成熟日志面板。
 > **v1.96 变更（日志行块选区）：** 对照 Logcat：当时行块闭区间 + `user-select: none`；已被 v1.98 撤回，现文档字符 Range + 行 `user-select: text`（v2.20）。
-> **v1.95 变更（日志复制）：** 对照 Logcat：当时剪贴板从 `LogLine` 经 `formatLogLine` 重排；现 `formatLogDoc`（v2.20），`formatLogLine` 只给导出 testdata。禁止 `Selection.toString()`（Grid 列盒会把粘贴拆成乱码）。选区只解析起止 `seq`；跨行取窗口 `visible` 闭区间；Ctrl+A 整表可见区；`copy` 事件只写 `text/plain`。无选区右键仍复制该行。
+> **v1.95 变更（日志复制）：** 对照 Logcat：当时剪贴板从 `LogLine` 经 `formatLogLine` 重排；当时 `formatLogDoc`（v2.20），`formatLogLine` 只给导出 testdata；现 Document.text（v3.78）。禁止 `Selection.toString()`（Grid 列盒会把粘贴拆成乱码）。选区只解析起止 `seq`；跨行取窗口 `visible` 闭区间；Ctrl+A 整表可见区；`copy` 事件只写 `text/plain`。无选区右键仍复制该行。
 > **v1.94 变更（空态跟随挤位）**：`inline-end` 补 `grid-template-rows` 0fr↔1fr，与宽度同一 `spatialPanel`。闭合不占列高，把手溢出。结果区居中空态靠 `flex:1` 跟随，禁止空态自写位移。`height:auto` / `max-height:none` 视为跳变。侧栏 `rail`、传输 `panel`、按钮 `swap` 同一条「造成挤位的配方插值、被挤兄弟跟随」纪律。
 > **v1.93 变更（发送栏宽度裁切）**：`inline-end` 改为与 `YoSwap`/侧栏同构的 `width` 插值（compact 控制高 ↔ 100%），内容锁祖先 `cqi`、贴 end 裁切；把手绝对叠在裁切盒上，只描露出的上+起边。禁止两列 `0fr auto`↔`minmax 1fr 0fr`（不插值）。
 > **v1.92 变更（发送栏横向开合）**：命令终端输入栏去掉向下 XOR `panel`。收起往右夹成把手（chevron-left），展开往左铺满（`yohu-recipe-inline-end`，宽度 spatial-panel）。
@@ -207,7 +215,7 @@
 > **v1.76 变更（启动交接）**：工作台 hydrate 之后才交接。同屏共享容器、异屏出场的数值仍用 `spatialPanel` / `spatialExit`。v1.78 起引擎改为分层快照，不再拉 HWND。品牌 Logo 按创建 DPI 冻结。系统关闭窗口动画则瞬时揭窗。禁止 WebView CSS 冒充启动过场。
 > **v1.75 变更（命令终端）**：导航与页眉展示名改为「命令终端」；常量在 `yohu-protocol::module_title` / `@yohu/api` `ModuleTitle`。目录 id 仍是 `adb-terminal`。
 > **v1.74 变更（启动数据单源）**：用户可见品牌只在原生小窗。HTML `#yohu-boot` 只铺画布。主窗居中读小窗锁定的工作区，不再二次 `GetCursorPos`。删除空命令 `boot.reveal` 与 `boot-reveal.js`。揭窗只走 `boot.showMain`。
-> **v1.76 变更（日志行跟表头轨道）**：当时行跟表头网格、格内文案、选区从单元格映射；现一份 pre 文档 === `formatLogDoc`，禁止 YoColTrack/YoColCell（v2.20）。解析失败行仍通栏。
+> **v1.76 变更（日志行跟表头轨道）**：当时行跟表头网格、格内文案、选区从单元格映射；当时一份 pre 文档 === `formatLogDoc`，禁止 YoColTrack/YoColCell（v2.20）；现 Document.text（v3.78）。解析失败行仍通栏。
 
 > **v1.75 变更（表头靠左+列垫）**：标题改回默认靠左。`--yohu-col-header-content-pad` 左 `space-md`、右 `space-sm`（鸿蒙 PC / Finder：不贴格边，左缘与文件名起笔对齐）。
 
@@ -298,11 +306,11 @@
 >
 > **v1.34 变更（日志显示列）**：设置项 `log_display_columns`（立即生效）控制清单表头与行显示哪些元数据列（时间 / UID / PID / TID / 级别 / Tag）。消息列始终在。缺字段视为开启。轨道按可见列内联写入，禁止在 CSS 写死七列。
 >
-> **v1.33 变更（日志固定表头）**：日志清单表头钉在 `YoVirtualList` 外（`flex-shrink: 0` + `--yohu-row-height-header`），当时共用 `.yohu-logs__cols` 定宽轨道；现尺是 `logDocTrackTemplate` + `formatLogDoc`（v2.20 / §4.1）。当时不走 `YoColHeader`；现表头 `YoColRow` + `YoColHeader` + 可拖宽（v1.55 / §4.1）。级别列改为 `4ch` 以容纳「级别」文案。表头与清单背板 `--yohu-canvas`。
+> **v1.33 变更（日志固定表头）**：日志清单表头钉在 `YoVirtualList` 外（`flex-shrink: 0` + `--yohu-row-height-header`），当时共用 `.yohu-logs__cols` 定宽轨道；当时尺是 `logDocTrackTemplate` + `formatLogDoc`（v2.20 / §4.1）；现 Document.text（v3.78）。当时不走 `YoColHeader`；现表头 `YoColRow` + `YoColHeader` + 可拖宽（v1.55 / §4.1）。级别列改为 `4ch` 以容纳「级别」文案。表头与清单背板 `--yohu-canvas`。
 >
 > **v1.32 变更（右键菜单宿主）**：菜单引擎收口到 `@yohu/ui` `context-menu/`（`defineContextMenu` / `openContextMenu` / `YoContextMenuHost`）。壳只挂一份 Host。模块场景表在各自 `menu.ts`。禁止 View 自挂 `YoContextMenu`。详见 `右键菜单-v6.md`。
 >
-> **v1.31 变更（多选选中片邻接圆角）**：连续选中行合成一块圆角矩形。代数 `adjacentJoin`（solo/start/middle/end）；class `--sel-start/mid/end` 削平邻接圆角，并用选中色补 hairline。`YoVirtualList` 行间 hairline 单源。禁止模块再写行分割线或选中圆角。当时日志定宽 grid、级别 2ch；现 `formatLogDoc` 连续文档，禁止格子，级别 4ch（v2.20 / v1.33）。`threadtime,uid` 的 UID 为数字或名；解析失败整行通栏，禁止画 `0 ?` 假列。
+> **v1.31 变更（多选选中片邻接圆角）**：连续选中行合成一块圆角矩形。代数 `adjacentJoin`（solo/start/middle/end）；class `--sel-start/mid/end` 削平邻接圆角，并用选中色补 hairline。`YoVirtualList` 行间 hairline 单源。禁止模块再写行分割线或选中圆角。当时日志定宽 grid、级别 2ch；当时 `formatLogDoc` 连续文档，禁止格子，级别 4ch（v2.20 / v1.33）；现 Document.text（v3.78）。`threadtime,uid` 的 UID 为数字或名；解析失败整行通栏，禁止画 `0 ?` 假列。
 >
 > **v1.30 变更（表头悬浮片铺满列格）**：`--yohu-col-header-content-pad` 只写在 `.yohu-col-header__label`。排序钮 `.yohu-interactive` 宿主 `padding: 0`。禁止把文案边距写在 `<button>` 上（绝对定位 `::before` 按内容盒计算，宿主 padding 会把悬浮片缩成文案胶囊）。
 >
@@ -386,7 +394,7 @@ Primitive（原始值：色板/字号/间距，不直接消费）
    ↓
 Semantic（语义别名：--yohu-fg / --yohu-surface / --yohu-accent / --yohu-success…，主题相关）
    ↓
-Component（组件级：--yohu-state-* / --yohu-level-* / --yohu-file-icon-* / --yohu-ripple-* / --yohu-focus-*，唯一被组件消费）
+Component（组件级：--yohu-state-* / --yohu-level-* / --yohu-logcat-* / --yohu-file-icon-* / --yohu-ripple-* / --yohu-focus-*，唯一被组件消费）
 ```
 
 - 组件与模块 CSS **只允许引用 Semantic/Component 层**；Primitive 仅在 tokens 内出现。
@@ -431,7 +439,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `switch-off-hover` / `pressed` | 关闭轨 + `font_primary` 5% / 10% | 叠字色 | 叠字色 | Switch 关闭叠态；禁止组件再写 color-mix |
 | `scrim` | 黑 10% / 黑 40% | `#00000019` | `#00000066` | 对话框压暗；禁止用 `fg`（深色会变白雾） |
 
-**logcat 级别板（复用官方语义色，无独立鸿蒙级别 Token）：**
+**Yohu 级别板（复用官方语义色，无独立鸿蒙级别 Token）：**
 
 | 级别 | 引用 | Light | Dark |
 |------|------|-------|------|
@@ -441,6 +449,8 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `--yohu-level-w` | `alert` | `#ED6F21` | `#DB6B42` |
 | `--yohu-level-e` | `warning` | `#E84026` | `#D94838` |
 | `--yohu-level-f` | `warning` 压黑 52% | 深于 Error；反色字走 `--yohu-fg-on` | 同构 |
+
+**LogCat 内容板（官方 Android Studio Logcat V2，设置 `log_color_scheme=logcat`）：** 消息 `--yohu-logcat-msg-*`；级别徽章 `--yohu-logcat-level-*` + `-bg`；Tag `--yohu-logcat-tag-0`…`79`。色值锁在 `tokens/logcat.ts`（`LogcatColorSchemeDefault.xml` / `Darcula.xml` + `logcat/resources/palette/logcat-tags-palette.json`），由 `logcatThemeVars` 排出。Assert 与 Error 同消息色，徽章更深，禁止社区紫。模块只写 token 名。
 
 **文件图标板（复用官方语义色，无 Material / 无自造 10 阶）：**
 
@@ -600,9 +610,9 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.1 日志分析（核心打磨对象）
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / **固定表头** + 虚拟列表 / 状态行）。
-- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 `formatLogDoc`。表头铬层可拖宽，行是连续文档，不是文件清单那种格子。禁止把 Family B 的行块拖选套到日志上。
-- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：时间列按设置 `log_time_format` 投影（默认完整墙钟）。`logDocColumns` 是表头与行的唯一尺。表头 `YoColFrame cellPad=list` / `YoColRow` / `YoColHeader` 写 `--yohu-col-tracks` 为 `logDocTrackTemplate`（`(padLeft+chars+gutter)ch`）。行 DOM 文本 === `formatLogDoc`（每字段先 `padLeft` 空格再 `padEnd`/`padStart`，与标题同一起笔；消息是 `line.msg` 原文，不加 `: `）。禁止 `cellPad=none`。禁止行再用 `YoColTrack` / `YoColCell`。UID 来自 `logcat -v threadtime,uid,year`。`LogLine.ts` 仍是完整墙钟 `YYYY-MM-DD HH:mm:ss.SSS`；清单时间按 `log_time_format` 投影（默认 `datetime_millis`）。解析失败（level=`?`）整行只有消息（字走 `--yohu-fg`）。级别色：`levelKey` → View 写 `--yohu-log-ink: var(--yohu-level-${key})`；左条 / 级别字 / Tag / 已知级别消息共用 ink（行上 `data-level`）。Fatal 字母反色块（`data-paint=invert`，字走 `--yohu-fg-on`，底走 ink）。禁止 CSS 再列 `[data-level="v"]` 这类 ink 表，禁止 `--yohu-level-f-bg`，禁止 `data-tint-msg`。反色/检索高亮禁止 padding（会挪进宽）。级别、Tag、已知级别消息、检索高亮挂 `.yohu-tone`。禁止 View 再写 `LEVEL_SUFFIX` / `--level` / `--bar` class。禁止模块再写 `grid-template-columns`。清单关闭行多选。行 `user-select: text`；`::selection` 用 `--yohu-text-sel` + `--yohu-text-sel-fg`。复制走 `copy.ts` 切清单文档，中间未挂载行补 `formatLogDoc`。导出仍走 `formatLogLine` testdata。`YoVirtualList` 默认 `tone=document`：文档不画行间分割线。文件清单显式 `tone=list`。
-- **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题默认靠左，列垫 `list` = 左 md / 右 sm；UID/PID/TID `align=end` 与文档 `padStart` 同一 `LOG_COLUMNS.align`；无排序；元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。列序时间 / PID / Tag / 级别 / 消息。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
+- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 Document.text。表头铬层可拖宽，行是连续文档，不是文件清单那种格子。禁止把 Family B 的行块拖选套到日志上。
+- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：三件套 `editor/format`（一行 accumulate 文本+range）→ `editor/document`（尾部追加/环裁/改选项重载）→ `editor/view`（软折行+定高 VL）。表头轨道 `trackTemplate` 与 Formatter options 同一把尺。逻辑文档 === Document.text。软折行只在 View：首行前缀不折，只折消息；续行 `data-doc-from`，hang 不进文档。禁止 `pre-wrap`。级别官方 `" L "` + 1 空格。View 禁止 `formatMessage`。CSS 只认 `data-tone` / `data-box=line` / `data-bar`。`YoVirtualList` 行高 `dataRowHeight()`。复制切 Document.text。导出仍走 `formatLogLine` testdata。`tone=document` 不画行间线。
+- **固定表头**：列名钉在滚动区外；高度 `--yohu-row-height-header`；背板 `--yohu-canvas`。表头是铬层（`user-select: none`），走 `YoColRow` + `YoColHeader`（标题默认靠左，列垫 `list` = 左 md / 右 sm；级别列贴 4ch 官方轨道、去列垫、不可拖；UID/PID/TID `align=end` 与文档 `padStart` 同一 `LOG_COLUMNS.align`；无排序；其余元数据列 `YoColResizer` 短柄；消息列 flex 不拖）。列序时间 / PID / Tag / 级别 / 消息。拖条热区透明，可见铬是居中 30% 高短柄。模块只 `setColWidth(key, px)`，禁止累加 delta。禁止把表头放进虚拟列表行。显示列读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。禁止模块再拉设置命令或把显示列拷进 logStore。
 - 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；Ctrl+A 整表铺底时信号底让位，左条保留。
 - 过滤栏：级别独立切换（V–F 精确集合，可多选；全部弹起不限）走 `YoSegmentedButton` `type=capsule` `multiple` `size=sm`；未选字色 `item.ink=var(--yohu-level-*)`；选中填 `item.fill=var(--yohu-level-*)`。禁止自造 `YoCorner`+flush Button、禁止 `.yohu-ink`、禁止点库内部 class。 / Tag（逗号分隔多针，精确命中；提交后 `YoChip` 走 `YoListPresence recipe=chip` 丝滑入场，流内右侧垂直居中删除；过滤生效走 `active`） / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
 - 会话 Tab：标题 + 采集绿点/信号红点 + 关闭 × + 新建 +；Tab 溢出可横向滚动；右键菜单（关闭其他/重命名/复制会话）走 `logs.tab` 场景。
