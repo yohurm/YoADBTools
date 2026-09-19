@@ -3,6 +3,7 @@
  * 运行时仍以 system.info 为准；本对象只作首屏兜底，由 testdata 契约锁死。
  */
 
+import { LOG_COLOR_SCHEME_DEFAULT } from "./log-color-scheme";
 import type { AppSettings } from "./types";
 
 export const APP_SETTINGS_DEFAULT: AppSettings = {
@@ -24,6 +25,7 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
     tag: true,
   },
   log_time_format: "datetime_millis",
+  log_color_scheme: LOG_COLOR_SCHEME_DEFAULT,
   mirror_max_size: 0,
   mirror_video_bit_rate: 16_000_000,
   mirror_max_fps: 0,

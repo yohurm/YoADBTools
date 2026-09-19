@@ -7,6 +7,7 @@ export * from "./safety";
 export * from "./log-filter";
 export * from "./log-bind";
 export * from "./log-format";
+export * from "./log-color-scheme";
 export * from "./log-signal";
 export * from "./command-line";
 export * from "./focus";

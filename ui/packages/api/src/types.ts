@@ -5,6 +5,10 @@
  * AppEvent 内部 tag `kind`（camelCase））。由 fixture 契约测试守护（types.test.ts）。
  */
 
+import type { LogColorScheme } from "./log-color-scheme";
+
+export type { LogColorScheme };
+
 // ===== device =====
 
 export type DeviceState = "online" | "unauthorized" | "offline";
@@ -119,6 +123,7 @@ export interface AppSettings {
   export_ask_every_time: boolean;
   log_display_columns: LogDisplayColumns;
   log_time_format: TerminalTimeFormat;
+  log_color_scheme: LogColorScheme;
   mirror_max_size: number;
   mirror_video_bit_rate: number;
   mirror_max_fps: number;
@@ -151,6 +156,7 @@ export type SettingKey =
   | "export_ask_every_time"
   | "log_display_columns"
   | "log_time_format"
+  | "log_color_scheme"
   | "mirror_max_size"
   | "mirror_video_bit_rate"
   | "mirror_max_fps"
