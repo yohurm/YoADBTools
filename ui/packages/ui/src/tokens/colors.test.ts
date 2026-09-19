@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Colors, DarkColors, FileIconDark, FileIconLight, Harmony, LogLevelDark, LogLevelLight } from "./colors";
+import {
+  Colors,
+  DarkColors,
+  FileIconDark,
+  FileIconLight,
+  Harmony,
+  LogLevelDark,
+  LogLevelLight,
+} from "./colors";
+import {
+  LogcatLevelDark,
+  LogcatLevelLight,
+  LogcatMessageDark,
+  LogcatMessageLight,
+  LogcatTagDark,
+  LogcatTagLight,
+} from "./logcat";
 import type { FileGlyph } from "../file-glyph";
 
 /**
@@ -240,7 +256,7 @@ describe("HarmonyOS 对比度门禁（§1.6）", () => {
   });
 });
 
-describe("logcat 级别板（复用官方语义色）", () => {
+describe("Yohu 级别板（复用鸿蒙语义色）", () => {
   it("键是小写 V–F，浅/深一致", () => {
     expect(Object.keys(LogLevelLight)).toEqual(["v", "d", "i", "w", "e", "f"]);
     expect(Object.keys(LogLevelDark)).toEqual(Object.keys(LogLevelLight));
@@ -347,6 +363,21 @@ describe("theme.css 变量", () => {
     }
     expect(themeCss).not.toContain("--yohu-level-f-bg");
     expect(themeCss).not.toContain("--yohu-ink-wash-");
+  });
+
+  it("官方 Logcat V2 板齐备（消息 / 徽章 / Tag）", () => {
+    for (const name of ["v", "d", "i", "w", "e", "f"]) {
+      expect(themeCss).toContain(`--yohu-logcat-msg-${name}:`);
+      expect(themeCss).toContain(`--yohu-logcat-level-${name}:`);
+      expect(themeCss).toContain(`--yohu-logcat-level-${name}-bg:`);
+    }
+    for (let i = 0; i < LogcatTagLight.length; i += 1) {
+      expect(themeCss).toContain(`--yohu-logcat-tag-${i}:`);
+    }
+    expect(themeCss).toContain(`--yohu-logcat-msg-e: ${LogcatMessageLight.e}`);
+    const darkBlock = themeCss.slice(themeCss.indexOf('[data-theme="dark"]'));
+    expect(darkBlock).toContain(`--yohu-logcat-msg-e: ${LogcatMessageDark.e}`);
+    expect(darkBlock).toContain(`--yohu-logcat-level-f-bg: ${LogcatLevelDark.f.bg}`);
   });
 
   it("文件图标板变量齐备（浅色+深色，body/mark）", () => {

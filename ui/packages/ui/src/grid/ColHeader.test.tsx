@@ -73,6 +73,16 @@ describe("YoColHeader", () => {
     expect(container.querySelector(".yohu-col-header")?.getAttribute("data-align")).toBe("start");
   });
 
+  it("pad=none 写 data-pad，CSS 清列垫", () => {
+    const { container } = render(() => (
+      <YoColHeader pad="none">级别</YoColHeader>
+    ));
+    expect(container.querySelector(".yohu-col-header")?.getAttribute("data-pad")).toBe("none");
+    expect(colHeaderCss).toMatch(
+      /\.yohu-col-header\[data-pad="none"\]\s*\{[^}]*--yohu-col-header-content-pad:\s*0/,
+    );
+  });
+
   it("悬浮片铺满交互宿主，文案边距只写在内容槽", () => {
     expect(colHeaderCss).toContain("--yohu-col-header-overlay-inset: 0");
     expect(colHeaderCss).toContain("--yohu-col-header-overlay-radius: var(--yohu-radius-none)");

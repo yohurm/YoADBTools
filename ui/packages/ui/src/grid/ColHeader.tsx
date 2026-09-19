@@ -20,8 +20,11 @@ import "./ColHeader.css";
 export type { YoColHeaderAlign, YoColHeaderSort };
 
 export interface YoColHeaderProps {
+  class?: string;
   /** 标题对齐；默认 start。单元格对齐由模块自己管。 */
   align?: YoColHeaderAlign;
+  /** 列垫。none = 官方 LevelFormat 4ch 轨道，标题贴格。默认跟 cellPad=list。 */
+  pad?: "list" | "none";
   /** 当前列排序态 */
   ariaSort?: YoColHeaderSort;
   /** 有则库内渲染排序钮；模块只传回调，不自绘 button / __label */
@@ -104,8 +107,9 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
 
   return (
     <div
-      class="yohu-col-header"
+      class={`yohu-col-header${props.class ? ` ${props.class}` : ""}`}
       data-align={host()["data-align"]}
+      data-pad={props.pad}
       role="columnheader"
       aria-sort={host()["aria-sort"]}
       data-resizing={host()["data-resizing"]}

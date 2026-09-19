@@ -167,6 +167,26 @@ describe("attachPanelKeys", () => {
     root.remove();
   });
 
+  it("onAction 返回 false 不拦截默认", () => {
+    const root = document.createElement("div");
+    const list = document.createElement("div");
+    list.className = "yohu-logs__list";
+    const row = document.createElement("div");
+    list.append(row);
+    root.append(list);
+    document.body.append(root);
+    const stop = attachPanelKeys(root, {
+      listSelector: ".yohu-logs__list",
+      bindings: [{ action: "copy", key: "c", ctrl: true, when: whenList }],
+      onAction: () => false,
+    });
+    const hit = new KeyboardEvent("keydown", { key: "c", ctrlKey: true, bubbles: true, cancelable: true });
+    row.dispatchEvent(hit);
+    expect(hit.defaultPrevented).toBe(false);
+    stop();
+    root.remove();
+  });
+
   it("host 模式：焦点不在列表也拦截内容键；Space 不抢按钮", () => {
     const seen: string[] = [];
     const stop = attachPanelKeys(window, {

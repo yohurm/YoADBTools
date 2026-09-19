@@ -2,7 +2,23 @@
  * theme.css 唯一生成器：全部变量从 TS token 排出。
  * 契约测试强制磁盘上的 theme.css 与本函数输出逐字节一致。
  */
-import { Colors, DarkColors, FileIconDark, FileIconLight, LogLevelDark, LogLevelLight } from "./colors";
+import {
+  Colors,
+  DarkColors,
+  FileIconDark,
+  FileIconLight,
+  LogLevelDark,
+  LogLevelLight,
+} from "./colors";
+import {
+  LogcatLevelDark,
+  LogcatLevelLight,
+  LogcatMessageDark,
+  LogcatMessageLight,
+  LogcatTagDark,
+  LogcatTagLight,
+  logcatThemeVars,
+} from "./logcat";
 import { Density } from "./density";
 import { DarkElevation, Elevation } from "./elevation";
 import { ZIndex } from "./z-index";
@@ -102,6 +118,7 @@ export function emitThemeCss(): string {
     ["--yohu-shadow-dialog", Elevation.Dialog],
     ["--yohu-shadow-dialog-unfocused", Elevation.DialogUnfocused],
     ...levelVars(LogLevelLight),
+    ...logcatThemeVars(LogcatMessageLight, LogcatLevelLight, LogcatTagLight),
     ...fileIconVars(FileIconLight),
     ["--yohu-canvas", "var(--yohu-bg-base)"],
     ["--yohu-splitter", "var(--yohu-border-strong)"],
@@ -149,6 +166,7 @@ export function emitThemeCss(): string {
     ["--yohu-shadow-dialog", DarkElevation.Dialog],
     ["--yohu-shadow-dialog-unfocused", DarkElevation.DialogUnfocused],
     ...levelVars(LogLevelDark),
+    ...logcatThemeVars(LogcatMessageDark, LogcatLevelDark, LogcatTagDark),
     ...fileIconVars(FileIconDark),
     ["--yohu-canvas", "var(--yohu-bg-base)"],
     ["--yohu-state-hover", DarkStateFill.Hover],

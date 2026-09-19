@@ -8,7 +8,7 @@ import { panelKeyContext, type PanelScopeOptions } from "./scope";
 
 export interface PanelKeyHost<A extends string> extends PanelScopeOptions {
   bindings: readonly KeyBinding<A>[];
-  onAction: (action: A, event: KeyboardEvent) => void;
+  onAction: (action: A, event: KeyboardEvent) => boolean | void;
 }
 
 export function attachPanelKeys<A extends string>(root: EventTarget, host: PanelKeyHost<A>): () => void {
@@ -18,9 +18,9 @@ export function attachPanelKeys<A extends string>(root: EventTarget, host: Panel
     const ctx = panelKeyContext(scopeRoot, event.target, host);
     const action = matchBindings(event, ctx, host.bindings);
     if (action === null) return;
+    if (host.onAction(action, event) === false) return;
     event.preventDefault();
     event.stopPropagation();
-    host.onAction(action, event);
   };
   root.addEventListener("keydown", onKeyDown, true);
   return () => root.removeEventListener("keydown", onKeyDown, true);
