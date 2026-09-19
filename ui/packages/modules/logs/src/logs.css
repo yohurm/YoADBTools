@@ -1,16 +1,18 @@
 /* ============================================================================
  * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 表头是铬层：YoColFrame cellPad=list + ch 轨道（logDocTrackTemplate）。
- * 列垫在尺里（padLeftChars = space-md），标题与文档同一起笔，禁止 cellPad=none 贴边。
- * 行是一份 white-space:pre 文档。表头与行共用 logDocColumns 一把尺。
+ * 表头是铬层：YoColFrame cellPad=list + ch 轨道（Formatter trackTemplate）。
+ * 列垫在尺里（LOG_PAD_LEFT_CHARS = space-md / LOG_CH_PX），标题与文档同一起笔，禁止 cellPad=none 贴边。
+ * 级别不是表格列：官方 LevelFormat `" L "` + 1 空格，无 padLeft。表头「级别」走 YoColHeader pad=none，贴 4ch 轨道。
+ * 行是一份 white-space:pre 文档。软折行在 EditorView 切成定高可视行，禁止整行 pre-wrap。
+ * 续行 hang 走 --yohu-log-hang（前缀 ch），不进复制表面。
  * 选区走原生 ::selection（--yohu-text-sel / --yohu-text-sel-fg）。
- * 列间空白是 formatLogDoc 的 pad 空格。
+ * 列间空白是 Document.text 的 pad 空格。
  * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
- * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
+ * 行 --yohu-log-ink 由 Document barInk 写入，禁止再列 V–F 六条映射。
  * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
- * 左条 / 级别字 / Tag / 已知级别消息共用 ink；解析失败消息走 fg。Fatal 字母反色块（data-paint=invert，字走 fg-on）。
- * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
+ * 着色只认 data-tone=ink|wash 与 data-bar。LevelFormat 是 data-box=line 行盒，禁止圆角徽章 / padding / 负 margin。
+ * 解析失败消息走 fg。信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -69,6 +71,7 @@
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
+  line-height: var(--yohu-font-leading-data);
 }
 
 .yohu-logs__list-body {
@@ -78,18 +81,15 @@
   overflow: hidden;
 }
 
-/* Ctrl+A 未挂载行：与拖选同一选字对，不是徽章软底。 */
+/* Ctrl+A 未挂载行：覆写 tone 变量，字段不再按 class 着色。 */
 .yohu-logs__row--picked {
   background-color: var(--yohu-text-sel);
   color: var(--yohu-text-sel-fg);
   --yohu-log-ink: var(--yohu-text-sel-fg);
+  --yohu-log-level-fg: var(--yohu-text-sel-fg);
+  --yohu-log-level-bg: transparent;
 }
 
-.yohu-logs__row--picked .yohu-logs__row-ts,
-.yohu-logs__row--picked .yohu-logs__row-uid,
-.yohu-logs__row--picked .yohu-logs__row-pid,
-.yohu-logs__row--picked .yohu-logs__row-tid,
-.yohu-logs__row--picked .yohu-logs__row-msg,
 .yohu-logs__row--picked .yohu-logs__row-fold {
   color: var(--yohu-text-sel-fg);
 }
@@ -141,13 +141,24 @@
 
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
+  color: var(--yohu-fg);
   display: block;
   height: 100%;
   overflow: hidden;
   white-space: pre;
+  line-height: var(--yohu-row-height);
   user-select: text;
   cursor: text;
+  border-left-color: transparent;
+}
+
+.yohu-logs__row[data-bar="level"] {
   border-left-color: var(--yohu-log-ink);
+}
+
+/* 续行只含消息切片；hang 对齐消息列起笔。禁止写进文档空格。 */
+.yohu-logs__row[data-wrap]:not([data-wrap="0"]) {
+  padding-left: calc(var(--yohu-log-hang, 0) * 1ch);
 }
 
 /* 列垫空格不是字段正文。禁止进双击选词，仍占文档宽度。 */
@@ -160,7 +171,7 @@
   color: var(--yohu-text-sel-fg);
 }
 
-/* ink 由 View 写入 --yohu-log-ink。 */
+/* 左条 ink 由 Document barInk 写入 --yohu-log-ink。 */
 
 /* 信号行（崩溃/ANR）：信号底色 + Error 左条。Ctrl+A 铺底时让位。 */
 .yohu-logs__row--signal {
@@ -173,43 +184,30 @@
   color: var(--yohu-text-sel-fg);
 }
 
-.yohu-logs__row-ts {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-logs__row-uid {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-logs__row-pid,
-.yohu-logs__row-tid {
-  color: var(--yohu-fg-2);
-}
-
-.yohu-logs__row-level,
-.yohu-logs__row-tag {
-  color: var(--yohu-log-ink);
-}
-
 .yohu-logs__row-level {
   font-weight: var(--yohu-font-weight-semibold);
-  box-sizing: border-box;
-}
-
-/* Fatal 反色块：字母用 font_on，底用 ink（更深的 warning）。 */
-.yohu-logs__row[data-paint="invert"] .yohu-logs__row-level {
-  color: var(--yohu-fg-on);
-  background-color: var(--yohu-log-ink);
-  border-radius: var(--yohu-radius-2xs);
 }
 
 .yohu-logs__row-msg {
-  color: var(--yohu-fg);
   min-width: 0;
 }
 
-.yohu-logs__row[data-level] .yohu-logs__row-msg {
+.yohu-logs__row [data-tone="ink"] {
   color: var(--yohu-log-ink);
+}
+
+/* 行盒：对照编辑器 TextAttributes.BACKGROUND，邻行相贴。禁止圆角 / padding。 */
+.yohu-logs__row [data-box="line"] {
+  display: inline-block;
+  height: 100%;
+  vertical-align: top;
+  line-height: var(--yohu-row-height);
+  box-sizing: border-box;
+}
+
+.yohu-logs__row [data-tone="wash"] {
+  color: var(--yohu-log-level-fg);
+  background-color: var(--yohu-log-level-bg);
 }
 
 .yohu-logs__mark {

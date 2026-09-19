@@ -16,7 +16,7 @@ const line = (over: Partial<LogLine> = {}): LogLine => ({
   ...over,
 });
 
-describe("formatLogLineParts（清单切段；join === api 文档行）", () => {
+describe("formatLogLineParts（导出 testdata；join === formatLogLine）", () => {
   it("无 uid 时 join 与 formatLogLine 同文", () => {
     const row = line();
     expect(joinLogLineParts(formatLogLineParts(row))).toBe(formatLogLine(row));

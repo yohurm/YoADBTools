@@ -19,7 +19,6 @@ import {
   toWireFilter,
   type SessionFilter,
 } from "./filter";
-import { levelInkStyle, levelPaint } from "./level-paint";
 import { RingMirror } from "./mirror";
 import { scanSignal } from "./signals";
 import { collapseStack } from "./stack";
@@ -44,20 +43,7 @@ const filter = (over: Partial<SessionFilter>): SessionFilter => ({
   ...over,
 });
 
-describe("levelPaint（反色；消息同色走行上 data-level）", () => {
-  it("只有 Fatal 反色；paint 不再分消息是否着色", () => {
-    expect(levelPaint("f")).toEqual({ invert: true });
-    expect(levelPaint("e")).toEqual({ invert: false });
-    expect(levelPaint("w")).toEqual({ invert: false });
-  });
-
-  it("ink 样式只引用 token 名", () => {
-    expect(levelInkStyle("e")).toEqual({ "--yohu-log-ink": "var(--yohu-level-e)" });
-    expect(levelInkStyle("f")).toEqual({ "--yohu-log-ink": "var(--yohu-level-f)" });
-  });
-});
-
-describe("levelKey（着色键，与 --yohu-level-* / data-level 对齐）", () => {
+describe("levelKey（筛选钮键，与 --yohu-level-* 对齐）", () => {
   it("已知级别映射到 token 小写键", () => {
     expect(levelKey("V")).toBe("v");
     expect(levelKey("e")).toBe("e");

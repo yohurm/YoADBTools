@@ -1,5 +1,6 @@
 /**
- * 清单/选区切段。整行导出文档走 @yohu/api `formatLogLine`（镜像 domain）。
+ * 导出 testdata 切段。join === @yohu/api `formatLogLine`（镜像 domain）。
+ * 清单 / 选区走 editor Document.text，不走这里。
  */
 
 import { formatLogLine } from "@yohu/api";

@@ -16,10 +16,10 @@ import {
   serializeLogCopy,
   textOffsetInDoc,
 } from "./copy";
-import { defaultLogDocLayout, formatLogDoc, formatLogDocParts } from "./doc";
+import { defaultFormatOptions, formatMessage, formatParts, hangChars, wrapMessage } from "./editor";
 import { ALL_LOG_DISPLAY_COLUMNS } from "./layout";
 
-const layout = defaultLogDocLayout(ALL_LOG_DISPLAY_COLUMNS);
+const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS, "yohu");
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -34,17 +34,23 @@ function line(over: Partial<LogLine> = {}): LogLine {
   };
 }
 
-function row(over: Partial<LogLine> = {}): { line: LogLine } {
-  return { line: line(over) };
+function messageOf(item: LogLine) {
+  const formatted = formatMessage(item, options);
+  return { seq: item.seq, text: formatted.text };
 }
 
 function mountRow(item: LogLine): HTMLElement {
+  const formatted = formatMessage(item, options);
   const el = document.createElement("div");
   el.dataset.seq = String(item.seq);
-  for (const part of formatLogDocParts(item, layout)) {
+  for (const range of formatted.ranges) {
     const span = document.createElement("span");
-    span.dataset.kind = part.kind;
-    span.textContent = part.text;
+    if (range.role === "pad") {
+      span.dataset.logPad = "";
+    } else {
+      span.dataset.kind = range.kind;
+    }
+    span.textContent = formatted.text.slice(range.start, range.end);
     el.append(span);
   }
   return el;
@@ -93,32 +99,30 @@ afterEach(() => {
 });
 
 describe("serializeLogCopy", () => {
-  const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
+  const messages = [messageOf(line({ seq: 1, msg: "one" })), messageOf(line({ seq: 2, msg: "two" })), messageOf(line({ seq: 3, msg: "three" }))];
 
   it("all 复制当前窗口全部可见行的清单文档", () => {
     expect(
       serializeLogCopy({
         pick: LOG_COPY_ALL,
-        rows,
+        messages,
         listRoot: null,
         selection: null,
-        layout,
       }),
-    ).toBe(rows.map((item) => formatLogDoc(item.line, layout)).join("\n"));
+    ).toBe(messages.map((item) => item.text).join("\n"));
   });
 
   it("无选区时回退一行；空则空串", () => {
     expect(
       serializeLogCopy({
         pick: LOG_COPY_NONE,
-        rows,
+        messages,
         listRoot: null,
         selection: null,
-        fallbackLine: rows[1]!.line,
-        layout,
+        fallbackText: messages[1]!.text,
       }),
-    ).toBe(formatLogDoc(rows[1]!.line, layout));
-    expect(serializeLogCopy({ pick: LOG_COPY_NONE, rows, listRoot: null, selection: null, layout })).toBe("");
+    ).toBe(messages[1]!.text);
+    expect(serializeLogCopy({ pick: LOG_COPY_NONE, messages, listRoot: null, selection: null })).toBe("");
     expect(copyHasPayload({ pick: LOG_COPY_NONE, listRoot: null, selection: null })).toBe(false);
     expect(copyHasPayload({ pick: LOG_COPY_ALL, listRoot: null, selection: null })).toBe(true);
   });
@@ -127,16 +131,15 @@ describe("serializeLogCopy", () => {
     const withUid = line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" });
     const text = serializeLogCopy({
       pick: LOG_COPY_NONE,
-      rows: [],
+      messages: [],
       listRoot: null,
       selection: null,
-      fallbackLine: withUid,
-      layout,
+      fallbackText: formatMessage(withUid, options).text,
     });
-    expect(text).toBe(formatLogDoc(withUid, layout));
+    expect(text).toBe(formatMessage(withUid, options).text);
     expect(text.includes("binder")).toBe(true);
     expect(text.includes("avc")).toBe(true);
-    const tag = formatLogDocParts(withUid, layout).find((part) => part.kind === "tag");
+    const tag = formatParts(formatMessage(withUid, options)).find((part) => part.kind === "tag");
     expect(tag?.text.endsWith(" ")).toBe(true);
   });
 });
@@ -148,21 +151,20 @@ describe("documentCopyText", () => {
     const rowEl = mountRow(item);
     list.append(rowEl);
     document.body.append(list);
-    const parts = formatLogDocParts(item, layout);
+    const parts = formatParts(formatMessage(item, options));
     const tagAt = parts.findIndex((part) => part.kind === "tag");
     const before = parts.slice(0, tagAt).reduce((n, part) => n + part.text.length, 0);
     const tag = parts[tagAt]!;
     const lead = tag.text.length - tag.text.trimStart().length;
     const selection = selectDoc(rowEl, before + lead, rowEl, before + tag.text.trimEnd().length);
-    expect(documentCopyText(list, selection, [{ line: item }], layout)).toBe("ActivityManager");
+    expect(documentCopyText(list, selection, [messageOf(item)])).toBe("ActivityManager");
     expect(
       serializeLogCopy({
         pick: LOG_COPY_NONE,
-        rows: [{ line: item }],
+        messages: [messageOf(item)],
         listRoot: list,
         selection,
-        fallbackLine: line({ seq: 9, msg: "other" }),
-        layout,
+        fallbackText: formatMessage(line({ seq: 9, msg: "other" }), options).text,
       }),
     ).toBe("ActivityManager");
   });
@@ -173,30 +175,67 @@ describe("documentCopyText", () => {
     const rowEl = mountRow(item);
     list.append(rowEl);
     document.body.append(list);
-    const parts = formatLogDocParts(item, layout);
+    const parts = formatParts(formatMessage(item, options));
     const tagAt = parts.findIndex((part) => part.kind === "tag");
     const before = parts.slice(0, tagAt).reduce((n, part) => n + part.text.length, 0);
     const tag = parts[tagAt]!;
     expect(tag.text.trimStart().startsWith("Yohu")).toBe(true);
     expect(tag.text.length).toBeGreaterThan(4);
     const selection = selectDoc(rowEl, before, rowEl, before + tag.text.length);
-    expect(documentCopyText(list, selection, [{ line: item }], layout)).toBe(tag.text);
-    expect(documentCopyText(list, selection, [{ line: item }], layout).endsWith(" ")).toBe(true);
+    expect(documentCopyText(list, selection, [messageOf(item)])).toBe(tag.text);
+    expect(documentCopyText(list, selection, [messageOf(item)]).endsWith(" ")).toBe(true);
   });
 
   it("跨行中间未挂载行用同一文档补齐", () => {
-    const rows = [row({ seq: 1, msg: "one" }), row({ seq: 2, msg: "two" }), row({ seq: 3, msg: "three" })];
+    const items = [line({ seq: 1, msg: "one" }), line({ seq: 2, msg: "two" }), line({ seq: 3, msg: "three" })];
+    const messages = items.map(messageOf);
     const list = document.createElement("div");
-    const first = mountRow(rows[0]!.line);
-    const last = mountRow(rows[2]!.line);
+    const first = mountRow(items[0]!);
+    const last = mountRow(items[2]!);
     list.append(first, last);
     document.body.append(list);
-    const firstDoc = formatLogDoc(rows[0]!.line, layout);
-    const lastDoc = formatLogDoc(rows[2]!.line, layout);
     const selection = selectDoc(first, 2, last, 4);
-    expect(documentCopyText(list, selection, rows, layout)).toBe(
-      [firstDoc.slice(2), formatLogDoc(rows[1]!.line, layout), lastDoc.slice(0, 4)].join("\n"),
+    expect(documentCopyText(list, selection, messages)).toBe(
+      [messages[0]!.text.slice(2), messages[1]!.text, messages[2]!.text.slice(0, 4)].join("\n"),
     );
+  });
+
+  it("跨可视续行复制映回同一逻辑文档，不含 hang", () => {
+    const item = line({ seq: 4, msg: "hello world now" });
+    const formatted = formatMessage(item, options);
+    const visuals = wrapMessage(
+      {
+        seq: item.seq,
+        text: formatted.text,
+        ranges: formatted.ranges,
+        headerChars: formatted.headerChars,
+        bar: formatted.bar,
+        line: item,
+      },
+      hangChars(options) + 10,
+    );
+    expect(visuals.length).toBeGreaterThan(1);
+    const list = document.createElement("div");
+    const els = visuals.map((visual) => {
+      const el = document.createElement("div");
+      el.dataset.seq = String(item.seq);
+      el.dataset.wrap = String(visual.wrapIndex);
+      el.dataset.docFrom = String(visual.docFrom);
+      for (const range of visual.ranges) {
+        const span = document.createElement("span");
+        if (range.role === "pad") {
+          span.dataset.logPad = "";
+        }
+        span.textContent = visual.text.slice(range.start, range.end);
+        el.append(span);
+      }
+      list.append(el);
+      return el;
+    });
+    document.body.append(list);
+    const last = els.at(-1)!;
+    const selection = selectDoc(els[0]!, 0, last, last.textContent?.length ?? 0);
+    expect(documentCopyText(list, selection, [messageOf(item)])).toBe(formatted.text);
   });
 });
 
@@ -211,8 +250,11 @@ describe("textOffsetInDoc / logSelectionInList", () => {
     document.body.append(rowEl);
     const firstText = rowEl.querySelector("span")?.firstChild;
     expect(firstText).toBeTruthy();
-    expect(textOffsetInDoc(rowEl, firstText!, 3)).toBe(3);
-    expect(textOffsetInDoc(rowEl, fold.firstChild!, 2)).toBe(formatLogDoc(item, layout).length);
+    const firstLen = firstText!.textContent?.length ?? 0;
+    expect(firstLen).toBeGreaterThan(0);
+    expect(textOffsetInDoc(rowEl, firstText!, firstLen)).toBe(firstLen);
+    expect(textOffsetInDoc(rowEl, firstText!, firstLen + 8)).toBe(firstLen);
+    expect(textOffsetInDoc(rowEl, fold.firstChild!, 2)).toBe(formatMessage(item, options).text.length);
   });
 
   it("折叠选区不算在清单里", () => {

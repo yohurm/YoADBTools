@@ -1,6 +1,6 @@
 /**
  * 日志页快捷键策略：绑定表。宿主在 @yohu/ui keymap。
- * 复制载荷在 copy.ts（原生选区偏移切 formatLogDoc；中间未挂载行补同一文档）。
+ * 复制载荷在 copy.ts（原生选区偏移切 Document.text；中间未挂载行补同一文档）。
  */
 
 import { whenIdle, whenPanel, whenPanelOrField, type KeyBinding } from "@yohu/ui";

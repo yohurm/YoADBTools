@@ -5,6 +5,7 @@ import type { LogLine } from "@yohu/api";
 import {
   applyAppend,
   canFreezeFollow,
+  EMPTY_VIEW_ROWS,
   isFreshLine,
   keepMatching,
   lastSeqOf,
@@ -77,10 +78,34 @@ describe("panel 游标", () => {
 });
 
 describe("panel 选择", () => {
-  it("trimRows 只裁尾部容量", () => {
+  it("trimRows 只裁尾部容量；未超 cap 保持同一引用", () => {
     const rows = collapseStack([line(0), line(1), line(2)]);
     expect(trimRows(rows, 2).map((r) => r.line.seq)).toEqual([1, 2]);
-    expect(trimRows(rows, 10)).toHaveLength(3);
+    expect(trimRows(rows, 10)).toBe(rows);
+    expect(
+      applyAppend({
+        visible: rows,
+        lines: [],
+        fromSeq: 0,
+        following: true,
+        paused: false,
+        filter: all,
+        cap: 10,
+        pendingCount: 3,
+      })?.visible,
+    ).toBe(rows);
+    expect(
+      applyAppend({
+        visible: rows,
+        lines: [],
+        fromSeq: 0,
+        following: true,
+        paused: false,
+        filter: all,
+        cap: 10,
+        pendingCount: 0,
+      }),
+    ).toBeNull();
   });
 
   it("keepMatching 从已有面板筛选，不依赖镜像", () => {
@@ -101,6 +126,27 @@ describe("panel 选择", () => {
     const { forPanel, pending } = selectHits([line(0), line(1), line(2)], 1, null, all);
     expect(forPanel.map((l) => l.seq)).toEqual([1, 2]);
     expect(pending).toBe(0);
+  });
+
+  it("空投影同一引用", () => {
+    expect(panelFromLines([], 8).visible).toBe(EMPTY_VIEW_ROWS);
+    expect(panelFromLines([], 100).visible).toBe(EMPTY_VIEW_ROWS);
+    expect(selectHits([line(0)], -1, null, all).forPanel).toBe(
+      selectHits([line(9)], -2, 0, all).forPanel,
+    );
+    expect(
+      projectWindow({
+        drawn: collapseStack([line(0)]),
+        source: [line(1)],
+        sourceCoversRange: true,
+        fromSeq: -1,
+        following: true,
+        frozenThroughSeq: null,
+        filter: all,
+        cap: 100,
+        pendingCount: 0,
+      }).visible,
+    ).toBe(EMPTY_VIEW_ROWS);
   });
 });
 

@@ -14,6 +14,7 @@ import type { LogLine, ProcessEntry } from "@yohu/api";
 import {
   applyAppend,
   canFreezeFollow,
+  EMPTY_VIEW_ROWS,
   isFreshLine,
   lastSeqOf,
   mirrorCoversRange,
@@ -172,7 +173,7 @@ export function createWorkspace(
       frozenThroughSeq: null,
       pendingCount: 0,
       signalCount: 0,
-      visible: [],
+      visible: EMPTY_VIEW_ROWS,
       binding: emptyBinding(),
     };
     if (scope.kind === "package") {
@@ -182,10 +183,20 @@ export function createWorkspace(
   }
 
   function writePanel(idx: number, rows: ViewRow[], pendingCount: number): void {
+    const session = state.sessions[idx];
     const visible = trimRows(rows, bufferCapacity());
+    const signalCount = signalCountOf(visible);
+    if (
+      session &&
+      session.visible === visible &&
+      session.signalCount === signalCount &&
+      session.pendingCount === pendingCount
+    ) {
+      return;
+    }
     setState("sessions", idx, {
       visible,
-      signalCount: signalCountOf(visible),
+      signalCount,
       pendingCount,
     });
   }
@@ -268,7 +279,7 @@ export function createWorkspace(
   function flushPanel(id: number): void {
     const idx = sessionIndex(id);
     if (idx < 0) return;
-    writePanel(idx, [], 0);
+    writePanel(idx, EMPTY_VIEW_ROWS, 0);
   }
 
   function flushDevicePanels(serial: string): void {
@@ -289,7 +300,7 @@ export function createWorkspace(
       following: true,
       frozenThroughSeq: null,
     });
-    writePanel(idx, [], 0);
+    writePanel(idx, EMPTY_VIEW_ROWS, 0);
   }
 
   function trimPanels(): void {

@@ -1,4 +1,4 @@
-//! 日志行文本格式（复制与导出共用）。protocol 只持有结构，排版在本层。
+//! 日志行文本格式（仅导出 testdata；清单复制走 UI Document.text）。protocol 只持有结构，排版在本层。
 
 use yohu_protocol::LogLine;
 

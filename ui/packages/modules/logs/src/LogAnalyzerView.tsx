@@ -1,6 +1,6 @@
 /**
  * 日志分析页壳：设备绑定、页眉、Tab、列表框、导出与对话框。
- * 行文档 / 过滤条 / 复制手势分文件。
+ * 清单走 editor/{format,document,view}；过滤条 / 复制手势分文件。
  */
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
@@ -24,7 +24,6 @@ import {
   YoTabs,
   YoTextField,
   YoToaster,
-  YoVirtualList,
   attachPanelKeys,
   closeContextMenu,
   createToaster,
@@ -40,12 +39,25 @@ import {
   type LogCopyScope,
 } from "./copy";
 import { attachLogCopyGestures } from "./copy-gesture";
-import { DEFAULT_CH_PX, logDocTrackTemplate, measureChPx, type LogDocLayout } from "./doc";
+import {
+  DEFAULT_CH_PX,
+  EditorView,
+  EMPTY_ROWS,
+  trackTemplate,
+  type FormatOptions,
+  type LogDocument,
+} from "./editor";
 import { tagFilterActive } from "./filter";
 import { suggestedExportPath } from "./host-path";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, tsFieldPx, visibleLogColumns } from "./layout";
-import { LogListBind, LogRow, rowKey } from "./LogDocView";
+import {
+  DEFAULT_LOG_DISPLAY_COLUMNS,
+  dataRowHeight,
+  logColResizable,
+  measureChPx,
+  tsFieldPx,
+  visibleLogColumns,
+} from "./layout";
 import { LogFilterBar } from "./LogFilterBar";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -129,9 +141,11 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [renameText, setRenameText] = createSignal("");
   const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
+  const [rowChars, setRowChars] = createSignal(0);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
 
   let keywordRef: YoSearchControl | undefined;
+  let activeDoc: LogDocument | undefined;
 
   createEffect(() => {
     const serial = props.selectedSerials[0] ?? null;
@@ -185,7 +199,7 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
-  const docLayout = createMemo((): LogDocLayout => {
+  const formatOpts = createMemo((): FormatOptions => {
     const widths = logStore.state.colWidths;
     return {
       display: displayColumns(),
@@ -200,6 +214,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       },
       chPx: chPx(),
       timeFormat: props.settings.log_time_format,
+      scheme: props.settings.log_color_scheme,
     };
   });
 
@@ -216,6 +231,21 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
   });
 
+  createEffect(() => {
+    const host = listEl();
+    const px = chPx();
+    if (!host) {
+      return;
+    }
+    const apply = (): void => {
+      setRowChars(px > 0 ? Math.floor(host.clientWidth / px) : 0);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(host);
+    onCleanup(() => ro.disconnect());
+  });
+
   const togglePause = (): void => {
     const id = logStore.state.activeSessionId;
     if (id === null) return;
@@ -223,26 +253,34 @@ export function LogAnalyzerView(props: DeviceSession) {
     if (session?.capturing) logStore.setPaused(id, !session.paused);
   };
 
-  const visibleRows = (): ViewRow[] =>
-    logStore.state.sessions.find((s) => s.id === logStore.state.activeSessionId)?.visible ?? [];
+  const copyMessages = () =>
+    (activeDoc?.messages ?? []).map((item) => ({ seq: item.seq, text: item.text }));
+
+  const fallbackTextOf = (line?: ViewRow["line"] | null): string | undefined => {
+    const seq = line?.seq;
+    if (seq == null) {
+      return undefined;
+    }
+    return copyMessages().find((item) => item.seq === seq)?.text;
+  };
 
   const copyText = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): string =>
     serializeLogCopy({
       pick: scope,
-      rows: visibleRows(),
+      messages: copyMessages(),
       listRoot: listEl(),
       selection: typeof window === "undefined" ? null : window.getSelection(),
-      fallbackLine: fallbackLine ?? contextLine(),
-      layout: docLayout(),
+      fallbackText: fallbackTextOf(fallbackLine ?? contextLine()),
     });
 
-  const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): void => {
+  const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): boolean => {
     const text = copyText(scope, fallbackLine);
-    if (!text) return;
+    if (!text) return false;
     void navigator.clipboard.writeText(text).catch((e) => toaster.show(`复制失败: ${errorMessage(e)}`, "error"));
+    return true;
   };
 
-  const onKeyAction = (action: LogsKeyAction): void => {
+  const onKeyAction = (action: LogsKeyAction): boolean | void => {
     const id = logStore.state.activeSessionId;
     if (action === "pause") {
       togglePause();
@@ -278,7 +316,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       window.getSelection()?.removeAllRanges();
       return;
     }
-    if (action === "copy") copySelected();
+    if (action === "copy") return copySelected();
   };
 
   onMount(() => {
@@ -441,17 +479,18 @@ export function LogAnalyzerView(props: DeviceSession) {
 
               <YoColFrame
                 class="yohu-logs__list"
-                template={logDocTrackTemplate(docLayout())}
+                template={trackTemplate(formatOpts())}
               >
                 <YoColRow class="yohu-logs__cols yohu-logs__cols--head">
                   <For each={visibleLogColumns(displayColumns())}>
                     {(col) => (
                       <YoColHeader
                         align={col.align}
-                        resizable={!col.flex}
+                        pad={col.key === "level" ? "none" : undefined}
+                        resizable={logColResizable(col)}
                         resizeLabel={col.resizeLabel}
                         width={logStore.state.colWidths[col.key]}
-                        minWidth={col.key === "ts" ? tsFieldPx(docLayout().timeFormat) : col.minWidth}
+                        minWidth={col.key === "ts" ? tsFieldPx(formatOpts().timeFormat) : col.minWidth}
                         onWidthChange={(width) => logStore.setColWidth(col.key, width)}
                       >
                         {col.header}
@@ -463,45 +502,52 @@ export function LogAnalyzerView(props: DeviceSession) {
                   class="yohu-logs__list-body"
                   ref={(el) => { setListEl(el); }}
                 >
-                  <LogListBind.Provider
-                    value={{
-                      keyword: () => session.keyword,
-                      layout: docLayout,
-                      pickAll: () => pick().kind === "all",
+                  <EditorView
+                    rows={() =>
+                      logStore.state.sessions.find((item) => item.id === session.id)?.visible ?? EMPTY_ROWS
+                    }
+                    options={formatOpts}
+                    rowChars={rowChars}
+                    itemHeight={dataRowHeight()}
+                    keyword={() =>
+                      logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""
+                    }
+                    pickAll={() => pick().kind === "all"}
+                    following={() =>
+                      Boolean(logStore.state.sessions.find((item) => item.id === session.id)?.following)
+                    }
+                    paused={() =>
+                      Boolean(logStore.state.sessions.find((item) => item.id === session.id)?.paused)
+                    }
+                    documentRef={(doc) => {
+                      activeDoc = doc;
                     }}
-                  >
-                    <YoVirtualList<ViewRow>
-                      items={() => logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? []}
-                      getItemKey={rowKey}
-                      autoScrollToBottom={() => session.following && !session.paused}
-                      onAtBottomChange={(atBottom) => {
-                        const rows =
-                          logStore.state.sessions.find((s) => s.id === session.id)?.visible ?? [];
-                        if (atBottom) logStore.resumeFollow(session.id);
-                        else if (rows.length > 0) logStore.detachFollow(session.id);
-                      }}
-                      ariaLabel="日志列表"
-                      onRowContextMenu={(row, _key, event) => {
-                        setContextLine(row.line);
-                        const scope = pick();
-                        const canCopy = copyHasPayload({
-                          pick: scope,
-                          listRoot: listEl(),
-                          selection: window.getSelection(),
-                          fallbackLine: row.line,
-                        });
-                        openContextMenu(logsRowMenu, {
-                          x: event.clientX,
-                          y: event.clientY,
-                          ctx: {
-                            canCopy,
-                            copy: () => copySelected(scope, row.line),
-                          },
-                        });
-                      }}
-                      renderRow={LogRow}
-                    />
-                  </LogListBind.Provider>
+                    onAtBottomChange={(atBottom) => {
+                      const rows =
+                        logStore.state.sessions.find((item) => item.id === session.id)?.visible ??
+                        EMPTY_ROWS;
+                      if (atBottom) logStore.resumeFollow(session.id);
+                      else if (rows.length > 0) logStore.detachFollow(session.id);
+                    }}
+                    onRowContextMenu={(row, event) => {
+                      setContextLine(row.line);
+                      const scope = pick();
+                      const canCopy = copyHasPayload({
+                        pick: scope,
+                        listRoot: listEl(),
+                        selection: window.getSelection(),
+                        fallbackText: fallbackTextOf(row.line),
+                      });
+                      openContextMenu(logsRowMenu, {
+                        x: event.clientX,
+                        y: event.clientY,
+                        ctx: {
+                          canCopy,
+                          copy: () => copySelected(scope, row.line),
+                        },
+                      });
+                    }}
+                  />
                   <Show
                     when={
                       (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0
