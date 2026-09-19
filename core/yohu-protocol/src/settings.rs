@@ -30,6 +30,16 @@ pub enum LogColorScheme {
     Logcat,
 }
 
+/// 日志清单长文本。`clip` = LogCat Soft-Wrap 关（不按视口折，硬换行仍切，超宽横滑）；`wrap` = 超宽只折消息。
+/// 身份在设置；画法只在 UI EditorView。禁止进 Formatter / Document。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLineLayout {
+    #[default]
+    Clip,
+    Wrap,
+}
+
 /// 日志清单显示哪些元数据列（消息列始终显示）。
 /// 缺字段回落 Default：UID / TID 默认关，其余默认开。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,6 +109,9 @@ pub struct AppSettings {
     /// 日志清单内容配色。立即生效；默认 Yohu（鸿蒙语义板）。
     #[serde(default)]
     pub log_color_scheme: LogColorScheme,
+    /// 日志清单长文本。立即生效；默认 clip（LogCat 单行）。
+    #[serde(default)]
+    pub log_line_layout: LogLineLayout,
     /// 投屏长边上限（像素）；0 = 设备原始。下次启动生效。
     #[serde(default = "default_mirror_max_size")]
     pub mirror_max_size: u32,
@@ -193,6 +206,7 @@ impl Default for AppSettings {
             log_display_columns: LogDisplayColumns::default(),
             log_time_format: default_log_time_format(),
             log_color_scheme: LogColorScheme::Yohu,
+            log_line_layout: LogLineLayout::Clip,
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
@@ -221,6 +235,7 @@ pub enum SettingKey {
     LogDisplayColumns,
     LogTimeFormat,
     LogColorScheme,
+    LogLineLayout,
     MirrorMaxSize,
     MirrorVideoBitRate,
     MirrorMaxFps,
@@ -247,6 +262,7 @@ impl SettingKey {
             SettingKey::LogDisplayColumns => "log_display_columns",
             SettingKey::LogTimeFormat => "log_time_format",
             SettingKey::LogColorScheme => "log_color_scheme",
+            SettingKey::LogLineLayout => "log_line_layout",
             SettingKey::MirrorMaxSize => "mirror_max_size",
             SettingKey::MirrorVideoBitRate => "mirror_video_bit_rate",
             SettingKey::MirrorMaxFps => "mirror_max_fps",
@@ -275,6 +291,7 @@ mod tests {
         assert!(s.export_default_path.is_empty());
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
         assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
         assert_eq!(s.mirror_max_size, 0);
         assert_eq!(s.mirror_video_bit_rate, 16_000_000);
         assert_eq!(s.mirror_max_fps, 0);
@@ -365,6 +382,7 @@ mod tests {
             SettingKey::LogDisplayColumns,
             SettingKey::LogTimeFormat,
             SettingKey::LogColorScheme,
+            SettingKey::LogLineLayout,
             SettingKey::MirrorMaxSize,
             SettingKey::MirrorVideoBitRate,
             SettingKey::MirrorMaxFps,
@@ -428,6 +446,7 @@ mod tests {
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
         assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
     }
 
     #[test]
@@ -439,6 +458,18 @@ mod tests {
         assert_eq!(
             serde_json::to_value(LogColorScheme::Logcat).unwrap(),
             serde_json::json!("logcat")
+        );
+    }
+
+    #[test]
+    fn log_line_layout_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_value(LogLineLayout::Clip).unwrap(),
+            serde_json::json!("clip")
+        );
+        assert_eq!(
+            serde_json::to_value(LogLineLayout::Wrap).unwrap(),
+            serde_json::json!("wrap")
         );
     }
 

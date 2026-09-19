@@ -28,6 +28,8 @@ pub enum SettingError {
     ExpectMirrorProtocol(&'static str),
     #[error("{0} 必须是 yohu 或 logcat")]
     ExpectLogColorScheme(&'static str),
+    #[error("{0} 必须是 clip 或 wrap")]
+    ExpectLogLineLayout(&'static str),
 }
 
 fn must_str(key: SettingKey, value: &serde_json::Value) -> Result<String, SettingError> {
@@ -107,6 +109,10 @@ pub fn apply_setting(
             settings.log_color_scheme = serde_json::from_value(value.clone())
                 .map_err(|_| SettingError::ExpectLogColorScheme(key.as_str()))?;
         }
+        SettingKey::LogLineLayout => {
+            settings.log_line_layout = serde_json::from_value(value.clone())
+                .map_err(|_| SettingError::ExpectLogLineLayout(key.as_str()))?;
+        }
         SettingKey::MirrorMaxSize => {
             let n = must_u64(key, value)?;
             settings.mirror_max_size = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
@@ -148,7 +154,7 @@ pub fn apply_setting(
 mod tests {
     use super::*;
     use serde_json::json;
-    use yohu_protocol::LogColorScheme;
+    use yohu_protocol::{LogColorScheme, LogLineLayout};
 
     #[test]
     fn buffer_capacity_rejects_zero() {
@@ -235,5 +241,15 @@ mod tests {
         assert_eq!(s.log_color_scheme, LogColorScheme::Logcat);
         let err = apply_setting(&mut s, SettingKey::LogColorScheme, &json!("darcula")).unwrap_err();
         assert!(matches!(err, SettingError::ExpectLogColorScheme(_)));
+    }
+
+    #[test]
+    fn log_line_layout_applies() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
+        apply_setting(&mut s, SettingKey::LogLineLayout, &json!("wrap")).unwrap();
+        assert_eq!(s.log_line_layout, LogLineLayout::Wrap);
+        let err = apply_setting(&mut s, SettingKey::LogLineLayout, &json!("soft")).unwrap_err();
+        assert!(matches!(err, SettingError::ExpectLogLineLayout(_)));
     }
 }
