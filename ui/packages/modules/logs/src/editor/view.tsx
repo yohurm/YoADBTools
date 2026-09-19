@@ -1,6 +1,9 @@
 /**
- * EditorView：软折行与定高视口内聚。
+ * EditorView：长文本 clip / wrap 与定高视口内聚。
  * 只读 Document，禁止回头调 Formatter。
+ * clip / wrap 只在本层分支，不进 FormatOptions / Document。
+ * clip = 官方 Soft-Wrap 关：不按视口折，硬 \\n 仍切行；hang 走 CSS，不进文档空格。
+ * wrap = 视口折消息（Yohu 设计，续行 hang）。
  */
 
 import {
@@ -17,8 +20,8 @@ import {
   type JSX,
 } from "solid-js";
 
-import type { LogLine } from "@yohu/api";
-import { YoVirtualList } from "@yohu/ui";
+import type { LogLine, LogLineLayout } from "@yohu/api";
+import { docSelBandStyle, YoVirtualList } from "@yohu/ui";
 
 import { highlightMessage } from "../highlight";
 import type { SignalKind } from "../signals";
@@ -32,6 +35,7 @@ import {
   type FormatRange,
   type LogFieldKind,
 } from "./document";
+import { readDocSel, selSlice, type DocSel } from "./selection";
 
 export type VisualLine = {
   seq: number;
@@ -112,6 +116,27 @@ function bodyWidth(headerChars: number, rowChars: number): number {
   return Math.max(1, rowChars - headerChars);
 }
 
+/** 对照官方 Soft-Wrap 关：只在硬 \\n 切开，行宽不封顶。 */
+export function clipMessage(message: DocMessage): VisualLine[] {
+  return wrapMessage(message, Number.MAX_SAFE_INTEGER);
+}
+
+export function visualLineChars(line: VisualLine): number {
+  return line.hang + line.text.length;
+}
+
+export function visualBoardChars(lines: readonly VisualLine[]): number {
+  let max = 0;
+  for (const line of lines) {
+    max = Math.max(max, visualLineChars(line));
+  }
+  return max;
+}
+
+function projectMessage(message: DocMessage, rowChars: number, layout: LogLineLayout): VisualLine[] {
+  return layout === "wrap" ? wrapMessage(message, rowChars) : clipMessage(message);
+}
+
 export function wrapMessage(message: DocMessage, rowChars: number): VisualLine[] {
   const header = message.headerChars;
   const prefix = message.text.slice(0, header);
@@ -155,14 +180,17 @@ export function wrapMessage(message: DocMessage, rowChars: number): VisualLine[]
 export class VisualBoard {
   private messages: readonly DocMessage[] | null = null;
   private rowChars = -1;
+  private layout: LogLineLayout = "clip";
   private items: VisualLine[] = EMPTY_VISUAL;
 
-  project(messages: readonly DocMessage[], rowChars: number): VisualLine[] {
-    if (messages === this.messages && rowChars === this.rowChars) {
+  project(messages: readonly DocMessage[], rowChars: number, layout: LogLineLayout): VisualLine[] {
+    const widthKey = layout === "wrap" ? rowChars : 0;
+    if (messages === this.messages && widthKey === this.rowChars && layout === this.layout) {
       return this.items;
     }
-    if (rowChars !== this.rowChars) {
-      this.rowChars = rowChars;
+    if (widthKey !== this.rowChars || layout !== this.layout) {
+      this.rowChars = widthKey;
+      this.layout = layout;
       this.messages = null;
     }
     if (messages === this.messages) {
@@ -182,7 +210,9 @@ export class VisualBoard {
         this.messages = messages;
         return this.items;
       }
-      const tail = messages.slice(this.messages.length).flatMap((row) => wrapMessage(row, this.rowChars));
+      const tail = messages
+        .slice(this.messages.length)
+        .flatMap((row) => projectMessage(row, this.rowChars, this.layout));
       this.items = this.items === EMPTY_VISUAL ? tail : this.items.concat(tail);
       this.messages = messages;
       return this.items;
@@ -204,7 +234,7 @@ export class VisualBoard {
       this.messages = messages;
       return this.items;
     }
-    this.items = messages.flatMap((row) => wrapMessage(row, this.rowChars));
+    this.items = messages.flatMap((row) => projectMessage(row, this.rowChars, this.layout));
     this.messages = messages;
     return this.items;
   }
@@ -243,12 +273,25 @@ function FieldSpan(props: { range: FormatRange; text: string; keyword: string })
 
 const ViewBind = createContext<{
   keyword: Accessor<string>;
-  pickAll: Accessor<boolean>;
+  docSel: Accessor<DocSel | "all" | null>;
 }>();
 
 function VisualRow(props: { item: VisualLine; index: number }) {
   const bind = useContext(ViewBind)!;
   const item = (): VisualLine => props.item;
+  const paint = createMemo(() => {
+    const sel = bind.docSel();
+    if (!sel) {
+      return { fromCh: 0, chars: 0, hang: item().hang };
+    }
+    return (
+      selSlice({ seq: item().seq, docFrom: item().docFrom, text: item().text, hang: item().hang }, sel) ?? {
+        fromCh: 0,
+        chars: 0,
+        hang: item().hang,
+      }
+    );
+  });
   return (
     <div
       class="yohu-logs__cols yohu-logs__row"
@@ -264,17 +307,17 @@ function VisualRow(props: { item: VisualLine; index: number }) {
       }
       classList={{
         "yohu-logs__row--signal": item().signal !== undefined,
-        "yohu-logs__row--picked": bind.pickAll(),
       }}
     >
+      <span
+        class="yohu-doc-sel"
+        data-log-chrome
+        style={docSelBandStyle(paint().fromCh, paint().chars, paint().hang) as JSX.CSSProperties}
+      />
       <For each={item().ranges}>
-        {(range) =>
-          range.role === "pad" ? (
-            <span data-log-pad>{item().text.slice(range.start, range.end)}</span>
-          ) : (
-            <FieldSpan range={range} text={item().text.slice(range.start, range.end)} keyword={bind.keyword()} />
-          )
-        }
+        {(range) => (
+          <FieldSpan range={range} text={item().text.slice(range.start, range.end)} keyword={bind.keyword()} />
+        )}
       </For>
       <Show when={item().collapsedAfter}>
         <span class="yohu-logs__row-fold" data-log-chrome>
@@ -288,7 +331,9 @@ function VisualRow(props: { item: VisualLine; index: number }) {
 export function EditorView(props: {
   rows: Accessor<readonly DocRow[]>;
   options: Accessor<FormatOptions>;
+  layout: Accessor<LogLineLayout>;
   rowChars: Accessor<number>;
+  chPx: Accessor<number>;
   itemHeight: number;
   keyword: Accessor<string>;
   pickAll: Accessor<boolean>;
@@ -296,13 +341,35 @@ export function EditorView(props: {
   paused: Accessor<boolean>;
   onAtBottomChange: (atBottom: boolean) => void;
   onRowContextMenu: (row: { line: LogLine }, event: MouseEvent) => void;
+  onInlineOffset?: (left: number) => void;
   documentRef?: (doc: LogDocument) => void;
 }) {
   const logDoc = new LogDocument();
   const board = new VisualBoard();
   const [rev, setRev] = createSignal(0);
-  onMount(() => props.documentRef?.(logDoc));
-  onCleanup(() => logDoc.clear());
+  const [docSel, setDocSel] = createSignal<DocSel | "all" | null>(null);
+  let host: HTMLDivElement | undefined;
+  const syncSel = (): void => {
+    if (props.pickAll()) {
+      setDocSel("all");
+      return;
+    }
+    const lenOf = (seq: number) => logDoc.messages.find((item) => item.seq === seq)?.text.length;
+    setDocSel(readDocSel(host ?? null, typeof window === "undefined" ? null : window.getSelection(), lenOf));
+  };
+  onMount(() => {
+    props.documentRef?.(logDoc);
+    document.addEventListener("selectionchange", syncSel);
+    syncSel();
+  });
+  onCleanup(() => {
+    document.removeEventListener("selectionchange", syncSel);
+    logDoc.clear();
+  });
+  createEffect(() => {
+    props.pickAll();
+    syncSel();
+  });
 
   createEffect(() => {
     const optChanged = logDoc.setOptions(props.options());
@@ -314,26 +381,45 @@ export function EditorView(props: {
 
   const items = createMemo(() => {
     rev();
-    return board.project(logDoc.messages.length === 0 ? EMPTY_MESSAGES : logDoc.messages, props.rowChars());
+    return board.project(
+      logDoc.messages.length === 0 ? EMPTY_MESSAGES : logDoc.messages,
+      props.rowChars(),
+      props.layout(),
+    );
+  });
+
+  const contentWidth = createMemo(() => {
+    if (props.layout() !== "clip") {
+      return 0;
+    }
+    const px = props.chPx();
+    if (!(px > 0)) {
+      return 0;
+    }
+    return visualBoardChars(items()) * px;
   });
 
   return (
     <ViewBind.Provider
       value={{
         keyword: props.keyword,
-        pickAll: props.pickAll,
+        docSel,
       }}
     >
-      <YoVirtualList<VisualLine>
-        items={items}
-        itemHeight={props.itemHeight}
-        getItemKey={visualRowKey}
-        autoScrollToBottom={() => props.following() && !props.paused()}
-        onAtBottomChange={props.onAtBottomChange}
-        ariaLabel="日志列表"
-        onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}
-        renderRow={VisualRow}
-      />
+      <div class="yohu-logs__view" data-layout={props.layout()} ref={(el) => { host = el; }}>
+        <YoVirtualList<VisualLine>
+          items={items}
+          itemHeight={props.itemHeight}
+          getItemKey={visualRowKey}
+          contentWidth={contentWidth}
+          onInlineOffset={props.onInlineOffset}
+          autoScrollToBottom={() => props.following() && !props.paused()}
+          onAtBottomChange={props.onAtBottomChange}
+          ariaLabel="日志列表"
+          onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}
+          renderRow={VisualRow}
+        />
+      </div>
     </ViewBind.Provider>
   );
 }

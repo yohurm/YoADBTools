@@ -1,13 +1,15 @@
 /**
- * Formatter：对照 AS MessageFormatter + TextAccumulator + FormattingOptions + LogcatColors。
+ * Formatter：对照 AS logcat/messages
+ *   MessageFormatter + FormattingOptions + TextAccumulator
+ *   TimestampFormat / ProcessThreadFormat / TagFormat / LevelFormat
  * 一行一次 accumulate：文本即复制面，着色 range 当时挂上。
+ * 每段 Format 自带 width() 与尾空格，禁止表格列垫、gutter、不可选空白 span。
  * 禁止 import Document / View / store / CSS。
+ * 长文本 clip / wrap 不进本层，只在 EditorView。
  */
 
 import {
   APP_SETTINGS_DEFAULT,
-  DATETIME_DISPLAY_LEN,
-  TIME_DISPLAY_LEN,
   clockDisplayLen,
   formatLogTs,
   isLogColorScheme,
@@ -19,18 +21,37 @@ import {
   type LogLine,
   type TerminalTimeFormat,
 } from "@yohu/api";
-import { defaultColWidths, Spacing } from "@yohu/ui";
+import { defaultColWidths } from "@yohu/ui";
 
-/** 设计尺：1 字段字符 = 8px。列宽换算与复制面用这把尺，不跟 measureChPx。 */
+/** 设计尺：1 字段字符 = 8px。Tag 拖宽换算用这把尺，不跟 measureChPx。 */
 export const DEFAULT_CH_PX = 8;
-export const LOG_CH_PX = DEFAULT_CH_PX;
-export const LOG_LEVEL_BADGE_CHARS = 3;
+
+/** TimestampFormat.width() = 显示长度 + 尾空格。DATETIME=24 TIME=13。 */
+export function timestampWidth(format: TerminalTimeFormat): number {
+  return clockDisplayLen(format) + 1;
+}
+
+/** ProcessThreadFormat：PID `%-5d ` = 6；BOTH `%5d-%-5d ` = 12。 */
+export const PROCESS_PID_WIDTH = 6;
+export const PROCESS_BOTH_WIDTH = 12;
+
+/** TagFormat.DEFAULT_LENGTH / MIN_LENGTH；width() = maxLength + 1。 */
+export const TAG_DEFAULT_MAX = 23;
+export const TAG_MIN_LENGTH = 10;
+export const TAG_ELLIPSIS = "...";
+
+/** LevelFormat.width() = `" L "` + 未着色空格。 */
+export const LEVEL_FORMAT_WIDTH = 4;
+
+/** 我们的扩展：threadtime,uid。官方 FormattingOptions 没有 UID，写法对齐「定宽 + 尾空格」。 */
+export const UID_BODY_CHARS = 8;
+export const UID_FORMAT_WIDTH = UID_BODY_CHARS + 1;
 
 export type LogMetaColKey = keyof LogDisplayColumns;
 export type LogColKey = LogMetaColKey | "msg";
-export type LogColAlign = "start" | "end" | "center";
 export type LogColWidths = Record<LogColKey, number>;
 export type LogFieldKind = LogColKey;
+export type ProcessThreadStyle = "off" | "pid" | "tid" | "both";
 
 export interface LogColumnSpec {
   key: LogColKey;
@@ -40,7 +61,6 @@ export interface LogColumnSpec {
   minWidth: number;
   flex: boolean;
   resize?: boolean;
-  align?: Exclude<LogColAlign, "start">;
 }
 
 export const DEFAULT_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
@@ -56,93 +76,126 @@ export const ALL_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
   tag: true,
 };
 
-export const LOG_PAD_LEFT_CHARS = Math.max(1, Math.round(Spacing.Md / DEFAULT_CH_PX));
-
-export const LOG_FIELD_CHARS: Record<LogMetaColKey, number> = {
-  ts: DATETIME_DISPLAY_LEN,
-  uid: 8,
-  pid: 5,
-  tid: 5,
-  level: 3,
-  tag: 10,
-};
-
-export const LOG_LEVEL_GUTTER_CHARS = 1;
-export const LOG_LEVEL_TRACK_CHARS = LOG_FIELD_CHARS.level + LOG_LEVEL_GUTTER_CHARS;
-export const LOG_TAG_DEFAULT_CHARS = 24;
-export const LOG_MSG_DEFAULT_CHARS = 12;
-export const LOG_MSG_MIN_CHARS = 10;
-
-export function headerLabelChars(header: string): number {
-  let n = 0;
-  for (const ch of header) {
-    n += (ch.codePointAt(0) ?? 0) > 0xff ? 2 : 1;
-  }
-  return n;
-}
-
-export function logSlotChars(key: LogMetaColKey, header: string, timeFormat?: TerminalTimeFormat): number {
-  if (key === "level") {
-    return LOG_FIELD_CHARS.level;
-  }
-  const payload = key === "ts" && timeFormat != null ? clockDisplayLen(timeFormat) : LOG_FIELD_CHARS[key];
-  return Math.max(payload, headerLabelChars(header));
-}
+const LOG_TAG_DEFAULT_CHARS = TAG_DEFAULT_MAX + 1;
+const LOG_MSG_DEFAULT_CHARS = 12;
+const LOG_MSG_MIN_CHARS = 10;
 
 function fieldPx(chars: number): number {
   return chars * DEFAULT_CH_PX;
 }
 
-export function tsFieldPx(format: TerminalTimeFormat): number {
-  return clockDisplayLen(format) * DEFAULT_CH_PX;
-}
-
-function metaColPx(key: LogMetaColKey, header: string): number {
-  return fieldPx(logSlotChars(key, header));
-}
-
 export const LOG_COLUMNS: readonly LogColumnSpec[] = [
-  { key: "ts", header: "时间", resizeLabel: "调节时间列宽", defaultWidth: tsFieldPx(APP_SETTINGS_DEFAULT.log_time_format), minWidth: fieldPx(TIME_DISPLAY_LEN), flex: false },
-  { key: "uid", header: "UID", resizeLabel: "调节 UID 列宽", defaultWidth: metaColPx("uid", "UID"), minWidth: metaColPx("uid", "UID"), flex: false, align: "end" },
-  { key: "pid", header: "PID", resizeLabel: "调节 PID 列宽", defaultWidth: metaColPx("pid", "PID"), minWidth: metaColPx("pid", "PID"), flex: false, align: "end" },
-  { key: "tid", header: "TID", resizeLabel: "调节 TID 列宽", defaultWidth: metaColPx("tid", "TID"), minWidth: metaColPx("tid", "TID"), flex: false, align: "end" },
-  { key: "tag", header: "Tag", resizeLabel: "调节 Tag 列宽", defaultWidth: fieldPx(LOG_TAG_DEFAULT_CHARS), minWidth: metaColPx("tag", "Tag"), flex: false },
-  { key: "level", header: "级别", resizeLabel: "调节级别列宽", defaultWidth: fieldPx(LOG_LEVEL_TRACK_CHARS), minWidth: fieldPx(LOG_LEVEL_TRACK_CHARS), flex: false, resize: false },
-  { key: "msg", header: "消息", resizeLabel: "调节消息列宽", defaultWidth: fieldPx(LOG_MSG_DEFAULT_CHARS), minWidth: fieldPx(LOG_MSG_MIN_CHARS), flex: true },
+  {
+    key: "ts",
+    header: "时间",
+    resizeLabel: "调节时间列宽",
+    defaultWidth: fieldPx(timestampWidth(APP_SETTINGS_DEFAULT.log_time_format)),
+    minWidth: fieldPx(timestampWidth("time")),
+    flex: false,
+    resize: false,
+  },
+  {
+    key: "uid",
+    header: "UID",
+    resizeLabel: "调节 UID 列宽",
+    defaultWidth: fieldPx(UID_FORMAT_WIDTH),
+    minWidth: fieldPx(UID_FORMAT_WIDTH),
+    flex: false,
+    resize: false,
+  },
+  {
+    key: "pid",
+    header: "PID",
+    resizeLabel: "调节 PID 列宽",
+    defaultWidth: fieldPx(PROCESS_PID_WIDTH),
+    minWidth: fieldPx(PROCESS_PID_WIDTH),
+    flex: false,
+    resize: false,
+  },
+  {
+    key: "tid",
+    header: "TID",
+    resizeLabel: "调节 TID 列宽",
+    defaultWidth: fieldPx(PROCESS_PID_WIDTH),
+    minWidth: fieldPx(PROCESS_PID_WIDTH),
+    flex: false,
+    resize: false,
+  },
+  {
+    key: "tag",
+    header: "Tag",
+    resizeLabel: "调节 Tag 列宽",
+    defaultWidth: fieldPx(LOG_TAG_DEFAULT_CHARS),
+    minWidth: fieldPx(TAG_MIN_LENGTH + 1),
+    flex: false,
+  },
+  {
+    key: "level",
+    header: "级别",
+    resizeLabel: "调节级别列宽",
+    defaultWidth: fieldPx(LEVEL_FORMAT_WIDTH),
+    minWidth: fieldPx(LEVEL_FORMAT_WIDTH),
+    flex: false,
+    resize: false,
+  },
+  {
+    key: "msg",
+    header: "消息",
+    resizeLabel: "调节消息列宽",
+    defaultWidth: fieldPx(LOG_MSG_DEFAULT_CHARS),
+    minWidth: fieldPx(LOG_MSG_MIN_CHARS),
+    flex: true,
+  },
 ];
 
 export function defaultLogColWidths(): LogColWidths {
   return defaultColWidths(LOG_COLUMNS) as LogColWidths;
 }
 
+export function processThreadStyle(display: LogDisplayColumns): ProcessThreadStyle {
+  if (display.pid && display.tid) {
+    return "both";
+  }
+  if (display.pid) {
+    return "pid";
+  }
+  if (display.tid) {
+    return "tid";
+  }
+  return "off";
+}
+
+export function processThreadWidth(style: ProcessThreadStyle): number {
+  if (style === "both") {
+    return PROCESS_BOTH_WIDTH;
+  }
+  if (style === "pid" || style === "tid") {
+    return PROCESS_PID_WIDTH;
+  }
+  return 0;
+}
+
+/**
+ * PID+TID 合成官方 BOTH，表头只留 PID 轨。
+ * 单独开 TID 时才出现 TID 列。
+ */
 export function visibleLogColumns(display: LogDisplayColumns): LogColumnSpec[] {
   return LOG_COLUMNS.filter((col) => {
-    if (col.key === "msg") return true;
+    if (col.key === "msg") {
+      return true;
+    }
+    if (col.key === "tid") {
+      return display.tid && !display.pid;
+    }
+    if (col.key === "pid") {
+      return display.pid;
+    }
     return display[col.key];
   });
 }
 
 export function logColResizable(col: LogColumnSpec): boolean {
-  return !col.flex && col.resize !== false;
-}
-
-export function logFieldText(line: LogLine, key: LogColKey): string {
-  switch (key) {
-    case "ts":
-      return line.ts;
-    case "uid":
-      return line.uid ?? "";
-    case "pid":
-      return String(line.pid);
-    case "tid":
-      return String(line.tid);
-    case "level":
-      return ` ${line.level} `;
-    case "tag":
-      return line.tag;
-    case "msg":
-      return line.msg;
-  }
+  return col.key === "tag";
 }
 
 export type TokenTone = "plain" | "ink" | "wash";
@@ -163,16 +216,15 @@ export type FormatRange = {
   start: number;
   end: number;
   kind: LogFieldKind;
-  role: "pad" | "field";
   tone?: TokenTone;
   box?: TokenBox;
   style?: TokenStyle;
 };
 
+/** 清单文档选项。长文本 clip / wrap 不进这里，只在 EditorView。 */
 export type FormatOptions = {
   display: LogDisplayColumns;
-  widths: LogColWidths;
-  chPx: number;
+  tagWidthPx: number;
   timeFormat: TerminalTimeFormat;
   scheme?: string;
 };
@@ -188,11 +240,7 @@ export type FormattedMessage = {
 export type FormatColumn = {
   key: LogColKey;
   header: string;
-  chars: number | null;
-  padLeft: number;
-  gutter: 0 | 1;
-  align: "start" | "end";
-  minWidthPx: number;
+  width: number | null;
 };
 
 type ColorEngine = {
@@ -303,8 +351,7 @@ export function contentColor(id: string | undefined): ColorEngine {
 export function defaultFormatOptions(display: LogDisplayColumns, scheme?: string): FormatOptions {
   return {
     display,
-    widths: defaultLogColWidths(),
-    chPx: DEFAULT_CH_PX,
+    tagWidthPx: defaultLogColWidths().tag,
     timeFormat: APP_SETTINGS_DEFAULT.log_time_format,
     scheme,
   };
@@ -312,7 +359,6 @@ export function defaultFormatOptions(display: LogDisplayColumns, scheme?: string
 
 export function formatOptionsKey(options: FormatOptions): string {
   const d = options.display;
-  const w = options.widths;
   return [
     options.timeFormat,
     options.scheme ?? "",
@@ -322,142 +368,115 @@ export function formatOptionsKey(options: FormatOptions): string {
     Number(d.tid),
     Number(d.level),
     Number(d.tag),
-    w.ts,
-    w.uid,
-    w.pid,
-    w.tid,
-    w.level,
-    w.tag,
-    w.msg,
+    options.tagWidthPx,
   ].join("|");
 }
 
-export function fieldChars(px: number, min: number): number {
-  return Math.max(min, Math.floor(px / LOG_CH_PX));
+function fieldChars(px: number, min: number): number {
+  return Math.max(min, Math.floor(px / DEFAULT_CH_PX));
 }
 
-export function padLeftChars(): number {
-  return LOG_PAD_LEFT_CHARS;
+/** TagFormat.maxLength：只跟 Tag 轨像素 / 设计尺，不跟 measureChPx。 */
+export function tagMaxLength(options: FormatOptions): number {
+  return Math.max(TAG_MIN_LENGTH, fieldChars(options.tagWidthPx, TAG_MIN_LENGTH + 1) - 1);
 }
 
-function alignOf(key: LogColKey): "start" | "end" {
-  return LOG_COLUMNS.find((col) => col.key === key)?.align === "end" ? "end" : "start";
+export function tagFormatWidth(options: FormatOptions): number {
+  return tagMaxLength(options) + 1;
+}
+
+function segmentWidth(key: LogMetaColKey, options: FormatOptions): number {
+  switch (key) {
+    case "ts":
+      return timestampWidth(options.timeFormat);
+    case "uid":
+      return UID_FORMAT_WIDTH;
+    case "pid":
+    case "tid":
+      return processThreadWidth(processThreadStyle(options.display)) || PROCESS_PID_WIDTH;
+    case "tag":
+      return tagFormatWidth(options);
+    case "level":
+      return LEVEL_FORMAT_WIDTH;
+  }
 }
 
 export function formatColumns(options: FormatOptions): FormatColumn[] {
-  const padLeft = padLeftChars();
-  const levelOn = options.display.level;
   return visibleLogColumns(options.display).map((col) => {
     if (col.key === "msg") {
-      return {
-        key: "msg",
-        header: col.header,
-        chars: null,
-        padLeft: 0,
-        gutter: 0,
-        align: "start",
-        minWidthPx: col.minWidth,
-      };
+      return { key: "msg", header: col.header, width: null };
     }
-    if (col.key === "level") {
-      return {
-        key: "level",
-        header: col.header,
-        chars: LOG_FIELD_CHARS.level,
-        padLeft: 0,
-        gutter: LOG_LEVEL_GUTTER_CHARS,
-        align: "start",
-        minWidthPx: col.minWidth,
-      };
-    }
-    const minCh = logSlotChars(col.key, col.header, options.timeFormat);
-    const chars = fieldChars(options.widths[col.key] ?? col.defaultWidth, minCh);
-    const gutter = col.key === "tag" && levelOn ? 0 : 1;
-    return {
-      key: col.key,
-      header: col.header,
-      chars,
-      padLeft,
-      gutter,
-      align: alignOf(col.key),
-      minWidthPx: Math.max(col.minWidth, (padLeft + minCh + gutter) * options.chPx),
-    };
+    return { key: col.key, header: col.header, width: segmentWidth(col.key, options) };
   });
-}
-
-export function columnTrackCh(col: FormatColumn): number | null {
-  return col.chars == null ? null : col.padLeft + col.chars + col.gutter;
-}
-
-export function columnTrackPx(col: FormatColumn, chPx: number): number {
-  const ch = columnTrackCh(col);
-  return ch == null ? col.minWidthPx : ch * chPx;
 }
 
 export function trackTemplate(options: FormatOptions): string {
   return formatColumns(options)
-    .map((col) => {
-      if (col.chars == null) {
-        const minCh = Math.max(1, Math.floor(col.minWidthPx / Math.max(options.chPx, 1)));
-        return `minmax(${minCh}ch, 1fr)`;
-      }
-      return `${col.padLeft + col.chars + col.gutter}ch`;
-    })
+    .map((col) => (col.width == null ? `minmax(${LOG_MSG_MIN_CHARS}ch, 1fr)` : `${col.width}ch`))
     .join(" ");
 }
 
-/** 前缀轨道合计。续行 hang 与首行消息起笔同一把尺。 */
+/** 前缀轨道合计 = 各 Format.width() 之和。续行 hang 与首行消息起笔同一把尺。 */
 export function hangChars(options: FormatOptions): number {
   let n = 0;
   for (const col of formatColumns(options)) {
     if (col.key === "msg") {
       continue;
     }
-    n += columnTrackCh(col) ?? 0;
+    n += col.width ?? 0;
   }
   return n;
 }
 
-export function clipPadField(text: string, width: number, align: "start" | "end"): string {
-  const n = Math.max(1, width);
-  let body = text;
-  if (body.length > n) {
-    body = n === 1 ? body.slice(0, 1) : `${body.slice(0, n - 1)}…`;
-  }
-  return align === "end" ? body.padStart(n) : body.padEnd(n);
+function padStartNum(value: number, width: number): string {
+  const text = String(value);
+  return text.length >= width ? text : text.padStart(width);
 }
 
-export function splitDocField(text: string): { lead: string; body: string; trail: string } {
-  const body = text.trim();
-  if (!body) {
-    return { lead: text, body: "", trail: "" };
-  }
-  const start = text.indexOf(body);
-  if (start < 0) {
-    return { lead: text, body: "", trail: "" };
-  }
-  return {
-    lead: text.slice(0, start),
-    body,
-    trail: text.slice(start + body.length),
-  };
+function padEndNum(value: number, width: number): string {
+  const text = String(value);
+  return text.length >= width ? text : text.padEnd(width);
 }
 
-function rawField(line: LogLine, key: LogMetaColKey, format: TerminalTimeFormat): string {
-  switch (key) {
-    case "ts":
-      return formatLogTs(line.ts, format);
-    case "uid":
-      return line.uid ?? "";
-    case "pid":
-      return String(line.pid);
-    case "tid":
-      return String(line.tid);
-    case "level":
-      return ` ${line.level} `;
-    case "tag":
-      return line.tag;
+/** IntelliJ StringUtil.shortenTextWithEllipsis(text, maxLength, suffixLength, "...") */
+export function shortenTextWithEllipsis(text: string, maxLength: number, suffixLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
   }
+  const prefix = Math.max(0, maxLength - suffixLength - TAG_ELLIPSIS.length);
+  return `${text.slice(0, prefix)}${TAG_ELLIPSIS}${text.slice(text.length - suffixLength)}`;
+}
+
+export function formatTimestamp(ts: string, timeFormat: TerminalTimeFormat): string {
+  return `${formatLogTs(ts, timeFormat)} `;
+}
+
+export function formatUid(uid: string | undefined): string {
+  return `${uid ?? ""}`.padEnd(UID_BODY_CHARS) + " ";
+}
+
+export function formatProcessThread(line: { pid: number; tid: number }, style: ProcessThreadStyle): string {
+  if (style === "both") {
+    return `${padStartNum(line.pid, 5)}-${padEndNum(line.tid, 5)} `;
+  }
+  if (style === "pid") {
+    return `${padEndNum(line.pid, 5)} `;
+  }
+  if (style === "tid") {
+    return `${padEndNum(line.tid, 5)} `;
+  }
+  return "";
+}
+
+export function formatTag(tag: string, maxLength: number): string {
+  const width = Math.max(TAG_MIN_LENGTH, maxLength) + 1;
+  if (!tag) {
+    return "<no-tag>".padEnd(width);
+  }
+  if (tag.length > maxLength) {
+    return `${shortenTextWithEllipsis(tag, maxLength, Math.floor((maxLength - TAG_ELLIPSIS.length) / 2))} `;
+  }
+  return tag.padEnd(width);
 }
 
 type Accumulator = {
@@ -465,21 +484,15 @@ type Accumulator = {
   ranges: FormatRange[];
 };
 
-function accumulate(
-  buf: Accumulator,
-  text: string,
-  kind: LogFieldKind,
-  role: "pad" | "field",
-  paint?: TokenPaint,
-): void {
+function accumulate(buf: Accumulator, text: string, kind: LogFieldKind, paint?: TokenPaint): void {
   if (!text) {
     return;
   }
   const start = buf.text.length;
   buf.text += text;
   const end = buf.text.length;
-  const range: FormatRange = { start, end, kind, role };
-  if (role === "field" && paint) {
+  const range: FormatRange = { start, end, kind };
+  if (paint && paint.tone !== "plain") {
     range.tone = paint.tone;
     range.box = paint.box;
     range.style = paint.style;
@@ -491,12 +504,12 @@ function paintOf(engine: ColorEngine, kind: LogFieldKind, line: LogLine): TokenP
   return engine.token(kind, line);
 }
 
-/** 一行 → 文本 + range。hang 不写入空格。 */
+/** 一行 → 文本 + range。hang 不写入空格。顺序对齐官方 MessageFormatter。 */
 export function formatMessage(line: LogLine, options: FormatOptions): FormattedMessage {
   const engine = contentColor(options.scheme);
   if (line.level === "?") {
     const buf: Accumulator = { text: "", ranges: [] };
-    accumulate(buf, line.msg, "msg", "field", paintOf(engine, "msg", line));
+    accumulate(buf, line.msg, "msg", paintOf(engine, "msg", line));
     return {
       text: buf.text,
       ranges: buf.ranges,
@@ -505,30 +518,28 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
       barInk: engine.barInk(line),
     };
   }
-  const columns = formatColumns(options);
   const buf: Accumulator = { text: "", ranges: [] };
-  let headerChars = 0;
-  for (const col of columns) {
-    if (col.key === "msg" || col.chars == null) {
-      accumulate(buf, " ".repeat(col.padLeft), "msg", "pad");
-      accumulate(buf, line.msg, "msg", "field", paintOf(engine, "msg", line));
-      continue;
-    }
-    if (col.key === "level") {
-      const start = buf.text.length;
-      accumulate(buf, ` ${line.level} `, "level", "field", paintOf(engine, "level", line));
-      accumulate(buf, " ".repeat(col.gutter), "level", "pad");
-      headerChars += buf.text.length - start;
-      continue;
-    }
-    const clipped = clipPadField(rawField(line, col.key, options.timeFormat), col.chars, col.align);
-    const split = splitDocField(clipped);
-    const start = buf.text.length;
-    accumulate(buf, `${" ".repeat(col.padLeft)}${split.lead}`, col.key, "pad");
-    accumulate(buf, split.body, col.key, "field", paintOf(engine, col.key, line));
-    accumulate(buf, `${split.trail}${" ".repeat(col.gutter)}`, col.key, "pad");
-    headerChars += buf.text.length - start;
+  const display = options.display;
+  if (display.ts) {
+    accumulate(buf, formatTimestamp(line.ts, options.timeFormat), "ts", paintOf(engine, "ts", line));
   }
+  if (display.uid) {
+    accumulate(buf, formatUid(line.uid), "uid", paintOf(engine, "uid", line));
+  }
+  const process = processThreadStyle(display);
+  if (process !== "off") {
+    const kind: LogFieldKind = process === "tid" ? "tid" : "pid";
+    accumulate(buf, formatProcessThread(line, process), kind, paintOf(engine, kind, line));
+  }
+  if (display.tag) {
+    accumulate(buf, formatTag(line.tag, tagMaxLength(options)), "tag", paintOf(engine, "tag", line));
+  }
+  if (display.level) {
+    accumulate(buf, ` ${line.level} `, "level", paintOf(engine, "level", line));
+    accumulate(buf, " ", "level");
+  }
+  const headerChars = buf.text.length;
+  accumulate(buf, line.msg, "msg", paintOf(engine, "msg", line));
   return {
     text: buf.text,
     ranges: buf.ranges,

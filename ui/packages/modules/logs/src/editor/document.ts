@@ -1,6 +1,8 @@
 /**
  * Document：对照 AS DocumentAppender。
- * 只尾部追加 / 环裁 / 改选项重载。只 import Formatter。
+ * 只尾部追加 / 环裁 / 改选项重载。文本来自官方 Format 分段，本层不垫列、不折行。
+ * 长文本 clip / wrap 不进本层，只在 EditorView。
+ * 只 import Formatter。
  */
 
 import type { LogLine } from "@yohu/api";

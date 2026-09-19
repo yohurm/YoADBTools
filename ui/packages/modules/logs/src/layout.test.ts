@@ -5,16 +5,12 @@ import { describe, expect, it } from "vitest";
 import { Density, setColWidth } from "@yohu/ui";
 import { defaultFormatOptions, trackTemplate } from "./editor";
 import {
+  ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
   LOG_COLUMNS,
-  LOG_FIELD_CHARS,
-  LOG_LEVEL_TRACK_CHARS,
   dataRowHeight,
   defaultLogColWidths,
-  headerLabelChars,
   logColResizable,
-  logFieldText,
-  logSlotChars,
   visibleLogColumns,
 } from "./layout";
 
@@ -49,19 +45,19 @@ describe("日志表头布局契约", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
-    expect(logsCss).toMatch(/\[data-log-pad\]\s*\{[^}]*user-select:\s*none/);
     expect(logsCss).not.toContain("::highlight(yohu-log-sel)");
     expect(logsCss).not.toContain("yohu-logs__sel-layer");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s+\.yohu-col-cell/);
-    expect(logsCss).toContain("var(--yohu-text-sel)");
-    expect(logsCss).toContain("var(--yohu-text-sel-fg)");
+    expect(logsCss).toContain("--yohu-doc-sel");
+    expect(logsCss).not.toContain("var(--yohu-text-sel-fg)");
     expect(logsCss).toMatch(
-      /\.yohu-logs__list ::selection\s*\{\s*background-color:\s*var\(--yohu-text-sel\);\s*color:\s*var\(--yohu-text-sel-fg\)/,
+      /\.yohu-logs__view \*::selection\s*\{\s*background-color:\s*transparent;\s*color:\s*inherit/,
     );
-    expect(logsCss).not.toMatch(/\.yohu-logs__list ::selection\s*\{\s*background:\s*transparent/);
+    expect(logsCss).not.toMatch(/\.yohu-logs__list \*::selection\s*\{\s*background-color:\s*var\(--yohu-doc-sel\)/);
+    expect(logsCss).not.toContain("yohu-logs__row--picked");
+    expect(logsCss).toContain("isolation: isolate");
     expect(logsCss).not.toContain('[data-select="cell"]');
     expect(logsCss).not.toContain(".yohu-logs__cell");
-    expect(logsCss).toContain("yohu-logs__row--picked");
     expect(logsCss).not.toContain("yohu-logs__list-body--picking");
     expect(logsCss).not.toContain("yohu-col-header");
     expect(logsCss).not.toContain("--yohu-col-tracks");
@@ -112,7 +108,7 @@ describe("日志表头布局契约", () => {
 describe("日志显示列", () => {
   it("默认不含 UID/TID，列序时间/PID/Tag/级别/消息", () => {
     expect(trackTemplate(defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(
-      "26ch 8ch 26ch 4ch minmax(10ch, 1fr)",
+      "24ch 6ch 24ch 4ch minmax(10ch, 1fr)",
     );
     expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
       "ts",
@@ -123,10 +119,24 @@ describe("日志显示列", () => {
     ]);
   });
 
+  it("PID+TID 合成 ProcessThread BOTH，表头不另开 TID 轨", () => {
+    expect(visibleLogColumns(ALL_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
+      "ts",
+      "uid",
+      "pid",
+      "tag",
+      "level",
+      "msg",
+    ]);
+    expect(trackTemplate(defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS))).toBe(
+      "24ch 9ch 12ch 24ch 4ch minmax(10ch, 1fr)",
+    );
+  });
+
   it("关闭元数据列后消息仍在，轨道只留可见列", () => {
     const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
     expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
-    expect(trackTemplate(defaultFormatOptions(display))).toBe("8ch 4ch minmax(10ch, 1fr)");
+    expect(trackTemplate(defaultFormatOptions(display))).toBe("6ch 4ch minmax(10ch, 1fr)");
   });
 
   it("全部元数据关闭只剩消息", () => {
@@ -134,38 +144,12 @@ describe("日志显示列", () => {
     expect(trackTemplate(defaultFormatOptions(display))).toBe("minmax(10ch, 1fr)");
   });
 
-  it("字段原文与表头同序，不含 pad / 列间空格", () => {
-    const line = {
-      seq: 1,
-      ts: "2026-01-01 12:00:00.000",
-      uid: "shell",
-      pid: 100,
-      tid: 200,
-      level: "I",
-      tag: "Yohu",
-      msg: "hello",
-    };
-    expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((col) => logFieldText(line, col.key))).toEqual([
-      "2026-01-01 12:00:00.000",
-      "100",
-      "Yohu",
-      " I ",
-      "hello",
-    ]);
-  });
-
-  it("表头全角计入其他列；级别只认官方 3ch，轨道 4ch，禁止拖开", () => {
-    expect(headerLabelChars("级别")).toBe(4);
-    expect(headerLabelChars("时间")).toBe(4);
-    expect(headerLabelChars("PID")).toBe(3);
-    expect(LOG_FIELD_CHARS.level).toBe(3);
-    expect(LOG_LEVEL_TRACK_CHARS).toBe(4);
-    expect(logSlotChars("level", "级别")).toBe(3);
-    expect(logSlotChars("pid", "PID")).toBe(5);
-    expect(logSlotChars("ts", "时间", "time_millis")).toBe(12);
+  it("只有 Tag 可拖；级别 / 时间 / PID 固定官方宽", () => {
     expect(LOG_COLUMNS.find((col) => col.key === "level")?.minWidth).toBe(32);
     expect(LOG_COLUMNS.find((col) => col.key === "level")?.resize).toBe(false);
     expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "level")!)).toBe(false);
+    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "pid")!)).toBe(false);
+    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "ts")!)).toBe(false);
     expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "tag")!)).toBe(true);
     expect(dataRowHeight()).toBe(Density.Comfortable.rowHeight);
   });
@@ -176,7 +160,7 @@ describe("日志显示列", () => {
     const pid = LOG_COLUMNS.find((col) => col.key === "pid")!;
     const msg = LOG_COLUMNS.find((col) => col.key === "msg")!;
     expect(setColWidth(start, tag, 212).tag).toBe(212);
-    expect(setColWidth(start, pid, 10).pid).toBe(40);
+    expect(setColWidth(start, pid, 10).pid).toBe(48);
     expect(setColWidth(start, msg, 200)).toBe(start);
   });
 
@@ -204,6 +188,7 @@ describe("日志显示列", () => {
     const filter = load("LogFilterBar.tsx");
     const editorView = load("editor/view.tsx");
     const formatter = load("editor/format.ts");
+    const documentSrc = load("editor/document.ts");
     expect(view).toContain('overflow="hidden"');
     expect(view).toContain('variant="pane"');
     expect(view).toContain("YoScroller");
@@ -225,17 +210,9 @@ describe("日志显示列", () => {
     expect(filter).not.toContain("__body");
     expect(editorView).not.toMatch(/<(input|select|textarea|button)\b/);
     expect(editorView).not.toContain("__body");
-    expect(editorView).not.toContain("yohu-logs__row--raw");
-    expect(editorView).not.toContain("data-tint-msg");
-    expect(editorView).not.toContain("tintMessage");
-    expect(editorView).not.toContain("paintLogLine");
     expect(editorView).not.toContain("formatMessage");
     expect(editorView).toContain("data-tone");
     expect(editorView).toContain("data-bar");
-    expect(editorView).not.toContain("badge");
-    expect(editorView).not.toContain("splitLevelGlyph");
-    expect(editorView).not.toContain("level-paint");
-    expect(editorView).not.toContain("data-paint");
     expect(view).not.toContain("contentColor");
     expect(formatter).toContain("parseLevelLetter");
     expect(formatter).not.toContain("../filter");
@@ -246,37 +223,41 @@ describe("日志显示列", () => {
     expect(filter).toContain("fill:");
     expect(filter).toContain("ink:");
     expect(filter).toContain("--yohu-level-");
-    expect(filter).not.toContain("yohu-ink");
-    expect(filter).not.toContain("levelInkStyle");
     expect(filter).not.toContain("YoButton");
-    expect(filter).not.toContain("data-paint");
-    expect(filter).not.toContain("data-level");
-    expect(view).not.toContain("logDocColumns");
-    expect(view).not.toContain("logDocTrackPx");
     expect(view).toContain("action=");
     expect(view).toContain("text={`信号 ${session.signalCount}`}");
-    expect(view).toContain("width={logStore.state.colWidths[col.key]}");
-    expect(view).toContain("align={col.align}");
+    expect(view).toContain("width={col.key === \"tag\" ? logStore.state.colWidths.tag : col.defaultWidth}");
     expect(view).toContain("EditorView");
-    expect(view).not.toContain("expandLogVisual");
-    expect(view).not.toContain("LogListProjector");
     expect(view).not.toContain("YoVirtualList");
     expect(editorView).toContain("YoVirtualList");
     expect(editorView).toContain("itemHeight={props.itemHeight}");
+    expect(editorView).toContain("yohu-doc-sel");
+    expect(editorView).toContain("docSelBandStyle");
+    expect(editorView).toContain("selSlice");
+    expect(editorView).toContain("selectionchange");
     expect(view).toContain("itemHeight={dataRowHeight()}");
     expect(view).not.toContain("hangChars");
     expect(editorView).toContain("wrapBody");
-    expect(load("doc.ts")).toBe("");
-    expect(load("wrap.ts")).toBe("");
-    expect(load("list-project.ts")).toBe("");
-    expect(load("LogList.tsx")).toBe("");
-    expect(load("LogDocView.tsx")).toBe("");
-    expect(load("level-paint.ts")).toBe("");
-    expect(load("tag-color.ts")).toBe("");
-    expect(load("color/index.ts")).toBe("");
-    expect(load("color/yohu.ts")).toBe("");
-    expect(load("color/logcat.ts")).toBe("");
+    expect(editorView).toContain("clipMessage");
+    expect(editorView).toContain("data-layout");
+    expect(editorView).not.toContain("log_line_layout");
+    expect(formatter).not.toContain("log_line_layout");
+    expect(formatter).not.toContain("clipMessage");
+    expect(formatter).not.toContain("wrapMessage");
+    expect(documentSrc).not.toContain("log_line_layout");
+    expect(documentSrc).not.toContain("clipMessage");
+    expect(documentSrc).not.toContain("wrapMessage");
+    expect(view).toContain("layout={() => props.settings.log_line_layout}");
+    expect(view).toContain('log_line_layout !== "wrap"');
+    expect(formatter).not.toContain("log-line-layout");
+    expect(documentSrc).not.toContain("log-line-layout");
+    expect(logsCss).toContain("--yohu-log-hang");
     expect(logsCss).toContain("[data-wrap]");
+    expect(logsCss).not.toContain('[data-layout="wrap"] .yohu-logs__row[data-wrap]');
+    expect(editorView).toContain("contentWidth");
+    expect(editorView).toContain("chPx");
+    expect(view).toContain("onInlineOffset");
+    expect(view).toContain("chPx={chPx}");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*pre-wrap/);
     expect(view).toContain("onCreated={beginCapture}");
     expect(view).toContain("onCleanup(() => toaster.destroy())");

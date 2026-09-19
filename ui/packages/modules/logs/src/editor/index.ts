@@ -1,24 +1,41 @@
 export {
-  clipPadField,
-  columnTrackPx,
   defaultFormatOptions,
   defaultLogColWidths,
-  fieldChars,
   formatColumns,
   formatMessage,
   formatOptionsKey,
   formatParts,
+  formatProcessThread,
+  formatTag,
   hangChars,
-  padLeftChars,
-  splitDocField,
+  processThreadStyle,
+  tagMaxLength,
+  timestampWidth,
   trackTemplate,
   visibleLogColumns,
   LOGCAT_TAG_SWATCHES,
-  LOG_LEVEL_BADGE_CHARS,
+  LEVEL_FORMAT_WIDTH,
+  PROCESS_BOTH_WIDTH,
+  PROCESS_PID_WIDTH,
   DEFAULT_CH_PX,
   type FormatOptions,
   type FormattedMessage,
   type FormatRange,
 } from "./format";
 export { EMPTY_MESSAGES, EMPTY_ROWS, LogDocument, type DocMessage, type DocRow } from "./document";
-export { EditorView, wrapMessage, type VisualLine } from "./view";
+export {
+  EditorView,
+  clipMessage,
+  visualBoardChars,
+  visualLineChars,
+  wrapMessage,
+  type VisualLine,
+} from "./view";
+export {
+  docSelCopyText,
+  orderDocSel,
+  readDocSel,
+  selSlice,
+  type DocSel,
+  type SelBand,
+} from "./selection";

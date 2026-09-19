@@ -107,7 +107,7 @@ describe("LogDocument", () => {
     const rows = [row(1)];
     doc.sync(rows);
     const first = doc.messages[0];
-    expect(doc.setOptions({ ...options, chPx: 11 })).toBe(false);
+    expect(doc.setOptions({ ...options })).toBe(false);
     expect(doc.messages[0]).toBe(first);
     expect(doc.setOptions({ ...options, scheme: "logcat" })).toBe(true);
     expect(doc.messages[0]).not.toBe(first);

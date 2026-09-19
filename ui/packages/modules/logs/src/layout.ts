@@ -1,6 +1,6 @@
 /**
  * 非文档常数：对话框高、行高、measureChPx。
- * 列尺与 hang 只在 editor/format options。本文件只转口，禁止再写第二把尺。
+ * Format 尺只在 editor/format。本文件只转口表头规格，禁止再写第二把尺。
  */
 
 import { Density, getDensity, type DensityName } from "@yohu/ui";
@@ -10,23 +10,13 @@ import { DEFAULT_CH_PX } from "./editor/format";
 export {
   ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
-  LOG_CH_PX,
   LOG_COLUMNS,
-  LOG_FIELD_CHARS,
-  LOG_LEVEL_TRACK_CHARS,
-  LOG_PAD_LEFT_CHARS,
   defaultLogColWidths,
-  headerLabelChars,
   logColResizable,
-  logFieldText,
-  logSlotChars,
-  tsFieldPx,
   visibleLogColumns,
-  type LogColAlign,
   type LogColKey,
   type LogColWidths,
   type LogColumnSpec,
-  type LogMetaColKey,
 } from "./editor/format";
 
 /** 新建窗口：设备行 + 分段 + 检索 + 列表。 */
@@ -52,7 +42,8 @@ export function dataRowHeight(): number {
 }
 
 /**
- * 只换 px 地板。禁止改 padLeft 或字段字符。
+ * wrap 用它算 rowChars；clip 用它把文档 ch 换成 inner 宽。
+ * 禁止拿去改 Format.width()。
  * 行 class 是 display:block，会吃满宿主宽，chPx 变成整行/10。
  */
 export function measureChPx(host: HTMLElement): number {

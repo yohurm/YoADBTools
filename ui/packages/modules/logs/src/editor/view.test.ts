@@ -5,7 +5,7 @@ import type { LogLine } from "@yohu/api";
 import { DEFAULT_LOG_DISPLAY_COLUMNS } from "../layout";
 import { LogDocument } from "./document";
 import { defaultFormatOptions, hangChars, trackTemplate } from "./format";
-import { VisualBoard, wrapBody, wrapMessage } from "./view";
+import { VisualBoard, clipMessage, visualBoardChars, visualLineChars, wrapBody, wrapMessage } from "./view";
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -63,8 +63,35 @@ describe("wrapBody", () => {
 
 describe("hang / 轨道", () => {
   it("默认 hang 是前缀轨道合计", () => {
-    expect(hangChars(options)).toBe(26 + 8 + 26 + 4);
-    expect(trackTemplate(options).startsWith("26ch 8ch 26ch 4ch")).toBe(true);
+    expect(hangChars(options)).toBe(24 + 6 + 24 + 4);
+    expect(trackTemplate(options).startsWith("24ch 6ch 24ch 4ch")).toBe(true);
+  });
+});
+
+describe("clipMessage", () => {
+  it("无硬换行时一行，文本等于逻辑文档，不看行宽", () => {
+    const message = formatted({ msg: "hello world now and then again" });
+    const visuals = clipMessage(message);
+    expect(visuals).toHaveLength(1);
+    expect(visuals[0]?.wrapIndex).toBe(0);
+    expect(visuals[0]?.docFrom).toBe(0);
+    expect(visuals[0]?.hang).toBe(0);
+    expect(visuals[0]?.text).toBe(message.text);
+    expect(visuals[0]?.ranges).toEqual(message.ranges);
+  });
+
+  it("硬换行切开，续行 hang 对齐消息列，正文不含空格垫", () => {
+    const message = formatted({ msg: "line1\nline2" });
+    const visuals = clipMessage(message);
+    expect(visuals).toHaveLength(2);
+    expect(visuals[0]?.text.endsWith("line1")).toBe(true);
+    expect(visuals[0]?.hang).toBe(0);
+    expect(visuals[1]?.text).toBe("line2");
+    expect(visuals[1]?.hang).toBe(message.headerChars);
+    expect(visuals[1]?.docFrom).toBe(message.headerChars + "line1\n".length);
+    expect(message.text.slice(visuals[1]!.docFrom, visuals[1]!.docFrom + visuals[1]!.text.length)).toBe("line2");
+    expect(visualLineChars(visuals[1]!)).toBe(message.headerChars + "line2".length);
+    expect(visualBoardChars(visuals)).toBeGreaterThan(message.headerChars);
   });
 });
 
@@ -118,8 +145,8 @@ describe("VisualBoard", () => {
     doc.setOptions(options);
     doc.reload([{ line: line({ seq: 1 }) }]);
     const board = new VisualBoard();
-    const first = board.project(doc.messages, 80);
-    expect(board.project(doc.messages, 80)).toBe(first);
+    const first = board.project(doc.messages, 80, "wrap");
+    expect(board.project(doc.messages, 80, "wrap")).toBe(first);
   });
 
   it("append 不重切旧行", () => {
@@ -129,10 +156,10 @@ describe("VisualBoard", () => {
     const b = { line: line({ seq: 2, msg: "two" }) };
     doc.sync([a]);
     const board = new VisualBoard();
-    const first = board.project(doc.messages, 80);
+    const first = board.project(doc.messages, 80, "wrap");
     const kept = first[0];
     doc.sync([a, b]);
-    const next = board.project(doc.messages, 80);
+    const next = board.project(doc.messages, 80, "wrap");
     expect(next[0]).toBe(kept);
     expect(next).toHaveLength(2);
     expect(next[1]?.seq).toBe(2);
@@ -146,10 +173,10 @@ describe("VisualBoard", () => {
     const c = { line: line({ seq: 3, msg: "three" }) };
     doc.sync([a, b, c]);
     const board = new VisualBoard();
-    const first = board.project(doc.messages, 80);
+    const first = board.project(doc.messages, 80, "wrap");
     const kept = first[2];
     doc.sync([b, c]);
-    const next = board.project(doc.messages, 80);
+    const next = board.project(doc.messages, 80, "wrap");
     expect(next).toHaveLength(2);
     expect(next[1]).toBe(kept);
   });
@@ -167,11 +194,46 @@ describe("VisualBoard", () => {
     doc.setOptions(options);
     doc.reload([{ line: line({ seq: 1, msg: "hello world now" }) }]);
     const board = new VisualBoard();
-    const wide = board.project(doc.messages, hangChars(options) + 80);
+    const wide = board.project(doc.messages, hangChars(options) + 80, "wrap");
     const kept = wide[0];
-    const narrow = board.project(doc.messages, hangChars(options) + 10);
+    const narrow = board.project(doc.messages, hangChars(options) + 10, "wrap");
     expect(narrow[0]).not.toBe(kept);
     expect(narrow.length).toBeGreaterThan(wide.length);
+  });
+
+  it("clip 无视行宽，长消息仍一行", () => {
+    const doc = new LogDocument();
+    doc.setOptions(options);
+    doc.reload([{ line: line({ seq: 1, msg: "hello world now and then again" }) }]);
+    const board = new VisualBoard();
+    const first = board.project(doc.messages, 8, "clip");
+    expect(first).toHaveLength(1);
+    expect(first[0]?.text).toBe(doc.messages[0]?.text);
+    expect(board.project(doc.messages, 80, "clip")).toBe(first);
+  });
+
+  it("clip 硬换行切开，不看行宽", () => {
+    const doc = new LogDocument();
+    doc.setOptions(options);
+    doc.reload([{ line: line({ seq: 1, msg: "one\ntwo" }) }]);
+    const board = new VisualBoard();
+    const first = board.project(doc.messages, 8, "clip");
+    expect(first).toHaveLength(2);
+    expect(first[1]?.text).toBe("two");
+    expect(first[1]?.hang).toBe(doc.messages[0]?.headerChars);
+    expect(board.project(doc.messages, 80, "clip")).toBe(first);
+  });
+
+  it("clip 与 wrap 切换才重切", () => {
+    const doc = new LogDocument();
+    doc.setOptions(options);
+    doc.reload([{ line: line({ seq: 1, msg: "hello world now" }) }]);
+    const board = new VisualBoard();
+    const clipped = board.project(doc.messages, hangChars(options) + 10, "clip");
+    expect(clipped).toHaveLength(1);
+    const wrapped = board.project(doc.messages, hangChars(options) + 10, "wrap");
+    expect(wrapped.length).toBeGreaterThan(1);
+    expect(wrapped).not.toBe(clipped);
   });
 });
 
@@ -187,6 +249,14 @@ describe("View 不回调 Formatter", () => {
     expect(src).not.toContain("../layout");
     expect(src).toContain("YoVirtualList");
     expect(src).toContain("itemHeight={props.itemHeight}");
-    expect(src).not.toContain("paintLogLine");
+    expect(src).toContain("yohu-doc-sel");
+    expect(src).toContain("docSelBandStyle");
+    expect(src).toContain("from \"./selection\"");
+    expect(src).toContain("clipMessage");
+    expect(src).toContain("contentWidth");
+    expect(src).toContain("visualBoardChars");
+    expect(src).toContain("data-layout");
+    expect(src).toContain("LogLineLayout");
+    expect(src).not.toContain("log_line_layout");
   });
 });

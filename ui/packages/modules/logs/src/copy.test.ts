@@ -45,11 +45,7 @@ function mountRow(item: LogLine): HTMLElement {
   el.dataset.seq = String(item.seq);
   for (const range of formatted.ranges) {
     const span = document.createElement("span");
-    if (range.role === "pad") {
-      span.dataset.logPad = "";
-    } else {
-      span.dataset.kind = range.kind;
-    }
+    span.dataset.kind = range.kind;
     span.textContent = formatted.text.slice(range.start, range.end);
     el.append(span);
   }
@@ -127,7 +123,7 @@ describe("serializeLogCopy", () => {
     expect(copyHasPayload({ pick: LOG_COPY_ALL, listRoot: null, selection: null })).toBe(true);
   });
 
-  it("回退行含 UID 的清单文档带 pad 空格，不是 formatLogLine 紧贴格式", () => {
+  it("回退行含 UID 的清单文档带 Format 尾空格，不是 formatLogLine 紧贴格式", () => {
     const withUid = line({ uid: "shell", pid: 1705, tid: 1705, level: "W", tag: "binder", msg: "avc" });
     const text = serializeLogCopy({
       pick: LOG_COPY_NONE,
@@ -169,7 +165,7 @@ describe("documentCopyText", () => {
     ).toBe("ActivityManager");
   });
 
-  it("从 Tag 拖过 pad 空格，复制含字段后的空白", () => {
+  it("从 Tag 拖过 TagFormat 尾空格，复制含字段后的空白", () => {
     const item = line({ seq: 1, tag: "Yohu", msg: "hello" });
     const list = document.createElement("div");
     const rowEl = mountRow(item);
@@ -223,9 +219,6 @@ describe("documentCopyText", () => {
       el.dataset.docFrom = String(visual.docFrom);
       for (const range of visual.ranges) {
         const span = document.createElement("span");
-        if (range.role === "pad") {
-          span.dataset.logPad = "";
-        }
         span.textContent = visual.text.slice(range.start, range.end);
         el.append(span);
       }
@@ -278,7 +271,7 @@ describe("seqFromTarget", () => {
 
 describe("rangeHitsNode", () => {
   it("产品文件只用 Range 边界比较，没有 intersectsNode / jsdom catch", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy.ts"), "utf-8");
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "editor/selection.ts"), "utf-8");
     expect(src).toContain("compareBoundaryPoints");
     expect(src).not.toContain("intersectsNode");
     expect(src).not.toContain("jsdom");

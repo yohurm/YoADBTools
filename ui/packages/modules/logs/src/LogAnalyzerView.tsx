@@ -55,7 +55,6 @@ import {
   dataRowHeight,
   logColResizable,
   measureChPx,
-  tsFieldPx,
   visibleLogColumns,
 } from "./layout";
 import { LogFilterBar } from "./LogFilterBar";
@@ -142,6 +141,7 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
   const [rowChars, setRowChars] = createSignal(0);
+  const [inlineOffset, setInlineOffset] = createSignal(0);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
 
   let keywordRef: YoSearchControl | undefined;
@@ -199,29 +199,12 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
-  const formatOpts = createMemo((): FormatOptions => {
-    const widths = logStore.state.colWidths;
-    return {
-      display: displayColumns(),
-      widths: {
-        ts: widths.ts,
-        uid: widths.uid,
-        pid: widths.pid,
-        tid: widths.tid,
-        level: widths.level,
-        tag: widths.tag,
-        msg: widths.msg,
-      },
-      chPx: chPx(),
-      timeFormat: props.settings.log_time_format,
-      scheme: props.settings.log_color_scheme,
-    };
-  });
-
-  createEffect(() => {
-    const format = props.settings.log_time_format;
-    logStore.setColWidth("ts", tsFieldPx(format));
-  });
+  const formatOpts = createMemo((): FormatOptions => ({
+    display: displayColumns(),
+    tagWidthPx: logStore.state.colWidths.tag,
+    timeFormat: props.settings.log_time_format,
+    scheme: props.settings.log_color_scheme,
+  }));
 
   createEffect(() => {
     props.settings.density;
@@ -232,6 +215,16 @@ export function LogAnalyzerView(props: DeviceSession) {
   });
 
   createEffect(() => {
+    if (props.settings.log_line_layout !== "clip") {
+      setInlineOffset(0);
+    }
+  });
+
+  createEffect(() => {
+    if (props.settings.log_line_layout !== "wrap") {
+      setRowChars(0);
+      return;
+    }
     const host = listEl();
     const px = chPx();
     if (!host) {
@@ -481,16 +474,18 @@ export function LogAnalyzerView(props: DeviceSession) {
                 class="yohu-logs__list"
                 template={trackTemplate(formatOpts())}
               >
-                <YoColRow class="yohu-logs__cols yohu-logs__cols--head">
+                <YoColRow
+                  class="yohu-logs__cols yohu-logs__cols--head"
+                  style={{ transform: `translate3d(${-inlineOffset()}px, 0, 0)` }}
+                >
                   <For each={visibleLogColumns(displayColumns())}>
                     {(col) => (
                       <YoColHeader
-                        align={col.align}
                         pad={col.key === "level" ? "none" : undefined}
                         resizable={logColResizable(col)}
                         resizeLabel={col.resizeLabel}
-                        width={logStore.state.colWidths[col.key]}
-                        minWidth={col.key === "ts" ? tsFieldPx(formatOpts().timeFormat) : col.minWidth}
+                        width={col.key === "tag" ? logStore.state.colWidths.tag : col.defaultWidth}
+                        minWidth={col.minWidth}
                         onWidthChange={(width) => logStore.setColWidth(col.key, width)}
                       >
                         {col.header}
@@ -507,7 +502,10 @@ export function LogAnalyzerView(props: DeviceSession) {
                       logStore.state.sessions.find((item) => item.id === session.id)?.visible ?? EMPTY_ROWS
                     }
                     options={formatOpts}
+                    layout={() => props.settings.log_line_layout}
                     rowChars={rowChars}
+                    chPx={chPx}
+                    onInlineOffset={setInlineOffset}
                     itemHeight={dataRowHeight()}
                     keyword={() =>
                       logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""

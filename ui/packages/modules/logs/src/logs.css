@@ -1,13 +1,13 @@
 /* ============================================================================
  * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 表头是铬层：YoColFrame cellPad=list + ch 轨道（Formatter trackTemplate）。
- * 列垫在尺里（LOG_PAD_LEFT_CHARS = space-md / LOG_CH_PX），标题与文档同一起笔，禁止 cellPad=none 贴边。
- * 级别不是表格列：官方 LevelFormat `" L "` + 1 空格，无 padLeft。表头「级别」走 YoColHeader pad=none，贴 4ch 轨道。
- * 行是一份 white-space:pre 文档。软折行在 EditorView 切成定高可视行，禁止整行 pre-wrap。
- * 续行 hang 走 --yohu-log-hang（前缀 ch），不进复制表面。
- * 选区走原生 ::selection（--yohu-text-sel / --yohu-text-sel-fg）。
- * 列间空白是 Document.text 的 pad 空格。
- * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
+ * 表头是铬层：YoColFrame cellPad=list + ch 轨道（Formatter trackTemplate = 各 Format.width()）。
+ * 文档走官方 Timestamp / ProcessThread / Tag / Level，每段自带尾空格。禁止再把 Spacing.Md 写进 Document.text。
+ * 级别是官方 LevelFormat `" L "` + 1 个未着色空格。表头「级别」走 YoColHeader pad=none，贴 4ch 轨道。
+ * 行是一份 white-space:pre 文档。长文本 clip / wrap 只在 EditorView，禁止整行 pre-wrap。
+ * 续行 hang 走 --yohu-log-hang（前缀 ch），不进复制表面。clip 不按视口折，硬 \\n 仍切行。
+ * 选区手势仍是原生 Selection；绘制是 EditorView 的 .yohu-doc-sel 带（--yohu-doc-sel）。
+ * 禁止再靠 ::selection 给 [data-tone=ink] 铺色。Ctrl+A = sel all 整条可视行带。
+ * 列间空白是各 Format 尾空格，全部可选。禁止再把列垫标成不可选。禁止洗白级别 ink，禁止 accent-soft 冒充选字。
  * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
  * 行 --yohu-log-ink 由 Document barInk 写入，禁止再列 V–F 六条映射。
  * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
@@ -76,22 +76,18 @@
 
 .yohu-logs__list-body {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Ctrl+A 未挂载行：覆写 tone 变量，字段不再按 class 着色。 */
-.yohu-logs__row--picked {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
-  --yohu-log-ink: var(--yohu-text-sel-fg);
-  --yohu-log-level-fg: var(--yohu-text-sel-fg);
-  --yohu-log-level-bg: transparent;
-}
-
-.yohu-logs__row--picked .yohu-logs__row-fold {
-  color: var(--yohu-text-sel-fg);
+.yohu-logs__view {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
 }
 
 /* 离开底部：只计数不跟滚（Entangle jump-to-bottom / Qovery new-logs） */
@@ -142,6 +138,8 @@
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
   color: var(--yohu-fg);
+  position: relative;
+  isolation: isolate;
   display: block;
   height: 100%;
   overflow: hidden;
@@ -156,32 +154,24 @@
   border-left-color: var(--yohu-log-ink);
 }
 
-/* 续行只含消息切片；hang 对齐消息列起笔。禁止写进文档空格。 */
-.yohu-logs__row[data-wrap]:not([data-wrap="0"]) {
+/* 续行只含消息切片；hang 对齐消息列起笔。禁止写进文档空格。clip / wrap 同一把尺。 */
+.yohu-logs__view .yohu-logs__row[data-wrap]:not([data-wrap="0"]) {
   padding-left: calc(var(--yohu-log-hang, 0) * 1ch);
 }
 
-/* 列垫空格不是字段正文。禁止进双击选词，仍占文档宽度。 */
-.yohu-logs__row [data-log-pad] {
-  user-select: none;
-}
-
-.yohu-logs__list ::selection {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
+/* 原生 ::selection 只当手势。色由 .yohu-doc-sel 带画，避免 WebView2 只在行尾画出一条并洗白 ink。 */
+.yohu-logs__view ::selection,
+.yohu-logs__view *::selection {
+  background-color: transparent;
+  color: inherit;
 }
 
 /* 左条 ink 由 Document barInk 写入 --yohu-log-ink。 */
 
-/* 信号行（崩溃/ANR）：信号底色 + Error 左条。Ctrl+A 铺底时让位。 */
+/* 信号行（崩溃/ANR）：信号底色 + Error 左条。选区带叠在行底上，左条保留。 */
 .yohu-logs__row--signal {
   background-color: var(--yohu-signal-bg);
   border-left-color: var(--yohu-error);
-}
-
-.yohu-logs__row--signal.yohu-logs__row--picked {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
 }
 
 .yohu-logs__row-level {
