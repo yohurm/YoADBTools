@@ -755,6 +755,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
+  it("日志长文本切换立即写入 log_line_layout", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("长文本")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "单行（LogCat，默认）" }));
+    fireEvent.click(screen.getByText("超宽换行", { exact: true }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("log_line_layout", "wrap");
+    });
+  });
+
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();

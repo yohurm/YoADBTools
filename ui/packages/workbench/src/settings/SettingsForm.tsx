@@ -8,6 +8,8 @@ import { APP_ICON_SRC } from "../app-identity";
 import {
   LOG_COLOR_SCHEME_CATALOG,
   LOG_COLOR_SCHEME_HINT,
+  LOG_LINE_LAYOUT_CATALOG,
+  LOG_LINE_LAYOUT_HINT,
   ModuleTitle,
   type Density,
   type LogDisplayColumns,
@@ -75,6 +77,11 @@ const LOG_TIME_FORMAT_OPTIONS = clockFormatOptions("datetime_millis", [
 ]);
 
 const LOG_COLOR_SCHEME_OPTIONS = LOG_COLOR_SCHEME_CATALOG.map(({ value, label }) => ({
+  value,
+  label,
+}));
+
+const LOG_LINE_LAYOUT_OPTIONS = LOG_LINE_LAYOUT_CATALOG.map(({ value, label }) => ({
   value,
   label,
 }));
@@ -177,6 +184,17 @@ export function SettingsForm(props: {
             options={LOG_COLOR_SCHEME_OPTIONS}
             value={settingsStore.state.log_color_scheme}
             onChange={(v) => props.save("log_color_scheme", v, "已保存（立即生效）")}
+          />
+        </YoFormRow>
+        <YoFormRow
+          title="长文本"
+          description={LOG_LINE_LAYOUT_HINT}
+          note={<EffectBadge text="立即生效" />}
+        >
+          <YoSelect
+            options={LOG_LINE_LAYOUT_OPTIONS}
+            value={settingsStore.state.log_line_layout}
+            onChange={(v) => props.save("log_line_layout", v, "已保存（立即生效）")}
           />
         </YoFormRow>
         <YoFormRow
