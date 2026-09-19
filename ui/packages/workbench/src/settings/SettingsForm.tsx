@@ -6,6 +6,8 @@ import { For, type JSX } from "solid-js";
 
 import { APP_ICON_SRC } from "../app-identity";
 import {
+  LOG_COLOR_SCHEME_CATALOG,
+  LOG_COLOR_SCHEME_HINT,
   ModuleTitle,
   type Density,
   type LogDisplayColumns,
@@ -71,6 +73,11 @@ const LOG_TIME_FORMAT_OPTIONS = clockFormatOptions("datetime_millis", [
   "time_millis",
   "time",
 ]);
+
+const LOG_COLOR_SCHEME_OPTIONS = LOG_COLOR_SCHEME_CATALOG.map(({ value, label }) => ({
+  value,
+  label,
+}));
 
 const LOG_COLUMN_OPTIONS: { key: keyof LogDisplayColumns; label: string }[] = [
   { key: "ts", label: "时间" },
@@ -159,6 +166,17 @@ export function SettingsForm(props: {
             options={LOG_TIME_FORMAT_OPTIONS}
             value={settingsStore.state.log_time_format}
             onChange={(v) => props.save("log_time_format", v, "已保存（立即生效）")}
+          />
+        </YoFormRow>
+        <YoFormRow
+          title="内容配色"
+          description={LOG_COLOR_SCHEME_HINT}
+          note={<EffectBadge text="立即生效" />}
+        >
+          <YoSelect
+            options={LOG_COLOR_SCHEME_OPTIONS}
+            value={settingsStore.state.log_color_scheme}
+            onChange={(v) => props.save("log_color_scheme", v, "已保存（立即生效）")}
           />
         </YoFormRow>
         <YoFormRow

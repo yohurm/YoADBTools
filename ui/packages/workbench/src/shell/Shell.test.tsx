@@ -745,6 +745,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
+  it("日志内容配色切换立即写入 log_color_scheme", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("内容配色")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Yohu（默认）" }));
+    fireEvent.click(screen.getByText("LogCat", { exact: true }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("log_color_scheme", "logcat");
+    });
+  });
+
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();
