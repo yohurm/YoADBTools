@@ -92,6 +92,7 @@ const LOG_COLUMN_OPTIONS: { key: keyof LogDisplayColumns; label: string }[] = [
   { key: "pid", label: "PID" },
   { key: "tid", label: "TID" },
   { key: "tag", label: "Tag" },
+  { key: "app", label: "应用" },
   { key: "level", label: "级别" },
 ];
 

@@ -666,15 +666,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.getByText("每次导出询问保存位置")).toBeTruthy();
   });
 
-  it("日志显示列复选框可见且默认不含 UID/TID", () => {
+  it("日志显示列复选框可见且默认 STANDARD：UID 关，PID/TID/应用开", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("日志显示列")).toBeTruthy();
-    for (const name of ["时间", "PID", "级别", "Tag"]) {
+    for (const name of ["时间", "PID", "TID", "级别", "Tag", "应用"]) {
       expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(true);
     }
-    for (const name of ["UID", "TID"]) {
-      expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(false);
-    }
+    expect((screen.getByRole("checkbox", { name: "UID" }) as HTMLInputElement).checked).toBe(false);
   });
 
   it("日志显示列走 YoFormRow：标题备注在左侧信息栈，复选在右侧控件槽", () => {
@@ -693,7 +691,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith(
         "log_display_columns",
-        expect.objectContaining({ pid: false, ts: true, uid: false, tid: false, tag: true }),
+        expect.objectContaining({ pid: false, ts: true, uid: false, tid: true, tag: true, app: true }),
       );
     });
   });
