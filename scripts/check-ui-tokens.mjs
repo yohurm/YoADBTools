@@ -21,6 +21,8 @@ const MOTION_RE = /(?:transition|animation)\s*:[^;]*\b\d+(?:\.\d+)?(?:ms|s)\b/;
 const RADIUS_DECL_RE = /border-radius\s*:\s*([^;]+)/;
 /** 行高必须走 --yohu-font-leading-*。`line-height: 1` 会裁切中文底部（雅黑 ink 超出 em）。 */
 const LINE_HEIGHT_DECL_RE = /line-height\s*:\s*([^;]+)/;
+/** 行盒高度可作 line-height：输入写入盒、日志 Document 行（洗色铺满 --yohu-row-height）。 */
+const LINE_HEIGHT_BOX_VARS = new Set(["var(--yohu-text-field-line)", "var(--yohu-row-height)"]);
 /** 关键帧只允许动效层 CSS（tokens 桶或 motion/engines|recipes）。 */
 const KEYFRAMES_RE = /@keyframes\s+/;
 const KEYFRAMES_ALLOW_PREFIX = "packages/ui/src/motion/";
@@ -113,7 +115,7 @@ for (const file of files) {
         leading &&
         leading[1].trim() !== "inherit" &&
         !/^var\(--yohu-font-leading-/.test(leading[1].trim()) &&
-        leading[1].trim() !== "var(--yohu-text-field-line)"
+        !LINE_HEIGHT_BOX_VARS.has(leading[1].trim())
       ) {
         violations.push(
           `${rel}:${i + 1}: 硬编码行高 → ${line.trim()}（须用 var(--yohu-font-leading-*)；禁止 1，会裁切中文底部）`,
