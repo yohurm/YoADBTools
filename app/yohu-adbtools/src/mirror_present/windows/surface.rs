@@ -19,9 +19,7 @@ use super::gpu::Gpu;
 use super::host::{self, Host};
 use super::slot::PictureBank;
 use super::window;
-use crate::limits::{
-    PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP,
-};
+use crate::limits::{PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP};
 use crate::mirror_present::backend::Cmd;
 
 pub fn spawn_surface(
@@ -179,9 +177,9 @@ fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) -> Option<super::slot:
             None
         }
         Cmd::Screenshot { path, reply } => {
-            let result = crate::mirror_present::screenshot_host_reply(Some(
-                host::screenshot_hwnd(hwnd, &path),
-            ));
+            let result = crate::mirror_present::screenshot_host_reply(Some(host::screenshot_hwnd(
+                hwnd, &path,
+            )));
             let _ = reply.send(result);
             None
         }
@@ -236,7 +234,9 @@ fn tick_picture(hwnd: HWND, pictures: &PictureBank, last_seq: &mut u64) {
     if !matched {
         return;
     }
-    host::with_host(hwnd, |h| h.adopt_encoded_size(frame.content_w, frame.content_h));
+    host::with_host(hwnd, |h| {
+        h.adopt_encoded_size(frame.content_w, frame.content_h)
+    });
     if host::present_picture(
         hwnd,
         frame.content_w,

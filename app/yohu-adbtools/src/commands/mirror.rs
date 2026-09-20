@@ -5,8 +5,8 @@ use tauri::State;
 use crate::commands::{ipc_mirror, ipc_present};
 use crate::state::AppState;
 use yohu_protocol::{
-    IpcError, MirrorInjectRequest, MirrorLayout, MirrorPointer, MirrorScreenshotRequest, MirrorStart,
-    MirrorStartRequest,
+    IpcError, MirrorInjectRequest, MirrorLayout, MirrorPointer, MirrorScreenshotRequest,
+    MirrorStart, MirrorStartRequest,
 };
 
 #[tauri::command(rename = "mirror.start")]

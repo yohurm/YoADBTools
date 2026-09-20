@@ -179,7 +179,9 @@ fn compile(src: &str, vs: bool) -> WinResult<windows::Win32::Graphics::Direct3D:
 }
 
 fn blob_bytes(blob: &windows::Win32::Graphics::Direct3D::ID3DBlob) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(blob.GetBufferPointer() as *const u8, blob.GetBufferSize()) }
+    unsafe {
+        std::slice::from_raw_parts(blob.GetBufferPointer() as *const u8, blob.GetBufferSize())
+    }
 }
 
 fn sampler(device: &ID3D11Device, point: bool) -> WinResult<ID3D11SamplerState> {
