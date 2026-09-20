@@ -18,17 +18,9 @@ export {
   combineOutput,
   commandBody,
   fillTemplate,
-  insertPlaceholder,
-  nextPlaceholderIndex,
   paramDescription,
-  placeholderArity,
   placeholderSlots,
-  placeholderTokens,
-  previewFill,
-  splitCommandLine,
-  stepParamSlots,
   toExecLine,
-  type PlaceholderToken,
   type StepParamSlot,
 } from "@yohu/api";
 

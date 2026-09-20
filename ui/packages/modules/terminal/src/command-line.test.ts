@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toExecLine as apiToExecLine } from "@yohu/api";
+import { stepParamSlots, toExecLine as apiToExecLine } from "@yohu/api";
 
 import {
   adbDisplayPrefix,
@@ -21,7 +21,6 @@ import {
   paramDescription,
   setParamDescription,
   stepParamLabel,
-  stepParamSlots,
   toExecLine,
 } from "./command-line";
 

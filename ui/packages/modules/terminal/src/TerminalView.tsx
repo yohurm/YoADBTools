@@ -4,7 +4,7 @@
 
 import { Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
 
-import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, YoScroller } from "@yohu/ui";
+import { YoBadge, YoButton, YoChrome, YoPage, YoPanel } from "@yohu/ui";
 import type { DeviceSession, LibraryEntryDto } from "@yohu/api";
 import { ModuleTitle } from "@yohu/api";
 

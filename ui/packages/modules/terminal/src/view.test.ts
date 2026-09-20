@@ -105,7 +105,6 @@ describe("命令终端动效接线", () => {
     expect(load("ResultStream.tsx")).toContain("scrollToEnd");
     expect(load("ResultStream.tsx")).not.toMatch(/\.\s*scrollHeight/);
     expect(load("LibraryPane.tsx")).toContain("YoScroller");
-    expect(load("TerminalView.tsx")).toContain("YoScroller");
     expect(load("TerminalView.tsx")).toContain('overflow="hidden"');
     expect(load("manager/EditorColumn.tsx")).toContain("YoScroller");
     expect(load("manager/EditorColumn.tsx")).toContain("YoEmptyState");
@@ -342,6 +341,7 @@ describe("命令终端动效接线", () => {
 
   it("发送/组编排在 store，View 不双轨、不写死 Comfortable", () => {
     expect(load("CommandTree.tsx")).not.toContain("enqueueGroup");
+    expect(load("store.ts")).not.toContain("enqueueGroup");
     expect(load("CommandTree.tsx")).toContain("if (isGroup(node.data)) return;");
     expect(load("TerminalView.tsx")).toContain("cancelGroup");
     expect(load("TerminalView.tsx")).not.toContain("fillTemplate");
