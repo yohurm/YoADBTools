@@ -47,14 +47,14 @@ L5 `index.ts` 只转发 `Yo*` 与模块契约：`setColWidth` / `colTrackTemplat
 列拖拽不是 `YoTable`。清单体仍是 `YoVirtualList`。公共层：
 
 1. `col-model`：`YoColSpec` / clamp / `colTrackTemplate`
-2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单溢出让出侧轨时表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）。文件清单才走列架。日志是 Family A 文档（官方 Format `width()` 写入 Document.text），禁止再为对齐标题把 `Spacing.Md` 写进文档，禁止再给日志挂表头。
+2. `YoColFrame`：只写一次 `--yohu-col-tracks` 与 `--yohu-col-cell-pad`；清单溢出让出侧轨时表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。默认 `cellPad=list`（左 md / 右 sm）、`tone=list`。文件清单走列架行（`YoColTrack` / `YoColCell`）。日志是 Family A 文档：`tone=document` 等宽 caption + `cellPad=none` + `YoColHeader pad=none`；轨道是 `charsTrack` / `logDocTrackTemplate(chPx)` 的探针 px，禁止 CSS `ch` 冒充文档格。拖宽 `px→ch` 回写 `FormatOptions.colChars`。禁止再为对齐标题把 `Spacing.Md` 写进文档，禁止把行收成格子。PID+TID 开时文档仍是一段 ProcessThread，表头拆成两格。级别列 `split` 出 mark 列缝，消息列无缝。
 3. `YoColRow` / `YoColHeader` / `YoColResizer`：表头行
 4. `YoColTrack` / `YoColCell`：Family B 清单行（`span` 通栏，不改 template）
 5. `YoVirtualList`：只虚拟化。行盒是 `list-row/`（`YoListRow`），投放框是 `list-frame/`（`YoListFrame`）。`tone` 默认 `document`（不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。投放命中走 `hotKey`，禁止模块再挂 `--drop` / `focus-ring`。命令管理中栏只借这条 hairline 画条目名之间的分割线，不是文件表。禁止默认画线再让日志去关。开启选择（`selectedKey` / `selectedKeys`）后宿主 `role=listbox`，`user-select: none`，禁止模块再自挂 `ul` 选区。禁止再为连续选中另画项间线。Family A 文档选区带是 L2 `docSelBandStyle` + L4 `.yohu-doc-sel`（`--yohu-doc-sel`），VL 入口引入 `doc-sel.css`；禁止 VL 再写 `*::selection` 铺色。`onReorder` 开启整行按住拖动换位：过 `Spacing.Sm` 臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 `from`/`to`。变高非虚拟列表走 `YoReorderList`（同一套 L2 行盒几何 + binder）。禁止模块再写第二套换位几何或常驻手柄。
 
-`col-resize` 从 `startX` 重算绝对宽，禁止每帧累加 `dx`。模块只存 `colWidths` 并 `setColWidth(key, px)`，禁止再写 `grid-template-columns` 或第二份列垫。文件清单走 `YoColTrack` / `YoColCell` + `YoColRow` / `YoColHeader`。日志不走列架表头：行是 Document.text，不是格子。Tag 最大宽是官方 `TagFormat.maxLength` 常数（23），不经 store 拖宽。文件列拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。
+`col-resize` 从 `startX` 重算绝对宽，禁止每帧累加 `dx`。文件清单只存 `colWidths` 并 `setColWidth(key, px)`，禁止再写 `grid-template-columns` 或第二份列垫。文件清单走 `YoColTrack` / `YoColCell` + `YoColRow` / `YoColHeader`。日志表头走同一套 `YoColHeader` / `YoColResizer`，轨道是 Format ch × 探针 px（`charsTrack`，不是 CSS `ch`，也不是 `colTrackTemplate` 的文件列宽）；行是 Document.text，不是格子。拖宽只加不减官方 `width()` 下限；级别与消息不可拖，级别用 `split` mark 列缝。Tag 默认仍是官方 `TagFormat.maxLength` 常数（23），加宽只活在会话 `colChars`，不进设置。文件列拖时 `html[data-yohu-col-resizing]` 锁 `col-resize` 并禁选区。双击 `onFit` 只留钩子，YoUI 不测单元格。
 
-`YoColHeader` 标题默认靠左（HarmonyOS PC / Finder 列表）。缺省 `align=start` / `ariaSort=none` 在 L2 `col-header-model`。列垫 `--yohu-col-cell-pad: 0 space-sm 0 space-md` 由 Frame 写入；表头 `--yohu-col-header-content-pad` 继承它。`pad="none"` 写 `data-pad` 并清列垫。`align` 只覆盖 center/end。库一律包 `__label`（无 `onSort` 的标题也有垫与对齐）。有 `onSort` 时库内渲染 `.yohu-interactive` + `__label` + chevron（`Icon` 单源）。排序字色走宿主 `aria-sort`（`ascending` / `descending` = `--yohu-fg` + semibold），CSS 留在库里。模块只传标题 / `onSort`；`__label` 不是模块 class，禁止再点 `.yohu-col-header` / `__label` 或自绘第二套排序钮。禁止给表头包 `YoTooltip`。`ColResizePhase` 在 L2 `col-model`，供 `onWidthChange` 回调使用，不进公开入口。`YoColResizer` 对照 AG Grid Quartz resize handle：热区透明，可见铬是居中短柄（宽 `--yohu-stroke-accent`、高 30%、空闲 `--yohu-border`）；悬停加长并改 accent；拖中铺满表头高。禁止把命中区整块涂 accent，禁止表头再画 `::after` 列分割线。
+`YoColHeader` 标题默认靠左（HarmonyOS PC / Finder 列表）。缺省 `align=start` / `ariaSort=none` / `tone=list` 在 L2 `col-header-model`。列垫 `--yohu-col-cell-pad: 0 space-sm 0 space-md` 由 Frame 写入；表头 `--yohu-col-header-content-pad` 继承它。`pad="none"` 写 `data-pad` 并清列垫。`tone=document` 字随列轨（等宽 caption）。`split` 出 `YoColResizer mark` 列缝，不拖、不进 Tab。`align` 只覆盖 center/end。库一律包 `__label`（无 `onSort` 的标题也有垫与对齐）。有 `onSort` 时库内渲染 `.yohu-interactive` + `__label` + chevron（`Icon` 单源）。排序字色走宿主 `aria-sort`（`ascending` / `descending` = `--yohu-fg` + semibold），CSS 留在库里。模块只传标题 / `onSort`；`__label` 不是模块 class，禁止再点 `.yohu-col-header` / `__label` 或自绘第二套排序钮。禁止给表头包 `YoTooltip`。`ColResizePhase` 在 L2 `col-model`，供 `onWidthChange` 回调使用，不进公开入口。`YoColResizer` 对照 AG Grid Quartz resize handle：热区透明，可见铬是居中短柄（宽 `--yohu-stroke-accent`、高 30%、空闲 `--yohu-border`）；悬停加长并改 accent；拖中铺满表头高。禁止把命中区整块涂 accent，禁止表头再画 `::after` 列分割线。
 
 ---
 
@@ -732,21 +732,26 @@ data / expandedKeys
 // 模块契约
 setColWidth(widths, spec, px): YoColWidths
 colTrackTemplate(specs, widths): string
+charsTrack(chars, chPx): string   // Format ch → 探针 px
 defaultColWidths(specs): YoColWidths
 
 // YoColFrame
 template: string
-cellPad?: "list" | "none"   // 默认 list
+cellPad?: "list" | "none"     // 默认 list
+tone?: "list" | "document"    // 默认 list
 
 // YoColHeader
 align?: "start" | "end" | "center"
+tone?: "list" | "document"
+pad?: "list" | "none"
+split?: boolean               // mark 列缝
 ariaSort?: "ascending" | "descending" | "none"
 onSort?: () => void
 children                     // 标题文案；库包 __label
 onWidthChange?: (width, phase) // phase 类型在 col-model，不从包入口再导出
 ```
 
-无 `cellPad` = `list`（左 md / 右 sm）。日志文档不收表头列垫；文件清单走 `YoColTrack` / `YoColCell`；日志行是文档不是格子。
+无 `cellPad` = `list`（左 md / 右 sm）。日志表头 `tone=document` + `cellPad=none` + `pad=none`，轨道探针 px，不把列垫写进 Document；文件清单走 `YoColTrack` / `YoColCell`；日志行是文档不是格子。
 
 ### 不做
 
