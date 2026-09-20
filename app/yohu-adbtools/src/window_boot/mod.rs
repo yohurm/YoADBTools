@@ -3,6 +3,7 @@
 //! 文档是浏览器错误页时走失败出口，禁止超时双轨冒充成功。
 
 mod colors;
+#[cfg(windows)]
 mod placement;
 
 use std::sync::OnceLock;

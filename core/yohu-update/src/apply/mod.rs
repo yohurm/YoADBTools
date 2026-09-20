@@ -4,9 +4,12 @@
 //! 助手脱离作业对象；不加 `/R`，由助手校验主程序后再拉起。
 
 mod plan;
+#[cfg(windows)]
 mod script;
 
-pub use plan::{installed_exe_path, ApplyPlan, NSIS_OVERLAY_ARGS};
+pub use plan::installed_exe_path;
+#[cfg(windows)]
+use plan::ApplyPlan;
 
 use std::path::Path;
 use std::process::Stdio;

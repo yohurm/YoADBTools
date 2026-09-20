@@ -67,32 +67,32 @@ pub fn canonicalize_datetime_seconds(raw: &str) -> Option<String> {
 }
 
 /// 按显示形状投影墙钟部件。
-pub fn format_clock(
-    year: u32,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-    millis: u32,
-    format: TerminalTimeFormat,
-) -> Option<String> {
+fn format_clock(p: &Parts, format: TerminalTimeFormat) -> Option<String> {
     match format {
         TerminalTimeFormat::TimeMillis => {
-            valid_parts(year, month, day, hour, minute, second, millis)?;
+            valid_parts(p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis)?;
             Some(format!(
-                "{hour:02}:{minute:02}:{second:02}.{millis:03}"
+                "{hour:02}:{minute:02}:{second:02}.{millis:03}",
+                hour = p.hour,
+                minute = p.minute,
+                second = p.second,
+                millis = p.millis
             ))
         }
         TerminalTimeFormat::Time => {
-            valid_parts(year, month, day, hour, minute, second, 0)?;
-            Some(format!("{hour:02}:{minute:02}:{second:02}"))
+            valid_parts(p.year, p.month, p.day, p.hour, p.minute, p.second, 0)?;
+            Some(format!(
+                "{hour:02}:{minute:02}:{second:02}",
+                hour = p.hour,
+                minute = p.minute,
+                second = p.second
+            ))
         }
         TerminalTimeFormat::DatetimeMillis => {
-            format_datetime(year, month, day, hour, minute, second, millis)
+            format_datetime(p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis)
         }
         TerminalTimeFormat::Datetime => {
-            format_datetime_seconds(year, month, day, hour, minute, second)
+            format_datetime_seconds(p.year, p.month, p.day, p.hour, p.minute, p.second)
         }
     }
 }
@@ -111,10 +111,7 @@ pub fn format_log_ts(ts: &str, format: TerminalTimeFormat) -> String {
     let Some(p) = parse_parts(ts) else {
         return String::new();
     };
-    format_clock(
-        p.year, p.month, p.day, p.hour, p.minute, p.second, p.millis, format,
-    )
-    .unwrap_or_default()
+    format_clock(&p, format).unwrap_or_default()
 }
 
 fn valid_parts(
@@ -262,6 +259,20 @@ mod tests {
         datetime: String,
     }
 
+    impl ProjectionCase {
+        fn parts(&self) -> Parts {
+            Parts {
+                year: self.year,
+                month: self.month,
+                day: self.day,
+                hour: self.hour,
+                minute: self.minute,
+                second: self.second,
+                millis: self.millis,
+            }
+        }
+    }
+
     #[derive(serde::Deserialize)]
     struct CanonCase {
         input: String,
@@ -324,63 +335,24 @@ mod tests {
             }
         }
         for (i, case) in fixture.projection.iter().enumerate() {
+            let p = case.parts();
             assert_eq!(
-                format_clock(
-                    case.year,
-                    case.month,
-                    case.day,
-                    case.hour,
-                    case.minute,
-                    case.second,
-                    case.millis,
-                    TerminalTimeFormat::TimeMillis
-                )
-                .as_deref(),
+                format_clock(&p, TerminalTimeFormat::TimeMillis).as_deref(),
                 Some(case.time_millis.as_str()),
                 "time_millis {i}"
             );
             assert_eq!(
-                format_clock(
-                    case.year,
-                    case.month,
-                    case.day,
-                    case.hour,
-                    case.minute,
-                    case.second,
-                    case.millis,
-                    TerminalTimeFormat::Time
-                )
-                .as_deref(),
+                format_clock(&p, TerminalTimeFormat::Time).as_deref(),
                 Some(case.time.as_str()),
                 "time {i}"
             );
             assert_eq!(
-                format_clock(
-                    case.year,
-                    case.month,
-                    case.day,
-                    case.hour,
-                    case.minute,
-                    case.second,
-                    case.millis,
-                    TerminalTimeFormat::DatetimeMillis
-                )
-                .as_deref(),
+                format_clock(&p, TerminalTimeFormat::DatetimeMillis).as_deref(),
                 Some(case.datetime_millis.as_str()),
                 "datetime_millis {i}"
             );
             assert_eq!(
-                format_clock(
-                    case.year,
-                    case.month,
-                    case.day,
-                    case.hour,
-                    case.minute,
-                    case.second,
-                    case.millis,
-                    TerminalTimeFormat::Datetime
-                )
-                .as_deref(),
+                format_clock(&p, TerminalTimeFormat::Datetime).as_deref(),
                 Some(case.datetime.as_str()),
                 "datetime {i}"
             );
@@ -393,7 +365,19 @@ mod tests {
                 TIME_MILLIS_DISPLAY_LEN
             );
         }
-        assert!(format_clock(2026, 13, 1, 0, 0, 0, 0, TerminalTimeFormat::TimeMillis).is_none());
+        assert!(format_clock(
+            &Parts {
+                year: 2026,
+                month: 13,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                millis: 0,
+            },
+            TerminalTimeFormat::TimeMillis
+        )
+        .is_none());
         assert!(format_log_ts("raw", TerminalTimeFormat::Time).is_empty());
     }
 }

@@ -27,12 +27,17 @@ pub fn apply_default_kernel(layer: &CALayer) {
 pub fn apply_layer_kernel(layer: &CALayer, src_w: u32, src_h: u32, dest: Letterbox) {
     match scale_kernel(src_w, src_h, dest) {
         ScaleKernel::Nearest => {
-            layer.setMinificationFilter(kCAFilterNearest);
-            layer.setMagnificationFilter(kCAFilterNearest);
+            // CA 滤镜名是 CFString 外部静态，读必须在 unsafe 里。
+            unsafe {
+                layer.setMinificationFilter(kCAFilterNearest);
+                layer.setMagnificationFilter(kCAFilterNearest);
+            }
         }
         ScaleKernel::Area => {
-            layer.setMinificationFilter(kCAFilterLinear);
-            layer.setMagnificationFilter(kCAFilterNearest);
+            unsafe {
+                layer.setMinificationFilter(kCAFilterLinear);
+                layer.setMagnificationFilter(kCAFilterNearest);
+            }
         }
     }
 }
