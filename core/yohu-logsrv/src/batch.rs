@@ -45,8 +45,8 @@ impl Batcher {
     }
 
     /// 送入一条 logd 记录（异步背压：聚合环消费快于生产，正常不阻塞）。
-    pub(crate) async fn feed(&self, line: LogLine) -> Result<(), mpsc::error::SendError<LogLine>> {
-        self.line_tx.send(line).await
+    pub(crate) async fn feed(&self, line: LogLine) -> Result<(), ()> {
+        self.line_tx.send(line).await.map_err(|_| ())
     }
 }
 
