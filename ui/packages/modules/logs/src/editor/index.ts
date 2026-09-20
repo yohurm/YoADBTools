@@ -1,6 +1,5 @@
 export {
   defaultFormatOptions,
-  defaultLogColWidths,
   formatColumns,
   formatMessage,
   formatOptionsKey,
@@ -13,28 +12,28 @@ export {
   processThreadStyle,
   tagMaxLength,
   timestampWidth,
-  visibleLogColumns,
+  ALL_LOG_DISPLAY_COLUMNS,
+  DEFAULT_LOG_DISPLAY_COLUMNS,
   LOGCAT_TAG_SWATCHES,
   LEVEL_FORMAT_WIDTH,
   PROCESS_BOTH_WIDTH,
   PROCESS_PID_WIDTH,
   APP_FORMAT_WIDTH,
   DEFAULT_CH_PX,
+  TAG_DEFAULT_WIDTH_PX,
   type FormatOptions,
   type FormattedMessage,
   type FormatRange,
 } from "./format";
 export { EMPTY_MESSAGES, EMPTY_ROWS, LogDocument, type DocMessage, type DocRow } from "./document";
 export {
-  EditorView,
   LineBoard,
   clipMessage,
   documentLines,
-  visualBoardChars,
-  visualLineChars,
   wrapMessage,
   type VisualLine,
-} from "./view";
+} from "./board";
+export { EditorView } from "./view";
 export {
   docSelCopyText,
   orderDocSel,

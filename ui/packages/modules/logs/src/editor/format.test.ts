@@ -5,8 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import { formatLogLine, LOG_COLOR_SCHEME_CATALOG, LOG_COLOR_SCHEME_DEFAULT, type LogLine } from "@yohu/api";
 
-import { ALL_LOG_DISPLAY_COLUMNS, DEFAULT_LOG_DISPLAY_COLUMNS } from "../layout";
 import {
+  ALL_LOG_DISPLAY_COLUMNS,
+  DEFAULT_LOG_DISPLAY_COLUMNS,
+  TAG_DEFAULT_MAX,
+  TAG_DEFAULT_WIDTH_PX,
   appNameOf,
   contentColor,
   defaultFormatOptions,
@@ -155,9 +158,9 @@ describe("formatMessage", () => {
     expect(headerWidth(clock)).toBe(13 + 12 + 24 + 36 + 4);
   });
 
-  it("只有 Tag 轨跟拖像素", () => {
-    expect(tagMaxLength(shown)).toBe(23);
-    expect(tagMaxLength({ ...shown, tagWidthPx: shown.tagWidthPx + 8 })).toBe(24);
+  it("Tag 最大宽对照官方 TagFormat.maxLength，不经 store 列宽", () => {
+    expect(shown.tagWidthPx).toBe(TAG_DEFAULT_WIDTH_PX);
+    expect(tagMaxLength(shown)).toBe(TAG_DEFAULT_MAX);
   });
 
   it("PID+TID 合成 BOTH，文档没有单独 TID 段", () => {
@@ -211,6 +214,7 @@ describe("measureChPx 不进 Formatter", () => {
     expect(src).not.toMatch(/function measureChPx/);
     expect(src).not.toContain("document.createElement");
     expect(src).not.toContain("./document");
+    expect(src).not.toContain("./board");
     expect(src).not.toContain("./view");
     expect(src).not.toContain("../layout");
   });

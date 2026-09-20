@@ -1,13 +1,12 @@
 /**
  * Document：对照 AS DocumentAppender。
  * 只尾部追加 / 环裁 / 改选项重载。文本来自官方 Format 分段，本层不垫列、不折行。
- * 长文本 clip / wrap 不进本层，只在 EditorView。
- * 只 import Formatter。
+ * Soft-Wrap 已在 Formatter 写入（关 hang / 开裸 \\n）。本层只存 Document.text。
+ * 格式化只走 Formatter；LogLine / SignalKind 从 @yohu/api 引入。
  */
 
-import type { LogLine } from "@yohu/api";
+import type { LogLine, SignalKind } from "@yohu/api";
 
-import type { SignalKind } from "../signals";
 import {
   formatMessage,
   formatOptionsKey,
@@ -29,7 +28,6 @@ export type DocMessage = {
   seq: number;
   text: string;
   ranges: readonly FormatRange[];
-  headerChars: number;
   bar: ContentBar;
   barInk?: string;
   signal?: SignalKind;
@@ -46,7 +44,6 @@ function paintRow(row: DocRow, options: FormatOptions): DocMessage {
     seq: row.line.seq,
     text: formatted.text,
     ranges: formatted.ranges,
-    headerChars: formatted.headerChars,
     bar: formatted.bar,
     barInk: formatted.barInk,
     signal: row.signal,

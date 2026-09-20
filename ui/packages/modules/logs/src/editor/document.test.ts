@@ -1,10 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { DEFAULT_LOG_DISPLAY_COLUMNS } from "../layout";
 import { LogDocument, type DocRow } from "./document";
-import { defaultFormatOptions } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions } from "./format";
 
 function line(seq: number, over: Partial<LogLine> = {}): LogLine {
   return {
@@ -112,6 +114,22 @@ describe("LogDocument", () => {
     expect(doc.setOptions({ ...options, scheme: "logcat" })).toBe(true);
     expect(doc.messages[0]).not.toBe(first);
     expect(doc.messages[0]?.bar).toBe("none");
+  });
+
+  it("messages 不带 headerChars", () => {
+    const doc = new LogDocument();
+    doc.setOptions(options);
+    doc.reload([row(1)]);
+    expect(doc.messages[0]).not.toHaveProperty("headerChars");
+  });
+
+  it("源文件不存 headerChars，SignalKind 不走 ../signals", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
+    expect(src).not.toContain("headerChars");
+    expect(src).toContain("formatMessage");
+    expect(src).toContain('from "@yohu/api"');
+    expect(src).toContain("SignalKind");
+    expect(src).not.toContain("../signals");
   });
 
   it("10k adopt 同引用", () => {

@@ -1,24 +1,11 @@
 /**
  * 非文档常数：对话框高、行高、measureChPx。
- * Format 尺只在 editor/format。本文件只转口表头规格，禁止再写第二把尺。
+ * Format 尺只在 editor/format。禁止再写第二把尺，禁止转口表头规格。
  */
 
 import { Density, getDensity, type DensityName } from "@yohu/ui";
 
 import { DEFAULT_CH_PX } from "./editor/format";
-
-export {
-  ALL_LOG_DISPLAY_COLUMNS,
-  DEFAULT_LOG_DISPLAY_COLUMNS,
-  LOG_COLUMNS,
-  defaultLogColWidths,
-  headerWidth,
-  logColResizable,
-  visibleLogColumns,
-  type LogColKey,
-  type LogColWidths,
-  type LogColumnSpec,
-} from "./editor/format";
 
 /** 新建窗口：设备行 + 分段 + 检索 + 列表。 */
 export const NEW_SESSION_DIALOG_HEIGHT = 520;

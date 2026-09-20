@@ -2,17 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { Density, setColWidth } from "@yohu/ui";
-import { defaultFormatOptions, headerWidth } from "./editor";
+import { Density } from "@yohu/ui";
 import {
   ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
-  LOG_COLUMNS,
-  dataRowHeight,
-  defaultLogColWidths,
-  logColResizable,
-  visibleLogColumns,
-} from "./layout";
+  defaultFormatOptions,
+  formatColumns,
+  headerWidth,
+} from "./editor";
+import { dataRowHeight } from "./layout";
 
 function loadSrc(name: string): string {
   const candidates = [
@@ -29,8 +27,8 @@ function loadSrc(name: string): string {
 
 const logsCss = loadSrc("logs.css");
 
-describe("日志表头布局契约", () => {
-  it("表头钉在虚拟列表外，不随行滚动", () => {
+describe("日志清单布局契约", () => {
+  it("清单壳自持滚轴，状态行不跟列表滚", () => {
     expect(logsCss).toMatch(/\.yohu-logs__list\s*\{[^}]*display:\s*flex/);
     expect(logsCss).not.toContain("yohu-logs__cols--head");
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
@@ -106,8 +104,9 @@ describe("日志表头布局契约", () => {
 
 describe("日志显示列", () => {
   it("默认 STANDARD：时间/BOTH/Tag/App/级别，headerWidth=100", () => {
-    expect(headerWidth(defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(100);
-    expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
+    const options = defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS);
+    expect(headerWidth(options)).toBe(100);
+    expect(formatColumns(options).map((c) => c.key)).toEqual([
       "ts",
       "pid",
       "tag",
@@ -118,7 +117,8 @@ describe("日志显示列", () => {
   });
 
   it("PID+TID 合成 ProcessThread BOTH，打开 UID 后 header 加 9", () => {
-    expect(visibleLogColumns(ALL_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
+    const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS);
+    expect(formatColumns(options).map((c) => c.key)).toEqual([
       "ts",
       "uid",
       "pid",
@@ -127,52 +127,28 @@ describe("日志显示列", () => {
       "level",
       "msg",
     ]);
-    expect(headerWidth(defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS))).toBe(109);
+    expect(headerWidth(options)).toBe(109);
   });
 
   it("关闭元数据列后消息仍在", () => {
     const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false, app: false };
-    expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
-    expect(headerWidth(defaultFormatOptions(display))).toBe(12 + 4);
+    const options = defaultFormatOptions(display);
+    expect(formatColumns(options).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
+    expect(headerWidth(options)).toBe(12 + 4);
   });
 
   it("全部元数据关闭只剩消息", () => {
     const display = { ts: false, uid: false, pid: false, tid: false, tag: false, app: false, level: false };
-    expect(headerWidth(defaultFormatOptions(display))).toBe(0);
-    expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["msg"]);
+    const options = defaultFormatOptions(display);
+    expect(headerWidth(options)).toBe(0);
+    expect(formatColumns(options).map((c) => c.key)).toEqual(["msg"]);
   });
 
-  it("只有 Tag 可拖；级别 / 时间 / PID 固定官方宽", () => {
-    expect(LOG_COLUMNS.find((col) => col.key === "level")?.minWidth).toBe(32);
-    expect(LOG_COLUMNS.find((col) => col.key === "level")?.resize).toBe(false);
-    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "level")!)).toBe(false);
-    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "pid")!)).toBe(false);
-    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "ts")!)).toBe(false);
-    expect(logColResizable(LOG_COLUMNS.find((col) => col.key === "tag")!)).toBe(true);
+  it("数据行高等于密度 token", () => {
     expect(dataRowHeight()).toBe(Density.Comfortable.rowHeight);
   });
 
-  it("写绝对宽度，不低于 min，消息列不拖", () => {
-    const start = defaultLogColWidths();
-    const tag = LOG_COLUMNS.find((col) => col.key === "tag")!;
-    const pid = LOG_COLUMNS.find((col) => col.key === "pid")!;
-    const msg = LOG_COLUMNS.find((col) => col.key === "msg")!;
-    expect(setColWidth(start, tag, 212).tag).toBe(212);
-    expect(setColWidth(start, pid, 10).pid).toBe(48);
-    expect(setColWidth(start, msg, 200)).toBe(start);
-  });
-
-  it("visibleLogColumns 复用 LOG_COLUMNS 引用，表头 For 拖宽才不重挂", () => {
-    const a = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
-    const b = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
-    expect(a.map((col) => col.key)).toEqual(b.map((col) => col.key));
-    for (const col of a) {
-      expect(col).toBe(LOG_COLUMNS.find((item) => item.key === col.key));
-      expect(col).toBe(b.find((item) => item.key === col.key));
-    }
-  });
-
-  it("表头 For 遍历稳定规格，拖条写字段 px", () => {
+  it("清单无表头：View 不走列架 / 拖宽", () => {
     const load = (name: string): string => {
       const candidates = [
         resolve(process.cwd(), `src/${name}`),
@@ -185,6 +161,7 @@ describe("日志显示列", () => {
     expect(view).not.toContain("logcat.css");
     const filter = load("LogFilterBar.tsx");
     const editorView = load("editor/view.tsx");
+    const editorBoard = load("editor/board.ts");
     const formatter = load("editor/format.ts");
     const documentSrc = load("editor/document.ts");
     expect(view).toContain('overflow="hidden"');
@@ -234,9 +211,16 @@ describe("日志显示列", () => {
     expect(editorView).toContain("selectionchange");
     expect(view).toContain("itemHeight={dataRowHeight()}");
     expect(view).not.toContain("hangChars");
+    expect(editorView).not.toMatch(/\bhang:\s/);
+    expect(load("editor/selection.ts")).not.toContain("hang");
     expect(editorView).not.toContain("wrapBody");
     expect(editorView).not.toContain("VisualBoard");
-    expect(editorView).toContain("clipMessage");
+    expect(editorView).toContain("LineBoard");
+    expect(editorView).not.toContain("clipMessage");
+    expect(editorView).not.toContain("wrapMessage");
+    expect(editorBoard).toContain("clipMessage");
+    expect(editorBoard).toContain("wrapMessage");
+    expect(editorBoard).not.toContain("formatMessage");
     expect(editorView).toContain("data-layout");
     expect(editorView).not.toContain("log_line_layout");
     expect(formatter).not.toContain("log_line_layout");

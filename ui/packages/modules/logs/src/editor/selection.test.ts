@@ -6,7 +6,6 @@ const line = (over: Partial<SelLine> = {}): SelLine => ({
   seq: 2,
   docFrom: 0,
   text: "abcdef",
-  hang: 0,
   ...over,
 });
 
@@ -19,7 +18,7 @@ describe("orderDocSel", () => {
 
 describe("selSlice", () => {
   it("整表 all 铺满本可视行", () => {
-    expect(selSlice(line({ hang: 8 }), "all")).toEqual({ fromCh: 0, chars: 6, hang: 8 });
+    expect(selSlice(line(), "all")).toEqual({ fromCh: 0, chars: 6 });
     expect(selSlice(line({ text: "" }), "all")).toBeNull();
   });
 
@@ -27,16 +26,14 @@ describe("selSlice", () => {
     expect(selSlice(line(), { start: { seq: 2, off: 2 }, end: { seq: 2, off: 5 } })).toEqual({
       fromCh: 2,
       chars: 3,
-      hang: 0,
     });
   });
 
-  it("续行只切本片，hang 原样带走", () => {
-    const wrap: SelLine = { seq: 2, docFrom: 10, text: "world", hang: 26 };
+  it("续行只切本片", () => {
+    const wrap: SelLine = { seq: 2, docFrom: 10, text: "world" };
     expect(selSlice(wrap, { start: { seq: 2, off: 12 }, end: { seq: 2, off: 20 } })).toEqual({
       fromCh: 2,
       chars: 3,
-      hang: 26,
     });
   });
 
@@ -44,17 +41,14 @@ describe("selSlice", () => {
     expect(selSlice(line({ seq: 1, text: "aaaa" }), { start: { seq: 1, off: 2 }, end: { seq: 3, off: 1 } })).toEqual({
       fromCh: 2,
       chars: 2,
-      hang: 0,
     });
     expect(selSlice(line({ seq: 2, text: "bbbb" }), { start: { seq: 1, off: 2 }, end: { seq: 3, off: 1 } })).toEqual({
       fromCh: 0,
       chars: 4,
-      hang: 0,
     });
     expect(selSlice(line({ seq: 3, text: "cccc" }), { start: { seq: 1, off: 2 }, end: { seq: 3, off: 1 } })).toEqual({
       fromCh: 0,
       chars: 1,
-      hang: 0,
     });
     expect(selSlice(line({ seq: 9 }), { start: { seq: 1, off: 0 }, end: { seq: 3, off: 1 } })).toBeNull();
   });

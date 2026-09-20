@@ -5,8 +5,8 @@
 
 export type DocPoint = { seq: number; off: number };
 export type DocSel = { start: DocPoint; end: DocPoint };
-export type SelLine = { seq: number; docFrom: number; text: string; hang: number };
-export type SelBand = { fromCh: number; chars: number; hang: number };
+export type SelLine = { seq: number; docFrom: number; text: string };
+export type SelBand = { fromCh: number; chars: number };
 
 export function orderDocSel(sel: DocSel): DocSel {
   const a = sel.start;
@@ -22,7 +22,7 @@ export function selSlice(line: SelLine, sel: DocSel | "all"): SelBand | null {
     if (line.text.length === 0) {
       return null;
     }
-    return { fromCh: 0, chars: line.text.length, hang: line.hang };
+    return { fromCh: 0, chars: line.text.length };
   }
   const { start, end } = orderDocSel(sel);
   if (line.seq < start.seq || line.seq > end.seq) {
@@ -37,7 +37,7 @@ export function selSlice(line: SelLine, sel: DocSel | "all"): SelBand | null {
   if (to <= from) {
     return null;
   }
-  return { fromCh: from - line.docFrom, chars: to - from, hang: line.hang };
+  return { fromCh: from - line.docFrom, chars: to - from };
 }
 
 function isChrome(node: Node): boolean {

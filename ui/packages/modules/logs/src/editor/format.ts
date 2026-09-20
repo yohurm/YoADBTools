@@ -3,7 +3,7 @@
  * 顺序：Timestamp → Uid（扩展）→ ProcessThread → Tag → AppName → Level → message。
  * Soft-Wrap 关：msg 里的 \\n 换成 \\n + headerWidth 空格，写入文档。
  * Soft-Wrap 开：裸 \\n，续行第 0 列。
- * 禁止表格 1fr、禁止 CSS hang、禁止 import Document / View / store。
+ * 禁止表格 1fr、禁止 CSS hang、禁止 import Document / Board / View / store。
  */
 
 import {
@@ -19,7 +19,6 @@ import {
   type LogLine,
   type TerminalTimeFormat,
 } from "@yohu/api";
-import { defaultColWidths } from "@yohu/ui";
 
 export const DEFAULT_CH_PX = 8;
 
@@ -46,20 +45,12 @@ export const UID_FORMAT_WIDTH = UID_BODY_CHARS + 1;
 
 export type LogMetaColKey = keyof LogDisplayColumns;
 export type LogColKey = LogMetaColKey | "msg";
-export type LogColWidths = Record<LogColKey, number>;
 export type LogFieldKind = LogColKey;
 export type ProcessThreadStyle = "off" | "pid" | "tid" | "both";
 export type AppNameMap = Readonly<Record<number, string>>;
 
-export interface LogColumnSpec {
-  key: LogColKey;
-  header: string;
-  resizeLabel: string;
-  defaultWidth: number;
-  minWidth: number;
-  flex: boolean;
-  resize?: boolean;
-}
+/** 官方 TagFormat.maxLength 对应的默认像素：maxLength+1 个 ch。 */
+export const TAG_DEFAULT_WIDTH_PX = (TAG_DEFAULT_MAX + 1) * DEFAULT_CH_PX;
 
 export const DEFAULT_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
   ...APP_SETTINGS_DEFAULT.log_display_columns,
@@ -74,91 +65,6 @@ export const ALL_LOG_DISPLAY_COLUMNS: LogDisplayColumns = {
   app: true,
   level: true,
 };
-
-const LOG_TAG_DEFAULT_CHARS = TAG_DEFAULT_MAX + 1;
-const LOG_MSG_DEFAULT_CHARS = 12;
-const LOG_MSG_MIN_CHARS = 10;
-
-function fieldPx(chars: number): number {
-  return chars * DEFAULT_CH_PX;
-}
-
-export const LOG_COLUMNS: readonly LogColumnSpec[] = [
-  {
-    key: "ts",
-    header: "时间",
-    resizeLabel: "调节时间列宽",
-    defaultWidth: fieldPx(timestampWidth(APP_SETTINGS_DEFAULT.log_time_format)),
-    minWidth: fieldPx(timestampWidth("time")),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "uid",
-    header: "UID",
-    resizeLabel: "调节 UID 列宽",
-    defaultWidth: fieldPx(UID_FORMAT_WIDTH),
-    minWidth: fieldPx(UID_FORMAT_WIDTH),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "pid",
-    header: "PID",
-    resizeLabel: "调节 PID 列宽",
-    defaultWidth: fieldPx(PROCESS_PID_WIDTH),
-    minWidth: fieldPx(PROCESS_PID_WIDTH),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "tid",
-    header: "TID",
-    resizeLabel: "调节 TID 列宽",
-    defaultWidth: fieldPx(PROCESS_PID_WIDTH),
-    minWidth: fieldPx(PROCESS_PID_WIDTH),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "tag",
-    header: "Tag",
-    resizeLabel: "调节 Tag 列宽",
-    defaultWidth: fieldPx(LOG_TAG_DEFAULT_CHARS),
-    minWidth: fieldPx(TAG_MIN_LENGTH + 1),
-    flex: false,
-  },
-  {
-    key: "app",
-    header: "应用",
-    resizeLabel: "调节应用列宽",
-    defaultWidth: fieldPx(APP_FORMAT_WIDTH),
-    minWidth: fieldPx(APP_MIN_LENGTH + 1),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "level",
-    header: "级别",
-    resizeLabel: "调节级别列宽",
-    defaultWidth: fieldPx(LEVEL_FORMAT_WIDTH),
-    minWidth: fieldPx(LEVEL_FORMAT_WIDTH),
-    flex: false,
-    resize: false,
-  },
-  {
-    key: "msg",
-    header: "消息",
-    resizeLabel: "调节消息列宽",
-    defaultWidth: fieldPx(LOG_MSG_DEFAULT_CHARS),
-    minWidth: fieldPx(LOG_MSG_MIN_CHARS),
-    flex: true,
-  },
-];
-
-export function defaultLogColWidths(): LogColWidths {
-  return defaultColWidths(LOG_COLUMNS) as LogColWidths;
-}
 
 export function processThreadStyle(display: LogDisplayColumns): ProcessThreadStyle {
   if (display.pid && display.tid) {
@@ -181,25 +87,6 @@ export function processThreadWidth(style: ProcessThreadStyle): number {
     return PROCESS_PID_WIDTH;
   }
   return 0;
-}
-
-export function visibleLogColumns(display: LogDisplayColumns): LogColumnSpec[] {
-  return LOG_COLUMNS.filter((col) => {
-    if (col.key === "msg") {
-      return true;
-    }
-    if (col.key === "tid") {
-      return display.tid && !display.pid;
-    }
-    if (col.key === "pid") {
-      return display.pid;
-    }
-    return display[col.key];
-  });
-}
-
-export function logColResizable(col: LogColumnSpec): boolean {
-  return col.key === "tag";
 }
 
 export type TokenTone = "plain" | "ink" | "wash";
@@ -245,7 +132,6 @@ export type FormattedMessage = {
 
 export type FormatColumn = {
   key: LogColKey;
-  header: string;
   width: number | null;
 };
 
@@ -357,7 +243,7 @@ export function contentColor(id: string | undefined): ColorEngine {
 export function defaultFormatOptions(display: LogDisplayColumns, scheme?: string): FormatOptions {
   return {
     display,
-    tagWidthPx: defaultLogColWidths().tag,
+    tagWidthPx: TAG_DEFAULT_WIDTH_PX,
     timeFormat: APP_SETTINGS_DEFAULT.log_time_format,
     scheme,
     softWrap: false,
@@ -393,31 +279,34 @@ export function tagFormatWidth(options: FormatOptions): number {
   return tagMaxLength(options) + 1;
 }
 
-function segmentWidth(key: LogMetaColKey, options: FormatOptions): number {
-  switch (key) {
-    case "ts":
-      return timestampWidth(options.timeFormat);
-    case "uid":
-      return UID_FORMAT_WIDTH;
-    case "pid":
-    case "tid":
-      return processThreadWidth(processThreadStyle(options.display)) || PROCESS_PID_WIDTH;
-    case "tag":
-      return tagFormatWidth(options);
-    case "app":
-      return APP_FORMAT_WIDTH;
-    case "level":
-      return LEVEL_FORMAT_WIDTH;
-  }
-}
-
+/** 按 LogDisplayColumns 列出 Format 字段；PID+TID 合成一条 ProcessThread。 */
 export function formatColumns(options: FormatOptions): FormatColumn[] {
-  return visibleLogColumns(options.display).map((col) => {
-    if (col.key === "msg") {
-      return { key: "msg", header: col.header, width: null };
-    }
-    return { key: col.key, header: col.header, width: segmentWidth(col.key, options) };
-  });
+  const display = options.display;
+  const cols: FormatColumn[] = [];
+  if (display.ts) {
+    cols.push({ key: "ts", width: timestampWidth(options.timeFormat) });
+  }
+  if (display.uid) {
+    cols.push({ key: "uid", width: UID_FORMAT_WIDTH });
+  }
+  const process = processThreadStyle(display);
+  if (process !== "off") {
+    cols.push({
+      key: process === "tid" ? "tid" : "pid",
+      width: processThreadWidth(process),
+    });
+  }
+  if (display.tag) {
+    cols.push({ key: "tag", width: tagFormatWidth(options) });
+  }
+  if (display.app) {
+    cols.push({ key: "app", width: APP_FORMAT_WIDTH });
+  }
+  if (display.level) {
+    cols.push({ key: "level", width: LEVEL_FORMAT_WIDTH });
+  }
+  cols.push({ key: "msg", width: null });
+  return cols;
 }
 
 /** 对照 FormattingOptions.getHeaderWidth()。不含消息。 */

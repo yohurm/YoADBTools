@@ -79,7 +79,7 @@ cargo clippy --all-targets -- -D warnings
 # 前端：依赖 / 类型检查 / 测试 / 构建
 pnpm install
 pnpm -C ui typecheck
-pnpm -C ui test          # Vitest（过滤管道/信号扫描/组件）
+pnpm -C ui test          # Vitest（消费端过滤 filter/stack/panel / 信号扫描 / 组件）
 pnpm -C ui build
 
 # 开发运行（WebView2 + dev server）
@@ -104,15 +104,15 @@ cargo tauri build
 - **S1 骨架已落地**：Cargo workspace + Tauri 壳（`app/yohu-adbtools`，含 `log.capture.status`）+ YoUI + `@yohu/api` + `@yohu/workbench` + sidecar adb
 - **S2 终端模块已落地**：命令库（默认库 3 组 9 命令，首次启动写入）/ 命令组 / 多设备并行 / 组内串行（无延时、不因失败中断）/ 命令管理窗口（快照编辑、全量提交、取消零污染）/ 占位符填值对话框 / 统一输入输出行（`>>>` / `<<<` + 时间 + 内容）/ 可收缩发送栏与排队发送；GroupProgress 回流为 IO 行
 - **S3 文件模块已落地**：设备目录浏览（YoVirtualList 虚拟化）/ 上传（tauri-plugin-dialog 选文件）/ 下载（save 对话框）/ 删除（确认框 + core 侧 SafetyRoot）/ 新建目录 / 传输面板（进度条/取消/状态徽章）
-- **S4 日志模块已落地**：多窗口 Tab（默认 System；按包名/PID 再开，每窗口绑定设备）/ 每设备一路 logcat + 窗口引用计数启停 / 切焦点不停其他设备 / AS 风格过滤栏（级别独立精确筛选/Tag 逗号多选 OR/关键字，无正则）/ 进程索引重绑（历史 PID 集上限 8）/ 信号扫描（崩溃/ANR 徽章）/ 堆叠折叠 / 溢出回补（log.replay）/ 导出 / 快捷键（Space/Ctrl+L/F/T/W/Tab）/ 批量 IPC 消费端过滤（pipeline.ts 纯函数 + 14 单测）
+- **S4 日志模块已落地**：多窗口 Tab（默认 System；按包名/PID 再开，每窗口绑定设备）/ 每设备一路 `logcat -v long,uid,year` + 组装为 logd 记录 / 窗口引用计数启停 / 切焦点不停其他设备 / AS 风格过滤栏（级别独立精确筛选/Tag 逗号多选 OR/关键字，无正则）/ 进程索引重绑（历史 PID 集上限 8）/ 信号扫描（崩溃/ANR 徽章）/ 堆叠折叠 / 溢出回补（log.replay）/ 导出 / 快捷键（Space/Ctrl+L/F/T/W/Tab）/ 消费端过滤在 `filter.ts` + `stack.ts` + `panel.ts`
 - **体积优化**：release profile 启用 lto + codegen-units=1 + strip + panic=abort → exe 6.4 MB
 - **NSIS 安装包已打通**：`cargo tauri build` 产出安装包（含 sidecar adb 内嵌 + WebView2 embedBootstrapper 引导）；原生 tauri-cli（cargo install）；tauri.conf 路径约定（frontendDist 相对 config 目录、beforeX 命令 cwd=app/）；NSIS 工具链离线缓存方案（winget NSIS → `%LOCALAPPDATA%\tauri\nsis-3.11`）；scripts/build-release.ps1 全流程封装
 - **fake-adb 集成测试已落地**：tools/fake-adb（脚本化假 adb，零共享状态：测试拷贝 exe + 同名 json 到独立临时目录）；yohu-logsrv 集成测试含 adopt / stop 期间 start 等世代；期间修复两个真实缺陷：run_capture 关闭通道忙循环（饿死 stderr 读任务）与 Batcher 生产端结束丢尾部批次（现冲刷 flush）
 - **真机测试已落地**（motorola edge 60 pro，自动跳过无设备环境）：yohu-adb 6 用例（扫描/型号/进程/组命令端到端）、yohu-logsrv 4 用例（采集 1000 行/导出/清缓冲/导出过滤）、yohu-files 3 用例（浏览/push-pull/传输中途取消）；yohu-adb 另含 3 用例自愈式扫描（fallback.rs）
 - **Phase A/B UI 打磨已落地**：三层 token + 双主题语义板 + 密度变量 + 级别板 + 动效 token（HarmonyOS 100/160/300/350ms + 标准/减速曲线，motion.ts ↔ theme.css 契约测试，lint 扩展动效时长纪律）；YoDialog/YoSelect/YoTabs/YoTree 键盘/ARIA 补全；YoVirtualList 选择模式（roving tabindex + ↑/↓/Home/End/Enter/Space + listbox/option 语义）；Dialog/Toast 入场动画（prefers-reduced-motion 降级）
 - **Phase C 壳重绘已落地**：设备卡片化（surface 卡片 + 选中 accent-soft 底 + 2px accent 左边条 + listbox/option 键盘选择）；导航键盘可达（aria-current + Enter/Space）；状态栏任务悬停明细（TaskInfo.detail，core 任务中心扩展）；设置页分组卡片 + 生效徽章（立即/重启/下次采集）+ 保存 toast + adb_path 浏览按钮 + density 设置（core 全链路：protocol → settings.set / settings/changed → settingsStore → UI 应用 data-density）；壳组件测试 11 用例（vi.mock @yohu/api + plugin-dialog）
-- **Phase D 三模块重绘已落地**：① 日志——列对齐行（时间 18ch/PID/级别/Tag≤24ch/消息，等宽 tabular-nums）、级别 3px 左条、Fatal 反色块、信号行底色+Error 左条、行选中（VirtualList 选择模式）、检索框放大镜+accent 边框、三态空态（未采集引导/等待/过滤无命中）、状态行采集指示+设备+滞后回补提示、会话右键菜单（关闭其他/重命名/复制会话，YoTabs onContextMenu）；修复溢出回补提示被回补批次立即清除的缺陷；② 终端——统一 IO 块（一次输入一整段输出，自上而下）、发送栏整栏收缩、纸飞机发送、预设命令排队预览、设置 `terminal_prepend_adb`、命令库树命令数徽章+`adb` 模板 title（YoTree badge/title）；③ 文件——面包屑路径栏（逐级可点）、双栏（目录下钻 | 文件列表含 ls 修改时间列，core RemoteEntry.mtime 全链路）、扩展名分类色图标、传输卡片（方向图标/速度采样/终态 3s 淡出自动移除）
-- **模块级测试扩展**：logs store 34 用例（窗口生命周期/System 默认/同设备引用计数/多设备并行/切焦点不停流/消费端过滤/溢出回补/掉线按 serial）+ pipeline 15 用例（新增行级信号标记）；files 纯函数 13 用例（新增 splitPath/fileCategory）；Vitest 累计 **248** 用例；Rust 侧 ls 解析新增 mtime 断言、settings 契约 4 用例
+- **Phase D 三模块重绘已落地**：① 日志——官方 Document（Soft-Wrap 关 hang 空格写入文档；开则续行第 0 列）、STANDARD BOTH+AppName、无表格表头、级别条 / Fatal wash / 信号行底、检索框放大镜+accent 边框、三态空态、状态行采集指示、会话右键菜单；② 终端——统一 IO 块（一次输入一整段输出，自上而下）、发送栏整栏收缩、纸飞机发送、预设命令排队预览、设置 `terminal_prepend_adb`、命令库树命令数徽章+`adb` 模板 title（YoTree badge/title）；③ 文件——面包屑路径栏（逐级可点）、双栏（目录下钻 | 文件列表含 ls 修改时间列，core RemoteEntry.mtime 全链路）、扩展名分类色图标、传输卡片（方向图标/速度采样/终态 3s 淡出自动移除）
+- **模块级测试扩展**：logs store 34 用例（窗口生命周期/System 默认/同设备引用计数/多设备并行/切焦点不停流/消费端过滤/溢出回补/掉线按 serial）+ filter/stack 用例（行级信号标记）；files 纯函数 13 用例（新增 splitPath/fileCategory）；Vitest 累计 **248** 用例；Rust 侧 ls 解析新增 mtime 断言、settings 契约 4 用例
 - **验收现状**：`cargo build --workspace && cargo test --workspace` 全绿（含 7 集成 + 4 设置契约 + 13 真机）、clippy -D warnings 通过、Vitest **248** 用例全绿、tsc -b 0 错误、`pnpm lint`（ADR-v6-011 token 纪律：色值/字号/动效时长/圆角，scripts/check-ui-tokens.mjs）通过、**verify-v6-smoke.ps1 已实际跑通**（进程存活/无 panic/sidecar 解压/默认命令库写入；期间修复 events.rs 必须在 tauri 异步运行时 spawn 的启动崩溃）
 - 待续（S5，需设备，脚本已备）：安装包安装冒烟、全功能联调、日志性能验收、产线镜像预置 WebView2
 - **v5 已下线**：C#/WPF 与存档文档均已移除，不再作为实现依据

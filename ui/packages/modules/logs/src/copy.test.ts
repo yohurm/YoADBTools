@@ -16,8 +16,14 @@ import {
   serializeLogCopy,
   textOffsetInDoc,
 } from "./copy";
-import { defaultFormatOptions, formatMessage, formatParts, headerWidth, wrapMessage } from "./editor";
-import { ALL_LOG_DISPLAY_COLUMNS } from "./layout";
+import {
+  ALL_LOG_DISPLAY_COLUMNS,
+  defaultFormatOptions,
+  formatMessage,
+  formatParts,
+  headerWidth,
+  wrapMessage,
+} from "./editor";
 
 const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS, "yohu");
 
@@ -196,7 +202,7 @@ describe("documentCopyText", () => {
     );
   });
 
-  it("跨可视续行复制映回同一逻辑文档，不含 hang", () => {
+  it("跨可视续行复制映回同一逻辑文档", () => {
     const item = line({ seq: 4, msg: "hello world now" });
     const formatted = formatMessage(item, options);
     const visuals = wrapMessage(
@@ -204,7 +210,6 @@ describe("documentCopyText", () => {
         seq: item.seq,
         text: formatted.text,
         ranges: formatted.ranges,
-        headerChars: formatted.headerChars,
         bar: formatted.bar,
         line: item,
       },

@@ -38,19 +38,17 @@ import {
 import { attachLogCopyGestures } from "./copy-gesture";
 import {
   DEFAULT_CH_PX,
+  DEFAULT_LOG_DISPLAY_COLUMNS,
   EditorView,
   EMPTY_ROWS,
+  TAG_DEFAULT_WIDTH_PX,
   type FormatOptions,
   type LogDocument,
 } from "./editor";
 import { tagFilterActive } from "./filter";
 import { suggestedExportPath } from "./host-path";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
-import {
-  DEFAULT_LOG_DISPLAY_COLUMNS,
-  dataRowHeight,
-  measureChPx,
-} from "./layout";
+import { dataRowHeight, measureChPx } from "./layout";
 import { LogFilterBar } from "./LogFilterBar";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -200,7 +198,7 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
     return {
       display: displayColumns(),
-      tagWidthPx: logStore.state.colWidths.tag,
+      tagWidthPx: TAG_DEFAULT_WIDTH_PX,
       timeFormat: props.settings.log_time_format,
       scheme: props.settings.log_color_scheme,
       softWrap: props.settings.log_line_layout === "wrap",
