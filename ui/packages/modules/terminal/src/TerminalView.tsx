@@ -4,7 +4,7 @@
 
 import { Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
 
-import { YoBadge, YoButton, YoChrome, YoPage, YoPanel } from "@yohu/ui";
+import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, type YoChromeAction } from "@yohu/ui";
 import type { DeviceSession, LibraryEntryDto } from "@yohu/api";
 import { ModuleTitle } from "@yohu/api";
 
@@ -35,24 +35,45 @@ export function TerminalView(props: DeviceSession) {
   const running = (): boolean => terminalStore.session.busy;
   const canCancel = (): boolean => terminalStore.session.activeRunId !== null;
 
+  const chromeActions = createMemo((): YoChromeAction[] => {
+    const items: YoChromeAction[] = [
+      {
+        key: "clear",
+        node: (
+          <YoButton buttonStyle="normal" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
+            清屏
+          </YoButton>
+        ),
+      },
+    ];
+    if (canCancel()) {
+      items.push({
+        key: "cancel",
+        node: (
+          <YoButton buttonStyle="normal" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
+            取消
+          </YoButton>
+        ),
+      });
+    }
+    items.push({
+      key: "library",
+      node: (
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
+          命令管理
+        </YoButton>
+      ),
+    });
+    return items;
+  });
+
   return (
     <YoPage class="yohu-terminal">
       <YoChrome
         title={ModuleTitle.Terminal}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
-      >
-        <YoButton buttonStyle="normal" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!hasLines()}>
-          清屏
-        </YoButton>
-        <Show when={canCancel()}>
-          <YoButton buttonStyle="normal" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
-            取消
-          </YoButton>
-        </Show>
-        <YoButton buttonStyle="normal" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
-          命令管理
-        </YoButton>
-      </YoChrome>
+        actions={chromeActions()}
+      />
 
       <div class="yohu-terminal__body">
         <LibraryPane
