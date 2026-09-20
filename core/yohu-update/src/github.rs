@@ -53,20 +53,13 @@ pub struct GitHubReleaseProvider {
 impl GitHubReleaseProvider {
     pub fn new(source: GitHubReleaseSource) -> Result<Self, UpdateError> {
         let endpoint = latest_endpoint(&source.owner, &source.repo);
-        Self::with_endpoint(source, endpoint)
-    }
-
-    pub fn with_endpoint(
-        source: GitHubReleaseSource,
-        endpoint: impl Into<String>,
-    ) -> Result<Self, UpdateError> {
         let client = Client::builder()
             .timeout(CHECK_TIMEOUT)
             .build()
             .map_err(|e| UpdateError::Network(e.to_string()))?;
         Ok(Self {
             source,
-            endpoint: endpoint.into(),
+            endpoint,
             client,
         })
     }

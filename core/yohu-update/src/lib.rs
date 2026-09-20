@@ -20,7 +20,7 @@ mod release;
 mod url_policy;
 mod verify;
 
-pub use apply::{installed_exe_path, spawn_overlay_install, NSIS_OVERLAY_ARGS};
+pub use apply::{installed_exe_path, spawn_overlay_install};
 pub use artifact::InstallerKind;
 pub use cache::{assert_cached_installer, installer_dest, update_cache_dir};
 pub use check::check_update;

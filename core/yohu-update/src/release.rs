@@ -7,6 +7,13 @@ use crate::error::UpdateError;
 use crate::platform::PlatformInfo;
 use crate::url_policy;
 
+const SCORE_BASE: i32 = 12;
+const SCORE_NSIS_SETUP: i32 = 6;
+const SCORE_NSIS_NAME: i32 = 3;
+const SCORE_NSIS_WIN: i32 = 2;
+const SCORE_DMG_HOST: i32 = 3;
+const SCORE_ARCH: i32 = 8;
+
 /// 仓库 Release 里的一个附件（平台字段对齐）。
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ReleaseAsset {
@@ -89,30 +96,30 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
         return None;
     }
 
-    let mut score = 12;
+    let mut score = SCORE_BASE;
     match kind {
         InstallerKind::Nsis => {
             if n.contains("setup") {
-                score += 6;
+                score += SCORE_NSIS_SETUP;
             }
             if n.contains("nsis") {
-                score += 3;
+                score += SCORE_NSIS_NAME;
             }
             if n.contains("win") {
-                score += 2;
+                score += SCORE_NSIS_WIN;
             }
         }
         InstallerKind::Dmg => {
             if contains_any(&n, &["darwin", "macos", "osx"]) {
-                score += 3;
+                score += SCORE_DMG_HOST;
             }
         }
     }
     if is_x64 && contains_any(&n, &["x64", "x86_64", "amd64", "win64"]) {
-        score += 8;
+        score += SCORE_ARCH;
     }
     if is_arm64 && contains_any(&n, &["arm64", "aarch64"]) {
-        score += 8;
+        score += SCORE_ARCH;
     }
 
     Some(score)
