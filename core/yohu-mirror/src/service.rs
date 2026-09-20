@@ -472,7 +472,7 @@ impl MirrorService {
                 Ok(()) | Err(MirrorError::Cancelled) => (MirrorSessionState::Stopped, None),
                 Err(e) => {
                     tracing::error!(serial, generation, error = %e, "投屏流失败");
-                    (MirrorSessionState::Failed, Some(e.to_string()))
+                    (MirrorSessionState::Failed, Some(e.public_message()))
                 }
             };
             emit::emit_terminal_state(&self.sink, serial, generation, state, error).await;

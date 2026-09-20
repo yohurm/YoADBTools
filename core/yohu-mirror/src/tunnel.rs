@@ -223,10 +223,10 @@ pub async fn setup_reverse(
         )
         .await?;
     if out.exit_code != 0 {
-        return Err(MirrorError::Adb(yohu_adb::AdbError::BadExit {
-            exit_code: out.exit_code,
-            stderr: out.stderr,
-        }));
+        return Err(MirrorError::ServerFailed(format!(
+            "reverse 失败(退出码 {})",
+            out.exit_code
+        )));
     }
     Ok(())
 }
@@ -247,10 +247,10 @@ pub async fn setup_forward(
         )
         .await?;
     if out.exit_code != 0 {
-        return Err(MirrorError::Adb(yohu_adb::AdbError::BadExit {
-            exit_code: out.exit_code,
-            stderr: out.stderr,
-        }));
+        return Err(MirrorError::ServerFailed(format!(
+            "forward 失败(退出码 {})",
+            out.exit_code
+        )));
     }
     Ok(())
 }
@@ -296,10 +296,10 @@ pub async fn push_server(
         )
         .await?;
     if out.exit_code != 0 {
-        return Err(MirrorError::Adb(yohu_adb::AdbError::BadExit {
-            exit_code: out.exit_code,
-            stderr: out.stderr,
-        }));
+        return Err(MirrorError::ServerFailed(format!(
+            "push server 失败(退出码 {})",
+            out.exit_code
+        )));
     }
     Ok(())
 }
