@@ -1,5 +1,6 @@
-/* 表单行默认排布：左信息栈吃剩余、右控件 hug 贴尾，两列垂直居中。
- * justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。 */
+/* 表单行默认排布：左信息栈吃剩余、右控件 hug 贴尾不收缩，两列垂直居中。
+ * justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。
+ * 右槽禁止 min-width:0 + flex-shrink：会把路径 input（size=1）压成空铬。 */
 
 .yohu-form-row {
   display: flex;
@@ -59,8 +60,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--yohu-space-sm);
-  min-width: 0;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   margin-inline-start: auto;
 }
 

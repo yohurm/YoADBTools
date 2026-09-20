@@ -1,14 +1,27 @@
-/* 效率型模块页壳。padding/gap 只写这里，模块 CSS 禁止再铺一套。 */
+/* 效率型模块页壳。padding/gap 只写这里，模块 CSS 禁止再铺一套。
+ * pad=margin：设置页左右 40vp（page-margin），上下仍是 page-inset。
+ * column=measure：阅读列帽 settings-max，超出居中留白。全屏适配是居中，不是拉满表单。 */
 
 .yohu-page {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   padding: var(--yohu-layout-page-inset);
   gap: var(--yohu-layout-page-gap);
   box-sizing: border-box;
+}
+
+.yohu-page[data-pad="margin"] {
+  padding-inline: var(--yohu-layout-page-margin);
+}
+
+.yohu-page[data-column="measure"] {
+  width: 100%;
+  max-width: var(--yohu-layout-settings-max);
+  margin-inline: auto;
 }
 
 .yohu-page > .yohu-chrome {

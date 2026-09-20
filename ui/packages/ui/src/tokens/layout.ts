@@ -26,6 +26,9 @@ export const Layout = {
   MirrorOps: 48,
   /** 投屏质量栏；比文件预览窄，只够一列下拉。 */
   MirrorFunc: 200,
+  /**
+   * 设置页阅读列帽。默认窗 1200−导航−双边距 ≈ 920；全屏居中留白，禁止拉满栅格。
+   */
   SettingsMax: 920,
   /** YoFormRow 左侧信息最小宽，避免标题被控件挤没。 */
   SettingsLabelMin: 160,
@@ -70,7 +73,7 @@ export const Layout = {
    */
   WindowMinW: 1024,
   WindowMinH: 768,
-  /** PC 屏幕左右边距 40vp（设置页） */
+  /** PC 屏幕左右边距 40vp（YoPage role=settings 的 data-pad=margin） */
   PageMargin: 40,
   /** 效率型模块页壳内边距；数值单源 Spacing.Md，经 YoPage 消费 */
   PageInset: Spacing.Md,
@@ -119,7 +122,10 @@ export const Layout = {
   TitlebarBlur: 32,
   /** 12 列栅格 gutter（≥840vp） */
   Gutter: 16,
-  /** 栅格最大使用宽度 2220vp，超出左右留白 */
+  /**
+   * 栅格最大使用宽度 2220vp，超出左右留白。
+   * 是窗口 12 列帽，不是设置阅读列（阅读列走 SettingsMax）。
+   */
   GridMax: 2220,
 } as const;
 

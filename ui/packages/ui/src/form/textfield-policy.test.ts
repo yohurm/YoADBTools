@@ -79,10 +79,12 @@ describe("textfield-policy", () => {
     expect(attrs["data-clearable"]).toBeUndefined();
   });
 
-  it("宽度只写 data-width：number / fill / hug", () => {
+  it("宽度只写 data-width：number / fill / hug / control", () => {
     expect(textFieldHostAttrs({ type: "number" })["data-width"]).toBe("number");
     expect(textFieldHostAttrs({ type: "number", block: true })["data-width"]).toBe("fill");
     expect(textFieldHostAttrs({})["data-width"]).toBe("hug");
+    expect(textFieldHostAttrs({ width: "control" })["data-width"]).toBe("control");
+    expect(textFieldHostAttrs({ width: "control", block: true })["data-width"]).toBe("control");
   });
 
   it("tokens 写 data-tokens", () => {

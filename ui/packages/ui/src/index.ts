@@ -87,7 +87,13 @@ export { YoThemeToggle } from "./basic/ThemeToggle";
 export type { YoThemeToggleProps } from "./basic/ThemeToggle";
 
 export { YoTextField } from "./form/TextField";
-export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix, YoTextFieldControl } from "./form/TextField";
+export type {
+  YoTextFieldProps,
+  YoTextFieldStatus,
+  YoTextFieldAffix,
+  YoTextFieldControl,
+  TextFieldWidthKind,
+} from "./form/TextField";
 
 export { YoSelect } from "./form/Select";
 export type { YoSelectProps, YoSelectOption } from "./form/Select";
@@ -238,7 +244,7 @@ export type {
 } from "./container/Panel";
 
 export { YoPage } from "./container/Page";
-export type { YoPageProps } from "./container/Page";
+export type { YoPageProps, YoPageRole } from "./container/Page";
 
 export { YoFormRow } from "./container/FormRow";
 export type { YoFormRowProps, YoFormRowLayout, YoFormRowPad } from "./container/FormRow";

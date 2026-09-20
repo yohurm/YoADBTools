@@ -87,12 +87,15 @@ describe("textfield-model", () => {
     ).toEqual({ prefix: true, suffix: false, addonBefore: true, addonAfter: false, tokens: false });
   });
 
-  it("宽度：默认 hug，number 次之，block 优先", () => {
+  it("宽度：显式 width 优先，否则 block → number → hug", () => {
     expect(resolveTextFieldWidthKind({})).toBe("hug");
     expect(resolveTextFieldWidthKind({ type: "number" })).toBe("number");
     expect(resolveTextFieldWidthKind({ type: "number", block: true })).toBe("fill");
+    expect(resolveTextFieldWidthKind({ width: "control" })).toBe("control");
+    expect(resolveTextFieldWidthKind({ width: "control", block: true })).toBe("control");
     expect(resolveTextFieldSpec({ type: "number" }).width).toBe("number");
     expect(resolveTextFieldSpec({ block: true }).width).toBe("fill");
+    expect(resolveTextFieldSpec({ width: "control" }).width).toBe("control");
   });
 
   it("写入盒 = 铬高 − 两侧 hairline，随密度变", () => {

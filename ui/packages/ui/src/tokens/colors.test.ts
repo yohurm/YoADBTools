@@ -419,6 +419,7 @@ describe("theme.css 变量", () => {
     expect(themeCss).toContain("--yohu-layout-page-gap: 12px");
     expect(themeCss).toContain("--yohu-layout-chrome-pad: 8px");
     expect(themeCss).toContain("--yohu-layout-rail-inset: 8px");
+    expect(themeCss).toContain("--yohu-layout-settings-max: 920px");
     expect(themeCss).toContain("--yohu-layout-settings-control-max: 360px");
     expect(themeCss).toContain("--yohu-layout-device-rail-max: 42%");
     expect(themeCss).toContain("--yohu-layout-switch-w: 36px");

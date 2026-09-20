@@ -51,10 +51,11 @@ describe("YoFormRow", () => {
     expect(css).not.toContain("justify-content: space-between");
   });
 
-  it("右槽 hug 贴尾，不 stretch；路径与按钮同簇", () => {
-    expect(css).toContain("flex: 0 1 auto");
+  it("右槽 hug 贴尾不收缩，不 stretch；路径与按钮同簇", () => {
+    expect(css).toMatch(/\.yohu-form-row__control\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toContain("data-control-fill");
     expect(css).not.toMatch(/\.yohu-form-row__control[\s\S]*?flex:\s*1 1 auto/);
+    expect(css).not.toMatch(/\.yohu-form-row__control\s*\{[^}]*flex:\s*0 1 auto/);
   });
 
   it("stacked 纵排铺满，不靠页面点内部槽", () => {
