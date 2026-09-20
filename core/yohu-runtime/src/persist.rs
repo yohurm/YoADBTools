@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 pub fn backup_corrupt(file: &Path, text: &str) -> std::io::Result<PathBuf> {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
+        .map_err(|e| std::io::Error::other(format!("系统时钟早于 UNIX_EPOCH: {e}")))?
+        .as_millis();
     let backup = file.with_extension(format!("corrupt-{stamp}"));
     std::fs::write(&backup, text)?;
     Ok(backup)

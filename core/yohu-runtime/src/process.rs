@@ -24,6 +24,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
 const STDERR_BUDGET: usize = 64 * 1024;
+const CAPTURE_CHAN: usize = 128;
+const STREAM_STDERR_CHAN: usize = 64;
 const REAP_WAIT: Duration = Duration::from_secs(3);
 
 /// 短命令捕获结果。非零退出码仍是 `Ok`；超时/取消/IO/截断才是 `Err`。
@@ -136,8 +138,8 @@ impl ProcessRunner {
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
-        let (stdout_tx, mut stdout_rx) = mpsc::channel::<String>(128);
-        let (stderr_tx, mut stderr_rx) = mpsc::channel::<String>(128);
+        let (stdout_tx, mut stdout_rx) = mpsc::channel::<String>(CAPTURE_CHAN);
+        let (stderr_tx, mut stderr_rx) = mpsc::channel::<String>(CAPTURE_CHAN);
         let mut stdout_task = spawn_bounded_pump(stdout, stdout_tx, STDOUT_BUDGET);
         let mut stderr_task = spawn_bounded_pump(stderr, stderr_tx, STDERR_BUDGET);
 
@@ -273,7 +275,7 @@ impl ProcessRunner {
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
-        let (stderr_tx, mut stderr_rx) = mpsc::channel::<String>(64);
+        let (stderr_tx, mut stderr_rx) = mpsc::channel::<String>(STREAM_STDERR_CHAN);
         let mut stderr_task = spawn_bounded_pump(stderr, stderr_tx, STDERR_BUDGET);
         let mut stderr_text = String::new();
 
