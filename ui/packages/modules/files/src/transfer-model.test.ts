@@ -4,7 +4,6 @@ import {
   applyProgressToJob,
   createTransferJob,
   isTerminalTransfer,
-  remoteBaseName,
   resolveJobName,
   shouldAcceptProgress,
   transferFallbackName,
@@ -69,9 +68,7 @@ describe("transferTone / label / name", () => {
     expect(transferLabel("cancelled")).toBe("已取消");
   });
 
-  it("远端末段与回退名", () => {
-    expect(remoteBaseName("/sdcard/DCIM/a.png")).toBe("a.png");
-    expect(remoteBaseName("/sdcard/DCIM/")).toBe("DCIM");
+  it("回退名", () => {
     expect(transferFallbackName("push", 3)).toBe("上传 #3");
   });
 

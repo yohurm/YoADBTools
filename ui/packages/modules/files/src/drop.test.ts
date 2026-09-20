@@ -6,16 +6,12 @@ import {
   adoptDropSession,
   cssPointFromPhysical,
   destDirFromEntries,
-  destDirName,
   dropCommit,
   DROP_IDLE,
   dropSessionForEvent,
   dropSessionWithDir,
   localBaseName,
   namesForDrag,
-  pointInRect,
-  readFolderTargets,
-  type DropRect,
 } from "./drop";
 
 type DropEvt = Extract<NativeDragDropEvent, { type: "drop" }>;
@@ -32,14 +28,16 @@ function drop(x: number, y: number, paths: string[] = ["C:/a.txt"]): DropEvt {
   return { type: "drop", paths, position: { x, y } } as DropEvt;
 }
 
-function el(tag: string, attrs: Record<string, string> = {}, children: HTMLElement[] = []): HTMLElement {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-  for (const child of children) node.appendChild(child);
-  return node;
-}
-
-const DCIM: DropRect = { left: 0, top: 40, right: 200, bottom: 64 };
+const space = {
+  rect: { left: 0, top: 40, right: 200, bottom: 400 },
+  scrollTop: 0,
+  itemHeight: 24,
+};
+const entries = [
+  { name: "Alarms", kind: "dir" },
+  { name: "a.txt", kind: "file" },
+  { name: "DCIM", kind: "dir" },
+];
 
 describe("cssPointFromPhysical", () => {
   it("物理点除以 scale；scale≤0 当 1", () => {
@@ -104,8 +102,7 @@ describe("dropSessionForEvent", () => {
 });
 
 describe("dropCommit", () => {
-  const folders = [{ name: "DCIM", rect: DCIM }];
-  const ready = { hasDevice: true, blocked: false, folders, intoFolder: true, scale: 1 };
+  const ready = { hasDevice: true, blocked: false, space, entries, intoFolder: true, scale: 1 };
 
   it("默认进当前目录，不读 position", () => {
     expect(
@@ -119,10 +116,10 @@ describe("dropCommit", () => {
     });
   });
 
-  it("开启指向文件夹才用行盒；scale 由调用方传入", () => {
+  it("开启指向文件夹才用清单下标；scale 由调用方传入", () => {
     expect(dropCommit(drop(10, 50), ready)).toEqual({
       paths: ["C:/a.txt"],
-      dirName: "DCIM",
+      dirName: "Alarms",
     });
     expect(dropCommit(drop(10, 80), ready)).toEqual({
       paths: ["C:/a.txt"],
@@ -130,11 +127,20 @@ describe("dropCommit", () => {
     });
     expect(dropCommit(drop(20, 100), { ...ready, scale: 2 })).toEqual({
       paths: ["C:/a.txt"],
-      dirName: "DCIM",
+      dirName: "Alarms",
     });
     expect(dropCommit(drop(10, 50), { ...ready, scale: 2 })).toEqual({
       paths: ["C:/a.txt"],
       dirName: null,
+    });
+  });
+
+  it("松手 dest 与热态同一套下标，滚动后不要求行在 DOM", () => {
+    expect(
+      dropCommit(drop(10, 50), { ...ready, space: { ...space, scrollTop: 48 } }),
+    ).toEqual({
+      paths: ["C:/a.txt"],
+      dirName: "DCIM",
     });
   });
 
@@ -144,26 +150,9 @@ describe("dropCommit", () => {
     ).toBeUndefined();
     expect(dropCommit(drop(10, 50, []), ready)).toBeUndefined();
   });
-
-  it("destDirName 未命中目录则为空", () => {
-    expect(pointInRect(DCIM, 10, 50)).toBe(true);
-    expect(destDirName(10, 80, folders)).toBeNull();
-    expect(destDirName(10, 50, folders)).toBe("DCIM");
-  });
 });
 
 describe("destDirFromEntries", () => {
-  const space = {
-    rect: { left: 0, top: 40, right: 200, bottom: 400 },
-    scrollTop: 0,
-    itemHeight: 24,
-  };
-  const entries = [
-    { name: "Alarms", kind: "dir" },
-    { name: "a.txt", kind: "file" },
-    { name: "DCIM", kind: "dir" },
-  ];
-
   it("用下标命中目录，文件行与空白为 null", () => {
     expect(destDirFromEntries(10, 50, space, entries)).toBe("Alarms");
     expect(destDirFromEntries(10, 70, space, entries)).toBeNull();
@@ -175,19 +164,6 @@ describe("destDirFromEntries", () => {
     expect(
       destDirFromEntries(10, 50, { ...space, scrollTop: 48 }, entries),
     ).toBe("DCIM");
-  });
-});
-
-describe("readFolderTargets", () => {
-  it("只收 dir / symlink 的 data-key", () => {
-    const dirInner = el("div", { "data-kind": "dir" });
-    const dirRow = el("div", { "data-key": "DCIM" }, [dirInner]);
-    const fileInner = el("div", { "data-kind": "file" });
-    const fileRow = el("div", { "data-key": "a.txt" }, [fileInner]);
-    const linkInner = el("div", { "data-kind": "symlink" });
-    const linkRow = el("div", { "data-key": "linkdir" }, [linkInner]);
-    const zone = el("div", { "data-drop": "files" }, [dirRow, fileRow, linkRow]);
-    expect(readFolderTargets(zone).map((item) => item.name)).toEqual(["DCIM", "linkdir"]);
   });
 });
 

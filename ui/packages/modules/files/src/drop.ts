@@ -1,7 +1,7 @@
 /**
  * L2 DropSession：有设备且未挡模态时，enter/over 立即热。
- * over 不得把已有 dirName 刷成 null。目录命中用清单下标 + 滚轴盒，禁止扫行盒。
- * 松手 dest 仍走同一套下标。禁止 elementFromPoint。
+ * over 不得把已有 dirName 刷成 null。热态 dest 与松手 dest 同一套清单下标 + 滚轴盒。
+ * 禁止扫 DOM 行盒，禁止 elementFromPoint。scale 由调用方传入。
  */
 
 import type { NativeDragDropEvent } from "@yohu/api";
@@ -20,11 +20,6 @@ export interface DropRect {
   top: number;
   right: number;
   bottom: number;
-}
-
-export interface FolderTarget {
-  name: string;
-  rect: DropRect;
 }
 
 export interface ListHitEntry {
@@ -61,22 +56,6 @@ export function pointInRect(rect: DropRect, x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
-/** 投放面内可见的目录 / 符号链接行。只给测试 / 回退；热态禁止走这里。 */
-export function readFolderTargets(zone: Element): FolderTarget[] {
-  const out: FolderTarget[] = [];
-  for (const node of zone.querySelectorAll("[data-kind='dir'], [data-kind='symlink']")) {
-    const host = node.closest("[data-key]") ?? node;
-    const name = host.getAttribute("data-key") ?? node.getAttribute("data-key");
-    if (name) out.push({ name, rect: rectOf(host) });
-  }
-  return out;
-}
-
-/** 点落在目录行则进该目录；坐标不可用或落在空白 → 当前目录。 */
-export function destDirName(x: number, y: number, folders: readonly FolderTarget[]): string | null {
-  return folders.find((item) => pointInRect(item.rect, x, y))?.name ?? null;
-}
-
 export function readListHitSpace(list: Element, itemHeight: number): ListHitSpace {
   return {
     rect: rectOf(list),
@@ -85,7 +64,7 @@ export function readListHitSpace(list: Element, itemHeight: number): ListHitSpac
   };
 }
 
-/** 清单下标命中。行被虚拟化卸掉也能中。 */
+/** 清单下标命中。行被虚拟化卸掉也能中。热态与松手 dest 都走这里。 */
 export function destDirFromEntries(
   x: number,
   y: number,
@@ -126,25 +105,26 @@ export function dropSessionWithDir(session: DropSession, dirName: string | null)
   return { hot: true, dirName };
 }
 
-/** 松手才扫目录行。默认进当前目录；intoFolder 才用行盒，scale 由调用方传入。 */
+/** 松手 dest 与热态同一套下标。默认进当前目录；intoFolder 才 destDirFromEntries。 */
 export function dropCommit(
   event: Extract<NativeDragDropEvent, { type: "drop" }>,
   ctx: {
     hasDevice: boolean;
     blocked: boolean;
-    folders: readonly FolderTarget[];
     intoFolder: boolean;
     scale: number;
+    space?: ListHitSpace;
+    entries: readonly ListHitEntry[];
   },
 ): DropCommit | undefined {
   if (!ctx.hasDevice || ctx.blocked || event.paths.length === 0) return undefined;
-  if (!ctx.intoFolder) {
+  if (!ctx.intoFolder || !ctx.space) {
     return { paths: event.paths, dirName: null };
   }
   const css = cssPointFromPhysical(event.position.x, event.position.y, ctx.scale);
   return {
     paths: event.paths,
-    dirName: destDirName(css.x, css.y, ctx.folders),
+    dirName: destDirFromEntries(css.x, css.y, ctx.space, ctx.entries),
   };
 }
 
