@@ -5,7 +5,7 @@
  *
  * 泛型组件：`.yohu-virtual-list` 只裁切；纵滚与产品条内组合 YoScroller
  *（视口 overflow hidden，滚轮改 scrollTop）。`__inner` 只撑总高。
- * 文件清单 YoColFrame 表头跟 data-gutter 对齐；日志 Document 无表头，clip 横滑靠 contentWidth + axis=both。
+ * 文件清单 YoColFrame 表头跟 data-gutter 对齐；日志表头同 Frame（cellPad=none），clip 横滑靠 contentWidth + axis=both。
  * 溢出让出侧轨，禁止 scrollbar-gutter。
  * fill / 投放框宽走 measureVirtualViewContentWidth（clientWidth 减 gutter padding），不进侧轨。
  * 总高变化后 handle.sync() 再量侧轨，过滤变短必须收回 gutter。

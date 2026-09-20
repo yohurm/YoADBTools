@@ -31,6 +31,7 @@ describe("YoColFrame", () => {
     );
     expect(container.querySelector(".yohu-col-cell")).not.toBeNull();
     expect(frame.getAttribute("data-cell-pad")).toBe("list");
+    expect(frame.getAttribute("data-tone")).toBe("list");
   });
 
   it("文档列表 cellPad=none 关掉列垫", () => {
@@ -44,6 +45,21 @@ describe("YoColFrame", () => {
     const frame = container.querySelector(".yohu-col-frame") as HTMLElement;
     expect(frame.getAttribute("data-cell-pad")).toBe("none");
     expect(frame.style.getPropertyValue("--yohu-col-tracks")).toBe("20ch minmax(12ch, 1fr)");
+  });
+
+  it("文档表头 tone=document 写等宽尺", () => {
+    const { container } = render(() => (
+      <YoColFrame template="192px max-content" cellPad="none" tone="document">
+        <YoColRow>
+          <span>时间</span>
+        </YoColRow>
+      </YoColFrame>
+    ));
+    const frame = container.querySelector(".yohu-col-frame") as HTMLElement;
+    expect(frame.getAttribute("data-tone")).toBe("document");
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
+    expect(css).toMatch(/\[data-tone="document"\]\s*\{[^}]*--yohu-font-mono/);
+    expect(css).toMatch(/\[data-tone="document"\]\s+\.yohu-col-row\s*\{[^}]*min-width:\s*max-content/);
   });
 });
 

@@ -52,6 +52,12 @@ export function colTrackTemplate(specs: readonly YoColSpec[], widths: YoColWidth
     .join(" ");
 }
 
+/** 把 Format ch 换成 px 轨道，跟探针量到的字宽同一把尺。禁止再用 CSS `ch` 冒充文档格。 */
+export function charsTrack(chars: number, chPx: number): string {
+  const unit = chPx > 0 ? chPx : 1;
+  return `${Math.max(1, Math.round(chars * unit))}px`;
+}
+
 export function nudgeColWidth(width: number, spec: YoColSpec, steps: number): number {
   return clampColWidth(spec, width + steps * COL_RESIZE_STEP);
 }

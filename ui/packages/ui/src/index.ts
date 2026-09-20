@@ -204,10 +204,10 @@ export { YoColResizer } from "./grid/ColResizer";
 export type { YoColResizerProps } from "./grid/ColResizer";
 
 export { YoColHeader } from "./grid/ColHeader";
-export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./grid/ColHeader";
+export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone } from "./grid/ColHeader";
 
 export { YoColFrame } from "./grid/ColFrame";
-export type { YoColFrameProps, YoColCellPad } from "./grid/ColFrame";
+export type { YoColFrameProps, YoColCellPad, YoColFrameTone } from "./grid/ColFrame";
 
 export { YoColRow } from "./grid/ColRow";
 export type { YoColRowProps } from "./grid/ColRow";
@@ -219,6 +219,7 @@ export { YoColCell } from "./grid/ColCell";
 export type { YoColCellProps } from "./grid/ColCell";
 
 export {
+  charsTrack,
   colTrackTemplate,
   defaultColWidths,
   setColWidth,

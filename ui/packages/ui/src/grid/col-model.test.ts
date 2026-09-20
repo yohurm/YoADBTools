@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   COL_RESIZE_STEP,
+  charsTrack,
   clampColWidth,
   colTrackTemplate,
   colWidthOf,
@@ -48,6 +49,12 @@ describe("col-model", () => {
     expect(nudgeColWidth(144, spec, 1)).toBe(152);
     expect(nudgeColWidth(72, spec, -1)).toBe(72);
     expect(colWidthOf(spec, {})).toBe(144);
+  });
+
+  it("charsTrack 用探针 px，不用 CSS ch", () => {
+    expect(charsTrack(24, 8)).toBe("192px");
+    expect(charsTrack(4, 8.4)).toBe("34px");
+    expect(charsTrack(6, 0)).toBe("6px");
   });
 
   it("列宽相位在 L2", () => {
