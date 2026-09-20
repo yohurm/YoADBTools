@@ -206,12 +206,12 @@ mod tests {
     }
 
     #[test]
-    fn app_install_root_is_not_data_root_on_windows() {
+    fn app_install_root_is_not_data_root() {
         let data = app_data_root("YohuAdbTools").expect("os app data root");
         let install = app_install_root("YohuAdbTools").expect("os install root");
-        assert!(install.ends_with("YohuAdbTools"));
         #[cfg(windows)]
         {
+            assert!(install.ends_with("YohuAdbTools"));
             assert!(install
                 .parent()
                 .map(|d| d.ends_with("Programs"))
@@ -220,7 +220,7 @@ mod tests {
         }
         #[cfg(target_os = "macos")]
         {
-            assert!(install.to_string_lossy().contains("YohuAdbTools.app"));
+            assert!(install.ends_with("YohuAdbTools.app"));
             assert_ne!(data, install);
         }
     }

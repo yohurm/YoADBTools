@@ -26,7 +26,7 @@ fn follow_argv() -> Vec<String> {
 
 async fn emit(ring: &RingBuffer, batcher: &Batcher, mut line: LogLine) -> Result<(), ()> {
     line.seq = ring.push(line.clone());
-    batcher.feed(line).await.map_err(|_| ())
+    batcher.feed(line).await
 }
 
 pub(crate) async fn run_follow(
