@@ -1,12 +1,17 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.86（2026-09-20，文档表头跟 Document 同尺）
+> **状态：** v3.91（2026-09-20，YoChrome 分层收口）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.91 变更（YoChrome 分层收口）：** L2 `ChromeSpec` 收齐 leading/bar/extra；L4 只读 L3 槽位。功能栏 `YoListPresence` 常挂，清空走 `each=[]` 播出场，禁止 `Show` 门闩卸树。日志页眉身份表改名 `logs-chrome-actions`（不再叫 chrome-bar）。见 [youi.md](youi.md)。
+> **v3.90 变更（YoChrome 页眉 chip 进出）：** 模块页眉左右槽收口 `@yohu/ui`：`leading` 走 `YoPresence recipe=chip`，功能栏改 `actions[{key,node}]` + `YoListPresence recipe=chip`。终端取消 / 日志暂停与滞后徽章随身份进出。禁止模块自挂 Presence 或碎片 `children` 补页眉。文案换牌仍走按钮 `YoSwap`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+> **v3.89 变更（设置阅读列 + 路径定宽）：** 全屏适配是居中阅读列，不是把表单拉满栅格。`YoPage role=settings` 列帽恢复 `SettingsMax` 920（`data-column=measure`）。路径槽 `YoTextField width=control` 定宽 `settings-control-max`，禁止 `block`/`width:100%` 套进 YoFormRow hug 簇（`size=1` + `overflow:hidden` 会裁成空铬）。右槽 `flex: 0 0 auto`，空间不够折行。见 [youi.md](youi.md)、[workbench.md](workbench.md)。
+> **v3.88 变更（设置页壳收口 YoPage）：** 设置页根走 `YoPage role=settings`：左右 `page-margin` 40vp。当时列帽误用 `grid-max`、删 `SettingsMax`；v3.89 改回阅读列。页眉是第一子节点，页面级一根 `YoScroller`。禁止再在 settings.css 铺一套页垫。见 [youi.md](youi.md)、[workbench.md](workbench.md)。
+> **v3.87 变更（日志页眉左右操作栏进出）：** 当时日志模块自挂 `YoPresence` / `YoListPresence` 补页眉。v3.90 已收口 `@yohu/ui` `YoChrome`（`leading` / `actions[{key,node}]`）。见 [youi.md](youi.md)。
 > **v3.86 变更（文档表头跟 Document 同尺）：** `YoColFrame tone=document` 用等宽 caption；轨道 `charsTrack` / `logDocTrackTemplate(chPx)` 是探针 px，禁止 CSS `ch` 冒充文档格。`YoColHeader split` 出 mark 列缝（级别|消息不再粘成一词）。拖条仍是 `YoColResizer`。见 [youi.md](youi.md)、[modules/logs.md](modules/logs.md)。
 > **v3.85 变更（日志表头 YoCol 列架）：** 清单标题栏改 `YoColFrame cellPad=none` + `YoColHeader pad=none`，轨道 `headerColumns` / `logDocTrackTemplate` 的官方 Format `ch`。拖宽 `px→round(ch)` 回写 `FormatOptions.colChars`，文档即时重排；级别与消息不可拖。PID+TID 开时文档仍是一段 ProcessThread，表头两格。clip 横滑 `translateX(-scrollLeft)`。设置项仍只认 7 个 wire 开关，文案单源 `LOG_DISPLAY_COLUMN_CATALOG`。行仍是 Document.text，禁止 `YoColTrack`。见 [youi.md](youi.md)、[modules/logs.md](modules/logs.md)。
 > **v3.84 变更（官方 Document 模型）：** 采集改 `logcat -v long,uid,year` + 组装器（一条 logd 记录）。Formatter 写入官方 hang 空格（Soft-Wrap 关）或裸 `\n`（开）；默认 STANDARD = BOTH + AppName，`headerWidth=100`。清单去掉表格表头 / CSS hang / VisualBoard 视口预切。View 1 文档行 = 1 可视行。见 [modules/logs.md](modules/logs.md)。
@@ -505,11 +510,11 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `--yohu-segment-hybrid` | 44 | 56 | 分段按钮图文（V2 `doubleline_background_height`） |
 | `--yohu-title-bar-height` | 40 | 40 | 窗口铬（页眉回内容区后走 HarmonyOS Compact；不再随内容密度抬到 56） |
 
-布局常量（不随密度变）：`--yohu-layout-shell-nav: 200px`、`--yohu-layout-shell-nav-icons: 48px`（收起图标轨，与 `TitlebarCaption` 同档）、`--yohu-layout-sidebar: 240px`、`--yohu-layout-preview: 240px`、`--yohu-layout-mirror-ops: 48px`、`--yohu-layout-mirror-func: 200px`、`--yohu-layout-settings-max: 920px`、`--yohu-layout-output-max: 260px`、`--yohu-layout-hit-splitter: 6px`、`--yohu-layout-gutter: 16px`、`--yohu-layout-grid-max: 2220px`、`--yohu-layout-page-inset` / `--yohu-layout-page-gap`（数值 = `Spacing.Md` 12vp，经 `YoPage` 消费）、`--yohu-layout-chrome-pad`（数值 = `Spacing.Sm` 8vp，经 `YoChrome` 消费）。
+布局常量（不随密度变）：`--yohu-layout-shell-nav: 200px`、`--yohu-layout-shell-nav-icons: 48px`（收起图标轨，与 `TitlebarCaption` 同档）、`--yohu-layout-sidebar: 240px`、`--yohu-layout-preview: 240px`、`--yohu-layout-mirror-ops: 48px`、`--yohu-layout-mirror-func: 200px`、`--yohu-layout-output-max: 260px`、`--yohu-layout-hit-splitter: 6px`、`--yohu-layout-gutter: 16px`、`--yohu-layout-settings-max: 920px`（设置页阅读列帽，超出居中留白）、`--yohu-layout-grid-max: 2220px`（窗口 12 列帽，不是设置阅读列）、`--yohu-layout-page-inset` / `--yohu-layout-page-gap`（数值 = `Spacing.Md` 12vp，经 `YoPage` 消费）、`--yohu-layout-chrome-pad`（数值 = `Spacing.Sm` 8vp，经 `YoChrome` 消费）。
 
 HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、**工作台主窗** `--yohu-layout-window-min-w/h: 1024×768`（与 Tauri `minWidth`/`minHeight` 同值；保证投屏竖屏 contain 短边 ≥280 CSS。鸿蒙对话框/子窗最小 360×240 **不**套主窗）、`--yohu-layout-page-margin: 40px`（PC 左右边距，设置页用）、`--yohu-layout-breakpoint-split: 600`（分栏）、`--yohu-layout-breakpoint-side: 840`（侧边页签）、`--yohu-layout-button-max: 448`、`--yohu-layout-dialog-max: 400`、`--yohu-layout-dialog-body-max: 260`（hug 滚槽预算）。数量约束 `LayoutLimits`：标题栏右侧 ≤3 图标、C 栏工具栏 ≤6、侧栏 ≤窗口宽 40%。间距补 `space-2xl=32`、`space-3xl=40`（Padding_level16/20）。控件行高仍按 P1 产线密度收敛，不改用手机 48vp 列表行。
 
-效率型工作台：内容区从窗口标题栏下方**贴边**排布（`.yohu-layout__content` padding 0）；模块页眉与分区的内边距由 `YoPage` 承担（`page-inset` / `page-gap`）。设置页才用 `page-margin` 40vp。
+效率型工作台：内容区从窗口标题栏下方**贴边**排布（`.yohu-layout__content` padding 0）；模块页眉与分区的内边距由 `YoPage` 承担。效率型 `role=module` 用 `page-inset` / `page-gap`；设置页 `role=settings` 左右 `page-margin` 40vp，列帽 `settings-max` 居中。
 
 描边宽：`--yohu-stroke-hairline: 1px`、`--yohu-stroke-accent: 2px`（焦点/左边条/Tab 指示）、`--yohu-stroke-emphasis: 3px`（级别条/结果卡强调）。
 
@@ -605,8 +610,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 - **设备栏**：标题行 = 折叠钮（`YoRailSlot`）+ `YoSubheader`「设备」`meta` 数量徽章 + 刷新（标题行兄弟，`YoIconButton loading`）。禁止把徽章放进 `actions`。开流 `data-stream=open` 时 heading 槽吃剩余宽，刷新贴行尾；图标轨 heading 关流，刷新与导航图标同槽起边。设备行走 `YoListItem`（型号 / serial / 可选运行时次行 + `YoStatusDot` + 未授权 `YoBadge`）。图标轨只留与导航同槽的状态点 + 刷新，文案走 `YoTooltip`；无设备时栏 hug（`data-empty`，折叠走默认 `collapse`，空态 `YoEmptyState size=sm` 短引导；有错误才出明细和重试），不占满 `--yohu-layout-device-rail-max`；有列表才 `recipe=fill` 在帽下纵滚。选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）。单选实底由 `YoIndicator` fill 在 list 宿主内滑动，宿主 `overflow: hidden` 裁切弹簧过冲；项滚动走公开 `YoScroller`。禁止把 `overflow: auto` 写在滑块宿主或模块 CSS。禁止壳点 Subheader / Scroller 内部 class。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
 - **导航**：行走 `YoListItem`（`role=button` + `Layout.IconSm` + 标题）；分组 `YoSubheader`；系统区 `YoDivider`。激活只加 `.yohu-interactive--selected`；Planned 项「开发中」走 `YoBadge`。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏是常驻双态轨（标题栏 `sidebar` 钮）：意图只走 `RailIntent`（页栅 / 轨 `data-rail`），禁止 `RailPresentation`。`data-stream` 是文案流（展开/展开行程开流，收起当拍关流）；`YoListItem` 轨内自写 `data-stream`，`rail.css` 不点 list-item。宽、槽、卡高、字同一拍软弹簧，禁止先水平再垂直。图标轨只留模块图标与设备状态点（与导航图标同槽）；悬停走 `YoTooltip`，禁止原生 `title`。禁止整栏收到 0 或 `inert`。设备栏高度帽 `--yohu-layout-device-rail-max`（`LayoutLimits.DeviceRailMaxPercent`）。模块名单纵滚走 `YoScroller`（视口 `flex: 1 1 auto`，禁止 `1 1 0`）。
-- **模块页眉**：在右侧内容区顶部（`YoChrome`）。左侧为功能标题区（Subtitle Bold）+ 选中设备名（`leading` 组合中性 `YoBadge`，文案来自 `DeviceSession.selectedLabel`），右侧为功能栏；与窗口标题栏分离，不挤进中区。无操作的模块（设置）只显示标题，但标题行高度仍是 `--yohu-control-height`（与有按钮的页同一占位）。底垫 `--yohu-layout-chrome-pad`。页眉是页壳的第一子节点（`flex: 0 0 auto`），禁止与内容区作为 fragment 兄弟交给模块转场。
-- **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点一律 `YoPage`（`.yohu-page`：`padding: page-inset`、`gap: page-gap`）。`YoChrome` 是第一子节点。内容进 `YoPanel`（`variant=pane` 撑满）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。设置页分组走 `YoPanel` 默认 card，边距仍是 `page-margin`。
+- **模块页眉**：在右侧内容区顶部（`YoChrome`）。左侧为功能标题区（Subtitle Bold）+ 选中设备名（`leading` 组合中性 `YoBadge`，文案来自 `DeviceSession.selectedLabel`），右侧为功能栏 `actions[{key,node}]`；与窗口标题栏分离，不挤进中区。leading / 功能栏进出走库 Presence chip。无操作的模块（设置）栏宿主空挂、不画钮，可见只是标题；标题行高度仍是 `--yohu-control-height`（与有按钮的页同一占位）。底垫 `--yohu-layout-chrome-pad`。页眉是页壳的第一子节点（`flex: 0 0 auto`），禁止与内容区作为 fragment 兄弟交给模块转场。禁止模块自挂 Presence 补页眉。
+- **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点 `YoPage`（缺省 `role=module`：`padding: page-inset`、`gap: page-gap`）。设置页同一组件 `role=settings`（左右 `page-margin`，列帽 `settings-max` 居中）。`YoChrome` 是第一子节点。内容进 `YoPanel`（效率型 `variant=pane` 撑满；设置分组默认 card）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏（展开与图标轨）与内容区之间画 hairline。模块分区 = `YoPanel`（surface + `YoCorner role=card` + 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行（`tone=list`）。对话框三区、设置行、日志级别槽不画分割线。路径栏与清单靠 canvas 分层，不另拉线。
 - **状态栏**：左「展示名 v版本」（`system.info.identity`）/ 中留白 / 右「设备 · 任务 · 状态」；任务悬停显示明细。状态槽由模块 `Status` 贡献（投屏出画后显示实测 fps）。透明贴合 canvas。Caption + leading-tight。
 - **对话框**：Title_S Bold；PC 圆角走 `YoCorner role=dialog`（`radius-md` 16）；宽 ≤400、高 ≤90%；**不要**把窗口最小 360×240 套到浮层确认框。三区不画分割线。层 Portal 到 `body`。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）；fill 定高不套 Travel、不开 clip。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。
@@ -619,7 +624,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.1 日志分析（核心打磨对象）
 
-- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / 虚拟列表 / 状态行）。
+- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作；进出走 `YoChrome` chip）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / 虚拟列表 / 状态行）。
 - **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 Document.text。行是连续文档，不是文件清单那种格子。标题栏走 `YoColFrame tone=document cellPad=none` + `YoColHeader pad=none`，轨道是 `logDocTrackTemplate(chPx)` 探针 px；禁止把 Family B 的行（`YoColTrack` / 行块拖选）套到日志上，禁止再画字符串头行，禁止 CSS `ch` 冒充文档格。
 - 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：三件套 `editor/format`（官方 Timestamp / ProcessThread / Tag / AppName / Level，一条 accumulate）→ `editor/document`（尾部追加/环裁/改选项重载）→ `editor/view`（1 文档行 = 1 可视行）。`headerWidth` 与各 Format `width()` 同一把尺。Soft-Wrap 关把 hang 空格写入 Document。默认 STANDARD `headerWidth=100`。禁止 CSS hang。View 禁止回调 Formatter。CSS 只认 `data-tone` / `data-box=line` / `data-bar`。`YoVirtualList` 行高 `dataRowHeight()`。复制切 Document.text。导出仍走 `formatLogLine` testdata。`tone=document` 不画行间线。选区手势是原生 Selection，绘制是 `.yohu-doc-sel` 带（`--yohu-doc-sel`），不改字色。
 - **显示列：** 读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。默认 STANDARD：时间 / BOTH / Tag / AppName / 级别。设置项与标题栏文案单源 `LOG_DISPLAY_COLUMN_CATALOG`。表头可拖列（时间 / UID / PID / TID / Tag / 应用）把 px 收成 `colChars`，只加不减官方 Format `width()`；级别与消息不可拖。Tag 默认仍是官方 `TagFormat.maxLength` 常数（23），加宽不进设置。禁止模块再拉设置命令或把显示列拷进 logStore，禁止行走 `YoColTrack`。
@@ -636,7 +641,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.2 命令终端
 
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
-- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 清屏 / 命令管理）→ 左侧命令库 `YoPanel title="命令库"`（宽 `--yohu-layout-sidebar` 240vp）+ 右侧结果 `YoPanel title="执行结果"`（间距 12vp）。两栏标题走面板 `title`（鸿蒙 Compact 栏 + 一级字），禁止左栏无标题、禁止再套 Toolbar 灰带。页眉不放执行/取消。
+- 布局：内容区顶部模块页眉（标题 + 选中设备名 + `actions[{key,node}]`：清屏 / 取消（有在途组时）/ 命令管理；进出走库 chip）→ 左侧命令库 `YoPanel title="命令库"`（宽 `--yohu-layout-sidebar` 240vp）+ 右侧结果 `YoPanel title="执行结果"`（间距 12vp）。两栏标题走面板 `title`（鸿蒙 Compact 栏 + 一级字），禁止左栏无标题、禁止再套 Toolbar 灰带。页眉不放发送/执行。
 - 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-header`，禁止套数据行 `--yohu-row-height`。栏标题右侧 `YoSearch slot=entry`，栏下 `slot=bar` 折叠；过滤走 YoSearch 引擎（组名命中保留整组）。点击组行或展开箭头只开合该组，不选中、不入队。选中/hover 走 `.yohu-interactive`（只有叶子选中）。命令与命令块同级：命令图标 `terminal`，命令块图标 `block`；命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
 - **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。栏标题 `YoToolbar pad=xs` 贴栏素底，与清单名 12vp 同缘，禁止再嵌 control 灰带。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单行走 `YoVirtualList`，禁止自写圆角底或 `focus-ring`。中栏条目仍是名称行（块带徽章）；名称之间的分割线走 `tone=list`，清单背板 `--yohu-canvas`。不走文件表列架。中栏可新增命令（`plus`）或命令块（`block`，禁止 `list`）。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。`{n}` 只活在一条模板上；按钮「插入参数」在本行光标写入下一个未用下标。命令描述标签 `{n}`；块描述与填参标签 `1-0` / `2-0`，跟步骤走，换位带着描述。禁止条目级并集。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令/该步（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；增删步骤走 `YoReorderList` 行内 Presence `list`（与参数描述同一 `useListPresenceSlots`）；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与填参栏（命令 `{n}`，块 `1-0`；有描述则跟在标签后），不展示预览；命令块一次按步序填多格。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。时间默认 `HH:mm:ss.SSS`（设置 `terminal_time_format`，立即投影已画出的行）。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
@@ -645,7 +650,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.3 文件管理
 
 - 清单对齐 Family B（数据网格）：行/单元格选择 + 列宽轨道，不是日志那种文档选区。禁止把日志的字符 Range 模型套过来。
-- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 上传/下载/刷新/预览）→ `YoPanel` 资源分区（路径栏 | 四列清单）与独立预览 `YoPanel` 并列 → 有任务时另起传输 `YoPanel`（Presence `rise` 升起；标题栏可点，列表 `YoCollapse recipe=panel`）。
+- 布局：内容区顶部模块页眉（标题 + 选中设备名 + 上传/下载/刷新/预览，`actions[{key,node}]`，进出走库 chip）→ `YoPanel` 资源分区（路径栏 | 四列清单）与独立预览 `YoPanel` 并列 → 有任务时另起传输 `YoPanel`（Presence `rise` 升起；标题栏可点，列表 `YoCollapse recipe=panel`）。
 - 四列清单：`YoVirtualList` 选择模式。行盒走 `list-row/`（`YoListRow`），投放框走 `list-frame/`（`YoListFrame`）。Family B 清单显式 `tone=list`，行间 hairline 在 list-row（直角通栏）。禁止 `yohu-interactive` / `focus-ring`，禁止 ripple / 邻接圆角 / VirtualList 自绘 hairline。文件走 `YoColFrame` + `YoColRow` / `YoColHeader` + `YoColTrack` / `YoColCell`（标题默认靠左，列垫左 md / 右 sm；前三列 `YoColResizer` 短柄）。日志表头也走 `YoColFrame` / `YoColHeader`，但 `cellPad=none`、轨道是 `ch`、行仍是文档。排序钮铺满列格，走 `.yohu-interactive`（宿主 padding 0）。列宽走 YoUI `col-model` / `col-resize`，文件模块只 `setColWidth(key, px)`，禁止累加 delta，禁止再写 `grid-template-columns`。拖条热区透明，可见铬是居中短柄，禁止整块涂 accent。悬浮片铺满列矩形（inset 0 / radius-none）。名称列不再自写左右 padding，与表头同一 `--yohu-col-cell-pad`。表头与清单背板 `--yohu-canvas`（与面板 surface 分层）。清单视口与日志相同：`overflow: hidden` 给虚拟列表确定高度。禁止模块再写 `.yohu-virtual-list__row` 分割线。
 - 路径行：上级钮 + **地址铬**（`AddressSlot`）。行铺满顶栏，铬 hug：浏览=面包屑簇 + 短热区（`--yohu-space-lg`，不 stretch）；编辑=输入盒（`YoCorner` 描边）。盒外不是路径栏。点铬内热区 / 分隔符 / `Ctrl+L` 后，输入同格 `clip-path` 从左向右揭开（`spatial-local`），打开手势松开后再 focus，光标在末尾、不预选；收回倒放同一条 clip（只打输入铬），播完再卸。编辑时面包屑 `display: none`，不占位。输入盒 `field-sizing: content`，`width: max-content`，跟文字 hug，`max-width: 100%` 超出才当铬视野滚动。禁止把顶栏剩余当路径栏，禁止热区 `flex: 1`，禁止面包屑 `visibility: hidden` 占满槽。禁止指定 `width`、禁止逐字改 `style.width`、禁止 `width` 走 `spatial-local`。Enter 提交：解析/安全根/设备浏览任一步失败则保持编辑态并标 invalid，清单停在原目录，`YoToast` 提示（目录不存在为「没有这个目录，请重新输入」）；成功才收回。禁止再在路径栏上方挂错误卡片。Esc / 点输入铬外取消。禁止第二栏、禁止常驻隐藏 input、禁止 `100cqi` / `container-type`。路径栏与清单之间不拉分割线。
 - 预览是独立 `YoPanel`（宽 `--yohu-layout-preview`），不嵌进清单卡片；右键走 `files.list` 场景（新建/下载/复制路径/删除），由壳 `YoContextMenuHost` 呈现。
@@ -653,7 +658,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.4 投屏显示
 
-- 与效率型模块同一 `YoPage` + `YoChrome title="投屏显示"` + `leading` 组合设备徽章。内容区操作栏 / 质量是 `YoPanel`；舞台列是 `.yohu-mirror__avail` 透明洞（不是 YoPanel）。HWND 按 FramePipe 编码尺寸 contain dest 并画占用卡片（ADR-v6-027）；idle 铺满 avail。缩小走面积核。不是编码器 `max_size`，也不是 UI `containInZone`。
+- 与效率型模块同一 `YoPage` + `YoChrome title="投屏显示"` + `leading` 组合设备徽章 + `actions[{key,node}]`（开始/停止、暂停、截图、全屏、仅显示；进出走库 chip）。内容区操作栏 / 质量是 `YoPanel`；舞台列是 `.yohu-mirror__avail` 透明洞（不是 YoPanel）。HWND 按 FramePipe 编码尺寸 contain dest 并画占用卡片（ADR-v6-027）；idle 铺满 avail。缩小走面积核。不是编码器 `max_size`，也不是 UI `containInZone`。
 - 舞台像素由 HWND 独占（空态/加载/暂停/视频都画在 HWND 上，ADR-v6-026/027）；WebView 只留透明占位上报 avail。禁止 WebView overlay 与 HWND XOR。`Stage.mode` 决定回缓冲主人：铬模式每拍画填充+文案+描边，视频模式每拍画帧+描边。填充走工作台 surface（`dark` = `data-theme`，不是设备夜览）。描边走 `--yohu-border-strong`，画在当前可见 clip 内侧。空态图标 `fg` + `surface-2` 井。禁止 dirty 一次画完、禁止动画期跳过描边。空态只写终态（未选择设备 / 未开始 / 启动失败），不把模块名再写一遍。Live 不等于已出画：首帧 Present 前舞台保持加载，避免黑屏空等。上次编码尺寸留在 present，`stop` 不清零。占用 fill↔dest 走 DComp clip 动画。禁止 CSS 占用宽高过渡、禁止 UI 运行时 contain。切走投屏由工作台先关舞台再淡出网页；禁止 View 观察 Presence。按下后指针离开占用面立刻抬起（`TOUCH_UP`），禁止拖出画面后设备仍按着。
 - 页眉主行 ≤6：开始/停止、暂停画面、截图、面板内全屏、**仅显示**（按下=只看；默认未按=可操作）。**面板内全屏**只藏操作栏与功能栏，舞台吃满页眉以下；页眉「退出全屏」与 Esc 始终可点。禁止 `position:fixed; inset:0` 盖住工作台。**设备操作栏**（宽 `--yohu-layout-mirror-ops`，在画面与设置栏之间，非常驻于全屏）：返回 / Home / 多任务 / 音量± / 电源 / **设备深浅色（月亮=设备当前深色、太阳=浅色，同一钮，读 `deviceStatuses.night`）** / 亮度±，鸿蒙符号 `YoIconButton`。非全屏时导航/音量/电源/亮度在不可操作时禁用，不把栏藏起来以免布局跳动；深浅色钮跟连接设备，不跟工作台 theme，禁止本页轮询 dumpsys。**右侧功能栏**（宽 `--yohu-layout-mirror-func`，`YoPanel`）：**质量**（投屏协议 USB/无线 / 长边 / 码率 / 帧率上限，**下次开始生效**）。禁止再把这些控件放进页眉 extra、设置页或通道开关。禁止把导航键放回设置栏。
 - 实测 fps 在状态栏右下角（1s 窗口已 Present 帧），不是画面角标，也不是质量栏的编码器上限。
@@ -661,10 +666,10 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 ### 4.5 设置
 
-- 页壳不滚动；`YoChrome` 钉在内容区顶部。分组卡片放进 `.yohu-settings__body` 滚动；`YoPanel` 不裁切表单项。
-- 页眉与卡片左缘共用 `--yohu-layout-page-margin`（PC 40vp）；页宽 `--yohu-layout-settings-max` 只约束滚动列，不把标题挤进 920 列。
-- 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug 贴尾；两列 `align-items: center`。行间不画分割线，分组靠卡片与间距。开关 / 数字 / 下拉 / 多选复选进右侧槽。路径框与「浏览」同一右簇、中间只有行内 gap，禁止把右槽 stretch 出空档。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex 或给 `YoTextField` 写 width。
-- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：`YoTextField readOnly` 显示绝对路径 + 「浏览」；槽宽 ≤ `--yohu-layout-settings-control-max`。空值显示 `system.info` 解析路径。禁止自绘第二套 control 皮。数字走 `YoTextField type=number`（左值右步进，槽宽 `--yohu-layout-settings-number-w`），下拉走 `YoSelect`。非法数字不在 View 吞掉，走 `settingsStore` → `settings.set` → domain。
+- 页壳不滚动；根节点 `YoPage role=settings`，`YoChrome` 钉在内容区顶部。分组卡片放进页面级 `YoScroller`；`YoPanel` 不裁切表单项。
+- 页眉与卡片左缘共用 `--yohu-layout-page-margin`（PC 40vp）；列宽帽 `--yohu-layout-settings-max` 920，超出居中留白。全屏适配是居中阅读列，禁止拉满 `grid-max`。
+- 表单项走 `YoFormRow`：左侧标题行（标题 + 备注水平相邻，生效徽章进 `note` 槽）+ 其下副标题，右侧功能控件 hug 贴尾且不收缩；两列 `align-items: center`。行间不画分割线，分组靠卡片与间距。开关 / 数字 / 下拉 / 多选复选进右侧槽。路径框与「浏览」同一右簇、中间只有行内 gap，禁止把右槽 stretch 出空档。说明文字是副标题，禁止再独占下一行，禁止设置页自写一行 flex 或给 `YoTextField` 写 CSS width。
+- 文件位置项（ADB 路径 / 数据目录 / 默认导出路径）统一：`YoTextField width=control readOnly` 显示绝对路径 + 「浏览」；定宽 `--yohu-layout-settings-control-max`。空值显示 `system.info` 解析路径。禁止 `block` 套 hug 簇，禁止自绘第二套 control 皮。数字走 `YoTextField type=number`（左值右步进，槽宽 `--yohu-layout-settings-number-w`），下拉走 `YoSelect`。非法数字不在 View 吞掉，走 `settingsStore` → `settings.set` → domain。
 - 投屏协议 / 长边 / 码率 / 帧率只在投屏显示页。设置页「投屏显示」仅保留强制 ADB forward。
 - 命令终端：「输入命令默认加上 adb」仅标题 + 开关，无副标题；默认关；立即生效。
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位，块下不画分割线；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。

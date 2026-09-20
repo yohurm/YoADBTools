@@ -221,10 +221,11 @@ HarmonyOS 对照：TextInput。盒内缀与盒外缀两清，status 一等。禁
     Token 槽 `display: contents`，气泡与 input 同属写入盒 flex 行，槽不是滚动区；
     内容 `overflow: hidden` 只 clip 字，禁止 auto/scroll（铬高装不下系统横条）；
     input `flex: 1 1 0%` + `width: auto`，禁止 `width: 100%` 把气泡挤瘦；
-    input size=1，宽度只听 data-width（hug | number | fill），禁止原生 size=20 漏进布局；
+    input size=1，宽度只听 data-width（hug | number | fill | control），禁止原生 size=20 漏进布局；
     hug 最小宽 space-xl*5；type=number 走 --yohu-layout-settings-number-w（80，左 5 位 tabular + 右步进柱），值 text-align:start；
     步进柱宽 --yohu-layout-text-field-stepper；增减走 L2 stepTextFieldNumber，触边/禁用/只读关对应钮。禁止再露 UA 步进。
-    block 映射 fill。fill 只铺父级宽（`width: 100%` + `flex: 0 1 auto`），禁止 `flex-grow` 在 pane 竖栏里吃栏高。
+    block 映射 fill。fill 只铺父级**定宽**（`width: 100%` + `flex: 0 1 auto`），禁止 `flex-grow` 在 pane 竖栏里吃栏高。
+    `width=control` 定宽 `--yohu-layout-settings-control-max`（`flex: 0 0 auto`）。路径槽必须走 control，禁止 `block` 套进 YoFormRow hug 簇：百分比对不定宽父级把 size=1 + overflow:hidden 裁成空铬。
     写入盒 `--yohu-text-field-line` = control-height − 2×hairline（L2 `textFieldLineBoxPx`）。
     单行 input 高与行高等于写入盒，禁止 `height: 100%` + `leading-ui`（Chromium 会把字/caret 顶到盒顶）。
     `multiline` 同一门面画 textarea：宿主 `data-multiline`，行高 leading-ui，`padding-block` 把第一行推到写入盒中线；
@@ -253,9 +254,10 @@ maxRows?: number              // 仅 multiline；默认 6；超过后写入盒�
 min?: number                  // 仅 type=number
 max?: number                  // 仅 type=number
 step?: number                 // 仅 type=number；默认 1
+width?: "hug" | "fill" | "number" | "control"  // 未写则 block→fill、number→number、否则 hug
 ```
 
-保留 `value` / `onInput` / `label` / `placeholder` / `clearable` / `disabled` / `readOnly`（可点选复制，不灰，隐藏清除）/ `ariaLabel` / `type` / `block` / `min` / `max` / `step` / `inputRef`（转发内部 input 或 textarea）/ `onKeyDown`（转发内部控件）/ `active`（过滤生效描边，写 `data-active`，不与 status 混）/ `tokens`（写入盒内输入前的 Token 槽）/ `maxRows`（弱多行抬高帽）。不做 YoForm、YoTextArea、密码显隐、size 轴、status 别名、独立 YoNumberField。禁止模块 `querySelector("input")`，禁止点 `.yohu-text-field` 改 `--yohu-text-field-edge`。禁止页面自绘第二套只读路径皮，禁止再挂 `textarea.yohu-text-field__input`。禁止模块自绘第二套数字步进。
+保留 `value` / `onInput` / `label` / `placeholder` / `clearable` / `disabled` / `readOnly`（可点选复制，不灰，隐藏清除）/ `ariaLabel` / `type` / `block` / `width`（`hug` \| `fill` \| `number` \| `control`）/ `min` / `max` / `step` / `inputRef`（转发内部 input 或 textarea）/ `onKeyDown`（转发内部控件）/ `active`（过滤生效描边，写 `data-active`，不与 status 混）/ `tokens`（写入盒内输入前的 Token 槽）/ `maxRows`（弱多行抬高帽）。不做 YoForm、YoTextArea、密码显隐、size 轴、status 别名、独立 YoNumberField。禁止模块 `querySelector("input")`，禁止点 `.yohu-text-field` 改 `--yohu-text-field-edge`。禁止页面自绘第二套只读路径皮，禁止再挂 `textarea.yohu-text-field__input`。禁止模块自绘第二套数字步进。禁止给路径槽写 `block` 或页面 `width`。
 
 ---
 
@@ -303,7 +305,7 @@ checked / onChange / ariaLabel / disabled
 title / description / note / children / layout / pad
   → L2 hasFormRowSlot / resolveFormRowLayout / resolveFormRowPad
   → L3 formRowHostAttrs（data-has-description / data-has-note / data-layout / data-pad）
-  → L4 两列内容区；行主轴 flex-end；右槽始终 hug 贴尾（路径+浏览是同一簇）；行间不画分割线
+  → L4 两列内容区；行主轴 flex-end；右槽 hug 贴尾且不收缩（`flex: 0 0 auto`，路径+浏览是同一簇）；行间不画分割线
 ```
 
 `layout=stacked` 才让控件槽 `width:100%`，`YoSelect block` 才能铺满（对话框 / 投屏质量栏）。`pad=flush` 去掉默认 `md` 行垫，给已经有 gap 的对话框字段。禁止模块点内部槽把横排右槽 stretch 成假 block。
@@ -633,13 +635,29 @@ variant / padding / header|title|actions / align / gap / overflow / paddingBlock
 
 ## 组件：YoPage（L0–L5）
 
-效率型模块页壳。`YoChrome` 必须是第一子节点。页垫走 layout token。设置页不用本组件。
+模块页壳。`YoChrome` 必须是第一子节点。页垫与列帽由角色解析，禁止页面再铺一套 `height:100%` + padding。
+
+```
+role?（module | settings）
+  → L2 resolvePageSpec / pagePadForRole / pageColumnForRole
+  → L3 pageHostAttrs（data-role；settings 才写 data-pad=margin、data-column=measure）
+  → L4 padding / 列帽只认 data-*
+```
+
+| 角色 | 页垫 | 列 |
+|------|------|----|
+| `module`（缺省） | `page-inset` 12vp 四边 | 铺满内容区 |
+| `settings` | 左右 `page-margin` 40vp，上下仍 inset | `width:100%`，帽 `settings-max` 920，超出居中留白 |
+
+设置页走本组件。全屏适配是居中阅读列，不是把表单拉满栅格（`grid-max` 是窗口 12 列帽）。路径槽走 `YoTextField width=control`（`settings-control-max`），数字走 `settings-number-w`。禁止 settings.css 再冻 `max-width` / 再套路径槽。
 
 ---
 
 ## 组件：YoChrome（L0–L5）
 
-模块页眉，不进窗口标题栏。标题行高 `--yohu-control-height`，底垫 `chrome-pad`。无按钮页同一占位。`extra` 只走次行。选中设备名走 `leading={<YoBadge text={selectedLabel} tone="neutral" />}`，库不画徽章。页眉与分区之间不画分割线，靠垫与 `YoPanel` 分层。标题 class 是 `.yohu-chrome__heading`。功能栏 / 次行 / leading 显隐只走 `resolveChromeSlots` + `Show`，宿主不写未消费的 `data-layout`。
+模块页眉，不进窗口标题栏。标题行高 `--yohu-control-height`，底垫 `chrome-pad`。无按钮页同一占位；栏宿主常挂、空 each 不画钮。`extra` 只走次行。选中设备名走 `leading={<YoBadge text={selectedLabel} tone="neutral" />}`，库不画徽章。页眉与分区之间不画分割线，靠垫与 `YoPanel` 分层。标题 class 是 `.yohu-chrome__heading`。
+
+公开 API：`title` / `leading` / `actions[{ key, node }]` / `extra` / `dropIgnore`。功能栏必须带身份 key（HarmonyOS C 栏 ≤6）。`leading` 走 `YoPresence recipe=chip`（卸前冻最后一帧，`when` 读 L3 `showLeading`）；`actions` 走 `YoListPresence recipe=chip`（栏宿主常挂，清空收 `each=[]` 播出场，禁止 `Show` 按意图卸树）。次行仍 `Show`。槽位显隐走 L3 `resolveChromeSlots`（L2 `ChromeSpec` 含 leading/bar/extra）。禁止模块自挂 Presence 补页眉，禁止碎片 `children`。宿主不写未消费的 `data-layout`。
 
 ---
 
