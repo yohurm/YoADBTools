@@ -25,10 +25,6 @@ export const LOG_COLOR_SCHEME_CATALOG: readonly {
   },
 ];
 
-export const LOG_COLOR_SCHEME_HINT = LOG_COLOR_SCHEME_CATALOG.map(
-  (item) => item.description,
-).join(" ");
-
 export function isLogColorScheme(value: unknown): value is LogColorScheme {
   return typeof value === "string" && LOG_COLOR_SCHEME_CATALOG.some((item) => item.value === value);
 }

@@ -26,8 +26,6 @@ export const LOG_LINE_LAYOUT_CATALOG: readonly {
   },
 ];
 
-export const LOG_LINE_LAYOUT_HINT = LOG_LINE_LAYOUT_CATALOG.map((item) => item.description).join(" ");
-
 export function isLogLineLayout(value: unknown): value is LogLineLayout {
   return typeof value === "string" && LOG_LINE_LAYOUT_CATALOG.some((item) => item.value === value);
 }

@@ -7,9 +7,7 @@ import { For, type JSX } from "solid-js";
 import { APP_ICON_SRC } from "../app-identity";
 import {
   LOG_COLOR_SCHEME_CATALOG,
-  LOG_COLOR_SCHEME_HINT,
   LOG_LINE_LAYOUT_CATALOG,
-  LOG_LINE_LAYOUT_HINT,
   ModuleTitle,
   type Density,
   type LogDisplayColumns,
@@ -176,22 +174,14 @@ export function SettingsForm(props: {
             onChange={(v) => props.save("log_time_format", v, "已保存（立即生效）")}
           />
         </YoFormRow>
-        <YoFormRow
-          title="内容配色"
-          description={LOG_COLOR_SCHEME_HINT}
-          note={<EffectBadge text="立即生效" />}
-        >
+        <YoFormRow title="内容配色" note={<EffectBadge text="立即生效" />}>
           <YoSelect
             options={LOG_COLOR_SCHEME_OPTIONS}
             value={settingsStore.state.log_color_scheme}
             onChange={(v) => props.save("log_color_scheme", v, "已保存（立即生效）")}
           />
         </YoFormRow>
-        <YoFormRow
-          title="长文本"
-          description={LOG_LINE_LAYOUT_HINT}
-          note={<EffectBadge text="立即生效" />}
-        >
+        <YoFormRow title="长文本" note={<EffectBadge text="立即生效" />}>
           <YoSelect
             options={LOG_LINE_LAYOUT_OPTIONS}
             value={settingsStore.state.log_line_layout}

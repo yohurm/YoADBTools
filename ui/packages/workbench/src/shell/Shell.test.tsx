@@ -746,6 +746,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("日志内容配色切换立即写入 log_color_scheme", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("内容配色")).toBeTruthy();
+    expect(screen.getByText("内容配色").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Yohu（默认）" }));
     fireEvent.click(screen.getByText("LogCat", { exact: true }));
     await waitFor(() => {
@@ -756,6 +757,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("日志长文本切换立即写入 log_line_layout", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("长文本")).toBeTruthy();
+    expect(screen.getByText("长文本").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "单行（LogCat，默认）" }));
     fireEvent.click(screen.getByText("超宽换行", { exact: true }));
     await waitFor(() => {
