@@ -15,7 +15,7 @@ export const LOG_LINE_LAYOUT_CATALOG: readonly {
 }[] = [
   {
     value: "clip",
-    label: "单行（LogCat，默认）",
+    label: "单行（LogCat）",
     description:
       "对照 LogCat Soft-Wrap 关：硬换行写入 headerWidth 空格，无硬换行的超长行不折，超宽底栏横滑。",
   },

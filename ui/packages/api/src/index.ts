@@ -8,6 +8,7 @@ export * from "./log-filter";
 export * from "./log-bind";
 export * from "./log-format";
 export * from "./log-color-scheme";
+export * from "./log-display-columns";
 export * from "./log-line-layout";
 export * from "./log-signal";
 export * from "./command-line";

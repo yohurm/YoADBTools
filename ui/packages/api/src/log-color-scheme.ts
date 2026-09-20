@@ -15,7 +15,7 @@ export const LOG_COLOR_SCHEME_CATALOG: readonly {
 }[] = [
   {
     value: "yohu",
-    label: "Yohu（默认）",
+    label: "Yohu",
     description: "鸿蒙语义级别色：消息、级别字、Tag 同色。",
   },
   {

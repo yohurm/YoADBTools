@@ -17,6 +17,10 @@ import {
   LOG_COLOR_SCHEME_DEFAULT,
 } from "./log-color-scheme";
 import {
+  LOG_DISPLAY_COLUMN_CATALOG,
+  LOG_MESSAGE_COLUMN,
+} from "./log-display-columns";
+import {
   isLogLineLayout,
   LOG_LINE_LAYOUT_CATALOG,
   LOG_LINE_LAYOUT_DEFAULT,
@@ -334,6 +338,16 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       app: true,
       level: true,
     });
+    expect(LOG_DISPLAY_COLUMN_CATALOG.map((item) => item.key)).toEqual([
+      "ts",
+      "uid",
+      "pid",
+      "tid",
+      "tag",
+      "app",
+      "level",
+    ]);
+    expect(LOG_MESSAGE_COLUMN).toEqual({ key: "msg", label: "消息" });
   });
 
   it("settingsChanged 事件携带全量 settings 快照", () => {
