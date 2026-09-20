@@ -22,9 +22,12 @@ import {
   formatTag,
   formatTimestamp,
   formatUid,
+  headerColumns,
   headerWidth,
   javaStringHash,
   LEVEL_FORMAT_WIDTH,
+  logDocTrackTemplate,
+  logFieldLabel,
   LOGCAT_TAG_SWATCHES,
   PROCESS_BOTH_WIDTH,
   PROCESS_PID_WIDTH,
@@ -89,9 +92,10 @@ describe("官方 Format 分段", () => {
     expect(formatUid("shell").length).toBe(9);
   });
 
-  it("formatOptionsKey 含 softWrap，不含 appNames", () => {
+  it("formatOptionsKey 含 softWrap 与 colChars，不含 appNames", () => {
     expect(formatOptionsKey({ ...all, scheme: "logcat" })).not.toBe(formatOptionsKey(all));
     expect(formatOptionsKey({ ...all, softWrap: true })).not.toBe(formatOptionsKey(all));
+    expect(formatOptionsKey({ ...all, colChars: { tag: 30 } })).not.toBe(formatOptionsKey(all));
     expect(all).not.toHaveProperty("log_line_layout");
   });
 });
@@ -168,6 +172,43 @@ describe("formatMessage", () => {
     expect(parts.find((part) => part.kind === "tid")).toBeUndefined();
     expect(parts.find((part) => part.kind === "pid")?.text).toBe("  100-200   ");
     expect(formatColumns(all).map((col) => col.key)).toEqual(["ts", "uid", "pid", "tag", "app", "level", "msg"]);
+  });
+
+  it("标题栏与内容同序同宽，PID+TID 按内容拆成两段", () => {
+    expect(logFieldLabel("ts")).toBe("时间");
+    expect(logFieldLabel("msg")).toBe("消息");
+    const head = headerColumns(shown);
+    expect(head.map((col) => col.key)).toEqual(["ts", "pid", "tid", "tag", "app", "level", "msg"]);
+    expect(head.map((col) => col.label)).toEqual(["时间", "PID", "TID", "Tag", "应用", "级别", "消息"]);
+    expect(head.filter((col) => col.key !== "msg").reduce((n, col) => n + (col.width ?? 0), 0)).toBe(
+      headerWidth(shown),
+    );
+    expect(head.find((col) => col.key === "level")?.resizable).toBe(false);
+    expect(head.find((col) => col.key === "msg")?.resizable).toBe(false);
+    expect(head.find((col) => col.key === "tag")?.resizable).toBe(true);
+    expect(logDocTrackTemplate(shown, 8)).toBe("192px 48px 48px 192px 288px 32px max-content");
+    expect(logDocTrackTemplate({ ...shown, softWrap: true }, 8)).toContain("minmax(0, 1fr)");
+    const allHead = headerColumns(all);
+    expect(allHead.map((col) => col.key)).toEqual(["ts", "uid", "pid", "tid", "tag", "app", "level", "msg"]);
+    expect(allHead.find((col) => col.key === "uid")?.label).toBe("UID");
+    const pidOnly = headerColumns(
+      defaultFormatOptions({
+        ...DEFAULT_LOG_DISPLAY_COLUMNS,
+        tid: false,
+      }),
+    );
+    expect(pidOnly.map((col) => col.key)).toEqual(["ts", "pid", "tag", "app", "level", "msg"]);
+    expect(pidOnly.some((col) => col.key === "tid")).toBe(false);
+  });
+
+  it("拖宽按 ch 加宽文档，PID/TID 各自垫进 BOTH 段", () => {
+    const wide = { ...shown, colChars: { pid: 8, tid: 7, tag: 30 } };
+    expect(headerWidth(wide)).toBe(24 + 8 + 7 + 30 + 36 + 4);
+    expect(formatProcessThread(line(), "both", 8, 7)).toBe("  100-  200    ");
+    expect(formatProcessThread(line(), "both", 8, 7).length).toBe(15);
+    expect(formatParts(formatMessage(line(), wide)).find((part) => part.kind === "pid")?.text.length).toBe(15);
+    expect(formatParts(formatMessage(line(), wide)).find((part) => part.kind === "tag")?.text.length).toBe(30);
+    expect(logDocTrackTemplate(wide, 8)).toBe("192px 64px 56px 240px 288px 32px max-content");
   });
 });
 

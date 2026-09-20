@@ -3,7 +3,8 @@
  * 顺序：Timestamp → Uid（扩展）→ ProcessThread → Tag → AppName → Level → message。
  * Soft-Wrap 关：msg 里的 \\n 换成 \\n + headerWidth 空格，写入文档。
  * Soft-Wrap 开：裸 \\n，续行第 0 列。
- * 禁止表格 1fr、禁止 CSS hang、禁止 import Document / Board / View / store。
+ * 表头轨道走 ch（wrap 时消息列 minmax(0,1fr)）；行仍是文档，禁止把 1fr 写进 Document。
+ * 禁止 CSS hang、禁止 import Document / Board / View / store。
  */
 
 import {
@@ -12,6 +13,8 @@ import {
   formatLogTs,
   isLogColorScheme,
   LOG_COLOR_SCHEME_DEFAULT,
+  LOG_DISPLAY_COLUMN_CATALOG,
+  LOG_MESSAGE_COLUMN,
   parseLevelLetter,
   type LevelLetter,
   type LogColorScheme,
@@ -120,6 +123,8 @@ export type FormatOptions = {
   /** 对照 MessageFormatter.softWrapEnabled */
   softWrap?: boolean;
   appNames?: AppNameMap;
+  /** 列宽覆盖（ch）。缺省走官方 Format.width()；拖宽只加不减官方下限。 */
+  colChars?: Partial<Record<LogMetaColKey, number>>;
 };
 
 export type FormattedMessage = {
@@ -264,6 +269,7 @@ export function formatOptionsKey(options: FormatOptions): string {
     Number(d.app),
     Number(d.level),
     options.tagWidthPx,
+    JSON.stringify(options.colChars ?? {}),
   ].join("|");
 }
 
@@ -276,7 +282,101 @@ export function tagMaxLength(options: FormatOptions): number {
 }
 
 export function tagFormatWidth(options: FormatOptions): number {
+  const override = options.colChars?.tag;
+  if (typeof override === "number" && override > 0) {
+    return Math.max(TAG_MIN_LENGTH + 1, override);
+  }
   return tagMaxLength(options) + 1;
+}
+
+export function minColChars(key: LogMetaColKey, options: FormatOptions): number {
+  if (key === "ts") {
+    return timestampWidth(options.timeFormat);
+  }
+  if (key === "uid") {
+    return UID_FORMAT_WIDTH;
+  }
+  if (key === "pid" || key === "tid") {
+    return PROCESS_PID_WIDTH;
+  }
+  if (key === "tag") {
+    return TAG_MIN_LENGTH + 1;
+  }
+  if (key === "app") {
+    return APP_MIN_LENGTH + 1;
+  }
+  return LEVEL_FORMAT_WIDTH;
+}
+
+export function colCharsOf(options: FormatOptions, key: LogMetaColKey, fallback: number): number {
+  const override = options.colChars?.[key];
+  if (typeof override !== "number" || !(override > 0)) {
+    return fallback;
+  }
+  return Math.max(minColChars(key, options), override);
+}
+
+function padField(text: string, width: number): string {
+  return text.length >= width ? text : text.padEnd(width);
+}
+
+export function logFieldLabel(key: LogColKey): string {
+  if (key === LOG_MESSAGE_COLUMN.key) {
+    return LOG_MESSAGE_COLUMN.label;
+  }
+  return LOG_DISPLAY_COLUMN_CATALOG.find((item) => item.key === key)?.label ?? key;
+}
+
+export type LogHeaderColumn = {
+  key: LogColKey;
+  label: string;
+  width: number | null;
+  resizable: boolean;
+};
+
+/** 标题栏列：与文档 Format 同尺；PID+TID 开时拆成两段，对应内容 `pid-tid`。 */
+export function headerColumns(options: FormatOptions): LogHeaderColumn[] {
+  const process = processThreadStyle(options.display);
+  const cols: LogHeaderColumn[] = [];
+  for (const col of formatColumns(options)) {
+    if (col.key === "pid" && process === "both") {
+      const pidWidth = colCharsOf(options, "pid", PROCESS_PID_WIDTH);
+      const tidWidth = colCharsOf(options, "tid", PROCESS_PID_WIDTH);
+      cols.push({
+        key: "pid",
+        label: logFieldLabel("pid"),
+        width: pidWidth,
+        resizable: true,
+      });
+      cols.push({
+        key: "tid",
+        label: logFieldLabel("tid"),
+        width: tidWidth,
+        resizable: true,
+      });
+      continue;
+    }
+    cols.push({
+      key: col.key,
+      label: logFieldLabel(col.key),
+      width: col.width,
+      resizable: col.key !== "msg" && col.key !== "level",
+    });
+  }
+  return cols;
+}
+
+/** 表头轨道。px 跟 measureChPx 同一把尺；wrap 时消息吃剩余；clip 时跟文档自然宽横滑。 */
+export function logDocTrackTemplate(options: FormatOptions, chPx = DEFAULT_CH_PX): string {
+  const unit = chPx > 0 ? chPx : DEFAULT_CH_PX;
+  return headerColumns(options)
+    .map((col) => {
+      if (col.width == null) {
+        return options.softWrap ? "minmax(0, 1fr)" : "max-content";
+      }
+      return `${Math.max(1, Math.round(col.width * unit))}px`;
+    })
+    .join(" ");
 }
 
 /** 按 LogDisplayColumns 列出 Format 字段；PID+TID 合成一条 ProcessThread。 */
@@ -284,23 +384,27 @@ export function formatColumns(options: FormatOptions): FormatColumn[] {
   const display = options.display;
   const cols: FormatColumn[] = [];
   if (display.ts) {
-    cols.push({ key: "ts", width: timestampWidth(options.timeFormat) });
+    cols.push({ key: "ts", width: colCharsOf(options, "ts", timestampWidth(options.timeFormat)) });
   }
   if (display.uid) {
-    cols.push({ key: "uid", width: UID_FORMAT_WIDTH });
+    cols.push({ key: "uid", width: colCharsOf(options, "uid", UID_FORMAT_WIDTH) });
   }
   const process = processThreadStyle(display);
   if (process !== "off") {
+    const width =
+      process === "both"
+        ? colCharsOf(options, "pid", PROCESS_PID_WIDTH) + colCharsOf(options, "tid", PROCESS_PID_WIDTH)
+        : colCharsOf(options, process === "tid" ? "tid" : "pid", PROCESS_PID_WIDTH);
     cols.push({
       key: process === "tid" ? "tid" : "pid",
-      width: processThreadWidth(process),
+      width,
     });
   }
   if (display.tag) {
     cols.push({ key: "tag", width: tagFormatWidth(options) });
   }
   if (display.app) {
-    cols.push({ key: "app", width: APP_FORMAT_WIDTH });
+    cols.push({ key: "app", width: colCharsOf(options, "app", APP_FORMAT_WIDTH) });
   }
   if (display.level) {
     cols.push({ key: "level", width: LEVEL_FORMAT_WIDTH });
@@ -348,15 +452,20 @@ export function formatUid(uid: string | undefined): string {
   return `${uid ?? ""}`.padEnd(UID_BODY_CHARS) + " ";
 }
 
-export function formatProcessThread(line: { pid: number; tid: number }, style: ProcessThreadStyle): string {
+export function formatProcessThread(
+  line: { pid: number; tid: number },
+  style: ProcessThreadStyle,
+  pidChars = PROCESS_PID_WIDTH,
+  tidChars = PROCESS_PID_WIDTH,
+): string {
   if (style === "both") {
-    return `${padStartNum(line.pid, 5)}-${padEndNum(line.tid, 5)} `;
+    return `${padField(`${padStartNum(line.pid, 5)}-`, pidChars)}${padField(`${padEndNum(line.tid, 5)} `, tidChars)}`;
   }
   if (style === "pid") {
-    return `${padEndNum(line.pid, 5)} `;
+    return padField(`${padEndNum(line.pid, 5)} `, pidChars);
   }
   if (style === "tid") {
-    return `${padEndNum(line.tid, 5)} `;
+    return padField(`${padEndNum(line.tid, 5)} `, tidChars);
   }
   return "";
 }
@@ -435,21 +544,43 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
   const buf: Accumulator = { text: "", ranges: [] };
   const display = options.display;
   if (display.ts) {
-    accumulate(buf, formatTimestamp(line.ts, options.timeFormat), "ts", paintOf(engine, "ts", line));
+    accumulate(
+      buf,
+      padField(formatTimestamp(line.ts, options.timeFormat), colCharsOf(options, "ts", timestampWidth(options.timeFormat))),
+      "ts",
+      paintOf(engine, "ts", line),
+    );
   }
   if (display.uid) {
-    accumulate(buf, formatUid(line.uid), "uid", paintOf(engine, "uid", line));
+    accumulate(
+      buf,
+      padField(formatUid(line.uid), colCharsOf(options, "uid", UID_FORMAT_WIDTH)),
+      "uid",
+      paintOf(engine, "uid", line),
+    );
   }
   const process = processThreadStyle(display);
   if (process !== "off") {
     const kind: LogFieldKind = process === "tid" ? "tid" : "pid";
-    accumulate(buf, formatProcessThread(line, process), kind, paintOf(engine, kind, line));
+    const pidChars = colCharsOf(options, "pid", PROCESS_PID_WIDTH);
+    const tidChars = colCharsOf(options, "tid", PROCESS_PID_WIDTH);
+    accumulate(
+      buf,
+      formatProcessThread(line, process, pidChars, tidChars),
+      kind,
+      paintOf(engine, kind, line),
+    );
   }
   if (display.tag) {
-    accumulate(buf, formatTag(line.tag, tagMaxLength(options)), "tag", paintOf(engine, "tag", line));
+    accumulate(buf, formatTag(line.tag, tagFormatWidth(options) - 1), "tag", paintOf(engine, "tag", line));
   }
   if (display.app) {
-    accumulate(buf, formatAppName(appNameOf(line, options.appNames)), "app", paintOf(engine, "app", line));
+    accumulate(
+      buf,
+      formatAppName(appNameOf(line, options.appNames), colCharsOf(options, "app", APP_FORMAT_WIDTH) - 1),
+      "app",
+      paintOf(engine, "app", line),
+    );
   }
   if (display.level) {
     accumulate(buf, ` ${line.level} `, "level", paintOf(engine, "level", line));

@@ -30,7 +30,7 @@ export function dataRowHeight(): number {
 }
 
 /**
- * wrap 用它算 rowChars；clip 用它把文档 ch 换成 inner 宽。
+ * wrap 用它算 rowChars；clip 用它把文档 ch 换成 inner 宽；表头拖条把 px 收成 ch。
  * 禁止拿去改 Format.width()。
  * 行 class 是 display:block，会吃满宿主宽，chPx 变成整行/10。
  */

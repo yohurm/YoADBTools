@@ -1,6 +1,10 @@
 export {
   defaultFormatOptions,
   formatColumns,
+  headerColumns,
+  logDocTrackTemplate,
+  logFieldLabel,
+  minColChars,
   formatMessage,
   formatOptionsKey,
   formatParts,
@@ -24,6 +28,8 @@ export {
   type FormatOptions,
   type FormattedMessage,
   type FormatRange,
+  type LogHeaderColumn,
+  type LogMetaColKey,
 } from "./format";
 export { EMPTY_MESSAGES, EMPTY_ROWS, LogDocument, type DocMessage, type DocRow } from "./document";
 export {

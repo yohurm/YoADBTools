@@ -11,6 +11,7 @@ import {
   YoBadge,
   YoButton,
   YoChrome,
+  YoColFrame,
   YoDialog,
   YoEmptyState,
   YoLoading,
@@ -42,13 +43,16 @@ import {
   EditorView,
   EMPTY_ROWS,
   TAG_DEFAULT_WIDTH_PX,
+  logDocTrackTemplate,
   type FormatOptions,
   type LogDocument,
+  type LogMetaColKey,
 } from "./editor";
 import { tagFilterActive } from "./filter";
 import { suggestedExportPath } from "./host-path";
 import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
 import { dataRowHeight, measureChPx } from "./layout";
+import { LogColumnHeader } from "./LogColumnHeader";
 import { LogFilterBar } from "./LogFilterBar";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -134,6 +138,8 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
   const [rowChars, setRowChars] = createSignal(0);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
+  const [headShift, setHeadShift] = createSignal(0);
+  const [colChars, setColChars] = createSignal<Partial<Record<LogMetaColKey, number>>>({});
 
   let keywordRef: YoSearchControl | undefined;
   let activeDoc: LogDocument | undefined;
@@ -203,6 +209,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       scheme: props.settings.log_color_scheme,
       softWrap: props.settings.log_line_layout === "wrap",
       appNames: names,
+      colChars: colChars(),
     };
   });
 
@@ -211,6 +218,12 @@ export function LogAnalyzerView(props: DeviceSession) {
     const host = listEl();
     if (host) {
       setChPx(measureChPx(host));
+    }
+  });
+
+  createEffect(() => {
+    if (props.settings.log_line_layout === "wrap") {
+      setHeadShift(0);
     }
   });
 
@@ -465,10 +478,29 @@ export function LogAnalyzerView(props: DeviceSession) {
               />
 
               <div class="yohu-logs__list">
-                <div
-                  class="yohu-logs__list-body"
-                  ref={(el) => { setListEl(el); }}
+                <YoColFrame
+                  class="yohu-logs__table"
+                  cellPad="none"
+                  tone="document"
+                  template={logDocTrackTemplate(formatOpts(), chPx())}
                 >
+                  <LogColumnHeader
+                    options={formatOpts()}
+                    chPx={chPx()}
+                    shift={headShift()}
+                    onResize={(key, chars) => setColChars((prev) => ({ ...prev, [key]: chars }))}
+                    onFit={(key) =>
+                      setColChars((prev) => {
+                        const next = { ...prev };
+                        delete next[key];
+                        return next;
+                      })
+                    }
+                  />
+                  <div
+                    class="yohu-logs__list-body"
+                    ref={(el) => { setListEl(el); }}
+                  >
                   <EditorView
                     rows={() =>
                       logStore.state.sessions.find((item) => item.id === session.id)?.visible ?? EMPTY_ROWS
@@ -478,6 +510,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     rowChars={rowChars}
                     chPx={chPx}
                     itemHeight={dataRowHeight()}
+                    onInlineScroll={setHeadShift}
                     keyword={() =>
                       logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""
                     }
@@ -529,6 +562,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     />
                   </Show>
                 </div>
+                </YoColFrame>
                 <Show when={session.pendingCount > 0}>
                   <div class="yohu-logs__pending">
                     <YoButton buttonStyle="normal" tone="neutral" onClick={() => logStore.resumeFollow(session.id)}>

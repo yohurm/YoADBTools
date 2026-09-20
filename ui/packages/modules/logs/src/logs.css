@@ -1,6 +1,6 @@
 /* ============================================================================
  * 日志分析模块。官方 Document + Soft-Wrap：一行文档 = 一行可视。
- * hang 空格只在 Formatter 写入 Document（Soft-Wrap 关）。禁止 CSS hang / 表头 1fr。
+ * hang 空格只在 Formatter 写入 Document（Soft-Wrap 关）。禁止 CSS hang / 模块 CSS 写表头 1fr。
  * clip 超宽横滑；wrap 视口软折续行第 0 列。
  * ========================================================================== */
 
@@ -61,6 +61,25 @@
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
   line-height: var(--yohu-font-leading-data);
+}
+
+.yohu-logs__table {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.yohu-logs__head {
+  flex-shrink: 0;
+  overflow: hidden;
+  height: var(--yohu-row-height-header);
+  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  color: var(--yohu-fg-2);
+  user-select: none;
+}
+
+.yohu-logs__table:has(.yohu-scroller[data-gutter="on"]) > .yohu-logs__head {
+  padding-inline-end: var(--yohu-space-lg);
 }
 
 .yohu-logs__list-body {

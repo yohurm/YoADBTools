@@ -31,6 +31,8 @@ describe("日志清单布局契约", () => {
   it("清单壳自持滚轴，状态行不跟列表滚", () => {
     expect(logsCss).toMatch(/\.yohu-logs__list\s*\{[^}]*display:\s*flex/);
     expect(logsCss).not.toContain("yohu-logs__cols--head");
+    expect(logsCss).toContain("yohu-logs__head");
+    expect(logsCss).not.toContain("yohu-logs__head-line");
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
     expect(logsCss).toMatch(/\.yohu-logs__status\s*\{[^}]*flex-shrink:\s*0/);
     expect(logsCss).not.toMatch(/overflow-y:\s*(auto|scroll)/);
@@ -148,7 +150,7 @@ describe("日志显示列", () => {
     expect(dataRowHeight()).toBe(Density.Comfortable.rowHeight);
   });
 
-  it("清单无表头：View 不走列架 / 拖宽", () => {
+  it("清单标题栏走 YoCol 列架，行仍是文档", () => {
     const load = (name: string): string => {
       const candidates = [
         resolve(process.cwd(), `src/${name}`),
@@ -173,8 +175,24 @@ describe("日志显示列", () => {
     );
     expect(view).not.toMatch(/<YoScroller[\s\S]*?<YoVirtualList/);
     expect(view).not.toContain("visibleLogColumns");
-    expect(view).not.toContain("YoColFrame");
-    expect(view).not.toContain("YoColHeader");
+    expect(view).toContain("LogColumnHeader");
+    expect(view).toContain("logDocTrackTemplate");
+    expect(view).toContain("YoColFrame");
+    expect(view).toContain('cellPad="none"');
+    expect(view).toContain('tone="document"');
+    expect(view).toContain("logDocTrackTemplate(formatOpts(), chPx())");
+    expect(view).not.toContain("formatHeader");
+    expect(view).not.toContain("yohu-logs__head-line");
+    expect(view).toContain("onInlineScroll");
+    const header = load("LogColumnHeader.tsx");
+    expect(header).toContain("YoColHeader");
+    expect(header).toContain("YoColRow");
+    expect(header).toContain('pad="none"');
+    expect(header).toContain('tone="document"');
+    expect(header).toContain("split={");
+    expect(header).toContain("onWidthChange");
+    expect(header).toContain("yohu-logs__head");
+    expect(view).toContain("setColChars");
     expect(logsCss).not.toContain("yohu-logs__head-level");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
@@ -239,6 +257,8 @@ describe("日志显示列", () => {
     expect(logsCss).toContain('[data-layout="clip"]');
     expect(editorView).not.toContain("--yohu-log-board");
     expect(editorView).toContain("contentWidth");
+    expect(editorView).toContain("hostRef");
+    expect(editorView).toContain("onInlineScroll");
     expect(editorView).toContain("chPx");
     expect(view).not.toContain("onInlineOffset");
     expect(view).toContain("chPx={chPx}");

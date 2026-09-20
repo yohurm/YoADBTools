@@ -120,6 +120,7 @@ export function EditorView(props: {
   rowChars: Accessor<number>;
   chPx: Accessor<number>;
   itemHeight: number;
+  onInlineScroll?: (left: number) => void;
   keyword: Accessor<string>;
   pickAll: Accessor<boolean>;
   following: Accessor<boolean>;
@@ -203,6 +204,12 @@ export function EditorView(props: {
           autoScrollToBottom={() => props.following() && !props.paused()}
           onAtBottomChange={props.onAtBottomChange}
           ariaLabel="日志列表"
+          hostRef={(el) => {
+            const emit = (): void => props.onInlineScroll?.(el.scrollLeft);
+            emit();
+            el.addEventListener("scroll", emit, { passive: true });
+            onCleanup(() => el.removeEventListener("scroll", emit));
+          }}
           onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}
           renderRow={VisualRow}
         />
