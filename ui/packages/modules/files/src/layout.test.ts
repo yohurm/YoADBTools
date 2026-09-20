@@ -238,7 +238,8 @@ const fileView = loadFileView();
 
 describe("页眉按钮样式", () => {
   it("预览是页眉次要，走 normal+neutral，不是 TEXTUAL", () => {
-    const chrome = fileView.slice(fileView.indexOf("<YoChrome"), fileView.indexOf("</YoChrome>"));
+    const start = fileView.indexOf("<YoChrome");
+    const chrome = fileView.slice(start, fileView.indexOf("<div", start));
     expect(chrome).toContain('buttonStyle="normal" tone="neutral"');
     expect(chrome).not.toContain('buttonStyle="textual"');
     expect(chrome).toContain("togglePreview");

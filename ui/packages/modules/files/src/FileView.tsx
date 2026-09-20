@@ -180,25 +180,41 @@ export function FileView(props: DeviceSession) {
         title={ModuleTitle.Files}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
         dropIgnore
-      >
-        <YoButton onClick={() => void onUpload()}>上传</YoButton>
-        <YoButton buttonStyle="normal" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
-          下载
-        </YoButton>
-        <YoIconButton
-          icon="refresh"
-          title="刷新"
-          loading={listingStore.session.loading}
-          onClick={() => void listingStore.refresh()}
-        />
-        <YoButton
-          buttonStyle="normal" tone="neutral"
-          aria-expanded={listingStore.ui.previewOpen}
-          onClick={() => listingStore.togglePreview()}
-        >
-          {listingStore.ui.previewOpen ? "收起预览" : "预览"}
-        </YoButton>
-      </YoChrome>
+        actions={[
+          { key: "upload", node: <YoButton onClick={() => void onUpload()}>上传</YoButton> },
+          {
+            key: "download",
+            node: (
+              <YoButton buttonStyle="normal" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
+                下载
+              </YoButton>
+            ),
+          },
+          {
+            key: "refresh",
+            node: (
+              <YoIconButton
+                icon="refresh"
+                title="刷新"
+                loading={listingStore.session.loading}
+                onClick={() => void listingStore.refresh()}
+              />
+            ),
+          },
+          {
+            key: "preview",
+            node: (
+              <YoButton
+                buttonStyle="normal" tone="neutral"
+                aria-expanded={listingStore.ui.previewOpen}
+                onClick={() => listingStore.togglePreview()}
+              >
+                {listingStore.ui.previewOpen ? "收起预览" : "预览"}
+              </YoButton>
+            ),
+          },
+        ]}
+      />
 
       <div
         class="yohu-files__stage yohu-recipe-preview"
