@@ -1,12 +1,12 @@
 /**
- * 设置面板组合：页眉铬 + 表单 + 更新对话框。
+ * 设置面板组合：页壳 + 页眉铬 + 表单 + 更新对话框。
  * 启动已 load 设置；本页不二次 settingsStore.load。关于页不展示通道，不打 update.info。
  */
 
 import { Component, onCleanup } from "solid-js";
 
 import { errorText, ModuleTitle, type SettingKey } from "@yohu/api";
-import { YoChrome, YoToaster, createToaster } from "@yohu/ui";
+import { YoChrome, YoPage, YoToaster, createToaster } from "@yohu/ui";
 
 import { settingsStore, updateStore } from "../stores";
 import { SettingsForm } from "./SettingsForm";
@@ -44,10 +44,8 @@ export const SettingsView: Component = () => {
   };
 
   return (
-    <div class="yohu-settings">
-      <div class="yohu-settings__chrome">
-        <YoChrome title={ModuleTitle.Settings} />
-      </div>
+    <YoPage role="settings" class="yohu-settings">
+      <YoChrome title={ModuleTitle.Settings} />
       <SettingsForm
         save={save}
         savedBrowse={savedBrowse}
@@ -55,6 +53,6 @@ export const SettingsView: Component = () => {
       />
       <UpdateDialogs show={(text, tone) => toaster.show(text, tone)} />
       <YoToaster toaster={toaster} />
-    </div>
+    </YoPage>
   );
 };

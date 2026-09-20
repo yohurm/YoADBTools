@@ -1,52 +1,11 @@
-/* 设置页：页眉铺满内容区；标题与分组卡片共用 page-margin 左缘。
+/* 设置页产品皮。页壳走 YoPage role=settings（page-margin + settings-max 居中）。
  * 表单项排布走 YoFormRow（右槽 hug 贴尾）；数字走 YoTextField type=number（左值右步进）。
- * 路径槽只约束宽，铬走 YoTextField。 */
-
-.yohu-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-md);
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  min-height: 0;
-  box-sizing: border-box;
-}
-
-.yohu-settings__chrome {
-  flex: 0 0 auto;
-  padding-inline: var(--yohu-layout-page-margin);
-  padding-top: var(--yohu-space-md);
-}
-
-.yohu-settings__body {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  max-width: var(--yohu-layout-settings-max);
-  padding-inline: var(--yohu-layout-page-margin);
-  padding-bottom: var(--yohu-space-lg);
-  box-sizing: border-box;
-}
-
-.yohu-settings__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-}
+ * 路径槽宽走 YoTextField width=control，禁止本页再套一层。 */
 
 .yohu-settings__stack {
   display: flex;
   flex-direction: column;
   gap: var(--yohu-space-lg);
-}
-
-.yohu-settings__path-field {
-  flex: 0 1 var(--yohu-layout-settings-control-max);
-  width: var(--yohu-layout-settings-control-max);
-  max-width: var(--yohu-layout-settings-control-max);
-  min-width: 0;
 }
 
 .yohu-settings__checks {

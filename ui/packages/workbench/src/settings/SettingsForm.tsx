@@ -93,8 +93,7 @@ export function SettingsForm(props: {
   onCheckUpdate: () => void;
 }): JSX.Element {
   return (
-    <div class="yohu-settings__body">
-      <YoScroller class="yohu-settings__scroll">
+    <YoScroller class="yohu-settings__scroll">
       <div class="yohu-settings__stack">
       <YoPanel title="工具链" overflow="visible">
         <YoFormRow title="ADB 路径" note={<EffectBadge text="立即生效" />}>
@@ -322,7 +321,6 @@ export function SettingsForm(props: {
         </YoFormRow>
       </YoPanel>
       </div>
-      </YoScroller>
-    </div>
+    </YoScroller>
   );
 }

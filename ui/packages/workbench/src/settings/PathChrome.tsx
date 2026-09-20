@@ -15,9 +15,7 @@ export function PathChrome(props: {
 }): JSX.Element {
   return (
     <>
-      <div class="yohu-settings__path-field">
-        <YoTextField block readOnly value={props.path} ariaLabel={props.label} />
-      </div>
+      <YoTextField width="control" readOnly value={props.path} ariaLabel={props.label} />
       <YoButton
         buttonStyle="normal"
         tone="neutral"

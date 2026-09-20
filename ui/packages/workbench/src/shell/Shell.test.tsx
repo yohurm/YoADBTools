@@ -714,6 +714,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(adb.readOnly).toBe(true);
     expect(adb.value).toContain("adb.exe");
     expect(document.querySelectorAll(".yohu-settings__path")).toHaveLength(0);
+    expect(document.querySelectorAll('.yohu-text-field[data-width="control"]')).toHaveLength(4);
     expect(document.querySelectorAll(".yohu-text-field[data-readonly]")).toHaveLength(4);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
@@ -864,15 +865,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("页眉与分组卡片分列：标题不进滚动容器", () => {
     const { container } = render(() => <SettingsView />);
     const root = container.querySelector(".yohu-settings");
-    const chromeWrap = root?.querySelector(":scope > .yohu-settings__chrome");
-    const chrome = chromeWrap?.querySelector(".yohu-chrome");
-    const body = root?.querySelector(":scope > .yohu-settings__body");
-    expect(chromeWrap).toBeTruthy();
+    expect(root?.classList.contains("yohu-page")).toBe(true);
+    expect(root?.getAttribute("data-role")).toBe("settings");
+    expect(root?.getAttribute("data-pad")).toBe("margin");
+    expect(root?.getAttribute("data-column")).toBe("measure");
+    const chrome = root?.querySelector(":scope > .yohu-chrome");
+    const scroller = root?.querySelector(":scope > .yohu-scroller");
     expect(chrome).toBeTruthy();
-    expect(body).toBeTruthy();
-    expect(body?.querySelector(".yohu-scroller")).toBeTruthy();
-    expect(body?.querySelector(".yohu-panel")).toBeTruthy();
-    expect(body?.contains(chrome as Node)).toBe(false);
+    expect(scroller).toBeTruthy();
+    expect(scroller?.querySelector(".yohu-panel")).toBeTruthy();
+    expect(scroller?.contains(chrome as Node)).toBe(false);
   });
 
   it("关于面板展示身份与路径，打开走 system.openPath", async () => {
