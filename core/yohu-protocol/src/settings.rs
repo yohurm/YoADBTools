@@ -193,6 +193,21 @@ pub const fn default_mirror_max_fps() -> u32 {
     0
 }
 
+/// WiFi 投屏默认长边。
+pub const fn default_wifi_mirror_max_size() -> u32 {
+    1280
+}
+
+/// WiFi 投屏默认码率 4 Mbps。
+pub const fn default_wifi_mirror_video_bit_rate() -> u32 {
+    4_000_000
+}
+
+/// WiFi 投屏默认帧率上限。
+pub const fn default_wifi_mirror_max_fps() -> u32 {
+    30
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {

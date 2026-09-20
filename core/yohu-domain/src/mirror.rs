@@ -1,8 +1,9 @@
 //! 投屏协议与编码参数（纯函数；无 IO）。
 
 use yohu_protocol::{
-    default_mirror_max_fps, default_mirror_max_size, default_mirror_video_bit_rate, AppSettings,
-    MirrorProtocol,
+    default_mirror_max_fps, default_mirror_max_size, default_mirror_video_bit_rate,
+    default_wifi_mirror_max_fps, default_wifi_mirror_max_size, default_wifi_mirror_video_bit_rate,
+    AppSettings, MirrorProtocol,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,9 +22,9 @@ pub const USB_ENCODE: MirrorEncodeParams = MirrorEncodeParams {
 };
 
 pub const WIFI_ENCODE: MirrorEncodeParams = MirrorEncodeParams {
-    max_size: 1280,
-    video_bit_rate: 4_000_000,
-    max_fps: 30,
+    max_size: default_wifi_mirror_max_size(),
+    video_bit_rate: default_wifi_mirror_video_bit_rate(),
+    max_fps: default_wifi_mirror_max_fps(),
     video_codec: "h264",
 };
 

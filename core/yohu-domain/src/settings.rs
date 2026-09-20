@@ -22,7 +22,7 @@ pub enum SettingError {
     ExpectTheme(&'static str),
     #[error("{0} 必须是 compact 或 comfortable")]
     ExpectDensity(&'static str),
-    #[error("{0} 必须是列开关对象（ts/uid/pid/tid/level/tag）")]
+    #[error("{0} 必须是列开关对象（ts/uid/pid/tid/tag/app/level）")]
     ExpectLogColumns(&'static str),
     #[error("{0} 必须是 usb 或 wifi")]
     ExpectMirrorProtocol(&'static str),
@@ -154,7 +154,10 @@ pub fn apply_setting(
 mod tests {
     use super::*;
     use serde_json::json;
-    use yohu_protocol::{LogColorScheme, LogLineLayout};
+    use yohu_protocol::{
+        default_wifi_mirror_max_fps, default_wifi_mirror_max_size, default_wifi_mirror_video_bit_rate,
+        LogColorScheme, LogLineLayout,
+    };
 
     #[test]
     fn buffer_capacity_rejects_zero() {
@@ -177,9 +180,9 @@ mod tests {
     fn mirror_protocol_fills_encode_params_without_inventing_custom() {
         let mut s = AppSettings::default();
         apply_setting(&mut s, SettingKey::MirrorProtocol, &json!("wifi")).unwrap();
-        assert_eq!(s.mirror_max_size, 1280);
-        assert_eq!(s.mirror_video_bit_rate, 4_000_000);
-        assert_eq!(s.mirror_max_fps, 30);
+        assert_eq!(s.mirror_max_size, default_wifi_mirror_max_size());
+        assert_eq!(s.mirror_video_bit_rate, default_wifi_mirror_video_bit_rate());
+        assert_eq!(s.mirror_max_fps, default_wifi_mirror_max_fps());
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();
         assert_eq!(s.mirror_max_fps, 15);
