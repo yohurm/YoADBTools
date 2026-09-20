@@ -53,7 +53,7 @@ mod tests {
                 SignalKind::Crash => "crash",
                 SignalKind::Anr => "anr",
             });
-            assert_eq!(got.as_deref(), case.kind.as_deref(), "case {i}");
+            assert_eq!(got, case.kind.as_deref(), "case {i}");
             if let Some(hit) = scan_signal(&case.line) {
                 assert_eq!(hit.pid, case.line.pid, "pid {i}");
             }

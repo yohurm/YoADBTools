@@ -31,9 +31,9 @@ pub use command::{
     ScheduledStep,
 };
 pub use datetime::{
-    canonicalize_datetime, canonicalize_datetime_seconds, clock_display_len, format_clock,
-    format_datetime, format_datetime_seconds, format_log_ts, DATETIME_DISPLAY_LEN,
-    DATETIME_SECONDS_LEN, TIME_DISPLAY_LEN, TIME_MILLIS_DISPLAY_LEN,
+    canonicalize_datetime, canonicalize_datetime_seconds, clock_display_len, format_datetime,
+    format_datetime_seconds, format_log_ts, DATETIME_DISPLAY_LEN, DATETIME_SECONDS_LEN,
+    TIME_DISPLAY_LEN, TIME_MILLIS_DISPLAY_LEN,
 };
 pub use focus::{
     assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,

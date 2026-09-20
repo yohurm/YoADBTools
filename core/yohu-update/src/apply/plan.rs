@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use yohu_protocol::{DATA_DIR_NAME, PRODUCT_NAME};
 use yohu_runtime::app_install_root;
 
+#[cfg(windows)]
 use crate::cache::update_cache_dir;
 use crate::error::UpdateError;
 
@@ -15,18 +16,24 @@ use crate::error::UpdateError;
 /// - `/NS` 静默时不新建桌面快捷方式
 ///
 /// 不加 `/R`：助手校验主程序存在后再拉起，避免与 NSIS `.onInstSuccess` 双启动。
+#[cfg(windows)]
 pub const NSIS_OVERLAY_ARGS: &[&str] = &["/S", "/UPDATE", "/NS"];
 
 /// 等进程退出的上限。
+#[cfg(windows)]
 pub const WAIT_PID_MINUTES: u32 = 5;
 /// 进程消失后再等，避开 Windows 主程序句柄未放。
+#[cfg(windows)]
 pub const SETTLE_SECS: u32 = 2;
 /// setup 失败重试次数（Omaha：忙/锁则退避）。
+#[cfg(windows)]
 pub const SETUP_TRIES: u32 = 4;
 /// 覆盖成功后再等，再拉起新主程序。
+#[cfg(windows)]
 pub const RELAUNCH_SETTLE_SECS: u32 = 1;
 
 /// 一次覆盖安装的冻结参数。
+#[cfg(windows)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplyPlan {
     pub installer: PathBuf,
@@ -35,6 +42,7 @@ pub struct ApplyPlan {
     pub log_path: PathBuf,
 }
 
+#[cfg(windows)]
 impl ApplyPlan {
     pub fn new(installer: PathBuf, wait_pid: u32, relaunch: PathBuf) -> Result<Self, UpdateError> {
         Ok(Self {
@@ -46,6 +54,7 @@ impl ApplyPlan {
     }
 }
 
+#[cfg(windows)]
 pub fn apply_log_path() -> Result<PathBuf, UpdateError> {
     Ok(update_cache_dir()?.join("apply.log"))
 }
@@ -77,14 +86,17 @@ pub fn installed_exe_path() -> Result<PathBuf, UpdateError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
     use std::path::PathBuf;
 
+    #[cfg(windows)]
     #[test]
     fn nsis_flags_match_tauri_updater() {
         assert_eq!(NSIS_OVERLAY_ARGS, &["/S", "/UPDATE", "/NS"]);
         assert!(!NSIS_OVERLAY_ARGS.contains(&"/R"));
     }
 
+    #[cfg(windows)]
     #[test]
     fn plan_writes_log_under_update_cache() {
         let plan = ApplyPlan::new(
