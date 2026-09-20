@@ -222,6 +222,7 @@ describe("YoReorderList", () => {
     expect(src).not.toContain("container.scrollTop =");
     expect(src).not.toContain("yohu-scroller__view");
     expect(src).toContain("useListPresenceSlots");
+    expect(src).not.toContain("list-presence-engine");
     expect(src).toContain('recipe="list"');
     expect(src).toContain("YoPresence");
     expect(src).toContain(":not([data-exiting])");

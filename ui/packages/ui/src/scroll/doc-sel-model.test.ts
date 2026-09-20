@@ -7,17 +7,14 @@ import { fileURLToPath } from "node:url";
 import { docSelBandStyle } from "./doc-sel-model";
 
 describe("docSelBandStyle", () => {
-  it("首行 hang=0，left 就是文档偏移", () => {
-    expect(docSelBandStyle(3, 8, 0)).toEqual({ left: "3ch", width: "8ch" });
-  });
-
-  it("续行 hang 加在 left 上，不进 width", () => {
-    expect(docSelBandStyle(0, 10, 26)).toEqual({ left: "26ch", width: "10ch" });
-    expect(docSelBandStyle(2, 4, 26)).toEqual({ left: "28ch", width: "4ch" });
+  it("left 就是文档偏移，不另加 hang 缩进", () => {
+    expect(docSelBandStyle(3, 8)).toEqual({ left: "3ch", width: "8ch" });
+    expect(docSelBandStyle(0, 10)).toEqual({ left: "0ch", width: "10ch" });
+    expect(docSelBandStyle(2, 4)).toEqual({ left: "2ch", width: "4ch" });
   });
 
   it("负值收成 0", () => {
-    expect(docSelBandStyle(-2, -1, -4)).toEqual({ left: "0ch", width: "0ch" });
+    expect(docSelBandStyle(-2, -1)).toEqual({ left: "0ch", width: "0ch" });
   });
 
   it("带色走 token，垫在字下，不接指针", () => {

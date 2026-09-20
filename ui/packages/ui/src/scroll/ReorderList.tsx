@@ -9,8 +9,7 @@
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { Accessor, Component, JSX } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
-import { YoPresence } from "../motion/engines/presence";
-import { useListPresenceSlots } from "../motion/engines/presence/list-presence-engine";
+import { YoPresence, useListPresenceSlots } from "../motion/engines/presence";
 import { ReorderBar } from "./ReorderBar";
 import { ReorderOverlay } from "./ReorderOverlay";
 import { createReorderBinder } from "./reorder-binder";
