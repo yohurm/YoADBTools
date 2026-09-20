@@ -280,9 +280,11 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
         | FileError::TreeLimit(_)
         | FileError::TreeDepth(_) => None,
         FileError::Adb(AdbError::Cancelled) => None,
-        FileError::Adb(AdbError::DeviceOffline(serial)) => Some(TransferFault::DeviceOffline {
-            serial: serial.clone(),
-        }),
+        FileError::Adb(AdbError::DeviceOffline(serial) | AdbError::NotOnline(serial)) => {
+            Some(TransferFault::DeviceOffline {
+                serial: serial.clone(),
+            })
+        }
         FileError::Adb(AdbError::Timeout) => Some(TransferFault::Timeout),
         FileError::Adb(AdbError::Io(_)) => Some(TransferFault::Io),
         FileError::Adb(AdbError::ToolUnavailable(_)) => Some(TransferFault::ToolUnavailable),
@@ -650,6 +652,12 @@ mod tests {
             wire_fault(&FileError::Adb(AdbError::DeviceOffline("S1".into()))),
             Some(TransferFault::DeviceOffline {
                 serial: "S1".into()
+            })
+        );
+        assert_eq!(
+            wire_fault(&FileError::Adb(AdbError::NotOnline("S2".into()))),
+            Some(TransferFault::DeviceOffline {
+                serial: "S2".into()
             })
         );
         assert_eq!(
