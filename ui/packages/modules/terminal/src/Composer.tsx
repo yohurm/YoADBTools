@@ -11,18 +11,14 @@ import { commandBlockGapLabel } from "./block-gap";
 import { formatAdbLine } from "./command-line";
 import { terminalStore, type QueuedSend } from "./store";
 
-function queuedLeading(item: QueuedSend): "terminal" | "block" | "folder" {
+function queuedLeading(item: QueuedSend): "terminal" | "block" {
   if (item.kind === "block") return "block";
-  if (item.kind === "group") return "folder";
   return "terminal";
 }
 
 function queuedText(item: QueuedSend): string {
   if (item.kind === "line") return `${item.title} · ${formatAdbLine("-", item.line)}`;
-  if (item.kind === "block") {
-    return `${item.title} · ${item.block.steps.length} 条 · 间隔 ${commandBlockGapLabel(item.block.gap_ms)}`;
-  }
-  return `${item.title} · ${item.group.entries.length} 条`;
+  return `${item.title} · ${item.block.steps.length} 条 · 间隔 ${commandBlockGapLabel(item.block.gap_ms)}`;
 }
 
 export function Composer(props: { serials: string[] }) {

@@ -1,22 +1,18 @@
 /**
- * 文件管理 View：绑定壳注入的 DeviceSession，对话框与本机选路留在视图层。
+ * 文件管理 View：挂载、传 ref、接线 store。拖放会话与对话框自持状态。
  */
 
-import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { Show, createEffect, onCleanup, onMount, untrack } from "solid-js";
 
-import { onNativeDragDrop, dialogOpenFile, dialogSaveFile, ModuleTitle, YoLog, type DeviceSession } from "@yohu/api";
+import { dialogOpenFile, dialogSaveFile, ModuleTitle, type DeviceSession } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
   YoChrome,
-  YoCorner,
-  YoDialog,
   YoEmptyState,
   YoIconButton,
   YoPage,
   YoPanel,
-  YoScroller,
-  YoTextField,
   YoToaster,
   attachPanelKeys,
   closeContextMenu,
@@ -24,51 +20,47 @@ import {
   openContextMenu,
 } from "@yohu/ui";
 
-import { DeleteConfirm, DeleteExpand, DeleteTargetList } from "./DeleteTargets";
+import { CreateDialog, type CreateDialogApi } from "./CreateDialog";
+import { DeleteDialog, type DeleteDialogApi } from "./DeleteDialog";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
 import { TransferDock } from "./TransferDock";
-import { DELETE_PREVIEW_LIMIT, canToggleDelete, dropDeleteName } from "./delete-targets";
-import {
-  adoptDropSession,
-  cssPointFromPhysical,
-  destDirFromEntries,
-  DROP_IDLE,
-  dropCommit,
-  dropSessionForEvent,
-  dropSessionWithDir,
-  localBaseName,
-  readFolderTargets,
-  readListHitSpace,
-  type DropSession,
-} from "./drop";
-import { controlRowHeight } from "./layout";
+import { localBaseName } from "./drop";
+import { createDropSession } from "./drop-session";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
 import { filesListMenu } from "./menu";
 import { filesFaultText } from "./fault";
-import { childPath, validateEntryName } from "./model";
+import { childPath } from "./model";
 import { AddressSlot, type AddressSlotApi } from "./AddressSlot";
 import { listingStore } from "./listing";
 import { transferStore } from "./transfers";
 import "./files.css";
 
-type CreateKind = "file" | "dir";
-
 export function FileView(props: DeviceSession) {
   const toaster = createToaster();
   onCleanup(() => toaster.destroy());
-  const [deleteOpen, setDeleteOpen] = createSignal(false);
-  const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
-  const [deleteExpanded, setDeleteExpanded] = createSignal(false);
-  const [createOpen, setCreateOpen] = createSignal(false);
-  const [createKind, setCreateKind] = createSignal<CreateKind | null>(null);
-  const [createName, setCreateName] = createSignal("");
-  const [createError, setCreateError] = createSignal("");
-  const [dropSession, setDropSession] = createSignal<DropSession>(DROP_IDLE);
   let pageEl: HTMLDivElement | undefined;
-  let explorerEl: HTMLDivElement | undefined;
   let listEl: HTMLDivElement | undefined;
   let addressSlot: AddressSlotApi | undefined;
+  let deleteDialog: DeleteDialogApi | undefined;
+  let createDialog: CreateDialogApi | undefined;
+
+  const drop = createDropSession({
+    listEl: () => listEl,
+    hasDevice: () => Boolean(props.selectedSerials[0]),
+    blocked: () => Boolean(deleteDialog?.isOpen() || createDialog?.isOpen()),
+    intoFolder: () => props.settings.files_drop_into_folder,
+    entries: () => listingStore.entries,
+    onCommit: (paths, dirName) => {
+      if (paths.length === 0) return;
+      try {
+        const dest = dirName ? childPath(listingStore.session.path, dirName) : listingStore.session.path;
+        void transferStore.pushLocals(paths, dest);
+      } catch (e) {
+        listingStore.notifyError(filesFaultText(e));
+      }
+    },
+  });
 
   createEffect(() => {
     listingStore.bindSerial(props.selectedSerials[0] ?? null);
@@ -80,23 +72,11 @@ export function FileView(props: DeviceSession) {
     if (tick > 0 && text) toaster.show(text, "error");
   });
 
-  const dropHot = (): boolean => dropSession().hot;
-
-  const dropIntoFolder = (): boolean => props.settings.files_drop_into_folder;
+  const dropHot = (): boolean => drop.session().hot;
 
   const dropDirName = (): string | null | undefined => {
-    const session = dropSession();
-    return session.hot && dropIntoFolder() ? session.dirName : undefined;
-  };
-
-  const onNativeDrop = (paths: string[], dirName: string | null): void => {
-    if (paths.length === 0) return;
-    try {
-      const dest = dirName ? childPath(listingStore.session.path, dirName) : listingStore.session.path;
-      void transferStore.pushLocals(paths, dest);
-    } catch (e) {
-      listingStore.notifyError(filesFaultText(e));
-    }
+    const session = drop.session();
+    return session.hot && props.settings.files_drop_into_folder ? session.dirName : undefined;
   };
 
   const onUpload = async (): Promise<void> => {
@@ -112,74 +92,6 @@ export function FileView(props: DeviceSession) {
     if (!file) return;
     const dest = await dialogSaveFile({ defaultPath: file.name, title: "保存到本机" });
     if (typeof dest === "string") void transferStore.pull(file.name, dest, file.size);
-  };
-
-  const closeDelete = (): void => {
-    setDeleteOpen(false);
-  };
-
-  const finishDelete = (): void => {
-    setDeleteNames([]);
-    setDeleteExpanded(false);
-  };
-
-  const askDelete = (names: string[]): void => {
-    if (names.length === 0) return;
-    closeContextMenu();
-    setDeleteExpanded(false);
-    setDeleteNames(names);
-    setDeleteOpen(true);
-  };
-
-  const dropFromDelete = (name: string): void => {
-    const next = dropDeleteName(deleteNames(), name);
-    if (next.length === 0) {
-      setDeleteOpen(false);
-      return;
-    }
-    setDeleteNames(next);
-    if (next.length <= DELETE_PREVIEW_LIMIT) setDeleteExpanded(false);
-  };
-
-  const confirmDelete = (): void => {
-    const names = deleteNames();
-    setDeleteOpen(false);
-    void listingStore.removeMany(names);
-  };
-
-  const closeCreate = (): void => {
-    setCreateOpen(false);
-  };
-
-  const finishCreate = (): void => {
-    setCreateKind(null);
-    setCreateName("");
-    setCreateError("");
-  };
-
-  const openCreate = (kind: CreateKind): void => {
-    setCreateKind(kind);
-    setCreateName(kind === "dir" ? "新建文件夹" : "新建文件.txt");
-    setCreateError("");
-    setCreateOpen(true);
-    closeContextMenu();
-  };
-
-  const createReady = (): boolean =>
-    validateEntryName(createName().trim()) === null && !listingStore.session.mutating;
-
-  const confirmCreate = (): void => {
-    const name = createName().trim();
-    const kind = createKind();
-    const invalid = validateEntryName(name);
-    if (invalid) {
-      setCreateError(invalid);
-      return;
-    }
-    setCreateOpen(false);
-    if (!kind) return;
-    if (kind === "dir") void listingStore.mkdir(name);
-    else void listingStore.createFile(name);
   };
 
   const copySelected = (): void => {
@@ -211,7 +123,7 @@ export function FileView(props: DeviceSession) {
       return;
     }
     if (action === "delete") {
-      askDelete([...listingStore.selection.names]);
+      deleteDialog?.ask([...listingStore.selection.names]);
       return;
     }
     if (action === "refresh") {
@@ -238,76 +150,8 @@ export function FileView(props: DeviceSession) {
       bindings: FILES_KEY_BINDINGS,
       onAction: onKeyAction,
     });
-    let stopDrag: (() => void) | undefined;
-    let cancelled = false;
-    let destFrame = 0;
-    let destPoint = { x: 0, y: 0 };
-    const stopDestFrame = (): void => {
-      if (destFrame === 0) return;
-      cancelAnimationFrame(destFrame);
-      destFrame = 0;
-    };
-    void onNativeDragDrop((event) => {
-      const gate = {
-        hasDevice: Boolean(props.selectedSerials[0]),
-        blocked: deleteOpen() || createOpen(),
-      };
-      setDropSession((prev) => adoptDropSession(prev, dropSessionForEvent(event, gate)));
-      const intoFolder = dropIntoFolder();
-      const scale = window.devicePixelRatio;
-      if (
-        (event.type === "enter" || event.type === "over") &&
-        intoFolder &&
-        gate.hasDevice &&
-        !gate.blocked
-      ) {
-        destPoint = cssPointFromPhysical(event.position.x, event.position.y, scale);
-        if (destFrame === 0) {
-          destFrame = requestAnimationFrame(() => {
-            destFrame = 0;
-            const list = listEl;
-            if (!list) return;
-            const dirName = destDirFromEntries(
-              destPoint.x,
-              destPoint.y,
-              readListHitSpace(list, controlRowHeight()),
-              listingStore.entries,
-            );
-            setDropSession((prev) => dropSessionWithDir(prev, dirName));
-          });
-        }
-        return;
-      }
-      if (event.type !== "drop") {
-        stopDestFrame();
-        return;
-      }
-      stopDestFrame();
-      const commit = dropCommit(event, {
-        ...gate,
-        intoFolder,
-        folders: intoFolder && explorerEl ? readFolderTargets(explorerEl) : [],
-        scale,
-      });
-      if (!commit) {
-        YoLog.info("files", "投放未提交", { x: event.position.x, y: event.position.y, paths: event.paths.length });
-        return;
-      }
-      onNativeDrop(commit.paths, commit.dirName);
-    }).then(
-      (unlisten) => {
-        if (cancelled) unlisten();
-        else stopDrag = unlisten;
-      },
-      (error: unknown) => {
-        YoLog.error("files", "订阅官方拖放失败", error);
-      },
-    );
     onCleanup(() => {
-      cancelled = true;
-      stopDestFrame();
       stopKeys();
-      stopDrag?.();
       closeContextMenu();
     });
   });
@@ -321,11 +165,11 @@ export function FileView(props: DeviceSession) {
         canDownload: listingStore.singleFile() !== undefined,
         canDelete: selected,
         canCopy: selected,
-        newFile: () => openCreate("file"),
-        newDir: () => openCreate("dir"),
+        newFile: () => createDialog?.open("file"),
+        newDir: () => createDialog?.open("dir"),
         download: () => void onDownload(),
         copy: copySelected,
-        remove: () => askDelete([...listingStore.selection.names]),
+        remove: () => deleteDialog?.ask([...listingStore.selection.names]),
       },
     });
   };
@@ -336,35 +180,47 @@ export function FileView(props: DeviceSession) {
         title={ModuleTitle.Files}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
         dropIgnore
-      >
-        <YoButton onClick={() => void onUpload()}>上传</YoButton>
-        <YoButton buttonStyle="normal" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
-          下载
-        </YoButton>
-        <YoIconButton
-          icon="refresh"
-          title="刷新"
-          loading={listingStore.session.loading}
-          onClick={() => void listingStore.refresh()}
-        />
-        <YoButton
-          buttonStyle="normal" tone="neutral"
-          aria-expanded={listingStore.ui.previewOpen}
-          onClick={() => listingStore.togglePreview()}
-        >
-          {listingStore.ui.previewOpen ? "收起预览" : "预览"}
-        </YoButton>
-      </YoChrome>
+        actions={[
+          { key: "upload", node: <YoButton onClick={() => void onUpload()}>上传</YoButton> },
+          {
+            key: "download",
+            node: (
+              <YoButton buttonStyle="normal" tone="neutral" disabled={listingStore.singleFile() === undefined} onClick={() => void onDownload()}>
+                下载
+              </YoButton>
+            ),
+          },
+          {
+            key: "refresh",
+            node: (
+              <YoIconButton
+                icon="refresh"
+                title="刷新"
+                loading={listingStore.session.loading}
+                onClick={() => void listingStore.refresh()}
+              />
+            ),
+          },
+          {
+            key: "preview",
+            node: (
+              <YoButton
+                buttonStyle="normal" tone="neutral"
+                aria-expanded={listingStore.ui.previewOpen}
+                onClick={() => listingStore.togglePreview()}
+              >
+                {listingStore.ui.previewOpen ? "收起预览" : "预览"}
+              </YoButton>
+            ),
+          },
+        ]}
+      />
 
       <div
         class="yohu-files__stage yohu-recipe-preview"
         classList={{ "yohu-files__stage--preview-collapsed": !listingStore.ui.previewOpen }}
       >
-        <div
-          class="yohu-files__explorer"
-          data-drop="files"
-          ref={(el) => { explorerEl = el; }}
-        >
+        <div class="yohu-files__explorer" data-drop="files">
           <YoPanel
             variant="pane"
             overflow="hidden"
@@ -392,76 +248,8 @@ export function FileView(props: DeviceSession) {
       </div>
 
       <div data-drop="ignore">
-        <YoDialog
-          open={deleteOpen}
-          title="确认删除"
-          initial="footer"
-          bodyLead={<DeleteConfirm count={deleteNames().length} />}
-          bodyTail={
-            canToggleDelete(deleteNames()) ? (
-              <DeleteExpand
-                names={deleteNames()}
-                expanded={deleteExpanded()}
-                onExpandedChange={setDeleteExpanded}
-              />
-            ) : undefined
-          }
-          onClose={closeDelete}
-          onExitComplete={finishDelete}
-          footer={
-            <>
-              <YoButton buttonStyle="normal" tone="accent" onClick={closeDelete}>
-                取消
-              </YoButton>
-              <YoButton buttonStyle="normal" tone="danger" onClick={confirmDelete}>
-                删除
-              </YoButton>
-            </>
-          }
-        >
-          <YoScroller>
-            <DeleteTargetList
-              names={deleteNames()}
-              expanded={deleteExpanded()}
-              onRemove={dropFromDelete}
-            />
-          </YoScroller>
-        </YoDialog>
-
-        <YoDialog
-          open={createOpen}
-          title={createKind() === "dir" ? "新建目录" : "新建文件"}
-          onClose={closeCreate}
-          onExitComplete={finishCreate}
-          footer={
-            <>
-              <YoButton buttonStyle="normal" tone="accent" onClick={closeCreate}>
-                取消
-              </YoButton>
-              <YoButton onClick={confirmCreate} disabled={!createReady()}>
-                创建
-              </YoButton>
-            </>
-          }
-        >
-          <YoScroller>
-            <YoTextField
-              block
-              label="名称"
-              value={createName()}
-              onInput={(v) => {
-                setCreateName(v);
-                setCreateError(validateEntryName(v) ?? "");
-              }}
-              ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}
-            />
-            <Show when={createError()}>
-              <YoCorner role="control" class="yohu-files__error" flex="hug" pad="xs">
-                {createError()}
-              </YoCorner>
-            </Show>
-          </YoScroller>
-        </YoDialog>
+        <DeleteDialog api={(api) => { deleteDialog = api; }} />
+        <CreateDialog api={(api) => { createDialog = api; }} />
       </div>
       <YoToaster toaster={toaster} />
     </YoPage>

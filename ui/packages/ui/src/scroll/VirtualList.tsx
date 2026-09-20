@@ -5,8 +5,10 @@
  *
  * 泛型组件：`.yohu-virtual-list` 只裁切；纵滚与产品条内组合 YoScroller
  *（视口 overflow hidden，滚轮改 scrollTop）。`__inner` 只撑总高。
- * 与 YoColFrame 表头共用视口：溢出让出侧轨，禁止 scrollbar-gutter。
- * fill / 投放框宽走视口内容盒（clientWidth 减 gutter padding），不进侧轨。
+ * 文件清单 YoColFrame 表头跟 data-gutter 对齐；日志表头同 Frame（cellPad=none），clip 横滑靠 contentWidth + axis=both。
+ * 溢出让出侧轨，禁止 scrollbar-gutter。
+ * fill / 投放框宽走 measureVirtualViewContentWidth（clientWidth 减 gutter padding），不进侧轨。
+ * 总高变化后 handle.sync() 再量侧轨，过滤变短必须收回 gutter。
  * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
  *（absolute + translate3d）。行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
  * 滚动改 transform / data-key / 行 props，不拆行节点。
@@ -20,7 +22,7 @@
  * tone=list 行自绘选中底；投放框是 list-frame 叠加层；document 单选才挂 YoIndicator fill。
  * fill 滑块 decorate=false，用 top/left 落在 inner 内容坐标；禁止把 yohu-indicator-host
  * 打在滚轴或超高 inner 上（fill 宿主 overflow:hidden 会吃掉纵滚 / 撑出合成层）。
- * 选中行指针热态写 data-indicator-hot，填色在 indicator.css，禁止 :has list-row。
+ * 选中行指针热态走 virtuallist-hot；L4 绑 data-indicator-hot。填色在 indicator.css，禁止 :has list-row。
  * `onReorder` 开启整行按住拖动换位：过臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 from/to。
  * 未开启选择模式时行不参与焦点序列（日志列表性能优先）。槽位回收时原生 Selection 不跨原点保留。
  * `tone` 默认 document（无分割线）；文件清单显式 list。`hotKey` 是行热态，不是模块 class。
@@ -57,7 +59,7 @@ import {
   isVirtualSelectable,
   isVirtualSelectionEmpty,
   virtualActiveKey,
-  virtualContentWidth,
+  virtualInnerWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
@@ -72,13 +74,17 @@ import {
   virtualRowTop,
   virtualTotalHeight,
 } from "./virtuallist-model";
+import { measureVirtualViewContentWidth } from "./virtuallist-measure";
 import {
   isPendingFocusAdopted,
   resolveVirtualListKeyAction,
   shouldEmitAtBottom,
   virtualHostAttrs,
+  virtualIndicatorFill,
   virtualRowAttrs,
 } from "./virtuallist-policy";
+import { createVirtualIndicatorHotBinder } from "./virtuallist-hot";
+import "./doc-sel.css";
 import "./VirtualList.css";
 
 export type YoVirtualListTone = "document" | "list";
@@ -130,6 +136,11 @@ export interface YoVirtualListProps<T> {
    * 松手提交 from/to；原槽或 Escape 不回调。键盘 Ctrl/Meta+↑/↓ 同一入口。
    */
   onReorder?: (from: number, to: number) => void;
+  /**
+   * 文档行宽（px）。abspos 行不撑 scrollWidth，inner 必须显式宽。
+   * >0 时 YoScroller axis=both，溢出才出底轨。0 / 缺省 = 只纵滚。
+   */
+  contentWidth?: Accessor<number>;
 }
 
 /**
@@ -144,9 +155,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   const [focusTick, setFocusTick] = createSignal(0);
   const [focusKey, setFocusKey] = createSignal<string | number | null>(null);
   const [barReady, setBarReady] = createSignal(false);
-  const [indicatorHot, setIndicatorHot] = createSignal<"hover" | "pressed" | undefined>();
   let container: HTMLDivElement | undefined;
-  let indicatorPressed = false;
   let pendingFocusKey: string | number | null = null;
   let focusAttempts = 0;
   let isAutoScrolling = false;
@@ -200,6 +209,14 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const totalHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
 
+  createEffect(() => {
+    void totalHeight();
+    void innerWidth();
+    const api = scrollerHandle;
+    if (!api) return;
+    queueMicrotask(() => api.sync());
+  });
+
   const poolSize = createMemo(() =>
     virtualPoolSize(viewportHeight(), itemHeight(), overscan(), props.items().length),
   );
@@ -238,15 +255,11 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       ? undefined
       : virtualIndicatorFollow(selectable(), selectedKeys(), selectedKey());
 
-  const viewContentWidth = (): number => {
-    const el = container;
-    if (!el) return 0;
-    const style = getComputedStyle(el);
-    const pad =
-      (Number.parseFloat(style.paddingInlineStart) || 0) +
-      (Number.parseFloat(style.paddingInlineEnd) || 0);
-    return virtualContentWidth(el.clientWidth, pad);
-  };
+  const viewContentWidth = (): number => measureVirtualViewContentWidth(container);
+
+  const innerWidth = (): number => virtualInnerWidth(props.contentWidth?.() ?? 0, viewContentWidth());
+
+  const scrollerAxis = (): "block" | "both" => (innerWidth() > 0 ? "both" : "block");
 
   const indicatorAnchor = (): IndicatorBox | null =>
     virtualIndicatorAnchor(
@@ -309,45 +322,10 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     },
   });
 
-  const selectedFillRow = (event: Event): boolean => {
-    if (!(event.target instanceof Element)) return false;
-    const row = event.target.closest(".yohu-virtual-list__row");
-    return row?.getAttribute("aria-selected") === "true";
-  };
-
-  const syncIndicatorHot = (event: Event): void => {
-    if (followKey() == null || reorder.session() !== null) {
-      setIndicatorHot(undefined);
-      return;
-    }
-    if (!selectedFillRow(event)) {
-      setIndicatorHot(undefined);
-      return;
-    }
-    setIndicatorHot(indicatorPressed ? "pressed" : "hover");
-  };
-
-  const onIndicatorPointerOver = (event: PointerEvent): void => {
-    syncIndicatorHot(event);
-  };
-
-  const onIndicatorPointerOut = (event: PointerEvent): void => {
-    const row = event.target instanceof Element ? event.target.closest(".yohu-virtual-list__row") : null;
-    const next = event.relatedTarget;
-    if (row instanceof Node && next instanceof Node && row.contains(next)) return;
-    if (indicatorPressed) return;
-    setIndicatorHot(undefined);
-  };
-
-  const onIndicatorPointerDown = (event: PointerEvent): void => {
-    indicatorPressed = selectedFillRow(event);
-    syncIndicatorHot(event);
-  };
-
-  const onIndicatorPointerUp = (event: PointerEvent): void => {
-    indicatorPressed = false;
-    syncIndicatorHot(event);
-  };
+  const indicatorHot = createVirtualIndicatorHotBinder({
+    follow: () => followKey() != null,
+    reordering: () => reorder.session() !== null,
+  });
 
   const handleRowClick = (index: number, event: MouseEvent): void => {
     if (reorder.consumeClick()) return;
@@ -495,6 +473,8 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       tone: props.tone,
       ariaLabel: props.ariaLabel,
       reordering: reorder.session() !== null,
+      indicatorFill: virtualIndicatorFill(followKey(), reorder.session() !== null),
+      indicatorHot: indicatorHot.hot(),
     });
 
   type BoundRow = { index: number; item: T; key: string | number };
@@ -532,7 +512,13 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           const drag = reorder.session();
           const shift =
             drag && current ? shiftForReorder(current.index, drag.from, previewDest(drag)) : 0;
-          return virtualRowBoxStyle(current?.index ?? 0, itemHeight(), shift, current != null);
+          return virtualRowBoxStyle(
+            current?.index ?? 0,
+            itemHeight(),
+            shift,
+            current != null,
+            innerWidth(),
+          );
         })()}
         onPointerDown={(event) => {
           const current = bound();
@@ -572,20 +558,19 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       class="yohu-virtual-list"
       data-tone={host()["data-tone"]}
       data-reordering={host()["data-reordering"]}
-      data-indicator={followKey() != null && reorder.session() === null ? "fill" : undefined}
-      data-indicator-hot={
-        followKey() != null && reorder.session() === null ? indicatorHot() : undefined
-      }
+      data-indicator={host()["data-indicator"]}
+      data-indicator-hot={host()["data-indicator-hot"]}
       role={host().role}
-      onPointerOver={onIndicatorPointerOver}
-      onPointerOut={onIndicatorPointerOut}
-      onPointerDown={onIndicatorPointerDown}
-      onPointerUp={onIndicatorPointerUp}
-      onPointerCancel={onIndicatorPointerUp}
+      onPointerOver={indicatorHot.onPointerOver}
+      onPointerOut={indicatorHot.onPointerOut}
+      onPointerDown={indicatorHot.onPointerDown}
+      onPointerUp={indicatorHot.onPointerUp}
+      onPointerCancel={indicatorHot.onPointerUp}
       aria-label={host()["aria-label"]}
       aria-multiselectable={host()["aria-multiselectable"]}
     >
       <YoScroller
+        axis={scrollerAxis()}
         handle={(api) => {
           scrollerHandle = api;
         }}
@@ -598,8 +583,14 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           });
         }}
       >
-      <div class="yohu-virtual-list__inner" style={{ height: `${totalHeight()}px` }}>
-        <Show when={followKey() != null && reorder.session() === null}>
+      <div
+        class="yohu-virtual-list__inner"
+        style={{
+          height: `${totalHeight()}px`,
+          ...(innerWidth() > 0 ? { width: `${innerWidth()}px`, "min-width": "100%" } : {}),
+        }}
+      >
+        <Show when={virtualIndicatorFill(followKey(), reorder.session() !== null)}>
           <YoIndicator decorate={false} follow={followKey()} variant="fill" anchor={indicatorAnchor} />
         </Show>
         <Show when={frameBox() != null && reorder.session() === null}>

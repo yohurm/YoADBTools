@@ -2,26 +2,18 @@
 
 use tauri::State;
 
-use crate::commands::{ipc, ipc_code};
+use crate::commands::ipc_library_store;
 use crate::state::AppState;
-use yohu_domain::CommandLibrary;
-use yohu_protocol::{CommandLibraryDto, IpcError, IpcErrorCode};
+use yohu_protocol::{CommandLibraryDto, IpcError};
 
-/// `commandlib.load`：缺失 → 默认库；当前 schema → `from_dto`；其余 schema / 解析校验失败 → 备份后写默认库。
+/// `commandlib.load`：缺失 → 默认库；当前 schema 采纳；其余 schema / 损坏 → 备份后写默认库。
 #[tauri::command(rename = "commandlib.load")]
 pub fn commandlib_load(state: State<'_, AppState>) -> Result<CommandLibraryDto, IpcError> {
-    let library =
-        crate::library_store::load_or_default(&state.paths.library_file()).map_err(ipc)?;
-    *state.library.lock().expect("library lock poisoned") = library.clone();
-    Ok(library.to_dto())
+    crate::library_store::load(&state).map_err(ipc_library_store)
 }
 
-/// `commandlib.save`：`from_dto` 后全量提交。取消零污染由 UI 深拷贝保证。
+/// `commandlib.save`：全量提交。取消零污染由 UI 深拷贝保证。
 #[tauri::command(rename = "commandlib.save")]
 pub fn commandlib_save(state: State<'_, AppState>, dto: CommandLibraryDto) -> Result<(), IpcError> {
-    let library = CommandLibrary::from_dto(&dto)
-        .map_err(|e| ipc_code(IpcErrorCode::InvalidArgs, e.to_string()))?;
-    crate::library_store::save(&state.paths.library_file(), &library).map_err(ipc)?;
-    *state.library.lock().expect("library lock poisoned") = library;
-    Ok(())
+    crate::library_store::save(&state, dto).map_err(ipc_library_store)
 }

@@ -1,8 +1,8 @@
-//! 日志行文本格式（复制与导出共用）。protocol 只持有结构，排版在本层。
+//! 日志行文本格式（仅导出 testdata；清单复制走 UI Document.text）。protocol 只持有结构，排版在本层。
 
 use yohu_protocol::LogLine;
 
-/// 还原为 logcat threadtime 风格的一行文本。
+/// 导出 testdata 用的一行文本（threadtime 形）。不是 AOSP FORMAT_LONG，不驱动清单。
 pub fn format_log_line(line: &LogLine) -> String {
     match &line.uid {
         Some(uid) => format!(
@@ -19,7 +19,6 @@ pub fn format_log_line(line: &LogLine) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yohu_protocol::LogLine;
 
     #[test]
     fn format_shared_fixture() {

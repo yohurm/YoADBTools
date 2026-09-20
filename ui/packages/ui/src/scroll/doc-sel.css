@@ -1,0 +1,9 @@
+/* 文档选区带。色走 --yohu-doc-sel。z-index:-1 垫在字下，宿主须 isolation。pointer-events 放开手势。 */
+.yohu-doc-sel {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: var(--yohu-doc-sel);
+  pointer-events: none;
+  z-index: -1;
+}

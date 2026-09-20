@@ -18,9 +18,9 @@ use tokio_util::sync::CancellationToken;
 use yohu_files::FileError;
 #[cfg(target_os = "macos")]
 use yohu_files::TreeEntry;
+use yohu_protocol::DragOutRequest;
 #[cfg(any(windows, target_os = "macos"))]
 use yohu_protocol::{Direction, TransferRequest};
-use yohu_protocol::DragOutRequest;
 
 use crate::state::AppState;
 
@@ -89,10 +89,7 @@ pub async fn drag_out(
         .filter(|e| relative_ok(&e.relative))
         .collect();
     if items.is_empty() {
-        return Err(FileError::EmptyTree(
-            req.remotes.first().cloned().unwrap_or_default(),
-        )
-        .into());
+        return Err(FileError::EmptyTree(req.remotes.first().cloned().unwrap_or_default()).into());
     }
 
     let root = state.paths.drag_out_dir();

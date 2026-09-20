@@ -1,15 +1,17 @@
 //! capability / domain 错误 → [`IpcError`]。与 `commands` 平级；只许 invoke 边界调用。
 
 use yohu_adb::AdbError;
-use yohu_domain::{LibraryError, RunError};
+use yohu_domain::LibraryError;
 use yohu_files::FileError;
 use yohu_logsrv::LogError;
 use yohu_mirror::MirrorError;
 use yohu_protocol::{IpcError, IpcErrorCode};
 use yohu_update::UpdateError;
 
+use crate::device_catalog::CatalogError;
 use crate::dnd::DndError;
 use crate::group_runs::GroupRunError;
+use crate::library_store::LibraryStoreError;
 use crate::mirror_present::PresentError;
 use crate::terminal_eval::TerminalEvalError;
 
@@ -21,32 +23,36 @@ pub fn ipc(e: impl std::fmt::Display) -> IpcError {
     }
 }
 
+fn adb_code(e: &AdbError) -> IpcErrorCode {
+    match e {
+        AdbError::DeviceOffline(_) | AdbError::NotOnline(_) => IpcErrorCode::DeviceOffline,
+        AdbError::Cancelled => IpcErrorCode::Cancelled,
+        AdbError::ToolUnavailable(_) | AdbError::BadExit { .. } | AdbError::Timeout => {
+            IpcErrorCode::AdbError
+        }
+        AdbError::Io(_) => IpcErrorCode::Internal,
+    }
+}
+
 /// ADB 错误 → IPC 错误（保留语义码）。
 pub fn ipc_adb(e: AdbError) -> IpcError {
-    let code = match &e {
-        AdbError::DeviceOffline(_) => IpcErrorCode::DeviceOffline,
-        AdbError::Cancelled => IpcErrorCode::Cancelled,
-        AdbError::ToolUnavailable(_) | AdbError::BadExit { .. } => IpcErrorCode::AdbError,
-        AdbError::Timeout => IpcErrorCode::AdbError,
-        AdbError::Io(_) => IpcErrorCode::Internal,
-    };
     IpcError {
-        code,
+        code: adb_code(&e),
         message: e.to_string(),
     }
 }
 
-/// domain 执行端口错误 → IPC。
-pub fn ipc_run(e: RunError) -> IpcError {
-    let code = match &e {
-        RunError::DeviceOffline(_) => IpcErrorCode::DeviceOffline,
-        RunError::Unauthorized => IpcErrorCode::Unauthorized,
-        RunError::Cancelled => IpcErrorCode::Cancelled,
-        RunError::Timeout | RunError::Adb(_) => IpcErrorCode::AdbError,
-    };
-    IpcError {
-        code,
-        message: e.to_string(),
+/// 设备目录扫描错误 → IPC。
+pub fn ipc_catalog(e: CatalogError) -> IpcError {
+    match e {
+        CatalogError::Interrupted => ipc_code(
+            IpcErrorCode::Cancelled,
+            CatalogError::Interrupted.to_string(),
+        ),
+        CatalogError::Adb(adb) => IpcError {
+            code: adb_code(&adb),
+            message: adb.to_string(),
+        },
     }
 }
 
@@ -60,6 +66,13 @@ pub fn ipc_code(code: IpcErrorCode, message: impl Into<String>) -> IpcError {
 
 pub fn ipc_library(error: LibraryError) -> IpcError {
     ipc_code(IpcErrorCode::InvalidArgs, error.to_string())
+}
+
+pub fn ipc_library_store(e: LibraryStoreError) -> IpcError {
+    match e {
+        LibraryStoreError::Library(lib) => ipc_library(lib),
+        LibraryStoreError::Io(msg) => ipc(msg),
+    }
 }
 
 /// 文件模块错误 → IPC。文案与 `FileError` Display 同一条（分类 + 载荷），不扫 stderr。
@@ -121,17 +134,28 @@ pub fn ipc_present(e: PresentError) -> IpcError {
 }
 
 pub fn ipc_mirror(e: MirrorError) -> IpcError {
+    let message = e.public_message();
     match e {
-        MirrorError::Cancelled => ipc_code(IpcErrorCode::Cancelled, e.to_string()),
+        MirrorError::Cancelled => ipc_code(IpcErrorCode::Cancelled, message),
         MirrorError::NotLive
         | MirrorError::NoControl
         | MirrorError::Protocol(_)
-        | MirrorError::Codec(_) => ipc_code(IpcErrorCode::InvalidArgs, e.to_string()),
+        | MirrorError::Codec(_) => ipc_code(IpcErrorCode::InvalidArgs, message),
         MirrorError::ServerMissing(_) | MirrorError::ServerFailed(_) => {
-            ipc_code(IpcErrorCode::AdbError, e.to_string())
+            ipc_code(IpcErrorCode::AdbError, message)
         }
-        MirrorError::Adb(adb) => ipc_adb(adb),
-        MirrorError::Io(_) => ipc(e),
+        MirrorError::Adb(adb) => IpcError {
+            code: match &adb {
+                AdbError::DeviceOffline(_) | AdbError::NotOnline(_) => IpcErrorCode::DeviceOffline,
+                AdbError::Cancelled => IpcErrorCode::Cancelled,
+                AdbError::ToolUnavailable(_) | AdbError::BadExit { .. } | AdbError::Timeout => {
+                    IpcErrorCode::AdbError
+                }
+                AdbError::Io(_) => IpcErrorCode::Internal,
+            },
+            message,
+        },
+        MirrorError::Io(_) => ipc_code(IpcErrorCode::Internal, message),
     }
 }
 
@@ -184,8 +208,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn run_error_keeps_offline_code() {
-        let e = ipc_run(RunError::DeviceOffline("S1".into()));
+    fn catalog_interrupted_is_cancelled() {
+        let e = ipc_catalog(CatalogError::Interrupted);
+        assert_eq!(e.code, IpcErrorCode::Cancelled);
+        assert_eq!(e.message, "扫描中断");
+    }
+
+    #[test]
+    fn catalog_adb_keeps_offline_code() {
+        let e = ipc_catalog(AdbError::DeviceOffline("S1".into()).into());
         assert_eq!(e.code, IpcErrorCode::DeviceOffline);
         assert!(e.message.contains("S1"));
     }
@@ -194,6 +225,22 @@ mod tests {
     fn library_error_is_invalid_args() {
         let e = ipc_library(LibraryError::EmptyTemplate("c1".into()));
         assert_eq!(e.code, IpcErrorCode::InvalidArgs);
+    }
+
+    #[test]
+    fn library_store_invalid_is_invalid_args() {
+        let e = ipc_library_store(LibraryStoreError::Library(LibraryError::EmptyTemplate(
+            "c1".into(),
+        )));
+        assert_eq!(e.code, IpcErrorCode::InvalidArgs);
+        assert!(e.message.contains("c1"));
+    }
+
+    #[test]
+    fn library_store_io_is_internal() {
+        let e = ipc_library_store(LibraryStoreError::Io("disk".into()));
+        assert_eq!(e.code, IpcErrorCode::Internal);
+        assert_eq!(e.message, "disk");
     }
 
     #[test]
@@ -254,6 +301,17 @@ mod tests {
         let host = ipc_dnd(DndError::Host);
         assert_eq!(host.code, IpcErrorCode::Internal);
         assert_eq!(host.message, "拖出宿主调度失败");
+    }
+
+    #[test]
+    fn mirror_bad_exit_strips_stderr() {
+        let e = ipc_mirror(MirrorError::Adb(AdbError::BadExit {
+            exit_code: 1,
+            stderr: "ls: /secret: Permission denied".into(),
+        }));
+        assert_eq!(e.code, IpcErrorCode::AdbError);
+        assert_eq!(e.message, "投屏设备命令失败(退出码 1)");
+        assert!(!e.message.contains("Permission denied"));
     }
 
     #[test]

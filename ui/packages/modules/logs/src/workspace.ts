@@ -14,6 +14,7 @@ import type { LogLine, ProcessEntry } from "@yohu/api";
 import {
   applyAppend,
   canFreezeFollow,
+  EMPTY_VIEW_ROWS,
   isFreshLine,
   lastSeqOf,
   mirrorCoversRange,
@@ -26,7 +27,6 @@ import {
 import { copyBinding, emptyBinding, rebindPids, type PidBinding } from "./binding";
 import { matchesLine, normalizeLevels, toSessionFilter, type LevelLetter, type SessionScope } from "./filter";
 import type { ViewRow } from "./stack";
-import type { LogColWidths } from "./layout";
 import type { MirrorBank } from "./mirror";
 
 /** 从未开始采集：入镜/补洞均跳过共享环。 */
@@ -87,8 +87,6 @@ export interface LogUiState {
   activeSessionId: number | null;
   /** 与 core `buffer_capacity` 对齐：镜像与可见区同一上限 */
   bufferCapacity: number;
-  /** 清单列宽（px）；不进设置，模块单例内有效 */
-  colWidths: LogColWidths;
 }
 
 export type WorkspaceApi = {
@@ -172,7 +170,7 @@ export function createWorkspace(
       frozenThroughSeq: null,
       pendingCount: 0,
       signalCount: 0,
-      visible: [],
+      visible: EMPTY_VIEW_ROWS,
       binding: emptyBinding(),
     };
     if (scope.kind === "package") {
@@ -182,10 +180,20 @@ export function createWorkspace(
   }
 
   function writePanel(idx: number, rows: ViewRow[], pendingCount: number): void {
+    const session = state.sessions[idx];
     const visible = trimRows(rows, bufferCapacity());
+    const signalCount = signalCountOf(visible);
+    if (
+      session &&
+      session.visible === visible &&
+      session.signalCount === signalCount &&
+      session.pendingCount === pendingCount
+    ) {
+      return;
+    }
     setState("sessions", idx, {
       visible,
-      signalCount: signalCountOf(visible),
+      signalCount,
       pendingCount,
     });
   }
@@ -268,7 +276,7 @@ export function createWorkspace(
   function flushPanel(id: number): void {
     const idx = sessionIndex(id);
     if (idx < 0) return;
-    writePanel(idx, [], 0);
+    writePanel(idx, EMPTY_VIEW_ROWS, 0);
   }
 
   function flushDevicePanels(serial: string): void {
@@ -289,7 +297,7 @@ export function createWorkspace(
       following: true,
       frozenThroughSeq: null,
     });
-    writePanel(idx, [], 0);
+    writePanel(idx, EMPTY_VIEW_ROWS, 0);
   }
 
   function trimPanels(): void {

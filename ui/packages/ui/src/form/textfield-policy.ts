@@ -75,6 +75,7 @@ export interface TextFieldHostAttrs {
 export function textFieldHostAttrs(
   input: TextFieldSlotInput &
     TextFieldInteractiveInput & {
+      width?: TextFieldWidthKind;
       block?: boolean;
       type?: string;
       active?: boolean;

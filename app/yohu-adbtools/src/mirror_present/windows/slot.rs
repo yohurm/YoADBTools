@@ -39,7 +39,11 @@ impl PictureBank {
     }
 
     pub fn latest(&self) -> Option<(u64, ReadyFrame)> {
-        let frame = self.slot.lock().expect("picture bank lock poisoned").clone()?;
+        let frame = self
+            .slot
+            .lock()
+            .expect("picture bank lock poisoned")
+            .clone()?;
         Some((self.seq.load(Ordering::SeqCst), frame))
     }
 

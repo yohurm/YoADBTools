@@ -21,8 +21,26 @@ pub enum Density {
     Comfortable,
 }
 
+/// 日志清单内容配色。`yohu` = 鸿蒙语义级别板；`logcat` = 官方 Android Studio Logcat V2。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogColorScheme {
+    #[default]
+    Yohu,
+    Logcat,
+}
+
+/// 日志清单长文本。对照官方 Soft-Wrap：`clip` = 关（硬 `\n` 写入 headerWidth 空格，超宽横滑）；`wrap` = 开（裸 `\n`，续行第 0 列）。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLineLayout {
+    #[default]
+    Clip,
+    Wrap,
+}
+
 /// 日志清单显示哪些元数据列（消息列始终显示）。
-/// 缺字段回落 Default：UID / TID 默认关，其余默认开。
+/// 缺字段回落 Default：对齐官方 STANDARD（UID 关，PID+TID / AppName 开）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogDisplayColumns {
     #[serde(default = "crate::default_true")]
@@ -31,12 +49,14 @@ pub struct LogDisplayColumns {
     pub uid: bool,
     #[serde(default = "crate::default_true")]
     pub pid: bool,
-    #[serde(default)]
+    #[serde(default = "crate::default_true")]
     pub tid: bool,
     #[serde(default = "crate::default_true")]
-    pub level: bool,
-    #[serde(default = "crate::default_true")]
     pub tag: bool,
+    #[serde(default = "crate::default_true")]
+    pub app: bool,
+    #[serde(default = "crate::default_true")]
+    pub level: bool,
 }
 
 impl Default for LogDisplayColumns {
@@ -45,9 +65,10 @@ impl Default for LogDisplayColumns {
             ts: true,
             uid: false,
             pid: true,
-            tid: false,
-            level: true,
+            tid: true,
             tag: true,
+            app: true,
+            level: true,
         }
     }
 }
@@ -87,6 +108,12 @@ pub struct AppSettings {
     /// 日志清单时间显示形状。立即生效；默认日期+时分秒.毫秒（与当前清单一致）。
     #[serde(default = "default_log_time_format")]
     pub log_time_format: TerminalTimeFormat,
+    /// 日志清单内容配色。立即生效；默认 Yohu（鸿蒙语义板）。
+    #[serde(default)]
+    pub log_color_scheme: LogColorScheme,
+    /// 日志清单长文本。立即生效；默认 clip（LogCat 单行）。
+    #[serde(default)]
+    pub log_line_layout: LogLineLayout,
     /// 投屏长边上限（像素）；0 = 设备原始。下次启动生效。
     #[serde(default = "default_mirror_max_size")]
     pub mirror_max_size: u32,
@@ -166,6 +193,21 @@ pub const fn default_mirror_max_fps() -> u32 {
     0
 }
 
+/// WiFi 投屏默认长边。
+pub const fn default_wifi_mirror_max_size() -> u32 {
+    1280
+}
+
+/// WiFi 投屏默认码率 4 Mbps。
+pub const fn default_wifi_mirror_video_bit_rate() -> u32 {
+    4_000_000
+}
+
+/// WiFi 投屏默认帧率上限。
+pub const fn default_wifi_mirror_max_fps() -> u32 {
+    30
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -180,6 +222,8 @@ impl Default for AppSettings {
             export_ask_every_time: default_export_ask(),
             log_display_columns: LogDisplayColumns::default(),
             log_time_format: default_log_time_format(),
+            log_color_scheme: LogColorScheme::Yohu,
+            log_line_layout: LogLineLayout::Clip,
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
@@ -207,6 +251,8 @@ pub enum SettingKey {
     ExportAskEveryTime,
     LogDisplayColumns,
     LogTimeFormat,
+    LogColorScheme,
+    LogLineLayout,
     MirrorMaxSize,
     MirrorVideoBitRate,
     MirrorMaxFps,
@@ -232,6 +278,8 @@ impl SettingKey {
             SettingKey::ExportAskEveryTime => "export_ask_every_time",
             SettingKey::LogDisplayColumns => "log_display_columns",
             SettingKey::LogTimeFormat => "log_time_format",
+            SettingKey::LogColorScheme => "log_color_scheme",
+            SettingKey::LogLineLayout => "log_line_layout",
             SettingKey::MirrorMaxSize => "mirror_max_size",
             SettingKey::MirrorVideoBitRate => "mirror_video_bit_rate",
             SettingKey::MirrorMaxFps => "mirror_max_fps",
@@ -259,6 +307,8 @@ mod tests {
         assert!(s.export_ask_every_time);
         assert!(s.export_default_path.is_empty());
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
+        assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
         assert_eq!(s.mirror_max_size, 0);
         assert_eq!(s.mirror_video_bit_rate, 16_000_000);
         assert_eq!(s.mirror_max_fps, 0);
@@ -348,6 +398,8 @@ mod tests {
             SettingKey::ExportAskEveryTime,
             SettingKey::LogDisplayColumns,
             SettingKey::LogTimeFormat,
+            SettingKey::LogColorScheme,
+            SettingKey::LogLineLayout,
             SettingKey::MirrorMaxSize,
             SettingKey::MirrorVideoBitRate,
             SettingKey::MirrorMaxFps,
@@ -410,6 +462,32 @@ mod tests {
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
+        assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
+    }
+
+    #[test]
+    fn log_color_scheme_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_value(LogColorScheme::Yohu).unwrap(),
+            serde_json::json!("yohu")
+        );
+        assert_eq!(
+            serde_json::to_value(LogColorScheme::Logcat).unwrap(),
+            serde_json::json!("logcat")
+        );
+    }
+
+    #[test]
+    fn log_line_layout_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_value(LogLineLayout::Clip).unwrap(),
+            serde_json::json!("clip")
+        );
+        assert_eq!(
+            serde_json::to_value(LogLineLayout::Wrap).unwrap(),
+            serde_json::json!("wrap")
+        );
     }
 
     #[test]
@@ -446,10 +524,10 @@ mod tests {
     }
 
     #[test]
-    fn partial_log_display_columns_defaults_missing_uid_tid_off() {
+    fn partial_log_display_columns_defaults_missing_uid_off_tid_app_on() {
         let s: LogDisplayColumns =
             serde_json::from_str(r#"{"uid":false,"tag":false}"#).expect("部分列开关");
-        assert!(s.ts && s.pid && s.level);
-        assert!(!s.uid && !s.tid && !s.tag);
+        assert!(s.ts && s.pid && s.tid && s.app && s.level);
+        assert!(!s.uid && !s.tag);
     }
 }

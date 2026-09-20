@@ -22,10 +22,14 @@ pub enum SettingError {
     ExpectTheme(&'static str),
     #[error("{0} 必须是 compact 或 comfortable")]
     ExpectDensity(&'static str),
-    #[error("{0} 必须是列开关对象（ts/uid/pid/tid/level/tag）")]
+    #[error("{0} 必须是列开关对象（ts/uid/pid/tid/tag/app/level）")]
     ExpectLogColumns(&'static str),
     #[error("{0} 必须是 usb 或 wifi")]
     ExpectMirrorProtocol(&'static str),
+    #[error("{0} 必须是 yohu 或 logcat")]
+    ExpectLogColorScheme(&'static str),
+    #[error("{0} 必须是 clip 或 wrap")]
+    ExpectLogLineLayout(&'static str),
 }
 
 fn must_str(key: SettingKey, value: &serde_json::Value) -> Result<String, SettingError> {
@@ -101,6 +105,14 @@ pub fn apply_setting(
         SettingKey::LogTimeFormat => {
             settings.log_time_format = must_clock_format(key, value)?;
         }
+        SettingKey::LogColorScheme => {
+            settings.log_color_scheme = serde_json::from_value(value.clone())
+                .map_err(|_| SettingError::ExpectLogColorScheme(key.as_str()))?;
+        }
+        SettingKey::LogLineLayout => {
+            settings.log_line_layout = serde_json::from_value(value.clone())
+                .map_err(|_| SettingError::ExpectLogLineLayout(key.as_str()))?;
+        }
         SettingKey::MirrorMaxSize => {
             let n = must_u64(key, value)?;
             settings.mirror_max_size = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
@@ -142,6 +154,10 @@ pub fn apply_setting(
 mod tests {
     use super::*;
     use serde_json::json;
+    use yohu_protocol::{
+        default_wifi_mirror_max_fps, default_wifi_mirror_max_size, default_wifi_mirror_video_bit_rate,
+        LogColorScheme, LogLineLayout,
+    };
 
     #[test]
     fn buffer_capacity_rejects_zero() {
@@ -164,9 +180,9 @@ mod tests {
     fn mirror_protocol_fills_encode_params_without_inventing_custom() {
         let mut s = AppSettings::default();
         apply_setting(&mut s, SettingKey::MirrorProtocol, &json!("wifi")).unwrap();
-        assert_eq!(s.mirror_max_size, 1280);
-        assert_eq!(s.mirror_video_bit_rate, 4_000_000);
-        assert_eq!(s.mirror_max_fps, 30);
+        assert_eq!(s.mirror_max_size, default_wifi_mirror_max_size());
+        assert_eq!(s.mirror_video_bit_rate, default_wifi_mirror_video_bit_rate());
+        assert_eq!(s.mirror_max_fps, default_wifi_mirror_max_fps());
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();
         assert_eq!(s.mirror_max_fps, 15);
@@ -218,5 +234,25 @@ mod tests {
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
         apply_setting(&mut s, SettingKey::LogTimeFormat, &json!("time_millis")).unwrap();
         assert_eq!(s.log_time_format, TerminalTimeFormat::TimeMillis);
+    }
+
+    #[test]
+    fn log_color_scheme_applies() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
+        apply_setting(&mut s, SettingKey::LogColorScheme, &json!("logcat")).unwrap();
+        assert_eq!(s.log_color_scheme, LogColorScheme::Logcat);
+        let err = apply_setting(&mut s, SettingKey::LogColorScheme, &json!("darcula")).unwrap_err();
+        assert!(matches!(err, SettingError::ExpectLogColorScheme(_)));
+    }
+
+    #[test]
+    fn log_line_layout_applies() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.log_line_layout, LogLineLayout::Clip);
+        apply_setting(&mut s, SettingKey::LogLineLayout, &json!("wrap")).unwrap();
+        assert_eq!(s.log_line_layout, LogLineLayout::Wrap);
+        let err = apply_setting(&mut s, SettingKey::LogLineLayout, &json!("soft")).unwrap_err();
+        assert!(matches!(err, SettingError::ExpectLogLineLayout(_)));
     }
 }

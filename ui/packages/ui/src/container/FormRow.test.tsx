@@ -51,10 +51,11 @@ describe("YoFormRow", () => {
     expect(css).not.toContain("justify-content: space-between");
   });
 
-  it("右槽 hug 贴尾，不 stretch；路径与按钮同簇", () => {
-    expect(css).toContain("flex: 0 1 auto");
+  it("右槽 hug 贴尾不收缩，不 stretch；路径与按钮同簇", () => {
+    expect(css).toMatch(/\.yohu-form-row__control\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).not.toContain("data-control-fill");
     expect(css).not.toMatch(/\.yohu-form-row__control[\s\S]*?flex:\s*1 1 auto/);
+    expect(css).not.toMatch(/\.yohu-form-row__control\s*\{[^}]*flex:\s*0 1 auto/);
   });
 
   it("stacked 纵排铺满，不靠页面点内部槽", () => {
@@ -66,6 +67,16 @@ describe("YoFormRow", () => {
     expect(container.querySelector(".yohu-form-row")?.getAttribute("data-layout")).toBe("stacked");
     expect(css).toMatch(/\[data-layout="stacked"\]\s*\{[^}]*flex-direction:\s*column/);
     expect(css).toMatch(/\[data-layout="stacked"\] \.yohu-form-row__control\s*\{[^}]*width:\s*100%/);
+  });
+
+  it("flush 去掉行垫，stacked 控件仍铺满", () => {
+    const { container } = render(() => (
+      <YoFormRow title="设备" layout="stacked" pad="flush">
+        <span>select</span>
+      </YoFormRow>
+    ));
+    expect(container.querySelector(".yohu-form-row")?.getAttribute("data-pad")).toBe("flush");
+    expect(css).toMatch(/\[data-pad="flush"\]\s*\{[^}]*padding:\s*0/);
   });
 
   it("相邻行不画分割线", () => {

@@ -14,12 +14,18 @@ import { useGrow } from "../motion/engines/grow";
 import { useRail, railTraveling } from "../motion/engines/rail";
 import { useTravel } from "../motion/engines/travel";
 import { createScrollerBinder } from "./scroller-binder";
-import { resolveScrollerBarState, resolveScrollerInteractive, type ScrollerBarState } from "./scroller-model";
+import {
+  resolveScrollerAxis,
+  resolveScrollerBarState,
+  resolveScrollerInteractive,
+  type ScrollerAxis,
+  type ScrollerBarState,
+} from "./scroller-model";
 import { scrollerHostAttrs, scrollerLaneAttrs, scrollerThumbAttrs } from "./scroller-policy";
 import { ScrollerPortContext, type ScrollerPort } from "./scroller-port";
 import "./Scroller.css";
 
-export type { ScrollerBarState } from "./scroller-model";
+export type { ScrollerAxis, ScrollerBarState } from "./scroller-model";
 
 export type YoScrollerHandle = {
   scrollTo: (top: number) => void;
@@ -27,7 +33,11 @@ export type YoScrollerHandle = {
   scrollToStart: () => void;
   scrollToEnd: () => void;
   scrollPage: (next: boolean) => void;
+  scrollToInline: (left: number) => void;
   offset: () => number;
+  offsetInline: () => number;
+  /** 内容总高变了再量一次：过滤变短后收回侧轨，禁止留下 16vp 空白。 */
+  sync: () => void;
 };
 
 export interface YoScrollerProps {
@@ -37,6 +47,8 @@ export interface YoScrollerProps {
   state?: ScrollerBarState;
   /** 对照 enableScrollInteraction。默认 true；false 仍可用 handle。 */
   interactive?: boolean;
+  /** 默认 block 只纵滚。both 才开底轨横滚（日志 clip）。 */
+  axis?: ScrollerAxis;
   /** 视口节点。钉底等只走 handle，禁止模块读原生内容高。 */
   viewRef?: (el: HTMLDivElement) => void;
   handle?: (api: YoScrollerHandle) => void;
@@ -53,19 +65,23 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
   const overflow = (): "auto" | "hidden" => props.overflow ?? "auto";
   const barState = (): ScrollerBarState => resolveScrollerBarState(props.state);
   const interactive = (): boolean => resolveScrollerInteractive(props.interactive);
+  const axis = (): ScrollerAxis => resolveScrollerAxis(props.axis);
   const traveling = (): boolean =>
     travel?.traveling() === true ||
     collapse?.traveling() === true ||
     grow?.traveling() === true ||
     (rail != null && railTraveling(rail.phase()));
-  const binder = createScrollerBinder({ overflow, barState, interactive, traveling });
+  const binder = createScrollerBinder({ overflow, barState, interactive, traveling, axis });
   const handle: YoScrollerHandle = {
     scrollTo: binder.scrollTo,
     scrollBy: binder.scrollBy,
     scrollToStart: binder.scrollToStart,
     scrollToEnd: binder.scrollToEnd,
     scrollPage: binder.scrollPage,
+    scrollToInline: binder.scrollToInline,
     offset: binder.offset,
+    offsetInline: binder.offsetInline,
+    sync: binder.sync,
   };
 
   createRenderEffect(() => {
@@ -73,13 +89,23 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
     overflow();
     barState();
     interactive();
+    axis();
     traveling();
     binder.sync();
   });
 
   onCleanup(() => binder.destroy());
 
-  const host = () => scrollerHostAttrs(binder.phase(), barState(), interactive(), binder.gutter());
+  const host = () =>
+    scrollerHostAttrs(
+      binder.phase(),
+      barState(),
+      interactive(),
+      binder.gutter(),
+      axis(),
+      binder.gutterInline(),
+      binder.phaseInline(),
+    );
   let planeEl: HTMLDivElement | undefined;
   const port: ScrollerPort = {
     view: () => binder.view(),
@@ -93,10 +119,13 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
       <div
         class={`yohu-scroller${props.class ? ` ${props.class}` : ""}`}
         data-overflow={overflow()}
+        data-axis={host()["data-axis"]}
         data-scroll={host()["data-scroll"]}
+        data-scroll-inline={host()["data-scroll-inline"]}
         data-bar={host()["data-bar"]}
         data-interactive={host()["data-interactive"]}
         data-gutter={host()["data-gutter"]}
+        data-gutter-inline={host()["data-gutter-inline"]}
         ref={(el) => {
           planeEl = el;
         }}
@@ -116,6 +145,7 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
         </div>
         <div
           class="yohu-scroller__lane"
+          data-orient="block"
           data-lane={scrollerLaneAttrs(binder.phase())["data-lane"]}
           aria-hidden={binder.phase() === "none" ? true : undefined}
           ref={binder.attachLane}
@@ -141,6 +171,39 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
                 ? {
                     height: `${binder.thumb()!.height}px`,
                     transform: `translateY(${binder.thumb()!.top}px)`,
+                  }
+                : undefined
+            }
+          />
+        </div>
+        <div
+          class="yohu-scroller__lane"
+          data-orient="inline"
+          data-lane={scrollerLaneAttrs(binder.phaseInline())["data-lane"]}
+          aria-hidden={binder.phaseInline() === "none" ? true : undefined}
+          ref={binder.attachLaneInline}
+          onPointerDown={binder.onInlineLanePointerDown}
+          onPointerMove={binder.onInlineLanePointerMove}
+          onPointerUp={binder.onInlineLanePointerUp}
+          onPointerCancel={binder.onInlineLanePointerUp}
+          onPointerEnter={binder.onInlineLaneEnter}
+          onPointerLeave={binder.onInlineLaneLeave}
+        >
+          <div
+            class="yohu-scroller__thumb"
+            role="scrollbar"
+            aria-orientation="horizontal"
+            aria-controls={viewId}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={binder.valueNowInline()}
+            data-pressed={scrollerThumbAttrs(binder.pressedInline())["data-pressed"]}
+            onTransitionEnd={binder.onThumbTransitionEnd}
+            style={
+              binder.thumbInline()
+                ? {
+                    width: `${binder.thumbInline()!.height}px`,
+                    transform: `translateX(${binder.thumbInline()!.top}px)`,
                   }
                 : undefined
             }

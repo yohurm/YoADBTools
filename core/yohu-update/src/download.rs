@@ -43,7 +43,11 @@ pub(crate) async fn stream_installer(
             .map_err(|e| UpdateError::Io(e.to_string()))?;
     }
 
-    if dest.is_file() {
+    if tokio::fs::metadata(&dest)
+        .await
+        .map(|m| m.is_file())
+        .unwrap_or(false)
+    {
         if let Ok(existing) = tokio::fs::read(&dest).await {
             let actual = sha256_hex(&existing);
             let size_ok = expected_size == 0 || existing.len() as u64 == expected_size;
@@ -95,7 +99,7 @@ pub(crate) async fn stream_installer(
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "installer.part".into())
     ));
-    if part.exists() {
+    if tokio::fs::try_exists(&part).await.unwrap_or(false) {
         let _ = tokio::fs::remove_file(&part).await;
     }
     let mut file = tokio::fs::File::create(&part)

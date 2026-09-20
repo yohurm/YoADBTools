@@ -16,6 +16,6 @@ pub mod terminal;
 pub mod update;
 
 pub use crate::ipc_map::{
-    ipc, ipc_adb, ipc_code, ipc_dnd, ipc_eval, ipc_file, ipc_group, ipc_log, ipc_mirror,
-    ipc_present, ipc_update,
+    ipc, ipc_adb, ipc_catalog, ipc_code, ipc_dnd, ipc_eval, ipc_file, ipc_group, ipc_library_store,
+    ipc_log, ipc_mirror, ipc_present, ipc_update,
 };

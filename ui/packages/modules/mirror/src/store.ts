@@ -45,7 +45,6 @@ export interface MirrorUiState {
   generation: number;
   width: number;
   height: number;
-  codec: string;
   control: boolean;
   error: string | null;
   hasFrame: boolean;
@@ -88,7 +87,6 @@ function idleAfterUnbind(): Pick<
   MirrorUiState,
   | "phase"
   | "generation"
-  | "codec"
   | "control"
   | "error"
   | "hasFrame"
@@ -102,7 +100,6 @@ function idleAfterUnbind(): Pick<
   return {
     phase: "idle",
     generation: 0,
-    codec: "",
     control: false,
     error: null,
     hasFrame: false,
@@ -123,7 +120,6 @@ export function createMirrorStore() {
     generation: 0,
     width: 0,
     height: 0,
-    codec: "",
     control: false,
     error: null,
     hasFrame: false,
@@ -382,7 +378,6 @@ export function createMirrorStore() {
         generation: e.generation,
         phase: phaseOf(e.state),
         ...(e.width > 0 && e.height > 0 ? { width: e.width, height: e.height } : {}),
-        codec: e.codec,
         control: e.control,
         error: e.error ?? null,
       });
@@ -453,4 +448,3 @@ export function createMirrorStore() {
 }
 
 export const mirrorStore = createMirrorStore();
-export type MirrorStoreApi = ReturnType<typeof createMirrorStore>;

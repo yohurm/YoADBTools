@@ -238,7 +238,8 @@ const fileView = loadFileView();
 
 describe("页眉按钮样式", () => {
   it("预览是页眉次要，走 normal+neutral，不是 TEXTUAL", () => {
-    const chrome = fileView.slice(fileView.indexOf("<YoChrome"), fileView.indexOf("</YoChrome>"));
+    const start = fileView.indexOf("<YoChrome");
+    const chrome = fileView.slice(start, fileView.indexOf("<div", start));
     expect(chrome).toContain('buttonStyle="normal" tone="neutral"');
     expect(chrome).not.toContain('buttonStyle="textual"');
     expect(chrome).toContain("togglePreview");
@@ -260,18 +261,42 @@ function loadDrop(): string {
 
 const dropSrc = loadDrop();
 
+function loadDropSession(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/drop-session.ts"),
+    resolve(process.cwd(), "packages/modules/files/src/drop-session.ts"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const dropSessionSrc = loadDropSession();
+
 describe("官方拖放契约", () => {
   it("api 形状进 dest；换算不读 globalThis", () => {
     expect(dropSrc).toContain("NativeDragDropEvent");
     expect(dropSrc).toContain("cssPointFromPhysical");
+    expect(dropSrc).toContain("destDirFromEntries");
     expect(dropSrc).not.toContain("DropDragEvent");
     expect(dropSrc).not.toContain("devicePixelRatio");
     expect(dropSrc).not.toContain("globalThis");
     expect(dropSrc).not.toContain("files.dropIn");
+    expect(dropSrc).not.toContain("readFolderTargets");
+    expect(dropSrc).not.toContain("destDirName(");
     expect(fileView).toContain("yohu-recipe-preview");
     expect(fileView).not.toContain("yohu-recipe-rail");
-    expect(fileView).toContain("onNativeDragDrop");
+    expect(fileView).toContain("createDropSession");
     expect(fileView).toContain("listRef");
+    expect(fileView).not.toContain("onNativeDragDrop");
+    expect(fileView).not.toContain("destDirFromEntries");
+    expect(fileView).not.toContain("dropCommit");
+    expect(fileView).not.toContain("devicePixelRatio");
+    expect(fileView).not.toContain("dropSessionForEvent");
+    expect(fileView).not.toContain("readFolderTargets");
     expect(fileView).not.toContain('querySelector(".yohu-virtual-list")');
     expect(fileView).not.toContain("files.dropIn");
     expect(fileView).not.toContain("ondrop=");
@@ -281,6 +306,26 @@ describe("官方拖放契约", () => {
     expect(fileView).not.toContain("deviceLabel");
     expect(fileView).toContain("selectedLabel");
     expect(fileView).not.toContain("overflowX");
+  });
+
+  it("松手 dest 与热态同一套清单下标，接线在 drop 层", () => {
+    expect(dropSrc).toContain("dropCommit");
+    expect(dropSrc).toContain("destDirFromEntries(css.x, css.y, ctx.space, ctx.entries)");
+    expect(dropSessionSrc).toContain("destDirFromEntries");
+    expect(dropSessionSrc).toContain("dropCommit");
+    expect(dropSessionSrc).toContain("devicePixelRatio");
+    expect(dropSessionSrc).toContain("requestAnimationFrame");
+    expect(dropSessionSrc).toContain("onNativeDragDrop");
+    expect(dropSessionSrc).toContain("event.position");
+    expect(dropSessionSrc).not.toContain("readFolderTargets");
+    expect(dropSessionSrc).not.toContain("destDirName(");
+    expect(dropSessionSrc).not.toContain("event.x");
+    expect(fileView).not.toContain("destDirName(");
+    expect(fileView).not.toContain("event.position");
+    expect(fileView).not.toContain("event.x");
+    expect(fileView).not.toContain("resolveDropAt");
+    expect(fileView).not.toContain("applyDropEvent");
+    expect(fileView).not.toContain("elementFromPoint");
   });
 });
 
@@ -299,43 +344,65 @@ function loadDeleteTargets(): string {
 
 const deleteTargets = loadDeleteTargets();
 
+function loadDeleteDialog(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/DeleteDialog.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/DeleteDialog.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+function loadCreateDialog(): string {
+  const candidates = [
+    resolve(process.cwd(), "src/CreateDialog.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/CreateDialog.tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return readFileSync(candidate, "utf-8");
+    }
+  }
+  return "";
+}
+
+const deleteDialog = loadDeleteDialog();
+const createDialog = loadCreateDialog();
+
 describe("确认删除多文件契约", () => {
   it("弹窗走 Dialog lead/main/tail，不把文件名拼成一段", () => {
-    expect(fileView).toContain("DeleteConfirm");
-    expect(fileView).toContain("DeleteTargetList");
-    expect(fileView).toContain("DeleteExpand");
-    expect(fileView).toContain("YoScroller");
-    expect(fileView).toContain("bodyLead");
-    expect(fileView).toContain("bodyTail");
-    expect(fileView).not.toContain('bodyOverflow="hidden"');
-    expect(fileView).toContain('initial="footer"');
-    expect(fileView).not.toContain('join("、")');
-    const deleteFooter = fileView.slice(fileView.indexOf("确认删除"), fileView.indexOf("新建目录"));
+    expect(fileView).toContain("DeleteDialog");
+    expect(fileView).toContain("CreateDialog");
+    expect(fileView).not.toContain("DeleteConfirm");
+    expect(fileView).not.toContain("DeleteTargetList");
+    expect(fileView).not.toContain("DeleteExpand");
+    expect(deleteDialog).toContain("DeleteConfirm");
+    expect(deleteDialog).toContain("DeleteTargetList");
+    expect(deleteDialog).toContain("DeleteExpand");
+    expect(deleteDialog).toContain("YoScroller");
+    expect(deleteDialog).toContain("bodyLead");
+    expect(deleteDialog).toContain("bodyTail");
+    expect(deleteDialog).not.toContain('bodyOverflow="hidden"');
+    expect(deleteDialog).toContain('initial="footer"');
+    expect(deleteDialog).not.toContain('join("、")');
+    const deleteFooter = deleteDialog.slice(deleteDialog.indexOf("确认删除"));
     expect(deleteFooter).toMatch(/<YoScroller[\s>]/);
     expect(deleteFooter).toContain('buttonStyle="normal"');
     expect(deleteFooter).toContain('tone="accent"');
     expect(deleteFooter).toContain('tone="danger"');
     expect(deleteFooter).not.toContain('tone="neutral"');
-    const createDialog = fileView.slice(fileView.indexOf("新建目录"));
     expect(createDialog).toMatch(/<YoScroller[\s>]/);
     expect(createDialog).toContain("YoTextField");
     expect(createDialog).toContain("YoCorner");
-    expect(fileView).toContain("createReady");
+    expect(createDialog).toContain("createReady");
     expect(fileView).toContain("TransferDock");
     expect(fileView).not.toContain("TransferPanel");
     expect(fileView).toContain('overflow="hidden"');
     expect(fileView).toContain("attachView");
-    expect(fileView).toContain("dropSessionForEvent");
-    expect(fileView).toContain("adoptDropSession");
-    expect(fileView).toContain("destDirFromEntries");
-    expect(fileView).not.toContain("destDirName(");
-    expect(fileView).toContain("dropCommit");
-    expect(fileView).toContain("event.position");
-    expect(fileView).toContain("devicePixelRatio");
-    expect(fileView).not.toContain("event.x");
-    expect(fileView).not.toContain("resolveDropAt");
-    expect(fileView).not.toContain("applyDropEvent");
-    expect(fileView).not.toContain("elementFromPoint");
     expect(fileView).not.toContain("pointInElement");
     expect(fileView).not.toContain("files.dropIn");
     expect(fileView).not.toContain("ondrop=");
@@ -346,34 +413,34 @@ describe("确认删除多文件契约", () => {
   });
 
   it("open 独立于名单，出场后再清载荷", () => {
-    expect(fileView).toContain("deleteOpen");
-    expect(fileView).toContain("onExitComplete");
-    expect(fileView).toContain("finishDelete");
-    expect(fileView).toContain("open={deleteOpen}");
-    expect(fileView).not.toContain("open={() => deleteNames().length");
-    const closeBlock = fileView.slice(fileView.indexOf("const closeDelete"), fileView.indexOf("const finishDelete"));
+    expect(deleteDialog).toContain("deleteOpen");
+    expect(deleteDialog).toContain("onExitComplete");
+    expect(deleteDialog).toContain("finishDelete");
+    expect(deleteDialog).toContain("open={deleteOpen}");
+    expect(deleteDialog).not.toContain("open={() => deleteNames().length");
+    const closeBlock = deleteDialog.slice(deleteDialog.indexOf("const closeDelete"), deleteDialog.indexOf("const finishDelete"));
     expect(closeBlock).toContain("setDeleteOpen(false)");
     expect(closeBlock).not.toContain("setDeleteNames");
     expect(closeBlock).not.toContain("setDeleteExpanded");
   });
 
   it("新建窗 open 独立于 kind，出场后再清载荷", () => {
-    expect(fileView).toContain("createOpen");
-    expect(fileView).toContain("finishCreate");
-    expect(fileView).toContain("open={createOpen}");
-    expect(fileView).not.toContain("open={() => createKind() !== null}");
-    expect(fileView).toContain('title={createKind() === "dir" ? "新建目录" : "新建文件"}');
-    expect(fileView).toContain('ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}');
-    const closeBlock = fileView.slice(fileView.indexOf("const closeCreate"), fileView.indexOf("const finishCreate"));
+    expect(createDialog).toContain("createOpen");
+    expect(createDialog).toContain("finishCreate");
+    expect(createDialog).toContain("open={createOpen}");
+    expect(createDialog).not.toContain("open={() => createKind() !== null}");
+    expect(createDialog).toContain('title={createKind() === "dir" ? "新建目录" : "新建文件"}');
+    expect(createDialog).toContain('ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}');
+    const closeBlock = createDialog.slice(createDialog.indexOf("const closeCreate"), createDialog.indexOf("const finishCreate"));
     expect(closeBlock).toContain("setCreateOpen(false)");
     expect(closeBlock).not.toContain("setCreateKind");
     expect(closeBlock).not.toContain("setCreateName");
     expect(closeBlock).not.toContain("setCreateError");
-    const finishBlock = fileView.slice(fileView.indexOf("const finishCreate"), fileView.indexOf("const openCreate"));
+    const finishBlock = createDialog.slice(createDialog.indexOf("const finishCreate"), createDialog.indexOf("const openCreate"));
     expect(finishBlock).toContain("setCreateKind(null)");
     expect(finishBlock).toContain("setCreateName");
     expect(finishBlock).toContain("setCreateError");
-    const confirmBlock = fileView.slice(fileView.indexOf("const confirmCreate"), fileView.indexOf("const copySelected"));
+    const confirmBlock = createDialog.slice(createDialog.indexOf("const confirmCreate"), createDialog.indexOf("props.api"));
     expect(confirmBlock).toContain("setCreateOpen(false)");
     expect(confirmBlock).not.toContain("setCreateKind");
   });

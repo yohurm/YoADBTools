@@ -82,4 +82,13 @@ describe("YoColResizer", () => {
     expect(colResizerCss).toContain("var(--yohu-border)");
     expect(colResizerCss).toContain("var(--yohu-radius-pill)");
   });
+
+  it("mark 只画列缝，不进 Tab", () => {
+    const { container } = render(() => <YoColResizer mark />);
+    const handle = container.querySelector(".yohu-col-resizer");
+    expect(handle?.getAttribute("data-mark")).toBe("");
+    expect(handle?.getAttribute("role")).toBeNull();
+    expect(handle?.getAttribute("tabindex")).toBeNull();
+    expect(colResizerCss).toMatch(/\[data-mark\]\s*\{[^}]*pointer-events:\s*none/);
+  });
 });

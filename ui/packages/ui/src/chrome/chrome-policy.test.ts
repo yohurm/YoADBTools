@@ -14,7 +14,7 @@ describe("chrome-policy", () => {
     });
   });
 
-  it("功能栏与次行分别开槽", () => {
+  it("功能栏与次行分别开槽，leading 走同一快照", () => {
     const input = { hasBar: true, hasExtra: true, hasLeading: true };
     expect(chromeHostAttrs(input)).not.toHaveProperty("data-layout");
     expect(resolveChromeSlots(input)).toEqual({
@@ -22,6 +22,8 @@ describe("chrome-policy", () => {
       showBar: true,
       showExtra: true,
     });
+    expect(resolveChromeSlots({ hasLeading: true }).showLeading).toBe(true);
+    expect(resolveChromeSlots({}).showLeading).toBe(false);
   });
 
   it("dropIgnore 写成 data-drop=ignore", () => {

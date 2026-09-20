@@ -109,7 +109,20 @@ describe("YoVirtualList", () => {
     expect(src).toContain("scrollToEnd");
     expect(src).toContain("scrollTo(");
     expect(src).toContain("virtualNearestScrollTop");
-    expect(src).toContain("virtualContentWidth");
+    expect(src).toContain("measureVirtualViewContentWidth");
+    expect(src).toContain("createVirtualIndicatorHotBinder");
+    expect(src).toContain("virtualIndicatorFill");
+    expect(src).toContain("virtualInnerWidth");
+    expect(src).toContain("contentWidth");
+    expect(src).toContain("data-indicator-hot");
+    expect(src).not.toContain("onInlineOffset");
+    expect(src).not.toContain("getComputedStyle");
+    expect(src).not.toContain("syncIndicatorHot");
+    expect(src).not.toContain("indicatorPressed");
+    expect(src).not.toContain("virtualContentWidth");
+    expect(src).toContain('axis={scrollerAxis()}');
+    expect(src).toContain("innerWidth()");
+    expect(src).toContain("queueMicrotask(() => api.sync())");
     expect(src).toContain("preventScroll: true");
     expect(src).not.toContain("scrollIntoView");
   });
@@ -123,6 +136,11 @@ describe("YoVirtualList", () => {
     expect(css).toMatch(
       /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \.yohu-virtual-list__row \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
+    expect(css).not.toContain("@import");
+    expect(css).not.toContain("*::selection");
+    expect(css).not.toContain("::selection");
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
+    expect(src).toContain("import \"./doc-sel.css\"");
     expect(css).toMatch(/\[role="listbox"\]:not\(\[data-reordering\]\) \{\s*user-select: none;/);
     expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*hidden;/);
     expect(css).not.toContain("!important");
@@ -457,6 +475,11 @@ describe("YoVirtualList", () => {
     expect(indicatorCss).toContain('[data-indicator-hot="hover"] .yohu-recipe-indicator--fill');
     expect(indicatorCss).toContain('[data-indicator-hot="pressed"] .yohu-recipe-indicator--fill');
     expect(indicatorCss).not.toContain(":has(.yohu-list-row");
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
+    expect(src).toContain("createVirtualIndicatorHotBinder");
+    expect(src).toContain('data-indicator-hot={host()["data-indicator-hot"]}');
+    expect(src).not.toContain("syncIndicatorHot");
+    expect(src).not.toContain("setIndicatorHot");
 
     const { container } = render(() => <SelectionHarness />);
     const rows = options(container);

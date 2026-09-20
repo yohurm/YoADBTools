@@ -1249,14 +1249,6 @@ describe("logStore 设置联动", () => {
     expect(store.state.bufferCapacity).toBe(10_000);
   });
 
-  it("setColWidth 写绝对宽度，消息列不动", () => {
-    const store = wiredStore();
-    store.setColWidth("tag", 220);
-    expect(store.state.colWidths.tag).toBe(220);
-    store.setColWidth("msg", 200);
-    expect(store.state.colWidths.msg).toBe(96);
-  });
-
   it("dispose 卸掉本实例订阅，不再吃后续批次", async () => {
     const store = wiredStore();
     store.dispose();

@@ -144,4 +144,13 @@ describe("YoTitleBar", () => {
     expect(css).not.toContain("yohu-icon-button");
     expect(css).not.toContain("titlebar-close-margin");
   });
+
+  it("L4 只读 L3 槽位，不点 L2 spec", () => {
+    const src = existsSync(resolve(process.cwd(), "src/chrome/TitleBar.tsx"))
+      ? readFileSync(resolve(process.cwd(), "src/chrome/TitleBar.tsx"), "utf-8")
+      : readFileSync(resolve(process.cwd(), "packages/ui/src/chrome/TitleBar.tsx"), "utf-8");
+    expect(src).toContain("resolveTitleBarSlots");
+    expect(src).not.toContain('from "./titlebar-model"');
+    expect(src).not.toContain("resolveTitleBarSpec");
+  });
 });

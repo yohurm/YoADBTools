@@ -31,7 +31,7 @@
 
 薄 IPC：类型、invoke 转发、`listen` 原样转发。禁止几何换算、禁止把 string/object 嗅成同一错误、禁止用延时重试顶启动时序。
 
-### 设计前（invoke / 事件）
+### 设计前（invoke / 事件，已废除）
 
 ```text
 invoke 失败

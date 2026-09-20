@@ -47,8 +47,9 @@
   border-radius: var(--yohu-radius-none);
 }
 
-.yohu-col-resizer:focus-visible {
-  outline: none;
+.yohu-col-resizer[data-mark] {
+  pointer-events: none;
+  cursor: default;
 }
 
 html[data-yohu-col-resizing] {

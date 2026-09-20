@@ -11,6 +11,8 @@ import type { LogLine } from "@yohu/api";
 import { matchesLine, type SessionFilter } from "./filter";
 import { collapseStack, type ViewRow } from "./stack";
 
+export const EMPTY_VIEW_ROWS: ViewRow[] = [];
+
 /** 订阅起点之前的游标；fromSeq 为负表示从未开始。 */
 export function seqBefore(fromSeq: number): number {
   return fromSeq < 0 ? -1 : fromSeq - 1;
@@ -57,7 +59,7 @@ export function nextDiscardFromSeq(
 
 export function trimRows(rows: readonly ViewRow[], cap: number): ViewRow[] {
   const n = Math.max(1, cap);
-  return rows.length > n ? rows.slice(rows.length - n) : [...rows];
+  return rows.length > n ? rows.slice(rows.length - n) : (rows as ViewRow[]);
 }
 
 /** 当前可见面板上的信号行；裁剪后必须重算，禁止累计已滚出的行。 */
@@ -87,13 +89,15 @@ export function splitHitsForFreeze(
   return { forPanel, pending };
 }
 
+const EMPTY_FOR_PANEL: LogLine[] = [];
+
 export function selectHits(
   lines: readonly LogLine[],
   fromSeq: number,
   ceiling: number | null,
   filter: SessionFilter,
 ): { forPanel: LogLine[]; pending: number } {
-  if (fromSeq < 0) return { forPanel: [], pending: 0 };
+  if (fromSeq < 0) return { forPanel: EMPTY_FOR_PANEL, pending: 0 };
   const hits = lines.filter((line) => line.seq >= fromSeq && matchesLine(line, filter));
   return splitHitsForFreeze(hits, ceiling);
 }
@@ -111,6 +115,7 @@ export function panelFromLines(
   lines: readonly LogLine[],
   cap: number,
 ): { visible: ViewRow[]; signalCount: number } {
+  if (lines.length === 0) return { visible: EMPTY_VIEW_ROWS, signalCount: 0 };
   const visible = trimRows(collapseStack(lines), cap);
   return { visible, signalCount: signalCountOf(visible) };
 }
@@ -168,9 +173,11 @@ export function applyAppend(opts: {
   );
   if (fresh.length === 0) {
     if (!following) return null;
+    const visible = trimRows(opts.visible, opts.cap);
+    if (visible === opts.visible && opts.pendingCount === 0) return null;
     return {
-      visible: trimRows(opts.visible, opts.cap),
-      signalCount: signalCountOf(opts.visible),
+      visible,
+      signalCount: signalCountOf(visible),
       pendingCount: 0,
     };
   }

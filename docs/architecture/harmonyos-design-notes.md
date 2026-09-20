@@ -526,7 +526,7 @@ YoDialog 落地：标题居中、一级字 `font_primary`、无分割线、操�
 | PC 正文 14 / Caption 12 / Title_S 18 | `--yohu-font-*` 默认；`[data-density=compact]` 收敛 |
 | Caption_M ≥10、Subtitle_M 14、行高 1.25/1.55/1.4 | `--yohu-font-caption-m` / `subtitle-m` / `--yohu-font-leading-*` |
 | 根节点 Body + `line-break: strict` | `theme.css` html/body；`.yohu-type-*` |
-| 效率型贴边、设置页 40vp 边距 | `.yohu-layout__content` padding 0；`YoPage` 消费 `--yohu-layout-page-inset` / `page-gap`；`YoChrome` 标题行 `--yohu-control-height`、底垫 `--yohu-layout-chrome-pad`；设置页眉/卡片共用 `--yohu-layout-page-margin` |
+| 效率型贴边、设置页 40vp 边距 | `.yohu-layout__content` padding 0；`YoPage` 缺省消费 `--yohu-layout-page-inset` / `page-gap`；`role=settings` 左右 `--yohu-layout-page-margin`，列帽 `--yohu-layout-settings-max` 居中；`YoChrome` 标题行 `--yohu-control-height`、底垫 `--yohu-layout-chrome-pad` |
 | 栅格 gutter 16 / 最大宽 2220 | `--yohu-layout-gutter` / `grid-max` |
 | 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `--yohu-scrim`（浅 10% 黑 / 深 40% 黑）；浮层小圆角 `radius-sm` |
 | Toast ≤3s、最大宽 400；按钮最大 448；菜单最小 224 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-min` |

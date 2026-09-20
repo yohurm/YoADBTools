@@ -2,22 +2,21 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { setColWidth } from "@yohu/ui";
-import { defaultLogDocLayout, logDocTrackTemplate } from "./doc";
+import { Density } from "@yohu/ui";
 import {
+  ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
-  LOG_COLUMNS,
-  defaultLogColWidths,
-  headerLabelChars,
-  logFieldText,
-  logSlotChars,
-  visibleLogColumns,
-} from "./layout";
+  defaultFormatOptions,
+  formatColumns,
+  headerWidth,
+} from "./editor";
+import { dataRowHeight } from "./layout";
+import { logsChromeActions } from "./logs-chrome-actions";
 
-function loadLogsCss(): string {
+function loadSrc(name: string): string {
   const candidates = [
-    resolve(process.cwd(), "src/logs.css"),
-    resolve(process.cwd(), "packages/modules/logs/src/logs.css"),
+    resolve(process.cwd(), `src/${name}`),
+    resolve(process.cwd(), `packages/modules/logs/src/${name}`),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
@@ -27,37 +26,38 @@ function loadLogsCss(): string {
   return "";
 }
 
-const logsCss = loadLogsCss();
+const logsCss = loadSrc("logs.css");
 
-describe("日志表头布局契约", () => {
-  it("表头钉在虚拟列表外，不随行滚动", () => {
+describe("日志清单布局契约", () => {
+  it("清单壳自持滚轴，状态行不跟列表滚", () => {
     expect(logsCss).toMatch(/\.yohu-logs__list\s*\{[^}]*display:\s*flex/);
-    expect(logsCss).toMatch(/\.yohu-logs__cols--head\s*\{[^}]*flex-shrink:\s*0/);
-    expect(logsCss).toContain("var(--yohu-row-height-header)");
+    expect(logsCss).not.toContain("yohu-logs__cols--head");
+    expect(logsCss).toContain("yohu-logs__head");
+    expect(logsCss).not.toContain("yohu-logs__head-line");
     expect(logsCss).toMatch(/\.yohu-logs__list-body\s*\{[^}]*overflow:\s*hidden/);
     expect(logsCss).toMatch(/\.yohu-logs__status\s*\{[^}]*flex-shrink:\s*0/);
     expect(logsCss).not.toMatch(/overflow-y:\s*(auto|scroll)/);
     expect(logsCss).not.toMatch(/overflow:\s*(auto|scroll)/);
   });
 
-  it("列轨道不在模块 CSS 写死，交给 YoColFrame", () => {
+  it("列轨道不在模块 CSS 写死，行是文档不是格子", () => {
     expect(logsCss).not.toMatch(/\.yohu-logs__cols\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*grid-template-columns:/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
-    expect(logsCss).toMatch(/\[data-log-pad\]\s*\{[^}]*user-select:\s*none/);
     expect(logsCss).not.toContain("::highlight(yohu-log-sel)");
     expect(logsCss).not.toContain("yohu-logs__sel-layer");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s+\.yohu-col-cell/);
-    expect(logsCss).toContain("var(--yohu-text-sel)");
-    expect(logsCss).toContain("var(--yohu-text-sel-fg)");
+    expect(logsCss).toContain("--yohu-doc-sel");
+    expect(logsCss).not.toContain("var(--yohu-text-sel-fg)");
     expect(logsCss).toMatch(
-      /\.yohu-logs__list ::selection\s*\{\s*background-color:\s*var\(--yohu-text-sel\);\s*color:\s*var\(--yohu-text-sel-fg\)/,
+      /\.yohu-logs__view \*::selection\s*\{\s*background-color:\s*transparent;\s*color:\s*inherit/,
     );
-    expect(logsCss).not.toMatch(/\.yohu-logs__list ::selection\s*\{\s*background:\s*transparent/);
+    expect(logsCss).not.toMatch(/\.yohu-logs__list \*::selection\s*\{\s*background-color:\s*var\(--yohu-doc-sel\)/);
+    expect(logsCss).not.toContain("yohu-logs__row--picked");
+    expect(logsCss).toContain("isolation: isolate");
     expect(logsCss).not.toContain('[data-select="cell"]');
     expect(logsCss).not.toContain(".yohu-logs__cell");
-    expect(logsCss).toContain("yohu-logs__row--picked");
     expect(logsCss).not.toContain("yohu-logs__list-body--picking");
     expect(logsCss).not.toContain("yohu-col-header");
     expect(logsCss).not.toContain("--yohu-col-tracks");
@@ -81,6 +81,16 @@ describe("日志表头布局契约", () => {
     expect(dialog).toContain("YoEmptyState");
     expect(dialog).toContain("YoLoading");
     expect(dialog).toContain("block");
+    expect(dialog).toContain("yohu-logs__new-bar");
+    expect(dialog).toContain("devicePickerFields");
+    expect(dialog).toContain('flex="fill"');
+    expect(dialog).not.toContain("<YoIndicator");
+    expect(dialog).not.toContain('tone="list"');
+    expect(dialog).not.toContain("YoFormRow");
+    expect(dialog).not.toMatch(/<YoSegmentedButton[\s\S]*?\bblock\b/);
+    expect(logsCss).toMatch(/\.yohu-logs__new-list\s*\{[^}]*flex-direction:\s*column/);
+    expect(dialog).toContain("onSubmit");
+    expect(dialog).toContain("onCreated");
     expect(dialog).not.toContain("yohu-logs__new-empty");
     expect(dialog).not.toContain("yohu-logs__new-hint");
     expect(dialog).not.toContain("yohu-logs__new-error");
@@ -96,81 +106,76 @@ describe("日志表头布局契约", () => {
 });
 
 describe("日志显示列", () => {
-  it("默认不含 UID/TID，列序时间/PID/Tag/级别/消息", () => {
-    expect(logDocTrackTemplate(defaultLogDocLayout(DEFAULT_LOG_DISPLAY_COLUMNS))).toBe(
-      "26ch 8ch 27ch 7ch minmax(10ch, 1fr)",
-    );
-    expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((c) => c.key)).toEqual([
+  it("默认 STANDARD：时间/BOTH/Tag/App/级别，headerWidth=100", () => {
+    const options = defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS);
+    expect(headerWidth(options)).toBe(100);
+    expect(formatColumns(options).map((c) => c.key)).toEqual([
       "ts",
       "pid",
       "tag",
+      "app",
       "level",
       "msg",
     ]);
   });
 
-  it("关闭元数据列后消息仍在，轨道只留可见列", () => {
-    const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false };
-    expect(visibleLogColumns(display).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
-    expect(logDocTrackTemplate(defaultLogDocLayout(display))).toBe("8ch 7ch minmax(10ch, 1fr)");
+  it("PID+TID 合成 ProcessThread BOTH，打开 UID 后 header 加 9", () => {
+    const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS);
+    expect(formatColumns(options).map((c) => c.key)).toEqual([
+      "ts",
+      "uid",
+      "pid",
+      "tag",
+      "app",
+      "level",
+      "msg",
+    ]);
+    expect(headerWidth(options)).toBe(109);
+  });
+
+  it("关闭元数据列后消息仍在", () => {
+    const display = { ...DEFAULT_LOG_DISPLAY_COLUMNS, ts: false, uid: false, tag: false, app: false };
+    const options = defaultFormatOptions(display);
+    expect(formatColumns(options).map((c) => c.key)).toEqual(["pid", "level", "msg"]);
+    expect(headerWidth(options)).toBe(12 + 4);
   });
 
   it("全部元数据关闭只剩消息", () => {
-    const display = { ts: false, uid: false, pid: false, tid: false, level: false, tag: false };
-    expect(logDocTrackTemplate(defaultLogDocLayout(display))).toBe("minmax(10ch, 1fr)");
+    const display = { ts: false, uid: false, pid: false, tid: false, tag: false, app: false, level: false };
+    const options = defaultFormatOptions(display);
+    expect(headerWidth(options)).toBe(0);
+    expect(formatColumns(options).map((c) => c.key)).toEqual(["msg"]);
   });
 
-  it("字段原文与表头同序，不含 pad / 列间空格", () => {
-    const line = {
-      seq: 1,
-      ts: "2026-01-01 12:00:00.000",
-      uid: "shell",
-      pid: 100,
-      tid: 200,
-      level: "I",
-      tag: "Yohu",
-      msg: "hello",
-    };
-    expect(visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS).map((col) => logFieldText(line, col.key))).toEqual([
-      "2026-01-01 12:00:00.000",
-      "100",
-      "Yohu",
-      "I",
-      "hello",
+  it("数据行高等于密度 token", () => {
+    expect(dataRowHeight()).toBe(Density.Comfortable.rowHeight);
+  });
+
+  it("页眉功能栏按采集态增删，不直切 Show", () => {
+    expect(logsChromeActions({ capturing: false, overflowed: false })).toEqual([
+      "capture",
+      "clear",
+      "clear-device",
+      "export",
+    ]);
+    expect(logsChromeActions({ capturing: true, overflowed: false })).toEqual([
+      "capture",
+      "pause",
+      "clear",
+      "clear-device",
+      "export",
+    ]);
+    expect(logsChromeActions({ capturing: true, overflowed: true })).toEqual([
+      "capture",
+      "pause",
+      "clear",
+      "clear-device",
+      "export",
+      "overflow",
     ]);
   });
 
-  it("表头全角计入列尺：级别 4ch，不被一字母字段压扁", () => {
-    expect(headerLabelChars("级别")).toBe(4);
-    expect(headerLabelChars("时间")).toBe(4);
-    expect(headerLabelChars("PID")).toBe(3);
-    expect(logSlotChars("level", "级别")).toBe(4);
-    expect(logSlotChars("pid", "PID")).toBe(5);
-    expect(logSlotChars("ts", "时间", "time_millis")).toBe(12);
-    expect(LOG_COLUMNS.find((col) => col.key === "level")?.minWidth).toBe(32);
-  });
-
-  it("写绝对宽度，不低于 min，消息列不拖", () => {
-    const start = defaultLogColWidths();
-    const tag = LOG_COLUMNS.find((col) => col.key === "tag")!;
-    const pid = LOG_COLUMNS.find((col) => col.key === "pid")!;
-    const msg = LOG_COLUMNS.find((col) => col.key === "msg")!;
-    expect(setColWidth(start, tag, 212).tag).toBe(212);
-    expect(setColWidth(start, pid, 10).pid).toBe(40);
-    expect(setColWidth(start, msg, 200)).toBe(start);
-  });
-
-  it("visibleLogColumns 复用 LOG_COLUMNS 引用，表头 For 拖宽才不重挂", () => {
-    const a = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
-    const b = visibleLogColumns(DEFAULT_LOG_DISPLAY_COLUMNS);
-    expect(a.map((col) => col.key)).toEqual(b.map((col) => col.key));
-    for (const col of a) {
-      expect(col).toBe(LOG_COLUMNS.find((item) => item.key === col.key));
-      expect(col).toBe(b.find((item) => item.key === col.key));
-    }
-  });
-
-  it("表头 For 遍历稳定规格，拖条写字段 px", () => {
+  it("清单标题栏走 YoCol 列架，行仍是文档", () => {
     const load = (name: string): string => {
       const candidates = [
         resolve(process.cwd(), `src/${name}`),
@@ -179,8 +184,13 @@ describe("日志显示列", () => {
       return candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
     };
     const view = load("LogAnalyzerView.tsx");
+    expect(view).not.toContain("data-scheme");
+    expect(view).not.toContain("logcat.css");
     const filter = load("LogFilterBar.tsx");
-    const doc = load("LogDocView.tsx");
+    const editorView = load("editor/view.tsx");
+    const editorBoard = load("editor/board.ts");
+    const formatter = load("editor/format.ts");
+    const documentSrc = load("editor/document.ts");
     expect(view).toContain('overflow="hidden"');
     expect(view).toContain('variant="pane"');
     expect(view).toContain("YoScroller");
@@ -189,7 +199,32 @@ describe("日志显示列", () => {
       /<YoScroller>\s*<YoTextField/,
     );
     expect(view).not.toMatch(/<YoScroller[\s\S]*?<YoVirtualList/);
-    expect(view).toContain("visibleLogColumns(displayColumns())");
+    expect(view).not.toContain("visibleLogColumns");
+    expect(view).toContain("LogColumnHeader");
+    expect(view).toContain("logDocTrackTemplate");
+    expect(view).toContain("YoColFrame");
+    expect(view).toContain('cellPad="none"');
+    expect(view).toContain('tone="document"');
+    expect(view).toContain("logDocTrackTemplate(formatOpts(), chPx())");
+    expect(view).not.toContain("formatHeader");
+    expect(view).not.toContain("yohu-logs__head-line");
+    expect(view).toContain("onInlineScroll");
+    const header = load("LogColumnHeader.tsx");
+    expect(header).toContain("YoColHeader");
+    expect(header).toContain("YoColRow");
+    expect(header).toContain('pad="none"');
+    expect(header).toContain('tone="document"');
+    expect(header).toContain("split={");
+    expect(header).toContain("onWidthChange");
+    expect(header).toContain("yohu-logs__head");
+    expect(view).toContain("setColChars");
+    expect(view).toContain("actions={");
+    expect(view).toContain("logs-chrome-actions");
+    expect(view).toContain("logsChromeActions");
+    expect(view).not.toContain("YoPresence");
+    expect(view).not.toContain("<YoListPresence");
+    expect(view).not.toContain("<Show when={active()?.capturing}");
+    expect(logsCss).not.toContain("yohu-logs__head-level");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
     expect(filter).toContain("YoChip");
@@ -197,9 +232,14 @@ describe("日志显示列", () => {
     expect(filter).toContain("YoSearch");
     expect(filter).not.toMatch(/<(input|select|textarea)\b/);
     expect(filter).not.toContain("__body");
-    expect(doc).not.toMatch(/<(input|select|textarea|button)\b/);
-    expect(doc).not.toContain("__body");
-    expect(doc).not.toContain("yohu-logs__row--raw");
+    expect(editorView).not.toMatch(/<(input|select|textarea|button)\b/);
+    expect(editorView).not.toContain("__body");
+    expect(editorView).not.toContain("formatMessage");
+    expect(editorView).toContain("data-tone");
+    expect(editorView).toContain("data-bar");
+    expect(view).not.toContain("contentColor");
+    expect(formatter).toContain("parseLevelLetter");
+    expect(formatter).not.toContain("../filter");
     expect(view).not.toContain("__body");
     expect(filter).toContain("YoSegmentedButton");
     expect(filter).toContain('type="capsule"');
@@ -207,20 +247,55 @@ describe("日志显示列", () => {
     expect(filter).toContain("fill:");
     expect(filter).toContain("ink:");
     expect(filter).toContain("--yohu-level-");
-    expect(filter).not.toContain("yohu-ink");
-    expect(filter).not.toContain("levelInkStyle");
     expect(filter).not.toContain("YoButton");
-    expect(filter).not.toContain("data-paint");
-    expect(filter).not.toContain("data-level");
-    expect(view).not.toContain("logDocColumns(docLayout())");
-    expect(view).not.toContain("logDocTrackPx");
     expect(view).toContain("action=");
     expect(view).toContain("text={`信号 ${session.signalCount}`}");
-    expect(view).toContain("width={logStore.state.colWidths[col.key]}");
-    expect(view).toContain("align={col.align}");
-    expect(view).toContain("layout: docLayout");
-    expect(doc).toContain("layout={bind.layout}");
-    expect(view).not.toContain("layout={docLayout()}");
+    expect(view).toContain("EditorView");
+    expect(view).not.toContain("YoVirtualList");
+    expect(editorView).toContain("YoVirtualList");
+    expect(editorView).toContain("itemHeight={props.itemHeight}");
+    expect(editorView).toContain("yohu-doc-sel");
+    expect(editorView).toContain("docSelBandStyle");
+    expect(editorView).toContain("selSlice");
+    expect(editorView).toContain("selectionchange");
+    expect(view).toContain("itemHeight={dataRowHeight()}");
+    expect(view).not.toContain("hangChars");
+    expect(editorView).not.toMatch(/\bhang:\s/);
+    expect(load("editor/selection.ts")).not.toContain("hang");
+    expect(editorView).not.toContain("wrapBody");
+    expect(editorView).not.toContain("VisualBoard");
+    expect(editorView).toContain("LineBoard");
+    expect(editorView).not.toContain("clipMessage");
+    expect(editorView).not.toContain("wrapMessage");
+    expect(editorBoard).toContain("clipMessage");
+    expect(editorBoard).toContain("wrapMessage");
+    expect(editorBoard).not.toContain("formatMessage");
+    expect(editorView).toContain("data-layout");
+    expect(editorView).not.toContain("log_line_layout");
+    expect(formatter).not.toContain("log_line_layout");
+    expect(formatter).toContain("softWrap");
+    expect(formatter).not.toContain("clipMessage");
+    expect(formatter).not.toContain("wrapMessage");
+    expect(documentSrc).not.toContain("log_line_layout");
+    expect(documentSrc).not.toContain("clipMessage");
+    expect(documentSrc).not.toContain("wrapMessage");
+    expect(view).toContain("layout={() => props.settings.log_line_layout}");
+    expect(view).toContain('log_line_layout !== "wrap"');
+    expect(formatter).not.toContain("log-line-layout");
+    expect(documentSrc).not.toContain("log-line-layout");
+    expect(logsCss).not.toContain("--yohu-log-hang");
+    expect(logsCss).not.toContain("--yohu-log-board");
+    expect(logsCss).toContain('[data-layout="clip"]');
+    expect(editorView).not.toContain("--yohu-log-board");
+    expect(editorView).toContain("contentWidth");
+    expect(editorView).toContain("hostRef");
+    expect(editorView).toContain("onInlineScroll");
+    expect(editorView).toContain("chPx");
+    expect(view).not.toContain("onInlineOffset");
+    expect(view).toContain("chPx={chPx}");
+    expect(view).toContain("softWrap");
+    expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*pre-wrap/);
+    expect(view).toContain("onCreated={beginCapture}");
     expect(view).toContain("onCleanup(() => toaster.destroy())");
     expect(view).not.toContain("Toast.success");
   });
@@ -234,6 +309,8 @@ describe("日志显示列", () => {
       return candidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
     };
     const view = load("LogAnalyzerView.tsx");
+    expect(view).not.toContain("data-scheme");
+    expect(view).not.toContain("logcat.css");
     expect(view).toContain("renameOpen");
     expect(view).toContain("onExitComplete");
     expect(view).toContain("open={renameOpen}");
@@ -246,16 +323,36 @@ describe("日志显示列", () => {
 });
 
 describe("日志级别色单源", () => {
-  it("行 --yohu-log-ink 由 View 写入，CSS 不再列 V–F 映射", () => {
+  it("行 --yohu-log-ink 由 Document range / barInk 写入，CSS 不再列 V–F 映射", () => {
     expect(logsCss).toContain('--yohu-log-ink: var(--yohu-fg-3)');
     expect(logsCss).not.toMatch(/\[data-level="[vdiwe]"\]/);
     expect(logsCss).not.toContain("--yohu-level-f-bg");
-    expect(logsCss).toContain('[data-paint="invert"]');
-    expect(logsCss).toContain("[data-tint-msg]");
-    expect(logsCss).toContain(".yohu-logs__row-tag {");
-    expect(logsCss).toContain("color: var(--yohu-log-ink)");
+    expect(logsCss).not.toContain('[data-paint="invert"]');
+    expect(logsCss).not.toContain("padding-inline: 0.5ch");
+    expect(logsCss).not.toContain("margin-inline: -0.5ch");
+    expect(logsCss).toContain("line-height: var(--yohu-font-leading-data)");
+    expect(logsCss).toContain("line-height: var(--yohu-row-height)");
+    expect(logsCss).toContain('[data-tone="ink"]');
+    expect(logsCss).toContain('[data-tone="wash"]');
+    expect(logsCss).toContain('[data-box="line"]');
+    expect(logsCss).not.toContain('[data-tone="badge"]');
+    expect(logsCss).not.toMatch(/\[data-tone="wash"\][^{]*\{[^}]*border-radius/);
+    expect(logsCss).not.toMatch(/\[data-box="line"\][^{]*\{[^}]*border-radius/);
+    expect(logsCss).toContain('[data-bar="level"]');
+    expect(logsCss).not.toContain(".yohu-logs__row-ts");
+    expect(logsCss).not.toContain(".yohu-logs__row-uid");
+    expect(logsCss).not.toContain(".yohu-logs__row-pid");
+    expect(logsCss).not.toContain("--yohu-log-tag");
+    expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*color:\s*var\(--yohu-fg\)/);
+    expect(logsCss).not.toContain("[data-tint-msg]");
+    expect(logsCss).toContain("var(--yohu-log-ink)");
     expect(logsCss).not.toMatch(/\.yohu-logs__row-level\s*\{[^}]*text-align:\s*center/);
-    expect(logsCss).toContain("[data-tint-msg] .yohu-logs__row-msg");
+    expect(logsCss).not.toContain("[data-level] .yohu-logs__row-msg");
+    expect(logsCss).not.toContain("data-scheme");
+    expect(logsCss).not.toContain("var(--yohu-logcat-msg-");
+    expect(loadSrc("color/logcat.css")).toBe("");
+    expect(loadSrc("color/index.ts")).toBe("");
+    expect(logsCss.includes(`#${"FF6B68"}`)).toBe(false);
     expect(logsCss).not.toContain(".yohu-logs__level--");
     expect(logsCss).not.toContain(".yohu-logs__row--bar-");
     expect(logsCss).toContain(".yohu-logs__levels {");

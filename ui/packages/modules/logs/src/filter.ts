@@ -33,7 +33,7 @@ export {
 };
 export type { LevelLetter };
 
-/** 与 `--yohu-level-*` / 行 `data-level` 对齐；由 LEVELS 派生，禁止再写一份小写表。 */
+/** 筛选钮 / `--yohu-level-*` 键；由 LEVELS 派生。着色在 editor/format 引擎，筛选钮只认 LEVELS 派生键。 */
 export type LevelKey = Lowercase<LevelLetter>;
 
 const LEVEL_CAPTION: Record<LevelLetter, string> = {

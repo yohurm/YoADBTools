@@ -63,11 +63,23 @@ fn build_service(adb_exe: PathBuf) -> (Arc<CaptureService>, mpsc::Receiver<AppEv
 const THREE_LINES_SCRIPT: &str = r#"{
     "devices": ["R58M1234A device product:x model:Yohu_Phone transport_id:1"],
     "logcat_lines": [
-        "2026-01-02 03:04:05.678  1234  5678 I TestTag: hello one",
-        "2026-01-02 03:04:05.779  1234  5678 W TestTag: hello two",
-        "2026-01-02 03:04:05.880  9999  5678 E OtherTag: hello three"
+        "[ 2026-01-02 03:04:05.678  1000: 1234: 5678 I/TestTag ]",
+        "hello one",
+        "[ 2026-01-02 03:04:05.779  1000: 1234: 5678 W/TestTag ]",
+        "hello two",
+        "[ 2026-01-02 03:04:05.880  1000: 9999: 5678 E/OtherTag ]",
+        "hello three"
     ],
     "logcat_delay_ms": 5
+}"#;
+
+const TICK_FOREVER_SCRIPT: &str = r#"{
+    "logcat_lines": [
+        "[ 2026-01-02 03:04:05.678  1: 2 I/T ]",
+        "tick"
+    ],
+    "logcat_delay_ms": 20,
+    "logcat_forever": true
 }"#;
 
 fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
@@ -111,15 +123,17 @@ async fn capture_streams_parses_and_batches() {
     service.start("R58M1234A", false).await.expect("开始采集");
 
     let lines = collect_lines(&mut rx, 3).await;
-    assert_eq!(lines.len(), 3, "应收到 3 行批量事件");
+    assert_eq!(lines.len(), 3, "应收到 3 条批量事件");
     assert_eq!(lines[0].seq, 0);
     assert_eq!(lines[0].pid, 1234);
+    assert_eq!(lines[0].uid.as_deref(), Some("1000"));
     assert_eq!(lines[0].level, 'I');
     assert_eq!(lines[0].tag, "TestTag");
+    assert_eq!(lines[0].msg, "hello one");
     assert_eq!(lines[1].level, 'W');
     assert_eq!(lines[2].pid, 9999);
 
-    // 流自然结束 → 环形缓冲保留全部行
+    // 流自然结束 → 环形缓冲保留全部记录
     let kept = replay_lines(&service, "R58M1234A");
     assert_eq!(kept.len(), 3);
     assert_eq!(service.status("R58M1234A").last_seq, 2);
@@ -145,13 +159,7 @@ async fn stop_keeps_ring_and_clear_empties() {
 
 #[tokio::test]
 async fn start_while_live_adopts_same_generation() {
-    let (service, _rx) = build_service(isolated_fake_adb(
-        r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
-            "logcat_delay_ms": 20,
-            "logcat_forever": true
-        }"#,
-    ));
+    let (service, _rx) = build_service(isolated_fake_adb(TICK_FOREVER_SCRIPT));
     let first = service.start("R58M1234A", false).await.expect("首次开始");
     assert!(!first.adopted);
     assert!(service.is_capturing("R58M1234A"));
@@ -172,13 +180,7 @@ async fn start_while_live_adopts_same_generation() {
 
 #[tokio::test]
 async fn concurrent_start_during_starting_shares_one_generation() {
-    let (service, _rx) = build_service(isolated_fake_adb(
-        r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
-            "logcat_delay_ms": 20,
-            "logcat_forever": true
-        }"#,
-    ));
+    let (service, _rx) = build_service(isolated_fake_adb(TICK_FOREVER_SCRIPT));
     let a = Arc::clone(&service);
     let b = Arc::clone(&service);
     let (first, second) = tokio::join!(a.start("R58M1234A", false), b.start("R58M1234A", false));
@@ -192,13 +194,7 @@ async fn concurrent_start_during_starting_shares_one_generation() {
 
 #[tokio::test]
 async fn stop_during_start_releases_slot_and_allows_restart() {
-    let (service, _rx) = build_service(isolated_fake_adb(
-        r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
-            "logcat_delay_ms": 20,
-            "logcat_forever": true
-        }"#,
-    ));
+    let (service, _rx) = build_service(isolated_fake_adb(TICK_FOREVER_SCRIPT));
     let starter = Arc::clone(&service);
     let start = tokio::spawn(async move { starter.start("R58M1234A", false).await });
     let deadline = tokio::time::Instant::now() + Duration::from_secs(4);
@@ -229,13 +225,7 @@ async fn stop_during_start_releases_slot_and_allows_restart() {
 
 #[tokio::test]
 async fn start_during_stop_waits_then_opens_new_generation() {
-    let (service, mut rx) = build_service(isolated_fake_adb(
-        r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
-            "logcat_delay_ms": 20,
-            "logcat_forever": true
-        }"#,
-    ));
+    let (service, mut rx) = build_service(isolated_fake_adb(TICK_FOREVER_SCRIPT));
     let first = service.start("R58M1234A", false).await.expect("首次开始");
     wait_ring_lines(&service, "R58M1234A", 1).await;
 
@@ -309,7 +299,10 @@ async fn device_offline_stream_ends_with_state_stopped() {
     // 假 adb 输出一行后以掉线特征退出
     let exe = isolated_fake_adb(
         r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: bye"],
+            "logcat_lines": [
+                "[ 2026-01-02 03:04:05.678  1: 2 I/T ]",
+                "bye"
+            ],
             "logcat_delay_ms": 5,
             "logcat_exit_code": 1,
             "logcat_stderr": "adb: device offline"
@@ -361,13 +354,7 @@ async fn device_offline_stream_ends_with_state_stopped() {
 #[tokio::test]
 async fn cancel_stops_long_running_stream() {
     // 长驻流（forever）：取消令牌终止进程树
-    let exe = isolated_fake_adb(
-        r#"{
-            "logcat_lines": ["2026-01-02 03:04:05.678  1  2 I T: tick"],
-            "logcat_delay_ms": 20,
-            "logcat_forever": true
-        }"#,
-    );
+    let exe = isolated_fake_adb(TICK_FOREVER_SCRIPT);
     let (service, _rx) = build_service(exe);
 
     service.start("R58M1234A", false).await.expect("开始采集");

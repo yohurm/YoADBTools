@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::commands::{ipc, ipc_adb};
+use crate::commands::{ipc_adb, ipc_catalog};
 use crate::state::AppState;
 use yohu_protocol::{DeviceInfo, DeviceStatus, IpcError};
 
@@ -15,7 +15,9 @@ pub fn device_list(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, IpcErr
 /// `device.refresh`：立即 `devices -l` 扫描并推 `devices/changed`。
 #[tauri::command(rename = "device.refresh")]
 pub async fn device_refresh(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, IpcError> {
-    crate::device_catalog::refresh(&state).await.map_err(ipc)
+    crate::device_catalog::refresh(&state)
+        .await
+        .map_err(ipc_catalog)
 }
 
 /// `device.status`：读运行时状态缓存（不触发扫描）。`serial` 缺省则返回全部在线设备。

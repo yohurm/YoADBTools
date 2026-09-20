@@ -2,6 +2,7 @@ export { YoPresence } from "./presence";
 export type { YoPresenceProps } from "./presence";
 export { YoListPresence } from "./list-presence";
 export type { YoListPresenceProps } from "./list-presence";
+export { useListPresenceSlots } from "./list-presence-engine";
 export type { PresenceRecipe } from "../../spec/recipes";
 export { firstPresentSlotKey } from "./list-presence-model";
 export type { ListPresenceSlot } from "./list-presence-model";

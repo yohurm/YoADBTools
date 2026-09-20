@@ -1,17 +1,40 @@
 //! 命令库落盘：采纳只走 domain `from_dto`；
-//! 本层只做原子写与损坏备份。
+//! 本层只做原子写、损坏备份，以及内存库写入。
 //! 磁盘与 IPC 共用 [`CommandLibraryDto`]；只认当前 schema。
 
 use std::fs;
 use std::path::Path;
 
-use yohu_domain::CommandLibrary;
+use crate::state::AppState;
+use yohu_domain::{CommandLibrary, LibraryError};
 use yohu_protocol::CommandLibraryDto;
 use yohu_runtime::{atomic_write, backup_corrupt};
 
-/// 加载命令库：缺失 → 默认库；当前 schema → `from_dto`；
+#[derive(Debug, thiserror::Error)]
+pub enum LibraryStoreError {
+    #[error("{0}")]
+    Library(#[from] LibraryError),
+    #[error("{0}")]
+    Io(String),
+}
+
+/// 加载命令库并写入内存：缺失 → 默认库；当前 schema → `from_dto`；
 /// 其它 schema_version 或解析/校验失败 → 备份后写默认库。
-pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
+pub fn load(state: &AppState) -> Result<CommandLibraryDto, LibraryStoreError> {
+    let library = load_or_default(&state.paths.library_file()).map_err(LibraryStoreError::Io)?;
+    *state.library.lock().expect("library lock poisoned") = library.clone();
+    Ok(library.to_dto())
+}
+
+/// `from_dto` 后全量原子提交，并写入内存库。取消零污染由 UI 深拷贝保证。
+pub fn save(state: &AppState, dto: CommandLibraryDto) -> Result<(), LibraryStoreError> {
+    let library = CommandLibrary::from_dto(&dto)?;
+    persist(&state.paths.library_file(), &library).map_err(LibraryStoreError::Io)?;
+    *state.library.lock().expect("library lock poisoned") = library;
+    Ok(())
+}
+
+fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
     match fs::read_to_string(file) {
         Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
             Ok(value) => match value.get("schema_version").and_then(|v| v.as_u64()) {
@@ -30,8 +53,7 @@ pub fn load_or_default(file: &Path) -> Result<CommandLibrary, String> {
     }
 }
 
-/// 全量原子提交。调用方先经 `from_dto`。
-pub fn save(file: &Path, library: &CommandLibrary) -> Result<(), String> {
+fn persist(file: &Path, library: &CommandLibrary) -> Result<(), String> {
     let dto = library.to_dto();
     atomic_write(
         file,
@@ -59,7 +81,7 @@ fn restore_default(file: &Path, text: &str, reason: &str) -> Result<CommandLibra
 
 fn write_default(file: &Path) -> Result<CommandLibrary, String> {
     let library = yohu_domain::default_library();
-    save(file, &library)?;
+    persist(file, &library)?;
     tracing::info!("已写入默认命令库: {}", file.display());
     Ok(library)
 }
@@ -95,7 +117,7 @@ mod tests {
     fn current_schema_adopts_from_dto() {
         let file = temp_file("current");
         let expected = yohu_domain::default_library();
-        save(&file, &expected).unwrap();
+        persist(&file, &expected).unwrap();
         let lib = load_or_default(&file).unwrap();
         assert_eq!(lib, expected);
         assert!(!has_corrupt_backup(file.parent().unwrap()));

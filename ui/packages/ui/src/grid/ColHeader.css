@@ -72,6 +72,15 @@
   white-space: nowrap;
 }
 
+.yohu-col-header[data-pad="none"] {
+  --yohu-col-header-content-pad: 0;
+}
+
+.yohu-col-header[data-tone="document"] {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
 .yohu-col-header[data-align="center"] .yohu-col-header__label {
   justify-content: center;
   text-align: center;

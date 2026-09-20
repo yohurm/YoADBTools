@@ -19,6 +19,18 @@ export type ScrollerPhase = "none" | "in" | "on" | "out";
 /** 对照 ArkUI BarState：Auto 滚动时显示，On 常驻，Off 不画条仍可滚。 */
 export type ScrollerBarState = "auto" | "on" | "off";
 
+/** 默认只纵滚。both 才开横轴产品条（日志 clip）。 */
+export type ScrollerAxis = "block" | "both";
+
+export function resolveScrollerAxis(axis?: ScrollerAxis): ScrollerAxis {
+  return axis === "both" ? "both" : "block";
+}
+
+/** client 含 padding；滚动口用内容盒。 */
+export function resolveScrollerViewSize(client: number, paddingStart = 0, paddingEnd = 0): number {
+  return Math.max(0, client - Math.max(0, paddingStart) - Math.max(0, paddingEnd));
+}
+
 /** 滑块最小高：鸿蒙滚动条最短 48vp（Layout.IconPreview）。 */
 export const SCROLLER_THUMB_MIN = Layout.IconPreview;
 

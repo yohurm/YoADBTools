@@ -1,16 +1,7 @@
 /* ============================================================================
- * 日志分析模块（UI设计系统-v6.md §4.1）。
- * 表头是铬层：YoColFrame cellPad=list + ch 轨道（logDocTrackTemplate）。
- * 列垫在尺里（padLeftChars = space-md），标题与文档同一起笔，禁止 cellPad=none 贴边。
- * 行是一份 white-space:pre 文档。表头与行共用 logDocColumns 一把尺。
- * 选区走原生 ::selection（--yohu-text-sel / --yohu-text-sel-fg）。
- * 列间空白是 formatLogDoc 的 pad 空格。
- * Ctrl+A 同色铺底。选字走强调实底 + 反白，禁止 accent-soft / 半透明品牌冒充选字。
- * 行间不画分割线（YoVirtualList 默认 tone=document，禁止再画再关）。
- * 行 --yohu-log-ink 由 View 写成 var(--yohu-level-${key})，禁止再列 V–F 六条映射。
- * 级别筛选走 YoSegmentedButton 胶囊多选。模块不点分段项、不写 --yohu-button-*。
- * 左条 / 级别字 / Tag 共用 ink；Error/Fatal 消息同色；Fatal 字母反色块（data-paint=invert，字走 fg-on）。
- * 信号行底色 + Error 左条；日志列表不动效（性能优先，§2.4）。
+ * 日志分析模块。官方 Document + Soft-Wrap：一行文档 = 一行可视。
+ * hang 空格只在 Formatter 写入 Document（Soft-Wrap 关）。禁止 CSS hang / 模块 CSS 写表头 1fr。
+ * clip 超宽横滑；wrap 视口软折续行第 0 列。
  * ========================================================================== */
 
 .yohu-logs__tabs {
@@ -69,29 +60,42 @@
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
+  line-height: var(--yohu-font-leading-data);
+}
+
+.yohu-logs__table {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.yohu-logs__head {
+  flex-shrink: 0;
+  overflow: hidden;
+  height: var(--yohu-row-height-header);
+  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  color: var(--yohu-fg-2);
+  user-select: none;
+}
+
+.yohu-logs__table:has(.yohu-scroller[data-gutter="on"]) > .yohu-logs__head {
+  padding-inline-end: var(--yohu-space-lg);
 }
 
 .yohu-logs__list-body {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Ctrl+A 未挂载行：与拖选同一选字对，不是徽章软底。 */
-.yohu-logs__row--picked {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
-  --yohu-log-ink: var(--yohu-text-sel-fg);
-}
-
-.yohu-logs__row--picked .yohu-logs__row-ts,
-.yohu-logs__row--picked .yohu-logs__row-uid,
-.yohu-logs__row--picked .yohu-logs__row-pid,
-.yohu-logs__row--picked .yohu-logs__row-tid,
-.yohu-logs__row--picked .yohu-logs__row-msg,
-.yohu-logs__row--picked .yohu-logs__row-fold {
-  color: var(--yohu-text-sel-fg);
+.yohu-logs__view {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
 }
 
 /* 离开底部：只计数不跟滚（Entangle jump-to-bottom / Qovery new-logs） */
@@ -119,7 +123,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 模块铬：等宽、左条。表头轨道由 YoColFrame 承担；行是文档。 */
+/* 模块铬：等宽、左条。行是 Document 文本，不是列架格子。 */
 .yohu-logs__cols {
   padding: 0;
   border-left: var(--yohu-stroke-emphasis) solid transparent;
@@ -128,88 +132,70 @@
   font-variant-numeric: tabular-nums;
 }
 
-.yohu-logs__cols--head {
-  flex-shrink: 0;
-  height: var(--yohu-row-height-header);
-  align-items: stretch;
-  background: var(--yohu-canvas);
-  border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
-  color: var(--yohu-fg-2);
-  font-weight: var(--yohu-font-weight-regular);
-  user-select: none;
-}
-
 .yohu-logs__row {
   --yohu-log-ink: var(--yohu-fg-3);
+  color: var(--yohu-fg);
+  position: relative;
+  isolation: isolate;
   display: block;
   height: 100%;
   overflow: hidden;
   white-space: pre;
+  line-height: var(--yohu-row-height);
   user-select: text;
   cursor: text;
+  border-left-color: transparent;
+}
+
+/* clip：行宽跟文档自然宽。hang 已在文档空格里。 */
+.yohu-logs__view[data-layout="clip"] .yohu-logs__row {
+  width: max-content;
+  min-width: 100%;
+}
+
+.yohu-logs__row[data-bar="level"] {
   border-left-color: var(--yohu-log-ink);
 }
 
-/* 列垫空格不是字段正文。禁止进双击选词，仍占文档宽度。 */
-.yohu-logs__row [data-log-pad] {
-  user-select: none;
+/* 原生 ::selection 只当手势。色由 .yohu-doc-sel / --yohu-doc-sel 带画，避免 WebView2 只在行尾画出一条并洗白 ink。 */
+.yohu-logs__view ::selection,
+.yohu-logs__view *::selection {
+  background-color: transparent;
+  color: inherit;
 }
 
-.yohu-logs__list ::selection {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
-}
+/* 左条 ink 由 Document barInk 写入 --yohu-log-ink。 */
 
-/* ink 由 View 写入 --yohu-log-ink。 */
-
-/* 信号行（崩溃/ANR）：信号底色 + Error 左条。Ctrl+A 铺底时让位。 */
+/* 信号行（崩溃/ANR）：信号底色 + Error 左条。选区带叠在行底上，左条保留。 */
 .yohu-logs__row--signal {
   background-color: var(--yohu-signal-bg);
   border-left-color: var(--yohu-error);
 }
 
-.yohu-logs__row--signal.yohu-logs__row--picked {
-  background-color: var(--yohu-text-sel);
-  color: var(--yohu-text-sel-fg);
-}
-
-.yohu-logs__row-ts {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-logs__row-uid {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-logs__row-pid,
-.yohu-logs__row-tid {
-  color: var(--yohu-fg-2);
-}
-
-.yohu-logs__row-level,
-.yohu-logs__row-tag {
-  color: var(--yohu-log-ink);
-}
-
 .yohu-logs__row-level {
   font-weight: var(--yohu-font-weight-semibold);
-  box-sizing: border-box;
-}
-
-/* Fatal 反色块：字母用 font_on，底用 ink（更深的 warning）。 */
-.yohu-logs__row[data-paint="invert"] .yohu-logs__row-level {
-  color: var(--yohu-fg-on);
-  background-color: var(--yohu-log-ink);
-  border-radius: var(--yohu-radius-2xs);
 }
 
 .yohu-logs__row-msg {
-  color: var(--yohu-fg);
   min-width: 0;
 }
 
-.yohu-logs__row[data-tint-msg] .yohu-logs__row-msg {
+.yohu-logs__row [data-tone="ink"] {
   color: var(--yohu-log-ink);
+}
+
+/* 行盒：对照编辑器 TextAttributes.BACKGROUND，邻行相贴。禁止圆角 / padding。 */
+.yohu-logs__row [data-box="line"] {
+  display: inline-block;
+  height: 100%;
+  vertical-align: top;
+  line-height: var(--yohu-row-height);
+  box-sizing: border-box;
+}
+
+.yohu-logs__row [data-tone="wash"] {
+  color: var(--yohu-log-level-fg);
+  background-color: var(--yohu-log-level-bg);
 }
 
 .yohu-logs__mark {
@@ -260,17 +246,43 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   gap: var(--yohu-space-sm);
 }
 
+.yohu-logs__new-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.yohu-logs__new-device {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.yohu-logs__new-device-hint {
+  display: block;
+  min-width: 0;
+  color: var(--yohu-fg-3);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-ui);
+}
+
 .yohu-logs__new-seg {
+  flex: 0 0 auto;
   min-width: 0;
 }
 
 .yohu-logs__new-search {
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .yohu-logs__new-list {
@@ -278,13 +290,17 @@
   --yohu-corner-stroke: var(--yohu-border);
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
 .yohu-logs__new-list-chrome {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
 }
 
 .yohu-logs__new-item {

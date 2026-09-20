@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   isPendingFocusAdopted,
+  resolveVirtualIndicatorHot,
   resolveVirtualListKeyAction,
   shouldEmitAtBottom,
   virtualHostAttrs,
+  virtualIndicatorFill,
   virtualRowAttrs,
 } from "./virtuallist-policy";
 
@@ -87,6 +89,8 @@ describe("virtuallist-policy", () => {
       "aria-multiselectable": undefined,
       "data-tone": "document",
       "data-reordering": undefined,
+      "data-indicator": undefined,
+      "data-indicator-hot": undefined,
     });
     expect(
       virtualHostAttrs({ selectable: true, multi: true, tone: "list", ariaLabel: "文件" }),
@@ -96,9 +100,45 @@ describe("virtuallist-policy", () => {
       "aria-multiselectable": true,
       "data-tone": "list",
       "data-reordering": undefined,
+      "data-indicator": undefined,
+      "data-indicator-hot": undefined,
     });
     expect(virtualHostAttrs({ selectable: true, multi: false, reordering: true })["data-reordering"]).toBe(
       "",
     );
+  });
+
+  it("indicator fill / hot：未 follow 或换位清空；选中填充才 hover/pressed", () => {
+    expect(virtualIndicatorFill("row-1", false)).toBe(true);
+    expect(virtualIndicatorFill(undefined, false)).toBe(false);
+    expect(virtualIndicatorFill("row-1", true)).toBe(false);
+    expect(resolveVirtualIndicatorHot({ fill: false, onSelectedFill: true, pressed: false })).toBeUndefined();
+    expect(resolveVirtualIndicatorHot({ fill: true, onSelectedFill: false, pressed: false })).toBeUndefined();
+    expect(resolveVirtualIndicatorHot({ fill: true, onSelectedFill: true, pressed: false })).toBe("hover");
+    expect(resolveVirtualIndicatorHot({ fill: true, onSelectedFill: true, pressed: true })).toBe("pressed");
+    expect(
+      virtualHostAttrs({
+        selectable: true,
+        multi: false,
+        indicatorFill: true,
+        indicatorHot: "hover",
+      })["data-indicator"],
+    ).toBe("fill");
+    expect(
+      virtualHostAttrs({
+        selectable: true,
+        multi: false,
+        indicatorFill: true,
+        indicatorHot: "pressed",
+      })["data-indicator-hot"],
+    ).toBe("pressed");
+    expect(
+      virtualHostAttrs({
+        selectable: true,
+        multi: false,
+        indicatorFill: false,
+        indicatorHot: "hover",
+      })["data-indicator-hot"],
+    ).toBeUndefined();
   });
 });

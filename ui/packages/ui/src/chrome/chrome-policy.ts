@@ -31,7 +31,7 @@ export function resolveChromeSlots(input: ChromeInput): ChromeSlots {
   const spec = resolveChromeSpec(input);
   return {
     showLeading: spec.showLeading,
-    showBar: Boolean(input.hasBar),
-    showExtra: Boolean(input.hasExtra),
+    showBar: spec.showBar,
+    showExtra: spec.showExtra,
   };
 }

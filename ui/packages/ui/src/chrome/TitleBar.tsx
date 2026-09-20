@@ -6,10 +6,9 @@
 import { For, Show, createMemo, type JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
-import { resolveTitleBarSpec } from "./titlebar-model";
 import {
   isCaptionTarget,
-  titlebarCaptionButtons,
+  resolveTitleBarSlots,
   titlebarHostAttrs,
   type TitleBarCaptionButton,
 } from "./titlebar-policy";
@@ -44,9 +43,8 @@ function onCaption(kind: TitleBarCaptionButton["kind"], props: YoTitleBarProps):
 
 /** 渲染 HarmonyOS 风格窗口标题栏（无系统边框时由 Application 接线拖动/三键）。 */
 export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
-  const spec = createMemo(() => resolveTitleBarSpec(props));
   const host = createMemo(() => titlebarHostAttrs(props));
-  const captions = createMemo(() => titlebarCaptionButtons(spec()));
+  const slots = createMemo(() => resolveTitleBarSlots(props));
 
   return (
     <header
@@ -59,7 +57,7 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
       }}
     >
       <div class="yohu-titlebar__brand" data-tauri-drag-region>
-        <Show when={spec().brand === "logo"}>
+        <Show when={slots().brand === "logo"}>
           <img
             class="yohu-titlebar__logo"
             src={props.logoSrc}
@@ -69,7 +67,7 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
             draggable={false}
           />
         </Show>
-        <Show when={spec().brand === "icon"}>
+        <Show when={slots().brand === "icon"}>
           <span class="yohu-titlebar__icon" aria-hidden="true">
             <Icon name={props.icon as IconName} size={Layout.IconSm} />
           </span>
@@ -81,9 +79,9 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
         <Show when={props.actions}>
           <div class="yohu-titlebar__actions">{props.actions}</div>
         </Show>
-        <Show when={spec().showCaptions}>
+        <Show when={slots().showCaptions}>
           <div class="yohu-titlebar__captions">
-            <For each={captions()}>
+            <For each={slots().captions}>
               {(btn) => (
                 <button
                   type="button"

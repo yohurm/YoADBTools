@@ -33,7 +33,7 @@ impl RingBuffer {
         }
     }
 
-    /// 下次写入起生效；已超出的旧行立即从头部淘汰。
+    /// 下次写入起生效；已超出的旧记录立即从头部淘汰。
     pub(crate) fn set_capacity(&self, capacity: usize) {
         let capacity = capacity.max(1);
         let mut state = self.inner.lock().expect("ring lock poisoned");
@@ -43,7 +43,7 @@ impl RingBuffer {
         }
     }
 
-    /// 写入一行（分配 seq）；返回该行 seq。
+    /// 写入一条 logd 记录（分配 seq）；返回该记录 seq。
     pub(crate) fn push(&self, mut line: LogLine) -> u64 {
         let mut state = self.inner.lock().expect("ring lock poisoned");
         let seq = state.next_seq;
@@ -56,7 +56,7 @@ impl RingBuffer {
         seq
     }
 
-    /// 快照：`seq >= from_seq` 的前 `limit` 行（回补用）。
+    /// 快照：`seq >= from_seq` 的前 `limit` 条记录（回补用）。
     pub(crate) fn snapshot(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
         let state = self.inner.lock().expect("ring lock poisoned");
         state
@@ -68,7 +68,7 @@ impl RingBuffer {
             .collect()
     }
 
-    /// 从 `from_seq` 取至多 `limit` 行；`truncated` 表示环内还有更大 seq。
+    /// 从 `from_seq` 取至多 `limit` 条记录；`truncated` 表示环内还有更大 seq。
     pub(crate) fn snapshot_page(&self, from_seq: u64, limit: usize) -> (Vec<LogLine>, bool) {
         let state = self.inner.lock().expect("ring lock poisoned");
         let lines: Vec<LogLine> = state
@@ -125,10 +125,10 @@ mod tests {
             ts: "2026-01-01 00:00:00.000".into(),
             pid: 1,
             tid: 1,
-            uid: None,
             level: 'I',
             tag: "T".into(),
             msg: format!("m{seq_hint}"),
+            ..LogLine::default()
         }
     }
 

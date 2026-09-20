@@ -22,8 +22,16 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  /* 只铺父级宽。flex-grow 会在 pane 竖栏里把字段沿栏高拉开。 */
+  /* 只铺父级定宽。flex-grow 会在 pane 竖栏里把字段沿栏高拉开。 */
   flex: 0 1 auto;
+}
+
+/* 路径等只读槽：定宽，禁止 width:100% 套进 hug 簇把 size=1 的字裁没。 */
+.yohu-text-field[data-width="control"] {
+  width: var(--yohu-layout-settings-control-max);
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 0 auto;
 }
 
 .yohu-text-field[data-active] {

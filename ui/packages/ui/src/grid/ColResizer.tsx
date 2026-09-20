@@ -11,14 +11,16 @@ import { beginColResize, moveColResize, type ColResizeSession } from "./col-resi
 import "./ColResizer.css";
 
 export interface YoColResizerProps {
-  width: number;
-  minWidth: number;
+  width?: number;
+  minWidth?: number;
   maxWidth?: number;
   /** 无障碍名称 */
   label?: string;
-  onWidthChange: (width: number, phase: ColResizePhase) => void;
+  onWidthChange?: (width: number, phase: ColResizePhase) => void;
   /** 双击；调用方决定是否按内容回默认宽 */
   onFit?: () => void;
+  /** 只画列缝短柄，不拖、不进 Tab */
+  mark?: boolean;
 }
 
 const RESIZE_LOCK = "yohuColResizing";
@@ -38,18 +40,18 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
 
   const spec = (): YoColSpec => ({
     key: "col",
-    defaultWidth: props.width,
-    minWidth: props.minWidth,
+    defaultWidth: props.width ?? 0,
+    minWidth: props.minWidth ?? 0,
     maxWidth: props.maxWidth,
   });
 
   const finish = (clientX: number | null): void => {
     if (!session) return;
-    const width = clientX === null ? props.width : moveColResize(session, clientX, spec());
+    const width = clientX === null ? (props.width ?? 0) : moveColResize(session, clientX, spec());
     session = null;
     setActive(false);
     lockPageResize(false);
-    props.onWidthChange(width, "end");
+    props.onWidthChange?.(width, "end");
   };
 
   const onPointerDown = (event: PointerEvent): void => {
@@ -57,10 +59,10 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
     event.preventDefault();
     event.stopPropagation();
     const target = event.currentTarget as HTMLElement;
-    session = beginColResize("col", event.clientX, props.width);
+    session = beginColResize("col", event.clientX, props.width ?? 0);
     setActive(true);
     lockPageResize(true);
-    props.onWidthChange(props.width, "start");
+    props.onWidthChange?.(props.width ?? 0, "start");
     try {
       target.setPointerCapture?.(event.pointerId);
     } catch {
@@ -71,8 +73,8 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
   const onPointerMove = (event: PointerEvent): void => {
     if (!session) return;
     const width = moveColResize(session, event.clientX, spec());
-    if (width === props.width) return;
-    props.onWidthChange(width, "move");
+    if (width === (props.width ?? 0)) return;
+    props.onWidthChange?.(width, "move");
   };
 
   const onPointerUp = (event: PointerEvent): void => {
@@ -95,10 +97,10 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
     let next: number | null = null;
     switch (event.key) {
       case "ArrowLeft":
-        next = nudgeColWidth(props.width, current, -1);
+        next = nudgeColWidth(props.width ?? 0, current, -1);
         break;
       case "ArrowRight":
-        next = nudgeColWidth(props.width, current, 1);
+        next = nudgeColWidth(props.width ?? 0, current, 1);
         break;
       case "Home":
         next = current.minWidth;
@@ -111,21 +113,25 @@ export function YoColResizer(props: YoColResizerProps): JSX.Element {
         return;
     }
     event.preventDefault();
-    if (next === props.width) return;
-    props.onWidthChange(next, "end");
+    if (next === (props.width ?? 0)) return;
+    props.onWidthChange?.(next, "end");
   };
 
   onCleanup(() => {
     if (session) lockPageResize(false);
   });
 
+  if (props.mark) {
+    return <div class="yohu-col-resizer" data-mark="" aria-hidden="true" />;
+  }
+
   return (
     <div
       role="separator"
       aria-orientation="vertical"
       aria-label={props.label ?? "调节列宽"}
-      aria-valuemin={props.minWidth}
-      aria-valuenow={Math.round(props.width)}
+      aria-valuemin={props.minWidth ?? 0}
+      aria-valuenow={Math.round(props.width ?? 0)}
       aria-valuemax={props.maxWidth ?? undefined}
       tabindex="0"
       class="yohu-col-resizer"

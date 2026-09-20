@@ -22,6 +22,14 @@ describe("scroller-policy", () => {
       "data-bar": "auto",
       "data-interactive": "off",
     });
+    expect(scrollerHostAttrs("on", "auto", true, true, "both", true, "in")).toEqual({
+      "data-scroll": "on",
+      "data-scroll-inline": "in",
+      "data-bar": "auto",
+      "data-gutter": "on",
+      "data-gutter-inline": "on",
+      "data-axis": "both",
+    });
     expect(scrollerLaneAttrs("none")).toEqual({ "data-lane": "off" });
     expect(scrollerLaneAttrs("on")).toEqual({ "data-lane": "on" });
     expect(scrollerThumbAttrs(false)).toEqual({});

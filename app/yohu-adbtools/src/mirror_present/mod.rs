@@ -194,10 +194,7 @@ impl PresentHost {
     pub fn unbind(&self, serial: &str) {
         let mut inner = self.inner.lock().expect("present lock poisoned");
         #[cfg(windows)]
-        let drop_seat = inner
-            .live_bind
-            .as_ref()
-            .is_some_and(|(s, ..)| s == serial);
+        let drop_seat = inner.live_bind.as_ref().is_some_and(|(s, ..)| s == serial);
         apply_pending_unbind(&mut inner.live_bind, serial);
         if inner
             .last_content
@@ -397,7 +394,11 @@ impl PresentHost {
     fn flush_live_bind(&self) {
         let bind = {
             let inner = self.inner.lock().expect("present lock poisoned");
-            match (inner.surface.clone(), inner.live_bind.clone(), inner.last_content.clone()) {
+            match (
+                inner.surface.clone(),
+                inner.live_bind.clone(),
+                inner.last_content.clone(),
+            ) {
                 (Some(tx), Some((serial, generation, pipe)), last) => {
                     Some((tx, serial, generation, pipe, last))
                 }
@@ -454,9 +455,7 @@ enum SurfaceEnsure {
 }
 
 fn layout_replayable(layout: &MirrorLayout) -> bool {
-    layout.visible
-        && layout.width >= MIRROR_MIN_LAYOUT_PX
-        && layout.height >= MIRROR_MIN_LAYOUT_PX
+    layout.visible && layout.width >= MIRROR_MIN_LAYOUT_PX && layout.height >= MIRROR_MIN_LAYOUT_PX
 }
 
 fn send_bind(tx: &Sender<Cmd>, serial: &str, generation: u64, pipe: Arc<FramePipe>) {

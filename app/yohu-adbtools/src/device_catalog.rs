@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::state::AppState;
+use yohu_adb::AdbError;
 use yohu_domain::{catalog_after_scan, start_force_forward};
 use yohu_protocol::{AppEvent, DeviceInfo, DeviceState};
 use yohu_runtime::atomic_write;
@@ -14,7 +15,21 @@ use yohu_runtime::atomic_write;
 /// 设备目录自动刷新周期。用户只开关，不设间隔。与 DeviceStatusHub 采样同拍。
 pub const AUTO_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
-type CatalogResult = Result<Vec<DeviceInfo>, String>;
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum CatalogError {
+    #[error("扫描中断")]
+    Interrupted,
+    #[error(transparent)]
+    Adb(Arc<AdbError>),
+}
+
+impl From<AdbError> for CatalogError {
+    fn from(e: AdbError) -> Self {
+        Self::Adb(Arc::new(e))
+    }
+}
+
+type CatalogResult = Result<Vec<DeviceInfo>, CatalogError>;
 
 /// 读目录快照，不触发扫描。
 pub fn snapshot(state: &AppState) -> Vec<DeviceInfo> {
@@ -70,7 +85,7 @@ pub async fn refresh(state: &AppState) -> CatalogResult {
                 return result;
             }
             if rx.changed().await.is_err() {
-                return Err("扫描中断".into());
+                return Err(CatalogError::Interrupted);
             }
         }
     }
@@ -88,8 +103,7 @@ async fn refresh_inner(state: &AppState) -> CatalogResult {
     let (scanned, adb_used) = state
         .client
         .devices_resilient(state.root_cancel.child_token())
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
     let previous = snapshot(state);
     let (devices, went_offline) = catalog_after_scan(&previous, scanned);
 

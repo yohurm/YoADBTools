@@ -104,8 +104,7 @@ pub fn show_if_hidden(win: &WebviewWindow, reason: &'static str) {
 /// 这是失败信号，不是超时。`about:blank` / `http(s)` / `tauri` 应用页不算失败。
 pub fn page_load_failed(url: &str) -> bool {
     let scheme = url.split_once(':').map(|(s, _)| s).unwrap_or("");
-    matches!(scheme, "chrome-error" | "edge-error" | "chrome")
-        || url.contains("chromewebdata")
+    matches!(scheme, "chrome-error" | "edge-error" | "chrome") || url.contains("chromewebdata")
 }
 
 pub fn on_main_page_finished(label: &str, url: &str, win: &WebviewWindow) {

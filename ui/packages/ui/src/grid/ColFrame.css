@@ -15,6 +15,16 @@
   --yohu-col-cell-pad: 0;
 }
 
+.yohu-col-frame[data-tone="document"] {
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.yohu-col-frame[data-tone="document"] .yohu-col-row {
+  min-width: max-content;
+}
+
 .yohu-col-frame > .yohu-col-row {
   overflow: hidden;
 }

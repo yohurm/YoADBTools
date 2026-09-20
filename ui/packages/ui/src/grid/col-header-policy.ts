@@ -9,13 +9,16 @@ import {
   type ColHeaderInput,
   type YoColHeaderAlign,
   type YoColHeaderSort,
+  type YoColHeaderTone,
 } from "./col-header-model";
 
 export interface ColHeaderHostAttrs {
   "data-align": YoColHeaderAlign;
+  "data-tone": YoColHeaderTone;
   "aria-sort": YoColHeaderSort;
   "data-resizing": "" | undefined;
   resizable: boolean;
+  edge: boolean;
 }
 
 export function colHeaderHostAttrs(
@@ -24,8 +27,10 @@ export function colHeaderHostAttrs(
   const spec = resolveColHeaderSpec(input);
   return {
     "data-align": spec.align,
+    "data-tone": spec.tone,
     "aria-sort": spec.sort,
     "data-resizing": input.resizing ? "" : undefined,
     resizable: spec.resizable,
+    edge: spec.edge,
   };
 }

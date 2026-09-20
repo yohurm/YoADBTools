@@ -2,8 +2,9 @@
  * YoSelect —— 自绘下拉选择框（L4 视图 / L5 门面）。
  * HarmonyOS 对照：Select。落点在 select-place → popover-place；选中在 select-model；开合/键盘/禁用在 select-policy。
  * 受控 API：options / value / onChange / disabled / placeholder / block。
+ * 选项可带 description（次文案）。block 触发钮才画出，菜单项始终画。
  * 默认 hug 文案簇（字 + 箭头）；禁止给 hug 写 min-width（短文案会被拉开）。
- * block 才让文案吃剩余、箭头贴尾。宿主是 button；YoCorner 只 paint。
+ * block 才让文案吃剩余、次文案与箭头贴尾。宿主是 button；YoCorner 只 paint。
  * 文案与箭头在钮上，禁止 clip-path 裁箭头。
  *
  * 交互：
@@ -13,7 +14,7 @@
  * - 触发钮 `aria-haspopup=listbox aria-expanded`；菜单 `role=listbox`；选项 `role=option`
  * - 菜单 Portal 到 body；宽 hug 内容（min=触发钮）；高 hug 内容，仅超出视口才纵向滚动
  */
-import { For, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
@@ -23,6 +24,7 @@ import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
 import {
   findOption,
+  optionDescription,
   optionDomId,
   type SelectMenuLayout,
   type YoSelectOption,
@@ -78,6 +80,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
   let menuRef: HTMLDivElement | undefined;
 
   const selected = (): YoSelectOption | undefined => findOption(props.options, props.value);
+  const selectedMeta = (): string | undefined => optionDescription(selected());
   const open = (): boolean => session().open;
   const activeIndex = (): number => session().activeIndex;
 
@@ -195,6 +198,9 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         >
           {selected()?.label ?? props.placeholder ?? ""}
         </span>
+        <Show when={props.block && selectedMeta()}>
+          {(meta) => <span class="yohu-select__description">{meta()}</span>}
+        </Show>
         <span class="yohu-select__chevron" aria-hidden="true">
           <Icon name="chevron-down" size={Layout.IconInline} />
         </span>
@@ -243,6 +249,9 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
                       onClick={() => commitValue(option.value)}
                     >
                       <span class="yohu-select__option-label">{option.label}</span>
+                      <Show when={optionDescription(option)}>
+                        {(meta) => <span class="yohu-select__description">{meta()}</span>}
+                      </Show>
                     </div>
                   )}
                 </For>

@@ -26,8 +26,12 @@ export const DEFAULT_TEXT_FIELD_STEP = 1;
 export type TextFieldPaintKind = "neutral" | "error" | "warning";
 export type TextFieldStepDirection = 1 | -1;
 
-/** 宽度契约。fill=铺满父级宽（不沿栏高 stretch）；number=数字 hug；hug=默认最小宽。不是 size 轴。 */
-export type TextFieldWidthKind = "hug" | "fill" | "number";
+/**
+ * 宽度契约。不是 size 轴。
+ * hug=默认最小宽；fill=铺满父级定宽（禁止套进 hug 簇）；number=数字槽；
+ * control=路径等只读槽，定宽 settings-control-max，不吃百分比。
+ */
+export type TextFieldWidthKind = "hug" | "fill" | "number" | "control";
 
 export interface TextFieldSlotInput {
   prefix?: unknown;
@@ -79,12 +83,21 @@ export function resolveTextFieldStatus(status?: string): YoTextFieldStatus {
   return DEFAULT_TEXT_FIELD_STATUS;
 }
 
-/** block 优先于 type。multiline 不当数字槽。原生 input size 不进模型。 */
+/** 显式 width 优先，否则 block → number → hug。multiline 不当数字槽。原生 input size 不进模型。 */
 export function resolveTextFieldWidthKind(input: {
+  width?: TextFieldWidthKind;
   block?: boolean;
   type?: string;
   multiline?: boolean;
 }): TextFieldWidthKind {
+  if (
+    input.width === "control" ||
+    input.width === "fill" ||
+    input.width === "number" ||
+    input.width === "hug"
+  ) {
+    return input.width;
+  }
   if (input.block) return "fill";
   if (!input.multiline && input.type === "number") return "number";
   return "hug";
@@ -200,6 +213,7 @@ export function canStepTextFieldNumber(input: {
 export function resolveTextFieldSpec(
   input: TextFieldSlotInput & {
     status?: string;
+    width?: TextFieldWidthKind;
     block?: boolean;
     type?: string;
     active?: boolean;

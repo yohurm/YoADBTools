@@ -11,12 +11,38 @@ export function shortSerial(serial: string | null | undefined): string {
   return serial.length > 6 ? serial.slice(-4) : serial;
 }
 
+/** 连接方式：usb / usb:* → USB；tcp: / wifi → 无线。 */
+export function deviceConnectionLabel(connection: string | null | undefined): string {
+  const value = connection?.trim() ?? "";
+  if (!value) return "";
+  if (value === "usb" || value.startsWith("usb:")) return "USB";
+  if (value === "wifi" || value.startsWith("tcp:")) return "无线";
+  return value;
+}
+
 /** 新建窗设备下拉：型号 · 短号；无名则整串 serial。 */
 export function devicePickerLabel(device: DeviceInfo): string {
   const name = deviceDisplayName(device);
   if (name === device.serial) return device.serial;
   const short = shortSerial(device.serial);
   return short ? `${name} · ${short}` : name;
+}
+
+/** 下拉次文案：有型号则短号 · 连接；无名则只留连接。 */
+export function devicePickerDescription(device: DeviceInfo): string {
+  const link = deviceConnectionLabel(device.connection);
+  const name = deviceDisplayName(device);
+  if (name === device.serial) return link;
+  const short = shortSerial(device.serial);
+  return [short, link].filter(Boolean).join(" · ");
+}
+
+/** 新建窗 Select 主/次文案。主文案是型号（无名回退 serial）。 */
+export function devicePickerFields(device: DeviceInfo): { label: string; description: string } {
+  return {
+    label: deviceDisplayName(device),
+    description: devicePickerDescription(device),
+  };
 }
 
 /** 状态行设备文案。无 serial 为破折号；缺型号回退 serial；缺版本则只出已有段。 */

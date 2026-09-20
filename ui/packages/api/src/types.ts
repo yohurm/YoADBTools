@@ -5,6 +5,11 @@
  * AppEvent 内部 tag `kind`（camelCase））。由 fixture 契约测试守护（types.test.ts）。
  */
 
+import type { LogColorScheme } from "./log-color-scheme";
+import type { LogLineLayout } from "./log-line-layout";
+
+export type { LogColorScheme, LogLineLayout };
+
 // ===== device =====
 
 export type DeviceState = "online" | "unauthorized" | "offline";
@@ -36,6 +41,8 @@ export interface LogLine {
   pid: number;
   tid: number;
   uid?: string;
+  /** 对照 LogcatHeader.applicationId。long 头不打印此列；采集缺省，清单 Formatter 用进程索引填 */
+  app?: string;
   level: string;
   tag: string;
   msg: string;
@@ -119,6 +126,8 @@ export interface AppSettings {
   export_ask_every_time: boolean;
   log_display_columns: LogDisplayColumns;
   log_time_format: TerminalTimeFormat;
+  log_color_scheme: LogColorScheme;
+  log_line_layout: LogLineLayout;
   mirror_max_size: number;
   mirror_video_bit_rate: number;
   mirror_max_fps: number;
@@ -129,14 +138,15 @@ export interface AppSettings {
   terminal_time_format: TerminalTimeFormat;
 }
 
-/** 日志清单元数据列开关；消息列始终显示。 */
+/** 日志清单元数据列开关；消息列始终显示。默认对齐官方 STANDARD。 */
 export interface LogDisplayColumns {
   ts: boolean;
   uid: boolean;
   pid: boolean;
   tid: boolean;
-  level: boolean;
   tag: boolean;
+  app: boolean;
+  level: boolean;
 }
 
 export type SettingKey =
@@ -151,6 +161,8 @@ export type SettingKey =
   | "export_ask_every_time"
   | "log_display_columns"
   | "log_time_format"
+  | "log_color_scheme"
+  | "log_line_layout"
   | "mirror_max_size"
   | "mirror_video_bit_rate"
   | "mirror_max_fps"

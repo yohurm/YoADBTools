@@ -203,48 +203,74 @@ export function MirrorView(props: DeviceSession) {
       <YoChrome
         title={ModuleTitle.Mirror}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
-      >
-        <YoButton
-          size="sm"
-          buttonStyle="emphasized"
-          disabled={!props.selectedSerials[0] || starting()}
-          loading={starting()}
-          onClick={() => {
-            if (live()) void mirrorStore.stop();
-            else void mirrorStore.start();
-          }}
-        >
-          {live() ? "停止" : "开始"}
-        </YoButton>
-        <YoIconButton
-          icon={mirrorStore.state.paused ? "play" : "pause"}
-          title={mirrorStore.state.paused ? "继续" : "暂停画面"}
-          disabled={!live()}
-          onClick={() => mirrorStore.setPaused(!mirrorStore.state.paused)}
-        />
-        <YoIconButton
-          icon="export"
-          title="截图"
-          disabled={!live() || !mirrorStore.state.hasFrame}
-          onClick={() => void screenshot()}
-        />
-        <YoIconButton
-          icon={mirrorStore.state.fullscreen ? "window-restore" : "window-max"}
-          title={mirrorStore.state.fullscreen ? "退出全屏" : "面板内全屏"}
-          disabled={!live()}
-          onClick={() => mirrorStore.setFullscreen(!mirrorStore.state.fullscreen)}
-        />
-        <YoButton
-          size="sm"
-          buttonStyle={mirrorStore.state.readOnly ? "emphasized" : "normal"}
-          tone={mirrorStore.state.readOnly ? "accent" : "neutral"}
-          aria-pressed={mirrorStore.state.readOnly}
-          disabled={!props.selectedSerials[0] || starting()}
-          onClick={() => void mirrorStore.setReadOnly(!mirrorStore.state.readOnly)}
-        >
-          仅显示
-        </YoButton>
-      </YoChrome>
+        actions={[
+          {
+            key: "capture",
+            node: (
+              <YoButton
+                size="sm"
+                buttonStyle="emphasized"
+                disabled={!props.selectedSerials[0] || starting()}
+                loading={starting()}
+                onClick={() => {
+                  if (live()) void mirrorStore.stop();
+                  else void mirrorStore.start();
+                }}
+              >
+                {live() ? "停止" : "开始"}
+              </YoButton>
+            ),
+          },
+          {
+            key: "pause",
+            node: (
+              <YoIconButton
+                icon={mirrorStore.state.paused ? "play" : "pause"}
+                title={mirrorStore.state.paused ? "继续" : "暂停画面"}
+                disabled={!live()}
+                onClick={() => mirrorStore.setPaused(!mirrorStore.state.paused)}
+              />
+            ),
+          },
+          {
+            key: "screenshot",
+            node: (
+              <YoIconButton
+                icon="export"
+                title="截图"
+                disabled={!live() || !mirrorStore.state.hasFrame}
+                onClick={() => void screenshot()}
+              />
+            ),
+          },
+          {
+            key: "fullscreen",
+            node: (
+              <YoIconButton
+                icon={mirrorStore.state.fullscreen ? "window-restore" : "window-max"}
+                title={mirrorStore.state.fullscreen ? "退出全屏" : "面板内全屏"}
+                disabled={!live()}
+                onClick={() => mirrorStore.setFullscreen(!mirrorStore.state.fullscreen)}
+              />
+            ),
+          },
+          {
+            key: "readonly",
+            node: (
+              <YoButton
+                size="sm"
+                buttonStyle={mirrorStore.state.readOnly ? "emphasized" : "normal"}
+                tone={mirrorStore.state.readOnly ? "accent" : "neutral"}
+                aria-pressed={mirrorStore.state.readOnly}
+                disabled={!props.selectedSerials[0] || starting()}
+                onClick={() => void mirrorStore.setReadOnly(!mirrorStore.state.readOnly)}
+              >
+                仅显示
+              </YoButton>
+            ),
+          },
+        ]}
+      />
 
       <div class="yohu-mirror__body">
         <div class="yohu-mirror__stage" aria-label="投屏画面">

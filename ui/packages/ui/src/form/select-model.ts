@@ -9,6 +9,14 @@ export interface YoSelectOption {
   value: string;
   /** 选项显示文本 */
   label: string;
+  /** 次文案（型号旁的短号 / 连接）。空串不算。 */
+  description?: string;
+}
+
+/** 去掉空白后的次文案；空则无。 */
+export function optionDescription(option: YoSelectOption | undefined): string | undefined {
+  const text = option?.description?.trim();
+  return text ? text : undefined;
 }
 
 /** 触发钮视口盒。视图读几何后交给 L3。 */

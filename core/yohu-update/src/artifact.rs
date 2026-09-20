@@ -11,9 +11,9 @@ impl InstallerKind {
     /// 从文件名或 URL 末段识别；无法识别则 `None`。
     pub fn from_name(name: &str) -> Option<Self> {
         let lower = name.trim().to_ascii_lowercase();
-        if lower.ends_with(".exe") {
+        if lower.ends_with(Self::Nsis.extension()) {
             Some(Self::Nsis)
-        } else if lower.ends_with(".dmg") {
+        } else if lower.ends_with(Self::Dmg.extension()) {
             Some(Self::Dmg)
         } else {
             None
@@ -31,8 +31,8 @@ impl InstallerKind {
 
     pub fn extension(self) -> &'static str {
         match self {
-            Self::Nsis => "exe",
-            Self::Dmg => "dmg",
+            Self::Nsis => ".exe",
+            Self::Dmg => ".dmg",
         }
     }
 }

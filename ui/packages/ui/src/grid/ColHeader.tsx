@@ -11,23 +11,30 @@ import { Show } from "solid-js";
 
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
-import type { YoColHeaderAlign, YoColHeaderSort } from "./col-header-model";
+import type { YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone } from "./col-header-model";
 import { colHeaderHostAttrs } from "./col-header-policy";
 import type { ColResizePhase } from "./col-model";
 import { YoColResizer } from "./ColResizer";
 import "./ColHeader.css";
 
-export type { YoColHeaderAlign, YoColHeaderSort };
+export type { YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone };
 
 export interface YoColHeaderProps {
+  class?: string;
   /** 标题对齐；默认 start。单元格对齐由模块自己管。 */
   align?: YoColHeaderAlign;
+  /** 列垫。none = 官方 LevelFormat 4ch 轨道，标题贴格。默认跟 cellPad=list。 */
+  pad?: "list" | "none";
+  /** list = 文件清单；document = 日志文档表头，字随列轨。 */
+  tone?: YoColHeaderTone;
   /** 当前列排序态 */
   ariaSort?: YoColHeaderSort;
   /** 有则库内渲染排序钮；模块只传回调，不自绘 button / __label */
   onSort?: () => void;
   /** 是否显示右缘拖拽条 */
   resizable?: boolean;
+  /** 只画列缝短柄，不拖。文档级别列跟消息分开。 */
+  split?: boolean;
   /** 拖拽条无障碍名称 */
   resizeLabel?: string;
   /** 当前列宽（px）；与 Resizer 受控 */
@@ -90,6 +97,8 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
     colHeaderHostAttrs({
       align: props.align,
       ariaSort: props.ariaSort,
+      tone: props.tone,
+      split: props.split,
       resizable: props.resizable,
       width: props.width,
       onWidthChange: props.onWidthChange,
@@ -104,8 +113,10 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
 
   return (
     <div
-      class="yohu-col-header"
+      class={`yohu-col-header${props.class ? ` ${props.class}` : ""}`}
       data-align={host()["data-align"]}
+      data-tone={host()["data-tone"]}
+      data-pad={props.pad}
       role="columnheader"
       aria-sort={host()["aria-sort"]}
       data-resizing={host()["data-resizing"]}
@@ -115,8 +126,9 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
           {props.children}
         </ColHeaderBody>
       </div>
-      <Show when={host().resizable}>
+      <Show when={host().edge}>
         <YoColResizer
+          mark={!host().resizable}
           width={props.width ?? 0}
           minWidth={props.minWidth ?? 0}
           maxWidth={props.maxWidth}

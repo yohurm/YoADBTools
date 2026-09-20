@@ -9,6 +9,7 @@ const load = (name: string): string => readFileSync(resolve(here, name), "utf-8"
 const dialogs = load("UpdateDialogs.tsx");
 const form = load("SettingsForm.tsx");
 const view = load("SettingsView.tsx");
+const path = load("PathChrome.tsx");
 const css = load("settings.css");
 
 describe("设置页滚轴", () => {
@@ -35,18 +36,32 @@ describe("设置页滚轴", () => {
   });
 
   it("表单只在页面级滚，卡片不套 YoScroller", () => {
+    expect(view).toContain('role="settings"');
+    expect(view).toContain("YoPage");
     expect(form).toContain('class="yohu-settings__scroll"');
     expect(form.match(/<YoScroller[\s>]/g)?.length).toBe(1);
     expect(form).not.toMatch(/<YoPanel[\s\S]*?<YoScroller/);
     expect(form).not.toContain("YoPage");
+    expect(form).not.toContain("yohu-settings__body");
     expect(form.match(/<YoPanel\b/g)?.length).toBe(7);
     expect(form.match(/overflow="visible"/g)?.length).toBe(7);
     expect(form).not.toContain("deviceLabel");
-    expect(css).toContain(".yohu-settings__scroll");
+    expect(form).toContain("LOG_DISPLAY_COLUMN_CATALOG");
+    expect(form).not.toContain("LOG_COLUMN_OPTIONS");
+    expect(css).not.toContain(".yohu-settings__body");
+    expect(css).not.toContain("path-field");
     expect(css).not.toMatch(/overflow:\s*auto/);
     expect(css).not.toMatch(/overflow:\s*scroll/);
     expect(css).not.toMatch(/overflow-y:\s*auto/);
     expect(css).not.toMatch(/overflow-y:\s*scroll/);
+  });
+
+  it("路径槽走 YoTextField width=control，禁止页面再套一层", () => {
+    expect(path).toContain('width="control"');
+    expect(path).not.toContain("block");
+    expect(path).not.toContain("path-field");
+    expect(css).not.toContain("path-field");
+    expect(css).not.toContain("settings-control-max");
   });
 
   it("设备自动刷新是开关，无间隔秒数字段", () => {

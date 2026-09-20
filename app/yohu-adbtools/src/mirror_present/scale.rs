@@ -216,10 +216,7 @@ mod tests {
 
     #[test]
     fn content_source_crops_alignment_pad() {
-        assert_eq!(
-            content_source_size(1220, 2712, 1248, 2720),
-            (1220, 2712)
-        );
+        assert_eq!(content_source_size(1220, 2712, 1248, 2720), (1220, 2712));
     }
 
     #[test]

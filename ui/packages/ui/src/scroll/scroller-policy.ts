@@ -4,24 +4,33 @@
  * data-gutter 只写 on：溢出让出侧轨，与显隐相位分开。拖拽几何在 L2；本文件不读盒。
  */
 
-import type { ScrollerBarState, ScrollerPhase } from "./scroller-model";
+import type { ScrollerAxis, ScrollerBarState, ScrollerPhase } from "./scroller-model";
 
 export function scrollerHostAttrs(
   phase: ScrollerPhase,
   barState: ScrollerBarState = "auto",
   interactive = true,
   gutter = false,
+  axis: ScrollerAxis = "block",
+  gutterInline = false,
+  phaseInline: ScrollerPhase = "none",
 ): {
   "data-scroll"?: Exclude<ScrollerPhase, "none">;
+  "data-scroll-inline"?: Exclude<ScrollerPhase, "none">;
   "data-bar": ScrollerBarState;
   "data-interactive"?: "off";
   "data-gutter"?: "on";
+  "data-gutter-inline"?: "on";
+  "data-axis"?: "both";
 } {
   return {
     ...(phase === "none" ? {} : { "data-scroll": phase }),
+    ...(phaseInline === "none" ? {} : { "data-scroll-inline": phaseInline }),
     "data-bar": barState,
     ...(interactive ? {} : { "data-interactive": "off" as const }),
     ...(gutter ? { "data-gutter": "on" as const } : {}),
+    ...(gutterInline ? { "data-gutter-inline": "on" as const } : {}),
+    ...(axis === "both" ? { "data-axis": "both" as const } : {}),
   };
 }
 

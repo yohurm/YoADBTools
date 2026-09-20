@@ -27,7 +27,9 @@ use crate::tasks::TaskCenter;
 use crate::transfer_runs::TransferRuns;
 use crate::update_runs::UpdateRuns;
 
-type CatalogWatch = tokio::sync::watch::Receiver<Option<Result<Vec<DeviceInfo>, String>>>;
+type CatalogWatch = tokio::sync::watch::Receiver<
+    Option<Result<Vec<DeviceInfo>, crate::device_catalog::CatalogError>>,
+>;
 
 /// 应用状态（Tauri managed state）。
 pub struct AppState {

@@ -193,11 +193,13 @@ export function virtualRowBoxStyle(
   itemHeight: number,
   shiftRows = 0,
   visible = true,
+  widthPx = 0,
 ): {
   position: "absolute";
   top: "0px";
   left: "0px";
-  right: "0px";
+  right?: "0px" | "auto";
+  width?: string;
   height: string;
   transform: string;
   visibility?: "hidden";
@@ -206,7 +208,7 @@ export function virtualRowBoxStyle(
     position: "absolute",
     top: "0px",
     left: "0px",
-    right: "0px",
+    ...(widthPx > 0 ? { width: `${widthPx}px`, right: "auto" as const } : { right: "0px" as const }),
     height: `${itemHeight}px`,
     transform: virtualRowTransform(index, itemHeight, shiftRows),
     ...(visible ? {} : { visibility: "hidden" as const }),
@@ -216,6 +218,12 @@ export function virtualRowBoxStyle(
 /** 视口内容宽：clientWidth 含 padding，行 / 投放框 / fill 只吃内容盒，不进侧轨。 */
 export function virtualContentWidth(clientWidth: number, paddingInline = 0): number {
   return Math.max(0, clientWidth - Math.max(0, paddingInline));
+}
+
+/** abspos 行不撑 scrollWidth；inner 必须显式宽。0 = 跟视口（不设 width）。 */
+export function virtualInnerWidth(contentWidth: number, viewportWidth: number): number {
+  if (!(contentWidth > 0)) return 0;
+  return Math.max(contentWidth, Math.max(0, viewportWidth));
 }
 
 export function virtualIndicatorBox(

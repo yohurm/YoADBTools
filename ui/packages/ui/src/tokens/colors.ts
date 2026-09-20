@@ -2,7 +2,8 @@
  * 色彩 token（三层架构，见 docs/architecture/UI设计系统-v6.md §2）：
  *   Primitive = HarmonyOS NEXT 系统基础/语义 Token（色彩.md 全量表）
  * → Semantic（--yohu-* 消费名，浅/深各一板）
- * → Component（级别板 / 文件图标板 / 交互态）
+ * → Component（Yohu 级别板 / 文件图标板 / 交互态）
+ * 官方 Android Studio Logcat V2 色板在 logcat.ts，不进本文件。
  *
  * 组件与模块样式 100% 引用语义/组件层，禁止裸色值。
  * 来源：yovo-harmonyos-docs / 设计指南 / 通用设计基础 / 视觉风格 / 色彩.md
@@ -145,11 +146,16 @@ export const Colors = {
   Offline: Harmony.fontTertiary.light,
   FocusRing: Harmony.iconSubEmphasize.light,
   /**
-   * 文档选字底。禁止 20%/45% 品牌：叠到画布 < 3:1，级别 ink 更不可读。
-   * 官方强调对：background_emphasize + font_on_primary。
+   * 输入框 / 表单选字：官方强调对 background_emphasize + font_on_primary。
+   * 禁止 20%/45% 品牌冒充输入选区。
    */
   TextSel: Harmony.backgroundEmphasize.light,
   TextSelFg: Harmony.fontOnPrimary.light,
+  /**
+   * Family A 文档选区底（对照 Editor Selection Background）。
+   * 只铺底，不改字色；禁止实底强调洗白级别 ink，禁止 accent-soft 冒充选字。
+   */
+  DocSel: "color-mix(in srgb, var(--yohu-accent) 32%, var(--yohu-bg-base))",
   Tag: Harmony.alert.light,
   Splitter: Harmony.compDivider.light,
   SplitterHover: Harmony.fontSecondary.light,
@@ -208,6 +214,7 @@ export const DarkColors: Record<SemanticColorName, string> = {
   FocusRing: Harmony.iconSubEmphasize.dark,
   TextSel: Harmony.backgroundEmphasize.dark,
   TextSelFg: Harmony.fontOnPrimary.dark,
+  DocSel: "color-mix(in srgb, var(--yohu-accent) 55%, var(--yohu-bg-base))",
   Tag: Harmony.alert.dark,
   Splitter: Harmony.compDivider.dark,
   SplitterHover: Harmony.fontSecondary.dark,
@@ -224,10 +231,11 @@ export const DarkColors: Record<SemanticColorName, string> = {
 };
 
 /**
- * logcat 级别板：键是小写 V–F，值是 ink 色相。
+ * Yohu 级别板：键是小写 V–F，值是 ink 色相。
  * V 用二级字色（可读弱化）；D/I/W/E 复用 brand/confirm/alert/warning；
  * F 是 warning 压黑（AS Assert 深于 Error），反色字走 `--yohu-fg-on`。
- * 排出 `--yohu-level-*`。模块只写 `--yohu-log-ink: var(--yohu-level-${key})`，禁止另起色表、禁止 f-bg。
+ * 排出 `--yohu-level-*`。Yohu 方案只写 `--yohu-log-ink: var(--yohu-level-${key})`，禁止 f-bg。
+ * 官方 Logcat V2 板在 logcat.ts，禁止本文件再列 AS hex。
  */
 function logLevelBoard(mode: "light" | "dark") {
   return {

@@ -37,6 +37,7 @@
 .yohu-select[data-block] .yohu-select__trigger {
   display: flex;
   width: 100%;
+  gap: var(--yohu-space-sm);
 }
 
 .yohu-select__trigger:not(:disabled):hover {
@@ -61,6 +62,30 @@
 
 .yohu-select[data-block] .yohu-select__value {
   flex: 1 1 auto;
+}
+
+.yohu-select__description {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--yohu-fg-3);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.yohu-select[data-block] .yohu-select__description {
+  flex: 0 0 auto;
+  max-width: 40%;
+}
+
+.yohu-select__option .yohu-select__description {
+  flex: 0 0 auto;
+  max-width: 40%;
 }
 
 .yohu-select__value[data-placeholder] {
@@ -124,6 +149,7 @@
 .yohu-select__option {
   display: flex;
   align-items: center;
+  gap: var(--yohu-space-sm);
   box-sizing: border-box;
   min-height: var(--yohu-control-height);
   padding: 0 var(--yohu-space-sm);
@@ -131,15 +157,15 @@
   line-height: var(--yohu-font-leading-ui);
   color: var(--yohu-fg);
   cursor: pointer;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .yohu-select__option-label {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yohu-select[data-disabled] .yohu-select__trigger {

@@ -114,7 +114,7 @@ impl DeviceStatusHub {
             .expect("status slots lock poisoned")
             .get(serial)
             .map(|s| s.cancel.clone())
-            .ok_or_else(|| crate::AdbError::DeviceOffline(serial.to_string()))?;
+            .ok_or_else(|| crate::AdbError::NotOnline(serial.to_string()))?;
         if cancel.is_cancelled() {
             return Err(crate::AdbError::Cancelled);
         }
@@ -132,7 +132,7 @@ impl DeviceStatusHub {
         let fields = overlay_after_set_night(previous.as_ref(), sampled, night);
         let (status, _) = self
             .upsert(serial, fields)
-            .ok_or_else(|| crate::AdbError::DeviceOffline(serial.to_string()))?;
+            .ok_or_else(|| crate::AdbError::NotOnline(serial.to_string()))?;
         // 用户写入是控制面：与 devices/changed 一样 send().await，禁止 try_send。
         if let Err(e) = self
             .sink
@@ -388,8 +388,8 @@ mod tests {
             .await
             .expect_err("无 Online 槽不得写设备");
         assert!(
-            matches!(err, crate::AdbError::DeviceOffline(ref s) if s == "ABSENT"),
-            "无槽应直接 DeviceOffline，不得落到 ToolUnavailable: {err}"
+            matches!(err, crate::AdbError::NotOnline(ref s) if s == "ABSENT"),
+            "无槽应直接 NotOnline，不得落到 DeviceOffline/ToolUnavailable: {err}"
         );
     }
 }

@@ -10,6 +10,7 @@ import {
   isVirtualSelectionEmpty,
   virtualActiveKey,
   virtualContentWidth,
+  virtualInnerWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
@@ -32,6 +33,13 @@ import {
 describe("virtuallist-model", () => {
   it("总高度 = 行数 × 行高", () => {
     expect(virtualTotalHeight(10, 22)).toBe(220);
+  });
+
+  it("文档宽 >0 才撑 inner，且不窄于视口", () => {
+    expect(virtualInnerWidth(0, 800)).toBe(0);
+    expect(virtualInnerWidth(-1, 800)).toBe(0);
+    expect(virtualInnerWidth(400, 800)).toBe(800);
+    expect(virtualInnerWidth(2000, 800)).toBe(2000);
   });
 
   it("槽位池大小随视口稳定，原点夹在数据范围内", () => {
@@ -135,6 +143,15 @@ describe("virtuallist-model", () => {
       top: "0px",
       left: "0px",
       right: "0px",
+      height: "22px",
+      transform: "translate3d(0, 66px, 0)",
+    });
+    expect(virtualRowBoxStyle(3, 22, 0, true, 1200)).toEqual({
+      position: "absolute",
+      top: "0px",
+      left: "0px",
+      right: "auto",
+      width: "1200px",
       height: "22px",
       transform: "translate3d(0, 66px, 0)",
     });

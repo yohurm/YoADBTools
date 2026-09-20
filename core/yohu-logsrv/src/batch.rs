@@ -1,6 +1,6 @@
-//! 批量器（ADR-v6-007 核心）：logcat 行聚合后成批推送，**禁逐行**。
+//! 批量器（ADR-v6-007 核心）：已组装的 `LogLine`（logd 记录）聚合后成批推送，**禁逐条**。
 //!
-//! 聚合策略：定时 100–200ms 或满 `max_lines` 行 / `max_bytes` 字节，先到先发。
+//! 聚合策略：定时 100–200ms 或满 `max_lines` 条 / `max_bytes` 字节，先到先发。
 //! 背压策略：下游事件队列有界（try_send）——溢出时**丢推送不丢环**，
 //! 计数经 `LogOverflow` 事件告知 UI，由 `log.replay(fromSeq)` 补齐。
 
@@ -16,7 +16,7 @@ pub(crate) const BATCH_FLUSH_INTERVAL: Duration = Duration::from_millis(150);
 pub(crate) const BATCH_MAX_LINES: usize = 1000;
 pub(crate) const BATCH_MAX_BYTES: usize = 512 * 1024;
 
-/// 批量器句柄（feed 行）。
+/// 批量器句柄（feed 一条 logd 记录）。
 pub(crate) struct Batcher {
     line_tx: mpsc::Sender<LogLine>,
 }
@@ -44,7 +44,7 @@ impl Batcher {
         (Self { line_tx }, handle)
     }
 
-    /// 送入一行（异步背压：聚合环消费快于生产，正常不阻塞）。
+    /// 送入一条 logd 记录（异步背压：聚合环消费快于生产，正常不阻塞）。
     pub(crate) async fn feed(&self, line: LogLine) -> Result<(), mpsc::error::SendError<LogLine>> {
         self.line_tx.send(line).await
     }
@@ -75,7 +75,7 @@ async fn aggregate_loop(
             }
             line = line_rx.recv() => {
                 let Some(line) = line else {
-                    // 生产端结束：最后一搏冲刷剩余行，避免尾部批次丢失
+                    // 生产端结束：最后一搏冲刷剩余记录，避免尾部批次丢失
                     if !pending.is_empty() {
                         flush(&mut pending, &mut pending_bytes, &serial, &sink, &mut dropped_batches);
                     }
@@ -147,7 +147,6 @@ fn emit_overflow(sink: &mpsc::Sender<AppEvent>, serial: &str, dropped: &mut u64)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yohu_protocol::LogBatchPayload;
 
     fn line(i: u64) -> LogLine {
         LogLine {
@@ -155,10 +154,10 @@ mod tests {
             ts: "2026-01-01 00:00:00.000".into(),
             pid: 1,
             tid: 1,
-            uid: None,
             level: 'I',
             tag: "T".into(),
             msg: format!("line {i}"),
+            ..LogLine::default()
         }
     }
 
@@ -198,7 +197,7 @@ mod tests {
             "s1".into(),
             sink,
             Duration::from_secs(60),
-            3, // 阈值 3 行
+            3, // 阈值 3 条
             BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
@@ -207,7 +206,7 @@ mod tests {
         }
         let event = tokio::time::timeout(Duration::from_secs(2), sink_rx.recv())
             .await
-            .expect("行阈值未触发")
+            .expect("条数阈值未触发")
             .expect("channel closed");
         match event {
             AppEvent::LogBatch(LogBatchPayload { batch }) => assert_eq!(batch.lines.len(), 3),
@@ -229,7 +228,7 @@ mod tests {
             BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
-        // 喂 6 行 → 3 批；下游只取 1 批 → 2 批溢出
+        // 喂 6 条 → 3 批；下游只取 1 批 → 2 批溢出
         for i in 0..6 {
             batcher.feed(line(i)).await.unwrap();
         }
@@ -254,8 +253,8 @@ mod tests {
         let _ = handle.await;
     }
 
-    /// 性能回归（架构文档 §12 自动化子集）：50k 行 → 50 批（每批 1000），
-    /// 零丢行且聚合耗时满足 ADR-v6-007 批量预算（16ms/批；debug 构建留 2.5x 余量）。
+    /// 性能回归（架构文档 §12 自动化子集）：50k 条 → 50 批（每批 1000），
+    /// 零丢条且聚合耗时满足 ADR-v6-007 批量预算（16ms/批；debug 构建留 2.5x 余量）。
     #[tokio::test]
     async fn perf_50k_lines_within_batch_budget() {
         const TOTAL: u64 = 50_000;
@@ -287,9 +286,9 @@ mod tests {
         assert_eq!(
             batches,
             (TOTAL as usize / BATCH_MAX_LINES) as u32,
-            "50k 行应恰好按 BATCH_MAX_LINES 切批"
+            "50k 条应恰好按 BATCH_MAX_LINES 切批"
         );
-        assert_eq!(lines, TOTAL as usize, "零丢行");
+        assert_eq!(lines, TOTAL as usize, "零丢条");
         assert!(
             elapsed.as_millis() < 2000,
             "50 批聚合耗时超预算（16ms/批 → 800ms，余量 2.5x）: {elapsed:?}"

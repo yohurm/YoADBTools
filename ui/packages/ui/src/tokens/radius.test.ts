@@ -94,6 +94,8 @@ describe("圆角 / 间距 / 布局 token 契约", () => {
     expect(cssVarValue("--yohu-layout-chrome-pad")).toBe(`${Spacing.Sm}px`);
     expect(cssVarValue("--yohu-layout-rail-inset")).toBe(`${Layout.RailInset}px`);
     expect(cssVarValue("--yohu-layout-settings-control-max")).toBe(`${Layout.SettingsControlMax}px`);
+    expect(cssVarValue("--yohu-layout-settings-max")).toBe(`${Layout.SettingsMax}px`);
+    expect(Layout.SettingsMax).toBe(920);
     expect(cssVarValue("--yohu-layout-settings-number-w")).toBe(`${Layout.SettingsNumberW}px`);
     expect(Layout.SettingsNumberW).toBe(80);
     expect(cssVarValue("--yohu-layout-text-field-stepper")).toBe(`${Layout.TextFieldStepper}px`);

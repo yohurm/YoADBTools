@@ -666,15 +666,13 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.getByText("每次导出询问保存位置")).toBeTruthy();
   });
 
-  it("日志显示列复选框可见且默认不含 UID/TID", () => {
+  it("日志显示列复选框可见且默认 STANDARD：UID 关，PID/TID/应用开", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("日志显示列")).toBeTruthy();
-    for (const name of ["时间", "PID", "级别", "Tag"]) {
+    for (const name of ["时间", "PID", "TID", "级别", "Tag", "应用"]) {
       expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(true);
     }
-    for (const name of ["UID", "TID"]) {
-      expect((screen.getByRole("checkbox", { name }) as HTMLInputElement).checked).toBe(false);
-    }
+    expect((screen.getByRole("checkbox", { name: "UID" }) as HTMLInputElement).checked).toBe(false);
   });
 
   it("日志显示列走 YoFormRow：标题备注在左侧信息栈，复选在右侧控件槽", () => {
@@ -693,7 +691,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith(
         "log_display_columns",
-        expect.objectContaining({ pid: false, ts: true, uid: false, tid: false, tag: true }),
+        expect.objectContaining({ pid: false, ts: true, uid: false, tid: true, tag: true, app: true }),
       );
     });
   });
@@ -716,6 +714,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(adb.readOnly).toBe(true);
     expect(adb.value).toContain("adb.exe");
     expect(document.querySelectorAll(".yohu-settings__path")).toHaveLength(0);
+    expect(document.querySelectorAll('.yohu-text-field[data-width="control"]')).toHaveLength(4);
     expect(document.querySelectorAll(".yohu-text-field[data-readonly]")).toHaveLength(4);
     expect(screen.getAllByText("浏览")).toHaveLength(3);
     expect(screen.getAllByText("打开")).toHaveLength(1);
@@ -738,18 +737,40 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("日志时间格式切换立即写入 log_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("清单时间显示")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "日期 + 时分秒.毫秒（默认）" }));
-    fireEvent.click(screen.getByText("时分秒.毫秒", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "日期 + 时分秒.毫秒" }));
+    fireEvent.click(screen.getByRole("option", { name: "时分秒.毫秒" }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("log_time_format", "time_millis");
+    });
+  });
+
+  it("日志内容配色切换立即写入 log_color_scheme", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("内容配色")).toBeTruthy();
+    expect(screen.getByText("内容配色").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Yohu" }));
+    fireEvent.click(screen.getByText("LogCat", { exact: true }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("log_color_scheme", "logcat");
+    });
+  });
+
+  it("日志长文本切换立即写入 log_line_layout", async () => {
+    render(() => <SettingsView />);
+    expect(screen.getByText("长文本")).toBeTruthy();
+    expect(screen.getByText("长文本").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "单行（LogCat）" }));
+    fireEvent.click(screen.getByText("超宽换行", { exact: true }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("log_line_layout", "wrap");
     });
   });
 
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒（默认）" }));
-    fireEvent.click(screen.getByText("日期 + 时分秒.毫秒", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒" }));
+    fireEvent.click(screen.getByRole("option", { name: "日期 + 时分秒.毫秒" }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_time_format", "datetime_millis");
     });
@@ -757,7 +778,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
 
   it("密度切换：保存到 core 并应用到 documentElement", async () => {
     render(() => <SettingsView />);
-    fireEvent.click(screen.getByRole("button", { name: "舒适（默认）" }));
+    fireEvent.click(screen.getByRole("button", { name: "舒适" }));
     fireEvent.click(screen.getByText("紧凑"));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("density", "compact");
@@ -844,15 +865,16 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("页眉与分组卡片分列：标题不进滚动容器", () => {
     const { container } = render(() => <SettingsView />);
     const root = container.querySelector(".yohu-settings");
-    const chromeWrap = root?.querySelector(":scope > .yohu-settings__chrome");
-    const chrome = chromeWrap?.querySelector(".yohu-chrome");
-    const body = root?.querySelector(":scope > .yohu-settings__body");
-    expect(chromeWrap).toBeTruthy();
+    expect(root?.classList.contains("yohu-page")).toBe(true);
+    expect(root?.getAttribute("data-role")).toBe("settings");
+    expect(root?.getAttribute("data-pad")).toBe("margin");
+    expect(root?.getAttribute("data-column")).toBe("measure");
+    const chrome = root?.querySelector(":scope > .yohu-chrome");
+    const scroller = root?.querySelector(":scope > .yohu-scroller");
     expect(chrome).toBeTruthy();
-    expect(body).toBeTruthy();
-    expect(body?.querySelector(".yohu-scroller")).toBeTruthy();
-    expect(body?.querySelector(".yohu-panel")).toBeTruthy();
-    expect(body?.contains(chrome as Node)).toBe(false);
+    expect(scroller).toBeTruthy();
+    expect(scroller?.querySelector(".yohu-panel")).toBeTruthy();
+    expect(scroller?.contains(chrome as Node)).toBe(false);
   });
 
   it("关于面板展示身份与路径，打开走 system.openPath", async () => {

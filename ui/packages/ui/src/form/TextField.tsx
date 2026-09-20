@@ -12,11 +12,16 @@ import { GROW_USED_ATTR, YoGrow, growUsedAttrs, useGrow } from "../motion/engine
 import { Layout } from "../tokens/layout";
 import { Radius } from "../tokens/radius";
 import { bindTextFieldGrow } from "./textfield-grow";
-import { stepTextFieldNumber, type TextFieldStepDirection, type YoTextFieldStatus } from "./textfield-model";
+import {
+  stepTextFieldNumber,
+  type TextFieldStepDirection,
+  type TextFieldWidthKind,
+  type YoTextFieldStatus,
+} from "./textfield-model";
 import { textFieldHostAttrs, textFieldStepperState } from "./textfield-policy";
 import "./TextField.css";
 
-export type { YoTextFieldStatus };
+export type { TextFieldWidthKind, YoTextFieldStatus };
 
 export type YoTextFieldControl = HTMLInputElement | HTMLTextAreaElement;
 
@@ -68,8 +73,10 @@ export interface YoTextFieldProps {
   status?: YoTextFieldStatus;
   /** 过滤/内容生效描边。与 status 正交，默认关 */
   active?: boolean;
-  /** 铺满父级（对话框 / 编辑栏）。默认 hug；type=number 走数字槽宽 */
+  /** 铺满父级定宽（对话框 / 编辑栏）。默认 hug；type=number 走数字槽宽。路径槽用 width=control，禁止 block 套 hug 簇。 */
   block?: boolean;
+  /** 宽度契约。未写则 block→fill、type=number→number、否则 hug。control=路径定宽。 */
+  width?: TextFieldWidthKind;
   /** 输入字族。默认 ui；命令/路径等用 mono。禁止模块再点 input。 */
   font?: "ui" | "mono";
   /** 转发内部 input / textarea，供宿主快捷键聚焦。不进模型。 */

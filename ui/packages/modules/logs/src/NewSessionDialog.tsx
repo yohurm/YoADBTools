@@ -1,13 +1,15 @@
 /**
  * 新建日志窗口：设备 + 划分（包名/PID）。
  * 包名列表来自已安装应用（`log.packageSnapshot`）；PID 列表来自当前进程（`ps`）。
- * 检索框同时是过滤和创建值。清单走 YoVirtualList；设备行走 YoFormRow。
- * `bodyOverflow=hidden`：清单自管滚轴，禁止再套第二根。
+ * 检索框同时是过滤和创建值：Enter / 创建 / 双击同一条提交。workspace 只加页签，订阅由 onCreated 走「开始采集」。
+ * 设备与划分同一行：Select block 吃剩余，分段 hug 贴尾。禁止再拆成两行，禁止 FormRow 横排把 Select 收成胶囊。
+ * 禁止模块再塞 YoIndicator，禁止 tone=list（不是文件表）。
+ * `bodyOverflow=hidden`：清单自管滚轴，禁止再套第二根。不走 bodyLead（确认句居中）。
  */
 
 import { Show, createContext, createEffect, createMemo, createSignal, untrack, useContext } from "solid-js";
 
-import type { DeviceInfo } from "@yohu/api";
+import { YoLog, type DeviceInfo } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -15,8 +17,6 @@ import {
   YoCorner,
   YoDialog,
   YoEmptyState,
-  YoFormRow,
-  YoIndicator,
   YoLoading,
   YoSegmentedButton,
   YoSearch,
@@ -27,7 +27,7 @@ import {
 
 import type { SessionScope } from "./filter";
 import { controlRowHeight, NEW_SESSION_DIALOG_HEIGHT } from "./layout";
-import { devicePickerLabel } from "./session-device";
+import { devicePickerFields } from "./session-device";
 import { logStore } from "./store";
 
 type PickerItem = { key: string; name: string; pid?: number };
@@ -46,9 +46,27 @@ function NewSessionRow(props: { item: PickerItem; index: number }) {
   );
 }
 
+function NewSessionActions(props: {
+  canCreate: () => boolean;
+  onCancel: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <>
+      <YoButton buttonStyle="normal" tone="accent" onClick={props.onCancel}>
+        取消
+      </YoButton>
+      <YoButton onClick={() => props.onCreate()} disabled={!props.canCreate()}>
+        创建
+      </YoButton>
+    </>
+  );
+}
+
 export function NewSessionDialog(props: {
   open: () => boolean;
   onClose: () => void;
+  onCreated?: () => void;
   devices: DeviceInfo[];
   focusSerial: string | null;
 }) {
@@ -148,10 +166,10 @@ export function NewSessionDialog(props: {
   });
 
   const deviceOptions = createMemo(() =>
-    devices().map((device) => ({
-      value: device.serial,
-      label: devicePickerLabel(device),
-    })),
+    devices().map((device) => {
+      const fields = devicePickerFields(device);
+      return { value: device.serial, ...fields };
+    }),
   );
 
   const selectedKey = (): string | null => {
@@ -194,8 +212,10 @@ export function NewSessionDialog(props: {
       scope = { kind: "pid", pid };
       title = `PID ${pid}`;
     }
-    logStore.createSession(scope, title, serial);
+    const id = logStore.createSession(scope, title, serial);
+    YoLog.info("logs", "新建窗口", { id, serial, kind: scope.kind, title });
     props.onClose();
+    props.onCreated?.();
   };
 
   const pickItem = (item: PickerItem): void => {
@@ -228,45 +248,38 @@ export function NewSessionDialog(props: {
       bodyOverflow="hidden"
       onClose={props.onClose}
       footer={
-        <>
-          <YoButton buttonStyle="normal" tone="accent" onClick={props.onClose}>
-            取消
-          </YoButton>
-          <YoButton onClick={create} disabled={!canCreate()}>
-            创建
-          </YoButton>
-        </>
+        <NewSessionActions canCreate={canCreate} onCancel={props.onClose} onCreate={create} />
       }
     >
       <div class="yohu-logs__new">
-        <YoFormRow
-          title="设备"
-          description={devices().length === 0 ? "没有在线设备，请先在左侧设备栏连接。" : undefined}
-        >
-          <Show when={devices().length > 0}>
-            <YoSelect
-              block
-              options={deviceOptions()}
-              value={deviceSerial()}
-              placeholder="选择设备"
-              onChange={loadDevice}
+        <div class="yohu-logs__new-bar">
+          <div class="yohu-logs__new-device">
+            <Show
+              when={devices().length > 0}
+              fallback={<span class="yohu-logs__new-device-hint">没有在线设备，请先在左侧设备栏连接。</span>}
+            >
+              <YoSelect
+                block
+                options={deviceOptions()}
+                value={deviceSerial()}
+                placeholder="选择设备"
+                onChange={loadDevice}
+              />
+            </Show>
+          </div>
+          <div class="yohu-logs__new-seg">
+            <YoSegmentedButton
+              ariaLabel="划分方式"
+              value={mode()}
+              items={[
+                { value: "package", label: "包名" },
+                { value: "pid", label: "PID" },
+              ]}
+              onChange={(value) => {
+                if (value === "package" || value === "pid") switchMode(value);
+              }}
             />
-          </Show>
-        </YoFormRow>
-
-        <div class="yohu-logs__new-seg">
-          <YoSegmentedButton
-            block
-            ariaLabel="划分方式"
-            value={mode()}
-            items={[
-              { value: "package", label: "包名" },
-              { value: "pid", label: "PID" },
-            ]}
-            onChange={(value) => {
-              if (value === "package" || value === "pid") switchMode(value);
-            }}
-          />
+          </div>
         </div>
 
         <div class="yohu-logs__new-search">
@@ -279,12 +292,12 @@ export function NewSessionDialog(props: {
               setQuery(v);
               setError("");
             }}
+            onSubmit={() => create()}
           />
         </div>
 
         <div class="yohu-logs__new-list">
-          <YoCorner role="control" class="yohu-logs__new-list-chrome" overflow="hidden">
-            <YoIndicator follow={query().trim() || undefined} variant="fill" />
+          <YoCorner role="control" class="yohu-logs__new-list-chrome" flex="fill" overflow="hidden">
             <Show
               when={!loading()}
               fallback={
@@ -307,7 +320,6 @@ export function NewSessionDialog(props: {
                   <YoVirtualList<PickerItem>
                     items={pickerItems}
                     itemHeight={controlRowHeight()}
-                    tone="list"
                     getItemKey={(item) => item.key}
                     selectedKey={selectedKey}
                     onSelectRow={(item) => pickItem(item)}

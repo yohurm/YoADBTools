@@ -13,7 +13,9 @@ describe("col-header-model / policy", () => {
     expect(resolveColHeaderSpec({})).toEqual({
       align: DEFAULT_COL_HEADER_ALIGN,
       sort: DEFAULT_COL_HEADER_SORT,
+      tone: "list",
       resizable: false,
+      edge: false,
     });
     expect(DEFAULT_COL_HEADER_ALIGN).toBe("start");
     expect(DEFAULT_COL_HEADER_SORT).toBe("none");
@@ -31,6 +33,21 @@ describe("col-header-model / policy", () => {
     expect(
       resolveColHeaderSpec({ resizable: true, width: 120, onWidthChange: () => undefined }).resizable,
     ).toBe(true);
+  });
+
+  it("split 只出列缝，document tone 写 data-tone", () => {
+    expect(resolveColHeaderSpec({ split: true })).toEqual({
+      align: DEFAULT_COL_HEADER_ALIGN,
+      sort: DEFAULT_COL_HEADER_SORT,
+      tone: "list",
+      resizable: false,
+      edge: true,
+    });
+    expect(resolveColHeaderSpec({ tone: "document" }).tone).toBe("document");
+    const host = colHeaderHostAttrs({ tone: "document", split: true });
+    expect(host["data-tone"]).toBe("document");
+    expect(host.edge).toBe(true);
+    expect(host.resizable).toBe(false);
   });
 
   it("宿主只写 data-align / aria-sort；拖中才有 data-resizing", () => {

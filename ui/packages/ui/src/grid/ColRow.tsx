@@ -10,6 +10,7 @@ export interface YoColRowProps {
   template?: string;
   resizing?: boolean;
   class?: string;
+  style?: JSX.CSSProperties;
   children: JSX.Element;
 }
 
@@ -22,7 +23,10 @@ export function YoColRow(props: YoColRowProps): JSX.Element {
       class={`yohu-col-row${props.class ? ` ${props.class}` : ""}`}
       data-resizing={props.resizing ? "" : undefined}
       role="row"
-      style={props.template ? { "grid-template-columns": props.template } : undefined}
+      style={{
+        ...(props.template ? { "grid-template-columns": props.template } : {}),
+        ...props.style,
+      }}
     >
       {props.children}
     </div>

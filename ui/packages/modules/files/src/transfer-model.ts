@@ -87,13 +87,6 @@ export function transferFaultText(fault: TransferFault | undefined): string {
   }
 }
 
-export function remoteBaseName(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
-  if (!trimmed) return "";
-  const parts = trimmed.split("/");
-  return parts[parts.length - 1] ?? "";
-}
-
 export function transferFallbackName(direction: "push" | "pull", id: number): string {
   return `${direction === "push" ? "上传" : "下载"} #${id}`;
 }

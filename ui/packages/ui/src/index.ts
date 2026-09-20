@@ -87,7 +87,13 @@ export { YoThemeToggle } from "./basic/ThemeToggle";
 export type { YoThemeToggleProps } from "./basic/ThemeToggle";
 
 export { YoTextField } from "./form/TextField";
-export type { YoTextFieldProps, YoTextFieldStatus, YoTextFieldAffix, YoTextFieldControl } from "./form/TextField";
+export type {
+  YoTextFieldProps,
+  YoTextFieldStatus,
+  YoTextFieldAffix,
+  YoTextFieldControl,
+  TextFieldWidthKind,
+} from "./form/TextField";
 
 export { YoSelect } from "./form/Select";
 export type { YoSelectProps, YoSelectOption } from "./form/Select";
@@ -182,10 +188,12 @@ export { YoTree } from "./list/Tree";
 export type { YoTreeProps, TreeNode } from "./list/Tree";
 
 export { YoScroller } from "./scroll/Scroller";
-export type { YoScrollerProps, YoScrollerHandle, ScrollerBarState } from "./scroll/Scroller";
+export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState } from "./scroll/Scroller";
 
 export { YoVirtualList } from "./scroll/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";
+export { docSelBandStyle } from "./scroll/doc-sel-model";
+export type { DocSelBandStyle } from "./scroll/doc-sel-model";
 
 export { YoReorderList } from "./scroll/ReorderList";
 export type { YoReorderListProps } from "./scroll/ReorderList";
@@ -202,10 +210,10 @@ export { YoColResizer } from "./grid/ColResizer";
 export type { YoColResizerProps } from "./grid/ColResizer";
 
 export { YoColHeader } from "./grid/ColHeader";
-export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./grid/ColHeader";
+export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone } from "./grid/ColHeader";
 
 export { YoColFrame } from "./grid/ColFrame";
-export type { YoColFrameProps, YoColCellPad } from "./grid/ColFrame";
+export type { YoColFrameProps, YoColCellPad, YoColFrameTone } from "./grid/ColFrame";
 
 export { YoColRow } from "./grid/ColRow";
 export type { YoColRowProps } from "./grid/ColRow";
@@ -217,6 +225,7 @@ export { YoColCell } from "./grid/ColCell";
 export type { YoColCellProps } from "./grid/ColCell";
 
 export {
+  charsTrack,
   colTrackTemplate,
   defaultColWidths,
   setColWidth,
@@ -235,10 +244,10 @@ export type {
 } from "./container/Panel";
 
 export { YoPage } from "./container/Page";
-export type { YoPageProps } from "./container/Page";
+export type { YoPageProps, YoPageRole } from "./container/Page";
 
 export { YoFormRow } from "./container/FormRow";
-export type { YoFormRowProps, YoFormRowLayout } from "./container/FormRow";
+export type { YoFormRowProps, YoFormRowLayout, YoFormRowPad } from "./container/FormRow";
 
 export { YoCorner, CornerPillRadius } from "./corner";
 export type {
@@ -377,7 +386,7 @@ export type {
 
 // —— 窗口铬 ——
 export { YoChrome } from "./chrome/chrome";
-export type { YoChromeProps } from "./chrome/chrome";
+export type { YoChromeAction, YoChromeProps } from "./chrome/chrome";
 export { YoTitleBar } from "./chrome/TitleBar";
 export type { YoTitleBarProps } from "./chrome/TitleBar";
 

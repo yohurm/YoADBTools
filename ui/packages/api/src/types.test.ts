@@ -11,8 +11,22 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_BROWSE_ROOT, ModuleId, ModuleTitle, SAFETY_ROOTS } from "./identity";
 import { COMMAND_BLOCK_GAPS_MS, COMMAND_LIBRARY_SCHEMA_VERSION } from "./library";
 import { AndroidKey, MIRROR_MIN_LAYOUT_PX } from "./scrcpy";
+import {
+  isLogColorScheme,
+  LOG_COLOR_SCHEME_CATALOG,
+  LOG_COLOR_SCHEME_DEFAULT,
+} from "./log-color-scheme";
+import {
+  LOG_DISPLAY_COLUMN_CATALOG,
+  LOG_MESSAGE_COLUMN,
+} from "./log-display-columns";
+import {
+  isLogLineLayout,
+  LOG_LINE_LAYOUT_CATALOG,
+  LOG_LINE_LAYOUT_DEFAULT,
+} from "./log-line-layout";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogDisplayColumns, type LogFilter, type LogLine, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -314,15 +328,26 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   });
 
   it("LogDisplayColumns 字段为 snake_case 布尔开关", () => {
-    const cols: LogDisplayColumns = { ts: true, uid: false, pid: true, tid: true, level: true, tag: false };
+    const cols: LogDisplayColumns = { ts: true, uid: false, pid: true, tid: true, tag: false, app: true, level: true };
     expect(JSON.parse(JSON.stringify(cols))).toEqual({
       ts: true,
       uid: false,
       pid: true,
       tid: true,
-      level: true,
       tag: false,
+      app: true,
+      level: true,
     });
+    expect(LOG_DISPLAY_COLUMN_CATALOG.map((item) => item.key)).toEqual([
+      "ts",
+      "uid",
+      "pid",
+      "tid",
+      "tag",
+      "app",
+      "level",
+    ]);
+    expect(LOG_MESSAGE_COLUMN).toEqual({ key: "msg", label: "消息" });
   });
 
   it("settingsChanged 事件携带全量 settings 快照", () => {
@@ -339,8 +364,10 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         density: "comfortable",
         export_default_path: "",
         export_ask_every_time: true,
-        log_display_columns: { ts: true, uid: false, pid: true, tid: true, level: true, tag: true },
+        log_display_columns: { ts: true, uid: false, pid: true, tid: true, tag: true, app: true, level: true },
         log_time_format: "datetime_millis",
+        log_color_scheme: "yohu",
+        log_line_layout: "clip",
         mirror_max_size: 0,
         mirror_video_bit_rate: 16_000_000,
         mirror_max_fps: 0,
@@ -455,6 +482,14 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     );
     const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as typeof APP_SETTINGS_DEFAULT;
     expect(APP_SETTINGS_DEFAULT).toEqual(fixture);
+    expect(APP_SETTINGS_DEFAULT.log_color_scheme).toBe(LOG_COLOR_SCHEME_DEFAULT);
+    expect(LOG_COLOR_SCHEME_CATALOG.map((item) => item.value)).toEqual(["yohu", "logcat"]);
+    expect(isLogColorScheme(LOG_COLOR_SCHEME_DEFAULT)).toBe(true);
+    expect(isLogColorScheme("darcula")).toBe(false);
+    expect(APP_SETTINGS_DEFAULT.log_line_layout).toBe(LOG_LINE_LAYOUT_DEFAULT);
+    expect(LOG_LINE_LAYOUT_CATALOG.map((item) => item.value)).toEqual(["clip", "wrap"]);
+    expect(isLogLineLayout(LOG_LINE_LAYOUT_DEFAULT)).toBe(true);
+    expect(isLogLineLayout("soft")).toBe(false);
     expect(COMMAND_LIBRARY_SCHEMA_VERSION).toBe(3);
     expect([...COMMAND_BLOCK_GAPS_MS]).toEqual([0, 200, 500, 1000, 2000, 5000]);
     expect(DEFAULT_BROWSE_ROOT).toBe(SAFETY_ROOTS[0]);
@@ -491,4 +526,6 @@ export type _SettingValue_Number = Expect<Equal<SettingValue<"buffer_capacity">,
 export type _SettingValue_Bool = Expect<Equal<SettingValue<"clear_device_on_start">, boolean>>;
 export type _SettingValue_DevicesAutoRefresh = Expect<Equal<SettingValue<"devices_auto_refresh">, boolean>>;
 export type _SettingValue_Object = Expect<Equal<SettingValue<"log_display_columns">, LogDisplayColumns>>;
+export type _SettingValue_LogColorScheme = Expect<Equal<SettingValue<"log_color_scheme">, LogColorScheme>>;
+export type _SettingValue_LogLineLayout = Expect<Equal<SettingValue<"log_line_layout">, LogLineLayout>>;
 export type _SettingValue_MirrorProtocol = Expect<Equal<SettingValue<"mirror_protocol">, "usb" | "wifi">>;

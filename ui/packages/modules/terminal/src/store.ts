@@ -48,8 +48,7 @@ export interface IoLine {
 
 export type QueuedSend =
   | { id: number; title: string; kind: "line"; line: string }
-  | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] }
-  | { id: number; title: string; kind: "group"; group: CommandGroupDto };
+  | { id: number; title: string; kind: "block"; block: CommandBlockDto; values: string[] };
 
 export function createTerminalStore() {
   let prependAdb = false;
@@ -211,12 +210,6 @@ export function createTerminalStore() {
     setSession("composerOpen", true);
   }
 
-  function enqueueGroup(group: CommandGroupDto): void {
-    if (group.entries.length === 0) return;
-    setSession("queue", (items) => [...items, { id: nextQueueId++, title: group.name, kind: "group", group }]);
-    setSession("composerOpen", true);
-  }
-
   function removeQueued(id: number): void {
     setSession("queue", (items) => items.filter((item) => item.id !== id));
   }
@@ -245,8 +238,7 @@ export function createTerminalStore() {
       for (const item of items) {
         if (gen !== drainGen) break;
         if (item.kind === "line") await send(serials, item.line);
-        else if (item.kind === "block") await runBlockSeq(serials, item.block, item.values);
-        else await runGroup(serials, item.group);
+        else await runBlockSeq(serials, item.block, item.values);
       }
       if (gen === drainGen && text) await send(serials, text);
     } finally {
@@ -283,7 +275,6 @@ export function createTerminalStore() {
     enqueueLine,
     enqueueCommand,
     enqueueBlock,
-    enqueueGroup,
     removeQueued,
     setDraft,
     setComposerOpen,

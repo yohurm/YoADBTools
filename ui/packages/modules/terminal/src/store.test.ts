@@ -147,19 +147,6 @@ describe("send / 队列 / runGroup 目标设备", () => {
     expect(store.lines.some((row) => row.text.includes("请逐条执行"))).toBe(true);
   });
 
-  it("点组入队后 sendAll 才 runGroup", async () => {
-    mocks.groupRun.mockResolvedValue(11);
-    const store = createTerminalStore();
-    store.enqueueGroup(GROUP);
-    expect(store.session.queue[0]?.kind).toBe("group");
-    const sending = store.sendAll(["B2"]);
-    expect(store.session.busy).toBe(true);
-    await finishRun(11);
-    await sending;
-    expect(mocks.groupRun).toHaveBeenCalledWith({ group_id: "g1", serials: ["B2"] });
-    expect(store.session.busy).toBe(false);
-  });
-
   it("多行输出收成一条 <<<", async () => {
     mocks.terminalExec.mockResolvedValue([
       {

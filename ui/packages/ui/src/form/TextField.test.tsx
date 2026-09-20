@@ -148,6 +148,7 @@ describe("YoTextField", () => {
     expect(css).toContain("::-webkit-inner-spin-button");
     expect(css).toContain('[data-width="number"]');
     expect(css).toContain('[data-width="fill"]');
+    expect(css).toContain('[data-width="control"]');
     expect(css).toContain("--yohu-layout-text-field-stepper");
     expect(css).not.toContain("[data-block]");
     render(() => <YoTextField ariaLabel="缓冲最大行数" type="number" value="10000" />);
@@ -216,7 +217,7 @@ describe("YoTextField", () => {
     expect(input.tagName).toBe("INPUT");
   });
 
-  it("block 铺满父级宽，压过 number 宽，不沿栏高 stretch", () => {
+  it("block 铺满父级定宽，压过 number 宽，不沿栏高 stretch", () => {
     render(() => <YoTextField block type="number" ariaLabel="全宽数字" />);
     const host = screen.getByLabelText("全宽数字").closest(".yohu-text-field");
     expect(host?.getAttribute("data-width")).toBe("fill");
@@ -226,6 +227,18 @@ describe("YoTextField", () => {
     expect(rule).toContain("width: 100%");
     expect(rule).toContain("flex: 0 1 auto");
     expect(rule).not.toContain("flex: 1");
+  });
+
+  it("control 定宽路径槽，不吃百分比", () => {
+    render(() => <YoTextField width="control" readOnly value="C:\\adb.exe" ariaLabel="ADB 路径" />);
+    const host = screen.getByLabelText("ADB 路径").closest(".yohu-text-field");
+    expect(host?.getAttribute("data-width")).toBe("control");
+    const control = css.slice(css.indexOf('[data-width="control"]'));
+    const rule = control.slice(0, control.indexOf("}") + 1);
+    expect(rule).toContain("width: var(--yohu-layout-settings-control-max)");
+    expect(rule).toContain("flex: 0 0 auto");
+    expect(rule).toContain("max-width: 100%");
+    expect(rule).not.toMatch(/^\s*width:\s*100%/m);
   });
 
   it("active 写 data-active，描边走 accent；默认不加", () => {

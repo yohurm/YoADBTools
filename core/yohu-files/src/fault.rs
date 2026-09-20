@@ -88,6 +88,7 @@ pub(crate) fn file_error_from_adb(path: &str, err: AdbError) -> FileError {
         },
         AdbError::Cancelled
         | AdbError::DeviceOffline(_)
+        | AdbError::NotOnline(_)
         | AdbError::Timeout
         | AdbError::Io(_)
         | AdbError::ToolUnavailable(_) => FileError::Adb(err),
@@ -167,6 +168,12 @@ mod tests {
             file_error_from_adb("/sdcard", AdbError::Io(std::io::Error::other("pipe"))),
             FileError::Adb(AdbError::Io(_))
         ));
+        assert!(matches!(
+            file_error_from_adb("/sdcard", AdbError::NotOnline("ABSENT".into())),
+            FileError::Adb(AdbError::NotOnline(_))
+        ));
+        let not_online = file_error_from_adb("/sdcard", AdbError::NotOnline("ABSENT".into()));
+        assert!(!not_online.to_string().contains("stderr"));
     }
 
     /// 模拟 browse / mutate / transfer 的 `map_err(file_error_from_adb)?`。

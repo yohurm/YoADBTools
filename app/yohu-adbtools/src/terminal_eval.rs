@@ -116,11 +116,10 @@ fn from_eval(serial: &str, result: EvalResult) -> SerialEvalResult {
 }
 
 fn from_run_error(serial: String, error: RunError) -> SerialEvalResult {
-    let mapped = crate::ipc_map::ipc_run(error);
     SerialEvalResult {
         serial,
         ok: false,
-        message: mapped.message,
+        message: error.to_string(),
         exit_code: -1,
         stdout: String::new(),
         stderr: String::new(),
