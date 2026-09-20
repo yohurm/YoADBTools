@@ -11,6 +11,7 @@ import {
   headerWidth,
 } from "./editor";
 import { dataRowHeight } from "./layout";
+import { logsChromeActions } from "./logs-chrome-actions";
 
 function loadSrc(name: string): string {
   const candidates = [
@@ -150,6 +151,30 @@ describe("日志显示列", () => {
     expect(dataRowHeight()).toBe(Density.Comfortable.rowHeight);
   });
 
+  it("页眉功能栏按采集态增删，不直切 Show", () => {
+    expect(logsChromeActions({ capturing: false, overflowed: false })).toEqual([
+      "capture",
+      "clear",
+      "clear-device",
+      "export",
+    ]);
+    expect(logsChromeActions({ capturing: true, overflowed: false })).toEqual([
+      "capture",
+      "pause",
+      "clear",
+      "clear-device",
+      "export",
+    ]);
+    expect(logsChromeActions({ capturing: true, overflowed: true })).toEqual([
+      "capture",
+      "pause",
+      "clear",
+      "clear-device",
+      "export",
+      "overflow",
+    ]);
+  });
+
   it("清单标题栏走 YoCol 列架，行仍是文档", () => {
     const load = (name: string): string => {
       const candidates = [
@@ -193,6 +218,12 @@ describe("日志显示列", () => {
     expect(header).toContain("onWidthChange");
     expect(header).toContain("yohu-logs__head");
     expect(view).toContain("setColChars");
+    expect(view).toContain("actions={");
+    expect(view).toContain("logs-chrome-actions");
+    expect(view).toContain("logsChromeActions");
+    expect(view).not.toContain("YoPresence");
+    expect(view).not.toContain("<YoListPresence");
+    expect(view).not.toContain("<Show when={active()?.capturing}");
     expect(logsCss).not.toContain("yohu-logs__head-level");
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');

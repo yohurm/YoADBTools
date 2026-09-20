@@ -54,6 +54,7 @@ import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./key
 import { dataRowHeight, measureChPx } from "./layout";
 import { LogColumnHeader } from "./LogColumnHeader";
 import { LogFilterBar } from "./LogFilterBar";
+import { logsChromeActions, type LogsChromeAction } from "./logs-chrome-actions";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import {
@@ -376,12 +377,16 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
   };
 
-  return (
-    <YoPage class="yohu-logs">
-      <YoChrome
-        title={ModuleTitle.Logs}
-        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
-      >
+  const chromeActions = createMemo(() =>
+    logsChromeActions({
+      capturing: Boolean(active()?.capturing),
+      overflowed: overflowed(),
+    }),
+  );
+
+  const chromeAction = (id: LogsChromeAction) => {
+    if (id === "capture") {
+      return (
         <YoButton
           tone={windowLive() ? "danger" : "accent"}
           disabled={!windowLive() && windowSerial() === null}
@@ -399,33 +404,58 @@ export function LogAnalyzerView(props: DeviceSession) {
               : "停止"
             : "开始"}
         </YoButton>
-        <Show when={active()?.capturing}>
-          <YoButton
-            buttonStyle="normal" tone="neutral"
-            onClick={togglePause}
-          >
-            {active()?.paused ? "继续" : "暂停"}
-          </YoButton>
-        </Show>
+      );
+    }
+    if (id === "pause") {
+      return (
+        <YoButton buttonStyle="normal" tone="neutral" onClick={togglePause}>
+          {active()?.paused ? "继续" : "暂停"}
+        </YoButton>
+      );
+    }
+    if (id === "clear") {
+      return (
         <YoButton
-          buttonStyle="normal" tone="neutral"
+          buttonStyle="normal"
+          tone="neutral"
           onClick={() => {
-            const id = logStore.state.activeSessionId;
-            if (id !== null) void logStore.clearVisible(id);
+            const sessionId = logStore.state.activeSessionId;
+            if (sessionId !== null) void logStore.clearVisible(sessionId);
           }}
         >
           清空
         </YoButton>
-        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void logStore.clearDevice()} disabled={windowSerial() === null}>
+      );
+    }
+    if (id === "clear-device") {
+      return (
+        <YoButton
+          buttonStyle="normal"
+          tone="neutral"
+          onClick={() => void logStore.clearDevice()}
+          disabled={windowSerial() === null}
+        >
           清设备缓冲
         </YoButton>
+      );
+    }
+    if (id === "export") {
+      return (
         <YoButton buttonStyle="normal" tone="neutral" onClick={() => void doExport()}>
           导出
         </YoButton>
-        <Show when={overflowed()}>
-          <YoBadge text="缓冲滞后（已回补）" tone="warning" />
-        </Show>
-      </YoChrome>
+      );
+    }
+    return <YoBadge text="缓冲滞后（已回补）" tone="warning" />;
+  };
+
+  return (
+    <YoPage class="yohu-logs">
+      <YoChrome
+        title={ModuleTitle.Logs}
+        leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
+        actions={chromeActions().map((id) => ({ key: id, node: chromeAction(id) }))}
+      />
 
       <Show
         when={logStore.state.sessions.length > 0}
