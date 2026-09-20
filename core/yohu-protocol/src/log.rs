@@ -1,4 +1,4 @@
-//! 日志域 wire 类型：logcat 行、批量协议、过滤作用域、进程索引。
+//! 日志域 wire 类型：logd 记录、批量协议、过滤作用域、进程索引。
 
 use serde::{Deserialize, Serialize};
 

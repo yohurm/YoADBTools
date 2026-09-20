@@ -123,16 +123,17 @@ async fn capture_streams_parses_and_batches() {
     service.start("R58M1234A", false).await.expect("开始采集");
 
     let lines = collect_lines(&mut rx, 3).await;
-    assert_eq!(lines.len(), 3, "应收到 3 行批量事件");
+    assert_eq!(lines.len(), 3, "应收到 3 条批量事件");
     assert_eq!(lines[0].seq, 0);
     assert_eq!(lines[0].pid, 1234);
     assert_eq!(lines[0].uid.as_deref(), Some("1000"));
     assert_eq!(lines[0].level, 'I');
     assert_eq!(lines[0].tag, "TestTag");
+    assert_eq!(lines[0].msg, "hello one");
     assert_eq!(lines[1].level, 'W');
     assert_eq!(lines[2].pid, 9999);
 
-    // 流自然结束 → 环形缓冲保留全部行
+    // 流自然结束 → 环形缓冲保留全部记录
     let kept = replay_lines(&service, "R58M1234A");
     assert_eq!(kept.len(), 3);
     assert_eq!(service.status("R58M1234A").last_seq, 2);

@@ -86,12 +86,12 @@ async fn real_capture_stream_batch_and_ring() {
 
     // 真实设备通常持续输出日志；等待批量事件（解析+聚合+推送全链路）
     let lines = collect_events(&mut rx, 5, Duration::from_secs(30)).await;
-    assert!(!lines.is_empty(), "真实 logcat 应产出日志行");
+    assert!(!lines.is_empty(), "真实 logcat 应产出日志记录");
     let ring_lines = replay_lines(&service, &serial);
-    assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次行");
+    assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次记录");
     let sample = &lines[0];
     eprintln!(
-        "[真机] 采集 {} 行（缓冲 {}），样例: {} pid={} level={} tag={}",
+        "[真机] 采集 {} 条（缓冲 {}），样例: {} pid={} level={} tag={}",
         lines.len(),
         ring_lines.len(),
         sample.ts,
@@ -151,7 +151,7 @@ async fn real_capture_with_clear_device() {
         .expect("开始采集（先清设备缓冲）");
     let lines = collect_events(&mut rx, 3, Duration::from_secs(30)).await;
     assert!(!lines.is_empty(), "清缓冲后仍应采集到新日志");
-    eprintln!("[真机] 清缓冲重采 {} 行", lines.len());
+    eprintln!("[真机] 清缓冲重采 {} 条", lines.len());
 
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
@@ -193,7 +193,7 @@ async fn real_detach_clears_ring() {
     );
 }
 
-/// 导出：采集后从环过滤快照写 txt，行数与环一致。
+/// 导出：采集后从环过滤快照写 txt，条数与环一致。
 #[tokio::test]
 async fn real_export_filtered_ring_snapshot() {
     let client = Arc::new(AdbClient::new(
@@ -217,7 +217,7 @@ async fn real_export_filtered_ring_snapshot() {
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
         .expect("stop 应在杀进程树后返回");
-    assert!(!lines.is_empty(), "真实设备应产出至少一行");
+    assert!(!lines.is_empty(), "真实设备应产出至少一条");
 
     let root = std::env::temp_dir().join(format!(
         "yohu-real-export-{}-{:?}",
@@ -232,7 +232,7 @@ async fn real_export_filtered_ring_snapshot() {
     assert_eq!(content.lines().count() as u64, result.lines);
     assert!(
         result.lines >= lines.len() as u64,
-        "导出行数应覆盖已收到的批次"
+        "导出条数应覆盖已收到的批次"
     );
 
     let _ = std::fs::remove_dir_all(&root);

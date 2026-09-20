@@ -1,4 +1,4 @@
-//! `logcat -v long` 头。语法只认 AOSP `liblog/logprint.cpp` 的 `FORMAT_LONG`。
+//! `logcat -v long,uid,year` 头。语法只认 AOSP `liblog/logprint.cpp` 的 `FORMAT_LONG`。
 //!
 //! 打印机：
 //! ```text

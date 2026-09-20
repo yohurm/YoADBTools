@@ -53,15 +53,14 @@ impl MessageAssembler {
         let header = self.header.take()?;
         let msg = join_body(std::mem::take(&mut self.body));
         Some(LogLine {
-            seq: 0,
             ts: header.ts,
             pid: header.pid,
             tid: header.tid,
             uid: header.uid,
-            app: None,
             level: header.level,
             tag: header.tag,
             msg,
+            ..LogLine::default()
         })
     }
 }

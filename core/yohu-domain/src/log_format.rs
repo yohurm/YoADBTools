@@ -19,7 +19,6 @@ pub fn format_log_line(line: &LogLine) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yohu_protocol::LogLine;
 
     #[test]
     fn format_shared_fixture() {

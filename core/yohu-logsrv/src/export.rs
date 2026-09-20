@@ -92,19 +92,17 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_util::sync::CancellationToken;
     use yohu_adb::{AdbClient, ToolResolver};
-    use yohu_protocol::{AppEvent, LogFilter, LogLine, LogScope};
+    use yohu_protocol::{AppEvent, LogLine, LogScope};
 
     fn line(pid: u32, msg: &str) -> LogLine {
         LogLine {
-            seq: 0,
             ts: "2026-01-01 00:00:00.000".into(),
             pid,
             tid: 1,
-            uid: None,
-            app: None,
             level: 'I',
             tag: "T".into(),
             msg: msg.into(),
+            ..LogLine::default()
         }
     }
 
