@@ -28,11 +28,26 @@ export interface TitleBarCaptionButton {
   icon: TitleBarCaptionIcon;
 }
 
+export interface TitleBarSlots {
+  brand: TitleBarSpec["brand"];
+  showCaptions: boolean;
+  captions: TitleBarCaptionButton[];
+}
+
 export function titlebarHostAttrs(input: TitleBarInput): TitleBarHostAttrs {
   const spec = resolveTitleBarSpec(input);
   return {
     "data-captions": spec.captions,
     "data-brand": spec.brand,
+  };
+}
+
+export function resolveTitleBarSlots(input: TitleBarInput): TitleBarSlots {
+  const spec = resolveTitleBarSpec(input);
+  return {
+    brand: spec.brand,
+    showCaptions: spec.showCaptions,
+    captions: titlebarCaptionButtons(spec),
   };
 }
 

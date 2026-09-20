@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createSignal } from "solid-js";
 import { render, screen } from "@solidjs/testing-library";
 import { YoChrome } from "./chrome";
 
@@ -26,9 +27,7 @@ describe("YoChrome", () => {
   it("在原地渲染标题区与功能栏，不传送", () => {
     const { container } = render(() => (
       <div data-testid="body">
-        <YoChrome title="命令终端" leading={<span>A1</span>}>
-          <button type="button">执行</button>
-        </YoChrome>
+        <YoChrome title="命令终端" leading={<span>A1</span>} actions={[{ key: "run", node: <button type="button">执行</button> }]} />
       </div>
     ));
     expect(container.querySelector(".yohu-chrome__title")?.textContent).toContain("命令终端");
@@ -53,7 +52,8 @@ describe("YoChrome", () => {
     expect(container.querySelector(".yohu-chrome")?.hasAttribute("data-layout")).toBe(false);
     expect(container.querySelector(".yohu-chrome__heading")?.textContent).toBe("投屏显示");
     expect(container.querySelector(".yohu-chrome__title")?.textContent).toBe("投屏显示");
-    expect(container.querySelector(".yohu-chrome__bar")).toBeNull();
+    expect(container.querySelector(".yohu-chrome__bar")?.textContent).toBe("");
+    expect(container.querySelector(".yohu-chrome__bar button")).toBeNull();
     expect(container.querySelector(".yohu-chrome__row")).toBeTruthy();
   });
 
@@ -74,13 +74,38 @@ describe("YoChrome", () => {
 
   it("extra 落在次行，不进主行功能栏", () => {
     const { container } = render(() => (
-      <YoChrome title="投屏显示" extra={<span>质量</span>}>
-        <button type="button">开始</button>
-      </YoChrome>
+      <YoChrome title="投屏显示" extra={<span>质量</span>} actions={[{ key: "start", node: <button type="button">开始</button> }]} />
     ));
     expect(container.querySelector(".yohu-chrome")?.hasAttribute("data-layout")).toBe(false);
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).toContain("开始");
     expect(container.querySelector(".yohu-chrome__bar")?.textContent).not.toContain("质量");
     expect(container.querySelector(".yohu-chrome__extra")?.textContent).toContain("质量");
+  });
+
+  it("leading 与功能栏走 Presence chip，不用 Show 直切", () => {
+    const src = readFileSync(
+      existsSync(resolve(process.cwd(), "src/chrome/chrome.tsx"))
+        ? resolve(process.cwd(), "src/chrome/chrome.tsx")
+        : resolve(process.cwd(), "packages/ui/src/chrome/chrome.tsx"),
+      "utf-8",
+    );
+    expect(src).toContain("YoPresence");
+    expect(src).toContain("YoListPresence");
+    expect(src).toContain('recipe="chip"');
+    expect(src).toContain("slots().showLeading");
+    expect(src).not.toContain("chromeHasBar");
+    expect(src).not.toContain('from "./chrome-model"');
+    expect(src).not.toMatch(/<Show when=\{slots\(\)\.showBar\}>/);
+    expect(src).not.toContain("children?");
+    expect(src).not.toContain("props.children");
+  });
+
+  it("功能栏清空时 ListPresence 仍在树上收 each=[]", () => {
+    const [actions, setActions] = createSignal([{ key: "run", node: <button type="button">执行</button> }]);
+    const { container } = render(() => <YoChrome title="命令终端" actions={actions()} />);
+    expect(container.querySelector(".yohu-chrome__bar")?.textContent).toContain("执行");
+    setActions([]);
+    expect(container.querySelector(".yohu-chrome__bar")).toBeTruthy();
+    expect(container.querySelector(".yohu-chrome__bar button")).toBeNull();
   });
 });

@@ -386,7 +386,7 @@ export type {
 
 // —— 窗口铬 ——
 export { YoChrome } from "./chrome/chrome";
-export type { YoChromeProps } from "./chrome/chrome";
+export type { YoChromeAction, YoChromeProps } from "./chrome/chrome";
 export { YoTitleBar } from "./chrome/TitleBar";
 export type { YoTitleBarProps } from "./chrome/TitleBar";
 
