@@ -121,6 +121,10 @@ async fn all_candidates_fail_yields_detailed_error() {
         .devices_resilient(CancellationToken::new())
         .await
         .expect_err("全部失败应报错");
+    assert!(
+        matches!(err, yohu_adb::AdbError::ToolUnavailable(_)),
+        "全候选失败应是 ToolUnavailable: {err}"
+    );
     let text = err.to_string();
     assert!(
         text.contains("全部 adb 候选扫描失败"),

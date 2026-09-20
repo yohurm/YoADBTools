@@ -168,7 +168,7 @@ async fn real_device_stream_lines() {
         eprintln!("跳过：无在线设备");
         return;
     };
-    // logcat 长驻流：读 3 行后取消（验证真实流式 + 取消终止进程树）
+    // 客户端流式冒烟：读若干物理行后取消。产品采集在 yohu-logsrv，同一套 long,uid,year。
     let (tx, mut rx) = mpsc::channel::<String>(64);
     let cancel = CancellationToken::new();
     let cancel_for_stream = cancel.clone();
@@ -178,7 +178,7 @@ async fn real_device_stream_lines() {
             client
                 .stream_lines(
                     &serial,
-                    &["logcat".into(), "-v".into(), "threadtime".into()],
+                    &["logcat".into(), "-v".into(), "long,uid,year".into()],
                     cancel_for_stream,
                     tx,
                 )

@@ -87,14 +87,11 @@ impl AdbClient {
                 }
             }
         }
-        Err(AdbError::BadExit {
-            exit_code: -1,
-            stderr: format!(
-                "全部 adb 候选扫描失败（{} 个）: {}",
-                candidates.len(),
-                failures.join("；")
-            ),
-        })
+        Err(AdbError::ToolUnavailable(format!(
+            "全部 adb 候选扫描失败（{} 个）: {}",
+            candidates.len(),
+            failures.join("；")
+        )))
     }
 }
 

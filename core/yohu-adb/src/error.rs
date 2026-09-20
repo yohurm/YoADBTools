@@ -8,6 +8,9 @@ pub enum AdbError {
     ToolUnavailable(String),
     #[error("设备掉线: {0}")]
     DeviceOffline(String),
+    /// Hub 无 Online 槽：会话不变量，不是 adb stderr 运输掉线。
+    #[error("设备未在线: {0}")]
+    NotOnline(String),
     #[error("执行超时")]
     Timeout,
     #[error("任务已取消")]
@@ -34,7 +37,9 @@ impl From<ProcessError> for AdbError {
 impl From<AdbError> for yohu_domain::RunError {
     fn from(e: AdbError) -> Self {
         match e {
-            AdbError::DeviceOffline(s) => yohu_domain::RunError::DeviceOffline(s),
+            AdbError::DeviceOffline(s) | AdbError::NotOnline(s) => {
+                yohu_domain::RunError::DeviceOffline(s)
+            }
             AdbError::Timeout => yohu_domain::RunError::Timeout,
             AdbError::Cancelled => yohu_domain::RunError::Cancelled,
             other => yohu_domain::RunError::Adb(other.to_string()),
