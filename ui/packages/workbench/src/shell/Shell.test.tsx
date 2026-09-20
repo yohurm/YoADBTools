@@ -736,8 +736,8 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("日志时间格式切换立即写入 log_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("清单时间显示")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "日期 + 时分秒.毫秒（默认）" }));
-    fireEvent.click(screen.getByText("时分秒.毫秒", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "日期 + 时分秒.毫秒" }));
+    fireEvent.click(screen.getByRole("option", { name: "时分秒.毫秒" }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("log_time_format", "time_millis");
     });
@@ -747,7 +747,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("内容配色")).toBeTruthy();
     expect(screen.getByText("内容配色").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Yohu（默认）" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yohu" }));
     fireEvent.click(screen.getByText("LogCat", { exact: true }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("log_color_scheme", "logcat");
@@ -758,7 +758,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     render(() => <SettingsView />);
     expect(screen.getByText("长文本")).toBeTruthy();
     expect(screen.getByText("长文本").closest(".yohu-form-row")?.hasAttribute("data-has-description")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "单行（LogCat，默认）" }));
+    fireEvent.click(screen.getByRole("button", { name: "单行（LogCat）" }));
     fireEvent.click(screen.getByText("超宽换行", { exact: true }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("log_line_layout", "wrap");
@@ -768,8 +768,8 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒（默认）" }));
-    fireEvent.click(screen.getByText("日期 + 时分秒.毫秒", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "时分秒.毫秒" }));
+    fireEvent.click(screen.getByRole("option", { name: "日期 + 时分秒.毫秒" }));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_time_format", "datetime_millis");
     });
@@ -777,7 +777,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
 
   it("密度切换：保存到 core 并应用到 documentElement", async () => {
     render(() => <SettingsView />);
-    fireEvent.click(screen.getByRole("button", { name: "舒适（默认）" }));
+    fireEvent.click(screen.getByRole("button", { name: "舒适" }));
     fireEvent.click(screen.getByText("紧凑"));
     await waitFor(() => {
       expect(mocks.settingsSet).toHaveBeenCalledWith("density", "compact");

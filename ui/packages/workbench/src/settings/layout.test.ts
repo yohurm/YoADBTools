@@ -42,6 +42,8 @@ describe("设置页滚轴", () => {
     expect(form.match(/<YoPanel\b/g)?.length).toBe(7);
     expect(form.match(/overflow="visible"/g)?.length).toBe(7);
     expect(form).not.toContain("deviceLabel");
+    expect(form).toContain("LOG_DISPLAY_COLUMN_CATALOG");
+    expect(form).not.toContain("LOG_COLUMN_OPTIONS");
     expect(css).toContain(".yohu-settings__scroll");
     expect(css).not.toMatch(/overflow:\s*auto/);
     expect(css).not.toMatch(/overflow:\s*scroll/);

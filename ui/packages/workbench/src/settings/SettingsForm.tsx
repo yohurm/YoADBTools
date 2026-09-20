@@ -7,10 +7,10 @@ import { For, type JSX } from "solid-js";
 import { APP_ICON_SRC } from "../app-identity";
 import {
   LOG_COLOR_SCHEME_CATALOG,
+  LOG_DISPLAY_COLUMN_CATALOG,
   LOG_LINE_LAYOUT_CATALOG,
   ModuleTitle,
   type Density,
-  type LogDisplayColumns,
   type SettingKey,
   type TerminalTimeFormat,
   type Theme,
@@ -39,7 +39,7 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 ];
 
 const DENSITY_OPTIONS: { value: Density; label: string }[] = [
-  { value: "comfortable", label: "舒适（默认）" },
+  { value: "comfortable", label: "舒适" },
   { value: "compact", label: "紧凑" },
 ];
 
@@ -51,23 +51,22 @@ const CLOCK_FORMAT_LABEL: Record<TerminalTimeFormat, string> = {
 };
 
 function clockFormatOptions(
-  defaultValue: TerminalTimeFormat,
   order: TerminalTimeFormat[],
 ): { value: TerminalTimeFormat; label: string }[] {
   return order.map((value) => ({
     value,
-    label: value === defaultValue ? `${CLOCK_FORMAT_LABEL[value]}（默认）` : CLOCK_FORMAT_LABEL[value],
+    label: CLOCK_FORMAT_LABEL[value],
   }));
 }
 
-const TERMINAL_TIME_FORMAT_OPTIONS = clockFormatOptions("time_millis", [
+const TERMINAL_TIME_FORMAT_OPTIONS = clockFormatOptions([
   "time_millis",
   "time",
   "datetime_millis",
   "datetime",
 ]);
 
-const LOG_TIME_FORMAT_OPTIONS = clockFormatOptions("datetime_millis", [
+const LOG_TIME_FORMAT_OPTIONS = clockFormatOptions([
   "datetime_millis",
   "datetime",
   "time_millis",
@@ -83,16 +82,6 @@ const LOG_LINE_LAYOUT_OPTIONS = LOG_LINE_LAYOUT_CATALOG.map(({ value, label }) =
   value,
   label,
 }));
-
-const LOG_COLUMN_OPTIONS: { key: keyof LogDisplayColumns; label: string }[] = [
-  { key: "ts", label: "时间" },
-  { key: "uid", label: "UID" },
-  { key: "pid", label: "PID" },
-  { key: "tid", label: "TID" },
-  { key: "tag", label: "Tag" },
-  { key: "app", label: "应用" },
-  { key: "level", label: "级别" },
-];
 
 function EffectBadge(props: { text: string }): JSX.Element {
   return <YoBadge text={props.text} tone={props.text === "立即生效" ? "accent" : "neutral"} />;
@@ -238,7 +227,7 @@ export function SettingsForm(props: {
 
         <YoFormRow title="日志显示列" note={<EffectBadge text="立即生效" />}>
           <div class="yohu-settings__checks">
-            <For each={LOG_COLUMN_OPTIONS}>
+            <For each={LOG_DISPLAY_COLUMN_CATALOG}>
               {(opt) => (
                 <YoCheckbox
                   label={opt.label}
