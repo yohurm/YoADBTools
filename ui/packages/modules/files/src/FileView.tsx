@@ -41,12 +41,14 @@ export function FileView(props: DeviceSession) {
   onCleanup(() => toaster.destroy());
   let pageEl: HTMLDivElement | undefined;
   let listEl: HTMLDivElement | undefined;
+  let listOffset = 0;
   let addressSlot: AddressSlotApi | undefined;
   let deleteDialog: DeleteDialogApi | undefined;
   let createDialog: CreateDialogApi | undefined;
 
   const drop = createDropSession({
     listEl: () => listEl,
+    listOffset: () => listOffset,
     hasDevice: () => Boolean(props.selectedSerials[0]),
     blocked: () => Boolean(deleteDialog?.isOpen() || createDialog?.isOpen()),
     intoFolder: () => props.settings.files_drop_into_folder,
@@ -234,6 +236,7 @@ export function FileView(props: DeviceSession) {
               <FileTable
                 dropDirName={dropDirName()}
                 listRef={(el) => { listEl = el; }}
+                onOffset={(block) => { listOffset = block; }}
                 onContextMenu={openListMenu}
               />
             </Show>

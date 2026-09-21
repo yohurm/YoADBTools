@@ -56,10 +56,10 @@ export function pointInRect(rect: DropRect, x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
-export function readListHitSpace(list: Element, itemHeight: number): ListHitSpace {
+export function readListHitSpace(list: Element, itemHeight: number, scrollTop: number): ListHitSpace {
   return {
     rect: rectOf(list),
-    scrollTop: list instanceof HTMLElement ? list.scrollTop : 0,
+    scrollTop,
     itemHeight,
   };
 }

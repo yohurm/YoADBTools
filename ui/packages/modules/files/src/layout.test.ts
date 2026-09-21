@@ -291,6 +291,8 @@ describe("官方拖放契约", () => {
     expect(fileView).not.toContain("yohu-recipe-rail");
     expect(fileView).toContain("createDropSession");
     expect(fileView).toContain("listRef");
+    expect(fileView).toContain("listOffset");
+    expect(fileView).toContain("onOffset");
     expect(fileView).not.toContain("onNativeDragDrop");
     expect(fileView).not.toContain("destDirFromEntries");
     expect(fileView).not.toContain("dropCommit");
@@ -311,7 +313,8 @@ describe("官方拖放契约", () => {
   it("松手 dest 与热态同一套清单下标，接线在 drop 层", () => {
     expect(dropSrc).toContain("dropCommit");
     expect(dropSrc).toContain("destDirFromEntries(css.x, css.y, ctx.space, ctx.entries)");
-    expect(dropSessionSrc).toContain("destDirFromEntries");
+    expect(dropSessionSrc).toContain("host.listOffset()");
+    expect(dropSrc).not.toContain("list.scrollTop");
     expect(dropSessionSrc).toContain("dropCommit");
     expect(dropSessionSrc).toContain("devicePixelRatio");
     expect(dropSessionSrc).toContain("requestAnimationFrame");

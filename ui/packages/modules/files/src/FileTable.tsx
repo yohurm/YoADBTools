@@ -102,6 +102,7 @@ export function FileTable(props: {
   onContextMenu: (x: number, y: number) => void;
   dropDirName?: string | null;
   listRef?: (el: HTMLDivElement) => void;
+  onOffset?: (block: number) => void;
 }) {
   const colTemplate = (): string => fileColTemplate(listingStore.ui.colWidths);
   const entries = (): ListingEntry[] => listingStore.entries;
@@ -137,6 +138,7 @@ export function FileTable(props: {
             getItemKey={(entry) => entry.name}
             ariaLabel="文件列表"
             hostRef={props.listRef}
+            onOffset={(block) => props.onOffset?.(block)}
             selectedKeys={listingStore.selectedSet}
             hotKey={() => props.dropDirName ?? null}
             onSelectRow={(entry, _key, event) => {
