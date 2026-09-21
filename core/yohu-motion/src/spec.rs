@@ -14,6 +14,8 @@ pub enum MotionSpec {
     EffectsExit,
     /// 开关 / 指示器位移：150ms（CSS 走弹簧；原生贝塞尔回退 standard）
     SpatialSmall,
+    /// 控件内图标成形（勾选描边等）：150ms standard（描边禁弹簧，过冲会画出头）
+    SpatialTick,
     /// 滑块宽高：200ms（CSS 软弹簧；原生回退 standard）
     SpatialStretch,
     /// 内容用后高：300ms（CSS 长尾弹簧；原生回退 standard）
@@ -35,7 +37,7 @@ impl MotionSpec {
     pub const fn duration_ms(self) -> u64 {
         match self {
             Self::EffectsFast => 100,
-            Self::SpatialSmall => 150,
+            Self::SpatialSmall | Self::SpatialTick => 150,
             Self::EffectsEnter => 160,
             Self::EffectsExit | Self::SpatialStretch | Self::SpatialLocal | Self::SpatialExit => 200,
             Self::SpatialPanel | Self::SpatialRail | Self::SpatialGrow => 300,
@@ -50,6 +52,7 @@ impl MotionSpec {
             | Self::SpatialPanel
             | Self::SpatialRail
             | Self::SpatialSmall
+            | Self::SpatialTick
             | Self::SpatialStretch
             | Self::SpatialGrow => {
                 ease_standard
@@ -86,6 +89,7 @@ mod tests {
             "effectsEnter" => MotionSpec::EffectsEnter,
             "effectsExit" => MotionSpec::EffectsExit,
             "spatialSmall" => MotionSpec::SpatialSmall,
+            "spatialTick" => MotionSpec::SpatialTick,
             "spatialStretch" => MotionSpec::SpatialStretch,
             "spatialGrow" => MotionSpec::SpatialGrow,
             "spatialLocal" => MotionSpec::SpatialLocal,
@@ -102,6 +106,7 @@ mod tests {
         "effectsEnter",
         "effectsExit",
         "spatialSmall",
+        "spatialTick",
         "spatialStretch",
         "spatialGrow",
         "spatialLocal",
