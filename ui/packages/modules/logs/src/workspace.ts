@@ -5,6 +5,7 @@
  *
  * 面板写入只有两条：applyAppend（入镜 / 补洞 / 重绑）与 projectWindow（改过滤）。
  * 清空走 discardView：推进 fromSeq，旧行不能再投影回来。
+ * 退订走 unsubscribeSession：capturing=false 并冻可见区；扇出只认 capturing。
  * 空面板不能 detachFollow：没有已画行就没有底部。
  */
 
@@ -100,8 +101,9 @@ export type WorkspaceApi = {
   patchFilter: (id: number, patch: SessionFilterPatch) => void;
   setPaused: (id: number, paused: boolean) => void;
   trimPanels: () => void;
-  catchUpSession: (id: number) => void;
-  bindPackageSessions: (serial: string, entries?: readonly ProcessEntry[]) => void;
+    catchUpSession: (id: number) => void;
+    unsubscribeSession: (id: number) => void;
+    bindPackageSessions: (serial: string, entries?: readonly ProcessEntry[]) => void;
   assignDefaultSerial: (serial: string | null) => void;
   onDeviceLines: (serial: string, lines: readonly LogLine[]) => void;
   discardView: (id: number) => void;
@@ -239,8 +241,27 @@ export function createWorkspace(
     const idx = sessionIndex(id);
     if (idx < 0) return;
     const session = state.sessions[idx]!;
+    if (!session.capturing) return;
     const after = lastSeqOf(session.visible, session.fromSeq);
     appendToSession(id, extraFromMirror(session, after));
+  }
+
+  function unsubscribeSession(id: number): void {
+    const idx = sessionIndex(id);
+    if (idx < 0) return;
+    const session = state.sessions[idx]!;
+    if (!session.capturing && !session.starting) return;
+    const freeze = canFreezeFollow(session.visible);
+    setState("sessions", idx, {
+      capturing: false,
+      starting: false,
+      ...(freeze
+        ? {
+            following: false,
+            frozenThroughSeq: lastSeqOf(session.visible, session.fromSeq),
+          }
+        : {}),
+    });
   }
 
   function projectSession(id: number): void {
@@ -248,9 +269,11 @@ export function createWorkspace(
     if (idx < 0) return;
     const session = state.sessions[idx]!;
     const mirror = session.serial ? mirrors.of(session.serial) : null;
-    const covers = mirror
-      ? mirrorCoversRange(mirror.size(), mirror.lastSeqNumber(), session.fromSeq)
-      : false;
+    const covers = Boolean(
+      session.capturing &&
+        mirror &&
+        mirrorCoversRange(mirror.size(), mirror.lastSeqNumber(), session.fromSeq),
+    );
     const source = covers ? extraFromMirror(session, seqBefore(session.fromSeq)) : [];
     const next = projectWindow({
       drawn: session.visible,
@@ -316,7 +339,7 @@ export function createWorkspace(
       if (session.serial !== serial) return;
       const binding = rebindPids(session.binding, index, session.scope.pkg, session.scope.includeChild);
       setState("sessions", idx, { binding });
-      if (state.sessions[idx]!.following && !state.sessions[idx]!.paused) {
+      if (state.sessions[idx]!.capturing && !state.sessions[idx]!.paused) {
         catchUpSession(session.id);
       }
     });
@@ -466,6 +489,7 @@ export function createWorkspace(
     setPaused,
     trimPanels,
     catchUpSession,
+    unsubscribeSession,
     bindPackageSessions,
     assignDefaultSerial,
     onDeviceLines,

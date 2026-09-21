@@ -305,8 +305,10 @@ describe("日志显示列", () => {
     expect(logsCss).toContain('[data-layout="clip"]');
     expect(editorView).not.toContain("--yohu-log-board");
     expect(editorView).toContain("contentWidth");
-    expect(editorView).toContain("hostRef");
+    expect(editorView).toContain("onOffset");
     expect(editorView).toContain("onInlineScroll");
+    expect(editorView).not.toContain("scrollLeft");
+    expect(editorView).not.toContain("hostRef");
     expect(editorView).toContain("chPx");
     expect(view).not.toContain("onInlineOffset");
     expect(view).toContain("chPx={chPx}");
