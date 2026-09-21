@@ -16,10 +16,6 @@
   box-sizing: border-box;
 }
 
-.yohu-switch .yohu-corner__fill {
-  transition: fill var(--yohu-motion-effects-fast);
-}
-
 .yohu-switch[data-paint="on"] {
   --yohu-corner-fill: var(--yohu-accent);
 }
@@ -40,11 +36,22 @@
   background-color: var(--yohu-fg-on);
   box-shadow: var(--yohu-shadow-xs);
   pointer-events: none;
+  transform-origin: left center;
   transition: transform var(--yohu-motion-spatial-small);
+}
+
+/* 按住沿行进方向拉长（transform 不触发布局），松手借同一弹簧回弹。 */
+.yohu-switch:not(:disabled):active .yohu-switch__thumb {
+  transform: scaleX(1.2);
 }
 
 .yohu-switch[data-paint="on"] .yohu-switch__thumb {
   transform: translateX(calc(var(--yohu-layout-switch-w) - var(--yohu-layout-switch-h)));
+  transform-origin: right center;
+}
+
+.yohu-switch[data-paint="on"]:not(:disabled):active .yohu-switch__thumb {
+  transform: translateX(calc(var(--yohu-layout-switch-w) - var(--yohu-layout-switch-h))) scaleX(1.2);
 }
 
 .yohu-switch:not(:disabled)[data-paint="off"]:hover {

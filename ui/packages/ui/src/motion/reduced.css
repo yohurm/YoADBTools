@@ -22,6 +22,9 @@
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-presence[data-recipe="chip"],
   .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
+  .yohu-corner__fill,
+  .yohu-corner__stroke,
+  .yohu-checkbox__check polyline,
   .yohu-switch,
   .yohu-switch__thumb,
   .yohu-recipe-reorder-bar[data-ready],
@@ -40,6 +43,14 @@
   .yohu-theme-toggle__moon,
   .yohu-checkbox__box,
   .yohu-text-field__control,
+  .yohu-text-field__clear,
+  .yohu-text-field__step,
+  .yohu-select__chevron,
+  .yohu-address__field,
+  .yohu-tabs__close,
+  .yohu-tabs__new,
+  .yohu-search__clear,
+  .yohu-col-resizer::before,
   .yohu-swap[data-resizing] .yohu-swap__clip {
     transition-duration: 0.01ms !important;
   }
@@ -58,8 +69,9 @@
     animation: none !important;
   }
 
-  .yohu-button__spinner,
-  .yohu-loading__spinner,
+  /* 循环指示器改静止：旋转与弧长都停，YoSpinner 落回 35% 静态弧。 */
+  .yohu-spinner__svg,
+  .yohu-spinner__arc,
   .yohu-icon-button[data-busy] > .yohu-icon,
   .yohu-progress[data-mode="indeterminate"] .yohu-progress__bar {
     animation: none !important;

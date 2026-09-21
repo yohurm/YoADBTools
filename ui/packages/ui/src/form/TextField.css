@@ -261,6 +261,9 @@
   background: transparent;
   color: var(--yohu-fg-3);
   cursor: pointer;
+  transition:
+    color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast);
 }
 
 .yohu-text-field__clear:hover {
@@ -307,6 +310,9 @@
   background: transparent;
   color: var(--yohu-fg-3);
   cursor: pointer;
+  transition:
+    color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast);
 }
 
 .yohu-text-field__step + .yohu-text-field__step {

@@ -61,8 +61,4 @@ html[data-yohu-col-resizing] * {
   user-select: none !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .yohu-col-resizer::before {
-    transition: none;
-  }
-}
+/* reduced-motion 降级统一点名：motion/reduced.css，组件内不再写第二份。 */

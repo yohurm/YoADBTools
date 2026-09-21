@@ -12,7 +12,10 @@
   color: var(--yohu-fg-2);
   cursor: pointer;
   box-sizing: border-box;
-  transition: color var(--yohu-motion-effects-fast);
+  /* window 变体 hover 走宿主 background-color，一并过渡。 */
+  transition:
+    color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast);
 }
 
 .yohu-icon-button__chrome {
@@ -81,9 +84,4 @@
 .yohu-icon-button[data-busy] .yohu-icon {
   animation: yohu-spin var(--yohu-dur-loop) linear infinite;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .yohu-icon-button[data-busy] .yohu-icon {
-    animation: none;
-  }
-}
+/* reduced-motion 降级统一点名：motion/reduced.css，组件内不再写第二份。 */

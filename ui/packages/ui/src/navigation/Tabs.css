@@ -75,6 +75,7 @@
   background: transparent;
   cursor: pointer;
   --yohu-ripple-inset: 0;
+  transition: color var(--yohu-motion-effects-fast);
 }
 
 .yohu-tabs__close {

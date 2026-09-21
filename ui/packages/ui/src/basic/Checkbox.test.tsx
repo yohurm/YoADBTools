@@ -49,4 +49,14 @@ describe("YoCheckbox", () => {
     expect(slot?.getAttribute("data-justify")).toBe("center");
     expect(css).not.toContain(".yohu-corner__content");
   });
+
+  it("勾选符常挂：成形走 spatialTick 描边过渡，不靠挂载直切", () => {
+    render(() => <YoCheckbox label="描边" checked={false} />);
+    const host = screen.getByRole("checkbox").closest(".yohu-checkbox");
+    const check = host?.querySelector(".yohu-checkbox__check");
+    expect(check).toBeTruthy();
+    expect(check?.querySelector("polyline")?.getAttribute("pathLength")).toBe("1");
+    expect(css).toContain("stroke-dashoffset var(--yohu-motion-spatial-tick)");
+    expect(css).toContain('.yohu-checkbox[data-checked="true"]');
+  });
 });

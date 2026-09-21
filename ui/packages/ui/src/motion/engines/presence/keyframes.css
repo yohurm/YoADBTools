@@ -161,6 +161,22 @@
   }
 }
 
+/* 彗星弧长：2%→60%→2%，dash+gap 恒 100，首尾同相无缝循环（pathLength=100 归一）。 */
+@keyframes yohu-spinner-arc {
+  0% {
+    stroke-dasharray: 2 98;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 60 40;
+    stroke-dashoffset: -20;
+  }
+  100% {
+    stroke-dasharray: 2 98;
+    stroke-dashoffset: -100;
+  }
+}
+
 @keyframes yohu-progress-indeterminate {
   0% {
     transform: translateX(-100%);

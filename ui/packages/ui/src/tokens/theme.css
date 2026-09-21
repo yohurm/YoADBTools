@@ -316,6 +316,7 @@
   --yohu-motion-effects-enter: var(--yohu-dur-normal) var(--yohu-ease-decel);
   --yohu-motion-effects-exit: var(--yohu-dur-local) var(--yohu-ease-accel);
   --yohu-motion-spatial-small: var(--yohu-dur-small) var(--yohu-ease-spring);
+  --yohu-motion-spatial-tick: var(--yohu-dur-small) var(--yohu-ease-standard);
   --yohu-motion-spatial-stretch: var(--yohu-dur-local) var(--yohu-ease-spring-soft);
   --yohu-motion-spatial-grow: var(--yohu-dur-slow) var(--yohu-ease-spring-grow);
   --yohu-motion-spatial-local: var(--yohu-dur-local) var(--yohu-ease-emphasized);

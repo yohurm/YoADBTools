@@ -117,6 +117,8 @@ export const MotionSpec = {
   effectsExit: { duration: "local", easing: "accel" },
   /** 滑块位移 / 开关：150ms 弹簧 */
   spatialSmall: { duration: "small", easing: "spring" },
+  /** 控件内图标成形（勾选描边等）：150ms 标准——描边走贝塞尔，弹簧过冲会让笔画画出头 */
+  spatialTick: { duration: "small", easing: "standard" },
   /** 滑块宽高滞后：200ms 软弹簧（拉伸） */
   spatialStretch: { duration: "local", easing: "springSoft" },
   /** 内容用后高：300ms 长尾弹簧（底边钉死、顶边抬起） */

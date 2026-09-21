@@ -10,6 +10,7 @@ import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { resolveText } from "../dom/text";
+import { YoSpinner } from "../spinner/Spinner";
 import { YoSwap } from "../motion/engines/swap";
 import type { YoButtonSize, YoButtonStyle, YoButtonTone } from "./button-model";
 import { buttonHostAttrs } from "./button-policy";
@@ -52,7 +53,7 @@ export function YoButton(props: YoButtonProps): JSX.Element {
   const host = createMemo(() => buttonHostAttrs(props));
   const body = () => (
     <>
-      {props.loading ? <span class="yohu-button__spinner" aria-hidden="true" /> : null}
+      {props.loading ? <YoSpinner class="yohu-button__spinner" /> : null}
       <Show when={text() !== null} fallback={resolved()}>
         <YoSwap keys={text() as string} anchor="center">
           {text()}

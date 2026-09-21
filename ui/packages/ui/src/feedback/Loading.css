@@ -26,15 +26,9 @@
   height: 100%;
 }
 
+/* 弧走 YoSpinner；本槽只给语义色（arc=currentColor，底道在 Spinner.css）。 */
 .yohu-loading__spinner {
-  width: var(--yohu-space-3xl);
-  height: var(--yohu-space-3xl);
-  border: var(--yohu-stroke-emphasis) solid var(--yohu-border);
-  border-top-color: var(--yohu-accent);
-  border-radius: var(--yohu-radius-full);
-  box-sizing: border-box;
-  flex-shrink: 0;
-  animation: yohu-spin var(--yohu-dur-loop) linear infinite;
+  color: var(--yohu-accent);
 }
 
 .yohu-loading__title {

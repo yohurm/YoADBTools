@@ -112,6 +112,9 @@ export type { YoChipProps, YoChipTone, YoChipLeading } from "./display/Chip";
 export { YoStatusDot } from "./display/StatusDot";
 export type { YoStatusDotProps, YoStatusDotTone } from "./display/StatusDot";
 
+export { YoSpinner } from "./spinner/Spinner";
+export type { YoSpinnerProps, YoSpinnerSize } from "./spinner/Spinner";
+
 export { YoDivider } from "./blank/Divider";
 export type { YoDividerProps, YoDividerOrientation } from "./blank/Divider";
 

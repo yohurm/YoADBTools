@@ -5,6 +5,7 @@
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
+import { YoSpinner } from "../spinner/Spinner";
 import { loadingHostAttrs } from "./loading-policy";
 import "./Loading.css";
 
@@ -31,7 +32,7 @@ export function YoLoading(props: YoLoadingProps): JSX.Element {
       aria-busy={host()["aria-busy"]}
       aria-live={host()["aria-live"]}
     >
-      <span class="yohu-loading__spinner" aria-hidden="true" />
+      <YoSpinner size="lg" track class="yohu-loading__spinner" />
       <div class="yohu-loading__title">{props.title}</div>
       <Show when={props.description}>
         {(description) => <div class="yohu-loading__description">{description()}</div>}
