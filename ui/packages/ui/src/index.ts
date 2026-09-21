@@ -188,7 +188,7 @@ export { YoTree } from "./list/Tree";
 export type { YoTreeProps, TreeNode } from "./list/Tree";
 
 export { YoScroller } from "./scroll/Scroller";
-export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState } from "./scroll/Scroller";
+export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState, ScrollerExtent } from "./scroll/Scroller";
 
 export { YoVirtualList } from "./scroll/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";

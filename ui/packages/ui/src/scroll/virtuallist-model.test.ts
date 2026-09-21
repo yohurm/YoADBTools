@@ -10,6 +10,7 @@ import {
   isVirtualSelectionEmpty,
   virtualActiveKey,
   virtualContentWidth,
+  virtualFlowWindow,
   virtualInnerWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
@@ -17,7 +18,8 @@ import {
   virtualIndexOfKey,
   virtualKeyIntent,
   virtualNearestScrollTop,
-  virtualPoolIndex,
+    virtualPoolBindIndex,
+    virtualPoolIndex,
   virtualPoolOrigin,
   virtualPoolSize,
   virtualPoolSlots,
@@ -29,6 +31,7 @@ import {
   virtualRowTransform,
   virtualTotalHeight,
   virtualListLayout,
+  virtualClusterStyle,
   virtualFlowLeadHeight,
   virtualFlowTailHeight,
   virtualFlowRowStyle,
@@ -67,6 +70,19 @@ describe("virtuallist-model", () => {
     const shortSize = virtualPoolSize(100, 20, 10, 3);
     expect(virtualPoolOrigin(0, 20, 10, 3, shortSize)).toBe(0);
     expect(virtualPoolSlots(shortSize)).toEqual([0, 1, 2]);
+  });
+
+  it("环形槽位 origin 步进只换一条绑定", () => {
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(0, slot, 5, 20))).toEqual([0, 1, 2, 3, 4]);
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(1, slot, 5, 20))).toEqual([5, 1, 2, 3, 4]);
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(6, slot, 5, 20))).toEqual([10, 6, 7, 8, 9]);
+    expect(virtualPoolBindIndex(0, 0, 5, 0)).toBe(-1);
+    expect(virtualPoolBindIndex(15, 0, 5, 20)).toBe(15);
+    expect(virtualPoolBindIndex(15, 4, 5, 20)).toBe(19);
+    expect(virtualFlowWindow(0, 5, 20)).toEqual([0, 1, 2, 3, 4]);
+    expect(virtualFlowWindow(1, 5, 20)).toEqual([1, 2, 3, 4, 5]);
+    expect(virtualFlowWindow(18, 5, 20)).toEqual([18, 19]);
+    expect(virtualFlowWindow(0, 10, 3)).toEqual([0, 1, 2]);
   });
 
   it("贴底阈值", () => {
@@ -197,7 +213,7 @@ describe("virtuallist-model", () => {
     expect(virtualKeyIntent("ArrowDown", 0, 0)).toBeNull();
   });
 
-  it("document 未开 listbox / 换位才走 flow；gap 与池外行同尺", () => {
+  it("文档未开 listbox / 换位才走 flow；簇钉原点，gap 尺仍等于未挂载区", () => {
     expect(virtualListLayout({ tone: "document", selectable: false, reordering: false })).toBe("flow");
     expect(virtualListLayout({ tone: "document", selectable: true, reordering: false })).toBe("pool");
     expect(virtualListLayout({ tone: "document", selectable: false, reordering: true })).toBe("pool");
@@ -216,6 +232,19 @@ describe("virtuallist-model", () => {
       height: "0px",
       visibility: "hidden",
       overflow: "hidden",
+    });
+    expect(virtualClusterStyle(8, 20, 400)).toEqual({
+      position: "absolute",
+      top: "160px",
+      left: "0px",
+      width: "400px",
+      right: "auto",
+    });
+    expect(virtualClusterStyle(0, 22)).toEqual({
+      position: "absolute",
+      top: "0px",
+      left: "0px",
+      right: "0px",
     });
   });
 });

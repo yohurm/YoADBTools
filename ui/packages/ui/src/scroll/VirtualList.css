@@ -26,6 +26,7 @@
 .yohu-virtual-list__inner {
   position: relative;
   width: 100%;
+  transform-origin: 0 0;
 }
 
 /* 单选 fill 在 inner 用 top/left 定位；隔离叠层让 z-index:-1 滑块垫在行下。禁止 overflow。 */
@@ -33,7 +34,7 @@
   isolation: isolate;
 }
 
-/* pool：abspos 槽。flow：行在文档流，gap 撑未挂载区。行铬在 list-row。 */
+/* pool：abspos 槽。flow：簇内文档流。行铬在 list-row。 */
 .yohu-virtual-list[data-layout="pool"] .yohu-virtual-list__row {
   position: absolute;
   top: 0;
@@ -45,10 +46,10 @@
   position: relative;
 }
 
-.yohu-virtual-list__gap {
-  width: 100%;
-  pointer-events: none;
-  user-select: none;
+.yohu-virtual-list__cluster {
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 .yohu-virtual-list[data-tone="document"]:not([role="listbox"]):not([data-reordering]) .yohu-virtual-list__row {

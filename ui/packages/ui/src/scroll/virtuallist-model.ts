@@ -70,6 +70,34 @@ export function virtualPoolIndex(origin: number, slot: number): number {
   return origin + slot;
 }
 
+/**
+ * 环形槽位：origin 步进只换一条进出的行。
+ * slot 身份 0..poolSize-1 不变；窗口里 index ≡ slot (mod poolSize)。
+ */
+export function virtualPoolBindIndex(
+  origin: number,
+  slot: number,
+  poolSize: number,
+  count: number,
+): number {
+  if (poolSize <= 0 || slot < 0 || slot >= poolSize || count <= 0) return -1;
+  const cycle = Math.floor(Math.max(0, origin) / poolSize) * poolSize;
+  let index = slot + cycle;
+  if (index < origin) index += poolSize;
+  return index < count ? index : -1;
+}
+
+/** flow：可视下标按文档序。For 以数字为身份，origin 步进只卸一条、挂一条。 */
+export function virtualFlowWindow(origin: number, poolSize: number, count: number): number[] {
+  if (poolSize <= 0 || count <= 0) return [];
+  const start = Math.max(0, origin);
+  const end = Math.min(count, start + poolSize);
+  if (end <= start) return [];
+  const window = new Array<number>(end - start);
+  for (let i = start; i < end; i++) window[i - start] = i;
+  return window;
+}
+
 /** For 用的稳定槽位身份 0..n-1。n 不变则调用方应复用同一数组。 */
 export function virtualPoolSlots(size: number): number[] {
   if (size <= 0) return [];
@@ -242,6 +270,26 @@ export function virtualFlowTailHeight(
 ): number {
   const mounted = Math.max(0, origin) + Math.max(0, poolSize);
   return Math.max(0, count - mounted) * Math.max(0, itemHeight);
+}
+
+/** flow 簇钉在原点行顶。子行进文档流；禁止再用 lead/tail gap 改 spacer 触发整窗回流。 */
+export function virtualClusterStyle(
+  origin: number,
+  itemHeight: number,
+  widthPx = 0,
+): {
+  position: "absolute";
+  top: string;
+  left: "0px";
+  right?: "0px" | "auto";
+  width?: string;
+} {
+  return {
+    position: "absolute",
+    top: `${virtualRowTop(origin, itemHeight)}px`,
+    left: "0px",
+    ...(widthPx > 0 ? { width: `${widthPx}px`, right: "auto" as const } : { right: "0px" as const }),
+  };
 }
 
 /** 流式行盒。禁止 abspos / translate3d，否则 Range 碎成多段。未绑定槽高度为 0。 */

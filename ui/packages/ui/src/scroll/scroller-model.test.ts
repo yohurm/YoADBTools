@@ -32,6 +32,10 @@ import {
   resolveScrollerWheelDelta,
   resolveScrollerAxis,
   resolveScrollerViewSize,
+  resolveScrollerViewFromGutter,
+  resolveScrollerContentBox,
+  resolveScrollerDrive,
+  scrollerPlaneTransform,
   resolveScrollerClampedTop,
   resolveScrollerPageTop,
   resolveScrollerPageTowardPointer,
@@ -45,6 +49,18 @@ describe("scroller-model", () => {
     expect(resolveScrollerViewSize(200, 0, 16)).toBe(184);
     expect(resolveScrollerViewSize(200, 8, 8)).toBe(184);
     expect(resolveScrollerViewSize(10, 8, 8)).toBe(0);
+    expect(resolveScrollerViewFromGutter(200, false)).toBe(200);
+    expect(resolveScrollerViewFromGutter(200, true)).toBe(200 - SCROLLER_LANE);
+    expect(resolveScrollerContentBox(undefined, 400, 300, 200)).toEqual({ block: 400, inline: 300 });
+    expect(resolveScrollerContentBox({ block: 2200 }, 0, 0, 800)).toEqual({ block: 2200, inline: 800 });
+    expect(resolveScrollerContentBox({ block: 2200, inline: 1400 }, 0, 0, 800)).toEqual({
+      block: 2200,
+      inline: 1400,
+    });
+    expect(resolveScrollerDrive(undefined)).toBe("flow");
+    expect(resolveScrollerDrive({ block: 2200 })).toBe("offset");
+    expect(scrollerPlaneTransform(80)).toBe("translate3d(0px, -80px, 0)");
+    expect(scrollerPlaneTransform(80, 12)).toBe("translate3d(-12px, -80px, 0)");
   });
 
   it("无法滚动则不溢出，滑块为空", () => {

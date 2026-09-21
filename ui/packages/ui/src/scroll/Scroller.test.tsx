@@ -62,7 +62,9 @@ describe("YoScroller", () => {
     expect(css).not.toContain("yohu-dialog");
     const src = load("src/scroll/Scroller.tsx");
     const binder = load("src/scroll/scroller-binder.ts");
-    expect(src).toContain("createScrollerBinder");
+    expect(src).toContain("extent");
+    expect(src).toContain("extent()?.block");
+    expect(binder).toContain("createScrollerBinder");
     expect(src).toContain("useTravel");
     expect(src).toContain("useCollapseTravel");
     expect(src).toContain("useGrow");
@@ -101,6 +103,14 @@ describe("YoScroller", () => {
     expect(binder).toContain("ResizeObserver");
     expect(binder).toContain("applyScrollTop");
     expect(binder).toContain("applyScrollLeft");
+    expect(binder).toContain("createScrollerSession");
+    expect(binder).toContain("writeFlowDom");
+    expect(binder).toContain("resolveScrollerDrive");
+    expect(binder).toContain("host.onOffset");
+    expect(binder).toContain("el.scrollTop = off.block");
+    expect(binder).toContain("resolveScrollerContentBox");
+    expect(binder).toContain("schedulePaint");
+    expect(binder).toContain("host.extent");
     expect(binder).toContain("scrollLeft = 0");
     expect(binder).toContain('host.axis() === "block"');
     expect(binder).not.toContain("scrollHeight");
@@ -133,5 +143,25 @@ describe("YoScroller", () => {
     expect(port?.clientHeight()).toBe(view.clientHeight);
     expect(handle?.scrollTo).toBeTypeOf("function");
     expect(port).not.toHaveProperty("scrollTo");
+  });
+
+  it("声明尺：会话偏移不写视口 scrollTop", () => {
+    let handle: YoScrollerHandle | undefined;
+    const { container } = render(() => (
+      <YoScroller
+        extent={() => ({ block: 400 })}
+        handle={(api) => {
+          handle = api;
+        }}
+      >
+        <p>名单</p>
+      </YoScroller>
+    ));
+    const view = container.querySelector(".yohu-scroller__view") as HTMLDivElement;
+    Object.defineProperty(view, "clientHeight", { value: 100, configurable: true });
+    handle?.sync();
+    handle?.scrollTo(80);
+    expect(handle?.offset()).toBe(80);
+    expect(view.scrollTop).toBe(0);
   });
 });
