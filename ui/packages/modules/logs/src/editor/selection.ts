@@ -1,6 +1,6 @@
 /**
- * 清单选区模型。手势仍是原生 Selection；绘制与复制都切 Document 偏移。
- * 对照 Editor SelectionModel：{seq, off} 闭开区间，可视行再投影成 ch 带。
+ * 清单选区模型。对照 Editor SelectionModel：caret 两点 → {seq, off} 闭开区间。
+ * 手势是原生 Selection 的 anchor/focus。复制切 Document 偏移；中间未挂载行由 docSelCopyText 补齐。
  */
 
 export type DocPoint = { seq: number; off: number };
@@ -118,14 +118,12 @@ export function logSelectionInList(listRoot: ParentNode | null, selection: Selec
   if (!listRoot || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
     return false;
   }
-  const node = selection.anchorNode;
-  return Boolean(node && listRoot instanceof Node && listRoot.contains(node));
-}
-
-function rangeHitsNode(range: Range, node: Node): boolean {
-  const probe = document.createRange();
-  probe.selectNodeContents(node);
-  return range.compareBoundaryPoints(Range.END_TO_START, probe) < 0 && range.compareBoundaryPoints(Range.START_TO_END, probe) > 0;
+  if (!(listRoot instanceof Node)) {
+    return false;
+  }
+  const anchor = selection.anchorNode;
+  const focus = selection.focusNode;
+  return Boolean((anchor && listRoot.contains(anchor)) || (focus && listRoot.contains(focus)));
 }
 
 function rowOf(node: Node): HTMLElement | null {
@@ -135,70 +133,40 @@ function rowOf(node: Node): HTMLElement | null {
   return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>("[data-seq]") ?? null;
 }
 
-type VisualHit = { seq: number; wrap: number; el: HTMLElement; docFrom: number };
+function rowDocFrom(row: HTMLElement): number {
+  const from = Number(row.dataset.docFrom ?? 0);
+  return Number.isFinite(from) ? from : 0;
+}
 
-function lineHits(listRoot: ParentNode, selection: Selection): VisualHit[] {
-  const range = selection.getRangeAt(0);
-  const hits: VisualHit[] = [];
-  for (const node of listRoot.querySelectorAll<HTMLElement>("[data-seq]")) {
-    if (!rangeHitsNode(range, node)) {
-      continue;
-    }
-    const seq = Number(node.dataset.seq);
-    if (!Number.isFinite(seq)) {
-      continue;
-    }
-    hits.push({
-      seq,
-      wrap: Number(node.dataset.wrap ?? 0),
-      el: node,
-      docFrom: Number(node.dataset.docFrom ?? 0),
-    });
+/** caret 落在某可视行上时映回 Document {seq, off}。铬带不计长。 */
+export function docPointFromCaret(listRoot: ParentNode, node: Node | null, offset: number): DocPoint | null {
+  if (!node || !(listRoot instanceof Node) || !listRoot.contains(node)) {
+    return null;
   }
-  hits.sort((a, b) => a.seq - b.seq || a.wrap - b.wrap);
-  return hits;
+  const row = rowOf(node);
+  if (!row || !listRoot.contains(row)) {
+    return null;
+  }
+  const seq = Number(row.dataset.seq);
+  if (!Number.isFinite(seq)) {
+    return null;
+  }
+  return { seq, off: rowDocFrom(row) + textOffsetInDoc(row, node, offset) };
 }
 
-function logicalOffset(hit: VisualHit, node: Node, offset: number): number {
-  const from = Number.isFinite(hit.docFrom) ? hit.docFrom : 0;
-  return from + textOffsetInDoc(hit.el, node, offset);
-}
-
-function visualEnd(hit: VisualHit): number {
-  return (Number.isFinite(hit.docFrom) ? hit.docFrom : 0) + textLengthOf(hit.el);
-}
-
-export function readDocSel(
-  listRoot: ParentNode | null,
-  selection: Selection | null,
-  docLen?: (seq: number) => number | undefined,
-): DocSel | null {
+export function readDocSel(listRoot: ParentNode | null, selection: Selection | null): DocSel | null {
   if (!listRoot || !selection || !logSelectionInList(listRoot, selection)) {
     return null;
   }
-  const hits = lineHits(listRoot, selection);
-  if (hits.length === 0) {
+  const start = docPointFromCaret(listRoot, selection.anchorNode, selection.anchorOffset);
+  const end = docPointFromCaret(listRoot, selection.focusNode, selection.focusOffset);
+  if (!start || !end) {
     return null;
   }
-  const range = selection.getRangeAt(0);
-  const first = hits[0]!;
-  const last = hits[hits.length - 1]!;
-  const startRow = rowOf(range.startContainer);
-  const endRow = rowOf(range.endContainer);
-  const startHit = hits.find((hit) => hit.el === startRow) ?? first;
-  const endHit = hits.find((hit) => hit.el === endRow) ?? last;
-  const startOff =
-    startRow && Number(startRow.dataset.seq) === first.seq
-      ? logicalOffset(startHit, range.startContainer, range.startOffset)
-      : 0;
-  const endOff =
-    endRow && Number(endRow.dataset.seq) === last.seq
-      ? logicalOffset(endHit, range.endContainer, range.endOffset)
-      : (docLen?.(last.seq) ?? visualEnd(last));
-  return orderDocSel({
-    start: { seq: first.seq, off: startOff },
-    end: { seq: last.seq, off: endOff },
-  });
+  if (start.seq === end.seq && start.off === end.off) {
+    return null;
+  }
+  return orderDocSel({ start, end });
 }
 
 export function docSelCopyText(sel: DocSel, messages: readonly { seq: number; text: string }[]): string {

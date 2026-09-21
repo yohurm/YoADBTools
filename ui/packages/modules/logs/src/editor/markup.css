@@ -1,0 +1,195 @@
+/* Markup 字色：只给 ::highlight 上 ink / 字母色。BACKGROUND 几何在文本节点 1ch 格。选区不在本文件。 */
+
+::highlight(yohu-ink-fg) {
+  color: var(--yohu-fg);
+}
+
+::highlight(yohu-ink-fg-2) {
+  color: var(--yohu-fg-2);
+}
+
+::highlight(yohu-ink-fg-3) {
+  color: var(--yohu-fg-3);
+}
+
+::highlight(yohu-ink-level-v) {
+  color: var(--yohu-level-v);
+}
+
+::highlight(yohu-ink-level-d) {
+  color: var(--yohu-level-d);
+}
+
+::highlight(yohu-ink-level-i) {
+  color: var(--yohu-level-i);
+}
+
+::highlight(yohu-ink-level-w) {
+  color: var(--yohu-level-w);
+}
+
+::highlight(yohu-ink-level-e) {
+  color: var(--yohu-level-e);
+}
+
+::highlight(yohu-ink-level-f) {
+  color: var(--yohu-level-f);
+}
+
+::highlight(yohu-wash-level-v) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-wash-level-d) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-wash-level-i) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-wash-level-w) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-wash-level-e) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-wash-level-f) {
+  color: var(--yohu-fg-on);
+}
+
+::highlight(yohu-ink-logcat-msg-v) {
+  color: var(--yohu-logcat-msg-v);
+}
+
+::highlight(yohu-ink-logcat-msg-d) {
+  color: var(--yohu-logcat-msg-d);
+}
+
+::highlight(yohu-ink-logcat-msg-i) {
+  color: var(--yohu-logcat-msg-i);
+}
+
+::highlight(yohu-ink-logcat-msg-w) {
+  color: var(--yohu-logcat-msg-w);
+}
+
+::highlight(yohu-ink-logcat-msg-e) {
+  color: var(--yohu-logcat-msg-e);
+}
+
+::highlight(yohu-ink-logcat-msg-f) {
+  color: var(--yohu-logcat-msg-f);
+}
+
+::highlight(yohu-wash-logcat-level-v-bg) {
+  color: var(--yohu-logcat-level-v);
+}
+
+::highlight(yohu-wash-logcat-level-d-bg) {
+  color: var(--yohu-logcat-level-d);
+}
+
+::highlight(yohu-wash-logcat-level-i-bg) {
+  color: var(--yohu-logcat-level-i);
+}
+
+::highlight(yohu-wash-logcat-level-w-bg) {
+  color: var(--yohu-logcat-level-w);
+}
+
+::highlight(yohu-wash-logcat-level-e-bg) {
+  color: var(--yohu-logcat-level-e);
+}
+
+::highlight(yohu-wash-logcat-level-f-bg) {
+  color: var(--yohu-logcat-level-f);
+}
+
+::highlight(yohu-ink-logcat-tag-0) { color: var(--yohu-logcat-tag-0); }
+::highlight(yohu-ink-logcat-tag-1) { color: var(--yohu-logcat-tag-1); }
+::highlight(yohu-ink-logcat-tag-2) { color: var(--yohu-logcat-tag-2); }
+::highlight(yohu-ink-logcat-tag-3) { color: var(--yohu-logcat-tag-3); }
+::highlight(yohu-ink-logcat-tag-4) { color: var(--yohu-logcat-tag-4); }
+::highlight(yohu-ink-logcat-tag-5) { color: var(--yohu-logcat-tag-5); }
+::highlight(yohu-ink-logcat-tag-6) { color: var(--yohu-logcat-tag-6); }
+::highlight(yohu-ink-logcat-tag-7) { color: var(--yohu-logcat-tag-7); }
+::highlight(yohu-ink-logcat-tag-8) { color: var(--yohu-logcat-tag-8); }
+::highlight(yohu-ink-logcat-tag-9) { color: var(--yohu-logcat-tag-9); }
+::highlight(yohu-ink-logcat-tag-10) { color: var(--yohu-logcat-tag-10); }
+::highlight(yohu-ink-logcat-tag-11) { color: var(--yohu-logcat-tag-11); }
+::highlight(yohu-ink-logcat-tag-12) { color: var(--yohu-logcat-tag-12); }
+::highlight(yohu-ink-logcat-tag-13) { color: var(--yohu-logcat-tag-13); }
+::highlight(yohu-ink-logcat-tag-14) { color: var(--yohu-logcat-tag-14); }
+::highlight(yohu-ink-logcat-tag-15) { color: var(--yohu-logcat-tag-15); }
+::highlight(yohu-ink-logcat-tag-16) { color: var(--yohu-logcat-tag-16); }
+::highlight(yohu-ink-logcat-tag-17) { color: var(--yohu-logcat-tag-17); }
+::highlight(yohu-ink-logcat-tag-18) { color: var(--yohu-logcat-tag-18); }
+::highlight(yohu-ink-logcat-tag-19) { color: var(--yohu-logcat-tag-19); }
+::highlight(yohu-ink-logcat-tag-20) { color: var(--yohu-logcat-tag-20); }
+::highlight(yohu-ink-logcat-tag-21) { color: var(--yohu-logcat-tag-21); }
+::highlight(yohu-ink-logcat-tag-22) { color: var(--yohu-logcat-tag-22); }
+::highlight(yohu-ink-logcat-tag-23) { color: var(--yohu-logcat-tag-23); }
+::highlight(yohu-ink-logcat-tag-24) { color: var(--yohu-logcat-tag-24); }
+::highlight(yohu-ink-logcat-tag-25) { color: var(--yohu-logcat-tag-25); }
+::highlight(yohu-ink-logcat-tag-26) { color: var(--yohu-logcat-tag-26); }
+::highlight(yohu-ink-logcat-tag-27) { color: var(--yohu-logcat-tag-27); }
+::highlight(yohu-ink-logcat-tag-28) { color: var(--yohu-logcat-tag-28); }
+::highlight(yohu-ink-logcat-tag-29) { color: var(--yohu-logcat-tag-29); }
+::highlight(yohu-ink-logcat-tag-30) { color: var(--yohu-logcat-tag-30); }
+::highlight(yohu-ink-logcat-tag-31) { color: var(--yohu-logcat-tag-31); }
+::highlight(yohu-ink-logcat-tag-32) { color: var(--yohu-logcat-tag-32); }
+::highlight(yohu-ink-logcat-tag-33) { color: var(--yohu-logcat-tag-33); }
+::highlight(yohu-ink-logcat-tag-34) { color: var(--yohu-logcat-tag-34); }
+::highlight(yohu-ink-logcat-tag-35) { color: var(--yohu-logcat-tag-35); }
+::highlight(yohu-ink-logcat-tag-36) { color: var(--yohu-logcat-tag-36); }
+::highlight(yohu-ink-logcat-tag-37) { color: var(--yohu-logcat-tag-37); }
+::highlight(yohu-ink-logcat-tag-38) { color: var(--yohu-logcat-tag-38); }
+::highlight(yohu-ink-logcat-tag-39) { color: var(--yohu-logcat-tag-39); }
+::highlight(yohu-ink-logcat-tag-40) { color: var(--yohu-logcat-tag-40); }
+::highlight(yohu-ink-logcat-tag-41) { color: var(--yohu-logcat-tag-41); }
+::highlight(yohu-ink-logcat-tag-42) { color: var(--yohu-logcat-tag-42); }
+::highlight(yohu-ink-logcat-tag-43) { color: var(--yohu-logcat-tag-43); }
+::highlight(yohu-ink-logcat-tag-44) { color: var(--yohu-logcat-tag-44); }
+::highlight(yohu-ink-logcat-tag-45) { color: var(--yohu-logcat-tag-45); }
+::highlight(yohu-ink-logcat-tag-46) { color: var(--yohu-logcat-tag-46); }
+::highlight(yohu-ink-logcat-tag-47) { color: var(--yohu-logcat-tag-47); }
+::highlight(yohu-ink-logcat-tag-48) { color: var(--yohu-logcat-tag-48); }
+::highlight(yohu-ink-logcat-tag-49) { color: var(--yohu-logcat-tag-49); }
+::highlight(yohu-ink-logcat-tag-50) { color: var(--yohu-logcat-tag-50); }
+::highlight(yohu-ink-logcat-tag-51) { color: var(--yohu-logcat-tag-51); }
+::highlight(yohu-ink-logcat-tag-52) { color: var(--yohu-logcat-tag-52); }
+::highlight(yohu-ink-logcat-tag-53) { color: var(--yohu-logcat-tag-53); }
+::highlight(yohu-ink-logcat-tag-54) { color: var(--yohu-logcat-tag-54); }
+::highlight(yohu-ink-logcat-tag-55) { color: var(--yohu-logcat-tag-55); }
+::highlight(yohu-ink-logcat-tag-56) { color: var(--yohu-logcat-tag-56); }
+::highlight(yohu-ink-logcat-tag-57) { color: var(--yohu-logcat-tag-57); }
+::highlight(yohu-ink-logcat-tag-58) { color: var(--yohu-logcat-tag-58); }
+::highlight(yohu-ink-logcat-tag-59) { color: var(--yohu-logcat-tag-59); }
+::highlight(yohu-ink-logcat-tag-60) { color: var(--yohu-logcat-tag-60); }
+::highlight(yohu-ink-logcat-tag-61) { color: var(--yohu-logcat-tag-61); }
+::highlight(yohu-ink-logcat-tag-62) { color: var(--yohu-logcat-tag-62); }
+::highlight(yohu-ink-logcat-tag-63) { color: var(--yohu-logcat-tag-63); }
+::highlight(yohu-ink-logcat-tag-64) { color: var(--yohu-logcat-tag-64); }
+::highlight(yohu-ink-logcat-tag-65) { color: var(--yohu-logcat-tag-65); }
+::highlight(yohu-ink-logcat-tag-66) { color: var(--yohu-logcat-tag-66); }
+::highlight(yohu-ink-logcat-tag-67) { color: var(--yohu-logcat-tag-67); }
+::highlight(yohu-ink-logcat-tag-68) { color: var(--yohu-logcat-tag-68); }
+::highlight(yohu-ink-logcat-tag-69) { color: var(--yohu-logcat-tag-69); }
+::highlight(yohu-ink-logcat-tag-70) { color: var(--yohu-logcat-tag-70); }
+::highlight(yohu-ink-logcat-tag-71) { color: var(--yohu-logcat-tag-71); }
+::highlight(yohu-ink-logcat-tag-72) { color: var(--yohu-logcat-tag-72); }
+::highlight(yohu-ink-logcat-tag-73) { color: var(--yohu-logcat-tag-73); }
+::highlight(yohu-ink-logcat-tag-74) { color: var(--yohu-logcat-tag-74); }
+::highlight(yohu-ink-logcat-tag-75) { color: var(--yohu-logcat-tag-75); }
+::highlight(yohu-ink-logcat-tag-76) { color: var(--yohu-logcat-tag-76); }
+::highlight(yohu-ink-logcat-tag-77) { color: var(--yohu-logcat-tag-77); }
+::highlight(yohu-ink-logcat-tag-78) { color: var(--yohu-logcat-tag-78); }
+::highlight(yohu-ink-logcat-tag-79) { color: var(--yohu-logcat-tag-79); }
+
+::highlight(yohu-log-mark) {
+  background-color: var(--yohu-warn-bg);
+  color: var(--yohu-fg);
+}

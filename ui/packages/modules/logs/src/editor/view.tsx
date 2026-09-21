@@ -1,11 +1,11 @@
 /**
  * EditorView：1 可视行 = 1 条文档行（只认硬 \\n）。
- * 本文件只绘制 + Host；投影在 LineBoard。
- * 禁止视口预切进文档、禁止 CSS hang、禁止回调 Formatter。
+ * 本文件只 Host + 组合：Document 文本、Markup 着色、关键字偏移、原生选区。
+ * 禁止视口预切进文档、禁止 CSS hang、禁止回调 Formatter、禁止按 range 拆 span 盒。
+ * BACKGROUND 几何在 markup-wash（文本节点 1ch 格），本文件只组合。
  */
 
 import {
-  For,
   Show,
   createContext,
   createEffect,
@@ -19,66 +19,59 @@ import {
 } from "solid-js";
 
 import type { LogLine, LogLineLayout } from "@yohu/api";
-import { docSelBandStyle, YoVirtualList } from "@yohu/ui";
+import { YoVirtualList } from "@yohu/ui";
 
-import { highlightMessage } from "../highlight";
+import { keywordRangesInWindows } from "../highlight";
 import { documentMaxChars, LineBoard, visualRowKey, type VisualLine } from "./board";
-import {
-  EMPTY_MESSAGES,
-  LogDocument,
-  type DocRow,
-  type FormatOptions,
-  type FormatRange,
-  type LogFieldKind,
-} from "./document";
-import { readDocSel, selSlice, type DocSel } from "./selection";
-
-function tokenClass(kind: LogFieldKind): string {
-  return `yohu-logs__row-${kind}`;
-}
-
-function FieldSpan(props: { range: FormatRange; text: string; keyword: string }) {
-  const painted = (): boolean => props.range.tone === "ink" || props.range.tone === "wash";
-  return (
-    <span
-      class={tokenClass(props.range.kind)}
-      classList={{ "yohu-tone": painted() }}
-      data-tone={painted() ? props.range.tone : undefined}
-      data-box={props.range.box === "line" ? "line" : undefined}
-      style={props.range.style as JSX.CSSProperties | undefined}
-    >
-      <Show when={props.range.kind === "msg" && props.keyword} keyed fallback={props.text}>
-        {(keyword) => (
-          <For each={highlightMessage(props.text, keyword)}>
-            {(chunk) =>
-              typeof chunk === "string" ? chunk : <mark class="yohu-logs__mark yohu-tone">{chunk.mark}</mark>
-            }
-          </For>
-        )}
-      </Show>
-    </span>
-  );
-}
+import { EMPTY_MESSAGES, LogDocument, type DocRow, type FormatOptions } from "./document";
+import "./markup.css";
+import { markupRunsFromRanges } from "./markup-model";
+import { MARKUP_MARK_NAME, nameMarkupRuns } from "./markup-policy";
+import { bindMarkupRuns } from "./markup-registry";
+import { bindWashPaint } from "./markup-wash";
 
 const ViewBind = createContext<{
   keyword: Accessor<string>;
-  docSel: Accessor<DocSel | "all" | null>;
 }>();
 
 function VisualRow(props: { item: VisualLine; index: number }) {
   const bind = useContext(ViewBind)!;
   const item = (): VisualLine => props.item;
-  const paint = createMemo(() => {
-    const sel = bind.docSel();
-    if (!sel) {
-      return { fromCh: 0, chars: 0 };
+  let textEl: HTMLSpanElement | undefined;
+  createEffect(() => {
+    const line = item();
+    const keyword = bind.keyword();
+    const el = textEl;
+    if (!el) {
+      return;
     }
-    return (
-      selSlice({ seq: item().seq, docFrom: item().docFrom, text: item().text }, sel) ?? {
-        fromCh: 0,
-        chars: 0,
-      }
+    if (el.childNodes.length !== 1 || el.firstChild?.nodeType !== Node.TEXT_NODE) {
+      el.textContent = line.text;
+    } else if ((el.firstChild as Text).data !== line.text) {
+      (el.firstChild as Text).data = line.text;
+    }
+    const node = el.firstChild;
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+      return;
+    }
+    const markup = markupRunsFromRanges(line.ranges);
+    const runs = [
+      ...nameMarkupRuns(markup),
+      ...keywordRangesInWindows(line.text, line.ranges, keyword).map((hit) => ({
+        from: hit.from,
+        to: hit.to,
+        name: MARKUP_MARK_NAME,
+      })),
+    ];
+    const wash = markup.flatMap((run) =>
+      run.paint.kind === "wash" ? [{ from: run.from, to: run.to, fill: run.paint.background }] : [],
     );
+    const stopInk = bindMarkupRuns(node as Text, runs);
+    const stopWash = bindWashPaint(el, wash);
+    onCleanup(() => {
+      stopInk();
+      stopWash();
+    });
   });
   return (
     <div
@@ -94,16 +87,7 @@ function VisualRow(props: { item: VisualLine; index: number }) {
         "yohu-logs__row--signal": item().signal !== undefined,
       }}
     >
-      <span
-        class="yohu-doc-sel"
-        data-log-chrome
-        style={docSelBandStyle(paint().fromCh, paint().chars) as JSX.CSSProperties}
-      />
-      <For each={item().ranges}>
-        {(range) => (
-          <FieldSpan range={range} text={item().text.slice(range.start, range.end)} keyword={bind.keyword()} />
-        )}
-      </For>
+      <span class="yohu-logs__text" ref={(el) => { textEl = el; }} />
       <Show when={item().collapsedAfter}>
         <span class="yohu-logs__row-fold" data-log-chrome>
           …{item().collapsedAfter} 帧折叠
@@ -122,7 +106,6 @@ export function EditorView(props: {
   itemHeight: number;
   onInlineScroll?: (left: number) => void;
   keyword: Accessor<string>;
-  pickAll: Accessor<boolean>;
   following: Accessor<boolean>;
   paused: Accessor<boolean>;
   onAtBottomChange: (atBottom: boolean) => void;
@@ -132,28 +115,11 @@ export function EditorView(props: {
   const logDoc = new LogDocument();
   const board = new LineBoard();
   const [rev, setRev] = createSignal(0);
-  const [docSel, setDocSel] = createSignal<DocSel | "all" | null>(null);
-  let host: HTMLDivElement | undefined;
-  const syncSel = (): void => {
-    if (props.pickAll()) {
-      setDocSel("all");
-      return;
-    }
-    const lenOf = (seq: number) => logDoc.messages.find((item) => item.seq === seq)?.text.length;
-    setDocSel(readDocSel(host ?? null, typeof window === "undefined" ? null : window.getSelection(), lenOf));
-  };
   onMount(() => {
     props.documentRef?.(logDoc);
-    document.addEventListener("selectionchange", syncSel);
-    syncSel();
   });
   onCleanup(() => {
-    document.removeEventListener("selectionchange", syncSel);
     logDoc.clear();
-  });
-  createEffect(() => {
-    props.pickAll();
-    syncSel();
   });
 
   createEffect(() => {
@@ -186,16 +152,9 @@ export function EditorView(props: {
 
   return (
     <ViewBind.Provider
-      value={{
-        keyword: props.keyword,
-        docSel,
-      }}
+      value={{ keyword: props.keyword }}
     >
-      <div
-        class="yohu-logs__view"
-        data-layout={props.layout()}
-        ref={(el) => { host = el; }}
-      >
+      <div class="yohu-logs__view" data-layout={props.layout()}>
         <YoVirtualList<VisualLine>
           items={items}
           itemHeight={props.itemHeight}
@@ -212,6 +171,7 @@ export function EditorView(props: {
           }}
           onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}
           renderRow={VisualRow}
+          state="on"
         />
       </div>
     </ViewBind.Provider>

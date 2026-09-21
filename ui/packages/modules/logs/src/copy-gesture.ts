@@ -1,5 +1,6 @@
 /**
- * 清单复制手势：Ctrl+C / 原生 copy、清整表铺底、选区变化。
+ * 清单复制手势：Ctrl+C / 原生 copy、指针开始新划选时清 ALL、选区变化。
+ * Ctrl+A 的 selectAllChildren 触发的 selectionchange 必须保住 ALL。
  * 冻结只认 YoVirtualList onAtBottomChange，这里不旁路 detachFollow。
  */
 
@@ -36,6 +37,7 @@ export function attachLogCopyGestures(opts: {
     if (opts.pick().kind !== "none") opts.setPick(LOG_COPY_NONE);
   };
   const onSelectionChange = (): void => {
+    if (opts.pick().kind === "all") return;
     if (logSelectionInList(opts.listRoot(), window.getSelection())) {
       opts.setPick(LOG_COPY_NONE);
     }

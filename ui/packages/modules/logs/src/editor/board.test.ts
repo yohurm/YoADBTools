@@ -116,6 +116,15 @@ describe("LineBoard", () => {
     expect(first).toHaveLength(2);
     expect(first[1]?.text.trimStart()).toBe("two");
   });
+
+  it("wash 行盒写在 range.box=line 上，不是第二层 ch 带", () => {
+    const message = formatted({ level: "F", msg: "fatal" });
+    const visuals = clipMessage(message);
+    const boxes = visuals[0]!.ranges.filter((range) => range.box === "line");
+    expect(boxes.length).toBeGreaterThan(0);
+    expect(boxes.every((range) => range.end > range.start)).toBe(true);
+    expect(boxes[0]!.end).toBeLessThanOrEqual(visuals[0]!.text.length);
+  });
 });
 
 describe("Board 不回调 Formatter", () => {

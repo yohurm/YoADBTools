@@ -314,7 +314,9 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
     if (action === "select-all") {
       setPick(LOG_COPY_ALL);
-      window.getSelection()?.removeAllRanges();
+      const root = listEl();
+      const host = root?.querySelector(".yohu-virtual-list__inner") ?? root;
+      if (host) window.getSelection()?.selectAllChildren(host);
       return;
     }
     if (action === "copy") return copySelected();
@@ -544,7 +546,6 @@ export function LogAnalyzerView(props: DeviceSession) {
                     keyword={() =>
                       logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""
                     }
-                    pickAll={() => pick().kind === "all"}
                     following={() =>
                       Boolean(logStore.state.sessions.find((item) => item.id === session.id)?.following)
                     }
@@ -659,7 +660,7 @@ export function LogAnalyzerView(props: DeviceSession) {
           </>
         }
       >
-        <YoScroller>
+        <YoScroller state="on">
           <YoTextField block label="会话标题" value={renameText()} onInput={setRenameText} />
         </YoScroller>
       </YoDialog>

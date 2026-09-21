@@ -136,7 +136,6 @@
   --yohu-log-ink: var(--yohu-fg-3);
   color: var(--yohu-fg);
   position: relative;
-  isolation: isolate;
   display: block;
   height: 100%;
   overflow: hidden;
@@ -157,51 +156,37 @@
   border-left-color: var(--yohu-log-ink);
 }
 
-/* 原生 ::selection 只当手势。色由 .yohu-doc-sel / --yohu-doc-sel 带画，避免 WebView2 只在行尾画出一条并洗白 ink。 */
+/* 原生 ::selection 只铺选区底。字色由 Markup 层上色，禁止 span 拆盒。 */
 .yohu-logs__view ::selection,
 .yohu-logs__view *::selection {
-  background-color: transparent;
-  color: inherit;
+  background-color: var(--yohu-doc-sel);
 }
 
-/* 左条 ink 由 Document barInk 写入 --yohu-log-ink。 */
+/* 左条 ink 由 Document barInk 写入 --yohu-log-ink。着色不在本文件。 */
 
-/* 信号行（崩溃/ANR）：信号底色 + Error 左条。选区带叠在行底上，左条保留。 */
+/* 信号行（崩溃/ANR）：信号底色 + Error 左条。选区叠在行底上，左条保留。 */
 .yohu-logs__row--signal {
   background-color: var(--yohu-signal-bg);
   border-left-color: var(--yohu-error);
 }
 
-.yohu-logs__row-level {
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
-.yohu-logs__row-msg {
-  min-width: 0;
-}
-
-.yohu-logs__row [data-tone="ink"] {
-  color: var(--yohu-log-ink);
-}
-
-/* 行盒：对照编辑器 TextAttributes.BACKGROUND，邻行相贴。禁止圆角 / padding。 */
-.yohu-logs__row [data-box="line"] {
+/* BACKGROUND：本行文本节点的 1ch 格（EXACT_RANGE）。不建第二棵 DOM。 */
+.yohu-logs__text {
+  position: relative;
+  z-index: 0;
   display: inline-block;
-  height: 100%;
   vertical-align: top;
-  line-height: var(--yohu-row-height);
   box-sizing: border-box;
-}
-
-.yohu-logs__row [data-tone="wash"] {
-  color: var(--yohu-log-level-fg);
-  background-color: var(--yohu-log-level-bg);
-}
-
-.yohu-logs__mark {
-  background: var(--yohu-warn-bg);
-  color: var(--yohu-fg);
-  border-radius: var(--yohu-radius-2xs);
+  height: 100%;
+  white-space: inherit;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-variant-numeric: normal;
+  font-feature-settings: "kern" 0, "liga" 0, "calt" 0;
+  background-image: var(--yohu-wash-image, none);
+  background-repeat: no-repeat;
+  background-size: var(--yohu-wash-size, auto);
+  background-position: var(--yohu-wash-position, 0 0);
 }
 
 .yohu-logs__row-fold {

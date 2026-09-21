@@ -43,8 +43,7 @@ export function documentCopyText(
   selection: Selection | null,
   messages: readonly CopyMessage[],
 ): string {
-  const lenOf = (seq: number) => messages.find((item) => item.seq === seq)?.text.length;
-  const sel = readDocSel(listRoot, selection, lenOf);
+  const sel = readDocSel(listRoot, selection);
   if (!sel) {
     return "";
   }
