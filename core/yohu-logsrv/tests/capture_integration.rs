@@ -133,7 +133,7 @@ async fn capture_streams_parses_and_batches() {
     assert_eq!(lines[1].level, 'W');
     assert_eq!(lines[2].pid, 9999);
 
-    // 流自然结束 → 环形缓冲保留全部记录
+    // 流自然结束后工人会重启：环保留、槽位仍 Live
     let kept = replay_lines(&service, "R58M1234A");
     assert_eq!(kept.len(), 3);
     assert_eq!(service.status("R58M1234A").last_seq, 2);
@@ -274,23 +274,42 @@ async fn start_during_stop_waits_then_opens_new_generation() {
 }
 
 #[tokio::test]
-async fn start_after_follow_ends_opens_new_stream() {
-    let (service, _rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
-    service.start("R58M1234A", false).await.expect("首次开始");
+async fn follow_exit_keeps_slot_live_and_start_adopts() {
+    let (service, mut rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
+    let first = service.start("R58M1234A", false).await.expect("首次开始");
     wait_ring_lines(&service, "R58M1234A", 3).await;
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
-    while service.is_capturing("R58M1234A") && tokio::time::Instant::now() < deadline {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    tokio::time::sleep(Duration::from_millis(400)).await;
     assert!(
-        !service.is_capturing("R58M1234A"),
-        "流自然结束后槽位必须释放"
+        service.is_capturing("R58M1234A"),
+        "跟流工人退出不得释放槽位"
     );
-    service
+    assert_eq!(
+        replay_lines(&service, "R58M1234A").len(),
+        3,
+        "同世代重启不得把 dump 再写入环"
+    );
+
+    let mut saw_stopped = false;
+    while let Ok(event) = rx.try_recv() {
+        if matches!(
+            event,
+            AppEvent::CaptureState {
+                generation,
+                state: yohu_protocol::CaptureState::Stopped,
+                ..
+            } if generation == first.generation
+        ) {
+            saw_stopped = true;
+        }
+    }
+    assert!(!saw_stopped, "同世代不得因跟流退出发 Stopped");
+
+    let second = service
         .start("R58M1234A", false)
         .await
-        .expect("流结束后应能再次开始");
-    assert!(service.is_capturing("R58M1234A"));
+        .expect("工人退出后 start 应 adopt");
+    assert!(second.adopted);
+    assert_eq!(second.generation, first.generation);
     service.stop("R58M1234A").await;
 }
 

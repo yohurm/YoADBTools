@@ -16,6 +16,13 @@ struct State {
     capacity: usize,
 }
 
+/// `-T` 续流时要跳过的已入环身份（同一墙钟可有多条）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ResumeSkip {
+    pub ts: String,
+    pub identities: Vec<(u32, u32, String, String)>,
+}
+
 /// 设备级共享环形缓冲。
 pub(crate) struct RingBuffer {
     inner: Mutex<State>,
@@ -109,6 +116,20 @@ impl RingBuffer {
         state.next_seq.saturating_sub(1)
     }
 
+    /// 工人重启用：末条墙钟 + 同一时刻已入环身份，避免 `-T` 含时刻重入。
+    pub(crate) fn resume_skip(&self) -> Option<ResumeSkip> {
+        let state = self.inner.lock().expect("ring lock poisoned");
+        let last = state.buf.back()?;
+        let ts = last.ts.clone();
+        let identities = state
+            .buf
+            .iter()
+            .filter(|l| l.ts == ts)
+            .map(|l| (l.pid, l.tid, l.tag.clone(), l.msg.clone()))
+            .collect();
+        Some(ResumeSkip { ts, identities })
+    }
+
     #[cfg(test)]
     pub(crate) fn capacity(&self) -> usize {
         self.inner.lock().expect("ring lock poisoned").capacity
@@ -187,5 +208,31 @@ mod tests {
         let snap = ring.snapshot(0, 10);
         assert_eq!(snap[0].seq, 3);
         assert_eq!(snap[1].seq, 4);
+    }
+
+    #[test]
+    fn resume_skip_is_last_ts_identities() {
+        let ring = RingBuffer::new(10);
+        ring.push(LogLine {
+            ts: "2026-01-01 00:00:00.000".into(),
+            pid: 1,
+            tid: 1,
+            tag: "A".into(),
+            msg: "old".into(),
+            ..LogLine::default()
+        });
+        ring.push(LogLine {
+            ts: "2026-01-01 00:00:01.000".into(),
+            pid: 2,
+            tid: 2,
+            tag: "B".into(),
+            msg: "new".into(),
+            ..LogLine::default()
+        });
+        let skip = ring.resume_skip().expect("has lines");
+        assert_eq!(skip.ts, "2026-01-01 00:00:01.000");
+        assert_eq!(skip.identities, vec![(2, 2, "B".into(), "new".into())]);
+        ring.clear();
+        assert!(ring.resume_skip().is_none());
     }
 }

@@ -44,25 +44,40 @@ fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::Lo
         .lines
 }
 
-async fn collect_events(
-    rx: &mut mpsc::Receiver<AppEvent>,
-    min_lines: usize,
-    timeout: Duration,
-) -> Vec<yohu_protocol::LogLine> {
-    let mut lines = Vec::new();
-    let deadline = tokio::time::Instant::now() + timeout;
-    while lines.len() < min_lines && tokio::time::Instant::now() < deadline {
-        match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
-            Ok(Some(AppEvent::LogBatch(payload))) => lines.extend(payload.batch.lines),
-            Ok(Some(_)) => {}
-            Ok(None) => break,
-            Err(_) => {}
+fn spawn_event_pump(mut rx: mpsc::Receiver<AppEvent>) -> (Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>, tokio::task::JoinHandle<()>) {
+    let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let collected = Arc::clone(&lines);
+    let handle = tokio::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            if let AppEvent::LogBatch(payload) = event {
+                collected.lock().expect("event pump").extend(payload.batch.lines);
+            }
         }
-    }
-    lines
+    });
+    (lines, handle)
 }
 
-#[tokio::test]
+async fn wait_pumped_lines(
+    lines: &Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>,
+    min: usize,
+    timeout: Duration,
+) -> Vec<yohu_protocol::LogLine> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        {
+            let guard = lines.lock().expect("event pump");
+            if guard.len() >= min {
+                return guard.clone();
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return lines.lock().expect("event pump").clone();
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_capture_stream_batch_and_ring() {
     let client = Arc::new(AdbClient::new(
         ToolResolver::new(Some(real_adb()), scratch("res"), scratch("data")),
@@ -73,7 +88,8 @@ async fn real_capture_stream_batch_and_ring() {
         return;
     };
 
-    let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (pumped, pump) = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -81,15 +97,20 @@ async fn real_capture_stream_batch_and_ring() {
         tokio_util::sync::CancellationToken::new(),
     );
 
-    service.start(&serial, false).await.expect("开始采集");
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("start 超时")
+        .expect("开始采集");
     assert!(service.is_capturing(&serial));
 
-    // 真实设备通常持续输出日志；等待批量事件（解析+聚合+推送全链路）
-    let lines = collect_events(&mut rx, 5, Duration::from_secs(30)).await;
+    let lines = wait_pumped_lines(&pumped, 5, Duration::from_secs(30)).await;
     assert!(!lines.is_empty(), "真实 logcat 应产出日志记录");
     let ring_lines = replay_lines(&service, &serial);
     assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次记录");
-    let sample = &lines[0];
+    let sample = lines
+        .iter()
+        .find(|l| !l.ts.is_empty() && l.level != '?')
+        .expect("应有解析成功的 logd 记录");
     eprintln!(
         "[真机] 采集 {} 条（缓冲 {}），样例: {} pid={} level={} tag={}",
         lines.len(),
@@ -124,9 +145,11 @@ async fn real_capture_stream_batch_and_ring() {
         !replay_lines(&service, &serial).is_empty(),
         "停止后缓冲保留"
     );
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_capture_with_clear_device() {
     let client = Arc::new(AdbClient::new(
         ToolResolver::new(Some(real_adb()), scratch("res"), scratch("data")),
@@ -136,7 +159,8 @@ async fn real_capture_with_clear_device() {
         eprintln!("跳过：无在线设备");
         return;
     };
-    let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (pumped, pump) = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -145,11 +169,11 @@ async fn real_capture_with_clear_device() {
     );
 
     // 开采前 logcat -c：start(clear_device=true) 内部执行
-    service
-        .start(&serial, true)
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, true))
         .await
+        .expect("start 超时")
         .expect("开始采集（先清设备缓冲）");
-    let lines = collect_events(&mut rx, 3, Duration::from_secs(30)).await;
+    let lines = wait_pumped_lines(&pumped, 3, Duration::from_secs(30)).await;
     assert!(!lines.is_empty(), "清缓冲后仍应采集到新日志");
     eprintln!("[真机] 清缓冲重采 {} 条", lines.len());
 
@@ -161,9 +185,11 @@ async fn real_capture_with_clear_device() {
         replay_lines(&service, &serial).is_empty(),
         "clear 后缓冲为空"
     );
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_detach_clears_ring() {
     let client = Arc::new(AdbClient::new(
         ToolResolver::new(Some(real_adb()), scratch("res"), scratch("data")),
@@ -173,7 +199,8 @@ async fn real_detach_clears_ring() {
         eprintln!("跳过：无在线设备");
         return;
     };
-    let (tx, _rx) = mpsc::channel::<AppEvent>(128);
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (_pumped, pump) = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -181,7 +208,10 @@ async fn real_detach_clears_ring() {
         tokio_util::sync::CancellationToken::new(),
     );
 
-    service.start(&serial, false).await.expect("开始采集");
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("start 超时")
+        .expect("开始采集");
     tokio::time::sleep(Duration::from_secs(3)).await;
     tokio::time::timeout(Duration::from_secs(15), service.detach_device(&serial))
         .await
@@ -191,10 +221,12 @@ async fn real_detach_clears_ring() {
         replay_lines(&service, &serial).is_empty(),
         "切换/掉线清缓冲（防串设备）"
     );
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
 
 /// 导出：采集后从环过滤快照写 txt，条数与环一致。
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_export_filtered_ring_snapshot() {
     let client = Arc::new(AdbClient::new(
         ToolResolver::new(Some(real_adb()), scratch("res2"), scratch("data2")),
@@ -204,7 +236,8 @@ async fn real_export_filtered_ring_snapshot() {
         eprintln!("跳过：无在线设备");
         return;
     };
-    let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (pumped, pump) = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -212,8 +245,11 @@ async fn real_export_filtered_ring_snapshot() {
         tokio_util::sync::CancellationToken::new(),
     );
 
-    service.start(&serial, false).await.expect("开始采集");
-    let lines = collect_events(&mut rx, 5, Duration::from_secs(30)).await;
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("start 超时")
+        .expect("开始采集");
+    let lines = wait_pumped_lines(&pumped, 5, Duration::from_secs(30)).await;
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
         .expect("stop 应在杀进程树后返回");
@@ -236,4 +272,6 @@ async fn real_export_filtered_ring_snapshot() {
     );
 
     let _ = std::fs::remove_dir_all(&root);
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
