@@ -4,6 +4,7 @@
 //! stdout 与 stderr 必须同时泵取，否则大输出会填满管道造成死锁。
 //! 流式路径在 stdout EOF 之后仍须排空 stderr，再 `wait`；成功路径不得提前丢接收端。
 //! 取消/超时时必须先松开管道再 `wait`，否则子进程堵在写满的 pipe 上退不出去。
+//! logcat 跟流按字节切行：非法 UTF-8 替换后继续；stderr 泵失败不得杀掉 stdout 跟流。
 
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
@@ -282,7 +283,7 @@ impl ProcessRunner {
         let mut stop: Option<ProcessError> = None;
         let mut stderr_done = stderr_rx.is_closed();
         if let Some(stdout) = stdout {
-            let mut lines = BufReader::new(stdout).lines();
+            let mut reader = BufReader::new(stdout);
             loop {
                 tokio::select! {
                     biased;
@@ -292,8 +293,12 @@ impl ProcessRunner {
                     }
                     result = join_pump_task(&mut stderr_task), if stderr_task.is_some() => {
                         if let Err(e) = result {
-                            stop = Some(e);
-                            break;
+                            // logcat 跟流只认 stdout。stderr 非法字节 / 超预算不得杀掉跟流。
+                            if join_stderr {
+                                stop = Some(e);
+                                break;
+                            }
+                            stderr_done = true;
                         }
                     }
                     chunk = stderr_rx.recv(), if !stderr_done => {
@@ -310,7 +315,7 @@ impl ProcessRunner {
                             None => stderr_done = true,
                         }
                     }
-                    line = lines.next_line() => {
+                    line = read_line_lossy(&mut reader) => {
                         match line {
                             Ok(Some(l)) => {
                                 tokio::select! {
@@ -502,6 +507,25 @@ async fn forward_line(
     }
 }
 
+/// logcat 跟流：按字节切行，非法 UTF-8 替换后继续，禁止因单行坏字节杀掉采集。
+async fn read_line_lossy<R>(reader: &mut R) -> std::io::Result<Option<String>>
+where
+    R: tokio::io::AsyncBufRead + Unpin,
+{
+    let mut buf = Vec::new();
+    let n = reader.read_until(b'\n', &mut buf).await?;
+    if n == 0 {
+        return Ok(None);
+    }
+    if buf.ends_with(b"\n") {
+        buf.pop();
+        if buf.ends_with(b"\r") {
+            buf.pop();
+        }
+    }
+    Ok(Some(String::from_utf8_lossy(&buf).into_owned()))
+}
+
 async fn read_lines_bounded<R>(
     reader: R,
     tx: mpsc::Sender<String>,
@@ -544,6 +568,22 @@ mod tests {
             .await
             .expect_err("非法 UTF-8 必须 Io");
         assert!(matches!(err, ProcessError::Io(_)));
+    }
+
+    #[tokio::test]
+    async fn read_line_lossy_keeps_stream_on_invalid_utf8() {
+        let mut reader = BufReader::new(Cursor::new(&b"ok\n\xFF\xFE bad\nend\n"[..]));
+        assert_eq!(
+            read_line_lossy(&mut reader).await.unwrap().as_deref(),
+            Some("ok")
+        );
+        let bad = read_line_lossy(&mut reader).await.unwrap().expect("坏字节行");
+        assert!(bad.contains('\u{FFFD}'), "非法 UTF-8 必须替换后继续: {bad:?}");
+        assert_eq!(
+            read_line_lossy(&mut reader).await.unwrap().as_deref(),
+            Some("end")
+        );
+        assert_eq!(read_line_lossy(&mut reader).await.unwrap(), None);
     }
 
     #[tokio::test]
