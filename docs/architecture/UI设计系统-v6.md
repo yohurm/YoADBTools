@@ -1,12 +1,20 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.91（2026-09-20，YoChrome 分层收口）
+> **状态：** v3.99（2026-09-21，日志清单滚条 BarState.On）
 
 
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.99 变更（日志清单滚条常显）：** 日志分析清单 `YoVirtualList state=on` 转给内嵌 `YoScroller`（对照 ArkUI `BarState.On`：溢出常显，无法滚动仍不画条）。库默认仍是 Auto。重命名会话 Dialog 同。新建窗口包名/PID 名单仍 Auto。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
+> **v3.98 变更（级别 BACKGROUND 收口文档文本格）：** Logcat 链路是 `LevelFormat` → `TextAccumulator` `[start,end)` → `Document.insertString` → `DocumentAppender.addRangeHighlighter(..., EXACT_RANGE)`；Editor 用同一把 `charWidth` 画字和 BACKGROUND，没有第二棵 overlay。Yohu 删 `.yohu-logs__wash` / `bindWashCells`（回收行子节点 + 表头 `chPx` 是第二套几何，字母不居中、切进程串列）。`markup-wash` 只把 `[from,to)` 写成文本节点的 `--yohu-wash-*`，CSS `1ch` 就是该节点的字符格。表头轨道仍走 `measureChPx`，禁止拿 CSS `ch` 冒充表头。见 [modules/logs.md](modules/logs.md)。
+> **v3.97 变更（级别 BACKGROUND 字符格）：** 当时用文档偏移 × 表头 `chPx` 铺绝对定位色块。v3.98 删掉这条双几何。见 [modules/logs.md](modules/logs.md)。
+> **v3.96 变更（级别 BACKGROUND 行盒）：** WebView2 `::highlight { background }` 只裹字母墨水。当时用 caret 量宽；v3.97 改字符格。`::highlight` wash 只上 `--yohu-fg-on`。禁止再拆 span / FieldSpan。见 [modules/logs.md](modules/logs.md)。
+> **v3.95 变更（Yohu 级别块对齐 Logcat BACKGROUND）：** 选区已与着色解耦。Yohu 已知级别（V–F）与 Logcat 一样在 `" L "` 三格上 wash：字母 `--yohu-fg-on`、底 `--yohu-level-*`。v3.96 起底不再走 `::highlight`。Tag / 消息仍是 ink。禁止再把 V–E 收成只上字色。见 [modules/logs.md](modules/logs.md)。
+> **v3.94 变更（日志着色 / 选区 / 关键字全量解耦）：** 对照 Logcat Editor Document + MarkupModel：一行一个文本节点。着色走 `CSS.highlights` / `::highlight`（ink = FOREGROUND，wash = BACKGROUND）。选区只铺 `::selection` 底，不改字色。关键字是文档偏移，不是 `<mark>`。删除按 FormatRange 拆 span、`display: contents`、`.yohu-logs__mark`。无 Highlight 引擎时零操作，禁止 span 回退。见 [modules/logs.md](modules/logs.md)。
+> **v3.93 变更（级别着色不参与几何）：** 当时用 `display: contents` 去盒。v3.94 起不再拆 span。见 [modules/logs.md](modules/logs.md)。
+> **v3.92 变更（日志文档划选收口原生 Selection）：** abspos 槽把 Range 拆成消息碎片，ch 带与 WebView2 `::selection` 两套几何。未开 listbox 的 document VL 改 `data-layout=flow`（行在文档流 + gap）。选区只走 `::selection`（`--yohu-doc-sel`）。删除 `docSelBandStyle` / `.yohu-doc-sel` / `visualLineBoxes`。Ctrl+A = `selectAllChildren` + 整表 Document。输入框仍走 `--yohu-text-sel`。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
 > **v3.91 变更（YoChrome 分层收口）：** L2 `ChromeSpec` 收齐 leading/bar/extra；L4 只读 L3 槽位。功能栏 `YoListPresence` 常挂，清空走 `each=[]` 播出场，禁止 `Show` 门闩卸树。日志页眉身份表改名 `logs-chrome-actions`（不再叫 chrome-bar）。见 [youi.md](youi.md)。
 > **v3.90 变更（YoChrome 页眉 chip 进出）：** 模块页眉左右槽收口 `@yohu/ui`：`leading` 走 `YoPresence recipe=chip`，功能栏改 `actions[{key,node}]` + `YoListPresence recipe=chip`。终端取消 / 日志暂停与滞后徽章随身份进出。禁止模块自挂 Presence 或碎片 `children` 补页眉。文案换牌仍走按钮 `YoSwap`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
 > **v3.89 变更（设置阅读列 + 路径定宽）：** 全屏适配是居中阅读列，不是把表单拉满栅格。`YoPage role=settings` 列帽恢复 `SettingsMax` 920（`data-column=measure`）。路径槽 `YoTextField width=control` 定宽 `settings-control-max`，禁止 `block`/`width:100%` 套进 YoFormRow hug 簇（`size=1` + `overflow:hidden` 会裁成空铬）。右槽 `flex: 0 0 auto`，空间不够折行。见 [youi.md](youi.md)、[workbench.md](workbench.md)。
@@ -18,7 +26,7 @@
 > **v3.83 变更（clip 对齐 LogCat Soft-Wrap 关）：** 当时 hang 仍走 CSS、表头跟滚。v3.84 已按官方写入 Document。
 > **v3.82 变更（长文本 clip / wrap）：** 设置 `log_line_layout`（立即，默认 `clip`）。当时 `clip` 右侧裁切。v3.83 起按官方 Soft-Wrap 关：硬 `\n` 仍切行，超宽底栏横滑。身份在 `@yohu/api` `log-line-layout`。当时画法只在 EditorView、禁止进 Formatter；现 `softWrap` 进 `FormatOptions`，hang 空格由 Formatter 写入 Document（v3.84）。见 [modules/logs.md](modules/logs.md)。
 > **v3.81 变更（官方 Format 分段）：** 对照 AS `TimestampFormat` / `ProcessThreadFormat` / `TagFormat` / `LevelFormat`：每段自带 `width()` 与尾空格，删除表格 `padLeft` / `gutter` / `data-log-pad` / `LOG_PAD_LEFT_CHARS`。当时默认轨道 `24ch 6ch 24ch 4ch 1fr`，只有 Tag 可拖。现无表格表头，Tag 宽是官方常数（v3.84）。PID+TID 合成 BOTH（12ch）。选区空格全部进文档。见 [modules/logs.md](modules/logs.md)。
-> **v3.80 变更（文档选区带）：** 手势仍是原生 Selection；绘制自底而上四层：`--yohu-doc-sel` → YoUI `docSelBandStyle` / `.yohu-doc-sel` → `editor/selection` `{seq,off}` → EditorView 按可视行铺 ch 带。当时 hang 加在 left；现 hang 空格已在 Document，left 只跟文档偏移（v3.84）。日志 `.yohu-logs__view ::selection` 透明，禁止再靠 WebView2 给着色 span 铺色。Ctrl+A = `sel === "all"` 整条可视行带，删除 `.yohu-logs__row--picked`。输入框仍走 `--yohu-text-sel` / `--yohu-text-sel-fg`。禁止 accent-soft / Highlight overlay。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
+> **v3.80 变更（文档选区带）：** 当时手势是原生 Selection，绘制是 ch 带。v3.92 起未开 listbox 的 document 清单改流式行，选区只走 `::selection`。
 > **v3.79 变更（文档选区对齐 Logcat）：** 当时用 `*::selection` + `--picked` 整行底。WebView2 对 `[data-tone=ink]` 只在行尾画出一条并洗字色；v3.80 改为选区带。
 > **v3.78 变更（清单三件套编辑器）：** 抛弃 `layout→doc→wrap→color→projector→LogList→Row`。对照 AS `logcat/messages/` 只留 Formatter / Document / EditorView。着色写入时挂 range；软折行只在 View；复制面是 Document.text。见 [modules/logs.md](modules/logs.md)。
 > **v3.76 变更（Logcat 软折行）：** 当时软折行在 `wrap.ts`。v3.78 起折行只在 EditorView，逻辑文档是 Document.text。见 [modules/logs.md](modules/logs.md)。
@@ -625,10 +633,10 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 ### 4.1 日志分析（核心打磨对象）
 
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + 采集操作；进出走 `YoChrome` chip）→ 会话 Tab（canvas 上）→ `YoPanel` 会话分区（过滤 / 虚拟列表 / 状态行）。
-- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 Document.text。行是连续文档，不是文件清单那种格子。标题栏走 `YoColFrame tone=document cellPad=none` + `YoColHeader pad=none`，轨道是 `logDocTrackTemplate(chPx)` 探针 px；禁止把 Family B 的行（`YoColTrack` / 行块拖选）套到日志上，禁止再画字符串头行，禁止 CSS `ch` 冒充文档格。
-- 行结构（**一份 pre 文档** + 等宽 `tabular-nums`）：三件套 `editor/format`（官方 Timestamp / ProcessThread / Tag / AppName / Level，一条 accumulate）→ `editor/document`（尾部追加/环裁/改选项重载）→ `editor/view`（1 文档行 = 1 可视行）。`headerWidth` 与各 Format `width()` 同一把尺。Soft-Wrap 关把 hang 空格写入 Document。默认 STANDARD `headerWidth=100`。禁止 CSS hang。View 禁止回调 Formatter。CSS 只认 `data-tone` / `data-box=line` / `data-bar`。`YoVirtualList` 行高 `dataRowHeight()`。复制切 Document.text。导出仍走 `formatLogLine` testdata。`tone=document` 不画行间线。选区手势是原生 Selection，绘制是 `.yohu-doc-sel` 带（`--yohu-doc-sel`），不改字色。
+- **面板家族：** 日志分析对齐 Family A（Android Studio Logcat Editor Document）：清单载荷是 Document.text。行是连续文档，不是文件清单那种格子。标题栏走 `YoColFrame tone=document cellPad=none` + `YoColHeader pad=none`，轨道是 `logDocTrackTemplate(chPx)` 探针 px；禁止把 Family B 的行（`YoColTrack` / 行块拖选）套到日志上，禁止再画字符串头行。表头禁止 CSS `ch` 冒充轨道；级别 BACKGROUND 用的是文档文本节点自己的 `1ch`（对照编辑器 `charWidth`），不是表头第二把尺。
+- 行结构（**一份 pre 文档** + 等宽）：`editor/format`（官方 Timestamp / ProcessThread / Tag / AppName / Level，一条 accumulate）→ `editor/document`（尾部追加/环裁/改选项重载）→ `editor/markup-*`（着色 run / `::highlight` 字色 / `markup-wash` 把 EXACT_RANGE 写成文本节点 `1ch` BACKGROUND）∥ 原生 `::selection` ∥ `highlight.ts` 关键字偏移 → `editor/view`（1 文档行 = 1 可视行，一个文本节点）。文档行关闭 `kern` / `liga` / `tnum`，对照 Logcat 编辑器纯等宽 `charWidth`，让 `1ch` 与每个字符同一格。`headerWidth` 与各 Format `width()` 同一把尺。Soft-Wrap 关把 hang 空格写入 Document。默认 STANDARD `headerWidth=100`。禁止 CSS hang。View 禁止回调 Formatter。CSS 行铬只认 `data-bar`。`YoVirtualList` 行高 `dataRowHeight()`，滚条 `state=on`（溢出常显）。复制切 Document.text。导出仍走 `formatLogLine` testdata。`tone=document` 不画行间线。选区手势与绘制都是原生 `::selection`（`--yohu-doc-sel`），不改字色。
 - **显示列：** 读壳注入的 `DeviceSession.settings.log_display_columns`（消息始终在；关列则文档省略该段）。默认 STANDARD：时间 / BOTH / Tag / AppName / 级别。设置项与标题栏文案单源 `LOG_DISPLAY_COLUMN_CATALOG`。表头可拖列（时间 / UID / PID / TID / Tag / 应用）把 px 收成 `colChars`，只加不减官方 Format `width()`；级别与消息不可拖。Tag 默认仍是官方 `TagFormat.maxLength` 常数（23），加宽不进设置。禁止模块再拉设置命令或把显示列拷进 logStore，禁止行走 `YoColTrack`。
-- 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；选区带叠在行底之上、字色之下，左条与级别 ink 保留。
+- 信号行（崩溃/ANR）行底色 `--yohu-signal-bg` + 左侧 Error 条；选区叠在行底之上，左条与级别 ink 保留。
 - 过滤栏：级别独立切换（V–F 精确集合，可多选；全部弹起不限）走 `YoSegmentedButton` `type=capsule` `multiple` `size=sm`；未选字色 `item.ink=var(--yohu-level-*)`；选中填 `item.fill=var(--yohu-level-*)`。禁止自造 `YoCorner`+flush Button、禁止 `.yohu-ink`、禁止点库内部 class。 / Tag（逗号分隔多针，精确命中；提交后 `YoChip` 走 `YoListPresence recipe=chip` 丝滑入场，流内右侧垂直居中删除；过滤生效走 `active`） / 关键字检索（放大镜图标 + 「清除」；过滤生效时检索框 accent 边框）+ 会话 scope 用 `YoBadge tone=accent`；控件走 `--yohu-control-height`。
 - 会话 Tab：标题 + 采集绿点/信号红点 + 关闭 × + 新建 +；Tab 溢出可横向滚动；右键菜单（关闭其他/重命名/复制会话）走 `logs.tab` 场景。
 - 日志行：原生选区走文档字符。Format 尾空格都在 Document.text 里，从 Tag 左缘拖过尾空格只选 Tag 段。三击选行交给浏览器；禁止对 `pointerdown` `preventDefault`。Ctrl+A 整表 `visible`。右键走 `logs.row`（有选区复制切片，否则该行文档）。与 Ctrl+C 同一 `serializeLogCopy`。折叠徽章 `data-log-chrome` 不进文档。禁止在本页再挂 `YoContextMenu`。禁止 `Selection.toString()` 当跨行唯一载荷。
