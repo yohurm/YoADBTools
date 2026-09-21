@@ -77,6 +77,12 @@ describe("YoVirtualList", () => {
     expect(screen.getByText("row-0")).toBeTruthy();
     expect(screen.queryByText("row-50")).toBeNull();
     expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-tone")).toBe("document");
+    expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-layout")).toBe("flow");
+    expect((container.querySelector(".yohu-virtual-list__row") as HTMLElement).style.position).toBe(
+      "relative",
+    );
+    expect(container.querySelector('[data-gap="lead"]')).not.toBeNull();
+    expect(container.querySelector('[data-gap="tail"]')).not.toBeNull();
   });
 
   it("文件清单显式 tone=list 才画行间线", () => {
@@ -121,15 +127,27 @@ describe("YoVirtualList", () => {
     expect(src).not.toContain("indicatorPressed");
     expect(src).not.toContain("virtualContentWidth");
     expect(src).toContain('axis={scrollerAxis()}');
+    expect(src).toContain("state={props.state}");
     expect(src).toContain("innerWidth()");
     expect(src).toContain("queueMicrotask(() => api.sync())");
     expect(src).toContain("preventScroll: true");
     expect(src).not.toContain("scrollIntoView");
   });
 
+  it("state 转给内嵌 YoScroller，库自己不写死 On", () => {
+    const { container } = render(() => (
+      <YoVirtualList items={() => makeItems(8)} itemHeight={22} renderRow={TestRow} state="on" />
+    ));
+    expect(container.querySelector(".yohu-scroller")?.getAttribute("data-bar")).toBe("on");
+  });
+
   it("VirtualList.css 只管槽位几何，行铬不在本文件", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.css"), "utf-8");
-    expect(css).toMatch(/\.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*\}/);
+    expect(css).toMatch(
+      /\[data-layout="pool"\] \.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*\}/,
+    );
+    expect(css).toMatch(/\[data-layout="flow"\] \.yohu-virtual-list__row \{\s*position: relative;/);
+    expect(css).toContain("yohu-virtual-list__gap");
     expect(css).toMatch(
       /\[data-tone="document"\]:not\(\[role="listbox"\]\):not\(\[data-reordering\]\) \{\s*user-select: text;\s*cursor: text;\s*\}/,
     );
@@ -140,7 +158,9 @@ describe("YoVirtualList", () => {
     expect(css).not.toContain("*::selection");
     expect(css).not.toContain("::selection");
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
-    expect(src).toContain("import \"./doc-sel.css\"");
+    expect(src).not.toContain("import \"./doc-sel.css\"");
+    expect(src).toContain("virtualListLayout");
+    expect(src).toContain("virtualFlowRowStyle");
     expect(css).toMatch(/\[role="listbox"\]:not\(\[data-reordering\]\) \{\s*user-select: none;/);
     expect(css).toMatch(/\.yohu-virtual-list \{[\s\S]*?overflow:\s*hidden;/);
     expect(css).not.toContain("!important");
@@ -169,6 +189,7 @@ describe("YoVirtualList", () => {
     expect(row.style.position).toBe("absolute");
     expect(row.style.top).toBe("0px");
     expect(row.style.transform).toBe("translate3d(0, 0px, 0)");
+    expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-layout")).toBe("pool");
     expect(row.classList.contains("yohu-list-row")).toBe(true);
     expect(row.classList.contains("yohu-interactive")).toBe(false);
     expect(row.classList.contains("yohu-focus-ring--inset")).toBe(false);

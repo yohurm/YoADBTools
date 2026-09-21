@@ -9,8 +9,9 @@
  * 溢出让出侧轨，禁止 scrollbar-gutter。
  * fill / 投放框宽走 measureVirtualViewContentWidth（clientWidth 减 gutter padding），不进侧轨。
  * 总高变化后 handle.sync() 再量侧轨，过滤变短必须收回 gutter。
- * For 身份只有槽位 0..poolSize-1。几何走 virtualRowBoxStyle 写进 inline
- *（absolute + translate3d）。行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
+ * For 身份只有槽位 0..poolSize-1。listbox / 换位走 virtualRowBoxStyle
+ *（absolute + translate3d）；未开选择的 document 走 flow 行 + gap，原生 Selection 不断档。
+ * 行宿主是 YoListRow，不挂 yohu-interactive / focus-ring。
  * 滚动改 transform / data-key / 行 props，不拆行节点。
  * renderRow 是 Component<{item, index}>：同一组件实例就地换绑。禁止函数快照返回新 JSX
  *（Solid 会当新树卸载，文件行 ColTrack 整行重挂，WebView2 闪白）。
@@ -48,7 +49,7 @@ import {
   shiftForReorder,
 } from "./reorder-model";
 import { applyReorderKey, previewDest } from "./reorder-policy";
-import { YoScroller, type YoScrollerHandle } from "./Scroller";
+import { YoScroller, type YoScrollerHandle, type ScrollerBarState } from "./Scroller";
 import {
   VIRTUAL_DEFAULT_ITEM_HEIGHT,
   VIRTUAL_DEFAULT_OVERSCAN,
@@ -59,11 +60,15 @@ import {
   isVirtualSelectable,
   isVirtualSelectionEmpty,
   virtualActiveKey,
+  virtualFlowLeadHeight,
+  virtualFlowRowStyle,
+  virtualFlowTailHeight,
   virtualInnerWidth,
   virtualIndicatorAnchor,
   virtualIndicatorBox,
   virtualIndicatorFollow,
   virtualIndexOfKey,
+  virtualListLayout,
   virtualNearestScrollTop,
   virtualPoolIndex,
   virtualPoolOrigin,
@@ -84,7 +89,6 @@ import {
   virtualRowAttrs,
 } from "./virtuallist-policy";
 import { createVirtualIndicatorHotBinder } from "./virtuallist-hot";
-import "./doc-sel.css";
 import "./VirtualList.css";
 
 export type YoVirtualListTone = "document" | "list";
@@ -141,6 +145,11 @@ export interface YoVirtualListProps<T> {
    * >0 时 YoScroller axis=both，溢出才出底轨。0 / 缺省 = 只纵滚。
    */
   contentWidth?: Accessor<number>;
+  /**
+   * 内嵌 YoScroller BarState。默认 auto（停滚淡出）。
+   * 日志清单传 on：溢出常显，无法滚动仍不画条。
+   */
+  state?: ScrollerBarState;
 }
 
 /**
@@ -249,6 +258,14 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   };
 
   const tone = (): YoVirtualListTone => props.tone ?? "document";
+
+  const layout = createMemo(() =>
+    virtualListLayout({
+      tone: tone(),
+      selectable: selectable(),
+      reordering: props.onReorder !== undefined,
+    }),
+  );
 
   const followKey = (): string | undefined =>
     listRowOwnsFill(tone())
@@ -473,6 +490,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       tone: props.tone,
       ariaLabel: props.ariaLabel,
       reordering: reorder.session() !== null,
+      layout: layout(),
       indicatorFill: virtualIndicatorFill(followKey(), reorder.session() !== null),
       indicatorHot: indicatorHot.hot(),
     });
@@ -509,6 +527,9 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
         tabIndex={attrs().tabIndex}
         style={(() => {
           const current = bound();
+          if (layout() === "flow") {
+            return virtualFlowRowStyle(itemHeight(), current != null, innerWidth());
+          }
           const drag = reorder.session();
           const shift =
             drag && current ? shiftForReorder(current.index, drag.from, previewDest(drag)) : 0;
@@ -557,6 +578,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     <div
       class="yohu-virtual-list"
       data-tone={host()["data-tone"]}
+      data-layout={host()["data-layout"]}
       data-reordering={host()["data-reordering"]}
       data-indicator={host()["data-indicator"]}
       data-indicator-hot={host()["data-indicator-hot"]}
@@ -571,6 +593,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     >
       <YoScroller
         axis={scrollerAxis()}
+        state={props.state}
         handle={(api) => {
           scrollerHandle = api;
         }}
@@ -603,6 +626,14 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
             ready={barReady()}
           />
         </Show>
+        <Show when={layout() === "flow"}>
+          <div
+            class="yohu-virtual-list__gap"
+            data-gap="lead"
+            aria-hidden="true"
+            style={{ height: `${virtualFlowLeadHeight(origin(), itemHeight())}px` }}
+          />
+        </Show>
         <For each={slots()}>
           {(slot) => {
             const bound = createMemo(() => {
@@ -615,6 +646,16 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
             return <RowView bound={bound} />;
           }}
         </For>
+        <Show when={layout() === "flow"}>
+          <div
+            class="yohu-virtual-list__gap"
+            data-gap="tail"
+            aria-hidden="true"
+            style={{
+              height: `${virtualFlowTailHeight(props.items().length, origin(), poolSize(), itemHeight())}px`,
+            }}
+          />
+        </Show>
       </div>
       </YoScroller>
       <Show when={reorder.session()}>

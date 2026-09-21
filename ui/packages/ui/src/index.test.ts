@@ -98,7 +98,6 @@ describe("@yohu/ui 公开组件清单", () => {
   it("含 YoSwitch 与 YoTitleBar", () => {
     expect(ui.YoSwitch).toBeTypeOf("function");
     expect(ui.YoTitleBar).toBeTypeOf("function");
-    expect(ui.docSelBandStyle).toBeTypeOf("function");
   });
 
   it("公开地址策略、搜索引擎与 YoRail", () => {
@@ -153,6 +152,7 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("railCopyOpaque");
     expect(index).not.toContain("railBlockHidden");
     expect(index).not.toContain("YoListRow");
+    expect(index).not.toContain("docSelBandStyle");
     expect(index).not.toContain("list-row");
     expect(index).not.toContain("YoListFrame");
     expect(index).not.toContain("list-frame");

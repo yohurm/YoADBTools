@@ -8,8 +8,10 @@
 import {
   VIRTUAL_DEFAULT_TONE,
   virtualKeyIntent,
+  virtualListLayout,
   virtualRowTabIndex,
   type VirtualKeyIntent,
+  type VirtualListLayout,
 } from "./virtuallist-model";
 
 export type VirtualListKeyAction = VirtualKeyIntent;
@@ -98,6 +100,7 @@ export interface VirtualHostAttrs {
   "aria-label": string | undefined;
   "aria-multiselectable": true | undefined;
   "data-tone": "document" | "list";
+  "data-layout": VirtualListLayout;
   "data-reordering": "" | undefined;
   "data-indicator": "fill" | undefined;
   "data-indicator-hot": VirtualIndicatorHot | undefined;
@@ -109,15 +112,24 @@ export function virtualHostAttrs(input: {
   tone?: "document" | "list";
   ariaLabel?: string;
   reordering?: boolean;
+  layout?: VirtualListLayout;
   indicatorFill?: boolean;
   indicatorHot?: VirtualIndicatorHot;
 }): VirtualHostAttrs {
   const fill = input.indicatorFill === true;
+  const tone = input.tone ?? VIRTUAL_DEFAULT_TONE;
   return {
     role: input.selectable ? "listbox" : undefined,
     "aria-label": input.selectable ? input.ariaLabel : undefined,
     "aria-multiselectable": input.multi ? true : undefined,
-    "data-tone": input.tone ?? VIRTUAL_DEFAULT_TONE,
+    "data-tone": tone,
+    "data-layout":
+      input.layout ??
+      virtualListLayout({
+        tone,
+        selectable: input.selectable,
+        reordering: input.reordering === true,
+      }),
     "data-reordering": input.reordering ? "" : undefined,
     "data-indicator": fill ? "fill" : undefined,
     "data-indicator-hot": fill ? input.indicatorHot : undefined,

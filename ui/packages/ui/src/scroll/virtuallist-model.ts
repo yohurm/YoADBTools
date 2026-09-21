@@ -12,6 +12,19 @@ export const VIRTUAL_DEFAULT_TONE = "document";
 export const VIRTUAL_FOCUS_RETRY_LIMIT = 3;
 
 export type VirtualKeyIntent = { type: "move"; index: number } | { type: "commit" };
+export type VirtualListLayout = "pool" | "flow";
+
+/** Family A 文档划选：未开 listbox / 换位时行在文档流里，原生 Selection 才是一份文档。 */
+export function virtualListLayout(input: {
+  tone: "document" | "list";
+  selectable: boolean;
+  reordering: boolean;
+}): VirtualListLayout {
+  if (input.tone === "document" && !input.selectable && !input.reordering) {
+    return "flow";
+  }
+  return "pool";
+}
 
 export interface VirtualIndicatorBox {
   x: number;
@@ -212,6 +225,42 @@ export function virtualRowBoxStyle(
     height: `${itemHeight}px`,
     transform: virtualRowTransform(index, itemHeight, shiftRows),
     ...(visible ? {} : { visibility: "hidden" as const }),
+  };
+}
+
+/** flow 前导空白：未挂载原点之前的行高。 */
+export function virtualFlowLeadHeight(origin: number, itemHeight: number): number {
+  return Math.max(0, origin) * Math.max(0, itemHeight);
+}
+
+/** flow 尾部空白：池外未挂载行高。 */
+export function virtualFlowTailHeight(
+  count: number,
+  origin: number,
+  poolSize: number,
+  itemHeight: number,
+): number {
+  const mounted = Math.max(0, origin) + Math.max(0, poolSize);
+  return Math.max(0, count - mounted) * Math.max(0, itemHeight);
+}
+
+/** 流式行盒。禁止 abspos / translate3d，否则 Range 碎成多段。未绑定槽高度为 0。 */
+export function virtualFlowRowStyle(
+  itemHeight: number,
+  visible = true,
+  widthPx = 0,
+): {
+  position: "relative";
+  height: string;
+  width?: string;
+  visibility?: "hidden";
+  overflow?: "hidden";
+} {
+  return {
+    position: "relative",
+    height: visible ? `${itemHeight}px` : "0px",
+    ...(widthPx > 0 && visible ? { width: `${widthPx}px` } : {}),
+    ...(visible ? {} : { visibility: "hidden" as const, overflow: "hidden" as const }),
   };
 }
 

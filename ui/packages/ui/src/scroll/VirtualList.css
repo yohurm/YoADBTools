@@ -33,12 +33,22 @@
   isolation: isolate;
 }
 
-/* 槽位几何。行铬在 list-row，这里只钉 absolute 盒。 */
-.yohu-virtual-list__row {
+/* pool：abspos 槽。flow：行在文档流，gap 撑未挂载区。行铬在 list-row。 */
+.yohu-virtual-list[data-layout="pool"] .yohu-virtual-list__row {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+}
+
+.yohu-virtual-list[data-layout="flow"] .yohu-virtual-list__row {
+  position: relative;
+}
+
+.yohu-virtual-list__gap {
+  width: 100%;
+  pointer-events: none;
+  user-select: none;
 }
 
 .yohu-virtual-list[data-tone="document"]:not([role="listbox"]):not([data-reordering]) .yohu-virtual-list__row {

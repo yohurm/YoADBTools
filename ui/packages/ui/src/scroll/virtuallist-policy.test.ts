@@ -83,11 +83,14 @@ describe("virtuallist-policy", () => {
   });
 
   it("宿主 attrs：可选才 listbox；默认 data-tone=document", () => {
-    expect(virtualHostAttrs({ selectable: false, multi: false })).toEqual({
+    expect(
+      virtualHostAttrs({ selectable: false, multi: false }),
+    ).toEqual({
       role: undefined,
       "aria-label": undefined,
       "aria-multiselectable": undefined,
       "data-tone": "document",
+      "data-layout": "flow",
       "data-reordering": undefined,
       "data-indicator": undefined,
       "data-indicator-hot": undefined,
@@ -99,6 +102,7 @@ describe("virtuallist-policy", () => {
       "aria-label": "文件",
       "aria-multiselectable": true,
       "data-tone": "list",
+      "data-layout": "pool",
       "data-reordering": undefined,
       "data-indicator": undefined,
       "data-indicator-hot": undefined,

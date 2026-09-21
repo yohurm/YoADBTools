@@ -192,8 +192,6 @@ export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState 
 
 export { YoVirtualList } from "./scroll/VirtualList";
 export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";
-export { docSelBandStyle } from "./scroll/doc-sel-model";
-export type { DocSelBandStyle } from "./scroll/doc-sel-model";
 
 export { YoReorderList } from "./scroll/ReorderList";
 export type { YoReorderListProps } from "./scroll/ReorderList";

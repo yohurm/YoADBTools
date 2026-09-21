@@ -28,6 +28,10 @@ import {
   virtualRowTop,
   virtualRowTransform,
   virtualTotalHeight,
+  virtualListLayout,
+  virtualFlowLeadHeight,
+  virtualFlowTailHeight,
+  virtualFlowRowStyle,
 } from "./virtuallist-model";
 
 describe("virtuallist-model", () => {
@@ -191,5 +195,27 @@ describe("virtuallist-model", () => {
     expect(virtualKeyIntent(" ", 2, 5)).toEqual({ type: "commit" });
     expect(virtualKeyIntent("Tab", 0, 5)).toBeNull();
     expect(virtualKeyIntent("ArrowDown", 0, 0)).toBeNull();
+  });
+
+  it("document 未开 listbox / 换位才走 flow；gap 与池外行同尺", () => {
+    expect(virtualListLayout({ tone: "document", selectable: false, reordering: false })).toBe("flow");
+    expect(virtualListLayout({ tone: "document", selectable: true, reordering: false })).toBe("pool");
+    expect(virtualListLayout({ tone: "document", selectable: false, reordering: true })).toBe("pool");
+    expect(virtualListLayout({ tone: "list", selectable: false, reordering: false })).toBe("pool");
+    expect(virtualFlowLeadHeight(8, 20)).toBe(160);
+    expect(virtualFlowLeadHeight(0, 20)).toBe(0);
+    expect(virtualFlowTailHeight(50, 8, 10, 20)).toBe(640);
+    expect(virtualFlowTailHeight(10, 0, 10, 20)).toBe(0);
+    expect(virtualFlowRowStyle(22, true, 400)).toEqual({
+      position: "relative",
+      height: "22px",
+      width: "400px",
+    });
+    expect(virtualFlowRowStyle(22, false)).toEqual({
+      position: "relative",
+      height: "0px",
+      visibility: "hidden",
+      overflow: "hidden",
+    });
   });
 });
