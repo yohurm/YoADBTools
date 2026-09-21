@@ -1,12 +1,12 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.99（2026-09-21，日志清单滚条 BarState.On）
-
-
+> **状态：** v3.101（2026-09-21，滚动会话偏移 / 平面 transform）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
 >
+> **v3.101 变更（滚动会话偏移）：** 声明 `extent` 时偏移数字在 `scroller-session`，视口 `scrollTop` 恒 0；内容平面 `translate3d`（`transform-origin: 0 0`）。拖滑块 / 滚轮不再写超高 inner 的 DOM 滚动。无 `extent` 的短名单仍写 `scrollTop`。日志表头 inline 走 `onOffset`，文件投放命中走同一会话偏移。见 [youi.md](youi.md)、[modules/logs.md](modules/logs.md)。
+> **v3.100 变更（滚动三拍）：** `YoScroller` 可声明 `extent`；虚拟列表传入总高 / 行宽，滚轮不再量 in-flow 子盒、不再 `getComputedStyle`。条铬 rAF 一拍。`YoVirtualList` 像素滚动不进 Solid；原点过行高才换窗。pool 环形绑数，origin 步进只换一条。flow `For` 按可视下标，簇钉 origin 行顶，删除 lead/tail gap。见 [youi.md](youi.md)、[modules/logs.md](modules/logs.md)。
 > **v3.99 变更（日志清单滚条常显）：** 日志分析清单 `YoVirtualList state=on` 转给内嵌 `YoScroller`（对照 ArkUI `BarState.On`：溢出常显，无法滚动仍不画条）。库默认仍是 Auto。重命名会话 Dialog 同。新建窗口包名/PID 名单仍 Auto。见 [modules/logs.md](modules/logs.md)、[youi.md](youi.md)。
 > **v3.98 变更（级别 BACKGROUND 收口文档文本格）：** Logcat 链路是 `LevelFormat` → `TextAccumulator` `[start,end)` → `Document.insertString` → `DocumentAppender.addRangeHighlighter(..., EXACT_RANGE)`；Editor 用同一把 `charWidth` 画字和 BACKGROUND，没有第二棵 overlay。Yohu 删 `.yohu-logs__wash` / `bindWashCells`（回收行子节点 + 表头 `chPx` 是第二套几何，字母不居中、切进程串列）。`markup-wash` 只把 `[from,to)` 写成文本节点的 `--yohu-wash-*`，CSS `1ch` 就是该节点的字符格。表头轨道仍走 `measureChPx`，禁止拿 CSS `ch` 冒充表头。见 [modules/logs.md](modules/logs.md)。
 > **v3.97 变更（级别 BACKGROUND 字符格）：** 当时用文档偏移 × 表头 `chPx` 铺绝对定位色块。v3.98 删掉这条双几何。见 [modules/logs.md](modules/logs.md)。
