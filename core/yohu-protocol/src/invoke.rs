@@ -60,10 +60,12 @@ pub struct TransferRequest {
 }
 
 /// `files.dragOut`：把设备路径交给壳虚拟文件拖出（DoDragDrop 结束后返回）。
+/// `generation` 必填，无 serde 缺省；缺字段反序列化失败（禁止回落到槽位窥世代）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DragOutRequest {
     pub serial: String,
     pub remotes: Vec<String>,
+    pub generation: u64,
 }
 
 /// `group.run` 请求。组内条目从命令库读取；组执行不接受运行时占位符。
@@ -159,11 +161,17 @@ mod tests {
 
     #[test]
     fn drag_out_request_is_serial_plus_remotes() {
-        let parsed: DragOutRequest =
-            serde_json::from_str(r#"{"serial":"S","remotes":["/sdcard/a.txt","/sdcard/DCIM"]}"#)
-                .unwrap();
+        let parsed: DragOutRequest = serde_json::from_str(
+            r#"{"serial":"S","remotes":["/sdcard/a.txt","/sdcard/DCIM"],"generation":7}"#,
+        )
+        .unwrap();
         assert_eq!(parsed.serial, "S");
         assert_eq!(parsed.remotes.len(), 2);
+        assert_eq!(parsed.generation, 7);
+        assert!(serde_json::from_str::<DragOutRequest>(
+            r#"{"serial":"S","remotes":["/sdcard/a.txt"]}"#
+        )
+        .is_err());
     }
 
     #[test]
