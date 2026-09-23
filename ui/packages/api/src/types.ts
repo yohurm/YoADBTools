@@ -306,6 +306,7 @@ export interface TransferRequest {
 export interface DragOutRequest {
   serial: string;
   remotes: string[];
+  generation: number;
 }
 
 export interface GroupRunRequest {

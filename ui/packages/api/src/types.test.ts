@@ -26,7 +26,7 @@ import {
   LOG_LINE_LAYOUT_DEFAULT,
 } from "./log-line-layout";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type BrowseAttach, type Density, type DeviceStatus, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type BrowseAttach, type Density, type DeviceStatus, type DragOutRequest, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -332,11 +332,16 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     });
   });
 
-  it("DragOutRequest 为 serial + remotes", () => {
-    const req = { serial: "S", remotes: ["/sdcard/a.txt", "/sdcard/DCIM"] };
+  it("DragOutRequest 为 serial + remotes + generation", () => {
+    const req: DragOutRequest = {
+      serial: "S",
+      remotes: ["/sdcard/a.txt", "/sdcard/DCIM"],
+      generation: 7,
+    };
     expect(JSON.parse(JSON.stringify(req))).toEqual({
       serial: "S",
       remotes: ["/sdcard/a.txt", "/sdcard/DCIM"],
+      generation: 7,
     });
   });
 
