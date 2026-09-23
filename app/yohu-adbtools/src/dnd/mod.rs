@@ -59,6 +59,7 @@ pub enum DndError {
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     NotReady,
     #[error("DoDragDrop 失败: {0}")]
+    #[cfg_attr(not(windows), allow(dead_code))]
     OleFailed(String),
     #[error("拖出宿主调度失败")]
     Host,

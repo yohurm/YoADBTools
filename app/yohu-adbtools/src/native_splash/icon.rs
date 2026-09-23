@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(&painted.data[0..4], [r, g, b, 255]);
         let last = painted.data.len() - 4;
         assert_eq!(&painted.data[last..], [r, g, b, 255]);
-        assert!(painted.data.chunks_exact(4).all(|px| px[3] == 255));
+        assert!(painted.data.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
     }
 
     #[test]
@@ -214,6 +214,6 @@ mod tests {
         let (r, g, b) = crate::tokens::CANVAS_DARK_RGB;
         let painted = icon.onto_canvas(r, g, b);
         assert_eq!(&painted.data[0..4], [r, g, b, 255]);
-        assert!(painted.data.chunks_exact(4).all(|px| px[3] == 255));
+        assert!(painted.data.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
     }
 }

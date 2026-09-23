@@ -41,10 +41,12 @@ impl AppPaths {
         Ok(Self::local_root()?.join(dir::LOGS))
     }
 
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn default_cache_dir() -> std::io::Result<PathBuf> {
         Ok(Self::local_root()?.join(dir::CACHE))
     }
 
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn default_webview_dir() -> std::io::Result<PathBuf> {
         Ok(Self::default_cache_dir()?.join(dir::WEBVIEW))
     }

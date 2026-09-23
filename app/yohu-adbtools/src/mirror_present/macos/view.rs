@@ -38,17 +38,19 @@ define_class!(
 );
 
 thread_local! {
-    pub(super) static VIEWS: RefCell<Option<Views>> = const { RefCell::new(None) };
+    static VIEWS: RefCell<Option<Views>> = const { RefCell::new(None) };
 }
 
-pub(super) struct Views {
-    pub(super) root: Retained<MirrorPassView>,
+struct Views {
+    root: Retained<MirrorPassView>,
     card: Retained<NSView>,
     video: Retained<NSView>,
     spin: Retained<NSProgressIndicator>,
     title: Retained<NSTextField>,
     body: Retained<NSTextField>,
-    pub(super) host: Arc<Mutex<Host>>,
+    /// 视图活着时钉住 Host，绘制读 `LayoutSnap` 不经过此字段。
+    #[allow(dead_code)]
+    host: Arc<Mutex<Host>>,
 }
 
 fn on_main(f: impl FnOnce() + Send) {

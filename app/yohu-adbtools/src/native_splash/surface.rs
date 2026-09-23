@@ -78,14 +78,14 @@ pub fn fill_tile(canvas: [u8; 4]) -> [u8; 16] {
 
 /// GDI 不写 alpha。这是 BGRA 不透明格式，不是补角。
 pub fn force_opaque(pixels: &mut [u8]) {
-    for px in pixels.chunks_exact_mut(4) {
+    for px in pixels.as_chunks_mut::<4>().0 {
         px[3] = 255;
     }
 }
 
 /// 矩形 frame 的唯一底色入口。品牌绘制叠在这上面，禁止留下未初始化黑。
 pub fn fill_canvas(pixels: &mut [u8], canvas: [u8; 4]) {
-    for px in pixels.chunks_exact_mut(4) {
+    for px in pixels.as_chunks_mut::<4>().0 {
         px.copy_from_slice(&canvas);
     }
 }
@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(pixel(&frame, 0, 299), canvas);
         assert_eq!(pixel(&frame, 479, 299), canvas);
         assert_ne!(pixel(&frame, 0, 0), [0, 0, 0, 255]);
-        assert!(frame.pixels.chunks_exact(4).all(|px| px[3] == 255));
+        assert!(frame.pixels.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
     }
 
     #[test]
