@@ -186,13 +186,15 @@ export function createTransferStore() {
 
   async function dragOut(dragName: string): Promise<void> {
     const current = listingStore.serial();
+    const generation = listingStore.generation();
     if (!current || dragging) return;
     const names = namesForDrag(listingStore.selection.names, dragName);
     if (names.length === 0) return;
+    if (generation === 0) return;
     dragging = true;
     try {
       const remotes = names.map((name) => childPath(listingStore.session.path, name));
-      await filesDragOut({ serial: current, remotes });
+      await filesDragOut({ serial: current, remotes, generation });
       listingStore.notifyError("");
     } catch (e) {
       listingStore.notifyError(filesFaultText(e));

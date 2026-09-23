@@ -193,6 +193,16 @@ describe("清单世代", () => {
     const store = createListingStore();
     store.bindSerial("S1");
     await vi.waitFor(() => expect(mocks.filesList).toHaveBeenCalledWith("S1", DEFAULT_BROWSE_ROOT, 7));
+    expect(store.generation()).toBe(7);
+  });
+
+  it("generation() 未 attach 为 0，detach 后归零", async () => {
+    const store = createListingStore();
+    expect(store.generation()).toBe(0);
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.generation()).toBe(1));
+    store.detachView();
+    expect(store.generation()).toBe(0);
   });
 
   it("切设备作废在途 list，不把旧 NotAttached 画进新会话", async () => {

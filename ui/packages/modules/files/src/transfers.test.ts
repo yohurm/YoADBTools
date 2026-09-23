@@ -5,6 +5,7 @@ import type { BrowseAttach, RemoteEntry } from "@yohu/api";
 const mocks = vi.hoisted(() => ({
   filesList: vi.fn(async (_serial: string, _path: string, _generation: number): Promise<RemoteEntry[]> => []),
   filesPush: vi.fn(async (_req: { serial: string; local: string; remote: string }): Promise<number> => 4),
+  filesDragOut: vi.fn(async (_req: { serial: string; remotes: string[]; generation: number }): Promise<void> => undefined),
   filesSessionAttach: vi.fn(async (serial: string): Promise<BrowseAttach> => ({
     serial,
     generation: 1,
@@ -19,6 +20,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     ...actual,
     filesList: mocks.filesList,
     filesPush: mocks.filesPush,
+    filesDragOut: mocks.filesDragOut,
     filesSessionAttach: mocks.filesSessionAttach,
     filesSessionDetach: mocks.filesSessionDetach,
   };
@@ -32,6 +34,14 @@ beforeEach(() => {
   mocks.filesList.mockResolvedValue([]);
   mocks.filesPush.mockReset();
   mocks.filesPush.mockResolvedValue(4);
+  mocks.filesDragOut.mockReset();
+  mocks.filesDragOut.mockResolvedValue(undefined);
+  mocks.filesSessionAttach.mockReset();
+  mocks.filesSessionAttach.mockImplementation(async (serial: string) => ({
+    serial,
+    generation: 1,
+    adopted: false,
+  }));
 });
 
 afterEach(() => {
@@ -68,5 +78,35 @@ describe("传输作业出生", () => {
       state: "running",
     });
     expect(store.transfers[0]?.name).not.toMatch(/上传 #/);
+  });
+});
+
+describe("拖出世代", () => {
+  it("dragOut 把 listing 世代交给 filesDragOut", async () => {
+    listingStore.bindSerial("S1");
+    await vi.waitFor(() => expect(mocks.filesList).toHaveBeenCalled());
+    const store = createTransferStore();
+    await store.dragOut("a.txt");
+    expect(mocks.filesDragOut).toHaveBeenCalledWith({
+      serial: "S1",
+      remotes: ["/sdcard/a.txt"],
+      generation: 1,
+    });
+  });
+
+  it("attach 完成前 dragOut 不 invoke", async () => {
+    let releaseAttach!: (value: BrowseAttach) => void;
+    mocks.filesSessionAttach.mockImplementationOnce(
+      () =>
+        new Promise((resolveAttach) => {
+          releaseAttach = resolveAttach;
+        }),
+    );
+    listingStore.bindSerial("S1");
+    const store = createTransferStore();
+    await store.dragOut("a.txt");
+    expect(mocks.filesDragOut).not.toHaveBeenCalled();
+    expect(listingStore.session.error).toBe("");
+    releaseAttach({ serial: "S1", generation: 1, adopted: false });
   });
 });

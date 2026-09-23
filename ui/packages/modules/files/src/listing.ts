@@ -87,6 +87,7 @@ export function createListingStore() {
   const dirCache = new Map<string, ListingEntry[]>();
 
   const serial = (): string | null => session.serial;
+  const generation = (): number => coreGeneration;
 
   function clearSelection(): void {
     setSelection({ names: [], pivot: null });
@@ -460,6 +461,7 @@ export function createListingStore() {
     selectedEntries,
     singleFile,
     serial,
+    generation,
     notifyError,
     requestListing,
   };
