@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RemoteEntry } from "@yohu/api";
+import type { BrowseAttach, RemoteEntry } from "@yohu/api";
 
 const mocks = vi.hoisted(() => ({
-  filesList: vi.fn(async (_serial: string, _path: string): Promise<RemoteEntry[]> => []),
+  filesList: vi.fn(async (_serial: string, _path: string, _generation: number): Promise<RemoteEntry[]> => []),
   filesPush: vi.fn(async (_req: { serial: string; local: string; remote: string }): Promise<number> => 4),
+  filesSessionAttach: vi.fn(async (serial: string): Promise<BrowseAttach> => ({
+    serial,
+    generation: 1,
+    adopted: false,
+  })),
+  filesSessionDetach: vi.fn(async (_serial: string, _generation: number): Promise<void> => undefined),
 }));
 
 vi.mock("@yohu/api", async (importOriginal) => {
@@ -13,6 +19,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     ...actual,
     filesList: mocks.filesList,
     filesPush: mocks.filesPush,
+    filesSessionAttach: mocks.filesSessionAttach,
+    filesSessionDetach: mocks.filesSessionDetach,
   };
 });
 

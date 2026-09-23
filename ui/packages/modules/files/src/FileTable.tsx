@@ -5,7 +5,7 @@
  * 投放热态走 VirtualList hotKey（行底 + list-frame 框），禁止模块 --drop。
  */
 
-import { For, Show } from "solid-js";
+import { For, Match, Switch } from "solid-js";
 
 import {
   Layout,
@@ -21,6 +21,7 @@ import {
   pointerSelectMode,
 } from "@yohu/ui";
 import { listingStore } from "./listing";
+import { listingPaint } from "./listing-paint";
 import { controlRowHeight } from "./layout";
 import {
   FILE_COLUMNS,
@@ -106,6 +107,8 @@ export function FileTable(props: {
 }) {
   const colTemplate = (): string => fileColTemplate(listingStore.ui.colWidths);
   const entries = (): ListingEntry[] => listingStore.entries;
+  const paint = (): ReturnType<typeof listingPaint> =>
+    listingPaint(entries().length, listingStore.session.loading, listingStore.session.cold);
 
   return (
     <YoColFrame class="yohu-files__table" template={colTemplate()}>
@@ -120,37 +123,35 @@ export function FileTable(props: {
           props.onContextMenu(event.clientX, event.clientY);
         }}
       >
-        <Show
-          when={entries().length > 0}
-          fallback={
-            <Show
-              when={listingStore.session.loading}
-              fallback={<YoEmptyState fill icon="folder" title="此文件夹为空" />}
-            >
-              <YoLoading fill title="加载中" description="正在读取目录" />
-            </Show>
-          }
-        >
-          <YoVirtualList<ListingEntry>
-            items={entries}
-            itemHeight={controlRowHeight()}
-            tone="list"
-            getItemKey={(entry) => entry.name}
-            ariaLabel="文件列表"
-            hostRef={props.listRef}
-            onOffset={(block) => props.onOffset?.(block)}
-            selectedKeys={listingStore.selectedSet}
-            hotKey={() => props.dropDirName ?? null}
-            onSelectRow={(entry, _key, event) => {
-              listingStore.select(entry.name, pointerSelectMode(event));
-            }}
-            onRowContextMenu={(entry, _key, event) => {
-              if (!listingStore.selectedSet().has(entry.name)) listingStore.select(entry.name, "replace");
-              props.onContextMenu(event.clientX, event.clientY);
-            }}
-            renderRow={FileRow}
-          />
-        </Show>
+        <Switch>
+          <Match when={paint() === "rows"}>
+            <YoVirtualList<ListingEntry>
+              items={entries}
+              itemHeight={controlRowHeight()}
+              tone="list"
+              getItemKey={(entry) => entry.name}
+              ariaLabel="文件列表"
+              hostRef={props.listRef}
+              onOffset={(block) => props.onOffset?.(block)}
+              selectedKeys={listingStore.selectedSet}
+              hotKey={() => props.dropDirName ?? null}
+              onSelectRow={(entry, _key, event) => {
+                listingStore.select(entry.name, pointerSelectMode(event));
+              }}
+              onRowContextMenu={(entry, _key, event) => {
+                if (!listingStore.selectedSet().has(entry.name)) listingStore.select(entry.name, "replace");
+                props.onContextMenu(event.clientX, event.clientY);
+              }}
+              renderRow={FileRow}
+            />
+          </Match>
+          <Match when={paint() === "cold"}>
+            <YoLoading fill title="加载中" description="正在读取目录" />
+          </Match>
+          <Match when={paint() === "empty"}>
+            <YoEmptyState fill icon="folder" title="此文件夹为空" />
+          </Match>
+        </Switch>
       </div>
     </YoColFrame>
   );
