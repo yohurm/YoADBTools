@@ -106,7 +106,6 @@ fn main() {
         if script.shell_t_reject_after_stdout {
             let _ = out.flush();
             drop(out);
-            drop(stdout);
             reject_shell_t_after_stdout();
         }
         if script.shell_no_ready {
