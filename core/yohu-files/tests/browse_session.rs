@@ -198,3 +198,32 @@ async fn list_after_release_during_flight_is_cancelled_or_not_attached() {
         Err(other) => panic!("在途 list 只能 Ok（随后已关）/ NotAttached / Cancelled: {other}"),
     }
 }
+
+#[tokio::test]
+async fn list_tree_without_attach_is_not_attached() {
+    let browser = FileBrowser::new(client(isolated_fake_adb(LS_SCRIPT)));
+    let err = browser
+        .list_tree("S1", &["/sdcard/a.txt".into()], 1, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert!(matches!(err, FileError::NotAttached));
+}
+
+#[tokio::test]
+async fn list_tree_wrong_generation_is_cancelled() {
+    let browser = FileBrowser::new(client(isolated_fake_adb(LS_SCRIPT)));
+    let attached = browser
+        .attach("S1", CancellationToken::new())
+        .await
+        .expect("attach");
+    let err = browser
+        .list_tree(
+            "S1",
+            &["/sdcard/a.txt".into()],
+            attached.generation.wrapping_add(1),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, FileError::Adb(AdbError::Cancelled)));
+}

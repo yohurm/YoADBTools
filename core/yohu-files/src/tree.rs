@@ -26,12 +26,15 @@ pub struct TreeEntry {
 impl FileBrowser {
     /// 把一组远端路径展开成 FILEDESCRIPTOR 树（目录递归；文件一条）。
     /// 每条必须是安全根真子路径，并做祖先 realpath 复核。
+    /// `generation` 由调用方自带（拖出会话与 `BrowseAttach` 同一时钟）；不从槽位窥世代。
     pub async fn list_tree(
         &self,
         serial: &str,
         remotes: &[String],
+        generation: u64,
         cancel: CancellationToken,
     ) -> Result<Vec<TreeEntry>, FileError> {
+        self.ensure_generation(serial, generation)?;
         let mut out = Vec::new();
         let mut seen = HashSet::new();
         for raw in remotes {
@@ -48,7 +51,9 @@ impl FileBrowser {
                 cancel.clone(),
             )
             .await?;
-            let (is_dir, size) = self.classify(serial, &resolved, cancel.clone()).await?;
+            let (is_dir, size) = self
+                .classify(serial, &resolved, generation, cancel.clone())
+                .await?;
             self.push_tree(
                 serial,
                 path,
@@ -56,6 +61,7 @@ impl FileBrowser {
                 is_dir,
                 size,
                 0,
+                generation,
                 &mut out,
                 &mut seen,
                 cancel.clone(),
@@ -74,12 +80,12 @@ impl FileBrowser {
         &self,
         serial: &str,
         path: &RemotePath,
+        generation: u64,
         cancel: CancellationToken,
     ) -> Result<(bool, u64), FileError> {
         let parent =
             parent_remote(path.as_str()).ok_or_else(|| FileError::Path(path.as_str().into()))?;
         let name = last_segment(path.as_str());
-        let generation = self.slot_generation(serial).ok_or(FileError::NotAttached)?;
         let entries = self.list(serial, parent, generation, cancel).await?;
         let entry = entries
             .iter()
@@ -100,6 +106,7 @@ impl FileBrowser {
         is_dir: bool,
         size: u64,
         depth: u32,
+        generation: u64,
         out: &'a mut Vec<TreeEntry>,
         seen: &'a mut HashSet<String>,
         cancel: CancellationToken,
@@ -121,7 +128,6 @@ impl FileBrowser {
             if !is_dir {
                 return Ok(());
             }
-            let generation = self.slot_generation(serial).ok_or(FileError::NotAttached)?;
             let children = self
                 .list(serial, remote.as_str(), generation, cancel.clone())
                 .await?;
@@ -147,7 +153,7 @@ impl FileBrowser {
                     Some(true) => (true, 0),
                     Some(false) => (false, child.size),
                     None => {
-                        self.classify(serial, &child_resolved, cancel.clone())
+                        self.classify(serial, &child_resolved, generation, cancel.clone())
                             .await?
                     }
                 };
@@ -158,6 +164,7 @@ impl FileBrowser {
                     child_dir,
                     child_size,
                     depth + 1,
+                    generation,
                     out,
                     seen,
                     cancel.clone(),

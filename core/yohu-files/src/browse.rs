@@ -2,7 +2,7 @@
 //!
 //! 列表走浏览会话（Empty / Starting / Live）内的 `DeviceShell.exec` 或 oneshot `browse_list`。
 //! 世代与采集槽位同构（ADR-v6-016/033）：attach Ok 只表示该世代在槽位提交时已发布 Live；
-//! 之后 list / release 携带世代。过期 release 不得清掉更新一代。
+//! 之后 list / list_tree / release 携带世代。过期 release 不得清掉更新一代。
 //! UI 快照只加速绘制，禁止在本层因「进过父目录」而跳过 `readlink`（目录可被换成符号链接）。
 
 use std::collections::HashMap;
@@ -19,7 +19,6 @@ use yohu_adb::{AdbClient, AdbError, DeviceShell, DeviceShellError};
 use yohu_domain::SafetyRoot;
 use yohu_protocol::{BrowseAttach, RemoteEntry};
 
-const LIST_TIMEOUT: Duration = Duration::from_secs(20);
 const EXEC_ATTEMPTS: u32 = 2;
 
 struct BrowseSlot {
@@ -143,7 +142,7 @@ impl FileBrowser {
         Ok((generation, cancel))
     }
 
-    pub(crate) fn slot_generation(&self, serial: &str) -> Option<u64> {
+    fn slot_generation(&self, serial: &str) -> Option<u64> {
         let slot = self.slot(serial)?;
         let inner = slot.inner.lock().expect("browse slot lock poisoned");
         match *inner {
@@ -151,6 +150,15 @@ impl FileBrowser {
                 Some(generation)
             }
             SlotInner::Closed => None,
+        }
+    }
+
+    /// 调用方自带世代；只比较当前槽位。不由此函数发号，也不回填世代。
+    pub(crate) fn ensure_generation(&self, serial: &str, generation: u64) -> Result<(), FileError> {
+        match self.slot_generation(serial) {
+            None => Err(FileError::NotAttached),
+            Some(g) if g == generation => Ok(()),
+            Some(_) => Err(FileError::Adb(AdbError::Cancelled)),
         }
     }
 
@@ -318,17 +326,6 @@ impl FileBrowser {
         self.changed.notify_waiters();
     }
 
-    pub async fn detach_all(&self) {
-        let slots: Vec<Arc<BrowseSlot>> = {
-            let mut map = self.sessions.lock().expect("browse sessions lock poisoned");
-            map.drain().map(|(_, s)| s).collect()
-        };
-        for slot in slots {
-            Self::close_slot(&slot);
-        }
-        self.changed.notify_waiters();
-    }
-
     /// 丢掉工人，槽位仍 Live。改 `adb.path` 后下一趟 list 用新工具再握手。
     pub async fn drop_workers(&self) {
         let slots: Vec<Arc<BrowseSlot>> = self
@@ -474,7 +471,14 @@ impl FileBrowser {
                 }
                 Err(e) => return Err(e),
             };
-            match shell.exec(&script, LIST_TIMEOUT, cancel.clone()).await {
+            match shell
+                .exec(
+                    &script,
+                    Duration::from_millis(yohu_adb::BROWSE_LIST_TIMEOUT_MS),
+                    cancel.clone(),
+                )
+                .await
+            {
                 Ok(out) => {
                     self.restore_worker(&slot, generation, shell);
                     if !self.still_live(&slot, generation) {
