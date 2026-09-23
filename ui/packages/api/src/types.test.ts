@@ -332,16 +332,22 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     });
   });
 
-  it("DragOutRequest 为 serial + remotes + generation", () => {
+  it("DragOutRequest 为 serial + generation + items", () => {
     const req: DragOutRequest = {
       serial: "S",
-      remotes: ["/sdcard/a.txt", "/sdcard/DCIM"],
       generation: 7,
+      items: [
+        { remote: "/sdcard/a.txt", is_dir: false, size: 3 },
+        { remote: "/sdcard/DCIM", is_dir: true, size: 0 },
+      ],
     };
     expect(JSON.parse(JSON.stringify(req))).toEqual({
       serial: "S",
-      remotes: ["/sdcard/a.txt", "/sdcard/DCIM"],
       generation: 7,
+      items: [
+        { remote: "/sdcard/a.txt", is_dir: false, size: 3 },
+        { remote: "/sdcard/DCIM", is_dir: true, size: 0 },
+      ],
     });
   });
 
