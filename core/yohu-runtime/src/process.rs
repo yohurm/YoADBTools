@@ -135,7 +135,7 @@ impl ProcessRunner {
         timeout: Option<Duration>,
         cancel: CancellationToken,
     ) -> Result<ProcessOutput, ProcessError> {
-        let mut child = self.spawn(program, args)?;
+        let mut child = self.spawn(program, args, Stdio::null())?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -272,7 +272,7 @@ impl ProcessRunner {
         line_tx: mpsc::Sender<String>,
         join_stderr: bool,
     ) -> Result<i32, ProcessError> {
-        let mut child = self.spawn(program, args)?;
+        let mut child = self.spawn(program, args, Stdio::null())?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -429,13 +429,22 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(program, args)?))
+        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::null())?))
     }
 
-    fn spawn(&self, program: &Path, args: &[String]) -> Result<Child, ProcessError> {
+    /// 长驻且 stdin 可写（浏览 raw shell）。logcat / 投屏仍走 [`Self::spawn_child`]。
+    pub fn spawn_child_piped(
+        &self,
+        program: &Path,
+        args: &[String],
+    ) -> Result<ChildHandle, ProcessError> {
+        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::piped())?))
+    }
+
+    fn spawn(&self, program: &Path, args: &[String], stdin: Stdio) -> Result<Child, ProcessError> {
         let mut cmd = Command::new(program);
         cmd.args(args)
-            .stdin(Stdio::null())
+            .stdin(stdin)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         #[cfg(windows)]
@@ -721,5 +730,51 @@ mod tests {
         }
         assert!(saw_stderr, "joined 必须把 stderr 行交给 line_tx");
         let _ = join.await;
+    }
+
+    #[cfg(windows)]
+    fn ping_stdin_echo() -> (&'static Path, Vec<String>) {
+        (
+            Path::new("powershell"),
+            vec![
+                "-NoLogo".into(),
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                "$line = [Console]::In.ReadLine(); Write-Output (\"pong:{0}\" -f $line)".into(),
+            ],
+        )
+    }
+
+    #[cfg(unix)]
+    fn ping_stdin_echo() -> (&'static Path, Vec<String>) {
+        (
+            Path::new("sh"),
+            vec!["-c".into(), "read line; printf 'pong:%s\\n' \"$line\"".into()],
+        )
+    }
+
+    #[tokio::test]
+    async fn spawn_child_piped_roundtrip() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+        let runner = ProcessRunner;
+        let (program, args) = ping_stdin_echo();
+        let mut child = runner.spawn_child_piped(program, &args).expect("spawn piped");
+        let mut stdin = child.stdin.take().expect("stdin");
+        let mut stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+        stdin.write_all(b"hi\n").await.expect("write");
+        stdin.flush().await.expect("flush");
+        drop(stdin);
+        let mut line = String::new();
+        tokio::time::timeout(Duration::from_secs(8), stdout.read_line(&mut line))
+            .await
+            .expect("read timed out")
+            .expect("read");
+        assert!(
+            line.contains("pong:hi"),
+            "piped stdin 必须到达子进程: {line:?}"
+        );
+        child.kill_tree();
+        let _ = child.wait().await;
     }
 }
