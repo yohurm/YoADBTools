@@ -8,7 +8,7 @@
 - **页眉：** `YoChrome.leading={<YoBadge text={selectedLabel} tone="neutral" />}`；功能栏 `actions[{key,node}]`（上传 / 下载 / 刷新 / 预览），进出走库 chip。禁止 `deviceLabel`，禁止模块自挂 Presence 补页眉。
 - **修改时间：** `ls -lla`（toybox `-ll` = 秒+纳秒+时区）在解析边界经 domain `canonicalize_datetime_seconds` 收到 `YYYY-MM-DD HH:mm:ss`。列表与预览按原文显示，不补毫秒、不把「只有时分」补成秒
 - **传输作业：** [文件传输-v6.md](../文件传输-v6.md)。四个入口同一 `TransferJob`；DropSession 热态（官方拖入 enter 即亮虚线）；默认进当前目录，`files_drop_into_folder`（立即，默认关，无副标题）才指向目录行；浏览在 `listing.ts`，作业寿命在 `transfers.ts`；清单只经 `listingStore.requestListing`；传输终态只点名 `requestListing("transfer")`；坞是 `TransferDock`。禁止 `fileStore` 别名
-- 拖出协议细节：[文件拖拽-v6.md](../文件拖拽-v6.md) + ADR-v6-018。空态/加载走 `YoEmptyState` / `YoLoading` 的 `fill`；拖入虚线走清单 `YoPanel edge="drop"`（填充盒外一圈 YoCorner halo，不是面板描边），禁止 CSS `outline` 直角环，禁止模块再写 `--drop` 补丁，禁止点库根 `.yohu-empty-state` / `.yohu-loading` / `.yohu-panel`
+- 拖出协议细节：[文件拖拽-v6.md](../文件拖拽-v6.md) + ADR-v6-018。空态/加载走 `YoEmptyState` / `YoLoading` 的 `fill`；**`YoLoading` 只用于无快照的设备冷启动**（`listingPaint === cold`）。进目录命中快照直接画行；miss 为 pending（表头在、不铺加载、不把 loading 画成空目录）。拖入虚线走清单 `YoPanel edge="drop"`（填充盒外一圈 YoCorner halo，不是面板描边），禁止 CSS `outline` 直角环，禁止模块再写 `--drop` 补丁，禁止点库根 `.yohu-empty-state` / `.yohu-loading` / `.yohu-panel`
 - 右键：`files/src/menu.ts` → `openContextMenu`
 
 ### 设计前（清单 / 错误）
@@ -33,10 +33,10 @@ path-guard 只做前缀 startsWith，放过 /sdcard/../data
 
 ```text
 AddressSlot Enter → listingStore.goTo(原文)
-  → path-resolve（唯一）→ invoke files.list
+  → path-resolve（唯一）→ invoke files.list(generation)
   → commands/files require_online + 转发
   → browse_runs::list（替换取消槽，后一次取消前一次）
-  → FileBrowser.list（SafetyRoot + ls）
+  → FileBrowser.list（无槽/Closed→NotAttached；世代不符→Cancelled；Starting 同世代等待；Live 同世代才 list；永不 attach；SafetyRoot + DeviceShell.exec 内 readlink 祖先 walk + ls -lla；ADR-v6-033）
   → FileError Display（分类 + 路径）
   → ipc_file：
         RemoteNotFound → not_found
@@ -91,7 +91,7 @@ AddressSlot Enter
                   保留 // . .. ；无 collapseDotSegments
        path-guard：向量在 `@yohu/api` `safety.test` ↔ testdata/safety_root.json
        失败：notifyError，不改 path，不关输入
-       成功：loadListing → ++listGen → files.list → ListingEntry
+       成功：loadListing → ++listGen → files.list(generation) → ListingEntry
 面包屑 / 上级
   → listingStore.navigate / goUp（夹紧绝对段，不经 resolve）
 ```
@@ -114,8 +114,16 @@ store.ts 一份 createFileStore
 
 ```text
 listing.ts
-  listGen / requestListing / goTo（唯一 resolve）/ 挂载期 fault
-  detachView：error=""，errorTick=0
+  路径是会话身份；serial+path 快照缓存（对照 ddmlib FileListingService / VS Code _isDirectoryResolved）
+  bindSerial / attachView → files.session.attach → 持有 BrowseAttach.generation → files.list(generation)
+  过期 attach 成功：detach(返回的 generation)（core 过期空操作，不得杀掉更新 Live）；不 list
+  过期 detach 空操作（不得杀掉更新 Live）
+  detachView / bindSerial(null) → files.session.detach(所持 generation)
+  navigate / enter / goUp：立刻切 path，命中快照即画行，files.list(generation) 只对账
+  goTo：成功才切 path（手输未知路径）
+  listingPaint：rows | empty | cold | pending；YoLoading 只 cold
+  listGen / requestListing / 挂载期 fault
+  detachView：error=""，errorTick=0；快照保留到换 serial
   不 import transfers，不订 transfer/progress
 
 transfers.ts
@@ -218,8 +226,11 @@ DELETE_TIMEOUT_MS / MUTATE_TIMEOUT_MS 写在 guard.rs
 ```text
 ls:
   FileBrowser.list
-    → normalize_browse + resolve_and_recheck
-      AdbClient::readlink_f → yohu_adb::ReadlinkF（根导出）
+    → 须同世代 Live（无槽/Closed → NotAttached；世代不符 → Cancelled；Starting 同世代等待；永不偷偷 open）
+    → normalize_browse + DeviceShell.exec / oneshot（一次运输 = realpath 复核 + ls）
+      禁止拆成两次 adb 短命令；禁止因「进过父目录」而跳过 readlink（目录可被换成符号链接逃出安全根）
+      UI 快照只加速绘制，不代替 core 复核
+      AdbClient::readlink_f 仍供 mutate / transfer / list_tree
     → AdbClient::ls
     → map_err(file_error_from_adb)
       BadExit → classify_remote_stderr → 命名变体
@@ -247,6 +258,42 @@ delete:
 ```
 
 不做什么：不恢复 `From<AdbError>`；不把分类推到壳；files 不写 `yohu_adb::parse::`；守卫只做词典 + 祖先拼接 + SafetyRoot 复核。
+
+### 设计前（浏览运输）
+
+```text
+AdbClient::browse_list
+  → run() 短命令信号量
+  → 每次 spawn adb.exe -s serial shell sh -c '<readlink walk; ls -lla>'
+  → 进程退出；下次进目录再 spawn 一次
+UI dirCache 命中只加速绘制；files.list 仍走上面整条
+```
+
+问题：小目录延迟被 `adb.exe` + 设备新 shell 主导。快照不能让第一次进 DCIM 变快，也不能代替 SafetyRoot。
+
+### 设计后（浏览会话）
+
+```text
+FileView 挂载且有 serial（对标 Device Explorer）
+  → files.session.attach → BrowseAttach { generation, adopted }
+  → UI 持有 generation（attach Ok = 该世代在槽位提交时已发布 Live，不保证稍后观察时仍 Live）
+  → FileBrowser.attach：Empty→Starting(g)→Live（DeviceShell 握手；握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot；已 Live 则 adopt）
+  → 过期 attach 不得把更新一代写成 Live
+files.list(serial, path, generation)
+  → browse_runs（后一次取消前一次）
+  → 无槽 / Closed → NotAttached；世代不符 → Cancelled
+  → Starting 同世代等待；Live 同世代才 list；永不 attach
+  → SafetyRoot 词典 + 复核（不变）
+  → Live+工人：同一条 stdin exec 一趟（子 shell + BEGIN/END nonce）
+  → Live+oneshot：sh -c 短命令
+  → 取消 / 超时 / 断管 → 杀工人，槽位仍 Live，下一趟再 open
+离开模块 / bindSerial(null) → files.session.detach(所持 generation) → browse_runs::release（世代不符空操作：不关槽、不 replace 取消在途 list；命中才关槽并取消在途 list）；过期 detach 空操作
+掉线 went_offline（壳目录，非 IPC）→ browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后
+改 adb.path → drop_workers、槽位仍 Live、世代不变；下一趟 list 再握手
+UI dirCache 对标 FileEntry 绘制快照；每次仍 readlink + ls
+```
+
+不做什么：不重实现 `sync:`；不把 Hub / logcat / push 接到 DeviceShell；不因进过父目录跳过 readlink；不用缓存代替 list；不在检测到设备时开浏览会话。见 [ADR-v6-033](../adr/ADR-v6-033.md)。
 
 传输 / 拖入 / 清单 / 坞的作业模型见 [文件传输-v6.md](../文件传输-v6.md)，本文不再叠第二套设计前/后。
 

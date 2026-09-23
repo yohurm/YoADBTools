@@ -144,8 +144,13 @@ invoke mirror.present.setActive(true) + mirror.layout
   → PresentHost::layout → ensure_surface 建 HWND
   → occupancy DComp clip contain
 
-invoke files.list → commands/files require_online → browse_runs::list（后一次取消前一次）
-  → FileBrowser.list（core SafetyRoot）
+invoke files.session.attach → commands/files require_online → browse_runs::attach
+  → FileBrowser.attach（Empty→Starting→Live 或 adopt；返回 BrowseAttach；ADR-v6-033）
+  → UI 持有 generation
+invoke files.list(serial, path, generation) → commands/files require_online → browse_runs::list（后一次取消前一次）
+  → FileBrowser.list（无槽/Closed→NotAttached；世代不符→Cancelled；Starting 同世代等待；Live 同世代才 list；永不 attach；SafetyRoot + DeviceShell.exec / oneshot）
+invoke files.session.detach(serial, generation) → browse_runs::release（世代不符空操作：不关槽、不 replace 取消在途 list；命中才关槽并取消在途 list；视图卸载带所持世代）
+went_offline（壳目录，非 IPC）→ browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后
 invoke files.push/pull → transfer_runs::spawn（tokio::spawn(run)；立即返回 id）
 invoke files.dragOut → dnd → transfer_runs::run（Win block_on / mac await）
 invoke log.export → commands/log 转发 → capture_runs::export
