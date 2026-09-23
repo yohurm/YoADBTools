@@ -11,6 +11,10 @@ import {
   transferIndeterminate,
   transferLabel,
   transferPercent,
+  transferToastDetail,
+  transferToastLeading,
+  transferToastProgress,
+  transferToastTone,
   transferTone,
 } from "./transfer-model";
 
@@ -125,5 +129,28 @@ describe("transferFaultText", () => {
     expect(transferFaultText({ kind: "remote_not_found", path: "/sdcard/a" })).not.toContain(
       "没有这个目录",
     );
+  });
+});
+
+describe("传输 toast 快照", () => {
+  it("方向图标、失败文案、运行中才带进度", () => {
+    expect(transferToastLeading("push")).toBe("arrow-up");
+    expect(transferToastLeading("pull")).toBe("arrow-down");
+    expect(transferToastTone("done")).toBe("success");
+    expect(transferToastTone("failed")).toBe("error");
+    expect(transferToastTone("running")).toBe("info");
+    const running = createTransferJob({ id: 1, direction: "push", name: "shot.png", total: 100 });
+    expect(transferToastDetail(running)).toBe("传输中");
+    expect(transferToastProgress(running)).toEqual({ value: 0, indeterminate: false });
+    const failed = applyProgressToJob(running, {
+      id: 1,
+      direction: "push",
+      bytes: 0,
+      total: 100,
+      state: "failed",
+      fault: { kind: "remote_not_found", path: "/sdcard/shot.png" },
+    });
+    expect(transferToastDetail(failed)).toBe("远端不存在: /sdcard/shot.png");
+    expect(transferToastProgress(failed)).toBeUndefined();
   });
 });

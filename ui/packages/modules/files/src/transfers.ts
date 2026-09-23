@@ -1,5 +1,5 @@
 /**
- * TransferJob 寿命：发号、progress、淡出、push/pull/cancel/dragOut。
+ * TransferJob 寿命：发号、progress、淡出、push/pull/cancel/dismiss/dragOut。
  * 读 listingStore.serial/path；终态只调 requestListing("transfer")。
  */
 
@@ -12,7 +12,7 @@ import {
   filesPush,
   onTransferProgress,
 } from "@yohu/api";
-import type { TransferProgress } from "@yohu/api";
+import type { DragOutItem, TransferProgress } from "@yohu/api";
 import { DISMISS_HOLD_DURATION, motionDurationMs } from "@yohu/ui";
 
 import { localBaseName, namesForDrag } from "./drop";
@@ -30,20 +30,34 @@ import {
 
 const TERMINAL_KEEP_MS = motionDurationMs(DISMISS_HOLD_DURATION);
 
+function dragItems(names: readonly string[]): DragOutItem[] {
+  const dir = listingStore.session.path;
+  const byName = new Map(listingStore.entries.map((entry) => [entry.name, entry]));
+  return names.flatMap((name) => {
+    const entry = byName.get(name);
+    if (!entry) return [];
+    return [
+      {
+        remote: childPath(dir, name),
+        is_dir: entry.kind === "dir",
+        size: entry.size,
+      },
+    ];
+  });
+}
+
 export function createTransferStore() {
   const [transfers, setTransfers] = createStore<TransferJob[]>([]);
-  const [ui, setUi] = createStore({
-    transfersOpen: true,
-  });
 
   const speedBase = new Map<number, { bytes: number; ts: number }>();
   const fadeTimers = new Map<number, number>();
+  const dismissed = new Set<number>();
 
   function adoptJob(job: TransferJob): void {
+    if (dismissed.has(job.id)) return;
     const index = transfers.findIndex((item) => item.id === job.id);
     if (index < 0) {
       setTransfers((ts) => [...ts, job]);
-      setUi("transfersOpen", true);
       return;
     }
     const current = transfers[index];
@@ -55,6 +69,7 @@ export function createTransferStore() {
   }
 
   function upsertTransfer(progress: TransferProgress): void {
+    if (dismissed.has(progress.id)) return;
     const existing = transfers.find((t) => t.id === progress.id);
     if (!shouldAcceptProgress(existing?.state, progress.state)) return;
     const now = Date.now();
@@ -73,7 +88,6 @@ export function createTransferStore() {
         total: progress.total,
       });
       setTransfers((ts) => [...ts, applyProgressToJob(born, progress, speed)]);
-      setUi("transfersOpen", true);
     } else {
       setTransfers(index, applyProgressToJob(existing, progress, speed));
     }
@@ -85,6 +99,7 @@ export function createTransferStore() {
         progress.id,
         window.setTimeout(() => {
           fadeTimers.delete(progress.id);
+          dismissed.add(progress.id);
           setTransfers((ts) => ts.filter((t) => t.id !== progress.id));
         }, TERMINAL_KEEP_MS),
       );
@@ -191,10 +206,11 @@ export function createTransferStore() {
     const names = namesForDrag(listingStore.selection.names, dragName);
     if (names.length === 0) return;
     if (generation === 0) return;
+    const items = dragItems(names);
+    if (items.length === 0) return;
     dragging = true;
     try {
-      const remotes = names.map((name) => childPath(listingStore.session.path, name));
-      await filesDragOut({ serial: current, remotes, generation });
+      await filesDragOut({ serial: current, generation, items });
       listingStore.notifyError("");
     } catch (e) {
       listingStore.notifyError(filesFaultText(e));
@@ -203,8 +219,19 @@ export function createTransferStore() {
     }
   }
 
-  function toggleTransfers(): void {
-    setUi("transfersOpen", (v) => !v);
+  function dismiss(id: number): void {
+    dismissed.add(id);
+    const prev = fadeTimers.get(id);
+    if (prev !== undefined) window.clearTimeout(prev);
+    fadeTimers.delete(id);
+    speedBase.delete(id);
+    const current = transfers.find((item) => item.id === id);
+    setTransfers((ts) => ts.filter((item) => item.id !== id));
+    if (current?.state === "running") {
+      void filesCancel(id).catch((e) => {
+        if (!isNotFoundError(e)) listingStore.notifyError(filesFaultText(e));
+      });
+    }
   }
 
   void onTransferProgress((e) => {
@@ -214,13 +241,12 @@ export function createTransferStore() {
 
   return {
     transfers,
-    ui,
     push,
     pushLocals,
     pull,
     cancel,
+    dismiss,
     dragOut,
-    toggleTransfers,
   };
 }
 

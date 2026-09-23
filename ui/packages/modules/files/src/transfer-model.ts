@@ -87,6 +87,32 @@ export function transferFaultText(fault: TransferFault | undefined): string {
   }
 }
 
+export function transferToastTone(state: TransferState): "success" | "error" | "info" {
+  if (state === "done") return "success";
+  if (state === "failed") return "error";
+  return "info";
+}
+
+export function transferToastLeading(direction: "push" | "pull"): "arrow-up" | "arrow-down" {
+  return direction === "push" ? "arrow-up" : "arrow-down";
+}
+
+export function transferToastDetail(job: TransferJob): string {
+  const fault = transferFaultText(job.fault);
+  if (fault) return fault;
+  return transferLabel(job.state);
+}
+
+export function transferToastProgress(
+  job: TransferJob,
+): { value?: number; indeterminate?: boolean } | undefined {
+  if (job.state !== "running") return undefined;
+  return {
+    value: transferPercent(job.bytes, job.total),
+    indeterminate: transferIndeterminate(job.state, job.total),
+  };
+}
+
 export function transferFallbackName(direction: "push" | "pull", id: number): string {
   return `${direction === "push" ? "上传" : "下载"} #${id}`;
 }

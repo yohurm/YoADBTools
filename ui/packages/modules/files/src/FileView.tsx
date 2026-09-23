@@ -24,7 +24,7 @@ import { CreateDialog, type CreateDialogApi } from "./CreateDialog";
 import { DeleteDialog, type DeleteDialogApi } from "./DeleteDialog";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
-import { TransferDock } from "./TransferDock";
+import { TransferToasts } from "./TransferToasts";
 import { localBaseName } from "./drop";
 import { createDropSession } from "./drop-session";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
@@ -246,14 +246,11 @@ export function FileView(props: DeviceSession) {
           <PreviewPane />
         </div>
       </div>
-      <div class="yohu-files__transfer-slot" data-drop="ignore">
-        <TransferDock />
-      </div>
-
       <div data-drop="ignore">
         <DeleteDialog api={(api) => { deleteDialog = api; }} />
         <CreateDialog api={(api) => { createDialog = api; }} />
       </div>
+      <TransferToasts toaster={toaster} />
       <YoToaster toaster={toaster} />
     </YoPage>
   );
