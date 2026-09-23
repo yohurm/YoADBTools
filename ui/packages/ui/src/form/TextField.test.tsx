@@ -40,7 +40,7 @@ describe("YoTextField", () => {
       />
     ));
     const clear = screen.getByRole("button", { name: "清除" });
-    expect(clear).toBeTruthy();
+    expect(clear.classList.contains("yohu-recipe-clear")).toBe(true);
     fireEvent.click(clear);
     expect(onInput).toHaveBeenCalledWith("", expect.anything());
   });

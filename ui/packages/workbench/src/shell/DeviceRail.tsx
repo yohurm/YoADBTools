@@ -2,11 +2,10 @@
  * 设备栏（UI设计系统-v6.md §3）：展开为卡片，图标轨为状态点。
  * 行走 YoListItem + YoStatusDot；标题走 YoSubheader（计数徽章走 meta）；
  * 刷新是标题行兄弟，不进 actions。滚动走 YoScroller。
- * 选中 = `.yohu-interactive--selected`（全表面同一配方）；
+ * 选中 = `.yohu-interactive--selected` + 配方 selected（项内弹出，禁止滑块换行）；
  * 无设备 hug（`recipe=collapse` + `YoEmptyState size=sm`）；有列表才 `fill` 吃帽下剩余高。
  * 空态短引导；有 lastError 才出明细和重试。
- * 滑块在 list 宿主内裁切；项滚动走 YoScroller，避免弹簧过冲撑出 Windows 双滚动条。
- * 插拔走 `YoListPresence`（配方 list）；空态/徽章仍直切。
+ * 项滚动走 YoScroller。插拔走 `YoListPresence`（配方 list）；空态/徽章仍直切。
  * 键盘：roving tabindex（焦点行 0）+ Enter/Space 选择，role=listbox/option。
  * MultiOptional：单击替换勾选；Ctrl/Meta+click 加减选。高亮 = 解析后的执行目标。
  */
@@ -19,7 +18,6 @@ import {
   YoCollapse,
   YoEmptyState,
   YoIconButton,
-  YoIndicator,
   YoListItem,
   YoListPresence,
   YoRailSlot,
@@ -69,10 +67,6 @@ export const DeviceRail: Component<{
   const empty = (): boolean => deviceStore.state.devices.length === 0;
   const emptyHint = (): string =>
     deviceStore.state.lastError || "连接设备并授权后刷新";
-  const indicatorFollow = (): string | undefined => {
-    const ids = targets();
-    return ids.length === 1 ? ids[0] : undefined;
-  };
 
   const select = (serial: string, event?: MouseEvent | KeyboardEvent): void => {
     deviceStore.selectDevice(serial, {
@@ -155,7 +149,6 @@ export const DeviceRail: Component<{
               aria-label="设备列表"
               aria-multiselectable={multi() || undefined}
             >
-              <YoIndicator follow={indicatorFollow()} variant="fill" />
               <YoScroller>
                 <div class="yohu-device-rail__stack">
                     <YoListPresence each={deviceStore.state.devices} key={(device) => device.serial}>

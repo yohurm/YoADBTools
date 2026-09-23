@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   isListRowHot,
-  listRowOwnsFill,
   resolveListRowChrome,
   resolveListRowRadius,
 } from "./list-row-model";
@@ -26,7 +25,7 @@ describe("list-row-model", () => {
     });
   });
 
-  it("document 可选单选：半径 chip，跟 fill 滑块同一族", () => {
+  it("document 可选单选：半径 chip，行自绘选中底", () => {
     expect(resolveListRowRadius({ selectable: true })).toBe("chip");
     expect(resolveListRowChrome({ selectable: true, selected: true })).toEqual({
       fill: "selected",
@@ -55,9 +54,8 @@ describe("list-row-model", () => {
     expect(isListRowHot(2, "2")).toBe(false);
   });
 
-  it("只有 list 行自绘选中底", () => {
-    expect(listRowOwnsFill("list")).toBe(true);
-    expect(listRowOwnsFill("document")).toBe(false);
-    expect(listRowOwnsFill()).toBe(false);
+  it("半径：list 直角，document 可选单选 chip", () => {
+    expect(resolveListRowRadius({ tone: "list", selectable: true })).toBe("none");
+    expect(resolveListRowRadius({ selectable: true })).toBe("chip");
   });
 });

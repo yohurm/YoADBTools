@@ -1,0 +1,22 @@
+/* 强调条几何井。填充在 __mark-fill；开合在配方 selected。
+ * 特异度必须压过壳后载入的 .yohu-interactive > * { position: relative }。 */
+
+.yohu-list-item.yohu-interactive > .yohu-list-item__mark {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: var(--yohu-radius-sm);
+  width: var(--yohu-space-xs);
+  overflow: hidden;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-start-end-radius: var(--yohu-radius-pill);
+  border-end-end-radius: var(--yohu-radius-pill);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.yohu-list-item__mark-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--yohu-accent);
+}

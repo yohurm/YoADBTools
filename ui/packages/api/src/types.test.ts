@@ -26,7 +26,7 @@ import {
   LOG_LINE_LAYOUT_DEFAULT,
 } from "./log-line-layout";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type Density, type DeviceStatus, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type BrowseAttach, type Density, type DeviceStatus, type DragOutRequest, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -212,6 +212,19 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(JSON.stringify(entry)).toContain('"kind":"dir"');
   });
 
+  it("BrowseAttach 与 CaptureStart 同构", () => {
+    const attach: BrowseAttach = {
+      serial: "S1",
+      generation: 2,
+      adopted: false,
+    };
+    expect(JSON.parse(JSON.stringify(attach))).toEqual({
+      serial: "S1",
+      generation: 2,
+      adopted: false,
+    });
+  });
+
   it("captureState 事件含 generation", () => {
     const event: AppEvent = {
       kind: "captureState",
@@ -319,11 +332,22 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     });
   });
 
-  it("DragOutRequest 为 serial + remotes", () => {
-    const req = { serial: "S", remotes: ["/sdcard/a.txt", "/sdcard/DCIM"] };
+  it("DragOutRequest 为 serial + generation + items", () => {
+    const req: DragOutRequest = {
+      serial: "S",
+      generation: 7,
+      items: [
+        { remote: "/sdcard/a.txt", is_dir: false, size: 3 },
+        { remote: "/sdcard/DCIM", is_dir: true, size: 0 },
+      ],
+    };
     expect(JSON.parse(JSON.stringify(req))).toEqual({
       serial: "S",
-      remotes: ["/sdcard/a.txt", "/sdcard/DCIM"],
+      generation: 7,
+      items: [
+        { remote: "/sdcard/a.txt", is_dir: false, size: 3 },
+        { remote: "/sdcard/DCIM", is_dir: true, size: 0 },
+      ],
     });
   });
 

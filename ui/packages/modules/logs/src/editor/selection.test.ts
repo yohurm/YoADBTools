@@ -67,7 +67,6 @@ describe("readDocSel", () => {
     row.dataset.docFrom = "0";
     const band = document.createElement("span");
     band.dataset.logChrome = "";
-    band.className = "yohu-doc-sel";
     band.textContent = "ghost";
     const text = document.createElement("span");
     text.textContent = "abcdef";
@@ -80,7 +79,7 @@ describe("readDocSel", () => {
     const selection = window.getSelection()!;
     selection.removeAllRanges();
     selection.addRange(range);
-    expect(readDocSel(list, selection, () => 6)).toEqual({
+    expect(readDocSel(list, selection)).toEqual({
       start: { seq: 2, off: 2 },
       end: { seq: 2, off: 5 },
     });
@@ -88,9 +87,53 @@ describe("readDocSel", () => {
     range.setEnd(row, 2);
     selection.removeAllRanges();
     selection.addRange(range);
-    expect(readDocSel(list, selection, () => 6)).toEqual({
+    expect(readDocSel(list, selection)).toEqual({
       start: { seq: 2, off: 0 },
       end: { seq: 2, off: 6 },
+    });
+  });
+
+  it("跨行只认 caret 两点；中间行 selSlice 从第 0 列，不跟首行消息 off", () => {
+    const list = document.createElement("div");
+    const rows = [1, 2, 3].map((seq) => {
+      const row = document.createElement("div");
+      row.dataset.seq = String(seq);
+      row.dataset.docFrom = "0";
+      const band = document.createElement("span");
+      band.dataset.logChrome = "";
+      const meta = document.createElement("span");
+      meta.textContent = "HEADER____";
+      const msg = document.createElement("span");
+      msg.textContent = `msg-${seq}----`;
+      row.append(band, meta, msg);
+      list.append(row);
+      return row;
+    });
+    document.body.append(list);
+    const startMsg = rows[0]!.childNodes[2]!.firstChild!;
+    const endMsg = rows[2]!.childNodes[2]!.firstChild!;
+    const range = document.createRange();
+    range.setStart(startMsg, 0);
+    range.setEnd(endMsg, 4);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const sel = readDocSel(list, selection);
+    expect(sel).toEqual({
+      start: { seq: 1, off: 10 },
+      end: { seq: 3, off: 14 },
+    });
+    expect(selSlice({ seq: 1, docFrom: 0, text: "HEADER____msg-1----" }, sel!)).toEqual({
+      fromCh: 10,
+      chars: 9,
+    });
+    expect(selSlice({ seq: 2, docFrom: 0, text: "HEADER____msg-2----" }, sel!)).toEqual({
+      fromCh: 0,
+      chars: 19,
+    });
+    expect(selSlice({ seq: 3, docFrom: 0, text: "HEADER____msg-3----" }, sel!)).toEqual({
+      fromCh: 0,
+      chars: 14,
     });
   });
 });

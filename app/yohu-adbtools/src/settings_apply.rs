@@ -19,6 +19,7 @@ pub async fn set(
     if key == SettingKey::AdbPath {
         let path = (!updated.adb_path.is_empty()).then(|| PathBuf::from(&updated.adb_path));
         state.client.set_user_path(path);
+        crate::browse_runs::reset_transport(state).await;
         state.app_log.info(if updated.adb_path.is_empty() {
             "ADB 路径已重置为自动解析".to_string()
         } else {

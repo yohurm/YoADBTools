@@ -15,6 +15,9 @@ pub enum AdbError {
     Timeout,
     #[error("任务已取消")]
     Cancelled,
+    /// `adb shell -T` 不可用，调用方回退短命令。不是 IO 故障。
+    #[error("浏览 shell 不可用")]
+    UnsupportedShell,
     #[error("执行失败(退出码 {exit_code}): {stderr}")]
     BadExit { exit_code: i32, stderr: String },
     #[error("IO 错误: {0}")]

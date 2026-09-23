@@ -16,7 +16,8 @@ pub(crate) const BATCH_FLUSH_INTERVAL: Duration = Duration::from_millis(150);
 pub(crate) const BATCH_MAX_LINES: usize = 1000;
 pub(crate) const BATCH_MAX_BYTES: usize = 512 * 1024;
 
-/// 批量器句柄（feed 一条 logd 记录）。
+/// 批量器句柄（feed 一条 logd 记录）。Clone 给各次跟流 attempt；聚合环属代际。
+#[derive(Clone)]
 pub(crate) struct Batcher {
     line_tx: mpsc::Sender<LogLine>,
 }

@@ -14,6 +14,7 @@ import type {
   CaptureStart,
   CaptureStatus,
   BlockRunRequest,
+  BrowseAttach,
   CommandLibraryDto,
   DeviceInfo,
   DeviceStatus,
@@ -85,8 +86,14 @@ export const commandlibSave = (dto: CommandLibraryDto) =>
 
 // ===== files =====
 
-export const filesList = (serial: string, path: string) =>
-  invoke<RemoteEntry[]>("files.list", { serial, path });
+export const filesList = (serial: string, path: string, generation: number) =>
+  invoke<RemoteEntry[]>("files.list", { serial, path, generation });
+
+export const filesSessionAttach = (serial: string) =>
+  invoke<BrowseAttach>("files.session.attach", { serial });
+
+export const filesSessionDetach = (serial: string, generation: number) =>
+  invoke<void>("files.session.detach", { serial, generation });
 
 export const filesPush = (req: TransferRequest) => invoke<number>("files.push", { req });
 

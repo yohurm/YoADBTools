@@ -22,6 +22,7 @@ describe("YoChip", () => {
     expect(chrome?.getAttribute("data-mode")).toBe("paint");
     expect(chrome?.parentElement).toBe(host);
     expect(remove.parentElement).toBe(host);
+    expect(remove.classList.contains("yohu-recipe-dismiss")).toBe(true);
     expect(remove.querySelector(".yohu-icon")).toBeTruthy();
     expect(remove.hasAttribute("data-dialog-skip")).toBe(false);
     fireEvent.click(remove);
@@ -61,10 +62,9 @@ describe("YoChip", () => {
     expect(css).not.toContain("opacity: 0");
     expect(css).not.toContain('[data-dismiss="hover"]');
     expect(css).toContain("height: var(--yohu-control-height-sm)");
-    expect(css).toContain("width: var(--yohu-layout-icon-sm)");
-    expect(css).toContain("border-radius: var(--yohu-radius-full)");
-    expect(css).toContain("background-color: var(--yohu-fg-2)");
-    expect(css).toContain("color: var(--yohu-surface)");
+    expect(css).not.toContain(".yohu-chip__remove");
+    expect(css).not.toContain("background-color: var(--yohu-fg-2)");
+    expect(src).toContain("./dismiss-mark");
   });
 
   it("胶囊 hug 可缩、关闭在流内，禁止绝对定位关钮", () => {
@@ -73,9 +73,8 @@ describe("YoChip", () => {
     expect(chipRule).toContain("flex: 0 1 auto");
     expect(chipRule).toContain("min-width: 0");
     expect(chipRule).not.toContain("border-radius:");
-    const removeBlock = css.slice(css.indexOf(".yohu-chip__remove {"));
+    const removeBlock = css.slice(css.indexOf(".yohu-chip .yohu-recipe-dismiss {"));
     const removeRule = removeBlock.slice(0, removeBlock.indexOf("}") + 1);
-    expect(removeRule).toContain("flex: 0 0 auto");
     expect(removeRule).not.toContain("align-self");
     expect(removeRule).not.toContain("position: absolute");
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);

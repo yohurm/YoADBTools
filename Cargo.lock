@@ -5144,6 +5144,7 @@ dependencies = [
  "yohu-adb",
  "yohu-domain",
  "yohu-protocol",
+ "yohu-runtime",
 ]
 
 [[package]]

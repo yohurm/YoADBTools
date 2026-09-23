@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { createSignal } from "solid-js";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoRail } from "../motion/engines/rail";
 import { YoListItem } from "./ListItem";
@@ -14,6 +15,9 @@ describe("YoListItem", () => {
     expect(row?.getAttribute("role")).toBe("option");
     expect(row?.getAttribute("aria-selected")).toBe("true");
     expect(row?.classList.contains("yohu-interactive--selected")).toBe(true);
+    expect(row?.classList.contains("yohu-recipe-selected")).toBe(true);
+    expect(container.querySelector(".yohu-list-item__mark")).toBeTruthy();
+    expect(container.querySelector(".yohu-list-item__mark-fill")).toBeTruthy();
     expect(screen.getByText("SERIAL")).toBeTruthy();
     expect(container.querySelector(".yohu-list-item__extra")).toBeTruthy();
     expect(container.querySelector(".yohu-list-item__description")?.textContent).toBe("SERIAL");
@@ -96,6 +100,47 @@ describe("YoListItem", () => {
     expect(css).toContain(':not([data-stream="open"])');
     expect(css).toContain("min-height var(--yohu-motion-spatial-rail)");
     expect(css).toContain("max-width var(--yohu-motion-spatial-rail)");
+    expect(css).not.toContain(".yohu-list-item__mark");
+    expect(css).toContain("color var(--yohu-motion-effects-fast)");
+    expect(css).not.toContain("[aria-current] .yohu-list-item__title");
     expect(css).not.toContain(".yohu-recipe-rail");
+  });
+
+  it("导航首次选中不弹，换项后 leading 才 bounce", () => {
+    const first = render(() => (
+      <YoListItem
+        role="button"
+        size="nav"
+        title="终端"
+        selected
+        leading={<span>i</span>}
+      />
+    ));
+    expect(first.container.querySelector(".yohu-list-item__leading")?.hasAttribute("data-bounce")).toBe(
+      false,
+    );
+    first.unmount();
+
+    const Harness = () => {
+      const [selected, setSelected] = createSignal(false);
+      return (
+        <>
+          <button type="button" onClick={() => setSelected(true)}>
+            pick
+          </button>
+          <YoListItem
+            role="button"
+            size="nav"
+            title="终端"
+            selected={selected()}
+            leading={<span>i</span>}
+          />
+        </>
+      );
+    };
+    const { container } = render(() => <Harness />);
+    expect(container.querySelector(".yohu-list-item__leading")?.hasAttribute("data-bounce")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "pick" }));
+    expect(container.querySelector(".yohu-list-item__leading")?.hasAttribute("data-bounce")).toBe(true);
   });
 });

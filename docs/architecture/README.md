@@ -15,11 +15,11 @@
 | [youi.md](youi.md) | `@yohu/ui`（对外名 YoUI） |
 | [workbench.md](workbench.md) | `@yohu/workbench` + `apps/shell` |
 | [modules/](modules/) | terminal / files / logs / mirror / update / **device** / [device-wireless（方案）](modules/device-wireless.md) |
-| [adr/](adr/) | ADR-v6-001～032 |
+| [adr/](adr/) | ADR-v6-001～033 |
 | [UI设计系统-v6.md](UI设计系统-v6.md) | token / 密度 / 主题 |
 | [动画系统-v6.md](动画系统-v6.md) | 动效（ADR-v6-017） |
 | [右键菜单-v6.md](右键菜单-v6.md) | 右键引擎（ADR-v6-019） |
-| [文件传输-v6.md](文件传输-v6.md) | 上下载 / 拖入拖出 / 进度 / 清单 / 传输坞（整条作业） |
+| [文件传输-v6.md](文件传输-v6.md) | 上下载 / 拖入拖出 / 进度 / 清单 / YoToast 传输通知 |
 | [文件拖拽-v6.md](文件拖拽-v6.md) | Explorer 拖出协议细节（ADR-v6-018）；作业入口以传输文为准 |
 
 旧入口 [`架构设计-v6.md`](架构设计-v6.md) 仅为跳转页，正文已拆到上表。

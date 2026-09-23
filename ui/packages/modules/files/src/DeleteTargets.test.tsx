@@ -72,8 +72,28 @@ describe("DeleteTargets", () => {
       />
     ));
     const close = document.querySelector('[aria-label="移除 drop.png"]');
-    expect(close).toBeTruthy();
+    expect(close?.classList.contains("yohu-recipe-dismiss")).toBe(true);
     fireEvent.click(close!);
     expect(removed).toEqual(["drop.png"]);
+  });
+
+  it("每一项关闭走配方圆钮，不自造 IconButton", () => {
+    render(() => (
+      <DeleteTargets
+        names={["a.png", "b.bin", "c.apk"]}
+        expanded={false}
+        onExpandedChange={() => {}}
+        onRemove={() => {}}
+      />
+    ));
+    const chips = visibleChips();
+    expect(chips).toHaveLength(3);
+    for (const chip of chips) {
+      const mark = chip.querySelector(":scope > .yohu-recipe-dismiss");
+      expect(mark).toBeTruthy();
+      expect(mark?.getAttribute("aria-label")?.startsWith("移除 ")).toBe(true);
+    }
+    expect(document.querySelector(".yohu-icon-button")).toBeNull();
+    expect(document.querySelector(".yohu-files__delete-chip-remove")).toBeNull();
   });
 });

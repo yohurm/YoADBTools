@@ -130,10 +130,10 @@ describe("地址槽接线", () => {
   });
 });
 
-function loadTransferDock(): string {
+function loadTransferToasts(): string {
   const candidates = [
-    resolve(process.cwd(), "src/TransferDock.tsx"),
-    resolve(process.cwd(), "packages/modules/files/src/TransferDock.tsx"),
+    resolve(process.cwd(), "src/TransferToasts.tsx"),
+    resolve(process.cwd(), "packages/modules/files/src/TransferToasts.tsx"),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
@@ -143,46 +143,28 @@ function loadTransferDock(): string {
   return "";
 }
 
-const transferDock = loadTransferDock();
+const transferToasts = loadTransferToasts();
 
-describe("传输坞开合契约", () => {
-  it("整块走 Presence rise，列表走一层 YoCollapse，行不套第二张卡", () => {
-    expect(transferDock).toContain('recipe="rise"');
-    expect(transferDock).toContain("YoPresence");
-    expect(transferDock.match(/<YoCollapse /g)?.length).toBe(1);
-    expect(transferDock).toContain('recipe="panel"');
-    expect(transferDock).not.toMatch(/<YoScroller[\s>]/);
-    expect(transferDock).not.toMatch(/<YoCorner[\s>]/);
-    expect(transferDock).toContain("yohu-recipe-tree-chevron");
-    expect(transferDock).toContain("toggleTransfers");
-    expect(transferDock).toContain("YoButton");
-    expect(transferDock).toContain("block");
-    expect(transferDock).not.toContain("<button");
-    expect(transferDock).not.toContain("TransferPanel");
-    expect(transferDock).not.toContain("overflowX");
+describe("传输 toast 契约", () => {
+  it("作业同步进 YoToaster，不自绘坞", () => {
+    expect(transferToasts).toContain("toaster.show");
+    expect(transferToasts).toContain("toaster.update");
+    expect(transferToasts).toContain("transferStore.dismiss");
+    expect(transferToasts).toContain("sticky: true");
+    expect(transferToasts).not.toContain("TransferDock");
+    expect(transferToasts).not.toContain("YoCollapse");
+    expect(transferToasts).not.toContain("YoProgressBar");
+    expect(transferToasts).not.toContain("toggleTransfers");
   });
 
-  it("方向图标走 YoTooltip，不写原生 title、不包已画出的文件名", () => {
-    expect(transferDock).toContain("YoTooltip");
-    expect(transferDock).toContain('content={job().direction === "push" ? "上传" : "下载"}');
-    expect(transferDock).toContain("tabIndex={0}");
-    expect(transferDock).not.toMatch(/<span[^>]*title=/);
-    const nameSlice = transferDock.slice(
-      transferDock.indexOf("yohu-files__transfer-name"),
-      transferDock.indexOf("yohu-files__transfer-meta"),
-    );
-    expect(nameSlice).not.toContain("YoTooltip");
-    expect(nameSlice).not.toContain("tabIndex");
-  });
-
-  it("模块 CSS 不自写 animation / 原生 overflow auto，帽高走 layout token", () => {
+  it("模块 CSS 不自写 animation / 原生 overflow auto，也不再铺传输坞", () => {
     expect(filesCss).not.toMatch(/animation\s*:/);
     expect(filesCss).not.toMatch(/overflow:\s*auto/);
     expect(filesCss).not.toMatch(/overflow-y:\s*auto/);
     expect(filesCss).not.toMatch(/overflow:\s*scroll/);
     expect(filesCss).not.toMatch(/overflow-y:\s*scroll/);
-    expect(filesCss).toContain(".yohu-files__transfer-bar");
-    expect(filesCss).toContain("max-height: var(--yohu-layout-output-max)");
+    expect(filesCss).not.toContain(".yohu-files__transfer-bar");
+    expect(filesCss).not.toContain(".yohu-files__transfer-slot");
     expect(filesCss).not.toContain(".yohu-files__transfer-viewport");
     expect(filesCss).not.toContain(".yohu-files__transfer-chrome");
   });
@@ -291,6 +273,8 @@ describe("官方拖放契约", () => {
     expect(fileView).not.toContain("yohu-recipe-rail");
     expect(fileView).toContain("createDropSession");
     expect(fileView).toContain("listRef");
+    expect(fileView).toContain("listOffset");
+    expect(fileView).toContain("onOffset");
     expect(fileView).not.toContain("onNativeDragDrop");
     expect(fileView).not.toContain("destDirFromEntries");
     expect(fileView).not.toContain("dropCommit");
@@ -311,7 +295,8 @@ describe("官方拖放契约", () => {
   it("松手 dest 与热态同一套清单下标，接线在 drop 层", () => {
     expect(dropSrc).toContain("dropCommit");
     expect(dropSrc).toContain("destDirFromEntries(css.x, css.y, ctx.space, ctx.entries)");
-    expect(dropSessionSrc).toContain("destDirFromEntries");
+    expect(dropSessionSrc).toContain("host.listOffset()");
+    expect(dropSrc).not.toContain("list.scrollTop");
     expect(dropSessionSrc).toContain("dropCommit");
     expect(dropSessionSrc).toContain("devicePixelRatio");
     expect(dropSessionSrc).toContain("requestAnimationFrame");
@@ -399,7 +384,8 @@ describe("确认删除多文件契约", () => {
     expect(createDialog).toContain("YoTextField");
     expect(createDialog).toContain("YoCorner");
     expect(createDialog).toContain("createReady");
-    expect(fileView).toContain("TransferDock");
+    expect(fileView).toContain("TransferToasts");
+    expect(fileView).not.toContain("TransferDock");
     expect(fileView).not.toContain("TransferPanel");
     expect(fileView).toContain('overflow="hidden"');
     expect(fileView).toContain("attachView");
@@ -474,8 +460,13 @@ describe("确认删除多文件契约", () => {
     expect(deleteTargets).not.toContain("dismiss=");
     expect(deleteTargets).toContain("onDismiss");
     expect(deleteTargets).toContain("YoFileIcon");
+    expect(deleteTargets).not.toContain("DismissMark");
+    expect(deleteTargets).not.toContain("YoIconButton");
+    expect(deleteTargets).not.toContain("yohu-recipe-dismiss");
     expect(deleteTargets).not.toContain("yohu-files__delete-chip-remove");
     expect(filesCss).not.toContain(".yohu-files__delete-chip-remove");
+    expect(filesCss).not.toContain("yohu-recipe-dismiss");
+    expect(filesCss).not.toContain("yohu-chip__remove");
     expect(deleteTargets).not.toContain("delete-scroller");
     expect(filesCss).not.toContain(".yohu-files__delete-scroller");
     expect(filesCss).not.toContain(".yohu-files__delete {");
@@ -486,7 +477,7 @@ describe("确认删除多文件契约", () => {
 });
 
 describe("磁盘幽灵", () => {
-  it("address-edit / TransferPanel / store / progress 已不在磁盘", () => {
+  it("address-edit / TransferPanel / TransferDock / store / progress 已不在磁盘", () => {
     const names = [
       "address-edit.ts",
       "address-edit.test.ts",
@@ -496,6 +487,8 @@ describe("磁盘幽灵", () => {
       "store.test.ts",
       "progress.ts",
       "progress.test.ts",
+      "TransferDock.tsx",
+      "TransferDock.test.tsx",
     ];
     for (const name of names) {
       const candidates = [

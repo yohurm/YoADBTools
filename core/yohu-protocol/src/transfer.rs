@@ -85,6 +85,14 @@ pub struct RemoteEntry {
     pub mtime: Option<String>,
 }
 
+/// `files.session.attach` 返回：新会话或 adopt 已有 Live（对标 [`crate::CaptureStart`]）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowseAttach {
+    pub serial: String,
+    pub generation: u64,
+    pub adopted: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +142,23 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&TransferFault::Timeout).unwrap(),
             serde_json::json!({ "kind": "timeout" })
+        );
+    }
+
+    #[test]
+    fn browse_attach_mirrors_capture_start() {
+        let attach = BrowseAttach {
+            serial: "S1".into(),
+            generation: 2,
+            adopted: false,
+        };
+        assert_eq!(
+            serde_json::to_value(&attach).unwrap(),
+            serde_json::json!({
+                "serial": "S1",
+                "generation": 2,
+                "adopted": false
+            })
         );
     }
 }

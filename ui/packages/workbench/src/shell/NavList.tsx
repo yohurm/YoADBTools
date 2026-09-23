@@ -12,7 +12,6 @@ import {
   Layout,
   YoBadge,
   YoDivider,
-  YoIndicator,
   YoListItem,
   YoRailSlot,
   YoScroller,
@@ -83,7 +82,6 @@ export const NavList: Component<{
   const iconTip = () => railTooltipEnabled(phase());
   return (
     <nav class="yohu-nav" aria-label="侧栏导航">
-      <YoIndicator follow={props.activeId} variant="fill" />
       <div class="yohu-nav__modules">
         <YoRailSlot open={railSlotOpen(phase())}>
           <YoSubheader title="模块" />

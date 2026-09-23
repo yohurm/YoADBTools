@@ -247,6 +247,12 @@ export interface TransferProgress {
   name?: string;
 }
 
+export interface BrowseAttach {
+  serial: string;
+  generation: number;
+  adopted: boolean;
+}
+
 export type EntryKind = "dir" | "file" | "symlink" | "other";
 
 export interface RemoteEntry {
@@ -297,9 +303,16 @@ export interface TransferRequest {
   expected_bytes?: number;
 }
 
+export interface DragOutItem {
+  remote: string;
+  is_dir: boolean;
+  size: number;
+}
+
 export interface DragOutRequest {
   serial: string;
-  remotes: string[];
+  generation: number;
+  items: DragOutItem[];
 }
 
 export interface GroupRunRequest {

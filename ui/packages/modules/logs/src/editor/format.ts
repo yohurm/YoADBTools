@@ -188,8 +188,8 @@ const yohuEngine: ColorEngine = {
     if (!key) {
       return kind === "msg" ? ink("var(--yohu-fg)") : unstyled();
     }
-    if (kind === "level" && key === "f") {
-      return wash("var(--yohu-fg-on)", "var(--yohu-level-f)");
+    if (kind === "level") {
+      return wash("var(--yohu-fg-on)", `var(--yohu-level-${key})`);
     }
     return ink(`var(--yohu-level-${key})`);
   },

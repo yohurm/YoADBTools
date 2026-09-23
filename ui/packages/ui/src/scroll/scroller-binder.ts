@@ -1,7 +1,9 @@
 /**
  * 滚轴 DOM 会话（L3 binder）。
  * 持有视口监听、滑块/轨道指针、Auto 隐藏与连翻定时器、ResizeObserver、相位 paint。
+ * 偏移数字在 scroller-session；本文件只把数字落到 DOM（flow 写 scrollTop，offset 不写）。
  * 几何走 scroller-model；attrs 仍由 L4 调 scroller-policy。
+ * 热路径用缓存尺 + rAF 画条。声明 extent 时不量 in-flow 子盒、不 getComputedStyle。
  * destroy 卸监听，幂等。不画铬。
  */
 
@@ -9,6 +11,8 @@ import { createSignal, type Accessor } from "solid-js";
 import { shouldSkipMotion } from "../motion/reduced";
 import {
   resolveScrollerClampedTop,
+  resolveScrollerContentBox,
+  resolveScrollerDrive,
   resolveScrollerFlowChild,
   resolveScrollerFlowSize,
   resolveScrollerGutter,
@@ -22,16 +26,20 @@ import {
   resolveScrollerThumbCoversPointer,
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
-  resolveScrollerViewSize,
+  resolveScrollerViewFromGutter,
+  type ScrollerAxis,
+  type ScrollerBarState,
+  type ScrollerDrive,
+  type ScrollerExtent,
+  type ScrollerMetrics,
+  type ScrollerPhase,
+  type ScrollerThumb,
   SCROLLER_AUTO_HIDE_MS,
   SCROLLER_PAGE_HOLD_MS,
   SCROLLER_PAGE_REPEAT_MS,
-  type ScrollerAxis,
-  type ScrollerBarState,
-  type ScrollerPhase,
-  type ScrollerThumb,
 } from "./scroller-model";
 import { scrollerKeyAction, scrollerStealsKeys } from "./scroller-policy";
+import { createScrollerSession } from "./scroller-session";
 
 export interface ScrollerBinderHost {
   overflow: () => "auto" | "hidden";
@@ -39,6 +47,10 @@ export interface ScrollerBinderHost {
   interactive: () => boolean;
   traveling: () => boolean;
   axis: () => ScrollerAxis;
+  /** 声明内容尺。有则 paint / 夹 top 不再量 in-flow 子盒。 */
+  extent?: () => ScrollerExtent | undefined;
+  /** 会话偏移变化。offset 驱动由调用方写平面 transform。 */
+  onOffset?: (block: number, inline: number) => void;
 }
 
 export interface ScrollerBinder {
@@ -110,6 +122,25 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   let pageHold: ReturnType<typeof setTimeout> | undefined;
   let pageTimer: ReturnType<typeof setInterval> | undefined;
   let ro: ResizeObserver | undefined;
+  let paintFrame = 0;
+  const session = createScrollerSession();
+  const metrics: ScrollerMetrics = {
+    viewBlock: 0,
+    contentBlock: 0,
+    viewInline: 0,
+    contentInline: 0,
+  };
+
+  const drive = (): ScrollerDrive => resolveScrollerDrive(host.extent?.());
+
+  const writeFlowDom = (): void => {
+    const el = view;
+    if (!el || drive() !== "flow") return;
+    const off = session.offset();
+    el.scrollTop = off.block;
+    if (host.axis() === "both") el.scrollLeft = off.inline;
+    else el.scrollLeft = 0;
+  };
 
   const measureFlow = (el: HTMLElement): number => {
     const boxes: { top: number; height: number }[] = [];
@@ -135,22 +166,17 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     return resolveScrollerFlowSize(boxes);
   };
 
-  const viewBlock = (el: HTMLElement): number => {
-    const style = getComputedStyle(el);
-    return resolveScrollerViewSize(
-      el.clientHeight,
-      Number.parseFloat(style.paddingBlockStart) || 0,
-      Number.parseFloat(style.paddingBlockEnd) || 0,
-    );
-  };
-
-  const viewInline = (el: HTMLElement): number => {
-    const style = getComputedStyle(el);
-    return resolveScrollerViewSize(
-      el.clientWidth,
-      Number.parseFloat(style.paddingInlineStart) || 0,
-      Number.parseFloat(style.paddingInlineEnd) || 0,
-    );
+  const refreshMetrics = (el: HTMLElement): ScrollerMetrics => {
+    metrics.viewBlock = resolveScrollerViewFromGutter(el.clientHeight, gutterInline());
+    metrics.viewInline = resolveScrollerViewFromGutter(el.clientWidth, gutter());
+    const declared = host.extent?.();
+    const measuredBlock = declared ? 0 : measureFlow(el);
+    const measuredInline = declared || host.axis() !== "both" ? metrics.viewInline : measureFlowInline(el);
+    const content = resolveScrollerContentBox(declared, measuredBlock, measuredInline, metrics.viewInline);
+    metrics.contentBlock = content.block;
+    metrics.contentInline = content.inline;
+    session.setMetrics(metrics);
+    return metrics;
   };
 
   const commitPhase = (
@@ -229,7 +255,6 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const paint = (): void => {
     const el = view;
-    if (el && host.axis() === "block") el.scrollLeft = 0;
     if (!el || host.overflow() === "hidden") {
       last = undefined;
       lastThumb = undefined;
@@ -240,15 +265,22 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       resetInline();
       return;
     }
-    const blockAll = measureFlow(el);
-    const blockView = viewBlock(el);
-    const overflowing = resolveScrollerOverflow(blockView, blockAll);
+    const box = refreshMetrics(el);
+    const prev = session.offset();
+    const next = session.reclamp();
+    if (next.block !== prev.block || next.inline !== prev.inline) {
+      writeFlowDom();
+      host.onOffset?.(next.block, next.inline);
+    } else if (drive() === "flow" && host.axis() === "block") {
+      el.scrollLeft = 0;
+    }
+    const overflowing = resolveScrollerOverflow(box.viewBlock, box.contentBlock);
     setGutter(resolveScrollerGutter({ overflowing, barState: host.barState() }));
     const measured = overflowing
       ? resolveScrollerThumb({
-          view: blockView,
-          all: blockAll,
-          top: el.scrollTop,
+          view: box.viewBlock,
+          all: box.contentBlock,
+          top: next.block,
         })
       : undefined;
     commitPhase(
@@ -267,15 +299,13 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       resetInline();
       return;
     }
-    const inlineAll = measureFlowInline(el);
-    const inlineView = viewInline(el);
-    const overflowingInline = resolveScrollerOverflow(inlineView, inlineAll);
+    const overflowingInline = resolveScrollerOverflow(box.viewInline, box.contentInline);
     setGutterInline(resolveScrollerGutter({ overflowing: overflowingInline, barState: host.barState() }));
     const measuredInline = overflowingInline
       ? resolveScrollerThumb({
-          view: inlineView,
-          all: inlineAll,
-          top: el.scrollLeft,
+          view: box.viewInline,
+          all: box.contentInline,
+          top: next.inline,
         })
       : undefined;
     commitPhase(
@@ -290,10 +320,17 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       measuredInline,
       "inline",
     );
-    el.scrollLeft = resolveScrollerClampedTop({
-      top: el.scrollLeft,
-      view: inlineView,
-      all: inlineAll,
+  };
+
+  const schedulePaint = (): void => {
+    if (typeof requestAnimationFrame !== "function") {
+      paint();
+      return;
+    }
+    if (paintFrame !== 0) return;
+    paintFrame = requestAnimationFrame(() => {
+      paintFrame = 0;
+      paint();
     });
   };
 
@@ -304,46 +341,47 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     }
     hideTimer = setTimeout(() => {
       idle = true;
-      paint();
+      schedulePaint();
     }, SCROLLER_AUTO_HIDE_MS);
   };
 
   const bump = (): void => {
     idle = false;
-    paint();
+    schedulePaint();
     scheduleHide();
   };
 
-  const applyScrollTop = (top: number): void => {
+  const applyScrollTop = (top: number, refresh = false): void => {
     const el = view;
     if (!el) return;
-    el.scrollTop = resolveScrollerClampedTop({
-      top,
-      view: viewBlock(el),
-      all: measureFlow(el),
-    });
+    if (refresh || !(metrics.contentBlock > 0 || metrics.viewBlock > 0)) refreshMetrics(el);
+    const prev = session.offset();
+    const next = session.moveTo(top, prev.inline);
+    const changed = next.block !== prev.block || next.inline !== prev.inline;
+    if (changed) writeFlowDom();
+    if (changed || refresh) host.onOffset?.(next.block, next.inline);
     bump();
   };
 
-  const applyScrollLeft = (left: number): void => {
+  const applyScrollLeft = (left: number, refresh = false): void => {
     const el = view;
     if (!el || host.axis() !== "both") return;
-    el.scrollLeft = resolveScrollerClampedTop({
-      top: left,
-      view: viewInline(el),
-      all: measureFlowInline(el),
-    });
+    if (refresh || !(metrics.contentInline > 0 || metrics.viewInline > 0)) refreshMetrics(el);
+    const prev = session.offset();
+    const next = session.moveTo(prev.block, left);
+    const changed = next.block !== prev.block || next.inline !== prev.inline;
+    if (changed) writeFlowDom();
+    if (changed || refresh) host.onOffset?.(next.block, next.inline);
     bump();
   };
 
   const scrollTo = (top: number): void => {
-    applyScrollTop(top);
+    applyScrollTop(top, true);
   };
 
   const scrollBy = (delta: number): void => {
-    const el = view;
-    if (!el) return;
-    applyScrollTop(el.scrollTop + delta);
+    if (!view) return;
+    applyScrollTop(session.offset().block + delta);
   };
 
   const scrollToStart = (): void => {
@@ -351,19 +389,17 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   };
 
   const scrollToEnd = (): void => {
-    const el = view;
-    if (!el) return;
-    applyScrollTop(resolveScrollerScrollEnd(viewBlock(el), measureFlow(el)));
+    if (view) refreshMetrics(view);
+    applyScrollTop(resolveScrollerScrollEnd(metrics.viewBlock, metrics.contentBlock));
   };
 
   const scrollPage = (next: boolean): void => {
-    const el = view;
-    if (!el) return;
+    if (!view) return;
     applyScrollTop(
       resolveScrollerPageTop({
-        view: viewBlock(el),
-        all: measureFlow(el),
-        top: el.scrollTop,
+        view: metrics.viewBlock,
+        all: metrics.contentBlock,
+        top: session.offset().block,
         next,
       }),
     );
@@ -375,8 +411,8 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     if (!el || !current) return;
     applyScrollTop(
       resolveScrollerScrollTop({
-        view: viewBlock(el),
-        all: measureFlow(el),
+        view: metrics.viewBlock,
+        all: metrics.contentBlock,
         thumbHeight: current.height,
         thumbTop,
       }),
@@ -389,8 +425,8 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     if (!el || !current) return;
     applyScrollLeft(
       resolveScrollerScrollTop({
-        view: viewInline(el),
-        all: measureFlowInline(el),
+        view: metrics.viewInline,
+        all: metrics.contentInline,
         thumbHeight: current.height,
         thumbTop: thumbLeft,
       }),
@@ -400,44 +436,41 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   const onWheel = (event: WheelEvent): void => {
     const el = view;
     if (!el || host.overflow() === "hidden" || !host.interactive()) return;
+    const off = session.offset();
     const inline =
       host.axis() === "both" && (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY));
     if (inline) {
-      const all = measureFlowInline(el);
-      const box = viewInline(el);
-      const end = resolveScrollerScrollEnd(box, all);
+      const end = resolveScrollerScrollEnd(metrics.viewInline, metrics.contentInline);
       if (!(end > 0)) return;
       const delta = resolveScrollerWheelDelta({
         deltaY: event.shiftKey ? event.deltaY : event.deltaX,
         deltaMode: event.deltaMode,
-        pageHeight: box,
+        pageHeight: metrics.viewInline,
       });
       const next = resolveScrollerClampedTop({
-        top: el.scrollLeft + delta,
-        view: box,
-        all,
+        top: off.inline + delta,
+        view: metrics.viewInline,
+        all: metrics.contentInline,
       });
-      if (next === el.scrollLeft) return;
+      if (next === off.inline) return;
       event.preventDefault();
       applyScrollLeft(next);
       return;
     }
-    const all = measureFlow(el);
-    const box = viewBlock(el);
-    const end = resolveScrollerScrollEnd(box, all);
+    const end = resolveScrollerScrollEnd(metrics.viewBlock, metrics.contentBlock);
     if (!(end > 0)) return;
     const next = resolveScrollerClampedTop({
       top:
-        el.scrollTop +
+        off.block +
         resolveScrollerWheelDelta({
           deltaY: event.deltaY,
           deltaMode: event.deltaMode,
-          pageHeight: box,
+          pageHeight: metrics.viewBlock,
         }),
-      view: box,
-      all,
+      view: metrics.viewBlock,
+      all: metrics.contentBlock,
     });
-    if (next === el.scrollTop) return;
+    if (next === off.block) return;
     event.preventDefault();
     applyScrollTop(next);
   };
@@ -468,14 +501,15 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     ro = new ResizeObserver(() => {
       if (host.traveling()) return;
       paint();
-      const block = resolveScrollerOverflow(viewBlock(el), measureFlow(el));
-      const inline =
-        host.axis() === "both" && resolveScrollerOverflow(viewInline(el), measureFlowInline(el));
+      const box = metrics;
+      const block = resolveScrollerOverflow(box.viewBlock, box.contentBlock);
+      const inline = host.axis() === "both" && resolveScrollerOverflow(box.viewInline, box.contentInline);
       if (host.barState() === "auto" && (block || inline)) {
         scheduleHide();
       }
     });
     ro.observe(el);
+    if (host.extent?.() != null) return;
     for (let i = 0; i < el.children.length; i += 1) {
       const child = el.children[i];
       if (child instanceof HTMLElement) ro.observe(child);
@@ -512,9 +546,9 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     if (next === undefined) return;
     applyScrollTop(
       resolveScrollerPageTop({
-        view: viewBlock(el),
-        all: measureFlow(el),
-        top: el.scrollTop,
+        view: metrics.viewBlock,
+        all: metrics.contentBlock,
+        top: session.offset().block,
         next,
       }),
     );
@@ -538,7 +572,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientY,
           trackTop: box.top,
           grab,
-          room: Math.max(0, viewBlock(el) - current.height),
+          room: Math.max(0, metrics.viewBlock - current.height),
         }),
       );
       dragging = true;
@@ -569,7 +603,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientY,
           trackTop: box.top,
           grab,
-          room: Math.max(0, viewBlock(el) - current.height),
+          room: Math.max(0, metrics.viewBlock - current.height),
         }),
       );
     }
@@ -630,9 +664,9 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     if (next === undefined) return;
     applyScrollLeft(
       resolveScrollerPageTop({
-        view: viewInline(el),
-        all: measureFlowInline(el),
-        top: el.scrollLeft,
+        view: metrics.viewInline,
+        all: metrics.contentInline,
+        top: session.offset().inline,
         next,
       }),
     );
@@ -658,7 +692,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientX,
           trackTop: box.left,
           grab: grabInline,
-          room: Math.max(0, viewInline(el) - current.height),
+          room: Math.max(0, metrics.viewInline - current.height),
         }),
       );
       draggingInline = true;
@@ -689,7 +723,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientX,
           trackTop: box.left,
           grab: grabInline,
-          room: Math.max(0, viewInline(el) - current.height),
+          room: Math.max(0, metrics.viewInline - current.height),
         }),
       );
     }
@@ -741,10 +775,23 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     setThumb(undefined);
   };
 
+  const onNativeScroll = (): void => {
+    const el = view;
+    if (!el || drive() !== "flow") return;
+    const prev = session.offset();
+    const next = session.moveTo(el.scrollTop, host.axis() === "both" ? el.scrollLeft : 0);
+    if (next.block === prev.block && next.inline === prev.inline) {
+      bump();
+      return;
+    }
+    host.onOffset?.(next.block, next.inline);
+    bump();
+  };
+
   const detachView = (): void => {
     const el = view;
     if (!el) return;
-    el.removeEventListener("scroll", bump);
+    el.removeEventListener("scroll", onNativeScroll);
     el.removeEventListener("wheel", onWheel);
     el.removeEventListener("keydown", onKeyDown);
   };
@@ -752,11 +799,13 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   const attachView = (el: HTMLDivElement): void => {
     detachView();
     view = el;
-    el.addEventListener("scroll", bump, { passive: true });
+    if (drive() === "flow") el.addEventListener("scroll", onNativeScroll, { passive: true });
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("keydown", onKeyDown);
     observe(el);
     paint();
+    const off = session.offset();
+    host.onOffset?.(off.block, off.inline);
     if (host.barState() === "auto") scheduleHide();
   };
 
@@ -775,23 +824,24 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   };
 
   const valueNow = (): number => {
-    const el = view;
-    if (!el) return 0;
-    const range = measureFlow(el) - viewBlock(el);
+    const range = metrics.contentBlock - metrics.viewBlock;
     if (!(range > 0)) return 0;
-    return Math.round((el.scrollTop / range) * 100);
+    return Math.round((session.offset().block / range) * 100);
   };
 
   const valueNowInline = (): number => {
-    const el = view;
-    if (!el) return 0;
-    const range = measureFlowInline(el) - viewInline(el);
+    const range = metrics.contentInline - metrics.viewInline;
     if (!(range > 0)) return 0;
-    return Math.round((el.scrollLeft / range) * 100);
+    return Math.round((session.offset().inline / range) * 100);
   };
 
   const destroy = (): void => {
+    if (paintFrame !== 0 && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(paintFrame);
+      paintFrame = 0;
+    }
     detachView();
+    session.destroy();
     ro?.disconnect();
     ro = undefined;
     clearHide();
@@ -816,9 +866,9 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     scrollToStart,
     scrollToEnd,
     scrollPage,
-    scrollToInline: applyScrollLeft,
-    offset: () => view?.scrollTop ?? 0,
-    offsetInline: () => view?.scrollLeft ?? 0,
+    scrollToInline: (left) => applyScrollLeft(left, true),
+    offset: () => session.offset().block,
+    offsetInline: () => session.offset().inline,
     valueNow,
     valueNowInline,
     sync,

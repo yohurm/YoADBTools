@@ -1,8 +1,9 @@
 //! 设备级采集槽位编排：Empty → Starting(gen) → Live(gen) → Stopping(gen) → Empty。
 //!
+//! 槽位 = 采集意图（代际令牌、Batcher、环、进程索引）。跟流工人在 `follow::supervise_follow`。
+//! 工人退出不得拆代际资源、不得发 Stopped；Stopped 只来自末 hold 的 stop / 掉线 / Starting 放弃。
 //! start 仅对 Live **adopt**；Starting/Stopping 等待后再决定。新流才 `ring.clear()`。
 //! 控制面 `CaptureState` 带 generation 且 `send().await` 必达；批次仍 `try_send`。
-//! 跟流泵、任务 join、进程索引分别在 `follow` / `task` / `index`。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,7 +13,7 @@ use tokio::sync::{mpsc, Notify};
 use tokio_util::sync::CancellationToken;
 
 use crate::batch::{Batcher, BATCH_FLUSH_INTERVAL, BATCH_MAX_BYTES, BATCH_MAX_LINES};
-use crate::follow::run_follow;
+use crate::follow::{supervise_follow, FollowEnd};
 use crate::index::ProcessIndexService;
 use crate::ring::RingBuffer;
 use crate::task::join_or_abort;
@@ -247,15 +248,25 @@ impl CaptureService {
             cancel.clone(),
         );
 
+        // 控制面 Running 先于工人：避免 logcat 批次占满有界 sink 后 start 卡在 send。
+        self.emit_state(serial, my_generation, CaptureState::Running)
+            .await;
+        if cancel.is_cancelled() {
+            self.abandon_starting(serial, my_generation).await;
+            return Err(LogError::Cancelled);
+        }
+
         let adb = Arc::clone(&self.adb);
         let service = Arc::clone(self);
         let serial_owned = serial.to_string();
         let follow_cancel = cancel.clone();
         let capture_handle = tokio::spawn(async move {
-            run_follow(adb, serial_owned.clone(), ring, batcher, follow_cancel).await;
-            service
-                .release_if_current(&serial_owned, my_generation)
-                .await;
+            let end = supervise_follow(adb, serial_owned.clone(), ring, batcher, follow_cancel).await;
+            if matches!(end, FollowEnd::Offline) {
+                service
+                    .release_if_current(&serial_owned, my_generation)
+                    .await;
+            }
         });
 
         let index_handle = self.index.spawn(serial.to_string(), cancel.clone());
@@ -285,8 +296,6 @@ impl CaptureService {
             }
             return Err(LogError::Cancelled);
         }
-        self.emit_state(serial, my_generation, CaptureState::Running)
-            .await;
         self.changed.notify_waiters();
         tracing::info!(serial, generation = my_generation, "采集开始");
         Ok(CaptureStart {

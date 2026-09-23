@@ -42,6 +42,7 @@ export {
 export { EditorView } from "./view";
 export {
   docSelCopyText,
+  docPointFromCaret,
   orderDocSel,
   readDocSel,
   selSlice,

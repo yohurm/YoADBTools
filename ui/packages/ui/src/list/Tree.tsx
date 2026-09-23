@@ -10,14 +10,13 @@
  * ARIA：`role=tree/treeitem` + `aria-expanded` + roving tabindex（仅焦点节点 tabindex=0）。
  * 受控展开（expandedKeys）或默认展开（defaultExpandedKeys）。
  * 子树用 YoCollapse，关闭后仍挂载（aria-hidden），高度走 MotionSpec。
- * 选中只挂 yohu-interactive--selected；单选滑块走 YoIndicator fill，不自绘第二套选中底。
+ * 选中只挂 yohu-interactive--selected + 配方 selected（项内弹出，禁止滑块换行）。
  */
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/engines/collapse";
-import { YoIndicator } from "../motion/engines/indicator";
 import { flattenVisible, treeActivateIntent, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,
@@ -123,7 +122,7 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
           <>
             <div
               data-tree-key={node.key}
-              class="yohu-tree__row yohu-interactive yohu-focus-ring--inset"
+              class="yohu-tree__row yohu-interactive yohu-recipe-selected yohu-focus-ring--inset"
               classList={{
                 "yohu-interactive--selected": attrs().selected,
               }}
@@ -194,7 +193,6 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
         props.rowHeight !== undefined ? { "--yohu-tree-row-height": `${props.rowHeight}px` } : undefined
       }
     >
-      <YoIndicator follow={selected()} variant="fill" />
       {renderNodes(props.data, 0)}
     </div>
   );

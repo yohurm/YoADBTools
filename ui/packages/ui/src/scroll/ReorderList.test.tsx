@@ -10,7 +10,7 @@ import {
   overlayOffset,
   pointerContentY,
 } from "./reorder-model";
-import { YoScroller } from "./Scroller";
+import { YoScroller, type YoScrollerHandle } from "./Scroller";
 
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ReorderList.css"), "utf-8");
 
@@ -98,8 +98,9 @@ describe("YoReorderList", () => {
   it("行盒相对视口顶 + scrollTop，插缝与条钉内容坐标", () => {
     const onReorder = vi.fn();
     const items = ["a", "b", "c"];
+    let handle: YoScrollerHandle | undefined;
     const { container } = render(() => (
-      <YoScroller>
+      <YoScroller handle={(api) => { handle = api; }}>
         <YoReorderList items={() => items} getItemKey={(item) => item} onReorder={onReorder} renderRow={TestRow} />
       </YoScroller>
     ));
@@ -107,8 +108,11 @@ describe("YoReorderList", () => {
     const view = container.querySelector(".yohu-scroller__view") as HTMLElement;
     mockBox(view, 80, 144);
     mockBox(host, 40, 144);
-    Object.defineProperty(view, "scrollTop", { value: 40, configurable: true, writable: true });
     Object.defineProperty(view, "clientHeight", { value: 144, configurable: true });
+    Object.defineProperty(host, "offsetTop", { value: 0, configurable: true });
+    Object.defineProperty(host, "offsetHeight", { value: 184, configurable: true });
+    handle?.sync();
+    handle?.scrollTo(40);
     const rows = [...container.querySelectorAll<HTMLElement>(".yohu-reorder-list__row")];
     mockBox(rows[0]!, 40, 40);
     mockBox(rows[1]!, 80, 80);
@@ -137,7 +141,7 @@ describe("YoReorderList", () => {
     const overlay = plane.querySelector(".yohu-recipe-reorder-overlay") as HTMLElement;
     expect(overlay).toBeTruthy();
     expect(host.getBoundingClientRect().top).not.toBe(view.getBoundingClientRect().top);
-    expect(view.scrollTop).not.toBe(0);
+    expect(handle?.offset()).toBe(40);
     expect(view.contains(overlay)).toBe(false);
     expect(plane.contains(overlay)).toBe(true);
     expect(host.contains(overlay)).toBe(false);

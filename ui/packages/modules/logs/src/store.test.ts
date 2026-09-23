@@ -52,6 +52,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     commandlibLoad: notConfigured,
     commandlibSave: notConfigured,
     filesList: notConfigured,
+    filesSessionAttach: notConfigured,
+    filesSessionDetach: notConfigured,
     filesPush: notConfigured,
     filesPull: notConfigured,
     filesCancel: notConfigured,
@@ -536,6 +538,8 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     push("S1", [mk(0, { msg: "kept" })]);
     await store.stopCapture();
     expect(store.state.sessions[0]!.capturing).toBe(false);
+    expect(store.state.sessions[0]!.following).toBe(false);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBe(0);
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["kept"]);
   });
 
@@ -935,6 +939,41 @@ describe("logStore 多窗口 × 多设备", () => {
     await store.stopCapture();
     expect(mocks.logCaptureStop).toHaveBeenCalledTimes(1);
     expect(mocks.logCaptureStop).toHaveBeenCalledWith("S1");
+  });
+
+  it("兄窗仍 hold 时停包名窗：进程索引与改过滤不得再写入已停窗口", async () => {
+    const store = await liveStore();
+    const system = store.state.sessions[0]!;
+    const pkg = store.createSession({ kind: "package", pkg: "com.foo", includeChild: false }, "com.foo");
+    store.setActive(pkg);
+    mocks.processIndexHandlers.at(-1)?.({
+      serial: "S1",
+      entries: [{ pid: 10, name: "com.foo" }],
+      degraded: false,
+    });
+    await store.startCapture();
+    push("S1", [mk(0, { pid: 10, msg: "before-stop" }), mk(1, { pid: 99, msg: "sys" })]);
+    await store.stopCapture();
+    expect(store.state.sessions.find((s) => s.id === pkg)!.capturing).toBe(false);
+    expect(store.state.sessions.find((s) => s.id === pkg)!.following).toBe(false);
+    expect(store.state.sessions.find((s) => s.id === system.id)!.capturing).toBe(true);
+
+    push("S1", [mk(2, { pid: 10, msg: "after-stop" })]);
+    mocks.processIndexHandlers.at(-1)?.({
+      serial: "S1",
+      entries: [{ pid: 10, name: "com.foo" }],
+      degraded: false,
+    });
+    store.patchFilter(pkg, { keyword: "" });
+
+    expect(store.state.sessions.find((s) => s.id === pkg)!.visible.map((r) => r.line.msg)).toEqual([
+      "before-stop",
+    ]);
+    expect(store.state.sessions.find((s) => s.id === system.id)!.visible.map((r) => r.line.msg)).toEqual([
+      "before-stop",
+      "sys",
+      "after-stop",
+    ]);
   });
 
   it("两窗口两设备：各打一次 start；停 A 不 stop B", async () => {

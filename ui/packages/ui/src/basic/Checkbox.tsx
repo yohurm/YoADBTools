@@ -47,20 +47,19 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
             disabled={host().disabled}
             onChange={handleChange}
           />
-          <Show when={host()["data-checked"] === "true"}>
-            <svg
-              class="yohu-checkbox__check"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width={3}
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </Show>
+          {/* 勾选符常挂：成形/收回走 dashoffset 过渡（spatialTick），可逆可打断，不用 Show 直切。 */}
+          <svg
+            class="yohu-checkbox__check"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width={3}
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" pathLength={1} />
+          </svg>
         </YoCorner>
       </span>
       <Show when={props.label}>

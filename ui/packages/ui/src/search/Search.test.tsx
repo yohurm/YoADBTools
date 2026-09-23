@@ -19,7 +19,7 @@ describe("YoSearch", () => {
     expect(input.type).toBe("search");
     expect(input.closest("[role='search']")).toBeTruthy();
     expect(input.closest(".yohu-search")?.querySelector("[data-icon='search']")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "清除" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "清除" }).classList.contains("yohu-recipe-clear")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "清除" }));
     expect(value()).toBe("");
   });
@@ -87,5 +87,6 @@ describe("YoSearch", () => {
     expect(css).toContain("var(--yohu-control-height)");
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(css).not.toMatch(/rgba?\(/);
+    expect(css).not.toContain(".yohu-search__clear");
   });
 });

@@ -24,7 +24,7 @@ import { CreateDialog, type CreateDialogApi } from "./CreateDialog";
 import { DeleteDialog, type DeleteDialogApi } from "./DeleteDialog";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
-import { TransferDock } from "./TransferDock";
+import { TransferToasts } from "./TransferToasts";
 import { localBaseName } from "./drop";
 import { createDropSession } from "./drop-session";
 import { copyRemotePaths, FILES_KEY_BINDINGS, FILES_LIST_SELECTOR, type FilesKeyAction } from "./keys";
@@ -41,12 +41,14 @@ export function FileView(props: DeviceSession) {
   onCleanup(() => toaster.destroy());
   let pageEl: HTMLDivElement | undefined;
   let listEl: HTMLDivElement | undefined;
+  let listOffset = 0;
   let addressSlot: AddressSlotApi | undefined;
   let deleteDialog: DeleteDialogApi | undefined;
   let createDialog: CreateDialogApi | undefined;
 
   const drop = createDropSession({
     listEl: () => listEl,
+    listOffset: () => listOffset,
     hasDevice: () => Boolean(props.selectedSerials[0]),
     blocked: () => Boolean(deleteDialog?.isOpen() || createDialog?.isOpen()),
     intoFolder: () => props.settings.files_drop_into_folder,
@@ -234,6 +236,7 @@ export function FileView(props: DeviceSession) {
               <FileTable
                 dropDirName={dropDirName()}
                 listRef={(el) => { listEl = el; }}
+                onOffset={(block) => { listOffset = block; }}
                 onContextMenu={openListMenu}
               />
             </Show>
@@ -243,14 +246,11 @@ export function FileView(props: DeviceSession) {
           <PreviewPane />
         </div>
       </div>
-      <div class="yohu-files__transfer-slot" data-drop="ignore">
-        <TransferDock />
-      </div>
-
       <div data-drop="ignore">
         <DeleteDialog api={(api) => { deleteDialog = api; }} />
         <CreateDialog api={(api) => { createDialog = api; }} />
       </div>
+      <TransferToasts toaster={toaster} />
       <YoToaster toaster={toaster} />
     </YoPage>
   );

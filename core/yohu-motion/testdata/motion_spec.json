@@ -19,6 +19,11 @@
     "easing": "spring",
     "controlPoints": [0.4, 0.0, 0.2, 1.0]
   },
+  "spatialTick": {
+    "durationMs": 150,
+    "easing": "standard",
+    "controlPoints": [0.4, 0.0, 0.2, 1.0]
+  },
   "spatialStretch": {
     "durationMs": 200,
     "easing": "springSoft",

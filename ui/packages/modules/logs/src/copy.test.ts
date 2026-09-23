@@ -274,12 +274,22 @@ describe("seqFromTarget", () => {
   });
 });
 
-describe("rangeHitsNode", () => {
-  it("产品文件只用 Range 边界比较，没有 intersectsNode / jsdom catch", () => {
+describe("caret 选区模型", () => {
+  it("产品文件读 anchor/focus，不扫 Range∩行", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "editor/selection.ts"), "utf-8");
-    expect(src).toContain("compareBoundaryPoints");
+    expect(src).toContain("anchorNode");
+    expect(src).toContain("focusNode");
+    expect(src).toContain("docPointFromCaret");
+    expect(src).not.toContain("compareBoundaryPoints");
     expect(src).not.toContain("intersectsNode");
+    expect(src).not.toContain("querySelectorAll");
     expect(src).not.toContain("jsdom");
+  });
+
+  it("Ctrl+A 后 selectionchange 不清 ALL", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy-gesture.ts"), "utf-8");
+    expect(src).toContain('opts.pick().kind === "all"');
+    expect(src).toContain("pointerdown");
   });
 });
 

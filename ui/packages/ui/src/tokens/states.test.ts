@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 function loadStatesCss(): string {
   const candidates = [
+    resolve(here, "states.css"),
     resolve(process.cwd(), "src/tokens/states.css"),
     resolve(process.cwd(), "packages/ui/src/tokens/states.css"),
   ];
@@ -15,7 +19,16 @@ function loadStatesCss(): string {
   return "";
 }
 
+function loadCss(rel: string): string {
+  const path = resolve(here, rel);
+  return existsSync(path) ? readFileSync(path, "utf-8") : "";
+}
+
 const statesCss = loadStatesCss();
+const chipCss = loadCss("../display/Chip.css");
+const toastCss = loadCss("../overlay/Toast.css");
+const textFieldCss = loadCss("../form/TextField.css");
+const searchCss = loadCss("../search/Search.css");
 
 describe("yohu-interactive 叠层契约", () => {
   it("states.css 可读取", () => {
@@ -69,5 +82,33 @@ describe("yohu-interactive 叠层契约", () => {
     expect(statesCss).not.toContain("selected-rule");
     expect(statesCss).not.toContain("sel-start::after");
     expect(statesCss).not.toContain("sel-mid::after");
+  });
+
+  it("正圆关闭配方 Chip/Toast 单源，组件 CSS 不再自绘圆", () => {
+    const block = statesCss.match(/\.yohu-recipe-dismiss\s*\{[^}]+\}/);
+    expect(block?.[0]).toContain("width: var(--yohu-layout-icon-sm)");
+    expect(block?.[0]).toContain("height: var(--yohu-layout-icon-sm)");
+    expect(block?.[0]).toContain("flex: 0 0 auto");
+    expect(block?.[0]).toContain("border-radius: var(--yohu-radius-full)");
+    expect(block?.[0]).toContain("background-color: var(--yohu-fg-2)");
+    expect(block?.[0]).toContain("color: var(--yohu-surface)");
+    expect(block?.[0]).not.toContain("position: absolute");
+    expect(statesCss).toContain(".yohu-recipe-dismiss:hover");
+    expect(chipCss).not.toContain(".yohu-chip__remove");
+    expect(chipCss).not.toContain("background-color: var(--yohu-fg-2)");
+    expect(toastCss).not.toContain(".yohu-toast__close");
+    expect(toastCss).not.toContain("background-color: var(--yohu-fg-2)");
+  });
+
+  it("幽灵清除配方 TextField/Search 单源，Tabs 关闭不走本配方", () => {
+    const block = statesCss.match(/\.yohu-recipe-clear\s*\{[^}]+\}/);
+    expect(block?.[0]).toContain("background: transparent");
+    expect(block?.[0]).toContain("color: var(--yohu-fg-3)");
+    expect(block?.[0]).toContain("border-radius: var(--yohu-radius-sm)");
+    expect(block?.[0]).toContain("var(--yohu-motion-effects-fast)");
+    expect(statesCss).toContain(".yohu-recipe-clear:hover");
+    expect(textFieldCss).not.toContain(".yohu-text-field__clear");
+    expect(searchCss).not.toContain(".yohu-search__clear");
+    expect(statesCss).not.toContain(".yohu-tabs__close");
   });
 });

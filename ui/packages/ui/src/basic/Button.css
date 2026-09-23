@@ -139,12 +139,3 @@
   color: var(--yohu-fg-3);
 }
 
-.yohu-button__spinner {
-  width: 1em;
-  height: 1em;
-  border: var(--yohu-stroke-accent) solid currentColor;
-  border-top-color: transparent;
-  border-radius: var(--yohu-radius-full);
-  box-sizing: border-box;
-  animation: yohu-spin var(--yohu-dur-loop) linear infinite;
-}

@@ -11,4 +11,6 @@ pub use os_paths::{
     app_data_root, app_install_root, ensure_executable, host_bin_name, open_path, open_url,
 };
 pub use persist::{atomic_write, backup_corrupt};
-pub use process::{kill_tree, ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
+pub use process::{
+    kill_tree, ChildHandle, ProcessError, ProcessOutput, ProcessRunner, STDERR_BUDGET, STDOUT_BUDGET,
+};

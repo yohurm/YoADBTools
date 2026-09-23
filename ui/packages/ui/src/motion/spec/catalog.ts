@@ -133,9 +133,9 @@ export const MotionCatalog = {
   toast: {
     name: "toast",
     engine: "presence",
-    spec: ["spatialLocal", "effectsExit"],
-    properties: ["opacity", "transform"],
-    interruptible: false,
+    spec: ["spatialRail", "effectsExit"],
+    properties: ["grid-template-rows", "opacity", "transform"],
+    interruptible: true,
   },
   popover: {
     name: "popover",
@@ -149,6 +149,13 @@ export const MotionCatalog = {
     engine: "indicator",
     spec: ["spatialSmall", "spatialStretch"],
     properties: ["transform", "width", "height"],
+    interruptible: true,
+  },
+  selected: {
+    name: "selected",
+    engine: "implicit",
+    spec: ["effectsFast", "spatialTick", "spatialSmall", "spatialStretch", "effectsExit", "spatialLocal"],
+    properties: ["opacity", "background-color", "color", "transform", "font-weight"],
     interruptible: true,
   },
   "dismiss-fade": {

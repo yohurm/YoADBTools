@@ -2,6 +2,7 @@
  * 采集客户端：窗口订阅 ↔ 每设备一路 logcat。
  * 引用只认 hold（capturing || starting，计数在 hold.ts）；世代对账在 capture-event。
  * 设备流停靠 captureState 事件；confirmStart 只退订本窗。
+ * 退订走 workspace.unsubscribeSession（冻可见区）；扇出只认 capturing。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * start 每次 await 后用 sessionId 重定位，禁止跨 await 缓存 idx。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
@@ -125,9 +126,9 @@ export function createCapture(
   }
 
   function stopWindowsOn(device: string): void {
-    state.sessions.forEach((session, idx) => {
+    state.sessions.forEach((session) => {
       if (session.serial !== device || !sessionHolds(session)) return;
-      setState("sessions", idx, { capturing: false, starting: false });
+      workspace.unsubscribeSession(session.id);
     });
   }
 
@@ -145,6 +146,10 @@ export function createCapture(
     if (decision.kind === "ignore") return;
     setDeviceGen(device, decision.generation);
     if (decision.kind === "stopped") {
+      YoLog.info("logs", "设备流已结束，窗口全部退订", {
+        serial: device,
+        generation: decision.generation,
+      });
       stopWindowsOn(device);
     }
   }
@@ -166,9 +171,9 @@ export function createCapture(
         return;
       }
       if (status.generation < startedGen) return;
-      const idx = sessionIndex(sessionId);
-      if (idx >= 0 && state.sessions[idx]!.serial === device) {
-        setState("sessions", idx, { capturing: false, starting: false });
+      const session = state.sessions.find((s) => s.id === sessionId);
+      if (session?.serial === device) {
+        workspace.unsubscribeSession(sessionId);
       }
     } catch (e) {
       console.error("log.capture.status 失败", e);
@@ -295,19 +300,18 @@ export function createCapture(
     if (!current || !session) return;
     const sessionId = session.id;
     const shouldStop = sessionHolds(session) && foreignHoldCount(state.sessions, current, sessionId) === 0;
-    const idx = sessionIndex(sessionId);
-    if (idx >= 0) {
-      setState("sessions", idx, { capturing: false, starting: false });
-    }
+    workspace.unsubscribeSession(sessionId);
     const interrupt = shouldStop ? logCaptureStop(current) : Promise.resolve();
     if (shouldStop) {
       YoLog.info("logs", "采集停止", { serial: current });
+    } else {
+      YoLog.info("logs", "窗口已退订，设备流由其他窗口保持", {
+        serial: current,
+        remaining: holdCount(state.sessions, current),
+      });
     }
     return runExclusive(current, async () => {
-      const done = sessionIndex(sessionId);
-      if (done >= 0) {
-        setState("sessions", done, { capturing: false, starting: false });
-      }
+      workspace.unsubscribeSession(sessionId);
       if (!shouldStop) return;
       await interrupt;
       try {

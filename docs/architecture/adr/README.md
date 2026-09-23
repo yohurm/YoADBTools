@@ -36,3 +36,4 @@
 | [030](ADR-v6-030.md) | macOS 像素 | VideoToolbox + NSView 出画；Finder 拖出；Linux 仍预留 |
 | [031](ADR-v6-031.md) | 路径家园 | 安装根 ≠ 产品家园；config / data / cache / logs |
 | [032](ADR-v6-032.md) | 投屏呈现分层 | Fit / Convert / Scale / Compose / Present；`gpu.rs` 只装配；禁 libplacebo/FFmpeg |
+| [033](ADR-v6-033.md) | 文件浏览会话 | FileListing 同构：工具窗 attach/detach；`DeviceShell` 是 008 补偿；失败回退短命令 |

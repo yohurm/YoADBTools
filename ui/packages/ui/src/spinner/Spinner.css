@@ -1,0 +1,50 @@
+/* 彗星弧加载环：整体转 + 弧长伸缩双动画；物理描边宽（non-scaling-stroke），各档同粗。 */
+.yohu-spinner {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.yohu-spinner[data-size="sm"] {
+  width: 1em;
+  height: 1em;
+}
+
+.yohu-spinner[data-size="md"] {
+  width: var(--yohu-layout-icon-md);
+  height: var(--yohu-layout-icon-md);
+}
+
+.yohu-spinner[data-size="lg"] {
+  width: var(--yohu-space-3xl);
+  height: var(--yohu-space-3xl);
+}
+
+.yohu-spinner__svg {
+  width: 100%;
+  height: 100%;
+  animation: yohu-spin var(--yohu-dur-loop) linear infinite;
+}
+
+.yohu-spinner__track {
+  stroke: var(--yohu-border);
+  stroke-width: var(--yohu-stroke-accent);
+  vector-effect: non-scaling-stroke;
+}
+
+.yohu-spinner__arc {
+  stroke: currentColor;
+  stroke-width: var(--yohu-stroke-accent);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  /* 静止底形（reduced-motion / 动画禁用时）：35% 弧，不是 0 长度。 */
+  stroke-dasharray: 35 65;
+  transform: rotate(-90deg);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: yohu-spinner-arc var(--yohu-dur-loop-slow) var(--yohu-ease-loop) infinite;
+}
+
+.yohu-spinner[data-size="lg"] .yohu-spinner__track,
+.yohu-spinner[data-size="lg"] .yohu-spinner__arc {
+  stroke-width: var(--yohu-stroke-emphasis);
+}

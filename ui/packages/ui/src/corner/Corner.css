@@ -39,12 +39,15 @@
   z-index: 0;
 }
 
+/* 铬色反馈单源：hover/按压/焦点描边全走 effectsFast，消费方禁止再补第二份过渡。 */
 .yohu-corner__fill {
   fill: var(--yohu-corner-fill, transparent);
+  transition: fill var(--yohu-motion-effects-fast);
 }
 
 .yohu-corner__stroke {
   fill: var(--yohu-corner-stroke, transparent);
+  transition: fill var(--yohu-motion-effects-fast);
 }
 
 /* 外圈中心线：路径在填充盒外。色/宽/虚线走 token；无路径则不画。 */

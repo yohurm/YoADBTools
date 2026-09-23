@@ -62,9 +62,20 @@
   --yohu-corner-stroke: var(--yohu-accent-pressed);
 }
 
+/* 勾选描边成形：pathLength=1 把笔画归一，dashoffset 1↔0 即画入/收回。 */
 .yohu-checkbox__check {
   width: calc(var(--yohu-space-md) + var(--yohu-space-xs));
   height: calc(var(--yohu-space-md) + var(--yohu-space-xs));
+}
+
+.yohu-checkbox__check polyline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--yohu-motion-spatial-tick);
+}
+
+.yohu-checkbox[data-checked="true"] .yohu-checkbox__check polyline {
+  stroke-dashoffset: 0;
 }
 
 .yohu-checkbox__label {

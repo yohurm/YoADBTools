@@ -4,11 +4,11 @@
  * 内置条 overlay。溢出时视口 padding-inline-end 让出 16vp（data-gutter，官方 hoverWidth），条叠在槽里。
  * Hover/Press GROW 4vp→8vp。默认 BarState.Auto。
  * 禁止侧轨进交叉轴夺滚动口宽。
- * 只组合 binder：订 traveling()（Travel / Collapse / Grow / Rail）、写 attrs、开槽。度量/手势/相位定时在 scroller-binder。
+ * 只组合 binder：订 traveling()（Travel / Collapse / Grow / Rail）、写 attrs、开槽。度量/手势/相位定时在 scroller-binder；偏移数字在 scroller-session。
  * 不知道 Dialog / Chip / Reveal。
  */
 import { createRenderEffect, createUniqueId, onCleanup } from "solid-js";
-import type { JSX } from "solid-js";
+import type { Accessor, JSX } from "solid-js";
 import { useCollapseTravel } from "../motion/engines/collapse";
 import { useGrow } from "../motion/engines/grow";
 import { useRail, railTraveling } from "../motion/engines/rail";
@@ -20,12 +20,13 @@ import {
   resolveScrollerInteractive,
   type ScrollerAxis,
   type ScrollerBarState,
+  type ScrollerExtent,
 } from "./scroller-model";
 import { scrollerHostAttrs, scrollerLaneAttrs, scrollerThumbAttrs } from "./scroller-policy";
 import { ScrollerPortContext, type ScrollerPort } from "./scroller-port";
 import "./Scroller.css";
 
-export type { ScrollerAxis, ScrollerBarState } from "./scroller-model";
+export type { ScrollerAxis, ScrollerBarState, ScrollerExtent } from "./scroller-model";
 
 export type YoScrollerHandle = {
   scrollTo: (top: number) => void;
@@ -49,6 +50,13 @@ export interface YoScrollerProps {
   interactive?: boolean;
   /** 默认 block 只纵滚。both 才开底轨横滚（日志 clip）。 */
   axis?: ScrollerAxis;
+  /**
+   * 声明内容尺。虚拟列表传入总高 / 行宽。
+   * 有则不再量 in-flow 子盒；缺省仍量短名单。
+   */
+  extent?: Accessor<ScrollerExtent | undefined>;
+  /** 会话偏移。声明尺时内容平面由调用方 transform，视口 scrollTop 恒 0。 */
+  onOffset?: (block: number, inline: number) => void;
   /** 视口节点。钉底等只走 handle，禁止模块读原生内容高。 */
   viewRef?: (el: HTMLDivElement) => void;
   handle?: (api: YoScrollerHandle) => void;
@@ -71,7 +79,16 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
     collapse?.traveling() === true ||
     grow?.traveling() === true ||
     (rail != null && railTraveling(rail.phase()));
-  const binder = createScrollerBinder({ overflow, barState, interactive, traveling, axis });
+  const extent = (): ScrollerExtent | undefined => props.extent?.();
+  const binder = createScrollerBinder({
+    overflow,
+    barState,
+    interactive,
+    traveling,
+    axis,
+    extent,
+    onOffset: (block, inline) => props.onOffset?.(block, inline),
+  });
   const handle: YoScrollerHandle = {
     scrollTo: binder.scrollTo,
     scrollBy: binder.scrollBy,
@@ -85,12 +102,13 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
   };
 
   createRenderEffect(() => {
-    props.children;
     overflow();
     barState();
     interactive();
     axis();
     traveling();
+    extent()?.block;
+    extent()?.inline;
     binder.sync();
   });
 
@@ -135,8 +153,8 @@ export function YoScroller(props: YoScrollerProps): JSX.Element {
           class="yohu-scroller__view"
           tabindex={-1}
           ref={(el) => {
-            binder.attachView(el);
             props.viewRef?.(el);
+            binder.attachView(el);
             props.handle?.(handle);
             onCleanup(() => binder.destroy());
           }}

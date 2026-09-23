@@ -23,12 +23,47 @@
   animation: yohu-scale-out var(--yohu-motion-spatial-exit) both;
 }
 
-.yohu-presence[data-recipe="toast"][data-state="open"] .yohu-toast {
-  animation: yohu-slide-end-in var(--yohu-motion-spatial-local) both;
+/*
+ * 配方 toast：对照 macOS 通知横幅（自盒外升起 + 微缩放）与 HarmonyOS 电脑弹簧。
+ * 高度 0fr/1fr 只挤堆栈；位移/缩放画在卡片（min-content），100% 相对自身高。
+ * clip overflow:visible，禁止 0fr 把倒放 translateY(100%) 裁没。
+ * 入场 spatialRail（300ms 软弹簧）；出场倒放 effectsExit（加速）。
+ * transition 可打断；出生 closed，双 rAF 后 open。禁止 keyframes。
+ */
+.yohu-presence[data-recipe="toast"] {
+  display: grid;
+  max-width: 100%;
+  overflow: visible;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--yohu-motion-effects-exit);
 }
 
-.yohu-presence[data-recipe="toast"][data-state="closed"] .yohu-toast {
-  animation: yohu-slide-end-out var(--yohu-motion-effects-exit) both;
+.yohu-presence[data-recipe="toast"][data-state="open"] {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--yohu-motion-spatial-rail);
+}
+
+.yohu-presence[data-recipe="toast"] .yohu-presence__clip {
+  overflow: visible;
+  min-height: 0;
+}
+
+.yohu-presence[data-recipe="toast"] .yohu-presence__clip > * {
+  min-height: min-content;
+  opacity: 0;
+  transform: translateY(100%) scale(0.94);
+  transform-origin: 50% 100%;
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-presence[data-recipe="toast"][data-state="open"] .yohu-presence__clip > * {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--yohu-motion-spatial-rail),
+    transform var(--yohu-motion-spatial-rail);
 }
 
 .yohu-presence[data-recipe="popover"][data-state="open"] .yohu-select__menu,

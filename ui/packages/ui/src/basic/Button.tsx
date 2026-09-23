@@ -10,6 +10,7 @@ import { Show, children, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { resolveText } from "../dom/text";
+import { YoSpinner } from "../spinner/Spinner";
 import { YoSwap } from "../motion/engines/swap";
 import type { YoButtonSize, YoButtonStyle, YoButtonTone } from "./button-model";
 import { buttonHostAttrs } from "./button-policy";
@@ -38,7 +39,7 @@ export interface YoButtonProps {
   "aria-pressed"?: boolean;
   /** 可见文案不足时的无障碍名（如级别字母）；不画气泡 */
   "aria-label"?: string;
-  /** 展开控件所控制的区域 id（传输坞列表等） */
+  /** 展开控件所控制的区域 id */
   "aria-controls"?: string;
   /** 铺满父级。默认 hug，受 `--yohu-layout-button-max` 帽宽 */
   block?: boolean;
@@ -52,7 +53,7 @@ export function YoButton(props: YoButtonProps): JSX.Element {
   const host = createMemo(() => buttonHostAttrs(props));
   const body = () => (
     <>
-      {props.loading ? <span class="yohu-button__spinner" aria-hidden="true" /> : null}
+      {props.loading ? <YoSpinner class="yohu-button__spinner" /> : null}
       <Show when={text() !== null} fallback={resolved()}>
         <YoSwap keys={text() as string} anchor="center">
           {text()}

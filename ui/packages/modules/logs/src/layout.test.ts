@@ -46,16 +46,18 @@ describe("日志清单布局契约", () => {
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*user-select:\s*text/);
     expect(logsCss).toMatch(/\.yohu-logs__row\s*\{[^}]*white-space:\s*pre/);
     expect(logsCss).not.toContain("::highlight(yohu-log-sel)");
+    expect(logsCss).not.toContain("::highlight");
     expect(logsCss).not.toContain("yohu-logs__sel-layer");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s+\.yohu-col-cell/);
     expect(logsCss).toContain("--yohu-doc-sel");
     expect(logsCss).not.toContain("var(--yohu-text-sel-fg)");
     expect(logsCss).toMatch(
-      /\.yohu-logs__view \*::selection\s*\{\s*background-color:\s*transparent;\s*color:\s*inherit/,
+      /\.yohu-logs__view \*::selection\s*\{\s*background-color:\s*var\(--yohu-doc-sel\);/,
     );
-    expect(logsCss).not.toMatch(/\.yohu-logs__list \*::selection\s*\{\s*background-color:\s*var\(--yohu-doc-sel\)/);
+    expect(logsCss).not.toMatch(/::selection[^{]*\{[^}]*[\s;{]color:/);
+    expect(logsCss).not.toMatch(/\.yohu-logs__view \*::selection\s*\{\s*background-color:\s*transparent/);
     expect(logsCss).not.toContain("yohu-logs__row--picked");
-    expect(logsCss).toContain("isolation: isolate");
+    expect(logsCss).not.toContain("isolation: isolate");
     expect(logsCss).not.toContain('[data-select="cell"]');
     expect(logsCss).not.toContain(".yohu-logs__cell");
     expect(logsCss).not.toContain("yohu-logs__list-body--picking");
@@ -77,6 +79,7 @@ describe("日志清单布局契约", () => {
       "";
     expect(dialog).toContain('bodyOverflow="hidden"');
     expect(dialog).toContain("YoVirtualList");
+    expect(dialog).not.toContain('state="on"');
     expect(dialog).not.toMatch(/<YoScroller[\s>/]/);
     expect(dialog).toContain("YoEmptyState");
     expect(dialog).toContain("YoLoading");
@@ -196,7 +199,7 @@ describe("日志显示列", () => {
     expect(view).toContain("YoScroller");
     expect(view).toContain('title="重命名会话"');
     expect(view.slice(view.indexOf('title="重命名会话"'))).toMatch(
-      /<YoScroller>\s*<YoTextField/,
+      /<YoScroller state="on">\s*<YoTextField/,
     );
     expect(view).not.toMatch(/<YoScroller[\s\S]*?<YoVirtualList/);
     expect(view).not.toContain("visibleLogColumns");
@@ -228,6 +231,11 @@ describe("日志显示列", () => {
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
     expect(filter).toContain("YoChip");
+    expect(filter).toContain("onDismiss");
+    expect(filter).not.toContain("DismissMark");
+    expect(filter).not.toContain("yohu-recipe-dismiss");
+    expect(logsCss).not.toContain("yohu-recipe-dismiss");
+    expect(logsCss).not.toContain("yohu-chip__remove");
     expect(filter).toContain("YoTextField");
     expect(filter).toContain("YoSearch");
     expect(filter).not.toMatch(/<(input|select|textarea)\b/);
@@ -235,7 +243,15 @@ describe("日志显示列", () => {
     expect(editorView).not.toMatch(/<(input|select|textarea|button)\b/);
     expect(editorView).not.toContain("__body");
     expect(editorView).not.toContain("formatMessage");
-    expect(editorView).toContain("data-tone");
+    expect(editorView).not.toContain("data-tone");
+    expect(editorView).not.toContain("data-box");
+    expect(editorView).not.toMatch(/\bFieldSpan\b/);
+    expect(editorView).not.toContain("highlightMessage");
+    expect(editorView).toContain("yohu-logs__text");
+    expect(editorView).toContain("bindMarkupRuns");
+    expect(editorView).toContain("bindWashPaint");
+    expect(editorView).not.toContain("bindWashCells");
+    expect(editorView).not.toContain("yohu-logs__wash");
     expect(editorView).toContain("data-bar");
     expect(view).not.toContain("contentColor");
     expect(formatter).toContain("parseLevelLetter");
@@ -253,11 +269,17 @@ describe("日志显示列", () => {
     expect(view).toContain("EditorView");
     expect(view).not.toContain("YoVirtualList");
     expect(editorView).toContain("YoVirtualList");
+    expect(editorView).toContain('state="on"');
     expect(editorView).toContain("itemHeight={props.itemHeight}");
-    expect(editorView).toContain("yohu-doc-sel");
-    expect(editorView).toContain("docSelBandStyle");
-    expect(editorView).toContain("selSlice");
-    expect(editorView).toContain("selectionchange");
+    expect(editorView).not.toContain("yohu-doc-sel");
+    expect(editorView).not.toContain("docSelBandStyle");
+    expect(editorView).not.toContain("selSlice");
+    expect(editorView).not.toContain("visualLineBoxes");
+    expect(editorView).not.toContain("data-box={props.range.box");
+    expect(editorView).not.toContain("selectionchange");
+    expect(editorView).not.toContain("pickAll");
+    expect(view).toContain("selectAllChildren");
+    expect(load("copy-gesture.ts")).toContain('opts.pick().kind === "all"');
     expect(view).toContain("itemHeight={dataRowHeight()}");
     expect(view).not.toContain("hangChars");
     expect(editorView).not.toMatch(/\bhang:\s/);
@@ -288,8 +310,10 @@ describe("日志显示列", () => {
     expect(logsCss).toContain('[data-layout="clip"]');
     expect(editorView).not.toContain("--yohu-log-board");
     expect(editorView).toContain("contentWidth");
-    expect(editorView).toContain("hostRef");
+    expect(editorView).toContain("onOffset");
     expect(editorView).toContain("onInlineScroll");
+    expect(editorView).not.toContain("scrollLeft");
+    expect(editorView).not.toContain("hostRef");
     expect(editorView).toContain("chPx");
     expect(view).not.toContain("onInlineOffset");
     expect(view).toContain("chPx={chPx}");
@@ -332,12 +356,30 @@ describe("日志级别色单源", () => {
     expect(logsCss).not.toContain("margin-inline: -0.5ch");
     expect(logsCss).toContain("line-height: var(--yohu-font-leading-data)");
     expect(logsCss).toContain("line-height: var(--yohu-row-height)");
-    expect(logsCss).toContain('[data-tone="ink"]');
-    expect(logsCss).toContain('[data-tone="wash"]');
-    expect(logsCss).toContain('[data-box="line"]');
+    expect(logsCss).not.toContain('[data-tone="ink"]');
+    expect(logsCss).not.toContain('[data-tone="wash"]');
+    expect(logsCss).not.toContain('[data-box="line"]');
+    expect(logsCss).not.toContain("display: contents");
+    expect(logsCss).not.toContain("yohu-logs__mark");
+    expect(logsCss).not.toMatch(/\[data-box="line"\][^{]*\{[^}]*display:\s*inline-block/);
+    expect(logsCss).not.toMatch(/\[data-box="line"\][^{]*\{[^}]*position:\s*absolute/);
     expect(logsCss).not.toContain('[data-tone="badge"]');
     expect(logsCss).not.toMatch(/\[data-tone="wash"\][^{]*\{[^}]*border-radius/);
     expect(logsCss).not.toMatch(/\[data-box="line"\][^{]*\{[^}]*border-radius/);
+    expect(logsCss).not.toContain("yohu-logs__wash");
+    expect(logsCss).toMatch(/\.yohu-logs__text\s*\{[^}]*--yohu-wash-image/);
+    expect(logsCss).toMatch(/\.yohu-logs__text\s*\{[^}]*height:\s*100%/);
+    const markupCss = loadSrc("editor/markup.css");
+    expect(markupCss).toContain("::highlight(yohu-ink-level-d)");
+    expect(markupCss).toContain("::highlight(yohu-wash-level-d)");
+    expect(markupCss).toContain("::highlight(yohu-wash-level-i)");
+    expect(markupCss).toContain("::highlight(yohu-wash-level-f)");
+    expect(markupCss).toContain("::highlight(yohu-log-mark)");
+    expect(markupCss).not.toMatch(/::highlight\(yohu-wash-level-d\)\s*\{[^}]*background-color/);
+    expect(markupCss).not.toMatch(/::highlight\(yohu-wash-logcat-level-d-bg\)\s*\{[^}]*background-color/);
+    expect(markupCss).not.toContain("::selection");
+    expect(markupCss).not.toContain("data-tone");
+    expect(markupCss).not.toContain("data-box");
     expect(logsCss).toContain('[data-bar="level"]');
     expect(logsCss).not.toContain(".yohu-logs__row-ts");
     expect(logsCss).not.toContain(".yohu-logs__row-uid");

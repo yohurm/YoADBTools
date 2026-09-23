@@ -1,5 +1,5 @@
 /*
- * 清单行盒。list 直角通栏；document 可选单选 data-radius=chip 跟 fill 滑块同一半径。
+ * 清单行盒。list 直角通栏；document 可选单选 data-radius=chip。
  * 投放框不在本文件。
  */
 .yohu-list-row {
@@ -8,7 +8,7 @@
   outline: none;
 }
 
-/* document 单选：悬浮/按压片与 YoIndicator fill 同一 --yohu-ripple-radius。 */
+/* document 单选：悬浮/按压片与选中底同一 --yohu-ripple-radius。 */
 .yohu-list-row[data-radius="chip"] {
   border-radius: var(--yohu-ripple-radius);
 }

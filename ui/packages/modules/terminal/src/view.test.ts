@@ -350,7 +350,10 @@ describe("命令终端动效接线", () => {
     expect(load("Composer.tsx")).toContain("leading={queuedLeading(item)}");
     expect(load("Composer.tsx")).not.toContain("dismiss=");
     expect(load("Composer.tsx")).toContain("onDismiss");
-    expect(load("Composer.tsx")).toContain("onDismiss");
+    expect(load("Composer.tsx")).not.toContain("DismissMark");
+    expect(load("Composer.tsx")).not.toContain("yohu-recipe-dismiss");
+    expect(css).not.toContain("yohu-recipe-dismiss");
+    expect(css).not.toContain("yohu-chip__remove");
     expect(load("Composer.tsx")).not.toContain("<textarea");
     expect(load("store.ts")).not.toContain("function runCommand");
     expect(load("store.ts")).toContain("onTaskSummary");

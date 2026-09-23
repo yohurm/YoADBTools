@@ -98,7 +98,6 @@ describe("@yohu/ui 公开组件清单", () => {
   it("含 YoSwitch 与 YoTitleBar", () => {
     expect(ui.YoSwitch).toBeTypeOf("function");
     expect(ui.YoTitleBar).toBeTypeOf("function");
-    expect(ui.docSelBandStyle).toBeTypeOf("function");
   });
 
   it("公开地址策略、搜索引擎与 YoRail", () => {
@@ -138,6 +137,8 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("YOHU_FOCUS_ATTR");
     expect(index).not.toContain("YOHU_FOCUS_KEYBOARD");
     expect(index).not.toContain("YoChipDismiss");
+    expect(index).not.toContain("DismissMark");
+    expect(index).not.toContain("ClearMark");
     expect(index).not.toContain("bindTravel");
     expect(index).not.toContain("bindGrow");
     expect(index).not.toContain("bindHugTravel");
@@ -153,6 +154,7 @@ describe("@yohu/ui 公开组件清单", () => {
     expect(index).not.toContain("railCopyOpaque");
     expect(index).not.toContain("railBlockHidden");
     expect(index).not.toContain("YoListRow");
+    expect(index).not.toContain("docSelBandStyle");
     expect(index).not.toContain("list-row");
     expect(index).not.toContain("YoListFrame");
     expect(index).not.toContain("list-frame");
@@ -201,11 +203,12 @@ describe("@yohu/ui 公开组件清单", () => {
     };
     const toaster: Record<keyof Toaster, true> = {
       show: true,
+      update: true,
       dismiss: true,
       destroy: true,
     };
     expect(Object.keys(menu).sort()).toEqual(["close", "open", "refine"]);
-    expect(Object.keys(toaster).sort()).toEqual(["destroy", "dismiss", "show"]);
+    expect(Object.keys(toaster).sort()).toEqual(["destroy", "dismiss", "show", "update"]);
   });
 
   it("不公开 form L2/L3", () => {

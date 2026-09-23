@@ -234,7 +234,7 @@ export const DarkColors: Record<SemanticColorName, string> = {
  * Yohu 级别板：键是小写 V–F，值是 ink 色相。
  * V 用二级字色（可读弱化）；D/I/W/E 复用 brand/confirm/alert/warning；
  * F 是 warning 压黑（AS Assert 深于 Error），反色字走 `--yohu-fg-on`。
- * 排出 `--yohu-level-*`。Yohu 方案只写 `--yohu-log-ink: var(--yohu-level-${key})`，禁止 f-bg。
+ * 排出 `--yohu-level-*`。Yohu 级别块底用 `--yohu-level-*` + 字母 `--yohu-fg-on`；Tag/消息仍写 `--yohu-log-ink`。禁止 `--yohu-level-f-bg`。
  * 官方 Logcat V2 板在 logcat.ts，禁止本文件再列 AS hex。
  */
 function logLevelBoard(mode: "light" | "dark") {

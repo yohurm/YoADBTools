@@ -24,6 +24,7 @@ import { controlRowHeight } from "./layout";
 
 export interface DropSessionHost {
   listEl: () => Element | undefined;
+  listOffset: () => number;
   hasDevice: () => boolean;
   blocked: () => boolean;
   intoFolder: () => boolean;
@@ -55,7 +56,7 @@ export function createDropSession(host: DropSessionHost): {
       const dirName = destDirFromEntries(
         destPoint.x,
         destPoint.y,
-        readListHitSpace(list, controlRowHeight()),
+        readListHitSpace(list, controlRowHeight(), host.listOffset()),
         host.entries(),
       );
       setSession((prev) => dropSessionWithDir(prev, dirName));
@@ -91,7 +92,7 @@ export function createDropSession(host: DropSessionHost): {
         ...gate,
         intoFolder,
         scale,
-        space: list ? readListHitSpace(list, controlRowHeight()) : undefined,
+        space: list ? readListHitSpace(list, controlRowHeight(), host.listOffset()) : undefined,
         entries: host.entries(),
       });
       if (!commit) {

@@ -6,6 +6,7 @@
 import { Show, createEffect, createMemo, createUniqueId, on } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { ClearMark } from "../form/clear-mark";
 import { Icon } from "../icons";
 import { YoCollapse } from "../motion/engines/collapse";
 import { YoTooltip } from "../overlay/Tooltip";
@@ -221,9 +222,7 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
             onKeyDown={handleKeyDown}
           />
           <Show when={host()["data-clearable"]}>
-            <button type="button" class="yohu-search__clear yohu-focus-ring" aria-label="清除" onClick={handleClear}>
-              <Icon name="close" size={Layout.IconInline} />
-            </button>
+            <ClearMark onClear={handleClear} />
           </Show>
         </YoCorner>
       </div>

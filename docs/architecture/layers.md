@@ -39,8 +39,8 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 | `yohu-search` | 目录级检索引擎（分词 / 命中 / 拼音 / 评分 / 组扩展 / 高亮） | 产品类型、命令库、logcat、路径、Tauri、domain |
 | `yohu-protocol` | serde DTO、身份、事件名 | IO、判定、正则 |
 | `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri、检索引擎 |
-| `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、实现 `Runner` | 日志会话、文件浏览用例、投屏 demux |
-| `yohu-files` / `logsrv` / `mirror` | 各自用例 | capability 互引；绕过 SafetyRoot |
+| `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、`DeviceShell` 原语（008 补偿）、实现 `Runner` | 日志会话、文件浏览用例（SafetyRoot / BrowseSession 在 files）、投屏 demux |
+| `yohu-files` / `logsrv` / `mirror` | 各自用例（files = BrowseSession Empty/Live + 传输/变更） | capability 互引；绕过 SafetyRoot；list 未 attach 不得偷偷开壳 |
 | `yohu-update` | 更新检查 / 下载 / 覆盖安装（GitHub Releases） | 依赖 adb |
 | `yohu-adbtools` | 组合根、IPC 映射、任务中心、OLE / Finder 拖出；壳服务 `update_runs` / `transfer_runs` / `browse_runs` / `GroupRuns` / `mirror_sessions` / `settings_apply` / `capture_runs`；Windows 启动 overlay（窗口/swapchain/DComp）与投屏 HWND | 业务判定、路径校验；禁止自写时长/曲线；commands 只转发 |
 
@@ -48,7 +48,7 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 
 ## `yohu-runtime` 三模块
 
-- **process**：`ProcessRunner`（`run_capture` / `run_streaming` / `spawn_child`）/ `kill_tree` / `ChildHandle` / `ProcessOutput` / `ProcessError`。不返回 `ExecOutcome` 或 `AdbError`。掉线文案判定留在 adb。`run_streaming` 即计划稿的流式入口（曾写 `spawn_streaming`）。
+- **process**：`ProcessRunner`（`run_capture` / `run_streaming` / `spawn_child` / `spawn_child_piped`）/ `kill_tree` / `ChildHandle` / `ProcessOutput` / `ProcessError`。`spawn_child` stdin 仍是 null（logcat / 投屏）；`DeviceShell` 才走 `spawn_child_piped`。不返回 `ExecOutcome` 或 `AdbError`。掉线文案判定留在 adb。`run_streaming` 即计划稿的流式入口（曾写 `spawn_streaming`）。
 - **persist**：`atomic_write` + `backup_corrupt`（`.tmp` rename；`.corrupt-<ts>`）。不解析 settings/library schema。
 - **os_paths**：`app_data_root` / `app_install_root` + `open_path` / `open_url` / `host_bin_name` / `ensure_executable`。产品子目录仍由壳拼。
 

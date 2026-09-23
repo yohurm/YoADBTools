@@ -335,6 +335,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::commandlib::commandlib_load,
             commands::commandlib::commandlib_save,
             commands::files::files_list,
+            commands::files::files_session_attach,
+            commands::files::files_session_detach,
             commands::files::files_push,
             commands::files::files_pull,
             commands::files::files_cancel,

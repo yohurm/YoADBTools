@@ -10,14 +10,14 @@ import {
   isVirtualSelectionEmpty,
   virtualActiveKey,
   virtualContentWidth,
+  virtualFlowWindow,
   virtualInnerWidth,
-  virtualIndicatorAnchor,
   virtualIndicatorBox,
-  virtualIndicatorFollow,
   virtualIndexOfKey,
   virtualKeyIntent,
   virtualNearestScrollTop,
-  virtualPoolIndex,
+    virtualPoolBindIndex,
+    virtualPoolIndex,
   virtualPoolOrigin,
   virtualPoolSize,
   virtualPoolSlots,
@@ -28,6 +28,11 @@ import {
   virtualRowTop,
   virtualRowTransform,
   virtualTotalHeight,
+  virtualListLayout,
+  virtualClusterStyle,
+  virtualFlowLeadHeight,
+  virtualFlowTailHeight,
+  virtualFlowRowStyle,
 } from "./virtuallist-model";
 
 describe("virtuallist-model", () => {
@@ -63,6 +68,19 @@ describe("virtuallist-model", () => {
     const shortSize = virtualPoolSize(100, 20, 10, 3);
     expect(virtualPoolOrigin(0, 20, 10, 3, shortSize)).toBe(0);
     expect(virtualPoolSlots(shortSize)).toEqual([0, 1, 2]);
+  });
+
+  it("环形槽位 origin 步进只换一条绑定", () => {
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(0, slot, 5, 20))).toEqual([0, 1, 2, 3, 4]);
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(1, slot, 5, 20))).toEqual([5, 1, 2, 3, 4]);
+    expect([0, 1, 2, 3, 4].map((slot) => virtualPoolBindIndex(6, slot, 5, 20))).toEqual([10, 6, 7, 8, 9]);
+    expect(virtualPoolBindIndex(0, 0, 5, 0)).toBe(-1);
+    expect(virtualPoolBindIndex(15, 0, 5, 20)).toBe(15);
+    expect(virtualPoolBindIndex(15, 4, 5, 20)).toBe(19);
+    expect(virtualFlowWindow(0, 5, 20)).toEqual([0, 1, 2, 3, 4]);
+    expect(virtualFlowWindow(1, 5, 20)).toEqual([1, 2, 3, 4, 5]);
+    expect(virtualFlowWindow(18, 5, 20)).toEqual([18, 19]);
+    expect(virtualFlowWindow(0, 10, 3)).toEqual([0, 1, 2]);
   });
 
   it("贴底阈值", () => {
@@ -123,16 +141,7 @@ describe("virtuallist-model", () => {
     ).toBe(-1);
   });
 
-  it("indicator follow：多选仅 1 个 key；0 或 ≥2 为 undefined", () => {
-    expect(virtualIndicatorFollow(false, undefined, "a")).toBeUndefined();
-    expect(virtualIndicatorFollow(true, undefined, "a")).toBe("a");
-    expect(virtualIndicatorFollow(true, undefined, null)).toBeUndefined();
-    expect(virtualIndicatorFollow(true, new Set(), null)).toBeUndefined();
-    expect(virtualIndicatorFollow(true, new Set(["only"]), null)).toBe("only");
-    expect(virtualIndicatorFollow(true, new Set(["a", "b"]), null)).toBeUndefined();
-  });
-
-  it("indicator 几何 = index × itemHeight，宽度由调用方传入", () => {
+  it("行盒几何 = index × itemHeight，宽度由调用方传入", () => {
     expect(virtualRowTop(3, 22)).toBe(66);
     expect(virtualRowOffsetY(3, 22)).toBe(66);
     expect(virtualRowOffsetY(3, 22, 1)).toBe(88);
@@ -160,13 +169,6 @@ describe("virtuallist-model", () => {
     expect(virtualContentWidth(400, 16)).toBe(384);
     expect(virtualContentWidth(400, -4)).toBe(400);
     expect(virtualIndicatorBox(3, 22, 400)).toEqual({ x: 0, y: 66, width: 400, height: 22 });
-    expect(virtualIndicatorAnchor(["a", "b", "c"], "1", 22, 320)).toEqual({
-      x: 0,
-      y: 22,
-      width: 320,
-      height: 22,
-    });
-    expect(virtualIndicatorAnchor(["a", "b"], undefined, 22, 320)).toBeNull();
     expect(virtualIndexOfKey(["a", "b", "c"], "b", (item) => item)).toBe(1);
     expect(virtualIndexOfKey(["a"], "missing", (item) => item)).toBe(-1);
   });
@@ -191,5 +193,40 @@ describe("virtuallist-model", () => {
     expect(virtualKeyIntent(" ", 2, 5)).toEqual({ type: "commit" });
     expect(virtualKeyIntent("Tab", 0, 5)).toBeNull();
     expect(virtualKeyIntent("ArrowDown", 0, 0)).toBeNull();
+  });
+
+  it("文档未开 listbox / 换位才走 flow；簇钉原点，gap 尺仍等于未挂载区", () => {
+    expect(virtualListLayout({ tone: "document", selectable: false, reordering: false })).toBe("flow");
+    expect(virtualListLayout({ tone: "document", selectable: true, reordering: false })).toBe("pool");
+    expect(virtualListLayout({ tone: "document", selectable: false, reordering: true })).toBe("pool");
+    expect(virtualListLayout({ tone: "list", selectable: false, reordering: false })).toBe("pool");
+    expect(virtualFlowLeadHeight(8, 20)).toBe(160);
+    expect(virtualFlowLeadHeight(0, 20)).toBe(0);
+    expect(virtualFlowTailHeight(50, 8, 10, 20)).toBe(640);
+    expect(virtualFlowTailHeight(10, 0, 10, 20)).toBe(0);
+    expect(virtualFlowRowStyle(22, true, 400)).toEqual({
+      position: "relative",
+      height: "22px",
+      width: "400px",
+    });
+    expect(virtualFlowRowStyle(22, false)).toEqual({
+      position: "relative",
+      height: "0px",
+      visibility: "hidden",
+      overflow: "hidden",
+    });
+    expect(virtualClusterStyle(8, 20, 400)).toEqual({
+      position: "absolute",
+      top: "160px",
+      left: "0px",
+      width: "400px",
+      right: "auto",
+    });
+    expect(virtualClusterStyle(0, 22)).toEqual({
+      position: "absolute",
+      top: "0px",
+      left: "0px",
+      right: "0px",
+    });
   });
 });

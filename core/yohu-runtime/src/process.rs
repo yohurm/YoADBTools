@@ -4,6 +4,7 @@
 //! stdout 与 stderr 必须同时泵取，否则大输出会填满管道造成死锁。
 //! 流式路径在 stdout EOF 之后仍须排空 stderr，再 `wait`；成功路径不得提前丢接收端。
 //! 取消/超时时必须先松开管道再 `wait`，否则子进程堵在写满的 pipe 上退不出去。
+//! logcat 跟流按字节切行：非法 UTF-8 替换后继续；stderr 泵失败不得杀掉 stdout 跟流。
 
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
@@ -22,8 +23,10 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
-const STDERR_BUDGET: usize = 64 * 1024;
+/// stdout 捕获上限（字节）。短命令与 piped IO 共用。
+pub const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
+/// stderr 捕获上限（字节）。短命令与 piped IO 共用。
+pub const STDERR_BUDGET: usize = 64 * 1024;
 const CAPTURE_CHAN: usize = 128;
 const STREAM_STDERR_CHAN: usize = 64;
 const REAP_WAIT: Duration = Duration::from_secs(3);
@@ -134,7 +137,7 @@ impl ProcessRunner {
         timeout: Option<Duration>,
         cancel: CancellationToken,
     ) -> Result<ProcessOutput, ProcessError> {
-        let mut child = self.spawn(program, args)?;
+        let mut child = self.spawn(program, args, Stdio::null())?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -271,7 +274,7 @@ impl ProcessRunner {
         line_tx: mpsc::Sender<String>,
         join_stderr: bool,
     ) -> Result<i32, ProcessError> {
-        let mut child = self.spawn(program, args)?;
+        let mut child = self.spawn(program, args, Stdio::null())?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -282,7 +285,7 @@ impl ProcessRunner {
         let mut stop: Option<ProcessError> = None;
         let mut stderr_done = stderr_rx.is_closed();
         if let Some(stdout) = stdout {
-            let mut lines = BufReader::new(stdout).lines();
+            let mut reader = BufReader::new(stdout);
             loop {
                 tokio::select! {
                     biased;
@@ -292,8 +295,12 @@ impl ProcessRunner {
                     }
                     result = join_pump_task(&mut stderr_task), if stderr_task.is_some() => {
                         if let Err(e) = result {
-                            stop = Some(e);
-                            break;
+                            // logcat 跟流只认 stdout。stderr 非法字节 / 超预算不得杀掉跟流。
+                            if join_stderr {
+                                stop = Some(e);
+                                break;
+                            }
+                            stderr_done = true;
                         }
                     }
                     chunk = stderr_rx.recv(), if !stderr_done => {
@@ -310,7 +317,7 @@ impl ProcessRunner {
                             None => stderr_done = true,
                         }
                     }
-                    line = lines.next_line() => {
+                    line = read_line_lossy(&mut reader) => {
                         match line {
                             Ok(Some(l)) => {
                                 tokio::select! {
@@ -424,13 +431,22 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(program, args)?))
+        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::null())?))
     }
 
-    fn spawn(&self, program: &Path, args: &[String]) -> Result<Child, ProcessError> {
+    /// 长驻且 stdin 可写（浏览 raw shell）。logcat / 投屏仍走 [`Self::spawn_child`]。
+    pub fn spawn_child_piped(
+        &self,
+        program: &Path,
+        args: &[String],
+    ) -> Result<ChildHandle, ProcessError> {
+        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::piped())?))
+    }
+
+    fn spawn(&self, program: &Path, args: &[String], stdin: Stdio) -> Result<Child, ProcessError> {
         let mut cmd = Command::new(program);
         cmd.args(args)
-            .stdin(Stdio::null())
+            .stdin(stdin)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         #[cfg(windows)]
@@ -502,6 +518,25 @@ async fn forward_line(
     }
 }
 
+/// logcat 跟流：按字节切行，非法 UTF-8 替换后继续，禁止因单行坏字节杀掉采集。
+async fn read_line_lossy<R>(reader: &mut R) -> std::io::Result<Option<String>>
+where
+    R: tokio::io::AsyncBufRead + Unpin,
+{
+    let mut buf = Vec::new();
+    let n = reader.read_until(b'\n', &mut buf).await?;
+    if n == 0 {
+        return Ok(None);
+    }
+    if buf.ends_with(b"\n") {
+        buf.pop();
+        if buf.ends_with(b"\r") {
+            buf.pop();
+        }
+    }
+    Ok(Some(String::from_utf8_lossy(&buf).into_owned()))
+}
+
 async fn read_lines_bounded<R>(
     reader: R,
     tx: mpsc::Sender<String>,
@@ -544,6 +579,22 @@ mod tests {
             .await
             .expect_err("非法 UTF-8 必须 Io");
         assert!(matches!(err, ProcessError::Io(_)));
+    }
+
+    #[tokio::test]
+    async fn read_line_lossy_keeps_stream_on_invalid_utf8() {
+        let mut reader = BufReader::new(Cursor::new(&b"ok\n\xFF\xFE bad\nend\n"[..]));
+        assert_eq!(
+            read_line_lossy(&mut reader).await.unwrap().as_deref(),
+            Some("ok")
+        );
+        let bad = read_line_lossy(&mut reader).await.unwrap().expect("坏字节行");
+        assert!(bad.contains('\u{FFFD}'), "非法 UTF-8 必须替换后继续: {bad:?}");
+        assert_eq!(
+            read_line_lossy(&mut reader).await.unwrap().as_deref(),
+            Some("end")
+        );
+        assert_eq!(read_line_lossy(&mut reader).await.unwrap(), None);
     }
 
     #[tokio::test]
@@ -681,5 +732,51 @@ mod tests {
         }
         assert!(saw_stderr, "joined 必须把 stderr 行交给 line_tx");
         let _ = join.await;
+    }
+
+    #[cfg(windows)]
+    fn ping_stdin_echo() -> (&'static Path, Vec<String>) {
+        (
+            Path::new("powershell"),
+            vec![
+                "-NoLogo".into(),
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                "$line = [Console]::In.ReadLine(); Write-Output (\"pong:{0}\" -f $line)".into(),
+            ],
+        )
+    }
+
+    #[cfg(unix)]
+    fn ping_stdin_echo() -> (&'static Path, Vec<String>) {
+        (
+            Path::new("sh"),
+            vec!["-c".into(), "read line; printf 'pong:%s\\n' \"$line\"".into()],
+        )
+    }
+
+    #[tokio::test]
+    async fn spawn_child_piped_roundtrip() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+        let runner = ProcessRunner;
+        let (program, args) = ping_stdin_echo();
+        let mut child = runner.spawn_child_piped(program, &args).expect("spawn piped");
+        let mut stdin = child.stdin.take().expect("stdin");
+        let mut stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+        stdin.write_all(b"hi\n").await.expect("write");
+        stdin.flush().await.expect("flush");
+        drop(stdin);
+        let mut line = String::new();
+        tokio::time::timeout(Duration::from_secs(8), stdout.read_line(&mut line))
+            .await
+            .expect("read timed out")
+            .expect("read");
+        assert!(
+            line.contains("pong:hi"),
+            "piped stdin 必须到达子进程: {line:?}"
+        );
+        child.kill_tree();
+        let _ = child.wait().await;
     }
 }

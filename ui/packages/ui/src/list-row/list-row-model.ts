@@ -1,13 +1,13 @@
 /**
  * 清单行盒（L2）。
  * Family B 数据网格行：直角通栏 + 底。投放框不在本层。
- * document 单选片交给 YoIndicator fill；行上悬浮必须同一 chip 半径。
+ * 选中底一律行自绘；document 单选半径 chip，list / 多选块直角通栏。
  * 不碰 DOM、不写色值。
  */
 
 export type YoListRowTone = "document" | "list";
 export type YoListRowFill = "none" | "selected" | "hot";
-/** none = 直角通栏；chip = 与 fill 滑块同一 --yohu-ripple-radius。 */
+/** none = 直角通栏；chip = document 单选圆角片。 */
 export type YoListRowRadius = "none" | "chip";
 
 export const DEFAULT_LIST_ROW_TONE: YoListRowTone = "document";
@@ -27,20 +27,12 @@ export interface ListRowChrome {
 }
 
 /**
- * list 行自绘选中底。
- * document 行把单选底交给 YoIndicator fill。
- */
-export function listRowOwnsFill(tone: YoListRowTone = DEFAULT_LIST_ROW_TONE): boolean {
-  return tone === "list";
-}
-
-/**
- * 选中片由滑块画时，行上悬浮/按压必须同一 chip。
- * list、不可选、document 多选块（≥2）走直角通栏。
+ * 选中片由行自绘。list 与 document 多选块走直角通栏；
+ * document 可选单选走 chip，与 --yohu-ripple-radius 同族。
  */
 export function resolveListRowRadius(input: ListRowChromeInput = {}): YoListRowRadius {
   if (!input.selectable) return "none";
-  if (listRowOwnsFill(input.tone)) return "none";
+  if (input.tone === "list") return "none";
   if (input.selectedKeys !== undefined && input.selectedKeys.size > 1) return "none";
   return "chip";
 }

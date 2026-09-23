@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MotionSpec, motionDurationMs } from "../../tokens/motion";
 import { loadMotionCss } from "../css";
-import { DISMISS_HOLD_DURATION, GROW_SPEC, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, TRAVEL_SPEC, presenceClipProperty, presenceUsesClip } from "./recipes";
+import { DISMISS_HOLD_DURATION, GROW_SPEC, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, TRAVEL_SPEC, presenceClipProperty, presenceExitWatchProperty, presenceUsesClip, presenceUsesTransition } from "./recipes";
 
 describe("motion recipes", () => {
   it("配方时长从 MotionSpec 派生，禁止散落毫秒", () => {
@@ -20,9 +20,27 @@ describe("motion recipes", () => {
     expect(css).toContain("@keyframes yohu-tip-in");
     expect(css).toContain("@keyframes yohu-tip-drop-in");
     const tip = css.slice(css.indexOf("@keyframes yohu-tip-in"));
-    const untilSlide = tip.slice(0, tip.indexOf("@keyframes yohu-slide-end-in"));
-    expect(untilSlide).toContain("--yohu-space-2xs");
-    expect(untilSlide).not.toContain("--yohu-space-sm");
+    const untilScale = tip.slice(0, tip.indexOf("@keyframes yohu-scale-in"));
+    expect(untilScale).toContain("--yohu-space-2xs");
+    expect(untilScale).not.toContain("--yohu-space-sm");
+  });
+
+  it("toast 自盒外升起并微缩放，出场倒放且 transition 可打断", () => {
+    const css = loadMotionCss();
+    const toastBlock = css.slice(css.indexOf("配方 toast"));
+    const untilPopover = toastBlock.slice(0, toastBlock.indexOf("data-recipe=\"popover\""));
+    expect(untilPopover).toContain("translateY(100%)");
+    expect(untilPopover).toContain("scale(0.94)");
+    expect(untilPopover).toContain("grid-template-rows");
+    expect(untilPopover).toContain(".yohu-presence__clip > *");
+    expect(untilPopover).toContain("overflow: visible");
+    expect(untilPopover).toContain("opacity var(--yohu-motion-spatial-rail)");
+    expect(untilPopover).toContain("opacity var(--yohu-motion-effects-exit)");
+    expect(untilPopover).not.toContain("animation:");
+    expect(untilPopover).not.toContain("--yohu-space-xs");
+    expect(untilPopover).not.toContain("overflow: hidden");
+    expect(css).not.toContain("yohu-toast-in");
+    expect(css).not.toContain("yohu-slide-end");
   });
 
   it("Presence 出场时长指向 spatialExit / effectsExit / spatialLocal", () => {
@@ -47,6 +65,10 @@ describe("motion recipes", () => {
     expect(presenceUsesClip("chip")).toBe(true);
     expect(presenceClipProperty("chip")).toBe("grid-template-columns");
     expect(presenceClipProperty("list")).toBe("grid-template-rows");
+    expect(presenceUsesTransition("toast")).toBe(true);
+    expect(presenceUsesClip("toast")).toBe(true);
+    expect(presenceClipProperty("toast")).toBe("grid-template-rows");
+    expect(presenceExitWatchProperty("toast")).toBe("grid-template-rows");
     const css = loadMotionCss();
     const chipBlock = css.slice(css.indexOf("配方 chip"));
     const untilFold = chipBlock.slice(0, chipBlock.indexOf("配方：折叠"));
@@ -245,6 +267,8 @@ describe("motion recipes", () => {
     expect(reduce).not.toContain("> * > [data-key]");
     expect(reduce).not.toContain("__view");
     expect(reduce).not.toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
+    expect(reduce).not.toContain(".yohu-chip__remove");
+    expect(reduce).toContain(".yohu-recipe-clear");
     expect(reduce).toContain(".yohu-recipe-reorder-bar[data-ready]");
     expect(reduce).toContain(".yohu-recipe-reorder-overlay[data-ready]");
     expect(reduce).not.toContain(".yohu-virtual-list[data-reordering] .yohu-virtual-list__row");

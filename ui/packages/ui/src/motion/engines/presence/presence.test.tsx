@@ -63,6 +63,21 @@ describe("YoPresence", () => {
     expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("HfLooper");
   });
 
+  it("recipe=toast 出生 closed，双 rAF 后 open，并用 clip 包一层", async () => {
+    const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
+    render(() => (
+      <YoPresence when recipe="toast">
+        <div class="yohu-toast">提示</div>
+      </YoPresence>
+    ));
+    const host = document.querySelector(".yohu-presence");
+    expect(host?.getAttribute("data-state")).toBe("closed");
+    expect(host?.querySelector(".yohu-presence__clip")?.textContent).toBe("提示");
+    await nextPaint();
+    expect(host?.getAttribute("data-state")).toBe("open");
+    skip.mockRestore();
+  });
+
   it("clip 配方出生 closed，双 rAF 后 open", async () => {
     const skip = vi.spyOn(reduced, "shouldSkipMotion").mockReturnValue(false);
     render(() => (

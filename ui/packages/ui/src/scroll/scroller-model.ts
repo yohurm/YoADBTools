@@ -58,6 +58,11 @@ export const SCROLLER_THUMB_END = Spacing.Xs;
  */
 export const SCROLLER_LANE = SCROLLER_THUMB_ACTIVE + SCROLLER_THUMB_END * 2;
 
+/** 侧轨让位用 token 尺，禁止热路径 getComputedStyle。 */
+export function resolveScrollerViewFromGutter(client: number, gutterOn: boolean): number {
+  return resolveScrollerViewSize(client, 0, gutterOn ? SCROLLER_LANE : 0);
+}
+
 /** HarmonyOS BarState.Auto：停止滚动后隐藏。 */
 export const SCROLLER_AUTO_HIDE_MS = motionDurationMs("barHide");
 
@@ -84,6 +89,50 @@ export interface ScrollerThumb {
 export interface ScrollerFlowBox {
   top: number;
   height: number;
+}
+
+/** 调用方声明的内容尺。虚拟列表用总高/行宽，禁止热路径再量 in-flow 子盒。 */
+export interface ScrollerExtent {
+  block: number;
+  inline?: number;
+}
+
+/**
+ * offset：声明尺，会话数字驱动平面 transform，视口 scrollTop 恒 0。
+ * flow：短名单，同一数字写进 scrollTop（in-flow 子盒）。
+ */
+export type ScrollerDrive = "offset" | "flow";
+
+export function resolveScrollerDrive(declared: ScrollerExtent | undefined): ScrollerDrive {
+  return declared != null ? "offset" : "flow";
+}
+
+/** 内容平面位移。负号把内容拉进视口；调用方写 DOM transform，不进 Solid。 */
+export function scrollerPlaneTransform(block: number, inline = 0): string {
+  return `translate3d(${-inline}px, ${-block}px, 0)`;
+}
+
+export interface ScrollerMetrics {
+  viewBlock: number;
+  contentBlock: number;
+  viewInline: number;
+  contentInline: number;
+}
+
+/** 有声明尺则用声明；横轴 0 / 缺省跟视口（不横滚）。 */
+export function resolveScrollerContentBox(
+  declared: ScrollerExtent | undefined,
+  measuredBlock: number,
+  measuredInline: number,
+  viewInline: number,
+): { block: number; inline: number } {
+  if (!declared) {
+    return { block: measuredBlock, inline: measuredInline };
+  }
+  return {
+    block: Math.max(0, declared.block),
+    inline: declared.inline != null && declared.inline > 0 ? declared.inline : Math.max(0, viewInline),
+  };
 }
 
 /** CSS Positioned Layout：absolute / fixed 出流，不进溢出。 */
@@ -170,7 +219,7 @@ export function resolveScrollerScrollEnd(view: number, all: number): number {
   return Math.max(0, all - view);
 }
 
-/** 滑块位移 → 视口 scrollTop。room=0 不滚。 */
+/** 滑块位移 → 会话 block 偏移。room=0 不滚。 */
 export function resolveScrollerScrollTop(input: {
   view: number;
   all: number;

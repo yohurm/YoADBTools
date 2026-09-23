@@ -220,13 +220,40 @@ describe("着色 range", () => {
     expect(contentColor("darcula").id).toBe(LOG_COLOR_SCHEME_DEFAULT);
   });
 
-  it("Yohu Fatal level 是行盒 wash，有左条；LevelFormat 尾空格不着色", () => {
-    const painted = formatMessage(line({ level: "E" }), { ...all, scheme: "darcula" });
-    expect(painted.bar).toBe("level");
-    expect(painted.barInk).toBe("var(--yohu-level-e)");
-    const level = painted.ranges.filter((range) => range.kind === "level");
-    expect(level[0]?.tone).toBe("ink");
-    expect(level[1]?.tone).toBeUndefined();
+  it("Yohu：已知级别都是 wash/line 色块，对照 LevelFormat BACKGROUND；尾空格不着色", () => {
+    const debug = formatMessage(line({ level: "D" }), shown);
+    expect(debug.bar).toBe("level");
+    const d = debug.ranges.find((range) => range.kind === "level" && range.tone);
+    expect(d?.tone).toBe("wash");
+    expect(d?.box).toBe("line");
+    expect(d?.style).toEqual({
+      "--yohu-log-level-fg": "var(--yohu-fg-on)",
+      "--yohu-log-level-bg": "var(--yohu-level-d)",
+    });
+    const dTrail = debug.ranges.filter((range) => range.kind === "level");
+    expect(dTrail[1]?.tone).toBeUndefined();
+    const info = formatMessage(line({ level: "I" }), shown);
+    const i = info.ranges.find((range) => range.kind === "level" && range.tone);
+    expect(i?.tone).toBe("wash");
+    expect(i?.style).toEqual({
+      "--yohu-log-level-fg": "var(--yohu-fg-on)",
+      "--yohu-log-level-bg": "var(--yohu-level-i)",
+    });
+    const fatal = formatMessage(line({ level: "F" }), shown);
+    const f = fatal.ranges.find((range) => range.kind === "level" && range.tone);
+    expect(f?.tone).toBe("wash");
+    expect(f?.box).toBe("line");
+    expect(f?.style).toEqual({
+      "--yohu-log-level-fg": "var(--yohu-fg-on)",
+      "--yohu-log-level-bg": "var(--yohu-level-f)",
+    });
+  });
+
+  it("Logcat：级别字母是 wash/line 色块，不是 ink", () => {
+    const painted = formatMessage(line({ level: "D" }), { ...shown, scheme: "logcat" });
+    const d = painted.ranges.find((range) => range.kind === "level" && range.tone);
+    expect(d?.tone).toBe("wash");
+    expect(d?.box).toBe("line");
   });
 
   it("Logcat 分 token，无左条；时间/进程无色键", () => {
@@ -257,6 +284,11 @@ describe("measureChPx 不进 Formatter", () => {
     expect(src).not.toContain("./document");
     expect(src).not.toContain("./board");
     expect(src).not.toContain("./view");
+    expect(src).not.toContain("./markup-model");
+    expect(src).not.toContain("./markup-policy");
+    expect(src).not.toContain("./markup-registry");
+    expect(src).not.toContain("./selection");
+    expect(src).not.toContain("../highlight");
     expect(src).not.toContain("../layout");
   });
 });

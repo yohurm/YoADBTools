@@ -144,10 +144,17 @@ invoke mirror.present.setActive(true) + mirror.layout
   → PresentHost::layout → ensure_surface 建 HWND
   → occupancy DComp clip contain
 
-invoke files.list → commands/files require_online → browse_runs::list（后一次取消前一次）
-  → FileBrowser.list（core SafetyRoot）
+invoke files.session.attach → commands/files require_online → browse_runs::attach
+  → FileBrowser.attach（Empty→Starting→Live 或 adopt；BrowseAttach { serial, generation, adopted }；ADR-v6-033）
+  → attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。
+  → 握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot。
+  → UI 持有 generation
+invoke files.list(serial, path, generation) → commands/files require_online → browse_runs::list
+  → files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。SafetyRoot + DeviceShell.exec / oneshot
+invoke files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。视图卸载带所持世代
+went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。
 invoke files.push/pull → transfer_runs::spawn（tokio::spawn(run)；立即返回 id）
-invoke files.dragOut → dnd → transfer_runs::run（Win block_on / mac await）
+invoke files.dragOut → dnd drag_roots（立刻 DoDragDrop）→ 目录后台 files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。→ GetData 才 transfer_runs::run（Win block_on / mac await）
 invoke log.export → commands/log 转发 → capture_runs::export
   → 空 export_default_path 用 paths.exports_dir，否则设置目录
   → CaptureService.export（环快照 + domain 过滤）

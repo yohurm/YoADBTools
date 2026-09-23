@@ -8,7 +8,7 @@ use crate::browse::FileBrowser;
 use crate::fault::FileError;
 use crate::guard::{last_segment, normalize_mut, parent_remote, resolve_and_recheck, RecheckKind};
 use yohu_domain::RemotePath;
-use yohu_protocol::EntryKind;
+use yohu_protocol::{DragOutItem, EntryKind};
 
 /// 单次拖出展开上限，避免巨大目录卡死 DoDragDrop 前的列举。
 pub const MAX_TREE_ENTRIES: usize = 4096;
@@ -24,14 +24,49 @@ pub struct TreeEntry {
 }
 
 impl FileBrowser {
+    /// 拖出根条目：只做同步 SafetyRoot，不碰设备。OLE 必须在松手前启动。
+    /// 目录子树仍走 [`Self::list_tree`]，在 DoDragDrop 之后后台展开。
+    pub fn drag_roots(&self, items: &[DragOutItem]) -> Result<Vec<TreeEntry>, FileError> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        for item in items {
+            let path = normalize_mut(&self.safety, &item.remote)?;
+            if !seen.insert(path.as_str().to_string()) {
+                continue;
+            }
+            let name = last_segment(path.as_str());
+            if name.is_empty() {
+                return Err(FileError::Path(path.as_str().into()));
+            }
+            out.push(TreeEntry {
+                remote: path.as_str().to_string(),
+                relative: name.to_string(),
+                is_dir: item.is_dir,
+                size: if item.is_dir { 0 } else { item.size },
+            });
+        }
+        if out.is_empty() {
+            return Err(FileError::EmptyTree(
+                items
+                    .first()
+                    .map(|item| item.remote.clone())
+                    .unwrap_or_default(),
+            ));
+        }
+        Ok(out)
+    }
+
     /// 把一组远端路径展开成 FILEDESCRIPTOR 树（目录递归；文件一条）。
     /// 每条必须是安全根真子路径，并做祖先 realpath 复核。
+    /// `generation` 由调用方自带（拖出会话与 `BrowseAttach` 同一时钟）；不从槽位窥世代。
     pub async fn list_tree(
         &self,
         serial: &str,
         remotes: &[String],
+        generation: u64,
         cancel: CancellationToken,
     ) -> Result<Vec<TreeEntry>, FileError> {
+        self.ensure_generation(serial, generation)?;
         let mut out = Vec::new();
         let mut seen = HashSet::new();
         for raw in remotes {
@@ -48,7 +83,9 @@ impl FileBrowser {
                 cancel.clone(),
             )
             .await?;
-            let (is_dir, size) = self.classify(serial, &resolved, cancel.clone()).await?;
+            let (is_dir, size) = self
+                .classify(serial, &resolved, generation, cancel.clone())
+                .await?;
             self.push_tree(
                 serial,
                 path,
@@ -56,6 +93,7 @@ impl FileBrowser {
                 is_dir,
                 size,
                 0,
+                generation,
                 &mut out,
                 &mut seen,
                 cancel.clone(),
@@ -74,12 +112,13 @@ impl FileBrowser {
         &self,
         serial: &str,
         path: &RemotePath,
+        generation: u64,
         cancel: CancellationToken,
     ) -> Result<(bool, u64), FileError> {
         let parent =
             parent_remote(path.as_str()).ok_or_else(|| FileError::Path(path.as_str().into()))?;
         let name = last_segment(path.as_str());
-        let entries = self.list(serial, parent, cancel).await?;
+        let entries = self.list(serial, parent, generation, cancel).await?;
         let entry = entries
             .iter()
             .find(|e| e.name == name)
@@ -99,6 +138,7 @@ impl FileBrowser {
         is_dir: bool,
         size: u64,
         depth: u32,
+        generation: u64,
         out: &'a mut Vec<TreeEntry>,
         seen: &'a mut HashSet<String>,
         cancel: CancellationToken,
@@ -120,7 +160,9 @@ impl FileBrowser {
             if !is_dir {
                 return Ok(());
             }
-            let children = self.list(serial, remote.as_str(), cancel.clone()).await?;
+            let children = self
+                .list(serial, remote.as_str(), generation, cancel.clone())
+                .await?;
             for child in children {
                 if cancel.is_cancelled() {
                     return Err(FileError::Adb(yohu_adb::AdbError::Cancelled));
@@ -143,7 +185,7 @@ impl FileBrowser {
                     Some(true) => (true, 0),
                     Some(false) => (false, child.size),
                     None => {
-                        self.classify(serial, &child_resolved, cancel.clone())
+                        self.classify(serial, &child_resolved, generation, cancel.clone())
                             .await?
                     }
                 };
@@ -154,6 +196,7 @@ impl FileBrowser {
                     child_dir,
                     child_size,
                     depth + 1,
+                    generation,
                     out,
                     seen,
                     cancel.clone(),

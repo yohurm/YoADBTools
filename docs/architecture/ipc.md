@@ -9,13 +9,14 @@
 | 命令 | 说明 |
 |------|------|
 | `device.list` | 读目录快照，不跑 adb |
-| `device.refresh` | `start-server` + `devices -l` 整表替换目录并立刻推 `devices/changed`；与启动预热单飞；先前 Online 且本次不再 Online 的 serial 推 `device/offline`，采集/投屏后台收敛；Online 集合同步 `DeviceStatusHub`（先 getprop 再 dumpsys） |
+| `device.refresh` | `start-server` + `devices -l` 整表替换目录并立刻推 `devices/changed`；与启动预热单飞；先前 Online 且本次不再 Online 的 serial 推 `device/offline`，浏览同一拍关当前槽；采集/投屏后台收敛；Online 集合同步 `DeviceStatusHub`（先 getprop 再 dumpsys） |
 | `device.status` | 读运行时状态缓存（可选 `serial`）；不触发扫描 |
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
 | `terminal.eval` / `terminal.exec` / `block.run` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；`block.run` 跑组下同级命令块（步间按块级间隔）；组编排；取消兼取消块 |
 | `commandlib.load` / `save` | 命令库 schemaVersion 3 only；缺文件写默认库；损坏或其他 schema 则备份后写默认库 |
-| `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。设备侧 `ls`/`rm`/`push` 失败由 `yohu-files::file_error_from_adb` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等；未分类 BadExit → `RemoteFailed(path)`，不带 stderr。`FileError` 不 `From<AdbError>`。拖出树触顶 `TreeLimit(项)` / `TreeDepth(层)` fail-closed，禁止当成功截断。壳 `ipc_file`：远端不存在 → `not_found`，本地不存在与其余路径类（含 `TreeLimit` / `TreeDepth`）→ `invalid_args`，`Adb` → `ipc_adb`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI；UI 禁止再扫 stderr |
+| `files.session.attach` / `files.session.detach` | 浏览能力会话（ADR-v6-033）。`attach(serial)` 返回 BrowseAttach { serial, generation, adopted }（Empty→Starting→Live 或 adopt）。attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot。files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。UI 持有 `BrowseAttach.generation`。视图卸载 / `bindSerial(null)` 带所持世代 detach。went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。改 `adb.path`：`drop_workers`、槽位仍 Live、世代不变 |
+| `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。设备侧 `ls`/`rm`/`push` 失败由 `yohu-files::file_error_from_adb` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等；未分类 BadExit → `RemoteFailed(path)`，不带 stderr。`FileError` 不 `From<AdbError>`。拖出树触顶 `TreeLimit(项)` / `TreeDepth(层)` fail-closed，禁止当成功截断。壳 `ipc_file`：远端不存在 → `not_found`，本地不存在与其余路径类（含 `TreeLimit` / `TreeDepth` / `NotAttached`）→ `invalid_args`，`Adb`（含 `Cancelled`）→ `ipc_adb`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI；UI 禁止再扫 stderr |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
@@ -108,9 +109,12 @@ RingBuffer seq 单调；Batcher 有界 mpsc 满则丢**推送**不丢环；UI �
 
 ```text
 invoke update.check/info/download/install/cancel/open → commands/update → update_runs
-invoke files.list → commands/files require_online → browse_runs → FileBrowser.list → file_error_from_adb → ipc_file
+invoke files.session.attach → commands/files require_online → browse_runs → FileBrowser.attach → BrowseAttach { serial, generation, adopted }。attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot。→ UI 持有 BrowseAttach.generation
+invoke files.list(serial, path, generation) → commands/files require_online → browse_runs → FileBrowser.list。files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。→ DeviceShell.exec 或 oneshot → file_error_from_adb → ipc_file
+invoke files.session.detach(serial, generation) → files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。视图卸载带所持世代
+went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。
 invoke files.push/pull/cancel → commands/files → transfer_runs::spawn / run
-invoke files.dragOut → commands/files → dnd → list_tree（TreeLimit / TreeDepth fail-closed → ipc_file）→ 成功才 transfer_runs::run
+invoke files.dragOut → commands/files → dnd drag_roots（立刻 DoDragDrop）→ 目录后台 files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。（TreeLimit / TreeDepth fail-closed → ipc_file）→ GetData 才 transfer_runs::run
 invoke files.delete/mkdir/create → commands/files → mutator（超时在 mutate.rs）→ file_error_from_adb → ipc_file
 invoke mirror.start → commands/mirror → mirror_sessions（present.attach 只绑管道）
 invoke log.capture.start → commands/log → capture_runs

@@ -2,7 +2,7 @@
  * 文件管理（UI设计系统-v6.md §4.3）。
  * 路径行（上级 + 公开 YoAddressField；盒外不是路径栏）→ 四列清单（名称定宽截断 / 类型 / 大小 / 日期吃剩余；
  * 表头轨道走 YoColHeader（悬浮片与文案边距分权）；行间 hairline 走 YoVirtualList tone=list，背板 canvas）
- * + 独立预览分区 → 传输坞（Presence rise + Collapse 插高；行即作业；终态 3s 淡出）。
+ * + 独立预览分区。传输进度走 YoToast，不占页面坞。
  * ========================================================================== */
 
 /* ===== 路径行：上级 + 公开 YoAddressField（盒外不是路径栏） ===== */
@@ -24,7 +24,7 @@
   cursor: default;
 }
 
-/* ===== 主体：圆角分区（清单 | 预览 | 传输） ===== */
+/* ===== 主体：圆角分区（清单 | 预览） ===== */
 
 .yohu-files__stage {
   display: grid;
@@ -153,113 +153,6 @@
   font-weight: var(--yohu-font-weight-semibold);
   text-align: center;
   word-break: break-all;
-}
-
-/* ===== 传输坞（容器 YoPanel；开合 YoCollapse；行即作业，不套第二张卡） ===== */
-
-.yohu-files__transfer-slot {
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.yohu-files__transfers {
-  width: 100%;
-  min-width: 0;
-}
-
-.yohu-files__transfer-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  width: 100%;
-  min-width: 0;
-}
-
-.yohu-files__transfer-title {
-  font-size: var(--yohu-font-caption);
-  font-weight: var(--yohu-font-weight-semibold);
-  line-height: var(--yohu-font-leading-tight);
-  color: var(--yohu-fg);
-}
-
-.yohu-files__transfer-summary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-2);
-}
-
-.yohu-files__transfer-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-xs);
-  max-height: var(--yohu-layout-output-max);
-  padding: 0 var(--yohu-space-sm) var(--yohu-space-sm);
-  box-sizing: border-box;
-}
-
-.yohu-files__transfer {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--yohu-space-sm);
-  min-width: 0;
-  padding: var(--yohu-space-sm) var(--yohu-space-md);
-  background-color: var(--yohu-surface-2);
-}
-
-.yohu-files__transfer--failed {
-  box-shadow: inset 0 0 0 var(--yohu-stroke-hairline) var(--yohu-error);
-}
-
-.yohu-files__transfer-dir {
-  display: inline-flex;
-  align-items: center;
-  color: var(--yohu-accent);
-  flex-shrink: 0;
-  height: var(--yohu-control-height);
-}
-
-.yohu-files__transfer-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--yohu-space-xs);
-}
-
-.yohu-files__transfer-head {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-}
-
-.yohu-files__transfer-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--yohu-font-body);
-  color: var(--yohu-fg);
-}
-
-.yohu-files__transfer-meta {
-  font-family: var(--yohu-font-mono);
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-fg-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.yohu-files__transfer-speed {
-  color: var(--yohu-fg-3);
-}
-
-.yohu-files__transfer-msg {
-  font-size: var(--yohu-font-caption);
-  color: var(--yohu-error);
 }
 
 .yohu-files__confirm {
