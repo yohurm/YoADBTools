@@ -32,6 +32,7 @@ use windows::Win32::UI::Shell::{
     IDataObjectAsyncCapability, IDataObjectAsyncCapability_Impl, SHCreateStdEnumFmtEtc,
     SHCreateStreamOnFileEx, FD_ATTRIBUTES, FD_FILESIZE, FD_PROGRESSUI, FD_UNICODE, FILEDESCRIPTORW,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
 use windows_core::{implement, BOOL};
 
 use yohu_files::TreeEntry;
@@ -55,7 +56,6 @@ fn fmt_drop_effect() -> u16 {
 }
 
 struct Inner {
-    items: Vec<TreeEntry>,
     pulled: HashMap<i32, PathBuf>,
     in_operation: bool,
 }
@@ -139,8 +139,8 @@ impl VirtualFiles {
     }
 
     fn descriptor_medium(&self) -> WinResult<STGMEDIUM> {
-        let inner = self.inner.lock().expect("dnd lock");
-        let n = inner.items.len();
+        let items = self.payload.items.lock().expect("dnd live");
+        let n = items.len();
         let desc_size = std::mem::size_of::<FILEDESCRIPTORW>();
         let bytes = 4 + n * desc_size;
         unsafe {
@@ -151,7 +151,7 @@ impl VirtualFiles {
                 return Err(Error::from_hresult(E_FAIL));
             }
             (ptr as *mut u32).write(n as u32);
-            for (i, item) in inner.items.iter().enumerate() {
+            for (i, item) in items.iter().enumerate() {
                 let dest = ptr.add(4 + i * desc_size) as *mut FILEDESCRIPTORW;
                 dest.write(file_descriptor(item));
             }
@@ -203,19 +203,19 @@ impl VirtualFiles {
     fn ensure_pulled(&self, lindex: i32) -> WinResult<PathBuf> {
         {
             let inner = self.inner.lock().expect("dnd lock");
-            if lindex < 0 || lindex as usize >= inner.items.len() {
-                return Err(Error::from_hresult(DV_E_LINDEX));
-            }
-            if inner.items[lindex as usize].is_dir {
-                return Err(Error::from_hresult(DV_E_LINDEX));
-            }
             if let Some(path) = inner.pulled.get(&lindex) {
                 return Ok(path.clone());
             }
         }
         let item = {
-            let inner = self.inner.lock().expect("dnd lock");
-            inner.items[lindex as usize].clone()
+            let items = self.payload.items.lock().expect("dnd live");
+            if lindex < 0 || lindex as usize >= items.len() {
+                return Err(Error::from_hresult(DV_E_LINDEX));
+            }
+            if items[lindex as usize].is_dir {
+                return Err(Error::from_hresult(DV_E_LINDEX));
+            }
+            items[lindex as usize].clone()
         };
         let local = self
             .payload
@@ -415,12 +415,14 @@ pub(super) fn do_drag_drop(payload: DragPayload) -> Result<(), DndError> {
     OLE_INIT.call_once(|| {
         let _ = unsafe { OleInitialize(None) };
     });
-    let items = payload.items.clone();
+    // WebView 可能仍握着鼠标捕获；不松开则 QueryContinueDrag 看不到 MK_LBUTTON。
+    unsafe {
+        let _ = ReleaseCapture();
+    }
     let dropped = Arc::new(AtomicBool::new(false));
     let seen_press = Arc::new(AtomicBool::new(false));
     let data_obj = VirtualFiles {
         inner: Mutex::new(Inner {
-            items,
             pulled: HashMap::new(),
             in_operation: false,
         }),
