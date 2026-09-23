@@ -12,9 +12,7 @@ import {
   virtualContentWidth,
   virtualFlowWindow,
   virtualInnerWidth,
-  virtualIndicatorAnchor,
   virtualIndicatorBox,
-  virtualIndicatorFollow,
   virtualIndexOfKey,
   virtualKeyIntent,
   virtualNearestScrollTop,
@@ -143,16 +141,7 @@ describe("virtuallist-model", () => {
     ).toBe(-1);
   });
 
-  it("indicator follow：多选仅 1 个 key；0 或 ≥2 为 undefined", () => {
-    expect(virtualIndicatorFollow(false, undefined, "a")).toBeUndefined();
-    expect(virtualIndicatorFollow(true, undefined, "a")).toBe("a");
-    expect(virtualIndicatorFollow(true, undefined, null)).toBeUndefined();
-    expect(virtualIndicatorFollow(true, new Set(), null)).toBeUndefined();
-    expect(virtualIndicatorFollow(true, new Set(["only"]), null)).toBe("only");
-    expect(virtualIndicatorFollow(true, new Set(["a", "b"]), null)).toBeUndefined();
-  });
-
-  it("indicator 几何 = index × itemHeight，宽度由调用方传入", () => {
+  it("行盒几何 = index × itemHeight，宽度由调用方传入", () => {
     expect(virtualRowTop(3, 22)).toBe(66);
     expect(virtualRowOffsetY(3, 22)).toBe(66);
     expect(virtualRowOffsetY(3, 22, 1)).toBe(88);
@@ -180,13 +169,6 @@ describe("virtuallist-model", () => {
     expect(virtualContentWidth(400, 16)).toBe(384);
     expect(virtualContentWidth(400, -4)).toBe(400);
     expect(virtualIndicatorBox(3, 22, 400)).toEqual({ x: 0, y: 66, width: 400, height: 22 });
-    expect(virtualIndicatorAnchor(["a", "b", "c"], "1", 22, 320)).toEqual({
-      x: 0,
-      y: 22,
-      width: 320,
-      height: 22,
-    });
-    expect(virtualIndicatorAnchor(["a", "b"], undefined, 22, 320)).toBeNull();
     expect(virtualIndexOfKey(["a", "b", "c"], "b", (item) => item)).toBe(1);
     expect(virtualIndexOfKey(["a"], "missing", (item) => item)).toBe(-1);
   });

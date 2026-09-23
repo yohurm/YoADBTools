@@ -71,4 +71,28 @@ describe("L3 recipe CSS", () => {
     expect(css).not.toContain(".yohu-virtual-list");
     expect(css).not.toContain(".yohu-reorder-list");
   });
+
+  it("selected 分通道非线性：软底绽开、条展开收回、字色过渡，禁止滑块与整项 scale", () => {
+    const css = loadMotionLayerCss("recipes/selected.css");
+    expect(css).toContain("yohu-recipe-selected");
+    expect(css).toContain("--yohu-motion-spatial-small");
+    expect(css).toContain("--yohu-motion-spatial-tick");
+    expect(css).toContain("--yohu-motion-spatial-local");
+    expect(css).toContain("--yohu-motion-spatial-stretch");
+    expect(css).toContain("--yohu-motion-effects-exit");
+    expect(css).toContain("yohu-bounce-down");
+    expect(css).toContain(".yohu-list-item__mark-fill");
+    expect(css).toContain("scaleY(0)");
+    expect(css).toContain("scaleY(1)");
+    expect(css).toContain("transform var(--yohu-motion-spatial-stretch)");
+    expect(css).toContain("transform var(--yohu-motion-effects-exit)");
+    expect(css).toContain("transition: color var(--yohu-motion-spatial-tick)");
+    expect(css).toContain("color: var(--yohu-state-selected-fg)");
+    expect(css).toContain("font-weight: var(--yohu-font-weight-medium)");
+    expect(css).not.toMatch(/\.yohu-recipe-selected\.yohu-interactive\s*\{[^}]*\bscale\(/);
+    expect(css).not.toMatch(/\btop\s*:/);
+    expect(css).not.toContain("translate3d");
+    expect(css).not.toMatch(/\b\d+ms\b/);
+    expect(css).not.toContain("--yohu-accent)");
+  });
 });

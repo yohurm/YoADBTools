@@ -19,7 +19,6 @@ import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
 import { Icon } from "../icons";
-import { YoIndicator } from "../motion/engines/indicator";
 import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
 import {
@@ -233,12 +232,11 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
                 overflow={overflowY() ? "auto" : "hidden"}
                 pad="block-xs"
               >
-                <YoIndicator follow={props.value} variant="fill" />
                 <For each={props.options}>
                   {(option, index) => (
                     <div
                       id={optionDomId(option.value)}
-                      class="yohu-select__option yohu-interactive"
+                      class="yohu-select__option yohu-interactive yohu-recipe-selected"
                       classList={{
                         "yohu-interactive--selected": option.value === props.value,
                         "yohu-interactive--active": index() === activeIndex(),

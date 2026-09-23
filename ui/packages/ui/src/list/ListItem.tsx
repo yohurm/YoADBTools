@@ -1,12 +1,14 @@
 /**
  * YoListItem —— 效率型列表行（L4）。
- * HarmonyOS 对照：ListItem。选中走 .yohu-interactive；模块不再自挂 button 皮。
+ * HarmonyOS 对照：ListItem。选中走配方 selected（软底绽开、强调条展开/收回、字色非线性、导航图标 DOWN）。
+ * 模块不再自挂 button 皮。
  */
-import { Show, createMemo } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import type { JSX } from "solid-js";
 import { useRail, railStreamAttr } from "../motion/engines/rail";
 import { listItemHostAttrs } from "./list-item-policy";
 import type { YoListItemRing, YoListItemRole, YoListItemSize } from "./list-item-model";
+import { ListItemMark } from "./Mark";
 import "./ListItem.css";
 
 export type { YoListItemRing, YoListItemRole, YoListItemSize };
@@ -50,13 +52,46 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
   const className = (): string => {
     const ring = host()["data-ring"] === "inset" ? "yohu-focus-ring--inset" : "yohu-focus-ring";
     const extra = props.class ? ` ${props.class}` : "";
-    return `yohu-list-item yohu-interactive ${ring}${extra}`;
+    return `yohu-list-item yohu-interactive yohu-recipe-selected ${ring}${extra}`;
   };
+
+  const [iconBounce, setIconBounce] = createSignal(false);
+  let bounceBound = false;
+  createEffect(
+    on(
+      () => Boolean(props.selected),
+      (selected) => {
+        if (props.size !== "nav") {
+          setIconBounce(false);
+          bounceBound = true;
+          return;
+        }
+        if (!bounceBound) {
+          bounceBound = true;
+          return;
+        }
+        setIconBounce(selected);
+      },
+    ),
+  );
 
   const body = (): JSX.Element => (
     <>
+      <ListItemMark />
       <Show when={props.leading}>
-        {(leading) => <span class="yohu-list-item__leading">{leading()}</span>}
+        {(leading) => (
+          <span
+            class="yohu-list-item__leading"
+            data-bounce={iconBounce() ? "" : undefined}
+            onAnimationEnd={(event) => {
+              if (event.animationName === "yohu-bounce-down") {
+                setIconBounce(false);
+              }
+            }}
+          >
+            {leading()}
+          </span>
+        )}
       </Show>
       <span class="yohu-list-item__info">
         <span class="yohu-list-item__title">{props.title}</span>

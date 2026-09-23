@@ -22,10 +22,8 @@
  * 选择模式：传入 `selectedKey` + `onSelectRow` 时开启单选——
  * roving tabindex、↑/↓/Home/End 移动、Enter/Space 选中、目标行滚入视野并聚焦、
  * `role=listbox/option` + `aria-selected`（对齐 UI设计系统-v6.md §5）。
- * tone=list 行自绘选中底；投放框是 list-frame 叠加层；document 单选才挂 YoIndicator fill。
- * fill 滑块 decorate=false，用 top/left 落在 inner 内容坐标；禁止把 yohu-indicator-host
- * 打在滚轴或超高 inner 上（fill 宿主 overflow:hidden 会吃掉纵滚 / 撑出合成层）。
- * 选中行指针热态走 virtuallist-hot；L4 绑 data-indicator-hot。填色在 indicator.css，禁止 :has list-row。
+ * 行自绘选中底（`YoListRow`）；投放框是 list-frame 叠加层。禁止挂 YoIndicator fill。
+ * 选中片行级禁动（不挂配方 selected）。
  * `onReorder` 开启整行按住拖动换位：过臂距后浮层跟指针、源行占位、邻行让位、缝上插条；松手提交 from/to。
  * 未开启选择模式时行不参与焦点序列（日志列表性能优先）。槽位回收时原生 Selection 不跨原点保留。
  * `tone` 默认 document（无分割线）；文件清单显式 list。`hotKey` 是行热态，不是模块 class。
@@ -37,9 +35,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount }
 import type { Accessor, Component, JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { YoListFrame, listFrameBox } from "../list-frame";
-import { YoListRow, isListRowHot, listRowOwnsFill } from "../list-row";
-import { YoIndicator } from "../motion/engines/indicator";
-import type { IndicatorBox } from "../motion/engines/indicator";
+import { YoListRow, isListRowHot } from "../list-row";
 import { ReorderBar } from "./ReorderBar";
 import { ReorderOverlay } from "./ReorderOverlay";
 import { createReorderBinder } from "./reorder-binder";
@@ -67,9 +63,7 @@ import {
   virtualFlowRowStyle,
   virtualFlowWindow,
   virtualInnerWidth,
-  virtualIndicatorAnchor,
   virtualIndicatorBox,
-  virtualIndicatorFollow,
   virtualIndexOfKey,
   virtualListLayout,
   virtualNearestScrollTop,
@@ -88,10 +82,8 @@ import {
   resolveVirtualListKeyAction,
   shouldEmitAtBottom,
   virtualHostAttrs,
-  virtualIndicatorFill,
   virtualRowAttrs,
 } from "./virtuallist-policy";
-import { createVirtualIndicatorHotBinder } from "./virtuallist-hot";
 import "./VirtualList.css";
 
 export type YoVirtualListTone = "document" | "list";
@@ -293,25 +285,11 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     }),
   );
 
-  const followKey = (): string | undefined =>
-    listRowOwnsFill(tone())
-      ? undefined
-      : virtualIndicatorFollow(selectable(), selectedKeys(), selectedKey());
-
   const viewContentWidth = (): number => measureVirtualViewContentWidth(container);
 
   const innerWidth = (): number => virtualInnerWidth(props.contentWidth?.() ?? 0, viewContentWidth());
 
   const scrollerAxis = (): "block" | "both" => (innerWidth() > 0 ? "both" : "block");
-
-  const indicatorAnchor = (): IndicatorBox | null =>
-    virtualIndicatorAnchor(
-      props.items(),
-      followKey(),
-      itemHeight(),
-      viewContentWidth(),
-      props.getItemKey,
-    );
 
   const frameBox = (): ReturnType<typeof listFrameBox> => {
     void origin();
@@ -364,11 +342,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       setFocusKey(key);
       props.onSelectRow(item, key);
     },
-  });
-
-  const indicatorHot = createVirtualIndicatorHotBinder({
-    follow: () => followKey() != null,
-    reordering: () => reorder.session() !== null,
   });
 
   const handleRowClick = (index: number, event: MouseEvent): void => {
@@ -514,8 +487,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       ariaLabel: props.ariaLabel,
       reordering: reorder.session() !== null,
       layout: layout(),
-      indicatorFill: virtualIndicatorFill(followKey(), reorder.session() !== null),
-      indicatorHot: indicatorHot.hot(),
     });
 
   type BoundRow = { index: number; item: T; key: string | number };
@@ -545,7 +516,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       <YoListRow
         class="yohu-virtual-list__row"
         tone={tone()}
-        selected={attrs().selected && followKey() == null}
+        selected={attrs().selected}
         hot={isListRowHot(attrs()["data-key"], props.hotKey?.() ?? null)}
         selectable={attrs().interactive}
         selectedKeys={selectedKeys()}
@@ -609,14 +580,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       data-tone={host()["data-tone"]}
       data-layout={host()["data-layout"]}
       data-reordering={host()["data-reordering"]}
-      data-indicator={host()["data-indicator"]}
-      data-indicator-hot={host()["data-indicator-hot"]}
       role={host().role}
-      onPointerOver={indicatorHot.onPointerOver}
-      onPointerOut={indicatorHot.onPointerOut}
-      onPointerDown={indicatorHot.onPointerDown}
-      onPointerUp={indicatorHot.onPointerUp}
-      onPointerCancel={indicatorHot.onPointerUp}
       aria-label={host()["aria-label"]}
       aria-multiselectable={host()["aria-multiselectable"]}
     >
@@ -651,9 +615,6 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           ...(innerWidth() > 0 ? { width: `${innerWidth()}px`, "min-width": "100%" } : {}),
         }}
       >
-        <Show when={virtualIndicatorFill(followKey(), reorder.session() !== null)}>
-          <YoIndicator decorate={false} follow={followKey()} variant="fill" anchor={indicatorAnchor} />
-        </Show>
         <Show when={frameBox() != null && reorder.session() === null}>
           <YoListFrame box={frameBox} />
         </Show>

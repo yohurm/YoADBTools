@@ -25,10 +25,6 @@
   padding: var(--yohu-space-xs) var(--yohu-space-sm);
 }
 
-.yohu-list-item[aria-current] .yohu-list-item__title {
-  font-weight: var(--yohu-font-weight-semibold);
-}
-
 .yohu-list-item__leading {
   display: inline-flex;
   align-items: center;
@@ -116,7 +112,8 @@
   transition:
     gap var(--yohu-motion-spatial-rail),
     min-height var(--yohu-motion-spatial-rail),
-    padding var(--yohu-motion-spatial-rail);
+    padding var(--yohu-motion-spatial-rail),
+    color var(--yohu-motion-effects-fast);
 }
 
 .yohu-list-item[data-stream]:not([data-stream="open"]) {
@@ -127,7 +124,8 @@
   transition:
     gap var(--yohu-motion-spatial-rail),
     min-height var(--yohu-motion-spatial-rail),
-    padding var(--yohu-motion-spatial-rail);
+    padding var(--yohu-motion-spatial-rail),
+    color var(--yohu-motion-effects-fast);
 }
 
 .yohu-list-item[data-stream]:not([data-stream="open"])[data-size="device"] {

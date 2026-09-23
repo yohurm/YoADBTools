@@ -6,7 +6,6 @@ export type { YoListRowProps, YoListRowTone } from "./ListRow";
 export {
   DEFAULT_LIST_ROW_TONE,
   isListRowHot,
-  listRowOwnsFill,
   resolveListRowChrome,
   resolveListRowRadius,
 } from "./list-row-model";

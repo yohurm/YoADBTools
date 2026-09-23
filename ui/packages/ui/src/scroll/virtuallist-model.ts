@@ -182,20 +182,6 @@ export function virtualRowTabIndex(input: {
   return -1;
 }
 
-/** 多选仅 1 个 key 才 follow；0 或 ≥2 为 undefined。是否挂滑块由调用方按行物种决定。 */
-export function virtualIndicatorFollow(
-  selectable: boolean,
-  selectedKeys?: ReadonlySet<string | number>,
-  selectedKey?: string | number | null,
-): string | undefined {
-  if (!selectable) return undefined;
-  if (selectedKeys !== undefined) {
-    const keys = [...selectedKeys];
-    return keys.length === 1 ? String(keys[0]) : undefined;
-  }
-  return selectedKey == null ? undefined : String(selectedKey);
-}
-
 export function virtualRowTop(index: number, itemHeight: number): number {
   return index * itemHeight;
 }
@@ -347,24 +333,6 @@ export function virtualIndexOfKey<T>(
     if (virtualRowKey(item, i, getItemKey) === key) return i;
   }
   return -1;
-}
-
-export function virtualIndicatorAnchor<T>(
-  items: readonly T[],
-  follow: string | undefined,
-  itemHeight: number,
-  clientWidth: number,
-  getItemKey?: (item: T, index: number) => string | number,
-): VirtualIndicatorBox | null {
-  if (follow == null) return null;
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item === undefined) break;
-    if (String(virtualRowKey(item, i, getItemKey)) === follow) {
-      return virtualIndicatorBox(i, itemHeight, clientWidth);
-    }
-  }
-  return null;
 }
 
 /** Arrow/Home/End 夹紧到 [0, count)；Enter/Space 是 commit 当前。未识别或空表为 null。 */

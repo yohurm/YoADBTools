@@ -30,6 +30,13 @@
   .yohu-recipe-reorder-bar[data-ready],
   .yohu-recipe-reorder-overlay[data-ready],
   .yohu-recipe-indicator[data-ready],
+  .yohu-recipe-selected.yohu-interactive,
+  .yohu-recipe-selected.yohu-interactive::before,
+  .yohu-recipe-selected .yohu-list-item__mark,
+  .yohu-recipe-selected .yohu-list-item__mark-fill,
+  .yohu-recipe-selected .yohu-list-item__title,
+  .yohu-recipe-selected .yohu-list-item__description,
+  .yohu-recipe-selected .yohu-list-item__meta,
   [data-reordering] [data-key]:not([data-reorder="source"]),
   .yohu-tabs__tab,
   .yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive,
@@ -65,7 +72,8 @@
   .yohu-presence[data-recipe="rise"],
   .yohu-presence[data-recipe="list"] .yohu-presence__clip,
   .yohu-presence[data-recipe="chip"] .yohu-presence__clip,
-  .yohu-recipe-dismiss-fade {
+  .yohu-recipe-dismiss-fade,
+  .yohu-recipe-selected .yohu-list-item__leading {
     animation: none !important;
   }
 

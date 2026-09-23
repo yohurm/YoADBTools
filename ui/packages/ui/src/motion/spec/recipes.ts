@@ -52,7 +52,7 @@ export const TRAVEL_SPEC = "spatialPanel" as const;
 /** 内容用后高：微过冲弹簧。折叠 0fr/1fr 仍走 spatialLocal。 */
 export const GROW_SPEC = "spatialGrow" as const;
 
-/** 选中滑块位移默认档：邻项 150ms 弹簧；短跳/跨栏由 YoIndicator 按行程改写。 */
+/** 轨上持续铬（Tabs 下划线 / 分段 thumb）位移默认档；短跳/跨栏由 YoIndicator 按行程改写。 */
 export const INDICATOR_DURATION: MotionDurationName = MotionSpec.spatialSmall.duration;
 
 /** 传输卡等一次性条目：停留后再播 dismiss-fade；须与 CSS calc(toast − slow) 对齐。 */

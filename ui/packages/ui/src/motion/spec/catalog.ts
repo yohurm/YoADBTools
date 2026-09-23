@@ -151,6 +151,13 @@ export const MotionCatalog = {
     properties: ["transform", "width", "height"],
     interruptible: true,
   },
+  selected: {
+    name: "selected",
+    engine: "implicit",
+    spec: ["effectsFast", "spatialTick", "spatialSmall", "spatialStretch", "effectsExit", "spatialLocal"],
+    properties: ["opacity", "background-color", "color", "transform", "font-weight"],
+    interruptible: true,
+  },
   "dismiss-fade": {
     name: "dismiss-fade",
     engine: "one-shot",

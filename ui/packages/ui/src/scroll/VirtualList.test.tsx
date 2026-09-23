@@ -137,11 +137,11 @@ describe("YoVirtualList", () => {
     expect(src).toContain("scrollTo(");
     expect(src).toContain("virtualNearestScrollTop");
     expect(src).toContain("measureVirtualViewContentWidth");
-    expect(src).toContain("createVirtualIndicatorHotBinder");
-    expect(src).toContain("virtualIndicatorFill");
+    expect(src).not.toContain("createVirtualIndicatorHotBinder");
+    expect(src).not.toContain("virtualIndicatorFill");
     expect(src).toContain("virtualInnerWidth");
     expect(src).toContain("contentWidth");
-    expect(src).toContain("data-indicator-hot");
+    expect(src).not.toContain("data-indicator-hot");
     expect(src).toContain("extent=");
     expect(src).toContain("virtualPoolBindIndex");
     expect(src).toContain("virtualFlowWindow");
@@ -401,14 +401,14 @@ describe("YoVirtualList", () => {
     await Promise.resolve();
     expect(rows[2]?.getAttribute("aria-selected")).toBe("true");
     expect(rows[2]?.classList.contains("yohu-list-row")).toBe(true);
-    expect(rows[2]?.hasAttribute("data-fill")).toBe(false);
+    expect(rows[2]?.getAttribute("data-fill")).toBe("selected");
     expect(rows[2]?.classList.contains("yohu-interactive--selected")).toBe(false);
     expect(rows[2]?.classList.contains("yohu-virtual-list__row--selected")).toBe(false);
     expect(rows[2]?.getAttribute("tabindex")).toBe("0");
     expect(rows[0]?.getAttribute("tabindex")).toBe("-1");
     expect(rows[0]?.getAttribute("aria-selected")).toBe("false");
-    expect(container.querySelector(".yohu-virtual-list .yohu-recipe-indicator--fill")).toBeTruthy();
-    expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-indicator")).toBe("fill");
+    expect(container.querySelector(".yohu-virtual-list .yohu-recipe-indicator--fill")).toBeNull();
+    expect(container.querySelector(".yohu-virtual-list")?.hasAttribute("data-indicator")).toBe(false);
     expect(container.querySelector(".yohu-virtual-list")?.hasAttribute("data-indicator-hot")).toBe(false);
     expect(container.querySelector(".yohu-virtual-list")?.classList.contains("yohu-indicator-host")).toBe(false);
     expect(container.querySelector(".yohu-virtual-list__inner")?.classList.contains("yohu-indicator-host")).toBe(
@@ -559,36 +559,27 @@ describe("YoVirtualList", () => {
     expect(container.querySelector(".yohu-virtual-list")?.getAttribute("data-indicator")).toBeNull();
   });
 
-  it("选中行指针热态写 data-indicator-hot，不穿 :has list-row", async () => {
-    const indicatorCss = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), "../motion/engines/indicator/indicator.css"),
+  it("选中行自绘底，hover 叠在行上，不挂滑块热态", async () => {
+    const rowCss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../list-row/ListRow.css"),
       "utf-8",
     );
-    expect(indicatorCss).toContain('[data-indicator-hot="hover"] .yohu-recipe-indicator--fill');
-    expect(indicatorCss).toContain('[data-indicator-hot="pressed"] .yohu-recipe-indicator--fill');
-    expect(indicatorCss).not.toContain(":has(.yohu-list-row");
+    expect(rowCss).toContain('.yohu-list-row[data-fill="selected"]:hover');
+    expect(rowCss).toContain(".yohu-list-row[data-fill=\"selected\"]:active");
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
-    expect(src).toContain("createVirtualIndicatorHotBinder");
-    expect(src).toContain('data-indicator-hot={host()["data-indicator-hot"]}');
-    expect(src).not.toContain("syncIndicatorHot");
-    expect(src).not.toContain("setIndicatorHot");
+    expect(src).not.toContain("createVirtualIndicatorHotBinder");
+    expect(src).not.toContain("data-indicator-hot");
+    expect(src).not.toContain('from "../motion/engines/indicator"');
 
     const { container } = render(() => <SelectionHarness />);
     const rows = options(container);
     fireEvent.click(rows[2] as HTMLElement);
     await Promise.resolve();
+    expect(rows[2]?.getAttribute("data-fill")).toBe("selected");
     const host = container.querySelector(".yohu-virtual-list") as HTMLElement;
-    fireEvent.pointerOver(rows[2] as HTMLElement);
-    expect(host.getAttribute("data-indicator-hot")).toBe("hover");
-    fireEvent.pointerOver(rows[0] as HTMLElement);
+    expect(host.hasAttribute("data-indicator")).toBe(false);
     expect(host.hasAttribute("data-indicator-hot")).toBe(false);
-    fireEvent.pointerOver(rows[2] as HTMLElement);
-    fireEvent.pointerDown(rows[2] as HTMLElement);
-    expect(host.getAttribute("data-indicator-hot")).toBe("pressed");
-    fireEvent.pointerUp(rows[2] as HTMLElement);
-    expect(host.getAttribute("data-indicator-hot")).toBe("hover");
-    fireEvent.pointerOut(rows[2] as HTMLElement);
-    expect(host.hasAttribute("data-indicator-hot")).toBe(false);
+    expect(container.querySelector(".yohu-recipe-indicator")).toBeNull();
   });
 
   it("未提供 onReorder 时不挂拖拽条", () => {

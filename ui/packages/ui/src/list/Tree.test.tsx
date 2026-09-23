@@ -99,9 +99,10 @@ describe("YoTree", () => {
     fireEvent.click(screen.getByText("根2"));
     const row = document.querySelector('[data-tree-key="root2"]');
     expect(row?.classList.contains("yohu-interactive--selected")).toBe(true);
+    expect(row?.classList.contains("yohu-recipe-selected")).toBe(true);
     expect(row?.classList.contains("yohu-tree__row--selected")).toBe(false);
     expect(row?.getAttribute("aria-selected")).toBe("true");
-    expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeTruthy();
+    expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeNull();
   });
 
   it("行高走 header 尺，不套数据行，不被 collapse 盖成 min-content", () => {

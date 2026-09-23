@@ -1,0 +1,87 @@
+/* 配方 selected：短列表项内选中。出处见 YoAgentDocs desktop--nav-item-selected。
+ * 通道分权（鸿蒙进场减速/出场加速 + Apple/b3ll 弹簧动 transform/opacity）：
+ * 软底绽开 spatialSmall；色与字 spatialTick（禁止弹簧过冲脏色）；
+ * 强调条填充 scaleY 展开 spatialStretch、收回 effectsExit；
+ * 导航图标 DOWN 回弹。禁止整项 scale、禁止滑页。虚拟列表不挂本配方。 */
+
+@keyframes yohu-bounce-down {
+  0% {
+    transform: translateY(0);
+  }
+  32% {
+    transform: translateY(calc(var(--yohu-space-xs) + var(--yohu-space-2xs)));
+  }
+  64% {
+    transform: translateY(calc(-1 * var(--yohu-space-2xs)));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.yohu-recipe-selected.yohu-interactive::before {
+  transform: scale(0.94);
+  transform-origin: center;
+  transition:
+    opacity var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast),
+    box-shadow var(--yohu-motion-effects-fast),
+    transform var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-selected.yohu-interactive:hover:not(:disabled):not([aria-disabled="true"]):not(.yohu-interactive--selected)::before,
+.yohu-recipe-selected.yohu-interactive--active:not(.yohu-interactive--selected)::before {
+  transform: scale(1);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected::before {
+  transform: scale(1);
+  transition:
+    opacity var(--yohu-motion-spatial-small),
+    background-color var(--yohu-motion-spatial-tick),
+    box-shadow var(--yohu-motion-spatial-tick),
+    transform var(--yohu-motion-spatial-small);
+}
+
+.yohu-recipe-selected.yohu-interactive {
+  color: var(--yohu-fg-2);
+  transition: color var(--yohu-motion-spatial-tick);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected {
+  color: var(--yohu-state-selected-fg);
+}
+
+.yohu-recipe-selected .yohu-list-item__mark-fill {
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform var(--yohu-motion-effects-exit);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__mark-fill {
+  transform: scaleY(1);
+  transition: transform var(--yohu-motion-spatial-stretch);
+}
+
+.yohu-recipe-selected[data-size="nav"] .yohu-list-item__title {
+  font-weight: var(--yohu-font-weight-regular);
+  transition: font-weight var(--yohu-motion-spatial-tick);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] .yohu-list-item__title {
+  font-weight: var(--yohu-font-weight-medium);
+}
+
+.yohu-recipe-selected .yohu-list-item__description,
+.yohu-recipe-selected .yohu-list-item__meta {
+  transition: color var(--yohu-motion-spatial-tick);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__description,
+.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__meta {
+  color: var(--yohu-fg-2);
+}
+
+.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] .yohu-list-item__leading[data-bounce] {
+  animation: yohu-bounce-down var(--yohu-motion-spatial-local);
+}

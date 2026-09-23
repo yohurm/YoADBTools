@@ -1,9 +1,9 @@
 /**
- * YoIndicator —— 选中态在项与项之间滑动（动画系统-v6.md 配方 indicator）。
+ * YoIndicator —— 轨上持续铬在项与项之间滑动（动画系统-v6.md 配方 indicator）。
+ * 只给 Tabs 下划线与分段 thumb。列表 / 导航 / 树 / 下拉选项走配方 selected（项内弹出），禁止 fill 换行。
  * 必须作为 track 的子节点。默认给 track 挂 `yohu-indicator-host`；
  * `decorate={false}` 时不挂（虚拟列表滚轴自己纵滚）。
- * 单选表面用 fill / underline / thumb；多选块（≥2）与「行级」虚拟列表过渡不要用；
- * 虚拟列表单选走 `anchor`（按下标定位，不测未渲染行）。
+ * 多选块（≥2）与「行级」虚拟列表过渡不要用。
  */
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";

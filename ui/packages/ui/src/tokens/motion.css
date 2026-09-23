@@ -10,6 +10,7 @@
 @import "../motion/engines/travel/travel.css";
 @import "../motion/engines/grow/grow.css";
 @import "../motion/engines/indicator/indicator.css";
+@import "../motion/recipes/selected.css";
 @import "../motion/engines/swap/swap.css";
 @import "../motion/engines/theme/theme-wipe.css";
 @import "../motion/recipes/inline-end.css";

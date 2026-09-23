@@ -1,7 +1,6 @@
 /**
  * 虚拟列表交互策略（L3）。
  * 键盘动作、贴底排放、聚焦确认与行/宿主 attrs 从快照组装。
- * fill 热态代数在此；指针会话在 virtuallist-hot。
  * 行铬在 list-row；本文件只出身份 / aria，不写色值、不画铬。
  */
 
@@ -15,23 +14,6 @@ import {
 } from "./virtuallist-model";
 
 export type VirtualListKeyAction = VirtualKeyIntent;
-
-export type VirtualIndicatorHot = "hover" | "pressed";
-
-/** follow 且未换位才挂 fill。 */
-export function virtualIndicatorFill(follow: string | undefined, reordering: boolean): boolean {
-  return follow != null && !reordering;
-}
-
-/** 选中填充行才 hover/pressed；无 fill 或未命中清空。 */
-export function resolveVirtualIndicatorHot(input: {
-  fill: boolean;
-  onSelectedFill: boolean;
-  pressed: boolean;
-}): VirtualIndicatorHot | undefined {
-  if (!input.fill || !input.onSelectedFill) return undefined;
-  return input.pressed ? "pressed" : "hover";
-}
 
 export function resolveVirtualListKeyAction(
   key: string,
@@ -102,8 +84,6 @@ export interface VirtualHostAttrs {
   "data-tone": "document" | "list";
   "data-layout": VirtualListLayout;
   "data-reordering": "" | undefined;
-  "data-indicator": "fill" | undefined;
-  "data-indicator-hot": VirtualIndicatorHot | undefined;
 }
 
 export function virtualHostAttrs(input: {
@@ -113,10 +93,7 @@ export function virtualHostAttrs(input: {
   ariaLabel?: string;
   reordering?: boolean;
   layout?: VirtualListLayout;
-  indicatorFill?: boolean;
-  indicatorHot?: VirtualIndicatorHot;
 }): VirtualHostAttrs {
-  const fill = input.indicatorFill === true;
   const tone = input.tone ?? VIRTUAL_DEFAULT_TONE;
   return {
     role: input.selectable ? "listbox" : undefined,
@@ -131,7 +108,5 @@ export function virtualHostAttrs(input: {
         reordering: input.reordering === true,
       }),
     "data-reordering": input.reordering ? "" : undefined,
-    "data-indicator": fill ? "fill" : undefined,
-    "data-indicator-hot": fill ? input.indicatorHot : undefined,
   };
 }

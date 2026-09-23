@@ -23,6 +23,7 @@ const REQUIRED_RECIPES = [
   "toast",
   "popover",
   "indicator",
+  "selected",
   "dismiss-fade",
   "theme-wipe",
   "tree-chevron",

@@ -15,7 +15,7 @@ motion/
     indicator/          L2 选中滑块
     swap/               L2 文案换牌
     theme/              L2 主题圆形揭示
-  recipes/              L3 无 Solid 的壳配方 CSS
+  recipes/              L3 无 Solid 的壳配方 CSS（含 selected）
   reduced.ts / reduced.css
   css.ts                测试展开 @import
   index.ts              族内桶（不是 L5）
