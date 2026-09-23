@@ -78,7 +78,12 @@ pub async fn drag_out(
     }
     let tree = state
         .browser
-        .list_tree(&req.serial, &req.remotes, CancellationToken::new())
+        .list_tree(
+            &req.serial,
+            &req.remotes,
+            req.generation,
+            CancellationToken::new(),
+        )
         .await?;
     let items: Vec<_> = tree
         .into_iter()
