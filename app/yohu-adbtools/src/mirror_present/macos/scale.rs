@@ -33,11 +33,9 @@ pub fn apply_layer_kernel(layer: &CALayer, src_w: u32, src_h: u32, dest: Letterb
                 layer.setMagnificationFilter(kCAFilterNearest);
             }
         }
-        ScaleKernel::Area => {
-            unsafe {
-                layer.setMinificationFilter(kCAFilterLinear);
-                layer.setMagnificationFilter(kCAFilterNearest);
-            }
-        }
+        ScaleKernel::Area => unsafe {
+            layer.setMinificationFilter(kCAFilterLinear);
+            layer.setMagnificationFilter(kCAFilterNearest);
+        },
     }
 }
