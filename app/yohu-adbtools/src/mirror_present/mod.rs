@@ -442,6 +442,7 @@ pub(crate) fn screenshot_from_pixels(
 }
 
 /// `with_host` 空：线程已拆 → Exited，不是 Empty。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn screenshot_host_reply<T>(
     host: Option<Result<T, PresentError>>,
 ) -> Result<T, PresentError> {

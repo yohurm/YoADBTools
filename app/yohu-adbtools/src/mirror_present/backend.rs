@@ -64,13 +64,14 @@ pub trait AnnexBDecoder: Sized {
     fn drain(&mut self) -> Result<Option<Self::Picture>, String>;
 }
 
+#[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
 pub(crate) fn unimplemented_screenshot_err(id: &'static str) -> PresentError {
     PresentError::Internal(format!(
         "{id} 投屏后端未实现：预留系统硬解，禁止用 FFmpeg 填坑"
     ))
 }
 
-#[cfg_attr(windows, allow(dead_code))]
+#[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
 pub fn spawn_unimplemented(id: &'static str, serial: &str) -> Sender<Cmd> {
     let (tx, rx) = std::sync::mpsc::channel();
     let label = format!("mirror-present-{id}-{serial}");

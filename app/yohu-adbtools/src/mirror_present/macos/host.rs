@@ -30,6 +30,7 @@ pub struct LayoutSnap {
     pub canvas: u32,
     pub title_argb: u32,
     pub body_argb: u32,
+    #[allow(dead_code)]
     pub dark: bool,
     pub chrome: bool,
     pub video: bool,

@@ -2,7 +2,7 @@
 
 pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), String> {
     let mut rgba = vec![0u8; bgra.len()];
-    for (i, chunk) in bgra.chunks_exact(4).enumerate() {
+    for (i, chunk) in bgra.as_chunks::<4>().0.iter().enumerate() {
         rgba[i * 4] = chunk[2];
         rgba[i * 4 + 1] = chunk[1];
         rgba[i * 4 + 2] = chunk[0];

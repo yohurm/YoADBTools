@@ -10,18 +10,22 @@ pub const APP_LOG_CAP: usize = 500;
 /// 呈现线程无命令时的等待。
 pub const PRESENT_IDLE: Duration = Duration::from_millis(4);
 /// 呈现泵单轮最多取出的窗口消息数。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const PRESENT_PUMP_BATCH: u32 = 32;
 /// 命令组进度事件通道容量。
 pub const GROUP_EVENT_CHANNEL_CAP: usize = 64;
-/// 加载环每步间隔（Win / mac 共用）。
+/// 加载环每步间隔（Win / mac 共用规格；macOS 走系统 spinner）。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const PRESENT_SPIN_STEP: Duration = Duration::from_millis(50);
-/// 加载环每步弧度（Win / mac 共用）。
+/// 加载环每步弧度（Win / mac 共用规格；macOS 走系统 spinner）。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const PRESENT_SPIN_DELTA: f32 = 0.28;
 /// 呈现节拍与已绘 fps 窗口（Win / mac 共用）。
 pub const PRESENT_BEAT: Duration = Duration::from_secs(1);
 /// `mirror.screenshot` 等呈现线程回执的上限。
 pub const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(5);
 /// 引导 HWND / `Gpu::new` 的初始边长（首帧 layout 到达前占位，勿与 `MIRROR_MIN_LAYOUT_PX` 混用）。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const PRESENT_BOOTSTRAP_PX: u32 = 16;
 
 #[cfg(test)]

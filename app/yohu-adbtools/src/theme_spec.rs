@@ -21,6 +21,7 @@ pub fn canvas_rgb(dark: bool) -> (u8, u8, u8) {
     }
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn brand_text_rgb(dark: bool) -> (u8, u8, u8) {
     if dark {
         BRAND_TEXT_DARK_RGB
@@ -30,6 +31,7 @@ pub fn brand_text_rgb(dark: bool) -> (u8, u8, u8) {
 }
 
 /// DXGI / GDI DIB 用 B8G8R8A8。
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn canvas_bgra(dark: bool) -> [u8; 4] {
     let (r, g, b) = canvas_rgb(dark);
     [b, g, r, 255]
