@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, AdbError, ToolResolver};
 use yohu_files::{FileBrowser, FileError};
+use yohu_protocol::DragOutItem;
 
 fn fake_adb_src() -> PathBuf {
     let mut p = std::env::current_exe().expect("测试进程路径");
@@ -226,4 +227,34 @@ async fn list_tree_wrong_generation_is_cancelled() {
         .await
         .unwrap_err();
     assert!(matches!(err, FileError::Adb(AdbError::Cancelled)));
+}
+
+#[test]
+fn drag_roots_does_not_need_attach() {
+    let browser = FileBrowser::new(client(isolated_fake_adb(LS_SCRIPT)));
+    let items = browser
+        .drag_roots(&[DragOutItem {
+            remote: "/sdcard/a.txt".into(),
+            is_dir: false,
+            size: 3,
+        }])
+        .expect("安全根内文件应通过");
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].remote, "/sdcard/a.txt");
+    assert_eq!(items[0].relative, "a.txt");
+    assert!(!items[0].is_dir);
+    assert_eq!(items[0].size, 3);
+}
+
+#[test]
+fn drag_roots_rejects_outside_safety() {
+    let browser = FileBrowser::new(client(isolated_fake_adb(LS_SCRIPT)));
+    let err = browser
+        .drag_roots(&[DragOutItem {
+            remote: "/data/a.txt".into(),
+            is_dir: false,
+            size: 1,
+        }])
+        .unwrap_err();
+    assert!(matches!(err, FileError::OutsideRoot(_)));
 }

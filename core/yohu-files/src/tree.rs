@@ -8,7 +8,7 @@ use crate::browse::FileBrowser;
 use crate::fault::FileError;
 use crate::guard::{last_segment, normalize_mut, parent_remote, resolve_and_recheck, RecheckKind};
 use yohu_domain::RemotePath;
-use yohu_protocol::EntryKind;
+use yohu_protocol::{DragOutItem, EntryKind};
 
 /// 单次拖出展开上限，避免巨大目录卡死 DoDragDrop 前的列举。
 pub const MAX_TREE_ENTRIES: usize = 4096;
@@ -24,6 +24,38 @@ pub struct TreeEntry {
 }
 
 impl FileBrowser {
+    /// 拖出根条目：只做同步 SafetyRoot，不碰设备。OLE 必须在松手前启动。
+    /// 目录子树仍走 [`Self::list_tree`]，在 DoDragDrop 之后后台展开。
+    pub fn drag_roots(&self, items: &[DragOutItem]) -> Result<Vec<TreeEntry>, FileError> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        for item in items {
+            let path = normalize_mut(&self.safety, &item.remote)?;
+            if !seen.insert(path.as_str().to_string()) {
+                continue;
+            }
+            let name = last_segment(path.as_str());
+            if name.is_empty() {
+                return Err(FileError::Path(path.as_str().into()));
+            }
+            out.push(TreeEntry {
+                remote: path.as_str().to_string(),
+                relative: name.to_string(),
+                is_dir: item.is_dir,
+                size: if item.is_dir { 0 } else { item.size },
+            });
+        }
+        if out.is_empty() {
+            return Err(FileError::EmptyTree(
+                items
+                    .first()
+                    .map(|item| item.remote.clone())
+                    .unwrap_or_default(),
+            ));
+        }
+        Ok(out)
+    }
+
     /// 把一组远端路径展开成 FILEDESCRIPTOR 树（目录递归；文件一条）。
     /// 每条必须是安全根真子路径，并做祖先 realpath 复核。
     /// `generation` 由调用方自带（拖出会话与 `BrowseAttach` 同一时钟）；不从槽位窥世代。
