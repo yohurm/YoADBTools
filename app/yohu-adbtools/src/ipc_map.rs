@@ -30,7 +30,7 @@ fn adb_code(e: &AdbError) -> IpcErrorCode {
         AdbError::ToolUnavailable(_) | AdbError::BadExit { .. } | AdbError::Timeout => {
             IpcErrorCode::AdbError
         }
-        AdbError::Io(_) => IpcErrorCode::Internal,
+        AdbError::Io(_) | AdbError::UnsupportedShell => IpcErrorCode::Internal,
     }
 }
 
@@ -87,6 +87,7 @@ pub fn ipc_file(e: FileError) -> IpcError {
                     IpcErrorCode::AdbError
                 }
                 FileError::ProgressJoin => IpcErrorCode::Internal,
+                FileError::NotAttached => IpcErrorCode::InvalidArgs,
                 FileError::Adb(_) => unreachable!("Adb 已在外层匹配"),
                 _ => IpcErrorCode::InvalidArgs,
             };
@@ -151,7 +152,7 @@ pub fn ipc_mirror(e: MirrorError) -> IpcError {
                 AdbError::ToolUnavailable(_) | AdbError::BadExit { .. } | AdbError::Timeout => {
                     IpcErrorCode::AdbError
                 }
-                AdbError::Io(_) => IpcErrorCode::Internal,
+                AdbError::Io(_) | AdbError::UnsupportedShell => IpcErrorCode::Internal,
             },
             message,
         },
@@ -320,5 +321,12 @@ mod tests {
         assert_eq!(e.code, IpcErrorCode::Internal);
         assert_eq!(e.message, "传输进度任务已中断");
         assert_ne!(e.code, IpcErrorCode::AdbError);
+    }
+
+    #[test]
+    fn browse_not_attached_is_invalid_args() {
+        let e = ipc_file(FileError::NotAttached);
+        assert_eq!(e.code, IpcErrorCode::InvalidArgs);
+        assert_eq!(e.message, "浏览会话未打开");
     }
 }

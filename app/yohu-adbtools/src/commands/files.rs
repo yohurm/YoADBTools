@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 use crate::commands::{ipc_dnd, ipc_file};
 use crate::state::AppState;
 use yohu_protocol::{
-    Direction, DragOutRequest, IpcError, PathOpRequest, RemoteEntry, TransferRequest,
+    BrowseAttach, Direction, DragOutRequest, IpcError, PathOpRequest, RemoteEntry, TransferRequest,
 };
 
 #[tauri::command(rename = "files.list")]
@@ -14,11 +14,33 @@ pub async fn files_list(
     state: State<'_, AppState>,
     serial: String,
     path: String,
+    generation: u64,
 ) -> Result<Vec<RemoteEntry>, IpcError> {
     state.require_online(&serial)?;
-    crate::browse_runs::list(&state, &serial, &path)
+    crate::browse_runs::list(&state, &serial, &path, generation)
         .await
         .map_err(ipc_file)
+}
+
+#[tauri::command(rename = "files.session.attach")]
+pub async fn files_session_attach(
+    state: State<'_, AppState>,
+    serial: String,
+) -> Result<BrowseAttach, IpcError> {
+    state.require_online(&serial)?;
+    crate::browse_runs::attach(&state, &serial)
+        .await
+        .map_err(ipc_file)
+}
+
+#[tauri::command(rename = "files.session.detach")]
+pub async fn files_session_detach(
+    state: State<'_, AppState>,
+    serial: String,
+    generation: u64,
+) -> Result<(), IpcError> {
+    crate::browse_runs::release(&state, &serial, generation).await;
+    Ok(())
 }
 
 #[tauri::command(rename = "files.push")]

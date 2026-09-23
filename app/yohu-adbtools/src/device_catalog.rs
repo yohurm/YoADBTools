@@ -161,11 +161,12 @@ async fn refresh_inner(state: &AppState) -> CatalogResult {
     }
 
     if !went_offline.is_empty() {
+        // 浏览关当时的槽（同拍）。采集/投屏 join 在后台；采集有世代门。
+        crate::browse_runs::went_offline(state, &went_offline).await;
         let capture = Arc::clone(&state.capture);
         let mirror = Arc::clone(&state.mirror);
-        let offline = went_offline;
         tokio::spawn(async move {
-            for serial in offline {
+            for serial in went_offline {
                 capture.detach_device(&serial).await;
                 mirror.stop(&serial).await;
                 mirror.drop_warm(&serial).await;
