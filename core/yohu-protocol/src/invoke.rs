@@ -59,13 +59,22 @@ pub struct TransferRequest {
     pub expected_bytes: Option<u64>,
 }
 
+/// `files.dragOut` 一条：远端绝对路径 + 清单已见的目录/大小（供 OLE 立刻出描述符）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DragOutItem {
+    pub remote: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
 /// `files.dragOut`：把设备路径交给壳虚拟文件拖出（DoDragDrop 结束后返回）。
 /// `generation` 必填，无 serde 缺省；缺字段反序列化失败（禁止回落到槽位窥世代）。
+/// `items` 来自当前清单，禁止再等 `list_tree` 才启动 OLE。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DragOutRequest {
     pub serial: String,
-    pub remotes: Vec<String>,
     pub generation: u64,
+    pub items: Vec<DragOutItem>,
 }
 
 /// `group.run` 请求。组内条目从命令库读取；组执行不接受运行时占位符。
@@ -160,18 +169,21 @@ mod tests {
     }
 
     #[test]
-    fn drag_out_request_is_serial_plus_remotes() {
+    fn drag_out_request_is_serial_generation_items() {
         let parsed: DragOutRequest = serde_json::from_str(
-            r#"{"serial":"S","remotes":["/sdcard/a.txt","/sdcard/DCIM"],"generation":7}"#,
+            r#"{"serial":"S","generation":7,"items":[{"remote":"/sdcard/a.txt","is_dir":false,"size":3},{"remote":"/sdcard/DCIM","is_dir":true,"size":0}]}"#,
         )
         .unwrap();
         assert_eq!(parsed.serial, "S");
-        assert_eq!(parsed.remotes.len(), 2);
         assert_eq!(parsed.generation, 7);
+        assert_eq!(parsed.items.len(), 2);
+        assert!(!parsed.items[0].is_dir);
+        assert!(parsed.items[1].is_dir);
         assert!(serde_json::from_str::<DragOutRequest>(
-            r#"{"serial":"S","remotes":["/sdcard/a.txt"]}"#
+            r#"{"serial":"S","generation":7,"remotes":["/sdcard/a.txt"]}"#
         )
         .is_err());
+        assert!(serde_json::from_str::<DragOutRequest>(r#"{"serial":"S","items":[]}"#).is_err());
     }
 
     #[test]
