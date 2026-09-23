@@ -111,28 +111,6 @@
   }
 }
 
-@keyframes yohu-slide-end-in {
-  from {
-    opacity: 0;
-    transform: translateX(calc(var(--yohu-space-md) * 2));
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes yohu-slide-end-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(calc(var(--yohu-space-md) * 2));
-  }
-}
-
 @keyframes yohu-scale-in {
   from {
     opacity: 0;

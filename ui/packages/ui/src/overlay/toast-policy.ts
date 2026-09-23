@@ -6,11 +6,17 @@
 
 import { motionDurationMs } from "../tokens/motion";
 import {
+  applyToastPatch,
+  hasToastDetail,
+  hasToastLeading,
+  hasToastMeta,
+  hasToastProgress,
   resolveToastSpec,
   toastPaintTone,
   type ToastInput,
   type ToastItem,
   type ToastPaintTone,
+  type ToastPatch,
 } from "./toast-model";
 
 export interface ToastQueue {
@@ -28,8 +34,25 @@ export function enqueueToast(queue: ToastQueue, input: ToastInput): ToastQueue {
   if (!queue.alive) return queue;
   const spec = resolveToastSpec(input);
   const id = queue.generation + 1;
-  const item: ToastItem = { id, text: spec.text, tone: spec.tone, open: true };
+  const item: ToastItem = {
+    id,
+    ...spec,
+    open: true,
+    onDismiss: input.onDismiss,
+  };
   return { generation: id, items: [...queue.items, item], alive: true };
+}
+
+/** 按代际补快照。不改 open / id / onDismiss。 */
+export function updateToast(queue: ToastQueue, id: number, patch: ToastPatch): ToastQueue {
+  if (!queue.alive) return queue;
+  let changed = false;
+  const items = queue.items.map((item) => {
+    if (item.id !== id) return item;
+    changed = true;
+    return applyToastPatch(item, patch);
+  });
+  return changed ? { ...queue, items } : queue;
 }
 
 /** 开始出场：只把对应代际标成 open=false。 */
@@ -68,12 +91,22 @@ export function toastHoldMs(): number {
 
 export interface ToastHostAttrs {
   "data-tone": ToastPaintTone;
+  "data-leading"?: "";
+  "data-detail"?: "";
+  "data-progress"?: "";
+  "data-meta"?: "";
+  "data-sticky"?: "";
   role: "status";
 }
 
 export function toastHostAttrs(item: ToastItem): ToastHostAttrs {
   return {
     "data-tone": toastPaintTone(item.tone),
+    "data-leading": hasToastLeading(item.leading) ? "" : undefined,
+    "data-detail": hasToastDetail(item.detail) ? "" : undefined,
+    "data-progress": hasToastProgress(item.progress) ? "" : undefined,
+    "data-meta": hasToastMeta(item.meta) ? "" : undefined,
+    "data-sticky": item.sticky ? "" : undefined,
     role: "status",
   };
 }

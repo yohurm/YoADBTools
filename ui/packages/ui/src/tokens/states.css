@@ -112,3 +112,50 @@ html[data-yohu-focus="keyboard"] .yohu-focus-host:focus-within:has(:focus-visibl
 html[data-yohu-focus="keyboard"] .yohu-focus-ring--inset:focus-visible::after {
   inset: calc(-1 * var(--yohu-focus-offset-inset) - var(--yohu-focus-width));
 }
+
+/* Chip / Toast 16vp 正圆关闭。宿主只叠 z-index，禁止再画一遍圆。 */
+.yohu-recipe-dismiss {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--yohu-layout-icon-sm);
+  height: var(--yohu-layout-icon-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-full);
+  background-color: var(--yohu-fg-2);
+  color: var(--yohu-surface);
+  cursor: pointer;
+}
+
+.yohu-recipe-dismiss.yohu-focus-ring {
+  border-radius: var(--yohu-radius-full);
+}
+
+.yohu-recipe-dismiss:hover {
+  background-color: var(--yohu-fg);
+}
+
+/* TextField / Search 盒内幽灵清除。Tabs 关闭是会话破坏，不走本配方。 */
+.yohu-recipe-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: pointer;
+  transition:
+    color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-clear:hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}

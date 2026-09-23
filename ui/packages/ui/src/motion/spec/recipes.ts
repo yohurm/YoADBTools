@@ -3,19 +3,31 @@ import { MotionSpec, type MotionDurationName } from "../../tokens/motion";
 /** Presence 配方名（与 motion.css data-recipe 对齐）。 */
 export type PresenceRecipe = "dialog" | "toast" | "popover" | "fade" | "rise" | "list" | "chip";
 
-/** 用 clip 层裁切进场的配方。list 裁高度，chip 裁宽度。 */
-export const PRESENCE_CLIP_RECIPES: readonly PresenceRecipe[] = ["list", "chip"];
+/** 用 clip 层裁切进场的配方。list / toast 裁高度，chip 裁宽度。 */
+export const PRESENCE_CLIP_RECIPES: readonly PresenceRecipe[] = ["list", "chip", "toast"];
+
+/** transition 可打断：出生 closed，双 rAF 后 open。clip 配方。keyframes 配方不在此列。 */
+export const PRESENCE_TRANSITION_RECIPES: readonly PresenceRecipe[] = ["list", "chip", "toast"];
 
 export function presenceUsesClip(recipe: PresenceRecipe): boolean {
-  return recipe === "list" || recipe === "chip";
+  return recipe === "list" || recipe === "chip" || recipe === "toast";
+}
+
+export function presenceUsesTransition(recipe: PresenceRecipe): boolean {
+  return recipe === "list" || recipe === "chip" || recipe === "toast";
 }
 
 export function presenceClipProperty(
   recipe: PresenceRecipe,
 ): "grid-template-rows" | "grid-template-columns" | null {
-  if (recipe === "list") return "grid-template-rows";
+  if (recipe === "list" || recipe === "toast") return "grid-template-rows";
   if (recipe === "chip") return "grid-template-columns";
   return null;
+}
+
+/** 出场 transitionend 要等的属性。keyframes 配方返回 null，改等 animationend。 */
+export function presenceExitWatchProperty(recipe: PresenceRecipe): string | null {
+  return presenceClipProperty(recipe);
 }
 
 /** Collapse 配方名（与 motion.css data-recipe 对齐）。对话框名单走 YoReveal，不在此列。 */

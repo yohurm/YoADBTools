@@ -69,6 +69,7 @@ export const FAMILY_STEMS = {
     "select-place",
     "AddressField",
     "address-field-model",
+    "clear-mark",
   ],
   display: [
     "Badge",
@@ -77,6 +78,7 @@ export const FAMILY_STEMS = {
     "Chip",
     "chip-model",
     "chip-policy",
+    "dismiss-mark",
     "StatusDot",
     "status-dot-model",
     "status-dot-policy",

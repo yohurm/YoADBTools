@@ -148,25 +148,6 @@
   appearance: none;
 }
 
-.yohu-search__clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
-  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
-  padding: 0;
-  border: none;
-  border-radius: var(--yohu-radius-sm);
-  background: transparent;
-  color: var(--yohu-fg-3);
-  cursor: pointer;
-}
-
-.yohu-search__clear:hover {
-  background-color: var(--yohu-state-hover);
-  color: var(--yohu-fg);
-}
-
 .yohu-search[data-disabled] .yohu-search__control {
   --yohu-corner-fill: var(--yohu-surface-2);
   --yohu-search-edge: var(--yohu-border);

@@ -1,22 +1,32 @@
+/* 钉窗口右下角（对照 VS Code / Win11 Toast / macOS 通知）。
+ * 右上角会挡住标题栏三键与模块页眉功能栏；底边让过状态栏 hug 高。 */
+
 .yohu-toaster {
   position: fixed;
-  top: var(--yohu-space-md);
   right: var(--yohu-space-md);
+  bottom: calc(var(--yohu-control-height-sm) + var(--yohu-space-md));
   z-index: var(--yohu-z-toast);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--yohu-space-sm);
+  overflow: visible;
   pointer-events: none;
   font-family: var(--yohu-font-sans);
 }
 
+/* 宿主排版；铬只 paint。关闭圆钮在宿主流内右上角，禁止 absolute。 */
 .yohu-toast {
   --yohu-corner-fill: var(--yohu-surface);
   --yohu-corner-stroke: var(--yohu-accent);
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--yohu-space-sm);
   pointer-events: auto;
   max-width: var(--yohu-layout-dialog-max);
-  padding: 0;
+  padding: var(--yohu-space-sm);
   overflow: visible;
   border: none;
   background-color: transparent;
@@ -24,6 +34,10 @@
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   box-sizing: border-box;
+}
+
+.yohu-toast[data-progress] {
+  width: var(--yohu-layout-dialog-max);
 }
 
 .yohu-toast[data-tone="success"] {
@@ -36,4 +50,89 @@
 
 .yohu-toast[data-tone="accent"] {
   --yohu-corner-stroke: var(--yohu-accent);
+}
+
+.yohu-toast__leading,
+.yohu-toast__body,
+.yohu-toast .yohu-recipe-dismiss {
+  position: relative;
+  z-index: 1;
+}
+
+.yohu-toast__leading {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--yohu-accent);
+}
+
+.yohu-toast[data-tone="success"] .yohu-toast__leading {
+  color: var(--yohu-success);
+}
+
+.yohu-toast[data-tone="danger"] .yohu-toast__leading {
+  color: var(--yohu-error);
+}
+
+.yohu-toast__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--yohu-space-xs);
+}
+
+.yohu-toast__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--yohu-font-weight-medium);
+}
+
+.yohu-toast__detail {
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg-2);
+}
+
+.yohu-toast[data-tone="danger"] .yohu-toast__detail {
+  color: var(--yohu-error);
+}
+
+.yohu-toast__meta {
+  font-family: var(--yohu-font-mono);
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.yohu-toast__progress {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: var(--yohu-space-xs);
+  background-color: transparent;
+  overflow: visible;
+}
+
+.yohu-toast__progress-chrome {
+  --yohu-corner-fill: var(--yohu-comp-gray);
+  --yohu-corner-stroke: transparent;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.yohu-toast__progress-bar {
+  height: 100%;
+  background-color: var(--yohu-accent);
+  transition: width var(--yohu-dur-progress) var(--yohu-ease-standard);
+}
+
+.yohu-toast__progress[data-mode="indeterminate"] .yohu-toast__progress-bar {
+  width: 40%;
+  animation: yohu-progress-indeterminate var(--yohu-dur-loop-slow) var(--yohu-ease-loop) infinite;
 }

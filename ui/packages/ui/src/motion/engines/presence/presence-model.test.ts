@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { presenceClipBornState } from "./presence-model";
+import { presenceBornState } from "./presence-model";
 
-describe("presenceClipBornState", () => {
-  it("clip 且播动效时出生 closed，才能 0fr→1fr", () => {
-    expect(presenceClipBornState({ when: true, usesClip: true, skipMotion: false })).toBe("closed");
+describe("presenceBornState", () => {
+  it("transition 且播动效时出生 closed，才能从位移/0fr 起步", () => {
+    expect(presenceBornState({ when: true, delayOpen: true, skipMotion: false })).toBe("closed");
   });
 
-  it("跳过动效或非 clip 出生即 open", () => {
-    expect(presenceClipBornState({ when: true, usesClip: true, skipMotion: true })).toBe("open");
-    expect(presenceClipBornState({ when: true, usesClip: false, skipMotion: false })).toBe("open");
+  it("跳过动效或非 transition 出生即 open", () => {
+    expect(presenceBornState({ when: true, delayOpen: true, skipMotion: true })).toBe("open");
+    expect(presenceBornState({ when: true, delayOpen: false, skipMotion: false })).toBe("open");
   });
 
   it("when=false 出生 closed", () => {
-    expect(presenceClipBornState({ when: false, usesClip: true, skipMotion: false })).toBe("closed");
+    expect(presenceBornState({ when: false, delayOpen: true, skipMotion: false })).toBe("closed");
   });
 });

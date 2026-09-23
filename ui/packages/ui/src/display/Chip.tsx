@@ -3,7 +3,7 @@
  * 对齐 HarmonyOS Chip：28vp 高、前导 + 文案 + 16vp 关闭圆钮。
  * 宿主排版；YoCorner 只 paint 胶囊，与 YoButton 同构。
  * 圆钮是宿主子级，不进 Corner 裁切盒。有 onDismiss 才画，始终可见。
- * 禁止 hover 藏钮。禁止 absolute 关钮。禁止原生 title。
+ * 关闭走 DismissMark / yohu-recipe-dismiss。禁止 hover 藏钮。禁止 absolute 关钮。禁止原生 title。
  */
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
@@ -12,6 +12,7 @@ import { Icon, isIconName, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import type { YoChipTone } from "./chip-model";
 import { chipHostAttrs } from "./chip-policy";
+import { DismissMark } from "./dismiss-mark";
 import "./Chip.css";
 
 export type { YoChipTone };
@@ -70,18 +71,7 @@ export function YoChip(props: YoChipProps): JSX.Element {
       </Show>
       <span class="yohu-chip__label">{props.text}</span>
       <Show when={host()["data-dismiss"]}>
-        <button
-          type="button"
-          class="yohu-chip__remove yohu-focus-ring"
-          aria-label={`移除 ${props.text}`}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={(event) => {
-            event.stopPropagation();
-            props.onDismiss?.();
-          }}
-        >
-          <Icon name="close" size={Layout.IconTiny} />
-        </button>
+        <DismissMark label={`移除 ${props.text}`} onDismiss={props.onDismiss} />
       </Show>
     </div>
   );

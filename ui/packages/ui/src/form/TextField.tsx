@@ -8,6 +8,7 @@ import { Show, createMemo, createRenderEffect, createUniqueId, onCleanup } from 
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { Icon, isIconName, type IconName } from "../icons";
+import { ClearMark } from "./clear-mark";
 import { GROW_USED_ATTR, YoGrow, growUsedAttrs, useGrow } from "../motion/engines/grow";
 import { Layout } from "../tokens/layout";
 import { Radius } from "../tokens/radius";
@@ -162,14 +163,7 @@ function TextFieldBody(props: {
         </span>
       </Show>
       <Show when={props.host["data-clearable"]}>
-        <button
-          type="button"
-          class="yohu-text-field__clear yohu-focus-ring"
-          aria-label="清除"
-          onClick={props.onClear}
-        >
-          <Icon name="close" size={Layout.IconInline} />
-        </button>
+        <ClearMark onClear={props.onClear} />
       </Show>
       <Show when={props.stepper.show}>
         <div class="yohu-text-field__stepper" data-no-focus>

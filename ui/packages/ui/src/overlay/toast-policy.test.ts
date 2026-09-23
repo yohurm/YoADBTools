@@ -10,6 +10,7 @@ import {
   toastHoldMs,
   toastHostAttrs,
   toasterHostAttrs,
+  updateToast,
 } from "./toast-policy";
 
 describe("toast-policy", () => {
@@ -17,11 +18,24 @@ describe("toast-policy", () => {
     const first = enqueueToast(createToastQueue(), { text: "一条" });
     expect(first.generation).toBe(1);
     expect(first.items).toHaveLength(1);
-    expect(first.items[0]).toMatchObject({ id: 1, text: "一条", tone: "info", open: true });
+    expect(first.items[0]).toMatchObject({ id: 1, text: "一条", tone: "info", open: true, sticky: false });
 
     const second = enqueueToast(first, { text: "两条", tone: "success" });
     expect(second.generation).toBe(2);
     expect(second.items.map((item) => item.id)).toEqual([1, 2]);
+  });
+
+  it("update 按代际补快照，不改 open", () => {
+    const queued = enqueueToast(createToastQueue(), { text: "shot.png", sticky: true, progress: { value: 10 } });
+    const next = updateToast(queued, 1, { detail: "完成", progress: null, sticky: false });
+    expect(toastById(next, 1)).toMatchObject({
+      text: "shot.png",
+      detail: "完成",
+      sticky: false,
+      open: true,
+    });
+    expect(toastById(next, 1)?.progress).toBeUndefined();
+    expect(updateToast(queued, 99, { text: "x" })).toBe(queued);
   });
 
   it("beginDismiss 只关对应代际", () => {
@@ -45,6 +59,7 @@ describe("toast-policy", () => {
     expect(enqueueToast(dead, { text: "二" })).toBe(dead);
     expect(beginDismissToast(dead, 1)).toBe(dead);
     expect(removeToast(dead, 1)).toBe(dead);
+    expect(updateToast(dead, 1, { text: "x" })).toBe(dead);
     expect(destroyToastQueue(dead)).toBe(dead);
   });
 
@@ -54,8 +69,10 @@ describe("toast-policy", () => {
   });
 
   it("单条宿主属性用 Button 涂装名", () => {
-    const attrs = toastHostAttrs({ id: 1, text: "失败", tone: "error", open: true });
-    expect(attrs).toEqual({ "data-tone": "danger", role: "status" });
+    const queued = enqueueToast(createToastQueue(), { text: "失败", tone: "error" });
+    const attrs = toastHostAttrs(queued.items[0]!);
+    expect(attrs["data-tone"]).toBe("danger");
+    expect(attrs.role).toBe("status");
   });
 
   it("堆栈宿主是通知 region", () => {

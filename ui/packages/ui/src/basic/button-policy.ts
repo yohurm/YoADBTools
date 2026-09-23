@@ -15,7 +15,7 @@ import {
 export interface ButtonInteractiveInput {
   disabled?: boolean;
   loading?: boolean;
-  /** 铺满父级（发送栏收起条 / 传输坞帽栏）。默认 hug */
+  /** 铺满父级（发送栏收起条）。默认 hug */
   block?: boolean;
 }
 

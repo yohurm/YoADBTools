@@ -133,9 +133,9 @@ export const MotionCatalog = {
   toast: {
     name: "toast",
     engine: "presence",
-    spec: ["spatialLocal", "effectsExit"],
-    properties: ["opacity", "transform"],
-    interruptible: false,
+    spec: ["spatialRail", "effectsExit"],
+    properties: ["grid-template-rows", "opacity", "transform"],
+    interruptible: true,
   },
   popover: {
     name: "popover",

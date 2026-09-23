@@ -1,7 +1,7 @@
 /**
  * YoPresence —— 进场挂载、出场播完再卸载（动画系统-v6.md L2）。
- * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip 改为 grid 裁切）。
- * clip：出生 closed（0fr），仅本实例 want 上升后双 rAF 开。邻项增删不重挂、不重播。
+ * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip/toast 改为 grid 裁切）。
+ * transition：出生 closed，仅本实例 want 上升后双 rAF 开。邻项增删不重挂、不重播。
  */
 import { Show, createEffect, createMemo, createRenderEffect, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
@@ -9,12 +9,13 @@ import { motionDurationMs } from "../../../tokens/motion";
 import {
   PRESENCE_EXIT_DURATION,
   PRESENCE_EXIT_SAFETY_MS,
-  presenceClipProperty,
   presenceUsesClip,
+  presenceUsesTransition,
+  presenceExitWatchProperty,
   type PresenceRecipe,
 } from "../../spec/recipes";
 import { shouldSkipMotion } from "../../reduced";
-import { presenceClipBornState } from "./presence-model";
+import { presenceBornState } from "./presence-model";
 import { presenceHostRecipe } from "./presence-policy";
 
 export type { PresenceRecipe };
@@ -32,9 +33,9 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   const recipeOf = (): PresenceRecipe => props.recipe ?? "fade";
   const [present, setPresent] = createSignal(Boolean(props.when));
   const [state, setState] = createSignal<"open" | "closed">(
-    presenceClipBornState({
+    presenceBornState({
       when: Boolean(props.when),
-      usesClip: presenceUsesClip(recipeOf()),
+      delayOpen: presenceUsesTransition(recipeOf()),
       skipMotion: shouldSkipMotion(),
     }),
   );
@@ -65,14 +66,14 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   /**
    * 进场：when 变 true 必须同拍挂载。
    * Solid 文档：createEffect 在渲染完成后才跑；Show 只认 present() 会再等一拍 setPresent。
-   * 对照 corvu/Radix：visible = show || present。clip 出生已是 closed，这里只负责非 clip 同拍 open。
+   * 对照 corvu/Radix：visible = show || present。transition 出生已是 closed，这里只负责 keyframes 同拍 open。
    */
   createRenderEffect(() => {
     if (!want()) return;
     setPresent(true);
     setExiting(false);
     const recipe = recipeOf();
-    if (presenceUsesClip(recipe) && !shouldSkipMotion()) return;
+    if (presenceUsesTransition(recipe) && !shouldSkipMotion()) return;
     setState("open");
   });
 
@@ -83,7 +84,7 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
       const gen = ++exitGen;
       setExiting(false);
       setPresent(true);
-      if (presenceUsesClip(recipe) && !shouldSkipMotion()) {
+      if (presenceUsesTransition(recipe) && !shouldSkipMotion()) {
         cancelEnterRafs();
         enterRaf1 = window.requestAnimationFrame(() => {
           enterRaf2 = window.requestAnimationFrame(() => {
@@ -114,8 +115,8 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
     };
     const onTransitionEnd = (event: TransitionEvent): void => {
       if (event.target !== host) return;
-      const clip = presenceClipProperty(recipe);
-      if (!clip || event.propertyName !== clip) return;
+      const watch = presenceExitWatchProperty(recipe);
+      if (!watch || event.propertyName !== watch) return;
       window.clearTimeout(timer);
       finishExit(gen);
     };

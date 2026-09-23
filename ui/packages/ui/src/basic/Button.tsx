@@ -39,7 +39,7 @@ export interface YoButtonProps {
   "aria-pressed"?: boolean;
   /** 可见文案不足时的无障碍名（如级别字母）；不画气泡 */
   "aria-label"?: string;
-  /** 展开控件所控制的区域 id（传输坞列表等） */
+  /** 展开控件所控制的区域 id */
   "aria-controls"?: string;
   /** 铺满父级。默认 hug，受 `--yohu-layout-button-max` 帽宽 */
   block?: boolean;

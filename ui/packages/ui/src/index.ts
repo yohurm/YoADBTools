@@ -337,7 +337,7 @@ export type {
 
 export { YoToast, YoToaster };
 export const createToaster: () => Toaster = createToasterHost;
-export type { ToastTone, Toaster, YoToastProps, YoToasterProps } from "./overlay/Toast";
+export type { ToastTone, ToastInput, ToastPatch, Toaster, YoToastProps, YoToasterProps } from "./overlay/Toast";
 
 export {
   YoPresence,
