@@ -23,8 +23,10 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
-const STDERR_BUDGET: usize = 64 * 1024;
+/// stdout 捕获上限（字节）。短命令与 piped IO 共用。
+pub const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
+/// stderr 捕获上限（字节）。短命令与 piped IO 共用。
+pub const STDERR_BUDGET: usize = 64 * 1024;
 const CAPTURE_CHAN: usize = 128;
 const STREAM_STDERR_CHAN: usize = 64;
 const REAP_WAIT: Duration = Duration::from_secs(3);
