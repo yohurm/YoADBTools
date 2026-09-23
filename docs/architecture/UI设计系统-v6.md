@@ -1,9 +1,19 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.110（2026-09-23，强调条组件几何 + 展开/收回曲线）
+> **状态：** v3.115（2026-09-23，关闭/清除铬单源）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v3.115 变更（关闭/清除铬单源）：** Chip 与 Toast 的 16vp 正圆关闭收口 `DismissMark` + `.yohu-recipe-dismiss`（`tokens/states.css`）；TextField 与 Search 的幽灵清除收口 `ClearMark` + `.yohu-recipe-clear`。文件删除名单、终端发送队列、日志 Tag 只挂 `YoChip`，禁止模块再画关钮。Tabs 页签关闭、TitleBar 窗口三键、页眉 `YoIconButton` 仍按角色分开，禁止套圆钮配方。见 [youi.md](youi.md)、[modules/files.md](modules/files.md)。
+>
+> **v3.114 变更（YoToast 横幅 + 传输卡）：** Toast 对齐 macOS 通知横幅与 HarmonyOS Chip 关闭圆钮：标题 / 明细 / 进度 / 元数据，右上角始终可关。入场自盒外 `translateY(100%) scale(0.94)` 走 `spatialRail` 软弹簧，出场倒放 `effectsExit`；高度 0fr/1fr clip。文件传输坞拆除，作业同步进文件页 `YoToaster`（`TransferToasts`）。`show` 返回代际，可 `update` / `sticky`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)、[文件传输-v6.md](文件传输-v6.md)。
+>
+> **v3.113 变更（YoToast 倒放可打断）：** 当时出场倒放入场位移（下方 xs 收回）。v3.114 改为自盒外升起 + 微缩放弹簧。keyframes 已在 v3.113 改 CSS `transition`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.112 变更（YoToast 进出场）：** 右下角后不再横向 slide-end。当时入场 `yohu-toast-in`、出场 `yohu-scale-out` 不倒放；v3.113 改 transition 倒放且可打断。删除 `yohu-slide-end-*`。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.111 变更（YoToast 右下角）：** 堆栈从窗口右上角改钉右下角。对照 VS Code 通知 / Win11 Toast：轻提示不进标题栏与页眉操作带。底边 `control-height-sm + space-md` 让过状态栏。当时进出场仍走 slide-end；v3.112 改从下方微移入场。见 [youi.md](youi.md)。
 >
 > **v3.110 变更（强调条组件）：** 条从 ListItem 拆到 `list/Mark`（L2 `list-item-mark-model`）。井宽 4vp、块向内缩行圆角 8vp 落在直边上（起边直角、内侧胶囊）；填充另层 `scaleY`，展开 `spatialStretch` 软弹簧、收回 `effectsExit` 加速。井 `overflow: hidden` 裁过冲，几何不随 scale 压扁。不再用 3vp 描边当条宽。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
 >
@@ -701,7 +711,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位，块下不画分割线；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
 - `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400；面板安全顶 90%；hug 滚槽预算 `--yohu-layout-dialog-body-max`。标题 Title_S Bold；电脑圆角 `YoCorner role=dialog`（16）。三区不画分割线。层 Portal 到 `body`。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）；fill 定高不套 Travel。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
-- `YoToast`：描边；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。
+- `YoToast`：描边；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。堆栈钉窗口右下角，底边让过状态栏；禁止钉右上角。入场下方 xs 微移升起；出场倒放同一位移；transition 可打断。
 
 ---
 

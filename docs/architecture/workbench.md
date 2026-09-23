@@ -154,7 +154,7 @@ invoke files.list(serial, path, generation) → commands/files require_online �
 invoke files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。视图卸载带所持世代
 went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。
 invoke files.push/pull → transfer_runs::spawn（tokio::spawn(run)；立即返回 id）
-invoke files.dragOut → dnd → files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。→ transfer_runs::run（Win block_on / mac await）
+invoke files.dragOut → dnd drag_roots（立刻 DoDragDrop）→ 目录后台 files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。→ GetData 才 transfer_runs::run（Win block_on / mac await）
 invoke log.export → commands/log 转发 → capture_runs::export
   → 空 export_default_path 用 paths.exports_dir，否则设置目录
   → CaptureService.export（环快照 + domain 过滤）

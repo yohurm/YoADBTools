@@ -114,7 +114,7 @@ invoke files.list(serial, path, generation) → commands/files require_online �
 invoke files.session.detach(serial, generation) → files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。视图卸载带所持世代
 went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。
 invoke files.push/pull/cancel → commands/files → transfer_runs::spawn / run
-invoke files.dragOut → commands/files → dnd → files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。（TreeLimit / TreeDepth fail-closed → ipc_file）→ 成功才 transfer_runs::run
+invoke files.dragOut → commands/files → dnd drag_roots（立刻 DoDragDrop）→ 目录后台 files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。（TreeLimit / TreeDepth fail-closed → ipc_file）→ GetData 才 transfer_runs::run
 invoke files.delete/mkdir/create → commands/files → mutator（超时在 mutate.rs）→ file_error_from_adb → ipc_file
 invoke mirror.start → commands/mirror → mirror_sessions（present.attach 只绑管道）
 invoke log.capture.start → commands/log → capture_runs
