@@ -22,7 +22,10 @@ pub fn end_prefix(nonce: u64) -> String {
 }
 
 pub fn handshake_script() -> String {
-    format!("export PS1=\nexport PS2=\nprintf '%s\\n' '{ready}'\n", ready = MARK_SHELL_READY)
+    format!(
+        "export PS1=\nexport PS2=\nprintf '%s\\n' '{ready}'\n",
+        ready = MARK_SHELL_READY
+    )
 }
 
 /// 包进子 shell：内层 `exit` 不得打死长驻会话。BEGIN/END 用 printf 打出，避免回显命令行被当成帧。
@@ -108,8 +111,7 @@ while :; do
     remainder="$name"
   fi
   current="$parent"
-done"#
-,
+done"#,
         path = quoted_path,
         mark_res = MARK_RESOLVED,
         mark_rem = MARK_REM,
@@ -119,11 +121,17 @@ done"#
 }
 
 /// 从合并 stdout 切分；`ls` 区交给 [`ls::parse_ls`]。
-pub fn parse_list_output(stdout: &str, exit_code: i32, stderr: &str) -> Result<BrowseListRaw, BrowseParseError> {
+pub fn parse_list_output(
+    stdout: &str,
+    exit_code: i32,
+    stderr: &str,
+) -> Result<BrowseListRaw, BrowseParseError> {
     if stdout.contains(MARK_FAIL) || (exit_code != 0 && !stdout.contains(MARK_LS)) {
         return Err(BrowseParseError::ResolveFailed);
     }
-    let res_idx = stdout.find(MARK_RESOLVED).ok_or(BrowseParseError::Malformed)?;
+    let res_idx = stdout
+        .find(MARK_RESOLVED)
+        .ok_or(BrowseParseError::Malformed)?;
     let rem_idx = stdout.find(MARK_REM).ok_or(BrowseParseError::Malformed)?;
     let ls_idx = stdout.find(MARK_LS).ok_or(BrowseParseError::Malformed)?;
     if !(res_idx < rem_idx && rem_idx < ls_idx) {
@@ -186,9 +194,8 @@ mod tests {
 
     #[test]
     fn parse_with_remainder() {
-        let stdout = format!(
-            "{MARK_RESOLVED}\n/storage/emulated/0\n{MARK_REM}\nnewdir\n{MARK_LS}\n"
-        );
+        let stdout =
+            format!("{MARK_RESOLVED}\n/storage/emulated/0\n{MARK_REM}\nnewdir\n{MARK_LS}\n");
         let raw = parse_list_output(&stdout, 0, "").unwrap();
         assert_eq!(raw.remainder, "newdir");
     }
@@ -203,9 +210,7 @@ mod tests {
 
     #[test]
     fn parse_ls_nonzero() {
-        let stdout = format!(
-            "{MARK_RESOLVED}\n/sdcard\n{MARK_REM}\n\n{MARK_LS}\n"
-        );
+        let stdout = format!("{MARK_RESOLVED}\n/sdcard\n{MARK_REM}\n\n{MARK_LS}\n");
         assert!(matches!(
             parse_list_output(&stdout, 1, "No such file"),
             Err(BrowseParseError::LsFailed { .. })

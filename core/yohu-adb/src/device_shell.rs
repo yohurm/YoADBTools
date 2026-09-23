@@ -17,12 +17,10 @@ use crate::parse::browse as browse_parse;
 use crate::parse::offline;
 use crate::parse::shell_option;
 use crate::tool::ToolResolver;
-use yohu_runtime::{ChildHandle, ProcessOutput, ProcessRunner};
+use yohu_runtime::{ChildHandle, ProcessOutput, ProcessRunner, STDERR_BUDGET, STDOUT_BUDGET};
 
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 const HANDSHAKE_LINE_LIMIT: usize = 64;
-const STDOUT_BUDGET: usize = 8 * 1024 * 1024;
-const STDERR_BUDGET: usize = 64 * 1024;
 const STDERR_DRAIN: Duration = Duration::from_secs(1);
 
 /// 长驻 shell 失败。`Unsupported` 表示无 `-T` / 非 sh，调用方回退短命令。
@@ -229,10 +227,7 @@ async fn classify_close(
             let _ = stderr_task.await;
         }
     }
-    let stderr = stderr_tail
-        .lock()
-        .map(|s| s.clone())
-        .unwrap_or_default();
+    let stderr = stderr_tail.lock().map(|s| s.clone()).unwrap_or_default();
     child.kill_tree();
     if matches!(
         origin,
@@ -241,9 +236,7 @@ async fn classify_close(
         return origin;
     }
     if offline::stderr_is_device_offline(&stderr) {
-        return DeviceShellError::Failed(AdbError::DeviceOffline(
-            stderr.trim().to_string(),
-        ));
+        return DeviceShellError::Failed(AdbError::DeviceOffline(stderr.trim().to_string()));
     }
     if shell_option::stderr_rejects_shell_option(&stderr) {
         return DeviceShellError::Unsupported;
@@ -267,9 +260,9 @@ async fn handshake(
             return Ok(());
         }
     }
-    Err(DeviceShellError::Failed(AdbError::Io(std::io::Error::other(
-        "浏览 shell 握手失败",
-    ))))
+    Err(DeviceShellError::Failed(AdbError::Io(
+        std::io::Error::other("浏览 shell 握手失败"),
+    )))
 }
 
 async fn exec_turn(
@@ -313,9 +306,9 @@ async fn exec_turn(
             });
         }
         if body.len() + line.len() + 1 > STDOUT_BUDGET {
-            return Err(DeviceShellError::Failed(AdbError::Io(std::io::Error::other(
-                "输出超过捕获预算",
-            ))));
+            return Err(DeviceShellError::Failed(AdbError::Io(
+                std::io::Error::other("输出超过捕获预算"),
+            )));
         }
         body.push_str(&line);
         body.push('\n');
@@ -341,9 +334,9 @@ async fn read_line(
     remaining: usize,
 ) -> Result<String, DeviceShellError> {
     if remaining == 0 {
-        return Err(DeviceShellError::Failed(AdbError::Io(std::io::Error::other(
-            "输出超过捕获预算",
-        ))));
+        return Err(DeviceShellError::Failed(AdbError::Io(
+            std::io::Error::other("输出超过捕获预算"),
+        )));
     }
     let mut buf = Vec::new();
     tokio::select! {

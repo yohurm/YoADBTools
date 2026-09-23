@@ -12,7 +12,10 @@ fn fake_adb_src() -> PathBuf {
     p.pop();
     p.pop();
     let plain = p.join(yohu_runtime::host_bin_name("fake-adb"));
-    assert!(plain.is_file(), "先执行 cargo build --workspace（fake-adb 明文 bin）");
+    assert!(
+        plain.is_file(),
+        "先执行 cargo build --workspace（fake-adb 明文 bin）"
+    );
     plain
 }
 
@@ -90,9 +93,9 @@ async fn device_shell_open_unsupported_when_t_rejected_after_stdout_eof() {
     .expect("延迟 stderr 后 open 必须结束");
     match opened {
         Err(DeviceShellError::Unsupported) => {}
-        Err(e) => panic!(
-            "stdout EOF 后延迟的 unknown option -T 必须 Unsupported，不能塌成 Io: {e:?}"
-        ),
+        Err(e) => {
+            panic!("stdout EOF 后延迟的 unknown option -T 必须 Unsupported，不能塌成 Io: {e:?}")
+        }
         Ok(_) => panic!("host 拒绝 -T 必须失败"),
     }
 }

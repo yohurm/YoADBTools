@@ -20,7 +20,9 @@ mod tests {
     fn matches_host_offline_needles() {
         assert!(stderr_is_device_offline("error: device offline"));
         assert!(stderr_is_device_offline("error: device not found"));
-        assert!(stderr_is_device_offline("error: no devices/emulators found"));
+        assert!(stderr_is_device_offline(
+            "error: no devices/emulators found"
+        ));
         assert!(stderr_is_device_offline("error: device 'offline'"));
         assert!(!stderr_is_device_offline("unknown option -T"));
     }

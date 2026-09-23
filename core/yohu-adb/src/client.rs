@@ -22,7 +22,9 @@ use yohu_runtime::{ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
 /// 各 ADB 短命令超时（ms）——单源，避免业务分支散落魔法数。
 const CLEAR_LOG_TIMEOUT_MS: u64 = 10_000;
 const LIST_LS_TIMEOUT_MS: u64 = 15_000;
-const BROWSE_LIST_TIMEOUT_MS: u64 = 20_000;
+/// 浏览列举超时（ms）。`browse_list` oneshot 与浏览会话 `DeviceShell.exec` 同一上限。
+/// 与 `AdbClient::ls` 短命令超时（15s）不是同一产品。
+pub const BROWSE_LIST_TIMEOUT_MS: u64 = 20_000;
 const LIST_PS_TIMEOUT_MS: u64 = 15_000;
 const LIST_PACKAGES_TIMEOUT_MS: u64 = 15_000;
 const READLINK_TIMEOUT_MS: u64 = 10_000;
@@ -158,7 +160,9 @@ impl AdbClient {
         };
         match result {
             Ok(code) => Ok(code),
-            Err(ProcessError::BadExit { stderr, .. }) if offline::stderr_is_device_offline(&stderr) => {
+            Err(ProcessError::BadExit { stderr, .. })
+                if offline::stderr_is_device_offline(&stderr) =>
+            {
                 Err(AdbError::DeviceOffline(stderr.trim().to_string()))
             }
             Err(e) => Err(e.into()),
@@ -208,10 +212,9 @@ impl AdbClient {
         stderr: &str,
     ) -> Result<browse_parse::BrowseListRaw, AdbError> {
         browse_parse::parse_list_output(stdout, exit_code, stderr).map_err(|e| match e {
-            browse_parse::BrowseParseError::LsFailed { exit_code, stderr } => AdbError::BadExit {
-                exit_code,
-                stderr,
-            },
+            browse_parse::BrowseParseError::LsFailed { exit_code, stderr } => {
+                AdbError::BadExit { exit_code, stderr }
+            }
             browse_parse::BrowseParseError::ResolveFailed
             | browse_parse::BrowseParseError::Malformed => AdbError::BadExit {
                 exit_code: exit_code.max(1),
@@ -228,12 +231,7 @@ impl AdbClient {
     ) -> Result<yohu_protocol::ExecOutcome, AdbError> {
         self.run(
             serial,
-            &[
-                "shell".into(),
-                "sh".into(),
-                "-c".into(),
-                script.to_string(),
-            ],
+            &["shell".into(), "sh".into(), "-c".into(), script.to_string()],
             Some(BROWSE_LIST_TIMEOUT_MS),
             cancel,
         )
