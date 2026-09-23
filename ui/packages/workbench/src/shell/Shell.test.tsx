@@ -64,6 +64,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     commandlibLoad: notConfigured,
     commandlibSave: notConfigured,
     filesList: notConfigured,
+    filesSessionAttach: notConfigured,
+    filesSessionDetach: notConfigured,
     filesPush: notConfigured,
     filesPull: notConfigured,
     filesCancel: notConfigured,
