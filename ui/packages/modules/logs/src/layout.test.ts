@@ -231,6 +231,11 @@ describe("日志显示列", () => {
     expect(filter).toContain("YoListPresence");
     expect(filter).toContain('recipe="chip"');
     expect(filter).toContain("YoChip");
+    expect(filter).toContain("onDismiss");
+    expect(filter).not.toContain("DismissMark");
+    expect(filter).not.toContain("yohu-recipe-dismiss");
+    expect(logsCss).not.toContain("yohu-recipe-dismiss");
+    expect(logsCss).not.toContain("yohu-chip__remove");
     expect(filter).toContain("YoTextField");
     expect(filter).toContain("YoSearch");
     expect(filter).not.toMatch(/<(input|select|textarea)\b/);
