@@ -278,7 +278,8 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
         FileError::ProgressClosed
         | FileError::EmptyTree(_)
         | FileError::TreeLimit(_)
-        | FileError::TreeDepth(_) => None,
+        | FileError::TreeDepth(_)
+        | FileError::NotAttached => None,
         FileError::Adb(AdbError::Cancelled) => None,
         FileError::Adb(AdbError::DeviceOffline(serial) | AdbError::NotOnline(serial)) => {
             Some(TransferFault::DeviceOffline {
@@ -286,7 +287,9 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
             })
         }
         FileError::Adb(AdbError::Timeout) => Some(TransferFault::Timeout),
-        FileError::Adb(AdbError::Io(_)) => Some(TransferFault::Io),
+        FileError::Adb(AdbError::Io(_)) | FileError::Adb(AdbError::UnsupportedShell) => {
+            Some(TransferFault::Io)
+        }
         FileError::Adb(AdbError::ToolUnavailable(_)) => Some(TransferFault::ToolUnavailable),
         FileError::Adb(AdbError::BadExit { .. }) => None,
     }
@@ -674,6 +677,7 @@ mod tests {
         );
         assert_eq!(wire_fault(&FileError::ProgressClosed), None);
         assert_eq!(wire_fault(&FileError::EmptyTree("/sdcard".into())), None);
+        assert_eq!(wire_fault(&FileError::NotAttached), None);
         assert!(!matches!(
             FileError::ProgressJoin,
             FileError::Adb(AdbError::Io(_))

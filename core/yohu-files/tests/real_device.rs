@@ -44,8 +44,17 @@ async fn real_browse_and_transfer_roundtrip() {
 
     // 1) 浏览 /sdcard
     let browser = FileBrowser::new(client.clone());
+    let attached = browser
+        .attach(&serial, CancellationToken::new())
+        .await
+        .expect("浏览会话");
     let entries = browser
-        .list(&serial, "/sdcard", CancellationToken::new())
+        .list(
+            &serial,
+            "/sdcard",
+            attached.generation,
+            CancellationToken::new(),
+        )
         .await
         .expect("浏览失败");
     assert!(!entries.is_empty());
@@ -140,7 +149,12 @@ async fn real_browse_and_transfer_roundtrip() {
         .await
         .expect("mkdir 失败");
     let entries_after = browser
-        .list(&serial, "/sdcard", CancellationToken::new())
+        .list(
+            &serial,
+            "/sdcard",
+            attached.generation,
+            CancellationToken::new(),
+        )
         .await
         .unwrap();
     assert!(
@@ -203,8 +217,17 @@ async fn real_transfer_cancel_midflight() {
     };
     // 找一个设备上的大文件（≥10MB）作为拉取源；没有则跳过
     let browser = FileBrowser::new(client.clone());
+    let attached = browser
+        .attach(&serial, CancellationToken::new())
+        .await
+        .expect("浏览会话");
     let entries = browser
-        .list(&serial, "/storage/emulated/0/", CancellationToken::new())
+        .list(
+            &serial,
+            "/storage/emulated/0/",
+            attached.generation,
+            CancellationToken::new(),
+        )
         .await
         .unwrap();
     let Some(big) = entries

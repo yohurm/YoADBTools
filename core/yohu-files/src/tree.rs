@@ -79,7 +79,8 @@ impl FileBrowser {
         let parent =
             parent_remote(path.as_str()).ok_or_else(|| FileError::Path(path.as_str().into()))?;
         let name = last_segment(path.as_str());
-        let entries = self.list(serial, parent, cancel).await?;
+        let generation = self.slot_generation(serial).ok_or(FileError::NotAttached)?;
+        let entries = self.list(serial, parent, generation, cancel).await?;
         let entry = entries
             .iter()
             .find(|e| e.name == name)
@@ -120,7 +121,10 @@ impl FileBrowser {
             if !is_dir {
                 return Ok(());
             }
-            let children = self.list(serial, remote.as_str(), cancel.clone()).await?;
+            let generation = self.slot_generation(serial).ok_or(FileError::NotAttached)?;
+            let children = self
+                .list(serial, remote.as_str(), generation, cancel.clone())
+                .await?;
             for child in children {
                 if cancel.is_cancelled() {
                     return Err(FileError::Adb(yohu_adb::AdbError::Cancelled));

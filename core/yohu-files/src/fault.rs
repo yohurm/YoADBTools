@@ -12,6 +12,8 @@ pub enum FileError {
     Path(String),
     #[error("路径不在安全根内: {0}")]
     OutsideRoot(String),
+    #[error("浏览会话未打开")]
+    NotAttached,
     #[error("远端不存在: {0}")]
     RemoteNotFound(String),
     #[error("不是目录: {0}")]
@@ -91,6 +93,7 @@ pub(crate) fn file_error_from_adb(path: &str, err: AdbError) -> FileError {
         | AdbError::NotOnline(_)
         | AdbError::Timeout
         | AdbError::Io(_)
+        | AdbError::UnsupportedShell
         | AdbError::ToolUnavailable(_) => FileError::Adb(err),
     }
 }
@@ -214,6 +217,7 @@ mod tests {
 
     #[test]
     fn display_is_class_and_path() {
+        assert_eq!(FileError::NotAttached.to_string(), "浏览会话未打开");
         assert_eq!(
             FileError::OutsideRoot("/data/x".into()).to_string(),
             "路径不在安全根内: /data/x"
