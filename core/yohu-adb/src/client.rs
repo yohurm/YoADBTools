@@ -9,10 +9,11 @@ use std::time::Duration;
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 
+use crate::device_shell::{DeviceShell, DeviceShellError};
 use crate::error::AdbError;
 use crate::parse::{
-    ls as ls_parse, packages as packages_parse, ps as ps_parse, readlink as readlink_parse,
-    status as status_parse, uimode as uimode_parse,
+    browse as browse_parse, ls as ls_parse, offline, packages as packages_parse, ps as ps_parse,
+    readlink as readlink_parse, status as status_parse, uimode as uimode_parse,
 };
 use crate::tool::ToolResolver;
 use yohu_protocol::{ExecOutcome, ProcessEntry, RemoteEntry};
@@ -21,6 +22,7 @@ use yohu_runtime::{ChildHandle, ProcessError, ProcessOutput, ProcessRunner};
 /// 各 ADB 短命令超时（ms）——单源，避免业务分支散落魔法数。
 const CLEAR_LOG_TIMEOUT_MS: u64 = 10_000;
 const LIST_LS_TIMEOUT_MS: u64 = 15_000;
+const BROWSE_LIST_TIMEOUT_MS: u64 = 20_000;
 const LIST_PS_TIMEOUT_MS: u64 = 15_000;
 const LIST_PACKAGES_TIMEOUT_MS: u64 = 15_000;
 const READLINK_TIMEOUT_MS: u64 = 10_000;
@@ -57,6 +59,15 @@ impl AdbClient {
     /// 更新用户自定义 adb 路径（设置立即生效）。
     pub fn set_user_path(&self, path: Option<std::path::PathBuf>) {
         self.tool.set_user_path(path);
+    }
+
+    /// 开一条 `adb shell -T`（不占短命令信号量）。浏览会话寿命在 `yohu-files`。
+    pub async fn open_device_shell(
+        &self,
+        serial: &str,
+        cancel: CancellationToken,
+    ) -> Result<DeviceShell, DeviceShellError> {
+        DeviceShell::open(&self.tool, &self.runner, serial, cancel).await
     }
 
     fn resolve_adb(&self) -> Result<std::path::PathBuf, AdbError> {
@@ -147,7 +158,7 @@ impl AdbClient {
         };
         match result {
             Ok(code) => Ok(code),
-            Err(ProcessError::BadExit { stderr, .. }) if is_device_offline(&stderr) => {
+            Err(ProcessError::BadExit { stderr, .. }) if offline::stderr_is_device_offline(&stderr) => {
                 Err(AdbError::DeviceOffline(stderr.trim().to_string()))
             }
             Err(e) => Err(e.into()),
@@ -173,7 +184,63 @@ impl AdbClient {
         Ok(())
     }
 
-    /// 浏览设备目录。
+    /// 安全浏览脚本：一次 `sh -c`（oneshot）。长驻工人走 [`Self::open_device_shell`]。
+    ///
+    /// SafetyRoot 复核与 remainder 拼接在 `yohu-files`；本层只运输与切分 stdout。
+    pub async fn browse_list(
+        &self,
+        serial: &str,
+        path: &str,
+        cancel: CancellationToken,
+    ) -> Result<browse_parse::BrowseListRaw, AdbError> {
+        let script = Self::browse_list_script(path);
+        let out = self.browse_oneshot(serial, &script, cancel).await?;
+        Self::parse_browse_list(&out.stdout, out.exit_code, &out.stderr)
+    }
+
+    pub fn browse_list_script(path: &str) -> String {
+        browse_parse::build_list_script(&crate::shell_quote(path))
+    }
+
+    pub fn parse_browse_list(
+        stdout: &str,
+        exit_code: i32,
+        stderr: &str,
+    ) -> Result<browse_parse::BrowseListRaw, AdbError> {
+        browse_parse::parse_list_output(stdout, exit_code, stderr).map_err(|e| match e {
+            browse_parse::BrowseParseError::LsFailed { exit_code, stderr } => AdbError::BadExit {
+                exit_code,
+                stderr,
+            },
+            browse_parse::BrowseParseError::ResolveFailed
+            | browse_parse::BrowseParseError::Malformed => AdbError::BadExit {
+                exit_code: exit_code.max(1),
+                stderr: String::new(),
+            },
+        })
+    }
+
+    async fn browse_oneshot(
+        &self,
+        serial: &str,
+        script: &str,
+        cancel: CancellationToken,
+    ) -> Result<yohu_protocol::ExecOutcome, AdbError> {
+        self.run(
+            serial,
+            &[
+                "shell".into(),
+                "sh".into(),
+                "-c".into(),
+                script.to_string(),
+            ],
+            Some(BROWSE_LIST_TIMEOUT_MS),
+            cancel,
+        )
+        .await
+    }
+
+    /// 浏览设备目录（仅 `ls -lla`；守卫路径请用 [`Self::browse_list`]）。
     pub async fn ls(
         &self,
         serial: &str,
@@ -417,7 +484,7 @@ impl AdbClient {
 }
 
 fn outcome_or_offline(out: ProcessOutput) -> Result<ExecOutcome, AdbError> {
-    if out.exit_code != 0 && is_device_offline(&out.stderr) {
+    if out.exit_code != 0 && offline::stderr_is_device_offline(&out.stderr) {
         return Err(AdbError::DeviceOffline(out.stderr.trim().to_string()));
     }
     Ok(ExecOutcome {
@@ -425,19 +492,6 @@ fn outcome_or_offline(out: ProcessOutput) -> Result<ExecOutcome, AdbError> {
         stdout: out.stdout,
         stderr: out.stderr,
     })
-}
-
-/// adb 掉线/无设备特征（stderr 判定）。
-fn is_device_offline(stderr: &str) -> bool {
-    let lower = stderr.to_lowercase();
-    [
-        "device offline",
-        "device not found",
-        "no devices/emulators found",
-        "device 'offline'",
-    ]
-    .iter()
-    .any(|k| lower.contains(k))
 }
 
 /// 实现 domain 执行端口（依赖倒置：适配层映射错误类型）。

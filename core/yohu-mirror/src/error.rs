@@ -31,7 +31,9 @@ impl MirrorError {
             Self::Adb(AdbError::BadExit { exit_code, .. }) => {
                 format!("投屏设备命令失败(退出码 {exit_code})")
             }
-            Self::Adb(AdbError::Io(_)) => "投屏设备通道失败".to_string(),
+            Self::Adb(AdbError::Io(_)) | Self::Adb(AdbError::UnsupportedShell) => {
+                "投屏设备通道失败".to_string()
+            }
             other => other.to_string(),
         }
     }
