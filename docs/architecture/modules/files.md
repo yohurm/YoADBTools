@@ -33,10 +33,10 @@ path-guard 只做前缀 startsWith，放过 /sdcard/../data
 
 ```text
 AddressSlot Enter → listingStore.goTo(原文)
-  → path-resolve（唯一）→ invoke files.list(generation)
+  → path-resolve（唯一）  → invoke files.list(serial, path, generation)
   → commands/files require_online + 转发
-  → browse_runs::list（替换取消槽，后一次取消前一次）
-  → FileBrowser.list（无槽/Closed→NotAttached；世代不符→Cancelled；Starting 同世代等待；Live 同世代才 list；永不 attach；SafetyRoot + DeviceShell.exec 内 readlink 祖先 walk + ls -lla；ADR-v6-033）
+  → browse_runs::list
+  → FileBrowser.list。files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。SafetyRoot + DeviceShell.exec 内 readlink 祖先 walk + ls -lla；ADR-v6-033
   → FileError Display（分类 + 路径）
   → ipc_file：
         RemoteNotFound → not_found
@@ -91,7 +91,7 @@ AddressSlot Enter
                   保留 // . .. ；无 collapseDotSegments
        path-guard：向量在 `@yohu/api` `safety.test` ↔ testdata/safety_root.json
        失败：notifyError，不改 path，不关输入
-       成功：loadListing → ++listGen → files.list(generation) → ListingEntry
+       成功：loadListing → ++listGen → files.list(serial, path, generation) → ListingEntry
 面包屑 / 上级
   → listingStore.navigate / goUp（夹紧绝对段，不经 resolve）
 ```
@@ -115,11 +115,12 @@ store.ts 一份 createFileStore
 ```text
 listing.ts
   路径是会话身份；serial+path 快照缓存（对照 ddmlib FileListingService / VS Code _isDirectoryResolved）
-  bindSerial / attachView → files.session.attach → 持有 BrowseAttach.generation → files.list(generation)
-  过期 attach 成功：detach(返回的 generation)（core 过期空操作，不得杀掉更新 Live）；不 list
-  过期 detach 空操作（不得杀掉更新 Live）
+  bindSerial / attachView → files.session.attach → BrowseAttach { serial, generation, adopted } → 持有 BrowseAttach.generation → files.list(serial, path, generation)
+  attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。
+  过期 attach 成功：detach(返回的 generation)；不 list
+  files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。
   detachView / bindSerial(null) → files.session.detach(所持 generation)
-  navigate / enter / goUp：立刻切 path，命中快照即画行，files.list(generation) 只对账
+  navigate / enter / goUp：立刻切 path，命中快照即画行，files.list(serial, path, generation) 只对账
   goTo：成功才切 path（手输未知路径）
   listingPaint：rows | empty | cold | pending；YoLoading 只 cold
   listGen / requestListing / 挂载期 fault
@@ -189,7 +190,7 @@ files.dragOut
 files.dragOut
   → commands/files require_online
   → dnd.drag_out
-    → FileBrowser.list_tree
+    → files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。
       → normalize_mut + resolve_and_recheck
       → push_tree → tree_bounds
         条数 >= 4096 → FileError::TreeLimit(4096)
@@ -226,7 +227,7 @@ DELETE_TIMEOUT_MS / MUTATE_TIMEOUT_MS 写在 guard.rs
 ```text
 ls:
   FileBrowser.list
-    → 须同世代 Live（无槽/Closed → NotAttached；世代不符 → Cancelled；Starting 同世代等待；永不偷偷 open）
+    → files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。
     → normalize_browse + DeviceShell.exec / oneshot（一次运输 = realpath 复核 + ls）
       禁止拆成两次 adb 短命令；禁止因「进过父目录」而跳过 readlink（目录可被换成符号链接逃出安全根）
       UI 快照只加速绘制，不代替 core 复核
@@ -275,20 +276,19 @@ UI dirCache 命中只加速绘制；files.list 仍走上面整条
 
 ```text
 FileView 挂载且有 serial（对标 Device Explorer）
-  → files.session.attach → BrowseAttach { generation, adopted }
-  → UI 持有 generation（attach Ok = 该世代在槽位提交时已发布 Live，不保证稍后观察时仍 Live）
-  → FileBrowser.attach：Empty→Starting(g)→Live（DeviceShell 握手；握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot；已 Live 则 adopt）
+  → files.session.attach → BrowseAttach { serial, generation, adopted }
+  → attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。
+  → UI 持有 generation
+  → FileBrowser.attach：Empty→Starting(g)→Live（DeviceShell 握手；握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot。已 Live 则 adopt）
   → 过期 attach 不得把更新一代写成 Live
-files.list(serial, path, generation)
-  → browse_runs（后一次取消前一次）
-  → 无槽 / Closed → NotAttached；世代不符 → Cancelled
-  → Starting 同世代等待；Live 同世代才 list；永不 attach
+files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。
+  → browse_runs
   → SafetyRoot 词典 + 复核（不变）
   → Live+工人：同一条 stdin exec 一趟（子 shell + BEGIN/END nonce）
   → Live+oneshot：sh -c 短命令
   → 取消 / 超时 / 断管 → 杀工人，槽位仍 Live，下一趟再 open
-离开模块 / bindSerial(null) → files.session.detach(所持 generation) → browse_runs::release（世代不符空操作：不关槽、不 replace 取消在途 list；命中才关槽并取消在途 list）；过期 detach 空操作
-掉线 went_offline（壳目录，非 IPC）→ browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后
+离开模块 / bindSerial(null) → files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。
+went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。
 改 adb.path → drop_workers、槽位仍 Live、世代不变；下一趟 list 再握手
 UI dirCache 对标 FileEntry 绘制快照；每次仍 readlink + ls
 ```
