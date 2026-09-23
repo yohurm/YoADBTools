@@ -247,6 +247,12 @@ export interface TransferProgress {
   name?: string;
 }
 
+export interface BrowseAttach {
+  serial: string;
+  generation: number;
+  adopted: boolean;
+}
+
 export type EntryKind = "dir" | "file" | "symlink" | "other";
 
 export interface RemoteEntry {

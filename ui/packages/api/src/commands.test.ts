@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import * as commands from "./commands";
 import { deviceSetNightMode, deviceStatus, mirrorLayout, mirrorPointer, mirrorPresentSetActive, mirrorScreenshot, mirrorStart } from "./commands";
@@ -38,5 +40,20 @@ describe("log snapshots", () => {
     expect(typeof commands.logPackageSnapshot).toBe("function");
     expect(commands.logProcessSnapshot.length).toBe(1);
     expect(commands.logPackageSnapshot.length).toBe(1);
+  });
+});
+
+describe("files session commands", () => {
+  it("导出 attach / detach 并锁定点分命令名", () => {
+    expect(typeof commands.filesSessionAttach).toBe("function");
+    expect(typeof commands.filesSessionDetach).toBe("function");
+    expect(typeof commands.filesList).toBe("function");
+    expect(commands.filesSessionAttach.length).toBe(1);
+    expect(commands.filesSessionDetach.length).toBe(2);
+    expect(commands.filesList.length).toBe(3);
+    const src = readFileSync(resolve("packages/api/src/commands.ts"), "utf8");
+    expect(src).toContain('invoke<BrowseAttach>("files.session.attach", { serial })');
+    expect(src).toContain('invoke<void>("files.session.detach", { serial, generation })');
+    expect(src).toContain('invoke<RemoteEntry[]>("files.list", { serial, path, generation })');
   });
 });
