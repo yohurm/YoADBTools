@@ -17,7 +17,7 @@
 
 Yohu ADB Tools（产品名 `YohuAdbTools`）把设备扫描、命令终端、文件管理、日志分析和投屏显示收进同一个工作台。核心用 Rust，窗口与 IPC 走 Tauri 2，界面是 TypeScript + SolidJS 与自研组件库 YoUI。
 
-当前版本 **0.1.1**。交付 **Windows 10/11 x64** 与 **macOS 12+**。Linux 不交付。
+当前版本 **0.1.2**。交付 **Windows 10/11 x64** 与 **macOS 12+**。Linux 不交付。
 
 ## 功能
 
