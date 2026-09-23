@@ -1,9 +1,23 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.103（2026-09-21，reduced-motion 点名收口 / 组件级过渡零遗漏）
+> **状态：** v3.110（2026-09-23，强调条组件几何 + 展开/收回曲线）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v3.110 变更（强调条组件）：** 条从 ListItem 拆到 `list/Mark`（L2 `list-item-mark-model`）。井宽 4vp、块向内缩行圆角 8vp 落在直边上（起边直角、内侧胶囊）；填充另层 `scaleY`，展开 `spatialStretch` 软弹簧、收回 `effectsExit` 加速。井 `overflow: hidden` 裁过冲，几何不随 scale 压扁。不再用 3vp 描边当条宽。见 [youi.md](youi.md)、[动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.109 变更（强调条跟行适配）：** 当时条宽跟 `--yohu-stroke-emphasis`、块向内缩同一宽度。v3.110 改 4vp / 圆角缩进。见 [youi.md](youi.md)。
+>
+> **v3.108 变更（选中分通道非线性）：** 软底选中绽开 `spatialSmall` 弹簧（悬停仍 `effectsFast`）；字色/字重 `spatialTick` 标准曲线；强调条胶囊 `scaleY` 弹簧回弹；导航图标 DOWN 用 `spatialLocal` 强调曲线。色通道不用弹簧，避免过冲脏色。禁止整项 scale、禁止滑块换行。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
+>
+> **v3.107 变更（侧栏选中去掉微软条）：** 当时按鸿蒙/Mac 去掉起边条。v3.108 起条回到项内胶囊，动效走弹簧而非 WinUI 几何权威。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
+>
+> **v3.106 变更（侧栏选中通道对齐开源）：** 当时按 WinUI 3×16 + Fluent 项内条收口。v3.107 起该几何不再作为侧栏依据。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
+>
+> **v3.105 变更（选中分部件过渡 + 强调条胶囊）：** 当时给字色/字重/图标加了 transition 与 `scaleY`。v3.106 按开源通道撤回无出处形变。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
+>
+> **v3.104 变更（列表选中就地弹出）：** 导航 / 设备栏 / 树 / 下拉选项不再用 `YoIndicator` fill 滑块上下移动。短列表挂配方 `selected`：项上 `::before` 软底就地 scale+opacity（选中 `spatialSmall` 弹簧，悬停 `effectsFast`）；`YoListItem` 另起边强调条。虚拟列表行仍自绘底、行级禁动。`YoIndicator` 只保留 Tabs 下划线与分段 thumb。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
 >
 > **v3.103 变更（reduced-motion 点名收口）：** 逐文件核对组件级 transition/animation 与降级名单，`motion/reduced.css` 补齐 Select 箭头旋转、AddressField 揭示 clip、Tabs 关闭/新建、TextField 清除/步进、Search 清除、ColResizer 柄八处漏点；删除 ColResizer.css 私有 `@media (prefers-reduced-motion)` 块（继 IconButton 后第二例双轨，组件内禁止再写降级媒体查询，统一点名只在 `motion/reduced.css`）。
 >
@@ -528,7 +542,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 
 效率型工作台：内容区从窗口标题栏下方**贴边**排布（`.yohu-layout__content` padding 0）；模块页眉与分区的内边距由 `YoPage` 承担。效率型 `role=module` 用 `page-inset` / `page-gap`；设置页 `role=settings` 左右 `page-margin` 40vp，列帽 `settings-max` 居中。
 
-描边宽：`--yohu-stroke-hairline: 1px`、`--yohu-stroke-accent: 2px`（焦点/左边条/Tab 指示）、`--yohu-stroke-emphasis: 3px`（级别条/结果卡强调）。
+描边宽：`--yohu-stroke-hairline: 1px`、`--yohu-stroke-accent: 2px`（焦点/Tab 下划线）、`--yohu-stroke-emphasis: 3px`（级别条/结果卡强调）。`YoListItem` 强调条（`list/Mark`）：贴起边井宽 4vp、块向内缩行圆角 8vp 落在直边上，起边直角、内侧胶囊；填充 `scaleY(0↔1)` 展开 `spatialStretch`、收回 `effectsExit`。禁止滑块换行、禁止写死条高。
 
 ### 2.4 动效
 
@@ -574,7 +588,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | `--yohu-state-hover` | `interactive_hover`：中性 5%（浅黑/深白） | 悬浮 / 键盘活动 |
 | `--yohu-state-pressed` | `interactive_pressed`：中性 10% | 按压 |
 | `--yohu-state-selected` | `interactive_select` = `var(--yohu-accent-soft)` | 选中软底（侧栏/树/命令/列表同一源） |
-| `--yohu-state-selected-fg` | `font_primary` = `var(--yohu-fg)` | 选中行文字/图标；次行保持 `fg-2`/`fg-3` |
+| `--yohu-state-selected-fg` | `font_primary` = `var(--yohu-fg)` | 选中行文字/图标（鸿蒙瞬时，禁止插值）。短列表未选走 `fg-2`。禁止表面另写 accent 字。次行未选 `fg-3`、选中抬到 `fg-2` |
 | `--yohu-accent-soft` | `comp_emphasize_secondary`（品牌 20%） | 选中底 / 徽章 / 芯片；禁止当文档选字 |
 | `--yohu-text-sel` | `background_emphasize` = 品牌实底 | 输入框 / 表单选字底 |
 | `--yohu-text-sel-fg` | `font_on_primary` | 输入选字反白 |
@@ -587,7 +601,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | `--yohu-ripple-radius` | `var(--yohu-radius-sm)` | 选中片圆角 |
 | `--yohu-ripple-inset` | `0` | 铺满行盒；距背板 = 容器 padding |
 
-**载体**：`tokens/states.css` 的 `.yohu-interactive`。选中只用 `.yohu-interactive--selected`（**不要**用 `[aria-selected]` 上填充：`YoTabs` 的 `aria-selected` 表示下划线激活，不是选中填充）。键盘活动用 `.yohu-interactive--active`。禁止 Tree/Select/命令管理/壳再写选中字色。短列表单选软底由 `YoIndicator` 在项之间滑动。`YoVirtualList` listbox 行关掉 `isolation` / `::before`，多选底画在行上；单选 fill 仍由滑块画片。禁止虚拟列表再给每行开合成层。选中悬停/按压在软底上叠 `--yohu-state-hover` / `--yohu-state-pressed`，禁止改走 `--yohu-accent-hover`。
+**载体**：`tokens/states.css` 的 `.yohu-interactive`。选中只用 `.yohu-interactive--selected`（**不要**用 `[aria-selected]` 上填充：`YoTabs` 的 `aria-selected` 表示下划线激活，不是选中填充）。键盘活动用 `.yohu-interactive--active`。禁止 Tree/Select/命令管理/壳再写选中字色。短列表单选软底走配方 `selected`（项内：软底弹簧绽开；强调条填充贴边 `scaleY` 展开 `spatialStretch`、收回 `effectsExit`；字色/字重 `spatialTick`；导航图标换项 DOWN。禁止 fill 滑块换行，禁止整项 scale）。`YoVirtualList` listbox 行关掉 `isolation` / `::before`，选中底画在行上；行级禁动。禁止虚拟列表再给每行开合成层。选中悬停/按压在软底上叠 `--yohu-state-hover` / `--yohu-state-pressed`，禁止改走 `--yohu-accent-hover`。
 
 - 实心底控件不走列表 ripple。`YoButton` 只认 `data-style` × `data-tone`：EMPHASIZED 用 `accent`/`error` 实底 + `fg-on`，hover/pressed 走对应 `*-hover/pressed`；NORMAL 用 `--yohu-comp-gray`，hover 叠在灰底上，禁止换成 `state-hover`。`YoCheckbox` 选中走 `--yohu-accent-hover/pressed`。`YoSegmentedButton` 选中 hover/pressed 叠 `--yohu-state-*`，不换 accent-hover 实底。
 - **YoButton 三档：** 公开 `buttonStyle` 对照鸿蒙 EMPHASIZED / NORMAL / TEXTUAL。`tone` 只有 `accent | neutral | danger`（danger = ButtonRole.ERROR）。页眉主操作默认无 props。次要操作 `normal+neutral`。弹出框脚钮：取消 `normal+accent`、破坏 `normal+danger`，建设确认默认强调。禁止脚钮再走 TEXTUAL。禁止再写 `variant` / `outlined` / `data-paint` / Button `success|warning`。禁用背板不变、字 `--yohu-fg-3`。
@@ -596,7 +610,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag / 已知级别消息，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
-- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。`YoVirtualList` `tone=list`（文件清单 / 命令管理中栏）行盒走 `list-row/`：直角通栏，hairline 贴齐左右。`tone=document` 单选（命令管理组栏）选中走 fill 滑块，行上悬浮写 `data-radius=chip`，与滑块同一 `--yohu-ripple-radius`。禁止在 Family B 行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
+- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。`YoVirtualList` `tone=list`（文件清单 / 命令管理中栏）行盒走 `list-row/`：直角通栏，hairline 贴齐左右。`tone=document` 单选（命令管理组栏）选中走行自绘 chip（`--yohu-ripple-radius`），行上悬浮写 `data-radius=chip`。禁止在 Family B 行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
 
 **焦点环（单源）**
 
@@ -620,8 +634,8 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 └────────────────────────────────────────┘       └──────────────────────────┘
 ```
 
-- **设备栏**：标题行 = 折叠钮（`YoRailSlot`）+ `YoSubheader`「设备」`meta` 数量徽章 + 刷新（标题行兄弟，`YoIconButton loading`）。禁止把徽章放进 `actions`。开流 `data-stream=open` 时 heading 槽吃剩余宽，刷新贴行尾；图标轨 heading 关流，刷新与导航图标同槽起边。设备行走 `YoListItem`（型号 / serial / 可选运行时次行 + `YoStatusDot` + 未授权 `YoBadge`）。图标轨只留与导航同槽的状态点 + 刷新，文案走 `YoTooltip`；无设备时栏 hug（`data-empty`，折叠走默认 `collapse`，空态 `YoEmptyState size=sm` 短引导；有错误才出明细和重试），不占满 `--yohu-layout-device-rail-max`；有列表才 `recipe=fill` 在帽下纵滚。选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）。单选实底由 `YoIndicator` fill 在 list 宿主内滑动，宿主 `overflow: hidden` 裁切弹簧过冲；项滚动走公开 `YoScroller`。禁止把 `overflow: auto` 写在滑块宿主或模块 CSS。禁止壳点 Subheader / Scroller 内部 class。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
-- **导航**：行走 `YoListItem`（`role=button` + `Layout.IconSm` + 标题）；分组 `YoSubheader`；系统区 `YoDivider`。激活只加 `.yohu-interactive--selected`；Planned 项「开发中」走 `YoBadge`。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏是常驻双态轨（标题栏 `sidebar` 钮）：意图只走 `RailIntent`（页栅 / 轨 `data-rail`），禁止 `RailPresentation`。`data-stream` 是文案流（展开/展开行程开流，收起当拍关流）；`YoListItem` 轨内自写 `data-stream`，`rail.css` 不点 list-item。宽、槽、卡高、字同一拍软弹簧，禁止先水平再垂直。图标轨只留模块图标与设备状态点（与导航图标同槽）；悬停走 `YoTooltip`，禁止原生 `title`。禁止整栏收到 0 或 `inert`。设备栏高度帽 `--yohu-layout-device-rail-max`（`LayoutLimits.DeviceRailMaxPercent`）。模块名单纵滚走 `YoScroller`（视口 `flex: 1 1 auto`，禁止 `1 1 0`）。
+- **设备栏**：标题行 = 折叠钮（`YoRailSlot`）+ `YoSubheader`「设备」`meta` 数量徽章 + 刷新（标题行兄弟，`YoIconButton loading`）。禁止把徽章放进 `actions`。开流 `data-stream=open` 时 heading 槽吃剩余宽，刷新贴行尾；图标轨 heading 关流，刷新与导航图标同槽起边。设备行走 `YoListItem`（型号 / serial / 可选运行时次行 + `YoStatusDot` + 未授权 `YoBadge`）。图标轨只留与导航同槽的状态点 + 刷新，文案走 `YoTooltip`；无设备时栏 hug（`data-empty`，折叠走默认 `collapse`，空态 `YoEmptyState size=sm` 短引导；有错误才出明细和重试），不占满 `--yohu-layout-device-rail-max`；有列表才 `recipe=fill` 在帽下纵滚。选中只加 `.yohu-interactive--selected`（高亮 = 当前模块解析后的执行目标）；铬走配方 `selected`（项内软底绽开 + 强调条展开/收回），禁止 `YoIndicator` fill 上下滑动。项滚动走公开 `YoScroller`。禁止把 `overflow: auto` 写在 list 宿主或模块 CSS。禁止壳点 Subheader / Scroller 内部 class。MultiOptional（终端）：单击替换勾选，Ctrl/Meta+click 加减选；未勾选回退全局焦点，不把全部在线设备当作已选。运行时字段只读壳 `deviceStore.statuses`，禁止栏内轮询。
+- **导航**：行走 `YoListItem`（`role=button` + `Layout.IconSm` + 标题）；分组 `YoSubheader`；系统区 `YoDivider`。激活只加 `.yohu-interactive--selected`，铬走配方 `selected`；Planned 项「开发中」走 `YoBadge`。图标节点每次渲染新建。设备栏与导航共用 `--yohu-layout-rail-inset`。侧栏是常驻双态轨（标题栏 `sidebar` 钮）：意图只走 `RailIntent`（页栅 / 轨 `data-rail`），禁止 `RailPresentation`。`data-stream` 是文案流（展开/展开行程开流，收起当拍关流）；`YoListItem` 轨内自写 `data-stream`，`rail.css` 不点 list-item。宽、槽、卡高、字同一拍软弹簧，禁止先水平再垂直。图标轨只留模块图标与设备状态点（与导航图标同槽）；悬停走 `YoTooltip`，禁止原生 `title`。禁止整栏收到 0 或 `inert`。设备栏高度帽 `--yohu-layout-device-rail-max`（`LayoutLimits.DeviceRailMaxPercent`）。模块名单纵滚走 `YoScroller`（视口 `flex: 1 1 auto`，禁止 `1 1 0`）。
 - **模块页眉**：在右侧内容区顶部（`YoChrome`）。左侧为功能标题区（Subtitle Bold）+ 选中设备名（`leading` 组合中性 `YoBadge`，文案来自 `DeviceSession.selectedLabel`），右侧为功能栏 `actions[{key,node}]`；与窗口标题栏分离，不挤进中区。leading / 功能栏进出走库 Presence chip。无操作的模块（设置）栏宿主空挂、不画钮，可见只是标题；标题行高度仍是 `--yohu-control-height`（与有按钮的页同一占位）。底垫 `--yohu-layout-chrome-pad`。页眉是页壳的第一子节点（`flex: 0 0 auto`），禁止与内容区作为 fragment 兄弟交给模块转场。禁止模块自挂 Presence 补页眉。
 - **模块页壳**：效率型与占位模块（终端/文件/日志/投屏）根节点 `YoPage`（缺省 `role=module`：`padding: page-inset`、`gap: page-gap`）。设置页同一组件 `role=settings`（左右 `page-margin`，列帽 `settings-max` 居中）。`YoChrome` 是第一子节点。内容进 `YoPanel`（效率型 `variant=pane` 撑满；设置分组默认 card）。禁止模块再写一套页垫。空态文案不得复写页眉模块名。
 - **通铺与分区**：窗口 `--yohu-canvas` 通铺；标题栏与工作区、状态栏不拉结构分割线。侧栏（展开与图标轨）与内容区之间画 hairline。模块分区 = `YoPanel`（surface + `YoCorner role=card` + 描边 + XS 阴影）。分割线还用于：页签指示、表头/列、数据行（`tone=list`）。对话框三区、设置行、日志级别槽不画分割线。路径栏与清单靠 canvas 分层，不另拉线。

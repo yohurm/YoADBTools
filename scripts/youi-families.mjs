@@ -131,6 +131,8 @@ export const FAMILY_STEMS = {
     "ListItem",
     "list-item-model",
     "list-item-policy",
+    "list-item-mark-model",
+    "Mark",
     "Subheader",
     "subheader-model",
     "Tree",

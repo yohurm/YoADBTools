@@ -78,15 +78,15 @@ PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 2
 
 ## 清单行盒（`list-row/`，L2–L4）
 
-独立模块。Family B（`tone=list`）数据网格行只负责格子：直角通栏 hairline + 底。`tone=document` 可选单选的悬浮/按压片与 `YoIndicator` fill 同一 `--yohu-ripple-radius`。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
+独立模块。Family B（`tone=list`）数据网格行只负责格子：直角通栏 hairline + 底。`tone=document` 可选单选的悬浮/按压/选中片同一 `--yohu-ripple-radius`。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
-| L2 | `list-row-model.ts` | `resolveListRowChrome`（fill / radius none\|chip）/`resolveListRowRadius` / `isListRowHot` / `listRowOwnsFill` | 不碰 DOM、不画框 |
+| L2 | `list-row-model.ts` | `resolveListRowChrome`（fill / radius none\|chip）/`resolveListRowRadius` / `isListRowHot` | 不碰 DOM、不画框 |
 | L3 | `list-row-policy.ts` | `listRowHostAttrs`（`data-tone` / `data-fill` / `data-selectable` / `data-radius`） | 不写 `data-ring` |
-| L4 | `ListRow.tsx` + `ListRow.css` | list 直角通栏；document 可选单选 `data-radius=chip` 跟滑块同一 ripple-radius | 不挂 focus-ring、不画投放框 |
+| L4 | `ListRow.tsx` + `ListRow.css` | list 直角通栏；document 可选单选 `data-radius=chip` | 不挂 focus-ring、不画投放框 |
 
-`tone=list` 行自绘选中底（radius=none）。`tone=document` 单选底交给 `YoIndicator` fill；行上悬浮必须同一 chip 半径，禁止方底配圆滑块。document 多选块（`selectedKeys.size>1`）行自绘底，仍直角。热态只改底（`fill=hot`）。L5 不导出 `YoListRow`。
+`tone=list` 行自绘选中底（radius=none）。`tone=document` 单选底也由行自绘（chip 半径）；行上悬浮必须同一 chip 半径，禁止方底配圆片。document 多选块（`selectedKeys.size>1`）仍直角。热态只改底（`fill=hot`）。L5 不导出 `YoListRow`。禁止挂 `YoIndicator` fill。
 
 禁止：模块 `.yohu-files__row--drop`、Family B 行盒叠圆角、在行盒上画投放环。
 
@@ -336,7 +336,17 @@ title / description / note / children / layout / pad
 
 ## 组件：YoListItem（L0–L5）
 
-对照 HarmonyOS ListItem 效率型。选中走 `.yohu-interactive`。`role=option`（listbox 行）或 `button`（导航）。`size=nav | device`。公开 API：`role` / `size` / `ring` / `selected` / `current` / `leading` / `title` / `description` / `meta` / `trailing`。轨内自写 `data-stream`，`rail.css` 不点 list-item。禁止模块再自挂导航/设备行皮。
+对照 HarmonyOS ListItem 效率型。选中走 `.yohu-interactive` + 配方 `selected`（软底 `spatialSmall` 绽开；字色/字重 `spatialTick`；强调条 `list/Mark` 贴起边；导航图标换项 Bounce DOWN）。禁止写死条高。禁止壳再挂 `YoIndicator` fill。禁止整项 scale。`role=option`（listbox 行）或 `button`（导航）。`size=nav | device`。公开 API：`role` / `size` / `ring` / `selected` / `current` / `leading` / `title` / `description` / `meta` / `trailing`。轨内自写 `data-stream`，`rail.css` 不点 list-item。禁止模块再自挂导航/设备行皮。
+
+项内强调条是 list 族内部件，不进 L5，禁止 `YoListItem` 再 import 产品 Yo*。
+
+| 层 | 文件 | 职责 | 不做什么 |
+|----|------|------|----------|
+| L2 | `list-item-mark-model.ts` | class / 宽 `space-xs` / 块向内缩 `radius-sm` / 填充 class | 不碰 DOM、不写时长 |
+| L3 | 配方 `selected` | 填充 `scaleY(0↔1)`：展开 `spatialStretch` 软弹簧、收回 `effectsExit` 加速 | 不改井几何；禁止 fade 冒充开合 |
+| L4 | `Mark.tsx` + `Mark.css` | 贴起边 D 形井（起边直角、内侧胶囊、`overflow: hidden`）+ 填充上色 | 不挂 `YoIndicator`；禁止写死条高 |
+
+井不随 `scaleY` 变形，过冲裁在胶囊里。填充才动 transform。
 
 ---
 
@@ -521,7 +531,7 @@ props
 | 层 | 文件 | 职责 |
 |----|------|------|
 | L0 | tokens | 控件高、间距、叠层 |
-| L1 | popover-place、YoPresence、YoIndicator | 定位、进出场、选中片 |
+| L1 | popover-place、YoPresence | 定位、进出场 |
 | L2 | select-model.ts | 选项、id、步进、按键意图、落点盒类型 |
 | L3 | select-policy.ts / select-place.ts | 开合、禁用、提交、Esc；菜单落点 |
 | L4 | Select.tsx / Select.css | 内容区 = `.yohu-select__menu`；不写测量算法 |
@@ -690,7 +700,7 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + `YoIndicator` fill。目录行 / 箭头 / Enter / 空格只开合，叶子才 `onSelect`。缺省行高 `--yohu-row-height-header`（命令库目录清单，比导航项再收一档；不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行 header 尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + 配方 `selected`（项内弹出与字色过渡，禁止 fill 滑块）。目录行 / 箭头 / Enter / 空格只开合，叶子才 `onSelect`。缺省行高 `--yohu-row-height-header`（命令库目录清单，比导航项再收一档；不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行 header 尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys
@@ -802,11 +812,11 @@ items / selectedKey|selectedKeys / hotKey / onSelectRow / onReorder / tone
   → L2 virtualPoolSize/Origin + virtualPoolBindIndex / virtualFlowWindow + 选择代数 + reorder-model
     （moveItemTo / 臂距 / 插缝 / shiftForReorder 邻行让位；源行恒 0）
   → L3 键盘步进、贴底、行身份 attrs + reorder-policy（applyReorderKey 夹取 / previewDest / 开合/提交）
-  → L4 原点换窗 + 槽位几何 + YoListRow + YoListFrame（hotKey）+ 条件 YoIndicator；源行只打 data-reorder=source
+  → L4 原点换窗 + 槽位几何 + YoListRow + YoListFrame（hotKey）；源行只打 data-reorder=source
   → 内嵌 YoScroller 吃声明 extent（总高/行宽），禁止热路径量 in-flow 子盒；像素滚动走会话偏移 + inner transform，视口 scrollTop 恒 0
 ```
 
-`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字，`data-layout=flow` 行进文档流，选区只走原生 `::selection`（`--yohu-doc-sel` 铺底，不改字色）。listbox / 换位 `data-layout=pool` 仍 abspos。禁止再叠选区带。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（对照官方 List 默认 `BarState.Auto`；`state` 原样转给内嵌条，日志清单传 `on` 溢出常显），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。`contentWidth>0` 时 inner 显式宽（abspos 行不撑 `scrollWidth`），行盒按 inner 宽（`right: auto`），`YoScroller axis=both`（日志 clip 横滑）。内容总高 / 行宽变化后 `handle.sync()` 再量侧轨与底轨，过滤变短必须收回 gutter，禁止模块再包一层 `YoIndicator`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：list 宿主 `overflow: hidden`（裁 fill 滑块过冲），项滚动走公开 `YoScroller`（视口 hidden，不留系统条，溢出让出侧轨），禁止模块再外包第二根。禁止再拆 `__scroll`。滚动拆三拍：像素只改会话偏移并写平面 `translate3d`（不过 Solid，视口 `scrollTop` 恒 0）；原点过行高才换窗；条铬吃声明 `extent`。pool：`For` 身份是槽位 `0..poolSize-1`，环形绑数，origin 步进只换一条。flow：`For` 身份是可视下标（不是文件名 / seq），簇 `virtualClusterStyle` 钉 origin 行顶，禁止 lead/tail gap 改 spacer 触发整窗回流。pool 槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）；flow 走 `virtualFlowRowStyle`。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选 fill 滑块 `decorate={false}`，用 `top`/`left` 落在 `__inner` 内容坐标；fill / 投放框宽走 `virtualContentWidth`（视口 clientWidth 减 padding，不进侧轨）；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
+`tone` 默认 `document`（只虚拟化，不画行线）。Family B 文件清单显式 `tone="list"` 才有行间 hairline。禁止默认画线再让日志去关。`role=listbox` 关原生划选（`user-select: none`）；未开选择的 document 清单仍可选字，`data-layout=flow` 行进文档流，选区只走原生 `::selection`（`--yohu-doc-sel` 铺底，不改字色）。listbox / 换位 `data-layout=pool` 仍 abspos。禁止再叠选区带。宿主 `.yohu-virtual-list` 只裁切；纵滚与产品条内组合 `YoScroller`（对照官方 List 默认 `BarState.Auto`；`state` 原样转给内嵌条，日志清单传 `on` 溢出常显），`hostRef` 是视口。贴底用 `virtualTotalHeight` + `handle.scrollToEnd()`，禁止读 `scrollHeight`。`contentWidth>0` 时 inner 显式宽（abspos 行不撑 `scrollWidth`），行盒按 inner 宽（`right: auto`），`YoScroller axis=both`（日志 clip 横滑）。内容总高 / 行宽变化后 `handle.sync()` 再量侧轨与底轨，过滤变短必须收回 gutter，禁止模块再包一层 `YoIndicator`。禁止 `overflow-y: auto` / `scrollbar-width` 藏条。`YoColFrame` 表头跟 `data-gutter` 对齐，禁止 `scrollbar-gutter`。设备栏 / 导航 / 设置 / 终端等非虚拟清单：项滚动走公开 `YoScroller`（视口 hidden，不留系统条，溢出让出侧轨），禁止模块再外包第二根。禁止再拆 `__scroll`。滚动拆三拍：像素只改会话偏移并写平面 `translate3d`（不过 Solid，视口 `scrollTop` 恒 0）；原点过行高才换窗；条铬吃声明 `extent`。pool：`For` 身份是槽位 `0..poolSize-1`，环形绑数，origin 步进只换一条。flow：`For` 身份是可视下标（不是文件名 / seq），簇 `virtualClusterStyle` 钉 origin 行顶，禁止 lead/tail gap 改 spacer 触发整窗回流。pool 槽位几何走 L2 `virtualRowBoxStyle` 写进 inline（`position:absolute` + `top:0` + `translate3d`）；flow 走 `virtualFlowRowStyle`。行宿主是 `YoListRow`，禁止再挂 `yohu-interactive` / `yohu-focus-ring`。`renderRow` 是稳定身份的 `Component<{item, index}>`：槽位回收只换 props，禁止 `(item) => JSX` 快照（Solid 当新树卸载，文件行整行重挂，WebView2 闪白）。禁止按文件名 / seq 把进出窗口的行交给 `For`。槽位回收后原生 Selection 不跨原点保留。`tone=list` 不挂 fill 滑块；document 单选底也由 `YoListRow` 自绘（chip）；投放框宽走 `virtualContentWidth`（视口 clientWidth 减 padding，不进侧轨）；禁止把 `yohu-indicator-host` 打在滚轴或超高 inner 上。投放热态只走 `hotKey`。禁止只写 `overflow-x` 把纵轴算成 auto。
 
 `onReorder` 对标鸿蒙 List `onMove` + Apple 列表插缝 + dnd-kit overlay：整行按下过 `Spacing.Sm` 后，overlay 挂不随 scrollTop 平移的平面（RL=`Port.plane()`=`.yohu-scroller`；VL 挂 `.yohu-virtual-list`），配方 `reorder-overlay`（跟指针，阴影浮起，`top` 走 `overlayOffset` 视口代数、不过渡）；源行 `data-reorder=source` 占位变淡；邻行 `translateY` 让位（`spatial-small`）；缝上配方 `reorder-bar` 只在离开原槽时展开。松手提交 `from`/`to`，Escape 取消。拖动中不改数组。一项不能拖。键盘 `Ctrl/Meta+↑/↓` 走 L3 `applyReorderKey` 夹取，两 L4 共用。指针会话在 `reorder-binder`（定高契约不变）。变高非虚拟列表走 `YoReorderList`。定高 / 变高预览共用 L2 `shiftForReorder` / `shiftPxForReorder`：位移只给邻行，源行不跟 dest，不 live-reorder。
 
@@ -815,13 +825,13 @@ items / selectedKey|selectedKeys / hotKey / onSelectRow / onReorder / tone
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
 | L0 | `--yohu-row-height` / `--yohu-border` / `--yohu-state-*` / `--yohu-state-reorder-source` / `--yohu-stroke-accent` / `--yohu-accent` / `--yohu-doc-sel` | 行高、源行占位、条色宽、文档选区底 | 不算窗口、不画行铬 |
-| L1 | `YoIndicator`、`keymap/selection` | document 单选滑块、邻接代数 | 不画 list 行盒 |
+| L1 | `keymap/selection` | 邻接代数 | 不画 list 行盒 |
 | L2 | `virtuallist-model.ts` + `reorder-model.ts` | 槽位池 + 环形绑数 + flow 窗口 + 选择代数 + 换位几何 + `virtualRowBoxStyle` / `virtualFlowRowStyle` / `virtualClusterStyle` + `virtualContentWidth` + `virtualListLayout` | 不碰 DOM / 键盘；无行铬；无中线落点 |
 | L3 | `virtuallist-policy.ts` + `reorder-policy.ts` + `reorder-binder.ts` | 键盘 / 贴底 / 行身份 attrs / `applyReorderKey` / 换位开合 | 不写色值、不画 fill/ring |
-| L4 | `VirtualList.tsx` + `VirtualList.css` + 内组合 `YoScroller` + `YoListRow` + `YoListFrame` + 内部 `ReorderOverlay` / `ReorderBar` | 组合滚轴/行盒/投放框、条件 Indicator、浮层、条；document 未开选择走 flow | 不在 TSX 里算窗口或按键意图；不挂 focus-ring；不自绘第二套滑块；不叠选区带 |
+| L4 | `VirtualList.tsx` + `VirtualList.css` + 内组合 `YoScroller` + `YoListRow` + `YoListFrame` + 内部 `ReorderOverlay` / `ReorderBar` | 组合滚轴/行盒/投放框、浮层、条；document 未开选择走 flow | 不在 TSX 里算窗口或按键意图；不挂 focus-ring；不挂 fill 滑块；不叠选区带 |
 | L5 | `index.ts` | `YoVirtualList` + Props / Tone + 插缝族 / `moveItemTo` / `shiftForReorder` | 不导出 `YoListRow` / `YoListFrame` / `ReorderBar` / `ReorderOverlay` / `dropIndexFromCenters` |
 
-运行时所有权：数据、选中 key 与 `hotKey` 在调用方；槽位池、选择代数与行盒 style 在 L2；键盘/贴底/行身份 attrs 在 L3；行铬在 `list-row`；投放框在 `list-frame`；滚动度量与条件 Indicator 在 L4。像素滚动不进 Solid。pool `For` 按槽位下标；flow `For` 按可视下标。行几何必须 inline。`renderRow` 必须是模块级组件（禁止在 View 里每次 new 函数）。未开选择模式时行不进焦点序列。`tone=list` 选中/热态底由 `YoListRow` 自绘，投放框由 `YoListFrame` 叠加；document 单选才走 `YoIndicator` fill。选中片行级禁动。换位时邻行 `transform` 让位（与行位同一条 `translate3d`）；浮层与插入条是独立绝对定位层。roving tabindex 只有活动行是 0（多选不是凡选中都 0）。
+运行时所有权：数据、选中 key 与 `hotKey` 在调用方；槽位池、选择代数与行盒 style 在 L2；键盘/贴底/行身份 attrs 在 L3；行铬在 `list-row`；投放框在 `list-frame`；滚动度量在 L4。像素滚动不进 Solid。pool `For` 按槽位下标；flow `For` 按可视下标。行几何必须 inline。`renderRow` 必须是模块级组件（禁止在 View 里每次 new 函数）。未开选择模式时行不进焦点序列。选中/热态底由 `YoListRow` 自绘，投放框由 `YoListFrame` 叠加。选中片行级禁动。换位时邻行 `transform` 让位（与行位同一条 `translate3d`）；浮层与插入条是独立绝对定位层。roving tabindex 只有活动行是 0（多选不是凡选中都 0）。
 
 ### 公开 API
 
