@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use crate::commands::ipc_update;
 use crate::state::AppState;
 use yohu_protocol::{
-    IpcError, RemoteUpdate, UpdateChannelInfo, UpdateDownloadRequest, UpdateDownloadResult,
+    IpcError, RemoteUpdate, UpdateChannelInfo, UpdateDownloadAccepted, UpdateDownloadRequest,
 };
 
 #[tauri::command(rename = "update.check")]
@@ -19,13 +19,12 @@ pub fn update_info(state: State<'_, AppState>) -> Result<UpdateChannelInfo, IpcE
 }
 
 #[tauri::command(rename = "update.download")]
-pub async fn update_download(
+pub fn update_download(
+    app: AppHandle,
     state: State<'_, AppState>,
     request: UpdateDownloadRequest,
-) -> Result<UpdateDownloadResult, IpcError> {
-    crate::update_runs::download(&state, request)
-        .await
-        .map_err(ipc_update)
+) -> Result<UpdateDownloadAccepted, IpcError> {
+    crate::update_runs::spawn_download(&app, &state, request).map_err(ipc_update)
 }
 
 #[tauri::command(rename = "update.install")]
