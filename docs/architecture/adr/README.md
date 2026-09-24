@@ -37,3 +37,6 @@
 | [031](ADR-v6-031.md) | 路径家园 | 安装根 ≠ 产品家园；config / data / cache / logs |
 | [032](ADR-v6-032.md) | 投屏呈现分层 | Fit / Convert / Scale / Compose / Present；`gpu.rs` 只装配；禁 libplacebo/FFmpeg |
 | [033](ADR-v6-033.md) | 文件浏览会话 | FileListing 同构：工具窗 attach/detach；`DeviceShell` 是 008 补偿；失败回退短命令 |
+| [034](ADR-v6-034.md) | HTTP 下载原语 | `yohu-download`；update 只编排 |
+| [035](ADR-v6-035.md) | GitHub Provider | manifest → Atom → Web Latest → REST；免配额优先 |
+| [036](ADR-v6-036.md) | 文本解析引擎 | `yohu-textparsing`：Html / Markdown / Xml / Plain；update 只调 API |
