@@ -93,6 +93,7 @@ mod tests {
             version: "1.2.0".into(),
             description: "fix".into(),
             installer_url: installer.map(str::to_string),
+            installer_name: String::new(),
             page_url: page.into(),
             sha256: String::new(),
             size_bytes: 0,

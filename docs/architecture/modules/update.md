@@ -1,59 +1,57 @@
 # 模块：应用更新
 
-- 能力：`yohu-update`（core，零 Tauri、零 adb）
+- 能力：**`yohu-update`**（产品用例）+ **`yohu-download`**（HTTP 落盘，ADR-v6-034）+ **`yohu-textparsing`**（说明纯文本，ADR-v6-036）
 - 固定 GitHub Releases（`yohurm/Windows-YoADBTools`）；无更新源切换
-- **公开仓库检查更新不需要 token**（`GET /repos/.../releases/latest`）
+- **公开仓用户不必配置 token**；检查顺序见 ADR-v6-035（manifest → Atom → Web Latest → REST 兜底）
 - 仓库覆盖：环境变量 + `config/update.json`（不要把 PAT 打进安装包）
-- 安装包：打 `vX.Y.Z` 标签 → `.github/workflows/release.yml` 打包 NSIS（Windows）与 DMG（macOS）并挂到该 tag 的 GitHub Release
+- 安装包：打 `vX.Y.Z` 标签 → workflow 挂 NSIS / DMG 到 Release
 - IPC：`update.check` / `update.info` / `update.download` / `update.install` / `update.cancel` / `update.open`
-- 事件：`update/progress`（200ms 节流；阶段切换必达）
+- 事件：`update/progress`（字节 200ms 可丢；**阶段切换必达**）
 - 不使用 `tauri-plugin-updater`
-- UI 不单独成模块：设置「关于」版本行绑 `update.*`；YoUI 零 IPC，不进 `@yohu/ui` / `modules/*`
+- UI：设置「关于」→ `updateStore` → `@yohu/api`；YoUI 零 IPC
 
-### 设计前（更新查询）
-
-```text
-invoke update.check → commands/update 拼 PlatformInfo → check_configured
-invoke update.info → commands/update → describe_channel
-invoke update.download/install/cancel/open → update_runs
-```
-
-问题：check/info 在门面拼平台并直调 core，与 download/install 不对称。
-
-### 设计后（更新查询）
+## 分层（YoAgentDocs 桌面栈）
 
 ```text
-invoke update.check → commands/update rename → update_runs::check
-  → PlatformInfo::from_identity(CARGO_PKG_VERSION) → check_configured
-invoke update.info → commands/update rename → update_runs::info
-  → describe_channel
-invoke update.download/install/cancel/open → commands/update rename → update_runs
+View（UpdateDialogs / SettingsForm）
+  → store（updateStore：对话框阶段、invoke）
+  → @yohu/api（update.check / update.download / onUpdateProgress）
+  → commands/update（薄转发）
+  → update_runs（任务中心、cancel 槽、AppEvent 映射）
+  → yohu-update（GitHub、semver、cache、apply）
+  → yohu-textparsing（to_plain + TextFormat；仅说明）
+  → yohu-download（HTTP fetch，仅 update 编排调用）
 ```
 
-不做什么：不在 commands 拼 PlatformInfo；不改 core；不改 UI。
+**禁止：** UI / `update_runs` / commands 内 reqwest；`yohu-download` 内 GitHub / NSIS；`yohu-update` 内嵌 HTML/Markdown 解析。
+
+## 子域职责（`yohu-update`）
+
+| 子域 | 文件 | 职责 |
+|------|------|------|
+| check | `check.rs` | 编排 Provider |
+| github | `github/` | 分层 Provider（manifest / atom / web / api） |
+| release | `release.rs` | 选 asset、semver、`RemoteUpdate`；说明 `yohu_textparsing::to_plain(..., Markdown)` |
+| credentials | `credentials.rs` | `update.json` / env |
+| url_policy | `url_policy.rs` | http(s) + **GitHub 主机 Bearer 范围** |
+| cache | `cache.rs` | `cache/update/` 路径、安装包形态校验 |
+| apply | `apply/` | NSIS 助手 / DMG |
+| fetch 编排 | `fetch.rs`（或 `lib` 内） | `DownloadSpec` + 调 `yohu_download::fetch` |
+
+## 下载链路（设计后）
+
+1. `update.download` → **`spawn_download` 立即返回**（与 `files.pull` 同纪律；禁止 invoke 内 await 整段 HTTP，否则 WebView 收不到进度）
+2. 后台 `download_configured(request)` → `yohu_download::fetch`
+3. `installer_dest(url)` → 绝对 `dest`；`load_github_source` + `url_policy` 拼 `DownloadSpec`
+4. 回调：`DownloadProgress` → `UpdateProgress`（`downloading` / `verifying` / `ready`+`installer_path` / `failed`+`message`）
+5. 壳 `update_runs` → `AppEvent::UpdateProgress` → `update/progress`；UI `updateStore` 等 `ready` 再切安装对话框
 
 ## 覆盖安装
 
-1. `update.download` 把当前平台安装包下到产品家园 `cache/update/`（Windows NSIS `*-setup.exe`，macOS `*.dmg`），流式 SHA-256（GitHub `digest` 有则校验）；Windows 安装成功后删除 setup
-2. Windows：`update.install` 拉起脱离作业对象的助手：等当前 PID 退出并 settle → `setup.exe /S /UPDATE /NS`（失败退避最多 4 次）写入 `%LOCALAPPDATA%\Programs\YohuAdbTools` → 启动新主程序；过程写 `cache/update/apply.log`；壳随后退出
-3. macOS：`update.install` 打开已缓存的 DMG，用户拖入 `/Applications`；进程不退出
-4. 产品家园 `config/` `logs/` `data/` `cache/` 不在安装包文件列表里，覆盖安装会保留
-5. `update.open` 仅作浏览器兜底（无匹配附件时）
+1. 安装包已在 `cache/update/` 且通过 `assert_cached_installer`
+2. Windows：`/S /UPDATE /NS` 助手（见 ADR-v6-022）
+3. macOS：打开 DMG
 
 ## Token
 
-安装包里不要打 PAT（`YOHU_GITHUB_TOKEN` / `update.json` 的 `github.token`）。公开仓匿名限额足够按钮点「检查更新」。
-
-CI 发版用 workflow 的 `GITHUB_TOKEN`（`permissions.contents: write`），不必另建 PAT。
-
-若本机 `gh release create` / `scripts/publish-github-release.ps1` 上传安装包，Fine-grained PAT：
-
-| 项 | 值 |
-|----|----|
-| Resource owner | `yohurm` |
-| Repository access | 仅 `Windows-YoADBTools` |
-| Contents | **Read and write**（建 Release、传附件） |
-| Metadata | Read（自动） |
-| 其余仓库/账号权限 | **No access** |
-
-不要勾选 Administration、Issues、Pull requests、Secrets、Workflows。过期建议 90 天。聊天里出现过的 PAT 一律作废重建。
+见 ADR-v6-022 / 下文 Token 表（与 as-built 一致）。

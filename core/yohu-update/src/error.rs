@@ -48,3 +48,19 @@ impl From<reqwest::Error> for UpdateError {
         UpdateError::Network(e.to_string())
     }
 }
+
+impl From<yohu_download::DownloadError> for UpdateError {
+    fn from(e: yohu_download::DownloadError) -> Self {
+        use yohu_download::DownloadError as D;
+        match e {
+            D::InvalidUrl => UpdateError::InvalidUrl,
+            D::TooLarge => UpdateError::TooLarge,
+            D::Http(c) => UpdateError::Http(c),
+            D::Network(m) => UpdateError::Network(m),
+            D::ChecksumMismatch => UpdateError::ChecksumMismatch,
+            D::SizeMismatch => UpdateError::SizeMismatch,
+            D::Cancelled => UpdateError::Cancelled,
+            D::Io(m) => UpdateError::Io(m),
+        }
+    }
+}

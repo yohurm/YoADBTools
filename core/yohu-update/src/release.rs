@@ -6,6 +6,7 @@ use crate::artifact::InstallerKind;
 use crate::error::UpdateError;
 use crate::platform::PlatformInfo;
 use crate::url_policy;
+use yohu_textparsing::{to_plain, TextFormat};
 
 const SCORE_BASE: i32 = 12;
 const SCORE_NSIS_SETUP: i32 = 6;
@@ -139,6 +140,56 @@ fn sha256_from_digest(digest: &str) -> String {
     }
 }
 
+/// CI 约定安装包文件名（无 manifest / 无 REST assets 时的直链）。
+pub fn conventional_installer_name(platform: &PlatformInfo, version: &str) -> Option<String> {
+    let kind = InstallerKind::for_os(&platform.os)?;
+    let arch = platform.arch.trim().to_ascii_lowercase();
+    match kind {
+        InstallerKind::Nsis if arch == "x86_64" || arch == "amd64" => Some(format!(
+            "YohuAdbTools_{version}_x64-setup.exe"
+        )),
+        InstallerKind::Dmg if arch == "aarch64" || arch == "arm64" => {
+            Some(format!("YohuAdbTools_{version}_aarch64.dmg"))
+        }
+        InstallerKind::Dmg if arch == "x86_64" || arch == "amd64" => {
+            Some(format!("YohuAdbTools_{version}_x64.dmg"))
+        }
+        _ => None,
+    }
+}
+
+pub fn github_release_download_url(owner: &str, repo: &str, tag: &str, file_name: &str) -> String {
+    format!("https://github.com/{owner}/{repo}/releases/download/{tag}/{file_name}")
+}
+
+/// Atom / Web Latest 得到 tag 后，用约定文件名组装 `RemoteUpdate`（无 size/sha256）。
+pub fn remote_from_tag_and_notes(
+    tag: &str,
+    notes: &str,
+    page_url: &str,
+    owner: &str,
+    repo: &str,
+    platform: &PlatformInfo,
+) -> Result<RemoteUpdate, UpdateError> {
+    let version = strip_tag_prefix(tag).to_string();
+    if version.is_empty() {
+        return Err(UpdateError::MissingTag);
+    }
+    let installer_name = conventional_installer_name(platform, &version)
+        .ok_or(UpdateError::NoInstallerOrPage)?;
+    let installer_url = github_release_download_url(owner, repo, tag, &installer_name);
+    Ok(RemoteUpdate {
+        has_new_version: is_newer(&version, &platform.version),
+        version,
+        description: to_plain(notes, TextFormat::Markdown),
+        installer_url: Some(installer_url),
+        installer_name,
+        page_url: page_url.trim().to_string(),
+        sha256: String::new(),
+        size_bytes: 0,
+    })
+}
+
 /// 把一份 Release 元数据编成 `RemoteUpdate`。
 pub fn remote_from_release(
     tag_name: &str,
@@ -152,20 +203,23 @@ pub fn remote_from_release(
         return Err(UpdateError::MissingTag);
     }
     let page_url = page_url.trim().to_string();
-    let (installer_url, size_bytes, sha256) = if let Some(asset) = pick_asset(assets, platform) {
-        (
-            Some(asset.browser_download_url.trim().to_string()),
-            asset.size,
-            sha256_from_digest(&asset.digest),
-        )
-    } else {
-        (None, 0, String::new())
-    };
+    let (installer_url, installer_name, size_bytes, sha256) =
+        if let Some(asset) = pick_asset(assets, platform) {
+            (
+                Some(asset.browser_download_url.trim().to_string()),
+                asset.name.trim().to_string(),
+                asset.size,
+                sha256_from_digest(&asset.digest),
+            )
+        } else {
+            (None, String::new(), 0, String::new())
+        };
     Ok(RemoteUpdate {
         has_new_version: is_newer(&version, &platform.version),
         version,
-        description: body.trim().to_string(),
+        description: to_plain(body, TextFormat::Markdown),
         installer_url,
+        installer_name,
         page_url,
         sha256,
         size_bytes,
