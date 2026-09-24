@@ -15,6 +15,7 @@
 | Tauri 壳 crate | **`yohu-adbtools`**（`app/yohu-adbtools`；唯一引用 Tauri） |
 | 原生动效 crate | **`yohu-motion`**（`core/yohu-motion`；与 runtime / protocol / search 并列，零 Tauri、零产品 HWND） |
 | 检索引擎 crate | **`yohu-search`**（`core/yohu-search`；与 motion 并列，零产品类型、零 domain） |
+| 文本解析引擎 crate | **`yohu-textparsing`**（`core/yohu-textparsing`；HTML / Markdown / XML → 纯文本，零产品类型） |
 | 前端工作台包 | **`@yohu/workbench`**（`ui/packages/workbench`） |
 | 组件库对外名 | **YoUI**；npm 包仍 `@yohu/ui` |
 | IPC 门面 | `@yohu/api` |

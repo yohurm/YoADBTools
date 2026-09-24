@@ -1,0 +1,6 @@
+[package]
+name = "yohu-textparsing"
+description = "Yohu ADB Tools v6 — 多格式文本解析引擎（零产品类型）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
