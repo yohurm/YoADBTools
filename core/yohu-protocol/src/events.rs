@@ -258,6 +258,8 @@ mod tests {
             stage: crate::UpdateStage::Downloading,
             received_bytes: 10,
             total_bytes: 20,
+            installer_path: None,
+            message: None,
         });
         let v = serde_json::to_value(&event).expect("serialize");
         assert_eq!(v["kind"], "updateProgress");

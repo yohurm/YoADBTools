@@ -13,6 +13,9 @@ pub struct RemoteUpdate {
     pub description: String,
     #[serde(default)]
     pub installer_url: Option<String>,
+    /// 当前平台安装包文件名（来自 Release 附件名；无附件为空）。
+    #[serde(default)]
+    pub installer_name: String,
     #[serde(default)]
     pub page_url: String,
     #[serde(default)]
@@ -33,12 +36,9 @@ pub struct UpdateDownloadRequest {
     pub version: String,
 }
 
-/// `update.download` 响应：本机已校验的安装包路径。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UpdateDownloadResult {
-    pub path: String,
-    pub size_bytes: u64,
-}
+/// `update.download` 已受理（实际落盘与路径经 `update/progress` 终态回传）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateDownloadAccepted;
 
 /// 下载 / 覆盖安装阶段（`update/progress`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +48,7 @@ pub enum UpdateStage {
     Verifying,
     Ready,
     Applying,
+    Failed,
 }
 
 /// 应用更新进度（200ms 节流；阶段切换必达）。
@@ -57,6 +58,19 @@ pub struct UpdateProgress {
     pub stage: UpdateStage,
     pub received_bytes: u64,
     pub total_bytes: u64,
+    /// `ready` 时为本机已校验安装包路径。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installer_path: Option<String>,
+    /// `failed` 时为展示用短句（非 stderr）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// 下载完成结果（core 编排用；不再经 `update.download` invoke 响应）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateDownloadResult {
+    pub path: String,
+    pub size_bytes: u64,
 }
 
 /// 当前更新通道摘要（`update.info`；不含密钥）。
@@ -79,6 +93,7 @@ mod tests {
             version: "1.2.0".into(),
             description: "fix".into(),
             installer_url: Some("https://example.com/setup.exe".into()),
+            installer_name: "setup.exe".into(),
             page_url: "https://github.com/o/r/releases/tag/v1.2.0".into(),
             sha256: "s".into(),
             size_bytes: 100,
@@ -101,6 +116,7 @@ mod tests {
             version: "1.2.0".into(),
             description: String::new(),
             installer_url: None,
+            installer_name: String::new(),
             page_url: "https://github.com/o/r/releases/tag/v1.2.0".into(),
             sha256: String::new(),
             size_bytes: 0,
@@ -139,12 +155,16 @@ mod tests {
 
         let progress = serde_json::to_value(UpdateProgress {
             version: "0.1.2".into(),
-            stage: UpdateStage::Downloading,
-            received_bytes: 1,
-            total_bytes: 2,
+            stage: UpdateStage::Ready,
+            received_bytes: 9,
+            total_bytes: 9,
+            installer_path: Some(r"C:\cache\setup.exe".into()),
+            message: None,
         })
         .unwrap();
-        assert_eq!(progress["received_bytes"], 1);
-        assert_eq!(progress["stage"], "downloading");
+        assert_eq!(progress["received_bytes"], 9);
+        assert_eq!(progress["stage"], "ready");
+        assert_eq!(progress["installer_path"], r"C:\cache\setup.exe");
+        assert!(progress.get("message").is_none());
     }
 }
