@@ -1,7 +1,8 @@
 name: Release
 
 # 打 vX.Y.Z 标签后打包 NSIS，并挂到该 tag 的 GitHub Release。
-# 应用内「检查更新」读 /releases/latest，比较本机 CARGO_PKG_VERSION。
+# 应用内检查更新优先读 releases/latest/download/update-manifest.json（无 REST 配额）；
+# 无 manifest 时走 Atom / Web Latest / REST 兜底。
 # 公开仓库检查更新不需要 PAT；本 workflow 用 GITHUB_TOKEN（contents: write）。
 
 on:
@@ -91,6 +92,15 @@ jobs:
             app/**/nsis/*setup.exe
           if-no-files-found: error
 
+      - name: 生成 update-manifest.json
+        shell: powershell
+        run: |
+          $setup = $env:SETUP_PATH
+          $ver = $env:GITHUB_REF_NAME -replace '^v',''
+          powershell -ExecutionPolicy Bypass -File scripts/build-update-manifest.ps1 `
+            -Version $ver -SetupPath $setup -Tag $env:GITHUB_REF_NAME `
+            -OutFile (Join-Path (Split-Path $setup) "update-manifest.json")
+
       - name: 创建 GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,4 +108,6 @@ jobs:
         run: |
           $setup = $env:SETUP_PATH
           if (-not $setup -or -not (Test-Path $setup)) { throw "未找到安装包产物" }
-          gh release create $env:GITHUB_REF_NAME $setup --generate-notes --title $env:GITHUB_REF_NAME
+          $manifest = Join-Path (Split-Path $setup) "update-manifest.json"
+          if (-not (Test-Path $manifest)) { throw "缺少 update-manifest.json" }
+          gh release create $env:GITHUB_REF_NAME $setup $manifest --generate-notes --title $env:GITHUB_REF_NAME
