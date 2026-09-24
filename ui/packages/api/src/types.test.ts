@@ -467,6 +467,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       version: "1.2.0",
       description: "fix",
       installer_url: "https://example.com/setup.exe",
+      installer_name: "setup.exe",
       page_url: "https://github.com/o/r/releases/tag/v1.2.0",
       sha256: "s",
       size_bytes: 100,

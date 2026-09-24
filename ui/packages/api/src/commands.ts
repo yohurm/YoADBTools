@@ -38,7 +38,7 @@ import type {
   RemoteUpdate,
   UpdateChannelInfo,
   UpdateDownloadRequest,
-  UpdateDownloadResult,
+  UpdateDownloadAccepted,
   MirrorStart,
   MirrorStartRequest,
   MirrorInjectRequest,
@@ -184,7 +184,7 @@ export const updateCheck = () => invoke<RemoteUpdate>("update.check");
 export const updateInfo = () => invoke<UpdateChannelInfo>("update.info");
 
 export const updateDownload = (request: UpdateDownloadRequest) =>
-  invoke<UpdateDownloadResult>("update.download", { request });
+  invoke<UpdateDownloadAccepted>("update.download", { request });
 
 export const updateInstall = (path: string) => invoke<void>("update.install", { path });
 

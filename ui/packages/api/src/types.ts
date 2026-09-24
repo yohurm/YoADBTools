@@ -409,6 +409,7 @@ export interface RemoteUpdate {
   version: string;
   description: string;
   installer_url: string | null;
+  installer_name: string;
   page_url: string;
   sha256: string;
   size_bytes: number;
@@ -422,14 +423,11 @@ export interface UpdateDownloadRequest {
   version: string;
 }
 
-/** `update.download` 响应。 */
-export interface UpdateDownloadResult {
-  path: string;
-  size_bytes: number;
-}
+/** `update.download` 响应（invoke 立即返回；路径经 progress.ready）。 */
+export type UpdateDownloadAccepted = Record<string, never>;
 
 /** `update/progress` 阶段。 */
-export type UpdateStage = "downloading" | "verifying" | "ready" | "applying";
+export type UpdateStage = "downloading" | "verifying" | "ready" | "applying" | "failed";
 
 /** `update/progress` 负载。 */
 export interface UpdateProgress {
@@ -437,6 +435,10 @@ export interface UpdateProgress {
   stage: UpdateStage;
   received_bytes: number;
   total_bytes: number;
+  /** ready 时已校验安装包路径 */
+  installer_path?: string;
+  /** failed 时展示用短句 */
+  message?: string;
 }
 
 /** `update.info` 响应（不含密钥）。 */
