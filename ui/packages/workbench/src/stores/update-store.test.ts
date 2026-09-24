@@ -28,6 +28,7 @@ const FOUND = {
   version: "1.2.0",
   description: "修复若干问题",
   installer_url: "https://example.com/setup.exe",
+  installer_name: "setup.exe",
   page_url: "https://github.com/o/r/releases/tag/v1.2.0",
   sha256: "",
   size_bytes: 0,

@@ -223,6 +223,7 @@ beforeEach(() => {
     version: "0.1.0",
     description: "",
     installer_url: null,
+    installer_name: "",
     page_url: "https://github.com/yohurm/Windows-YoADBTools",
     sha256: "",
     size_bytes: 0,
@@ -920,6 +921,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       version: "1.2.0",
       description: "修复若干问题",
       installer_url: "https://example.com/setup.exe",
+      installer_name: "setup.exe",
       page_url: "https://github.com/yohurm/Windows-YoADBTools",
       sha256: "",
       size_bytes: 0,
@@ -927,7 +929,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     fireEvent.click(screen.getByRole("button", { name: "检查更新" }) as HTMLButtonElement);
     await waitFor(() => {
       expect(screen.getByText("发现新版本")).toBeTruthy();
-      expect(screen.getByText("1.2.0")).toBeTruthy();
+      expect(screen.getByText("v1.2.0")).toBeTruthy();
       expect(screen.getByText("修复若干问题")).toBeTruthy();
     });
     fireEvent.click(screen.getByRole("button", { name: "下载" }) as HTMLButtonElement);
@@ -954,13 +956,14 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
       version: "1.2.0",
       description: "修复若干问题",
       installer_url: "https://example.com/setup.exe",
+      installer_name: "setup.exe",
       page_url: "https://github.com/yohurm/Windows-YoADBTools",
       sha256: "",
       size_bytes: 0,
     });
     fireEvent.click(screen.getByRole("button", { name: "检查更新" }) as HTMLButtonElement);
     await waitFor(() => {
-      expect(screen.getByText("1.2.0")).toBeTruthy();
+      expect(screen.getByText("v1.2.0")).toBeTruthy();
     });
     expect(updateStore.pending()?.version).toBe("1.2.0");
     fireEvent.click(screen.getByRole("button", { name: "稍后" }) as HTMLButtonElement);

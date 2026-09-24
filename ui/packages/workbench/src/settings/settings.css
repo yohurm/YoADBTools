@@ -79,9 +79,33 @@
   margin-top: var(--yohu-space-md);
 }
 
+/* split tail 默认 align-self:flex-start 会收窄进度条；钉在对话框底、满宽 */
+.yohu-dialog__tail:has(.yohu-settings__update-progress--pinned) {
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+}
+
+.yohu-settings__update-progress--pinned {
+  width: 100%;
+  margin-top: 0;
+  padding-top: var(--yohu-space-md);
+  border-top: 1px solid var(--yohu-border);
+  box-sizing: border-box;
+}
+
+.yohu-settings__update-progress .yohu-progress {
+  height: var(--yohu-space-sm);
+}
+
 .yohu-settings__update-progress-text {
   margin: var(--yohu-space-sm) 0 0;
   font-size: var(--yohu-font-caption);
   color: var(--yohu-fg-3);
   font-variant-numeric: tabular-nums;
+}
+
+/* 下载中滚槽底缘淡出，避免 • / 断行残影落在进度条上方 */
+.yohu-settings__update-scroller > .yohu-scroller__view {
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--yohu-space-lg)), transparent 100%);
 }

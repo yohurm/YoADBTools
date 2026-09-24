@@ -15,7 +15,8 @@ const css = load("settings.css");
 describe("设置页滚轴", () => {
   it("更新对话框正文走 YoScroller", () => {
     expect(dialogs).toContain("YoScroller");
-    expect(dialogs.match(/<YoScroller>/g)?.length).toBe(2);
+    expect(dialogs.match(/<YoScroller/g)?.length).toBe(2);
+    expect(dialogs).toContain("yohu-settings__update-progress--pinned");
     expect(dialogs).toContain("yohu-settings__update-desc");
     expect(dialogs).toContain("yohu-settings__update-copy");
   });
