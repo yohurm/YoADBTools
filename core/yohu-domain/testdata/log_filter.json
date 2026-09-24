@@ -91,7 +91,27 @@
   },
   {
     "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "libcomposer_ext", "msg": "m" },
-    "filter": { "tag_contains": "libc", "scope": { "kind": "all" } },
+    "filter": { "tag_contains": "libc,", "scope": { "kind": "all" } },
+    "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "GGEC-DeviceEventRouter", "msg": "m" },
+    "filter": { "tag_contains": "GGEC-", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "GGEC-DeviceEventRouter", "msg": "m" },
+    "filter": { "tag_contains": "GGEC-,", "scope": { "kind": "all" } },
+    "expect": false
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "GGEC-DeviceEventRouter", "msg": "m" },
+    "filter": { "tag_contains": "other, GGEC-", "scope": { "kind": "all" } },
+    "expect": true
+  },
+  {
+    "line": { "seq": 0, "ts": "2026-01-01 00:00:00.000", "pid": 1, "tid": 1, "level": "I", "tag": "GGEC-DeviceEventRouter", "msg": "m" },
+    "filter": { "tag_contains": "other, GGEC-,", "scope": { "kind": "all" } },
     "expect": false
   },
   {

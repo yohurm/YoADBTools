@@ -96,14 +96,51 @@ pub(crate) fn equals_ascii_ignore_case(a: &str, b: &str) -> bool {
             .all(|(x, y)| x.eq_ignore_ascii_case(y))
 }
 
-fn tag_allowed(line_tag: &str, spec: &str) -> bool {
+pub(crate) fn starts_with_ascii_ignore_case(haystack: &str, prefix: &str) -> bool {
+    prefix.len() <= haystack.len()
+        && haystack.as_bytes()[..prefix.len()]
+            .iter()
+            .zip(prefix.as_bytes())
+            .all(|(x, y)| x.eq_ignore_ascii_case(y))
+}
+
+fn has_trailing_tag_sep(spec: &str) -> bool {
+    spec.trim_end().chars().last().is_some_and(is_tag_needle_sep)
+}
+
+/// 拆解为已提交针（精确匹配）与输入草稿针（前缀匹配）。
+pub fn parse_tag_filter_needles(spec: &str) -> (Vec<&str>, Option<&str>) {
     let needles = parse_tag_needles(spec);
     if needles.is_empty() {
+        return (Vec::new(), None);
+    }
+    if has_trailing_tag_sep(spec) {
+        (needles, None)
+    } else {
+        let draft = needles.last().copied();
+        let committed = needles[..needles.len() - 1].to_vec();
+        (committed, draft)
+    }
+}
+
+/// 空针不限；已提交针精确命中，正在输入的草稿针前缀命中。
+fn tag_allowed(line_tag: &str, spec: &str) -> bool {
+    let (committed, draft) = parse_tag_filter_needles(spec);
+    if committed.is_empty() && draft.is_none() {
         return true;
     }
-    needles
+    if committed
         .into_iter()
         .any(|needle| equals_ascii_ignore_case(line_tag, needle))
+    {
+        return true;
+    }
+    if let Some(prefix) = draft {
+        if starts_with_ascii_ignore_case(line_tag, prefix) {
+            return true;
+        }
+    }
+    false
 }
 
 /// 单行匹配。`Package { pids: [] }` 不命中任何行。
