@@ -35,7 +35,7 @@ function TagFilterField(props: { session: LogSessionState }) {
   return (
     <YoTextField
       block
-      ariaLabel="Tag，逗号分隔，精确匹配"
+      ariaLabel="Tag，逗号分隔，多针匹配"
       placeholder={parsed().committed.length > 0 ? "" : "Tag，逗号分隔"}
       value={parsed().draft}
       tokens={
@@ -50,7 +50,6 @@ function TagFilterField(props: { session: LogSessionState }) {
           </YoListPresence>
         ) : undefined
       }
-      clearable
       active={tagFilterActive(props.session.tagContains)}
       onInput={(v) => {
         const { committed } = parsed();

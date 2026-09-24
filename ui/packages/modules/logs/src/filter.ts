@@ -12,8 +12,10 @@ import {
   matchesWireFilter,
   normalizeLevels,
   parseLevelLetter,
+  parseTagFilterNeedles,
   parseTagNeedles,
   pidSetOf,
+  startsWithAsciiIgnoreCase,
   tagAllowed,
   tagFilterActive,
   toWireFilter as sessionToWireFilter,
@@ -28,8 +30,11 @@ export {
   matchesWireFilter,
   normalizeLevels,
   parseLevelLetter,
+  parseTagFilterNeedles,
   parseTagNeedles,
+  startsWithAsciiIgnoreCase,
   tagFilterActive,
+  tagAllowed,
 };
 export type { LevelLetter };
 
@@ -72,15 +77,8 @@ export interface SessionFilter {
   pidSet: number[];
 }
 
-const TAG_TRAILING_SEP = /[,，、;；|]\s*$/;
-
-/** 已提交的针（气泡）与正在输入的草稿。尾部分隔符 = 全部已提交。 */
-export function splitTagInput(raw: string): { committed: string[]; draft: string } {
-  const needles = parseTagNeedles(raw);
-  if (needles.length === 0) return { committed: [], draft: "" };
-  if (TAG_TRAILING_SEP.test(raw)) return { committed: needles, draft: "" };
-  return { committed: needles.slice(0, -1), draft: needles[needles.length - 1]! };
-}
+/** 已提交的针（气泡）与正在输入的草稿。统一委托给 @yohu/api 的 parseTagFilterNeedles。 */
+export const splitTagInput = parseTagFilterNeedles;
 
 export function joinTagInput(committed: readonly string[], draft: string): string {
   const tags = uniqueTagNeedles(committed);

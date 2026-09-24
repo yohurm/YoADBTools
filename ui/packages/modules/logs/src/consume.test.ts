@@ -97,9 +97,11 @@ describe("matchesLine", () => {
     expect(matchesLine(line({ level: "?" }), filter({ levels: ["V"] }))).toBe(false);
   });
 
-  it("Tag 精确命中（忽略大小写），不是子串", () => {
+  it("Tag 打字前缀匹配与已提交气泡精确匹配（忽略大小写）", () => {
     expect(matchesLine(line({ tag: "OkHttp" }), filter({ tagContains: "okhttp" }))).toBe(true);
-    expect(matchesLine(line({ tag: "libcomposer_ext" }), filter({ tagContains: "libc" }))).toBe(false);
+    expect(matchesLine(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-" }))).toBe(true);
+    expect(matchesLine(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-," }))).toBe(false);
+    expect(matchesLine(line({ tag: "libcomposer_ext" }), filter({ tagContains: "libc," }))).toBe(false);
     expect(matchesLine(line({ tag: "libc" }), filter({ tagContains: "libc," }))).toBe(true);
     expect(matchesLine(line({ msg: "Request Timeout" }), filter({ keyword: "timeout" }))).toBe(true);
     expect(matchesLine(line({ msg: "ok" }), filter({ keyword: "timeout" }))).toBe(false);

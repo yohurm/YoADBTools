@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { LogLine } from "@yohu/api";
 
 import { LogDocument, type DocRow } from "./document";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions, formatParts } from "./format";
 
 function line(seq: number, over: Partial<LogLine> = {}): LogLine {
   return {
@@ -53,6 +53,16 @@ describe("LogDocument", () => {
     const first = doc.messages;
     expect(doc.sync(rows)).toBe(false);
     expect(doc.messages).toBe(first);
+  });
+
+  it("append 延续 previousTag 供 hideDuplicates", () => {
+    const doc = new LogDocument();
+    const dup = { ...options, hideDuplicateTag: true };
+    doc.setOptions(dup);
+    doc.reload([row(1, { tag: "Dup" })]);
+    doc.append([row(2, { tag: "Dup" })]);
+    const tag2 = formatParts(doc.messages[1]!).find((p) => p.kind === "tag");
+    expect(tag2?.text.trim()).toBe("");
   });
 
   it("append 前缀对象不动", () => {

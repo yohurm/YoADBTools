@@ -8,11 +8,13 @@
 import type { LogLine, SignalKind } from "@yohu/api";
 
 import {
-  formatMessage,
+  formatMessages,
   formatOptionsKey,
   type ContentBar,
+  type FormatBatchState,
   type FormatOptions,
   type FormatRange,
+  type FormattedMessage,
   type LogFieldKind,
 } from "./format";
 
@@ -38,8 +40,15 @@ export type DocMessage = {
 export const EMPTY_MESSAGES: DocMessage[] = [];
 export const EMPTY_ROWS: DocRow[] = [];
 
-function paintRow(row: DocRow, options: FormatOptions): DocMessage {
-  const formatted = formatMessage(row.line, options);
+function duplicateSeed(items: readonly DocMessage[]): FormatBatchState {
+  const last = items.at(-1)?.line;
+  if (!last) {
+    return {};
+  }
+  return { previousTag: last.tag, previousPid: last.pid };
+}
+
+function toDocMessage(row: DocRow, formatted: FormattedMessage): DocMessage {
   return {
     seq: row.line.seq,
     text: formatted.text,
@@ -50,6 +59,15 @@ function paintRow(row: DocRow, options: FormatOptions): DocMessage {
     collapsedAfter: row.collapsedAfter,
     line: row.line,
   };
+}
+
+function paintRows(rows: readonly DocRow[], options: FormatOptions, seed: FormatBatchState = {}): DocMessage[] {
+  const { messages } = formatMessages(
+    rows.map((row) => row.line),
+    options,
+    seed,
+  );
+  return messages.map((formatted, index) => toDocMessage(rows[index]!, formatted));
 }
 
 function prefixLen(prev: readonly DocRow[], next: readonly DocRow[]): number {
@@ -127,7 +145,7 @@ export class LogDocument {
     if (!this.opts || rows.length === 0) {
       return false;
     }
-    const painted = rows.map((row) => paintRow(row, this.opts!));
+    const painted = paintRows(rows, this.opts!, duplicateSeed(this.items));
     this.source = this.source === EMPTY_ROWS ? rows.slice() : [...this.source, ...rows];
     this.items = this.items === EMPTY_MESSAGES ? painted : this.items.concat(painted);
     return true;
@@ -160,7 +178,7 @@ export class LogDocument {
       return changed;
     }
     this.source = rows;
-    this.items = rows.map((row) => paintRow(row, this.opts!));
+    this.items = paintRows(rows, this.opts!);
     return true;
   }
 

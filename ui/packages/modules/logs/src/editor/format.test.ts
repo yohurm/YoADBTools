@@ -16,7 +16,9 @@ import {
   formatAppName,
   formatColumns,
   formatMessage,
+  formatMessages,
   formatOptionsKey,
+  logcatLevelLetter,
   formatParts,
   formatProcessThread,
   formatTag,
@@ -70,9 +72,26 @@ describe("官方 Format 分段", () => {
     expect(headerWidth(shown)).toBe(24 + 12 + 24 + 36 + 4);
   });
 
-  it("TagFormat padEnd(max+1)，空 Tag 是空格不是 <no-tag>", () => {
+  it("hideDuplicates 时连续相同 Tag/App 留空列（AS TagFormat / AppNameFormat）", () => {
+    const dup = { ...shown, hideDuplicateTag: true, hideDuplicateApp: true };
+    const a = line({ tag: "Same", pid: 9 });
+    const b = line({ tag: "Same", pid: 9, msg: "b" });
+    const { messages } = formatMessages([a, b], dup);
+    expect(formatParts(messages[0]!).find((p) => p.kind === "tag")?.text.trim()).toBe("Same");
+    expect(formatParts(messages[1]!).find((p) => p.kind === "tag")?.text.trim()).toBe("");
+    expect(formatParts(messages[1]!).find((p) => p.kind === "app")?.text.trim()).toBe("");
+  });
+
+  it("FATAL 级别列显示 A（AS LogLevel.ASSERT）", () => {
+    expect(logcatLevelLetter("F")).toBe("A");
+    const fatal = formatMessage(line({ level: "F" }), shown);
+    expect(fatal.text).toContain(" A ");
+    expect(fatal.text).not.toContain(" F ");
+  });
+
+  it("TagFormat padEnd(max+1)，空 Tag 是 <no-tag>（对照 AS TagFormat）", () => {
     expect(formatTag("Yohu", 23)).toBe("Yohu".padEnd(24));
-    expect(formatTag("", 23)).toBe(" ".padEnd(24));
+    expect(formatTag("", 23)).toBe("<no-tag>".padEnd(24));
     const long = "A".repeat(24);
     expect(formatTag(long, 23)).toBe(`${shortenTextWithEllipsis(long, 23, 10)} `);
   });

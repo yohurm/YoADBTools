@@ -125,6 +125,16 @@ export type FormatOptions = {
   appNames?: AppNameMap;
   /** 列宽覆盖（ch）。缺省走官方 Format.width()；拖宽只加不减官方下限。 */
   colChars?: Partial<Record<LogMetaColKey, number>>;
+  /** 对照 AS `TagFormat.hideDuplicates`（STANDARD 默认 false） */
+  hideDuplicateTag?: boolean;
+  /** 对照 AS `AppNameFormat.hideDuplicates`（STANDARD 默认 false） */
+  hideDuplicateApp?: boolean;
+};
+
+/** 对照 AS `MessageFormatter` 批内 `previousTag` / `previousPid`。 */
+export type FormatBatchState = {
+  previousTag?: string;
+  previousPid?: number;
 };
 
 export type FormattedMessage = {
@@ -209,6 +219,11 @@ export function tagSwatchIndex(tag: string): number {
   return Math.abs(javaStringHash(tag)) % LOGCAT_TAG_SWATCHES;
 }
 
+function logcatLevelSwatch(level: string): LevelSwatch | null {
+  const paint = level === "F" || level === "A" ? "F" : level;
+  return levelSwatch(paint);
+}
+
 const logcatEngine: ColorEngine = {
   id: "logcat",
   bar: "none",
@@ -222,7 +237,7 @@ const logcatEngine: ColorEngine = {
     if (kind === "tag") {
       return ink(`var(--yohu-logcat-tag-${tagSwatchIndex(line.tag)})`);
     }
-    const key = levelSwatch(line.level);
+    const key = logcatLevelSwatch(line.level);
     if (!key) {
       return kind === "msg" ? ink("var(--yohu-fg)") : unstyled();
     }
@@ -270,6 +285,8 @@ export function formatOptionsKey(options: FormatOptions): string {
     Number(d.level),
     options.tagWidthPx,
     JSON.stringify(options.colChars ?? {}),
+    Number(options.hideDuplicateTag ?? false),
+    Number(options.hideDuplicateApp ?? false),
   ].join("|");
 }
 
@@ -470,10 +487,26 @@ export function formatProcessThread(
   return "";
 }
 
-export function formatTag(tag: string, maxLength: number): string {
+/** AS `LevelFormat`：设备 FATAL（`F`）在清单里显示为 ASSERT 字母 `A`。 */
+export function logcatLevelLetter(level: string): string {
+  if (level === "F") {
+    return "A";
+  }
+  return level;
+}
+
+export function formatTag(
+  tag: string,
+  maxLength: number,
+  previousTag?: string,
+  hideDuplicates = false,
+): string {
   const width = Math.max(TAG_MIN_LENGTH, maxLength) + 1;
+  if (hideDuplicates && tag === previousTag) {
+    return "".padEnd(width);
+  }
   if (!tag) {
-    return " ".padEnd(width);
+    return "<no-tag>".padEnd(width);
   }
   if (tag.length > maxLength) {
     return `${shortenTextWithEllipsis(tag, maxLength, Math.floor((maxLength - TAG_ELLIPSIS.length) / 2))} `;
@@ -495,8 +528,17 @@ export function appNameOf(line: LogLine, names?: AppNameMap): string {
   return `pid-${line.pid}`;
 }
 
-export function formatAppName(name: string, maxLength = APP_DEFAULT_MAX): string {
+export function formatAppName(
+  name: string,
+  maxLength = APP_DEFAULT_MAX,
+  pid?: number,
+  previousPid?: number,
+  hideDuplicates = false,
+): string {
   const width = Math.max(APP_MIN_LENGTH, maxLength) + 1;
+  if (hideDuplicates && pid != null && pid === previousPid) {
+    return "".padEnd(width);
+  }
   if (name.length > maxLength) {
     return `${shortenTextWithEllipsis(name, maxLength, maxLength - APP_PREFIX_KEEP)} `;
   }
@@ -528,7 +570,11 @@ function paintOf(engine: ColorEngine, kind: LogFieldKind, line: LogLine): TokenP
   return engine.token(kind, line);
 }
 
-export function formatMessage(line: LogLine, options: FormatOptions): FormattedMessage {
+export function formatMessage(
+  line: LogLine,
+  options: FormatOptions,
+  batch: FormatBatchState = {},
+): FormattedMessage {
   const engine = contentColor(options.scheme);
   if (line.level === "?") {
     const buf: Accumulator = { text: "", ranges: [] };
@@ -572,18 +618,35 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
     );
   }
   if (display.tag) {
-    accumulate(buf, formatTag(line.tag, tagFormatWidth(options) - 1), "tag", paintOf(engine, "tag", line));
+    accumulate(
+      buf,
+      formatTag(
+        line.tag,
+        tagFormatWidth(options) - 1,
+        batch.previousTag,
+        options.hideDuplicateTag ?? false,
+      ),
+      "tag",
+      paintOf(engine, "tag", line),
+    );
   }
   if (display.app) {
     accumulate(
       buf,
-      formatAppName(appNameOf(line, options.appNames), colCharsOf(options, "app", APP_FORMAT_WIDTH) - 1),
+      formatAppName(
+        appNameOf(line, options.appNames),
+        colCharsOf(options, "app", APP_FORMAT_WIDTH) - 1,
+        line.pid,
+        batch.previousPid,
+        options.hideDuplicateApp ?? false,
+      ),
       "app",
       paintOf(engine, "app", line),
     );
   }
   if (display.level) {
-    accumulate(buf, ` ${line.level} `, "level", paintOf(engine, "level", line));
+    const letter = logcatLevelLetter(line.level);
+    accumulate(buf, ` ${letter} `, "level", paintOf(engine, "level", line));
     accumulate(buf, " ", "level");
   }
   const headerChars = buf.text.length;
@@ -596,6 +659,22 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
     bar: engine.bar,
     barInk: engine.barInk(line),
   };
+}
+
+export function formatMessages(
+  lines: readonly LogLine[],
+  options: FormatOptions,
+  seed: FormatBatchState = {},
+): { messages: FormattedMessage[]; state: FormatBatchState } {
+  let previousTag = seed.previousTag;
+  let previousPid = seed.previousPid;
+  const messages: FormattedMessage[] = [];
+  for (const line of lines) {
+    messages.push(formatMessage(line, options, { previousTag, previousPid }));
+    previousTag = line.tag;
+    previousPid = line.pid;
+  }
+  return { messages, state: { previousTag, previousPid } };
 }
 
 export function formatParts(formatted: FormattedMessage): { kind: LogFieldKind; text: string }[] {
