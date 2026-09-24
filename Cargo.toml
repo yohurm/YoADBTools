@@ -10,6 +10,7 @@ members = [
   "core/yohu-logsrv",
   "core/yohu-files",
   "core/yohu-mirror",
+  "core/yohu-download",
   "core/yohu-textparsing",
   "core/yohu-update",
   "app/yohu-adbtools",
@@ -46,5 +47,6 @@ yohu-adb = { path = "core/yohu-adb" }
 yohu-logsrv = { path = "core/yohu-logsrv" }
 yohu-files = { path = "core/yohu-files" }
 yohu-mirror = { path = "core/yohu-mirror" }
+yohu-download = { path = "core/yohu-download" }
 yohu-textparsing = { path = "core/yohu-textparsing" }
 yohu-update = { path = "core/yohu-update" }
