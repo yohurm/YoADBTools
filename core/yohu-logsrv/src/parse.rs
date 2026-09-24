@@ -65,10 +65,32 @@ fn take_level_tag(rest: &str) -> Option<(&str, char, String)> {
     let tag = rest[slash + 1..].trim().to_string();
     let level_at = before.rfind(char::is_whitespace)? + 1;
     let level_tok = &before[level_at..];
-    if level_tok.len() != 1 || !is_log_level_letter(level_tok) {
+    if level_tok.len() != 1 || !is_header_priority_letter(level_tok) {
         return None;
     }
-    Some((before[..level_at].trim(), level_tok.chars().next()?, tag))
+    let raw = level_tok.chars().next()?;
+    Some((before[..level_at].trim(), normalize_header_priority(raw), tag))
+}
+
+/// AS `LogcatHeaderParser` / ddmlib：头里允许 `[VDIWEAF]`；`F` 映射为 ASSERT（显示 `A`）。
+fn is_header_priority_letter(token: &str) -> bool {
+    matches!(
+        token.chars().next(),
+        Some('V' | 'D' | 'I' | 'W' | 'E' | 'F' | 'A')
+            if token.len() == 1
+    )
+}
+
+fn normalize_header_priority(raw: char) -> char {
+    let upper = raw.to_ascii_uppercase();
+    if is_log_level_letter(&upper.to_string()) {
+        return upper;
+    }
+    match upper {
+        'A' => 'A',
+        'F' => 'F',
+        _ => 'W',
+    }
 }
 
 /// `pid:tid` 或 `uid:pid:tid`。uid 是数字或短名（`root`/`shell`）。
@@ -76,10 +98,10 @@ fn parse_process_ids(ids: &str) -> Option<(Option<String>, u32, u32)> {
     let parts: Vec<&str> = ids.split(':').map(str::trim).collect();
     match parts.as_slice() {
         [pid, tid] if !pid.is_empty() && !tid.is_empty() => {
-            Some((None, parse_u32(pid)?, parse_u32(tid)?))
+            Some((None, parse_pid(pid), parse_thread_id(tid)))
         }
         [uid, pid, tid] if !uid.is_empty() && !pid.is_empty() && !tid.is_empty() => {
-            Some((Some((*uid).to_string()), parse_u32(pid)?, parse_u32(tid)?))
+            Some((Some((*uid).to_string()), parse_pid(pid), parse_thread_id(tid)))
         }
         _ => None,
     }
@@ -87,6 +109,28 @@ fn parse_process_ids(ids: &str) -> Option<(Option<String>, u32, u32)> {
 
 fn parse_u32(s: &str) -> Option<u32> {
     s.parse().ok()
+}
+
+/// 对照 AS `parsePid`：过长数字失败时返回 -1（wire 用 `u32::MAX` 占位）。
+fn parse_pid(s: &str) -> u32 {
+    match s.parse::<i64>() {
+        Ok(n) if (0..=u32::MAX as i64).contains(&n) => n as u32,
+        Ok(-1) => u32::MAX,
+        Ok(_) => 0,
+        Err(_) => u32::MAX,
+    }
+}
+
+/// 对照 AS `parseThreadId` / ddmlib `Integer.decode`（十进制 / `0x` 十六进制）。
+fn parse_thread_id(s: &str) -> u32 {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return u32::MAX;
+    }
+    if let Some(hex) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+        return u32::from_str_radix(hex, 16).unwrap_or(u32::MAX);
+    }
+    trimmed.parse().unwrap_or(u32::MAX)
 }
 
 fn take_timestamp(inner: &str) -> Option<(String, &str)> {
@@ -127,7 +171,7 @@ fn take_epoch(inner: &str) -> Option<(String, &str)> {
     if milli.len() < 3 || !milli.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    let seconds: i64 = sec.parse().ok()?;
+    let seconds: i64 = sec.parse().unwrap_or(0);
     let millis: u32 = milli[..3].parse().ok()?;
     let ts = epoch_to_wall(seconds, millis)?;
     Some((ts, rest))
@@ -307,6 +351,45 @@ mod tests {
     fn body_line_is_not_header() {
         assert!(parse_long_header("Unable to detect current Activity.").is_none());
         assert!(parse_long_header("[2026-09-19T16:09:33.187210] INFO Luci: x").is_none());
+    }
+
+    #[test]
+    fn parses_hex_thread_id() {
+        let header =
+            parse_long_header("[ 2026-01-02 03:04:05.678  1234: 0x2a I/TestTag ]").expect("hex");
+        assert_eq!(header.tid, 42);
+        let tight =
+            parse_long_header("[ 1517266949.472 5755:0x100 I/Tag ]").expect("as fixture");
+        assert_eq!(tight.pid, 5755);
+        assert_eq!(tight.tid, 256);
+    }
+
+    #[test]
+    fn invalid_pid_still_parses_header() {
+        let header = parse_long_header(
+            "[ 1517266949.472 1234567890123456789012345678901234567890:601 I/Tag ]",
+        )
+        .expect("header");
+        assert_eq!(header.pid, u32::MAX);
+        assert_eq!(header.tid, 601);
+        assert_eq!(header.tag, "Tag");
+    }
+
+    #[test]
+    fn invalid_epoch_seconds_defaults_to_zero() {
+        let header = parse_long_header(
+            "[ 1234567890123456789012345678901234567890.472 5755:601 I/Tag ]",
+        )
+        .expect("header");
+        assert_eq!(header.pid, 5755);
+        assert!(header.ts.ends_with(".472") || header.ts.contains("1970"));
+    }
+
+    #[test]
+    fn assert_priority_letter_in_header() {
+        let header =
+            parse_long_header("[ 2026-01-02 03:04:05.678  1: 2 A/MyTag ]").expect("assert");
+        assert_eq!(header.level, 'A');
     }
 
     #[test]

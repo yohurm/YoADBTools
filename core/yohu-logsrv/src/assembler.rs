@@ -2,11 +2,12 @@
 //!
 //! AOSP 在消息后打印 `\n\n`。记录结束只由下一条头（或空闲 flush / 流结束）判定；
 //! 中间空行算正文，`trim_end` 去掉记录尾部分隔空行。头之前的正文丢弃。
-//! `--------- beginning of` 作为系统消息立即发出。
+//! `--------- beginning of` 作为系统消息立即发出（不冲刷未闭合的上一条记录，与 AS 一致）。
 
 use yohu_protocol::LogLine;
 
 use crate::parse::{is_system_line, parse_long_header, system_message, LogcatHeader};
+use crate::stack_trace::expand_stack_trace_lines;
 
 pub(crate) struct MessageAssembler {
     header: Option<LogcatHeader>,
@@ -28,16 +29,11 @@ impl MessageAssembler {
     pub(crate) fn ingest(&mut self, raw: &str) -> Vec<LogLine> {
         let line = raw.replace('\r', "");
         if is_system_line(&line) {
-            let mut out = Vec::new();
-            if let Some(msg) = self.take() {
-                out.push(msg);
-            }
-            out.push(system_message(&line));
-            return out;
+            return vec![system_message(&line)];
         }
         if let Some(header) = parse_long_header(&line) {
             let mut out = Vec::new();
-            if let Some(msg) = self.take() {
+            if let Some(msg) = self.flush() {
                 out.push(msg);
             }
             self.header = Some(header);
@@ -50,8 +46,16 @@ impl MessageAssembler {
     }
 
     pub(crate) fn take(&mut self) -> Option<LogLine> {
+        self.flush()
+    }
+
+    fn flush(&mut self) -> Option<LogLine> {
+        if self.header.is_none() || self.body.is_empty() {
+            return None;
+        }
         let header = self.header.take()?;
-        let msg = join_body(std::mem::take(&mut self.body));
+        let expanded = expand_stack_trace_lines(&std::mem::take(&mut self.body));
+        let msg = join_body(expanded);
         Some(LogLine {
             ts: header.ts,
             pid: header.pid,
@@ -145,16 +149,30 @@ mod tests {
     }
 
     #[test]
-    fn system_line_flushes_and_emits() {
+    fn system_line_does_not_flush_open_record() {
         let mut asm = MessageAssembler::new();
         asm.ingest("[ 2026-01-02 03:04:05.678  1: 2 I/T ]");
         asm.ingest("hello");
         let out = asm.ingest("--------- beginning of main");
-        assert_eq!(out.len(), 2);
-        assert_eq!(out[0].msg, "hello");
-        assert_eq!(out[0].level, 'I');
-        assert_eq!(out[1].level, '?');
-        assert_eq!(out[1].msg, "--------- beginning of main");
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].level, '?');
+        assert_eq!(out[0].msg, "--------- beginning of main");
+        assert!(asm.has_pending());
+        let done = asm.ingest("[ 2026-01-02 03:04:05.679  1: 2 I/U ]");
+        assert_eq!(done.len(), 1);
+        assert_eq!(done[0].msg, "hello");
+        assert_eq!(done[0].tag, "T");
+    }
+
+    #[test]
+    fn header_without_body_is_not_flushed_on_next_header() {
+        let mut asm = MessageAssembler::new();
+        asm.ingest("[ 2026-01-02 03:04:05.678  1: 2 I/T ]");
+        assert!(!asm.has_pending());
+        let out = asm.ingest("[ 2026-01-02 03:04:05.679  1: 2 I/U ]");
+        assert!(out.is_empty());
+        asm.ingest("only-u");
+        assert_eq!(asm.take().expect("u").tag, "U");
     }
 
     #[test]
@@ -168,6 +186,57 @@ mod tests {
     }
 
     #[test]
+    fn as_fixture_multiple_complete_messages() {
+        let mut asm = MessageAssembler::new();
+        let block = "\
+[          1619900000.101  1: 2000 D/Tag  ]
+Message 1
+
+[          1619900000.102  1: 2000 D/Tag  ]
+Message 2
+
+[          1619900000.103  1: 2000 D/Tag  ]
+Message 3
+";
+        for line in block.lines() {
+            asm.ingest(line);
+        }
+        let last = asm.take().expect("flush");
+        assert_eq!(last.msg, "Message 3");
+    }
+
+    fn as_fixture_system_lines_order() {
+        let mut asm = MessageAssembler::new();
+        let lines = [
+            "--------- beginning of crash",
+            "[          1619900001.123  1:1000 I/Tag1  ]",
+            "Message 1",
+            "",
+            "--------- beginning of system",
+            "[          1619900001.123  1:1000 I/Tag2  ]",
+            "Message 2",
+        ];
+        let mut out = Vec::new();
+        for line in lines {
+            out.extend(asm.ingest(line));
+        }
+        out.extend(asm.take());
+        assert_eq!(out.len(), 4);
+        assert_eq!(out[0].msg, "--------- beginning of crash");
+        assert_eq!(out[1].msg, "--------- beginning of system");
+        assert_eq!(out[2].msg, "Message 1");
+        assert_eq!(out[3].msg, "Message 2");
+    }
+
+    fn as_fixture_lines_without_header_dropped() {
+        let mut asm = MessageAssembler::new();
+        assert!(asm.ingest("Message 1").is_empty());
+        asm.ingest("[          1619900001.123  1:1000 I/Tag2  ]");
+        asm.ingest("Message 2");
+        let line = asm.take().expect("one");
+        assert_eq!(line.msg, "Message 2");
+    }
+
     fn pixel_uid_pid_tid_header_closes_record() {
         let mut asm = MessageAssembler::new();
         asm.ingest("[ 2026-09-19 16:09:33.046 shell: 4310: 4310 W/libbinder.BackendUnifiedServiceManager ]");

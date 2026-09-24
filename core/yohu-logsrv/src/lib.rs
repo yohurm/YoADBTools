@@ -10,6 +10,7 @@ mod export;
 mod follow;
 mod index;
 mod parse;
+mod stack_trace;
 mod ring;
 mod task;
 
