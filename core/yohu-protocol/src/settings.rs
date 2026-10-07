@@ -62,13 +62,13 @@ pub struct LogDisplayColumns {
 impl Default for LogDisplayColumns {
     fn default() -> Self {
         Self {
-            ts: true,
+            ts: crate::default_true(),
             uid: false,
-            pid: true,
-            tid: true,
-            tag: true,
-            app: true,
-            level: true,
+            pid: crate::default_true(),
+            tid: crate::default_true(),
+            tag: crate::default_true(),
+            app: crate::default_true(),
+            level: crate::default_true(),
         }
     }
 }
@@ -89,7 +89,7 @@ pub struct AppSettings {
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: usize,
     /// 开始采集前执行 `adb logcat -c`
-    #[serde(default = "default_clear_device")]
+    #[serde(default = "crate::default_true")]
     pub clear_device_on_start: bool,
     #[serde(default)]
     pub theme: Theme,
@@ -100,7 +100,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub export_default_path: String,
     /// 手动导出每次询问保存位置（默认开）
-    #[serde(default = "default_export_ask")]
+    #[serde(default = "crate::default_true")]
     pub export_ask_every_time: bool,
     /// 日志清单显示列（立即生效；消息列始终在）
     #[serde(default)]
@@ -171,12 +171,6 @@ pub enum TerminalTimeFormat {
 fn default_buffer_capacity() -> usize {
     10_000
 }
-fn default_clear_device() -> bool {
-    true
-}
-fn default_export_ask() -> bool {
-    true
-}
 
 /// 投屏默认长边（USB 协议；0 = 设备原始）。
 pub const fn default_mirror_max_size() -> u32 {
@@ -213,25 +207,25 @@ impl Default for AppSettings {
         Self {
             adb_path: String::new(),
             data_root: String::new(),
-            devices_auto_refresh: true,
+            devices_auto_refresh: crate::default_true(),
             buffer_capacity: default_buffer_capacity(),
-            clear_device_on_start: default_clear_device(),
-            theme: Theme::System,
-            density: Density::Comfortable,
+            clear_device_on_start: crate::default_true(),
+            theme: Theme::default(),
+            density: Density::default(),
             export_default_path: String::new(),
-            export_ask_every_time: default_export_ask(),
+            export_ask_every_time: crate::default_true(),
             log_display_columns: LogDisplayColumns::default(),
             log_time_format: default_log_time_format(),
-            log_color_scheme: LogColorScheme::Yohu,
-            log_line_layout: LogLineLayout::Clip,
+            log_color_scheme: LogColorScheme::default(),
+            log_line_layout: LogLineLayout::default(),
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
-            mirror_protocol: MirrorProtocol::Usb,
+            mirror_protocol: MirrorProtocol::default(),
             mirror_force_forward: false,
             terminal_prepend_adb: false,
             files_drop_into_folder: false,
-            terminal_time_format: TerminalTimeFormat::TimeMillis,
+            terminal_time_format: TerminalTimeFormat::default(),
         }
     }
 }

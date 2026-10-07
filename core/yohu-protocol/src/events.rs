@@ -30,14 +30,13 @@ pub struct TaskInfo {
 pub struct GroupProgress {
     pub run_id: u32,
     pub serial: String,
-    /// 命令名（展示用）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    /// 命令名（展示用）。空串表示没有名字。
+    pub name: String,
     /// 已填充的具体命令行（不含 adb）
     pub template: String,
     pub ok: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    /// 原始输出（stdout + stderr；执行失败则为错误文案）。空串表示没有正文。
+    pub message: String,
     /// 单命令用时（毫秒）
     pub duration_ms: u64,
 }
@@ -150,6 +149,23 @@ mod tests {
     use crate::{AppSettings, CaptureState, LogBatch};
 
     #[test]
+    fn group_progress_keeps_empty_message() {
+        let event = AppEvent::GroupProgress(GroupProgress {
+            run_id: 1,
+            serial: "A1".into(),
+            name: String::new(),
+            template: "echo hi".into(),
+            ok: true,
+            message: String::new(),
+            duration_ms: 0,
+        });
+        let v = serde_json::to_value(&event).expect("serialize");
+        assert_eq!(v["kind"], "groupProgress");
+        assert_eq!(v["message"], "");
+        assert_eq!(v["name"], "");
+    }
+
+    #[test]
     fn device_status_event_nests_snapshot() {
         let event = AppEvent::DeviceStatus {
             status: crate::DeviceStatus {
@@ -259,7 +275,7 @@ mod tests {
             received_bytes: 10,
             total_bytes: 20,
             installer_path: None,
-            message: None,
+            error: None,
         });
         let v = serde_json::to_value(&event).expect("serialize");
         assert_eq!(v["kind"], "updateProgress");

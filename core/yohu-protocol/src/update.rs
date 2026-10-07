@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::IpcError;
+
 /// 远程更新信息（`update.check` 响应）。
 ///
 /// `installer_url` 仅在有当前平台安装包附件时存在；Release 页只进 `page_url`。
@@ -61,9 +63,9 @@ pub struct UpdateProgress {
     /// `ready` 时为本机已校验安装包路径。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installer_path: Option<String>,
-    /// `failed` 时为展示用短句（非 stderr）。
+    /// `failed` 时为壳 `ipc_update` 的结果。其他阶段没有。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    pub error: Option<IpcError>,
 }
 
 /// 下载完成结果（core 编排用；不再经 `update.download` invoke 响应）。
@@ -159,12 +161,13 @@ mod tests {
             received_bytes: 9,
             total_bytes: 9,
             installer_path: Some(r"C:\cache\setup.exe".into()),
-            message: None,
+            error: None,
         })
         .unwrap();
         assert_eq!(progress["received_bytes"], 9);
         assert_eq!(progress["stage"], "ready");
         assert_eq!(progress["installer_path"], r"C:\cache\setup.exe");
+        assert!(progress.get("error").is_none());
         assert!(progress.get("message").is_none());
     }
 }

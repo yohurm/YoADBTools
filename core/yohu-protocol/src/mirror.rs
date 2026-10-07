@@ -2,8 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 可用区任一边低于此物理像素则不 Present（UI `layoutIsPresentable` 对齐）。
+/// 可用区任一边低于此物理像素则不 Present。判定只走 `layout_is_presentable`。
+/// UI `layoutIsPresentable` 与这一份对齐。
 pub const MIRROR_MIN_LAYOUT_PX: u32 = 64;
+
+/// 两边都达到最小可用区。可见性由调用方另判。
+pub fn layout_is_presentable(width: u32, height: u32) -> bool {
+    width >= MIRROR_MIN_LAYOUT_PX && height >= MIRROR_MIN_LAYOUT_PX
+}
 
 /// 启动结果（对标 [`crate::CaptureStart`]：adopt = 已有 Live 会话）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,5 +267,23 @@ mod tests {
                 "y": 20
             })
         );
+    }
+
+    #[test]
+    fn layout_edge_is_one_gate() {
+        assert!(!layout_is_presentable(63, 64));
+        assert!(!layout_is_presentable(64, 63));
+        assert!(layout_is_presentable(64, 64));
+        let files = [
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/stage.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/mod.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/host.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/surface.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/follow.rs"),
+        ];
+        for file in files {
+            assert!(!file.contains(">= MIRROR_MIN_LAYOUT_PX"));
+            assert!(!file.contains("< MIRROR_MIN_LAYOUT_PX"));
+        }
     }
 }

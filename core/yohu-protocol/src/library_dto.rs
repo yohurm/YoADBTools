@@ -69,6 +69,44 @@ pub struct CommandLibraryDto {
     pub groups: Vec<CommandGroupDto>,
 }
 
+/// 导入预览：条目相对当前库是新的还是已存在。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportPresence {
+    New,
+    Existing,
+}
+
+/// 导入预览里的叶子种类。与 [`LibraryEntryDto`] 的 `kind` 同名。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportEntryKind {
+    Command,
+    Block,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportEntryPreviewDto {
+    pub id: String,
+    pub name: String,
+    pub kind: ImportEntryKind,
+    pub presence: ImportPresence,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportGroupPreviewDto {
+    pub id: String,
+    pub name: String,
+    pub presence: ImportPresence,
+    pub entries: Vec<ImportEntryPreviewDto>,
+}
+
+/// `commandlib.preview` 响应。不含 template，提交时按路径重读文件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportPreviewDto {
+    pub groups: Vec<ImportGroupPreviewDto>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +198,26 @@ mod tests {
         let json = serde_json::to_value(&parsed).unwrap();
         assert!(json.get("params").is_none());
         assert_eq!(json["steps"][0]["params"][0]["description"], "主机");
+    }
+
+    #[test]
+    fn import_preview_uses_snake_kind_and_presence() {
+        let preview = ImportPreviewDto {
+            groups: vec![ImportGroupPreviewDto {
+                id: "g1".into(),
+                name: "基础".into(),
+                presence: ImportPresence::Existing,
+                entries: vec![ImportEntryPreviewDto {
+                    id: "c1".into(),
+                    name: "重启".into(),
+                    kind: ImportEntryKind::Command,
+                    presence: ImportPresence::New,
+                }],
+            }],
+        };
+        let json = serde_json::to_value(&preview).unwrap();
+        assert_eq!(json["groups"][0]["presence"], "existing");
+        assert_eq!(json["groups"][0]["entries"][0]["kind"], "command");
+        assert_eq!(json["groups"][0]["entries"][0]["presence"], "new");
     }
 }
