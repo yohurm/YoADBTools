@@ -8,7 +8,7 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import { attachPanelKeys } from "@yohu/ui";
 
 import type { DraftEntry } from "../draft";
-import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./keys";
+import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR, commandManagerKeyIsSelectAll } from "./keys";
 import type { CommandManagerStore } from "./store";
 import { EditorColumn } from "./EditorColumn";
 import { EntryColumn } from "./EntryColumn";
@@ -27,7 +27,7 @@ export function ManagerWorkspace(props: {
       listSelector: COMMAND_MANAGER_LIST_SELECTOR,
       bindings: COMMAND_MANAGER_KEY_BINDINGS,
       onAction: (action) => {
-        if (action === "select-all") props.store.selectAllEntries();
+        if (commandManagerKeyIsSelectAll(action)) props.store.selectAllEntries();
       },
     });
     onCleanup(stop);

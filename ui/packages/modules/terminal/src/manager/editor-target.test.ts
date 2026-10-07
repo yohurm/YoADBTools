@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { DraftBlock, DraftCommand, DraftGroup } from "../draft";
 import {
@@ -6,7 +9,10 @@ import {
   asCommand,
   asGroup,
   editorPaneTitle,
+  editorShowsForm,
   editorTarget,
+  editorTargetIsGroup,
+  draftRowTitle,
   multiCount,
 } from "./editor-target";
 
@@ -55,6 +61,7 @@ describe("editorTarget", () => {
     const target = editorTarget({ group, entry: undefined, selectedEntryCount: 0 });
     expect(target).toEqual({ kind: "group", group });
     expect(asGroup(target)).toBe(group);
+    expect(editorTargetIsGroup(target)).toBe(true);
     expect(editorPaneTitle(target)).toBe("组属性");
   });
 
@@ -62,5 +69,53 @@ describe("editorTarget", () => {
     const target = editorTarget({ group: undefined, entry: undefined, selectedEntryCount: 0 });
     expect(target).toEqual({ kind: "empty" });
     expect(editorPaneTitle(target)).toBeUndefined();
+  });
+
+  it("命令、块和组铺表单；空选和多选不铺", () => {
+    expect(editorShowsForm(editorTarget({ group, entry: command, selectedEntryCount: 1 }))).toBe(true);
+    expect(editorShowsForm(editorTarget({ group, entry: block, selectedEntryCount: 1 }))).toBe(true);
+    expect(editorShowsForm(editorTarget({ group, entry: undefined, selectedEntryCount: 0 }))).toBe(true);
+    expect(editorShowsForm(editorTarget({ group, entry: undefined, selectedEntryCount: 3 }))).toBe(false);
+    expect(editorShowsForm(editorTarget({ group: undefined, entry: undefined, selectedEntryCount: 0 }))).toBe(false);
+  });
+
+  it("行标题空名用（未命名），有名原样", () => {
+    expect(draftRowTitle("")).toBe("（未命名）");
+    expect(draftRowTitle("设备信息")).toBe("设备信息");
+  });
+});
+
+describe("编辑目标组只写一处", () => {
+  it("生产源里只有 editorTargetIsGroup 比较 kind===group", () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if ((name.endsWith(".ts") || name.endsWith(".tsx")) && !name.includes(".test.")) files.push(path);
+      }
+    };
+    walk(root);
+    for (const path of files) {
+      const text = readFileSync(path, "utf8");
+      const body = path.endsWith("editor-target.ts")
+        ? text.replace('return target.kind === "group"', "").replace('return target.kind === "empty"', "")
+        : text;
+      expect(body, path).not.toContain('kind === "group"');
+      expect(body, path).not.toContain('kind === "empty"');
+    }
+  });
+});
+
+describe("空名称回退只写一处", () => {
+  it("name_or_fallback_once", () => {
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "editor-target.ts"), "utf8");
+    expect(src.split("|| DRAFT_ROW_UNNAMED").length - 1).toBe(0);
+    expect(src.split("|| UNNAMED_GROUP").length - 1).toBe(0);
+    expect(src.split("return name || fallback").length - 1).toBe(1);
   });
 });

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 function load(name: string): string {
@@ -35,7 +36,10 @@ describe("命令终端动效接线", () => {
 
   it("发送栏贴右横向开合，禁止纵向 XOR panel", () => {
     expect(view).toContain("yohu-recipe-inline-end");
-    expect(view).toContain("data-open={open() ? \"true\" : \"false\"}");
+    expect(load("Composer.tsx")).toContain('data-part="clip"');
+    expect(load("Composer.tsx")).toContain('data-part="pane"');
+    expect(load("Composer.tsx")).toContain('data-part="toggle"');
+    expect(view).toContain("data-open={flagAttr(open())}");
     expect(view).toContain("chevron-right");
     expect(view).toContain("chevron-left");
     expect(view).not.toContain("yohu-recipe-xor");
@@ -67,7 +71,7 @@ describe("命令终端动效接线", () => {
 
   it("有内容时发送图标挂 send-aim，空内容不朝上", () => {
     expect(view).toContain("yohu-recipe-send-aim");
-    expect(view).toContain('data-armed={canSend() ? "true" : "false"}');
+    expect(view).toContain("data-armed={flagAttr(canSend())}");
     expect(view).toContain('icon="send"');
     expect(css).not.toContain("rotate(");
   });
@@ -88,7 +92,7 @@ describe("命令终端动效接线", () => {
     expect(library).toContain('slot="entry"');
     expect(library).toContain('slot="bar"');
     expect(library).toContain("filterLibraryGroups");
-    expect(library).toContain('placeholder="搜索命令"');
+    expect(library).toContain("placeholder={librarySearchPrompt()}");
     expect(library).not.toContain("YoIconButton");
     expect(library).not.toContain("YoCollapse");
     expect(library).not.toContain("YoTextField");
@@ -103,6 +107,10 @@ describe("命令终端动效接线", () => {
   it("结果流与命令树走 YoScroller，钉底不读原生内容高", () => {
     expect(load("ResultStream.tsx")).toContain("YoScroller");
     expect(load("ResultStream.tsx")).toContain("scrollToEnd");
+    expect(load("ResultStream.tsx")).toContain("ioLineIsIn");
+    expect(load("ResultStream.tsx")).not.toContain('kind === "in"');
+    expect(load("ResultStream.tsx")).not.toContain('kind === "out"');
+    expect(load("store.ts")).toContain('return kind === "in"');
     expect(load("ResultStream.tsx")).not.toMatch(/\.\s*scrollHeight/);
     expect(load("LibraryPane.tsx")).toContain("YoScroller");
     expect(load("TerminalView.tsx")).toContain('overflow="hidden"');
@@ -199,7 +207,8 @@ describe("命令终端动效接线", () => {
     expect(load("manager/ParamDescriptions.tsx")).toContain('recipe="list"');
     expect(load("manager/ParamDescriptions.tsx")).not.toContain("<For");
     expect(load("manager/ParamDescriptions.tsx")).not.toContain("<Show");
-    expect(managerCss).toContain(".yohu-cm__param-descs:not(:has(.yohu-presence))");
+    expect(managerCss).toContain(".yohu-cm__param-descs:not(:has(*))");
+    expect(managerCss).not.toContain(".yohu-presence");
     const templateBlock = managerCss.slice(managerCss.indexOf(".yohu-cm__template {"));
     const templateRule = templateBlock.slice(0, templateBlock.indexOf("}") + 1);
     expect(templateRule).toContain("flex: 0 1 auto");
@@ -219,7 +228,9 @@ describe("命令终端动效接线", () => {
     ].join("\n");
     const managerCss = load("command-manager.css");
     expect(manager).toContain('pad="xs"');
+    expect(manager).toContain("opsListBindings");
     expect(manager).toContain("YoVirtualList");
+    expect(manager).not.toContain("YoOpsList");
     expect(manager).toContain("YoPanel");
     expect(load("manager/GroupColumn.tsx")).toContain("onReorder");
     expect(load("manager/EntryColumn.tsx")).toContain("onReorder");
@@ -239,17 +250,21 @@ describe("命令终端动效接线", () => {
     expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__step-grip");
     expect(load("manager/BlockSteps.tsx")).not.toContain('name="grip"');
     expect(load("manager/BlockSteps.tsx")).not.toContain("onShift");
-    expect(load("manager/GroupColumn.tsx")).toContain('title="命令组"');
-    expect(load("manager/EntryColumn.tsx")).toContain('title="条目"');
+    expect(load("manager/GroupColumn.tsx")).toContain("title={groupColumnLabel()}");
+    expect(load("manager/EntryColumn.tsx")).toContain("title={entryColumnLabel()}");
     expect(load("manager/GroupColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
     expect(load("manager/EntryColumn.tsx")).not.toMatch(/<YoToolbar[^>]*\stitle=/);
-    expect(load("manager/EntryColumn.tsx")).toContain('tone="list"');
+    expect(load("manager/EntryColumn.tsx")).not.toContain('tone="list"');
+    expect(load("manager/EntryColumn.tsx")).toContain('"rule"');
     expect(load("manager/EntryColumn.tsx")).toContain('icon="block"');
     expect(load("manager/EntryColumn.tsx")).toContain('title="新增命令块"');
     expect(load("manager/EntryColumn.tsx")).not.toContain('icon="list"');
-    expect(load("CommandTree.tsx")).toContain('icon: "block"');
+    expect(load("CommandTree.tsx")).toContain("libraryEntryIcon");
     expect(load("CommandTree.tsx")).not.toContain('icon: "list"');
+    expect(load("CommandTree.tsx")).not.toContain('icon: "block"');
     expect(load("Composer.tsx")).toContain('return "block"');
+    expect(load("Composer.tsx")).toContain("IconName");
+    expect(load("Composer.tsx")).not.toContain('"terminal" | "block"');
     expect(load("manager/BlockSteps.tsx")).toContain("YoSubheader");
     expect(load("manager/BlockSteps.tsx")).not.toContain("yohu-cm__caption");
     expect(load("CommandManager.tsx")).toContain("YoBadge");
@@ -257,7 +272,12 @@ describe("命令终端动效接线", () => {
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColFrame");
     expect(load("manager/EntryColumn.tsx")).not.toContain("YoColTrack");
     expect(load("manager/EditorColumn.tsx")).toContain('variant="pane"');
-    expect(load("manager/EditorColumn.tsx")).not.toContain("<div class=\"yohu-cm__editor\"");
+    expect(load("manager/EditorColumn.tsx")).not.toContain('class="yohu-cm__editor"');
+    expect(load("manager/GroupColumn.tsx")).not.toContain("yohu-cm__groups");
+    expect(load("manager/EntryColumn.tsx")).not.toContain("yohu-cm__commands");
+    expect(managerCss).not.toContain(".yohu-cm__groups");
+    expect(managerCss).not.toContain(".yohu-cm__commands");
+    expect(managerCss).not.toContain(".yohu-cm__editor {");
     expect(manager).toContain("pointerSelectMode");
     expect(manager).toContain("attachPanelKeys");
     expect(manager).toContain("createEffect");
@@ -266,6 +286,11 @@ describe("命令终端动效接线", () => {
     expect(load("CommandManager.tsx")).toContain("toaster.destroy()");
     expect(load("CommandManager.tsx")).not.toContain("onMount");
     expect(manager).toContain("COMMAND_MANAGER_KEY_BINDINGS");
+    expect(load("manager/keys.ts")).toContain('".yohu-cm__list"');
+    expect(load("manager/keys.ts")).not.toContain(".yohu-virtual-list");
+    expect(load("manager/GroupColumn.tsx")).toContain('class="yohu-cm__list"');
+    expect(load("manager/EntryColumn.tsx")).toContain('class="yohu-cm__list"');
+    expect(managerCss).not.toContain(".yohu-cm__list");
     expect(manager).toContain("openContextMenu");
     expect(manager).toContain("terminalCommandMenu");
     expect(manager).toContain("ManagerWorkspace");
@@ -284,9 +309,22 @@ describe("命令终端动效接线", () => {
     expect(managerStore).not.toContain("querySelector");
     expect(managerCss).not.toContain(".yohu-toolbar");
     expect(managerCss).not.toContain(".yohu-panel");
-    expect(managerCss).toContain(".yohu-cm__commands .yohu-cm__list");
+    expect(load("manager/GroupColumn.tsx")).toContain('role="ops"');
+    expect(load("manager/EntryColumn.tsx")).toContain('role="ops"');
+    expect(load("manager/GroupColumn.tsx")).toContain('features: ["select", "reorder"]');
+    expect(load("manager/EntryColumn.tsx")).toContain('features: ["multi", "reorder", "menu", "rule"]');
+    expect(load("manager/GroupColumn.tsx")).toContain("YoOpsItem");
+    expect(load("manager/EntryColumn.tsx")).toContain("YoOpsItem");
+    expect(load("manager/GroupColumn.tsx")).toContain("draftRowTitle");
+    expect(load("manager/EntryColumn.tsx")).toContain("draftRowTitle");
+    expect(load("manager/GroupColumn.tsx")).not.toContain("（未命名）");
+    expect(load("manager/EntryColumn.tsx")).not.toContain("（未命名）");
+    expect(load("manager/EditorColumn.tsx")).not.toContain('role="ops"');
+    expect(managerCss).not.toContain(".yohu-cm__row");
+    expect(managerCss).not.toContain("var(--yohu-canvas)");
+    expect(load("manager/GroupColumn.tsx")).toContain("opsListBindings");
+    expect(load("manager/EntryColumn.tsx")).toContain("opsListBindings");
     expect(managerCss).toContain("grid-template-rows: minmax(0, 1fr)");
-    expect(managerCss).toContain("var(--yohu-canvas)");
     expect(managerCss).not.toContain(".yohu-cm__table");
     expect(managerCss).not.toContain(".yohu-cm__cols");
   });
@@ -303,16 +341,17 @@ describe("命令终端动效接线", () => {
       terminalView.indexOf("onClose={() => {"),
       terminalView.indexOf("onExitComplete"),
     );
-    expect(onCloseBlock).toContain("setInputOpen(false)");
+    expect(onCloseBlock).toContain("closeParameter()");
     expect(onCloseBlock).not.toContain("setInputEntry");
     const onSubmitBlock = terminalView.slice(terminalView.indexOf("onSubmit={(values)"));
-    expect(onSubmitBlock).toContain("setInputOpen(false)");
+    expect(onSubmitBlock).toContain("closeParameter()");
     expect(onSubmitBlock).not.toContain("setInputEntry");
     expect(params).toContain("onExitComplete={props.onExitComplete}");
     expect(params).toContain("props.onClose()");
     expect(params).toContain("createEffect((wasOpen");
     expect(params).toContain("!wasOpen && now");
-    expect(params).not.toContain("if (props.open())");
+    expect(params).toContain("resolveDialogOpen(props.open)");
+    expect(params).not.toContain("props.open()");
   });
 
   it("命令管理关窗不抽空草稿，Toaster 挂回树", () => {
@@ -360,6 +399,9 @@ describe("命令终端动效接线", () => {
     expect(load("store.ts")).not.toContain("请逐条执行");
     expect(load("manager/GroupColumn.tsx")).toContain("controlRowHeight");
     expect(load("manager/EntryColumn.tsx")).toContain("controlRowHeight");
+    expect(load("manager/GroupColumn.tsx")).not.toContain('from "../layout"');
+    expect(load("manager/EntryColumn.tsx")).not.toContain('from "../layout"');
+    expect(load("layout.ts")).not.toContain("function controlRowHeight");
     expect(load("manager/GroupColumn.tsx")).not.toContain("Density.Comfortable");
     expect(load("manager/EntryColumn.tsx")).not.toContain("Density.Comfortable");
     expect(load("CommandManager.tsx")).toContain("errorText(e)");
@@ -376,5 +418,330 @@ describe("命令终端动效接线", () => {
     expect(load("command-manager.css")).not.toContain("position: absolute");
     expect(load("manager/BlockSteps.tsx")).not.toContain('"z-index": 1');
     expect(load("manager/TemplateField.tsx")).not.toContain("dataset.slotBound");
+  });
+});
+
+describe("命令库拖入导入", () => {
+  it("命令库栏复用面板虚线，不引用文件模块", () => {
+    const pane = load("LibraryPane.tsx");
+    const drop = load("library-drop.ts");
+    const dialog = load("ImportDialog.tsx");
+    const view = load("TerminalView.tsx");
+    expect(pane).toContain("edge={panelHotEdge(drop.hot())}");
+    const dropEdge = '? "drop" : undefined';
+    const terminalRoot = dirname(fileURLToPath(import.meta.url));
+    const dropEdgeOffenders = terminalSources(terminalRoot).filter((file) => {
+      let text = readFileSync(file, "utf8");
+      if (file.includes(".test.")) text = text.replaceAll(dropEdge, "");
+      return text.includes(dropEdge);
+    });
+    expect(dropEdgeOffenders).toEqual([]);
+    expect(pane).toContain("createLibraryDrop");
+    expect(pane).not.toContain("@yohu/module-files");
+    expect(drop).toContain("bindNativeDragDrop");
+    expect(drop).toContain("NATIVE_DRAG_SUBSCRIBE_FAILED");
+    expect(drop).not.toContain("订阅官方拖放失败");
+    expect(drop).toContain("hostPixelRatio()");
+    expect(drop).not.toContain("window.devicePixelRatio");
+    expect(drop).not.toContain("module-files");
+    expect(drop).not.toContain("destDirFromEntries");
+    expect(dialog).toContain("resolveDialogOpen(props.open)");
+    expect(dialog).not.toContain("props.open()");
+    expect(dialog).toContain('title="导入命令"');
+    expect(dialog).toContain("YoCheckbox");
+    expect(dialog).toContain("YoBadge");
+    expect(dialog).toContain("IMPORT_ALREADY_IN_LIBRARY");
+    expect(dialog).not.toContain('text="已在库中"');
+    expect(dialog).toContain('label="全选"');
+    expect(dialog).toContain("YoScroller");
+    expect(dialog).toContain("importDialogSize");
+    expect(dialog).toContain('data-role="section"');
+    expect(dialog).toContain('data-role="entry"');
+    expect(dialog).toMatch(/<YoCheckbox\s+block/);
+    expect(dialog).not.toContain("yohu-terminal__import-check");
+    expect(css).not.toContain(".yohu-checkbox");
+    expect(css).not.toContain("yohu-terminal__import-check");
+    expect(dialog).toContain('tone="section"');
+    expect(dialog).toContain("importConfirmLabel");
+    expect(dialog).toContain("libraryEntryIcon");
+    expect(dialog).not.toContain('entry.kind === "block"');
+    expect(view).not.toContain("commandlibPreview");
+    expect(view).not.toContain("commandlibApply");
+    expect(view).not.toContain("importPathReject");
+    expect(drop).not.toContain("importPathReject");
+    expect(load("store.ts")).toContain("commandlibPreview");
+    expect(load("store.ts")).toContain("commandlibApply");
+    expect(view).toContain("commandManagerStore.ui.open");
+    expect(view).not.toContain("@yohu/module-files");
+    expect(load("draft.ts")).not.toContain("import-selection");
+  });
+
+  it("命令库树键只拼一次", () => {
+    const tree = load("CommandTree.tsx")
+      .replace("return `g:${id}`", "")
+      .replace("return `c:${id}`", "")
+      .replace("return `b:${id}`", "");
+    expect(tree).not.toContain("`g:${");
+    expect(tree).not.toContain("`c:${");
+    expect(tree).not.toContain("`b:${");
+    expect(load("LibraryPane.tsx")).not.toContain("`g:${");
+    expect(load("LibraryPane.tsx")).toContain("libraryGroupKey");
+  });
+
+  it("组节点的 kind 只在 isGroup 里看", () => {
+    const tree = load("CommandTree.tsx").replace('!("kind" in data)', "");
+    expect(tree).not.toContain('"kind" in');
+  });
+});
+
+/** 开着省略、关掉写成 true。先从本文件剥掉这些针，再扫。 */
+const CLOSED_ATTR_NEEDLES = [
+  "!open() || undefined",
+  "!open() ? true : undefined",
+  "open() || undefined",
+  "open() ? true : undefined",
+];
+
+function terminalSources(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = resolve(dir, entry.name);
+    if (entry.isDirectory()) out.push(...terminalSources(path));
+    else if (/\.(ts|tsx)$/.test(entry.name)) out.push(path);
+  }
+  return out;
+}
+
+function withoutClosedNeedles(text: string): string {
+  let out = text;
+  for (const needle of CLOSED_ATTR_NEEDLES) out = out.replaceAll(needle, "");
+  return out;
+}
+
+describe("关掉写成 true", () => {
+  it("生产源只调 closedAttr，不再手写开合省略", () => {
+    const composer = load("Composer.tsx");
+    expect(composer.match(/closedAttr\(!open\(\)\)/g)?.length ?? 0).toBe(2);
+    expect(composer.match(/closedAttr\(open\(\)\)/g)?.length ?? 0).toBe(2);
+    const root = dirname(fileURLToPath(import.meta.url));
+    const offenders = terminalSources(root).filter((file) => {
+      let text = readFileSync(file, "utf8");
+      if (file.includes(".test.")) text = withoutClosedNeedles(text);
+      return CLOSED_ATTR_NEEDLES.some((needle) => text.includes(needle));
+    });
+    expect(offenders).toEqual([]);
+  });
+});
+
+const FLAG_ATTR_NEEDLE = '? "true" : "false"';
+
+describe("真假旗", () => {
+  it("生产源只调 flagAttr，不再手写 true/false", () => {
+    const composer = load("Composer.tsx");
+    expect(composer).toContain("data-open={flagAttr(open())}");
+    expect(composer).toContain("data-armed={flagAttr(canSend())}");
+    const root = dirname(fileURLToPath(import.meta.url));
+    const offenders = terminalSources(root).filter((file) => {
+      let text = readFileSync(file, "utf8");
+      if (file.includes(".test.")) text = text.replaceAll(FLAG_ATTR_NEEDLE, "");
+      return text.includes(FLAG_ATTR_NEEDLE);
+    });
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("要不要填参", () => {
+  it("个数大于零只留在 countNeedsInput", () => {
+    const line = load("command-line.ts").replace("return count > 0", "");
+    expect(line).toContain("function countNeedsInput");
+    expect(line).not.toContain("placeholderArity(template) > 0");
+    expect(line).not.toContain("entryArity(entry) > 0");
+  });
+});
+
+describe("模板字段选区", () => {
+  it("同一元素同一回调的摘挂只登记一处", () => {
+    const source = load("manager/TemplateField.tsx");
+    expect(source.split("el.add" + "EventListener").length - 1).toBe(1);
+    expect(source.split("el.remove" + "EventListener").length - 1).toBe(1);
+    expect(source).toContain("listen(");
+  });
+});
+
+describe("搜索命令只写一句", () => {
+  it("library_search_prompt_once", () => {
+    const src = load("LibraryPane.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "搜索命令" + '"')).toBe(1);
+    expect(times("function librarySearchPrompt")).toBe(1);
+    expect(times("export function librarySearchPrompt")).toBe(0);
+    expect(times("librarySearchPrompt()")).toBe(4);
+  });
+});
+
+describe("原始命令只写一句", () => {
+  it("original_command_label_once", () => {
+    const src = load("ParameterDialog.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "原始命令" + '"')).toBe(1);
+    expect(times("function originalCommandLabel")).toBe(1);
+    expect(times("export function originalCommandLabel")).toBe(0);
+    expect(times("originalCommandLabel()")).toBe(3);
+  });
+});
+
+describe("参数描述只写一句", () => {
+  it("param_description_copy_once", () => {
+    const src = load("manager/ParamDescriptions.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "参数描述" + '"')).toBe(1);
+    expect(times("function paramDescriptionCopy")).toBe(1);
+    expect(times("export function paramDescriptionCopy")).toBe(0);
+    expect(times("paramDescriptionCopy()")).toBe(4);
+  });
+});
+
+describe("命令组栏名字只写一句", () => {
+  it("group_column_label_once", () => {
+    const src = load("manager/GroupColumn.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "命令组" + '"')).toBe(1);
+    expect(times("function groupColumnLabel")).toBe(1);
+    expect(times("export function groupColumnLabel")).toBe(0);
+    expect(times("groupColumnLabel()")).toBe(3);
+  });
+});
+
+describe("条目栏名字只写一句", () => {
+  it("entry_column_label_once", () => {
+    const src = load("manager/EntryColumn.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "条目" + '"')).toBe(1);
+    expect(times("function entryColumnLabel")).toBe(1);
+    expect(times("export function entryColumnLabel")).toBe(0);
+    expect(times("entryColumnLabel()")).toBe(3);
+  });
+});
+
+describe("步骤名单名字只写一句", () => {
+  it("step_list_label_once", () => {
+    const src = load("manager/BlockSteps.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('"' + "步骤" + '"')).toBe(1);
+    expect(times("function stepListLabel")).toBe(1);
+    expect(times("export function stepListLabel")).toBe(0);
+    expect(times("stepListLabel()")).toBe(3);
+  });
+});
+
+describe("导入对话框尺寸只取一次", () => {
+  it("import_dialog_box_once", () => {
+    const src = load("ImportDialog.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("importDialog" + "Size()")).toBe(1);
+    expect(times("function importDialogBox")).toBe(1);
+    expect(times("export function importDialogBox")).toBe(0);
+    expect(times("const box = importDialogBox()")).toBe(1);
+  });
+});
+
+describe("导入不再进行中只写一次", () => {
+  it("clear_busy_once", () => {
+    const src = load("ImportDialog.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("setBusy(" + "false)")).toBe(1);
+    expect(times("function clearBusy")).toBe(1);
+    expect(times("export function clearBusy")).toBe(0);
+    expect(times("clearBusy()")).toBe(3);
+  });
+});
+
+describe("填参当前条目只读一次", () => {
+  it("current_entry_once", () => {
+    const src = load("TerminalView.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("input" + "Entry()")).toBe(1);
+    expect(times("function currentEntry")).toBe(1);
+    expect(times("export function currentEntry")).toBe(0);
+    expect(times("currentEntry()")).toBe(3);
+  });
+});
+
+describe("关上填参只写一次", () => {
+  it("close_parameter_once", () => {
+    const src = load("TerminalView.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("setInputOpen(" + "false)")).toBe(1);
+    expect(times("function closeParameter")).toBe(1);
+    expect(times("export function closeParameter")).toBe(0);
+    expect(times("closeParameter()")).toBe(3);
+  });
+});
+
+describe("发送栏发送只转发一次", () => {
+  it("send_composer_once", () => {
+    const src = load("Composer.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("terminalStore.sendAll(" + "props.serials)")).toBe(1);
+    expect(times("function sendComposer")).toBe(1);
+    expect(times("export function sendComposer")).toBe(0);
+    expect(src).toContain("sendComposer()");
+    expect(src).toContain("onClick={sendComposer}");
+  });
+});
+
+describe("树节点条目标签只写一次", () => {
+  it("entry_node_label_once", () => {
+    const src = load("CommandTree.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("label: " + "entry.name")).toBe(1);
+    expect(times("function entryNodeLabel")).toBe(1);
+    expect(times("export function entryNodeLabel")).toBe(0);
+    expect(times("...entryNodeLabel(entry)")).toBe(2);
+  });
+});
+
+describe("树节点条目数据只写一次", () => {
+  it("entry_node_data_once", () => {
+    const src = load("CommandTree.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("data: " + "entry")).toBe(1);
+    expect(times("function entryNodeData")).toBe(1);
+    expect(times("export function entryNodeData")).toBe(0);
+    expect(times("...entryNodeData(entry)")).toBe(2);
+  });
+});
+
+describe("钉底下一帧只登记一次", () => {
+  it("schedule_pin_once", () => {
+    const src = load("ResultStream.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("window.requestAnimationFrame(" + "tick)")).toBe(1);
+    expect(times("function schedulePin")).toBe(1);
+    expect(times("export function schedulePin")).toBe(0);
+    expect(times("schedulePin(tick)")).toBe(2);
+  });
+});
+
+describe("模板控件只读一次", () => {
+  it("field_el_once", () => {
+    const src = load("manager/TemplateField.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("return " + "input()")).toBe(1);
+    expect(times("function fieldEl")).toBe(1);
+    expect(times("export function fieldEl")).toBe(0);
+    expect(times("const el = fieldEl()")).toBe(2);
+  });
+});
+
+describe("光标收成同一选区只写一次", () => {
+  it("caret_span_once", () => {
+    const src = load("manager/TemplateField.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("start: caret, " + "end: caret")).toBe(1);
+    expect(times("next.caret, " + "next.caret")).toBe(0);
+    expect(times("function caretSpan")).toBe(1);
+    expect(times("export function caretSpan")).toBe(0);
+    expect(times("caretSpan(next.caret)")).toBe(1);
   });
 });

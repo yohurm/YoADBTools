@@ -5,7 +5,7 @@
 
 import { Show, onCleanup } from "solid-js";
 
-import { errorText } from "@yohu/api";
+import { writeClipboard, clipboardFailureText, errorText } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -50,7 +50,7 @@ export function CommandManager() {
   };
 
   const openCommandMenu = (entry: DraftEntry, event: MouseEvent): void => {
-    if (!store.ui.selectedEntryIds.includes(entry.id)) {
+    if (!store.selectedEntrySet().has(entry.id)) {
       store.selectOnly(entry.id);
     }
     const text = commandCopyLines(store.selectedCommands().map((command) => command.template));
@@ -60,9 +60,9 @@ export function CommandManager() {
       ctx: {
         canCopy: text.length > 0,
         copy: () => {
-          void navigator.clipboard.writeText(text).catch((e: unknown) => {
-            const detail = e instanceof Error ? e.message : "复制失败";
-            toaster.show(`复制失败: ${detail}`, "error");
+          void writeClipboard(text).then((result) => {
+            const failure = clipboardFailureText(result);
+            if (failure) toaster.show(failure, "error");
           });
         },
         remove: () => store.removeEntries(),

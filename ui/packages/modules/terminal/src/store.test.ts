@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandBlockDto, CommandDto, CommandGroupDto, TaskInfo } from "@yohu/api";
@@ -7,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   groupRun: vi.fn(),
   blockRun: vi.fn(),
   groupCancel: vi.fn(),
+  commandlibPreview: vi.fn(),
+  commandlibApply: vi.fn(),
   progress: [] as Array<(e: { run_id: number; serial: string; template: string; message?: string }) => void>,
   tasks: [] as Array<(e: { tasks: TaskInfo[] }) => void>,
 }));
@@ -17,6 +22,8 @@ vi.mock("@yohu/api", async () => {
     ...actual,
     commandlibLoad: vi.fn(),
     commandlibSave: vi.fn(),
+    commandlibPreview: (...a: unknown[]) => mocks.commandlibPreview(...a),
+    commandlibApply: (...a: unknown[]) => mocks.commandlibApply(...a),
     groupRun: (...a: unknown[]) => mocks.groupRun(...a),
     blockRun: (...a: unknown[]) => mocks.blockRun(...a),
     groupCancel: (...a: unknown[]) => mocks.groupCancel(...a),
@@ -78,6 +85,8 @@ describe("send / 队列 / runGroup 目标设备", () => {
     mocks.groupRun.mockReset();
     mocks.blockRun.mockReset();
     mocks.groupCancel.mockReset();
+    mocks.commandlibPreview.mockReset();
+    mocks.commandlibApply.mockReset();
   });
 
   it("库命令填充后入队，sendAll 走 terminal.exec", async () => {
@@ -85,7 +94,7 @@ describe("send / 队列 / runGroup 目标设备", () => {
       { serial: "A1", ok: true, message: "", stdout: "ok", duration_ms: 1, exit_code: 0, stderr: "" },
     ]);
     const store = createTerminalStore();
-    store.enqueueCommand(COMMAND, ["hi"]);
+    store.enqueueEntry({ kind: "command", ...COMMAND }, ["hi"]);
     expect(store.session.queue).toHaveLength(1);
     const sending = store.sendAll(["A1"]);
     await sending;
@@ -95,6 +104,17 @@ describe("send / 队列 / runGroup 目标设备", () => {
       serials: ["A1"],
     });
     expect(texts(store)).toEqual(["in:adb -s A1 echo hi", "out:ok"]);
+  });
+
+  it("空步骤的块不入队，有步骤的块整段入队", () => {
+    const store = createTerminalStore();
+    store.enqueueEntry({ kind: "block", id: "empty", name: "空", gap_ms: 0, steps: [] }, []);
+    expect(store.session.queue).toHaveLength(0);
+    store.enqueueEntry(
+      { kind: "block", id: "b", name: "两步", gap_ms: 200, steps: [{ template: "echo a" }] },
+      ["x"],
+    );
+    expect(store.session.queue[0]).toMatchObject({ kind: "block", title: "两步", values: ["x"] });
   });
 
   it("开启 prepend 时发送与展示都带 adb", async () => {
@@ -108,18 +128,19 @@ describe("send / 队列 / runGroup 目标设备", () => {
     expect(texts(store)).toEqual(["in:adb -s A1 shell ls", "out:list"]);
   });
 
-  it("空目标不调用 IPC，仍记输入输出行", async () => {
-    mocks.terminalExec.mockClear();
-    mocks.groupRun.mockClear();
-    mocks.blockRun.mockClear();
+  it("空目标交给命令边界，输出用领域句", async () => {
+    const empty = { code: "invalid_args", message: "未选择在线设备" };
+    mocks.terminalExec.mockRejectedValue(empty);
+    mocks.groupRun.mockRejectedValue(empty);
+    mocks.blockRun.mockRejectedValue(empty);
     const store = createTerminalStore();
     await store.send([], "echo hi");
     await store.runGroup([], GROUP);
     await store.runBlock([], BLOCK, []);
-    expect(mocks.terminalExec).not.toHaveBeenCalled();
-    expect(mocks.groupRun).not.toHaveBeenCalled();
-    expect(mocks.blockRun).not.toHaveBeenCalled();
-    expect(store.lines.some((row) => row.text === "未选择在线设备")).toBe(true);
+    expect(mocks.terminalExec).toHaveBeenCalledWith({ command: "echo hi", serials: [] });
+    expect(mocks.groupRun).toHaveBeenCalledWith({ group_id: "g1", serials: [] });
+    expect(mocks.blockRun).toHaveBeenCalledWith({ block_id: "b1", values: [], serials: [] });
+    expect(store.lines.filter((row) => row.text === "未选择在线设备")).toHaveLength(3);
   });
 
   it("命令组把传入 serials 原样交给 groupRun，busy 等到 run_id 终态", async () => {
@@ -202,6 +223,8 @@ describe("send / 队列 / runGroup 目标设备", () => {
     await Promise.resolve();
     expect(done).toBe(false);
     expect(store.session.activeRunId).toBe(8);
+    emitProgress({ run_id: 8, serial: "B2", template: "echo", message: "" });
+    expect(store.lines.some((row) => row.kind === "out" && row.text === "")).toBe(true);
     await finishRun(8);
     await running;
     expect(done).toBe(true);
@@ -292,17 +315,23 @@ describe("send / 队列 / runGroup 目标设备", () => {
   });
 
   it("clearResults 清空执行结果面板", async () => {
+    mocks.terminalExec.mockResolvedValue([
+      { serial: "A1", ok: true, message: "", stdout: "ok", duration_ms: 1, exit_code: 0, stderr: "" },
+    ]);
     const store = createTerminalStore();
-    await store.send([], "echo hi");
+    await store.send(["A1"], "echo hi");
     expect(store.lines.length).toBeGreaterThan(0);
     store.clearResults();
     expect(store.lines).toEqual([]);
   });
 
   it("IO 行记下墙钟毫秒，不烘焙展示字符串", async () => {
+    mocks.terminalExec.mockResolvedValue([
+      { serial: "A1", ok: true, message: "", stdout: "ok", duration_ms: 1, exit_code: 0, stderr: "" },
+    ]);
     const before = Date.now();
     const store = createTerminalStore();
-    await store.send([], "echo hi");
+    await store.send(["A1"], "echo hi");
     const after = Date.now();
     expect(store.lines.length).toBeGreaterThan(0);
     for (const row of store.lines) {
@@ -312,6 +341,26 @@ describe("send / 队列 / runGroup 目标设备", () => {
     }
   });
 
+  it("导入预览与提交经 store 换库", async () => {
+    mocks.commandlibPreview.mockResolvedValue({
+      groups: [{ id: "g1", name: "demo", presence: "new", entries: [] }],
+    });
+    mocks.commandlibApply.mockResolvedValue({
+      schema_version: 3,
+      groups: [GROUP],
+    });
+    const store = createTerminalStore();
+    await store.previewImport(["D:/lib.json"]);
+    expect(store.importing.open).toBe(true);
+    expect(store.importing.paths).toEqual(["D:/lib.json"]);
+    expect(mocks.commandlibPreview).toHaveBeenCalledWith(["D:/lib.json"]);
+    await store.applyImport(["c0"]);
+    expect(mocks.commandlibApply).toHaveBeenCalledWith(["D:/lib.json"], ["c0"]);
+    expect(store.importing.open).toBe(false);
+    expect(store.importing.preview).toBeNull();
+    expect(store.library.groups).toEqual([GROUP]);
+  });
+
   it("stdout 空时用 message，不在 combineOutput 里做 fallback", async () => {
     mocks.terminalExec.mockResolvedValue([
       { serial: "A1", ok: true, message: "done", stdout: "", duration_ms: 1, exit_code: 0, stderr: "" },
@@ -319,5 +368,180 @@ describe("send / 队列 / runGroup 目标设备", () => {
     const store = createTerminalStore();
     await store.send(["A1"], "shell ls");
     expect(texts(store)).toEqual(["in:adb -s A1 shell ls", "out:done"]);
+  });
+});
+
+describe("结果、入队和启动失败只各写一处", () => {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+  const view = readFileSync(resolve(dir, "TerminalView.tsx"), "utf8");
+  const stream = readFileSync(resolve(dir, "ResultStream.tsx"), "utf8");
+
+  it("有没有结果行只在 store", () => {
+    expect(src.match(/lines\.length > 0/g)?.length ?? 0).toBe(1);
+    expect(view).not.toContain("lines.length > 0");
+    expect(stream).not.toContain("lines.length > 0");
+  });
+
+  it("入队打开发送栏只写一次", () => {
+    expect(src.match(/setSession\("composerOpen", true\)/g)?.length ?? 0).toBe(1);
+  });
+
+  it("组块启动失败只记一次", () => {
+    expect(src.match(/pushOut\(errorText\(e\)\)/g)?.length ?? 0).toBe(0);
+    expect(src.match(/pushOut\(errorText\(error\)\)/g)?.length ?? 0).toBe(1);
+  });
+
+  it("发送空白行不看 if (!line)", () => {
+    expect(src).not.toContain("if (!line)");
+  });
+
+  it("push_error_once", () => {
+    const needle = "pushOut(" + "errorText";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("pushError(");
+  });
+
+  it("push_adb_in_once", () => {
+    const needle = "pushLine(\"in\", " + "formatAdbLine";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("pushAdbIn(");
+  });
+
+  it("draft_trimmed_present_once", () => {
+    expect(src).not.toContain("trim().length");
+    expect(src).toContain("trimmedTextPresent");
+    let cursor = dir;
+    let index = "";
+    for (;;) {
+      const candidate = resolve(cursor, "packages/ui/src/index.ts");
+      if (existsSync(candidate)) {
+        index = readFileSync(candidate, "utf8");
+        break;
+      }
+      const parent = dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    expect(index).toContain("trimmedTextPresent");
+  });
+});
+
+describe("关上导入预览只写一处", () => {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+
+  it("close_import_once", () => {
+    const needle = "setImporting({ open: false" + ", paths: [], preview: null })";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("closeImport(");
+  });
+});
+
+describe("会话忙碌只读一次", () => {
+  it("session_busy_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const composer = readFileSync(resolve(dir, "Composer.tsx"), "utf8");
+    const view = readFileSync(resolve(dir, "TerminalView.tsx"), "utf8");
+    const times = (text: string, needle: string) => text.split(needle).length - 1;
+    const needle = "session" + ".busy";
+    expect(times(src, needle)).toBe(1);
+    expect(times(composer, needle)).toBe(0);
+    expect(times(view, needle)).toBe(0);
+    expect(times(src, "function busy")).toBe(1);
+    expect(times(src, "export function busy")).toBe(0);
+    expect(composer).toContain("terminalStore.busy()");
+    expect(view).toContain("terminalStore.busy()");
+  });
+});
+
+describe("清掉活动运行只写一次", () => {
+  it("clear_active_run_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('setSession("activeRunId", ' + "null)")).toBe(1);
+    expect(times("function clearActiveRun")).toBe(1);
+    expect(times("export function clearActiveRun")).toBe(0);
+    expect(times("clearActiveRun()")).toBe(3);
+  });
+});
+
+describe("发送日志明细只拼一次", () => {
+  it("command_detail_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("{ command: prepared, " + "serials }")).toBe(1);
+    expect(times("function commandDetail")).toBe(1);
+    expect(times("export function commandDetail")).toBe(0);
+    expect(times("commandDetail(prepared, serials)")).toBe(3);
+  });
+});
+
+describe("日志里的错误原文只取一次", () => {
+  it("error_detail_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("errorText(" + "e)")).toBe(1);
+    expect(times("function errorDetail")).toBe(1);
+    expect(times("export function errorDetail")).toBe(0);
+    expect(times("errorDetail(e)")).toBe(2);
+  });
+});
+
+describe("换上内存库只写一次", () => {
+  it("adopt_library_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("setLibrary(" + "dto)")).toBe(1);
+    expect(times("function adoptLibrary")).toBe(1);
+    expect(times("export function adoptLibrary")).toBe(0);
+    expect(times("adoptLibrary(dto)")).toBe(2);
+  });
+});
+
+describe("没有等待就返回只写一次", () => {
+  it("with_wait_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("const current = " + "wait")).toBe(1);
+    expect(times("if (!current) " + "return")).toBe(1);
+    expect(times("function withWait")).toBe(1);
+    expect(times("export function withWait")).toBe(0);
+    expect(times("withWait(")).toBe(3);
+  });
+});
+
+describe("还是这次排空只比一次", () => {
+  it("same_drain_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("gen === " + "drainGen")).toBe(1);
+    expect(times("gen !== " + "drainGen")).toBe(0);
+    expect(times("function sameDrain")).toBe(1);
+    expect(times("export function sameDrain")).toBe(0);
+    expect(times("sameDrain(gen)")).toBe(2);
+  });
+});
+
+describe("下一个队列编号只加一次", () => {
+  it("next_queued_id_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("nextQueueId" + "++")).toBe(1);
+    expect(times("function nextQueuedId")).toBe(1);
+    expect(times("export function nextQueuedId")).toBe(0);
+    expect(times("nextQueuedId()")).toBe(3);
+  });
+});
+
+describe("等这次运行结束只写一次", () => {
+  it("wait_run_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("await await" + "Run(runId)")).toBe(1);
+    expect(times("function waitRun")).toBe(1);
+    expect(times("export function waitRun")).toBe(0);
+    expect(times("await waitRun(runId)")).toBe(2);
   });
 });

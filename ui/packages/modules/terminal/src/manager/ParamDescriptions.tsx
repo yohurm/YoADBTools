@@ -3,10 +3,14 @@
  * 增删走公开 YoListPresence（配方 list），禁止本模块自写进出场。
  */
 
-import type { CommandParamDto } from "@yohu/api";
+import { paramDescription, type CommandParamDto } from "@yohu/api";
 import { YoListPresence, YoPresence, YoSubheader, YoTextField } from "@yohu/ui";
 
-import { paramDescription, setParamDescription } from "../command-line";
+import { commandParamLabel, setParamDescription } from "../command-line";
+
+function paramDescriptionCopy(): string {
+  return "参数描述";
+}
 
 export function ParamDescriptions(props: {
   slots: number[];
@@ -15,18 +19,18 @@ export function ParamDescriptions(props: {
   title?: string;
   onChange: (params: CommandParamDto[]) => void;
 }) {
-  const labelOf = (index: number): string => props.labelOf?.(index) ?? `{${index}}`;
+  const labelOf = (index: number): string => props.labelOf?.(index) ?? commandParamLabel(index);
   return (
-    <div class="yohu-cm__param-descs" aria-label="参数描述">
+    <div class="yohu-cm__param-descs" aria-label={paramDescriptionCopy()}>
       <YoPresence when={props.slots.length > 0} recipe="list">
-        <YoSubheader title={props.title ?? "参数描述"} pad="flush" />
+        <YoSubheader title={props.title ?? paramDescriptionCopy()} pad="flush" />
       </YoPresence>
       <YoListPresence each={props.slots} key={(index) => index}>
         {(index) => (
           <YoTextField
             block
             label={labelOf(index)}
-            placeholder="参数描述"
+            placeholder={paramDescriptionCopy()}
             value={paramDescription(props.params, index)}
             onInput={(value) => props.onChange(setParamDescription(props.params, index, value))}
           />

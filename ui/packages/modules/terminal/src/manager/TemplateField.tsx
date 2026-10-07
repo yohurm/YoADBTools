@@ -5,9 +5,14 @@
 
 import { createEffect, createSignal, onCleanup } from "solid-js";
 
+import { commandBody } from "@yohu/api";
 import { YoButton, YoTextField, type YoTextFieldControl } from "@yohu/ui";
 
-import { commandBody, formatAdbLine, insertPlaceholderAtDisplay } from "../command-line";
+import { commandCopyText, insertPlaceholderAtDisplay } from "../command-line";
+
+function caretSpan(caret: number): { start: number; end: number } {
+  return { start: caret, end: caret };
+}
 
 export function TemplateField(props: {
   label?: string;
@@ -18,10 +23,14 @@ export function TemplateField(props: {
   const [input, setInput] = createSignal<YoTextFieldControl | undefined>();
   let range = { start: 0, end: 0 };
 
-  const display = (): string => formatAdbLine("-", props.value);
+  const display = (): string => commandCopyText(props.value);
+
+  function fieldEl(): YoTextFieldControl | undefined {
+    return input();
+  }
 
   createEffect(() => {
-    const el = input();
+    const el = fieldEl();
     if (!el) return;
     const save = (): void => {
       range = {
@@ -29,31 +38,36 @@ export function TemplateField(props: {
         end: el.selectionEnd ?? el.selectionStart ?? 0,
       };
     };
-    el.addEventListener("select", save);
-    el.addEventListener("keyup", save);
-    el.addEventListener("mouseup", save);
-    el.addEventListener("focus", save);
-    el.addEventListener("input", save);
+    const listen = (type: "select" | "keyup" | "mouseup" | "focus" | "input"): (() => void) => {
+      el.addEventListener(type, save);
+      return () => el.removeEventListener(type, save);
+    };
+    const stopSelect = listen("select");
+    const stopKeyup = listen("keyup");
+    const stopMouseup = listen("mouseup");
+    const stopFocus = listen("focus");
+    const stopInput = listen("input");
     onCleanup(() => {
-      el.removeEventListener("select", save);
-      el.removeEventListener("keyup", save);
-      el.removeEventListener("mouseup", save);
-      el.removeEventListener("focus", save);
-      el.removeEventListener("input", save);
+      stopSelect();
+      stopKeyup();
+      stopMouseup();
+      stopFocus();
+      stopInput();
     });
   });
 
   const insert = (): void => {
-    const el = input();
+    const el = fieldEl();
     const focused = el !== undefined && document.activeElement === el;
     const start = focused ? (el.selectionStart ?? range.start) : display().length;
     const end = focused ? (el.selectionEnd ?? range.end) : start;
     const next = insertPlaceholderAtDisplay(props.value, start, end);
     props.onChange(next.body);
+    const span = caretSpan(next.caret);
     requestAnimationFrame(() => {
       el?.focus();
-      el?.setSelectionRange(next.caret, next.caret);
-      range = { start: next.caret, end: next.caret };
+      el?.setSelectionRange(span.start, span.end);
+      range = span;
     });
   };
 

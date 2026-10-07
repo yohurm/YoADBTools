@@ -23,7 +23,7 @@ export function BlockEditor(props: { block: DraftBlock; store: CommandManagerSto
         block
         label="命令块名称"
         value={props.block.name}
-        onInput={(v) => props.store.updateEntry({ name: v })}
+        onInput={(v) => props.store.setEntryName(v)}
       />
       <YoFormRow title="间隔">
         <YoSelect

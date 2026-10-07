@@ -4,6 +4,8 @@
  */
 
 import type { CommandGroupDto, LibraryEntryDto } from "@yohu/api";
+
+import { entryTemplates } from "./command-line";
 import {
   expandSearchGroups,
   normalizeSearchQuery,
@@ -18,15 +20,18 @@ export type LibrarySearchItem = {
   entry: LibraryEntryDto;
 };
 
-function entryTemplateText(entry: LibraryEntryDto): string {
-  return entry.kind === "command" ? entry.template : entry.steps.map((step) => step.template).join("\n");
+function eachLibraryGroup(
+  groups: readonly CommandGroupDto[],
+  visit: (group: CommandGroupDto) => void,
+): void {
+  for (const group of groups) visit(group);
 }
 
 export function librarySearchDocuments(
   groups: readonly CommandGroupDto[],
 ): SearchDocument<LibrarySearchItem>[] {
   const docs: SearchDocument<LibrarySearchItem>[] = [];
-  for (const group of groups) {
+  eachLibraryGroup(groups, (group) => {
     for (const entry of group.entries) {
       docs.push({
         id: entry.id,
@@ -34,12 +39,12 @@ export function librarySearchDocuments(
         group: group.id,
         fields: [
           { key: "name", text: entry.name, weight: 3 },
-          { key: "template", text: entryTemplateText(entry), weight: 1 },
+          { key: "template", text: entryTemplates(entry).join("\n"), weight: 1 },
           { key: "group", text: group.name, weight: 2 },
         ],
       });
     }
-  }
+  });
   return docs;
 }
 
@@ -64,9 +69,9 @@ export function filterLibraryGroups(
     byGroup.set(item.groupId, list);
   }
   const out: CommandGroupDto[] = [];
-  for (const group of groups) {
+  eachLibraryGroup(groups, (group) => {
     const entries = byGroup.get(group.id);
     if (entries && entries.length > 0) out.push({ ...group, entries });
-  }
+  });
   return out;
 }

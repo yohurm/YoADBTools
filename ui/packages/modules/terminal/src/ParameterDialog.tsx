@@ -6,19 +6,23 @@
 import { For, createEffect, createMemo, createSignal } from "solid-js";
 
 import type { LibraryEntryDto } from "@yohu/api";
-import { YoButton, YoDialog, YoScroller, YoSubheader, YoTextField } from "@yohu/ui";
+import { YoButton, YoDialog, YoScroller, YoSubheader, YoTextField, resolveDialogOpen, type YoDialogProps } from "@yohu/ui";
 
-import { entryFillFields, entryTemplates, formatAdbLine, type FillField } from "./command-line";
+import { commandCopyText, entryFillFields, entryTemplates, type FillField } from "./command-line";
 import { PARAM_DIALOG_WIDTH } from "./layout";
 
 function fieldLabel(field: FillField): string {
   return field.description ? `${field.label} ${field.description}` : field.label;
 }
 
+function originalCommandLabel(): string {
+  return "原始命令";
+}
+
 export function ParameterDialog(props: {
   title: string;
   entry: LibraryEntryDto | null;
-  open: () => boolean;
+  open: YoDialogProps["open"];
   onClose: () => void;
   onExitComplete?: () => void;
   onSubmit: (values: string[]) => void;
@@ -27,7 +31,7 @@ export function ParameterDialog(props: {
   const fields = createMemo(() => (props.entry ? entryFillFields(props.entry) : []));
 
   createEffect((wasOpen?: boolean) => {
-    const now = props.open();
+    const now = resolveDialogOpen(props.open);
     if (!wasOpen && now) {
       setValues(fields().map(() => ""));
     }
@@ -35,7 +39,7 @@ export function ParameterDialog(props: {
   });
 
   const originals = (): string[] =>
-    props.entry ? entryTemplates(props.entry).map((template) => formatAdbLine("-", template)) : [];
+    props.entry ? entryTemplates(props.entry).map((template) => commandCopyText(template)) : [];
 
   const submit = (): void => {
     props.onSubmit(values());
@@ -61,13 +65,13 @@ export function ParameterDialog(props: {
       <YoScroller>
         <div class="yohu-terminal__params">
           <section class="yohu-terminal__params-section">
-            <YoSubheader title="原始命令" pad="flush" />
+            <YoSubheader title={originalCommandLabel()} pad="flush" />
             <YoTextField
               block
               readOnly
               multiline
               font="mono"
-              ariaLabel="原始命令"
+              ariaLabel={originalCommandLabel()}
               rows={Math.max(1, originals().length)}
               value={originals().join("\n")}
             />

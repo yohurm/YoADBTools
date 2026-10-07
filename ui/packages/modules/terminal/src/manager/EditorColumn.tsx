@@ -15,7 +15,9 @@ import {
   asCommand,
   asGroup,
   editorPaneTitle,
+  editorShowsForm,
   editorTarget,
+  editorTargetIsEmpty,
   multiCount,
 } from "./editor-target";
 import type { CommandManagerStore } from "./store";
@@ -25,14 +27,13 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
     editorTarget({
       group: props.store.selectedGroup(),
       entry: props.store.selectedEntry(),
-      selectedEntryCount: props.store.ui.selectedEntryIds.length,
+      selectedEntryCount: props.store.selectedEntrySet().size,
     }),
   );
   const title = createMemo(() => editorPaneTitle(target()));
 
   return (
     <YoPanel
-      class="yohu-cm__editor"
       variant="pane"
       padding="md"
       overflow="hidden"
@@ -44,13 +45,13 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
         ) : undefined
       }
     >
-      <Show when={target().kind === "empty"}>
+      <Show when={editorTargetIsEmpty(target())}>
         <YoEmptyState fill size="sm" title="选择左侧命令组，或新建一组" />
       </Show>
       <Show when={multiCount(target())}>
         {(count) => <YoEmptyState fill size="sm" title={`已选 ${count()} 条`} />}
       </Show>
-      <Show when={target().kind === "command" || target().kind === "block" || target().kind === "group"}>
+      <Show when={editorShowsForm(target())}>
         <YoScroller>
           <div class="yohu-cm__editor-stack">
           <Show when={asCommand(target())} keyed>

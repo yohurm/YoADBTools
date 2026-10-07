@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { CommandGroupDto } from "@yohu/api";
@@ -63,5 +66,16 @@ describe("命令库检索", () => {
     expect(filterLibraryGroups(groups, "wlltx").map((group) => group.entries.map((entry) => entry.id))).toEqual([
       ["c-ping"],
     ]);
+  });
+});
+
+describe("命令库按组走一遍", () => {
+  it("each_library_group_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "search.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("for (const group of " + "groups)")).toBe(1);
+    expect(times("function eachLibraryGroup")).toBe(1);
+    expect(times("export function eachLibraryGroup")).toBe(0);
+    expect(times("eachLibraryGroup(groups")).toBe(2);
   });
 });

@@ -6,6 +6,11 @@ import { type KeyBinding, type PanelKeyContext } from "@yohu/ui";
 
 export type CommandManagerKeyAction = "select-all";
 
+/** 全选条目。与文件、日志的全选不是同一类型。 */
+export function commandManagerKeyIsSelectAll(action: CommandManagerKeyAction): boolean {
+  return action === "select-all";
+}
+
 export const COMMAND_MANAGER_LIST_SELECTOR = ".yohu-cm__list";
 
 const whenManagerList = (ctx: PanelKeyContext): boolean => ctx.inList && !ctx.inEditable;

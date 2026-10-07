@@ -7,3 +7,8 @@ export function commandBlockGapLabel(ms: number): string {
   if (ms % 1000 === 0) return `${ms / 1000} 秒`;
   return `${ms} 毫秒`;
 }
+
+/** 树节点标题和发送队列共用的块摘要。 */
+export function commandBlockSummary(stepCount: number, gapMs: number): string {
+  return `${stepCount} 条 · 间隔 ${commandBlockGapLabel(gapMs)}`;
+}

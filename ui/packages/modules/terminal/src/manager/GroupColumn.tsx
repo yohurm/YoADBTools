@@ -1,21 +1,25 @@
 /**
- * 命令管理左栏：组 listbox。选区走 YoVirtualList 单选。
- * 铬走 YoPanel pane，与中栏 / 编辑栏同一圆角。
- * 整行按住拖动换位走 YoVirtualList onReorder。
+ * 命令管理左栏：组操作面板。
+ * 底色走 YoPanel role=ops（顶栏白、内容灰）。
+ * 功能集摊到 YoVirtualList；行内容是 YoOpsItem。只要单选和换位。
  */
 
-import { YoBadge, YoIconButton, YoPanel, YoSubheader, YoToolbar, YoVirtualList } from "@yohu/ui";
+import { YoBadge, YoIconButton, YoOpsItem, YoPanel, YoSubheader, YoToolbar, YoVirtualList, controlRowHeight, opsListBindings } from "@yohu/ui";
 
 import type { DraftGroup } from "../draft";
-import { controlRowHeight } from "../layout";
+import { draftRowTitle } from "./editor-target";
 import type { CommandManagerStore } from "./store";
+
+function groupColumnLabel(): string {
+  return "命令组";
+}
 
 function GroupRow(props: { item: DraftGroup; index: number }) {
   return (
-    <div class="yohu-cm__row">
-      <span class="yohu-cm__row-name">{props.item.name || "（未命名）"}</span>
-      <YoBadge text={String(props.item.entries.length)} tone="neutral" />
-    </div>
+    <YoOpsItem
+      title={draftRowTitle(props.item.name)}
+      trailing={<YoBadge text={String(props.item.entries.length)} tone="neutral" />}
+    />
   );
 }
 
@@ -24,25 +28,27 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
   const rowHeight = controlRowHeight();
 
   return (
-    <YoPanel class="yohu-cm__groups" variant="pane" overflow="hidden" header={
+    <YoPanel variant="pane" overflow="hidden" padding="xs" role="ops" header={
       <YoToolbar pad="xs">
-        <YoSubheader title="命令组" pad="flush" />
+        <YoSubheader title={groupColumnLabel()} pad="flush" />
         <YoIconButton icon="plus" title="新增组" onClick={() => props.store.addGroup()} />
         <YoIconButton icon="trash" title="删除组" onClick={() => props.store.removeGroup()} />
       </YoToolbar>
     }>
-      <div class="yohu-cm__list">
-        <YoVirtualList<DraftGroup>
-          items={groups}
-          itemHeight={rowHeight}
-          getItemKey={(group) => group.id}
-          ariaLabel="命令组"
-          selectedKey={() => props.store.ui.selectedGroupId}
-          onSelectRow={(group) => props.store.selectGroup(group.id)}
-          onReorder={(from, to) => props.store.moveGroupTo(from, to)}
-          renderRow={GroupRow}
-        />
-      </div>
+      <YoVirtualList
+        class="yohu-cm__list"
+        items={groups}
+        itemHeight={rowHeight}
+        getItemKey={(group) => group.id}
+        ariaLabel={groupColumnLabel()}
+        renderRow={GroupRow}
+        {...opsListBindings({
+          features: ["select", "reorder"],
+          selectedKey: () => props.store.ui.selectedGroupId,
+          onSelectRow: (group) => props.store.selectGroup(group.id),
+          onReorder: (from, to) => props.store.moveGroupTo(from, to),
+        })}
+      />
     </YoPanel>
   );
 }

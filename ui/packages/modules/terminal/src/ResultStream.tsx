@@ -16,7 +16,11 @@ import {
 import type { TerminalTimeFormat } from "@yohu/api";
 import { formatClockFromMs } from "@yohu/api";
 
-import { terminalStore, type IoLine } from "./store";
+import { terminalStore, ioLineIsIn, type IoLine } from "./store";
+
+function schedulePin(tick: FrameRequestCallback): number {
+  return window.requestAnimationFrame(tick);
+}
 
 function IoRow(props: { line: IoLine; format: TerminalTimeFormat }) {
   return (
@@ -24,11 +28,11 @@ function IoRow(props: { line: IoLine; format: TerminalTimeFormat }) {
       <span
         class="yohu-terminal__mark"
         classList={{
-          "yohu-terminal__mark--in": props.line.kind === "in",
-          "yohu-terminal__mark--out": props.line.kind === "out",
+          "yohu-terminal__mark--in": ioLineIsIn(props.line.kind),
+          "yohu-terminal__mark--out": !ioLineIsIn(props.line.kind),
         }}
       >
-        {props.line.kind === "in" ? ">>>" : "<<<"}
+        {ioLineIsIn(props.line.kind) ? ">>>" : "<<<"}
       </span>
       <time class="yohu-terminal__line-time">{formatClockFromMs(props.line.at, props.format)}</time>
       <span class="yohu-terminal__line-text">{props.line.text}</span>
@@ -38,7 +42,6 @@ function IoRow(props: { line: IoLine; format: TerminalTimeFormat }) {
 
 export function ResultStream(props: { format: TerminalTimeFormat }) {
   let scroller: YoScrollerHandle | undefined;
-  const hasLines = (): boolean => terminalStore.lines.length > 0;
 
   createEffect(() => {
     const count = terminalStore.lines.length;
@@ -54,20 +57,20 @@ export function ResultStream(props: { format: TerminalTimeFormat }) {
     const tick = (now: number): void => {
       pin();
       if (now - started < hold) {
-        frame = window.requestAnimationFrame(tick);
+        frame = schedulePin(tick);
       }
     };
-    frame = window.requestAnimationFrame(tick);
+    frame = schedulePin(tick);
     onCleanup(() => window.cancelAnimationFrame(frame));
   });
 
   return (
     <div
       class="yohu-terminal__stream"
-      classList={{ "yohu-terminal__stream--empty": !hasLines() }}
+      classList={{ "yohu-terminal__stream--empty": !terminalStore.hasLines() }}
     >
       <Show
-        when={hasLines()}
+        when={terminalStore.hasLines()}
         fallback={
           <YoEmptyState
             icon="terminal"

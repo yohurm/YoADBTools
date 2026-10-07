@@ -5,40 +5,55 @@
 
 import { createMemo, createSignal } from "solid-js";
 
-import { YoPanel, YoScroller, YoSearch } from "@yohu/ui";
+import { panelHotEdge, YoPanel, YoScroller, YoSearch } from "@yohu/ui";
 import type { LibraryEntryDto } from "@yohu/api";
 
-import { CommandTree } from "./CommandTree";
+import { CommandTree, libraryGroupKey } from "./CommandTree";
+import { createLibraryDrop } from "./library-drop";
 import { filterLibraryGroups, normalizeSearchQuery } from "./search";
 import { terminalStore } from "./store";
 
 const LIBRARY_SEARCH_ID = "yohu-terminal-library-search";
 
-export function LibraryPane(props: { onNeedValues: (entry: LibraryEntryDto) => void }) {
+function librarySearchPrompt(): string {
+  return "搜索命令";
+}
+
+export function LibraryPane(props: {
+  onNeedValues: (entry: LibraryEntryDto) => void;
+  onImportPaths: (paths: string[]) => void;
+}) {
   const [open, setOpen] = createSignal(false);
   const [query, setQuery] = createSignal("");
+  let paneEl: HTMLDivElement | undefined;
+  const drop = createLibraryDrop({
+    paneEl: () => paneEl,
+    onDrop: props.onImportPaths,
+  });
 
   const groups = createMemo(() => filterLibraryGroups(terminalStore.library.groups, query()));
 
   return (
-    <YoPanel
-      variant="pane"
-      padding="sm"
-      overflow="hidden"
-      title="命令库"
-      actions={
-        <YoSearch
-          id={LIBRARY_SEARCH_ID}
-          slot="entry"
-          collapsible
-          open={open()}
-          onOpenChange={setOpen}
-          value={query()}
-          onInput={setQuery}
-          title="搜索命令"
-        />
-      }
-    >
+    <div class="yohu-terminal__library" ref={paneEl}>
+      <YoPanel
+        variant="pane"
+        padding="sm"
+        overflow="hidden"
+        edge={panelHotEdge(drop.hot())}
+        title="命令库"
+        actions={
+          <YoSearch
+            id={LIBRARY_SEARCH_ID}
+            slot="entry"
+            collapsible
+            open={open()}
+            onOpenChange={setOpen}
+            value={query()}
+            onInput={setQuery}
+            title={librarySearchPrompt()}
+          />
+        }
+      >
       <YoSearch
         id={LIBRARY_SEARCH_ID}
         slot="bar"
@@ -47,17 +62,18 @@ export function LibraryPane(props: { onNeedValues: (entry: LibraryEntryDto) => v
         onOpenChange={setOpen}
         value={query()}
         onInput={setQuery}
-        ariaLabel="搜索命令"
-        placeholder="搜索命令"
+        ariaLabel={librarySearchPrompt()}
+        placeholder={librarySearchPrompt()}
       />
       <YoScroller>
         <CommandTree
           groups={groups()}
           sourceEmpty={terminalStore.library.groups.length === 0}
-          expandedKeys={normalizeSearchQuery(query()) ? groups().map((group) => `g:${group.id}`) : undefined}
+          expandedKeys={normalizeSearchQuery(query()) ? groups().map((group) => libraryGroupKey(group.id)) : undefined}
           onNeedValues={props.onNeedValues}
         />
       </YoScroller>
-    </YoPanel>
+      </YoPanel>
+    </div>
   );
 }
