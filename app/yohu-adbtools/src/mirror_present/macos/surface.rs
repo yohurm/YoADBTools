@@ -1,6 +1,6 @@
 //! 呈现线程：Cmd → Stage / DecodeBind；NSView 只在主线程碰。
 
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -8,7 +8,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
 use yohu_protocol::AppEvent;
 
-use super::super::backend::Cmd;
+use super::super::backend::{poll_ready, poll_timeout, Cmd, SurfacePoll};
 use super::decode::DecodeBind;
 use super::host::Host;
 use super::view;
@@ -22,14 +22,12 @@ pub fn spawn_surface(
     event_tx: tokio_mpsc::Sender<AppEvent>,
 ) -> Sender<Cmd> {
     let (tx, rx) = mpsc::channel::<Cmd>();
-    std::thread::Builder::new()
-        .name(format!("mirror-present-{serial}"))
-        .spawn(move || {
-            if let Err(e) = run_loop(serial, owner, mirror, event_tx, rx) {
-                tracing::error!("投屏呈现退出: {e}");
-            }
-        })
-        .expect("spawn present thread");
+    let name = crate::mirror_present::present_thread_name(&serial);
+    crate::mirror_present::spawn_present_thread(name, move || {
+        if let Err(e) = run_loop(serial, owner, mirror, event_tx, rx) {
+            crate::mirror_present::present_beat::log_present_exit(&e);
+        }
+    });
     tx
 }
 
@@ -46,13 +44,13 @@ fn run_loop(
     let mut beat = Instant::now();
     let mut need_sync = true;
     loop {
-        match rx.recv_timeout(PRESENT_IDLE) {
-            Ok(Cmd::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
-            Ok(cmd) => {
+        match poll_timeout(rx.recv_timeout(PRESENT_IDLE)) {
+            SurfacePoll::Stop => break,
+            SurfacePoll::Ready(cmd) => {
                 dispatch(&host, cmd, &mut decode);
                 need_sync = true;
             }
-            Err(RecvTimeoutError::Timeout) => {}
+            SurfacePoll::Idle => {}
         }
         if !drain_cmds(&rx, &host, &mut decode) {
             break;
@@ -84,7 +82,7 @@ fn run_loop(
 fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) {
     match cmd {
         Cmd::Layout(layout) => {
-            let mut h = host.lock().expect("present lock poisoned");
+            let mut h = super::super::lock_present(host);
             h.apply_layout(&layout);
         }
         Cmd::BindPipe {
@@ -92,32 +90,25 @@ fn dispatch(host: &Arc<Mutex<Host>>, cmd: Cmd, decode: &mut Option<DecodeBind>) 
             generation,
             pipe,
         } => {
-            host.lock()
-                .expect("present lock poisoned")
-                .bind(serial, generation);
+            super::super::lock_present(host).bind(serial, generation);
             *decode = Some(DecodeBind::new(pipe));
         }
         Cmd::UnbindPipe { serial } => {
-            if host.lock().expect("present lock poisoned").unbind(&serial) {
+            if super::super::lock_present(host).unbind(&serial) {
                 *decode = None;
             }
         }
         Cmd::AdoptContent { width, height } => {
-            host.lock()
-                .expect("present lock poisoned")
+            super::super::lock_present(host)
+                .stage
                 .adopt_encoded_size(width, height);
         }
         Cmd::Screenshot { path, reply } => {
-            let result = host
-                .lock()
-                .expect("present lock poisoned")
-                .screenshot(&path);
+            let result = super::super::lock_present(host).screenshot(&path);
             let _ = reply.send(result);
         }
         Cmd::Pointer { kind, x, y } => {
-            host.lock()
-                .expect("present lock poisoned")
-                .handle_wire_pointer(kind, x, y);
+            super::super::lock_present(host).handle_wire_pointer(kind, x, y);
         }
         Cmd::Shutdown => {}
     }
@@ -129,22 +120,22 @@ fn drain_cmds(
     decode: &mut Option<DecodeBind>,
 ) -> bool {
     loop {
-        match rx.try_recv() {
-            Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return false,
-            Err(TryRecvError::Empty) => return true,
-            Ok(cmd) => dispatch(host, cmd, decode),
+        match poll_ready(rx.try_recv()) {
+            SurfacePoll::Stop => return false,
+            SurfacePoll::Idle => return true,
+            SurfacePoll::Ready(cmd) => dispatch(host, cmd, decode),
         }
     }
 }
 
 fn tick_decode(host: &Arc<Mutex<Host>>, bind: &mut DecodeBind) -> bool {
-    let frames = bind.pull();
+    let frames = bind.pipe.drain_ready();
     if frames.is_empty() {
         return false;
     }
-    if let Some(frame) = frames.iter().find(|f| f.width > 0 && f.height > 0) {
-        host.lock()
-            .expect("present lock poisoned")
+    if let Some(frame) = frames.iter().find(|f| f.has_content_size()) {
+        super::super::lock_present(host)
+            .stage
             .adopt_encoded_size(frame.width, frame.height);
     }
     let Some(pic) = bind.tick.ingest(frames) else {
@@ -152,10 +143,7 @@ fn tick_decode(host: &Arc<Mutex<Host>>, bind: &mut DecodeBind) -> bool {
     };
     bind.tick.note_first(pic.width, pic.height);
     let image = pic.retain_image();
-    let shown = host
-        .lock()
-        .expect("present lock poisoned")
-        .present_picture(pic);
+    let shown = super::super::lock_present(host).present_picture(pic);
     if shown {
         view::present_pixel(image);
     }
@@ -163,6 +151,6 @@ fn tick_decode(host: &Arc<Mutex<Host>>, bind: &mut DecodeBind) -> bool {
 }
 
 fn sync_view(host: &Arc<Mutex<Host>>) {
-    let snap = host.lock().expect("present lock poisoned").layout_snap();
+    let snap = super::super::lock_present(host).layout_snap();
     view::apply_snap(snap);
 }

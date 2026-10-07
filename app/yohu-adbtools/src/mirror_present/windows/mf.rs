@@ -30,6 +30,7 @@ use windows::Win32::Media::MediaFoundation::{
     MF_TRANSFORM_ASYNC, MF_TRANSFORM_ASYNC_UNLOCK, MF_VERSION,
 };
 use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_MULTITHREADED};
+use yohu_mirror::content_size_usable;
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 
@@ -606,7 +607,7 @@ fn current_output_size(mft: &IMFTransform) -> Result<(u32, u32), String> {
     let packed = unsafe { ty.GetUINT64(&MF_MT_FRAME_SIZE) }.map_err(|e| e.to_string())?;
     let width = (packed >> 32) as u32;
     let height = packed as u32;
-    if width == 0 || height == 0 {
+    if !content_size_usable(width, height) {
         return Err("输出帧尺寸为 0".into());
     }
     Ok((width, height))

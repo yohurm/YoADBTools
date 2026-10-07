@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use tokio::sync::mpsc;
 
+use crate::ipc_update::ipc_update;
 use crate::state::AppState;
 use yohu_protocol::{
     AppEvent, AppIdentity, RemoteUpdate, UpdateChannelInfo, UpdateDownloadAccepted,
@@ -29,12 +30,13 @@ impl UpdateRuns {
         }
     }
 
+    fn lock_download_cancel(&self) -> std::sync::MutexGuard<'_, Option<CancellationToken>> {
+        self.download_cancel.lock().expect("update cancel lock poisoned")
+    }
+
     fn replace_cancel(&self) -> CancellationToken {
         let cancel = CancellationToken::new();
-        let mut slot = self
-            .download_cancel
-            .lock()
-            .expect("update cancel lock poisoned");
+        let mut slot = self.lock_download_cancel();
         if let Some(prev) = slot.take() {
             prev.cancel();
         }
@@ -43,10 +45,7 @@ impl UpdateRuns {
     }
 
     fn clear_if_current(&self, cancel: &CancellationToken) {
-        let mut slot = self
-            .download_cancel
-            .lock()
-            .expect("update cancel lock poisoned");
+        let mut slot = self.lock_download_cancel();
         if slot.as_ref().is_some_and(|c| c == cancel) {
             *slot = None;
         }
@@ -77,18 +76,13 @@ impl UpdateRuns {
                 received_bytes: 0,
                 total_bytes: 0,
                 installer_path: None,
-                message: Some(err.to_string()),
+                error: Some(ipc_update(err)),
             },
         );
     }
 
     pub fn cancel(&self) {
-        if let Some(cancel) = self
-            .download_cancel
-            .lock()
-            .expect("update cancel lock poisoned")
-            .take()
-        {
+        if let Some(cancel) = self.lock_download_cancel().take() {
             cancel.cancel();
         }
     }
@@ -117,21 +111,16 @@ pub fn spawn_download(
     } else {
         format!("v{}", request.version.trim_start_matches(['v', 'V']))
     };
-    let task_id = state
-        .tasks
-        .register("下载更新".into(), version_label, None);
+    let task_id = state.tasks.register("下载更新".into(), version_label, None);
     let event_tx = state.event_tx.clone();
     let config_dir = state.paths.config_dir.clone();
     let version = request.version.clone();
     let app = app.clone();
 
     tauri::async_runtime::spawn(async move {
-        let result = download_configured(
-            &config_dir,
-            request,
-            cancel.clone(),
-            |progress| UpdateRuns::emit_progress(&event_tx, progress),
-        )
+        let result = download_configured(&config_dir, request, cancel.clone(), |progress| {
+            UpdateRuns::emit_progress(&event_tx, progress)
+        })
         .await;
         let state = app.state::<AppState>();
         state.update_runs.clear_if_current(&cancel);
@@ -149,14 +138,16 @@ pub fn install(app: &AppHandle, state: &AppState, path: &str) -> Result<(), Upda
     let installer = assert_cached_installer(std::path::Path::new(path))?;
     let relaunch = installed_exe_path()?;
     let pid = std::process::id();
-    let _ = state.event_tx.try_send(AppEvent::UpdateProgress(UpdateProgress {
-        version: String::new(),
-        stage: UpdateStage::Applying,
-        received_bytes: 0,
-        total_bytes: 0,
-        installer_path: None,
-        message: None,
-    }));
+    let _ = state
+        .event_tx
+        .try_send(AppEvent::UpdateProgress(UpdateProgress {
+            version: String::new(),
+            stage: UpdateStage::Applying,
+            received_bytes: 0,
+            total_bytes: 0,
+            installer_path: None,
+            error: None,
+        }));
     let should_exit = spawn_overlay_install(&installer, pid, &relaunch)?;
     if should_exit {
         state.app_log.info("已启动覆盖安装，即将退出以便写入主程序");
@@ -177,6 +168,6 @@ pub fn cancel(state: &AppState) {
 
 pub fn open(url: &str) -> Result<(), UpdateError> {
     let url = yohu_update::assert_http_url(url)?;
-    yohu_runtime::open_url(url).map_err(|e| UpdateError::Io(e.to_string()))?;
+    yohu_runtime::open_url(url).map_err(|_| UpdateError::OpenFailed)?;
     Ok(())
 }

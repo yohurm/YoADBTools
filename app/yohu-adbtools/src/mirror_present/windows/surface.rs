@@ -2,7 +2,7 @@
 
 #![cfg(windows)]
 
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -11,7 +11,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Gdi::InvalidateRect;
 use windows::Win32::UI::WindowsAndMessaging::DestroyWindow;
 use yohu_mirror::MirrorService;
-use yohu_protocol::{AppEvent, MIRROR_MIN_LAYOUT_PX};
+use yohu_protocol::{layout_is_presentable, AppEvent};
 
 use super::d3d::D3dDevice;
 use super::follow::GeomHost;
@@ -20,7 +20,7 @@ use super::host::{self, Host};
 use super::slot::PictureBank;
 use super::window;
 use crate::limits::{PRESENT_BOOTSTRAP_PX, PRESENT_IDLE, PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP};
-use crate::mirror_present::backend::Cmd;
+use crate::mirror_present::backend::{poll_ready, poll_timeout, Cmd, SurfacePoll};
 
 pub fn spawn_surface(
     serial: String,
@@ -32,23 +32,21 @@ pub fn spawn_surface(
     pictures: Arc<PictureBank>,
 ) -> Sender<Cmd> {
     let (tx, rx) = mpsc::channel::<Cmd>();
-    std::thread::Builder::new()
-        .name(format!("mirror-present-{serial}"))
-        .spawn(move || {
-            let ctx = PresentCtx {
-                serial,
-                owner,
-                mirror,
-                event_tx,
-                geom,
-                d3d,
-                pictures,
-            };
-            if let Err(e) = run_loop(ctx, rx) {
-                tracing::error!("投屏呈现退出: {e}");
-            }
-        })
-        .expect("spawn present thread");
+    let name = crate::mirror_present::present_thread_name(&serial);
+    crate::mirror_present::spawn_present_thread(name, move || {
+        let ctx = PresentCtx {
+            serial,
+            owner,
+            mirror,
+            event_tx,
+            geom,
+            d3d,
+            pictures,
+        };
+        if let Err(e) = run_loop(ctx, rx) {
+            crate::mirror_present::present_beat::log_present_exit(&e);
+        }
+    });
     tx
 }
 
@@ -91,13 +89,13 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
         host::follow_host_size(hwnd);
         let mut live = None;
         let mut dirty = false;
-        match rx.recv_timeout(PRESENT_IDLE) {
-            Ok(Cmd::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
-            Ok(cmd) => {
+        match poll_timeout(rx.recv_timeout(PRESENT_IDLE)) {
+            SurfacePoll::Stop => break,
+            SurfacePoll::Ready(cmd) => {
                 live = dispatch(hwnd, cmd, &pictures);
                 dirty = true;
             }
-            Err(RecvTimeoutError::Timeout) => {}
+            SurfacePoll::Idle => {}
         }
         match drain_cmds(&rx, hwnd, &pictures, &mut live) {
             None => break,
@@ -134,6 +132,10 @@ fn run_loop(ctx: PresentCtx, rx: Receiver<Cmd>) -> Result<(), String> {
     Ok(())
 }
 
+fn same_present_identity(serial_a: &str, generation_a: u64, serial_b: &str, generation_b: u64) -> bool {
+    serial_a == serial_b && generation_a == generation_b
+}
+
 fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) -> Option<super::slot::ReadyFrame> {
     match cmd {
         Cmd::Layout(layout) => {
@@ -154,7 +156,7 @@ fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) -> Option<super::slot:
             pipe: _,
         } => {
             let live = pictures.latest().and_then(|(_, frame)| {
-                if frame.serial == serial && frame.generation == generation {
+                if same_present_identity(&frame.serial, frame.generation, &serial, generation) {
                     Some(frame)
                 } else {
                     None
@@ -173,7 +175,7 @@ fn dispatch(hwnd: HWND, cmd: Cmd, pictures: &PictureBank) -> Option<super::slot:
             None
         }
         Cmd::AdoptContent { width, height } => {
-            host::with_host(hwnd, |h| h.adopt_encoded_size(width, height));
+            host::with_host(hwnd, |h| h.stage.adopt_encoded_size(width, height));
             None
         }
         Cmd::Screenshot { path, reply } => {
@@ -199,10 +201,10 @@ fn drain_cmds(
 ) -> Option<bool> {
     let mut more = false;
     loop {
-        match rx.try_recv() {
-            Ok(Cmd::Shutdown) | Err(TryRecvError::Disconnected) => return None,
-            Err(TryRecvError::Empty) => return Some(more),
-            Ok(cmd) => {
+        match poll_ready(rx.try_recv()) {
+            SurfacePoll::Stop => return None,
+            SurfacePoll::Idle => return Some(more),
+            SurfacePoll::Ready(cmd) => {
                 more = true;
                 if let Some(frame) = dispatch(hwnd, cmd, pictures) {
                     *live = Some(frame);
@@ -215,7 +217,7 @@ fn drain_cmds(
 fn tick_picture(hwnd: HWND, pictures: &PictureBank, last_seq: &mut u64) {
     let sized = host::with_host(hwnd, |h| {
         let (w, hgt) = h.stage.host_size();
-        w >= MIRROR_MIN_LAYOUT_PX && hgt >= MIRROR_MIN_LAYOUT_PX
+        layout_is_presentable(w, hgt)
     })
     .unwrap_or(false);
     if !sized {
@@ -228,14 +230,14 @@ fn tick_picture(hwnd: HWND, pictures: &PictureBank, last_seq: &mut u64) {
         return;
     }
     let matched = host::with_host(hwnd, |h| {
-        h.stage.serial == frame.serial && h.stage.generation == frame.generation
+        same_present_identity(&h.stage.serial, h.stage.generation, &frame.serial, frame.generation)
     })
     .unwrap_or(false);
     if !matched {
         return;
     }
     host::with_host(hwnd, |h| {
-        h.adopt_encoded_size(frame.content_w, frame.content_h)
+        h.stage.adopt_encoded_size(frame.content_w, frame.content_h)
     });
     if host::present_picture(
         hwnd,

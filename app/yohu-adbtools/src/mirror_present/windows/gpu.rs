@@ -6,6 +6,7 @@ use windows::core::{Interface, Result as WinResult};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
 use windows::Win32::Graphics::Dxgi::IDXGIDevice;
+use yohu_mirror::content_size_usable;
 
 use super::chrome::{ChromePainter, ChromeSpec};
 use super::convert::YuvConvert;
@@ -13,6 +14,7 @@ use super::d3d::D3dDevice;
 use super::occupancy::{apply_occupancy_clip, attach_dcomp, clip_now, DcompTree};
 use super::present::Present;
 use super::scale::RgbScale;
+
 use crate::mirror_present::scale::Letterbox;
 use crate::mirror_present::stage::OccupancyMotion;
 
@@ -143,7 +145,7 @@ impl Gpu {
         };
         let (width, height) = self.convert.video_size();
         let (cw, ch) = self.convert.content_size();
-        if width == 0 || height == 0 || cw == 0 || ch == 0 {
+        if !content_size_usable(width, height) || !content_size_usable(cw, ch) {
             return Ok(false);
         }
         self.present_cpu_nv12(width, height, cw, ch, &nv12, dest)?;

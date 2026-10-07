@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use crate::state::AppState;
 use yohu_adb::AdbError;
-use yohu_domain::{catalog_after_scan, start_force_forward};
-use yohu_protocol::{AppEvent, DeviceInfo, DeviceState};
+use yohu_domain::{catalog_after_scan, device_is_online, start_force_forward};
+use yohu_protocol::{AppEvent, DeviceInfo};
 use yohu_runtime::atomic_write;
 
 /// 设备目录自动刷新周期。用户只开关，不设间隔。与 DeviceStatusHub 采样同拍。
@@ -33,11 +33,7 @@ type CatalogResult = Result<Vec<DeviceInfo>, CatalogError>;
 
 /// 读目录快照，不触发扫描。
 pub fn snapshot(state: &AppState) -> Vec<DeviceInfo> {
-    state
-        .last_devices
-        .lock()
-        .expect("devices lock poisoned")
-        .clone()
+    state.lock_devices().clone()
 }
 
 /// 启动时恢复上次目录，UI `device.list` 能马上画出卡片；随后扫描会整表替换。
@@ -58,7 +54,7 @@ pub fn restore(state: &AppState) {
         return;
     }
     tracing::info!(n = devices.len(), "已恢复上次设备目录，等待扫描对账");
-    *state.last_devices.lock().expect("devices lock poisoned") = devices;
+    *state.lock_devices() = devices;
 }
 
 fn persist_catalog(state: &AppState, devices: &[DeviceInfo]) {
@@ -115,14 +111,14 @@ async fn refresh_inner(state: &AppState) -> CatalogResult {
     );
 
     {
-        let mut cache = state.last_devices.lock().expect("devices lock poisoned");
+        let mut cache = state.lock_devices();
         *cache = devices.clone();
     }
     persist_catalog(state, &devices);
 
     let online: Vec<String> = devices
         .iter()
-        .filter(|d| d.state == DeviceState::Online)
+        .filter(|d| device_is_online(d.state))
         .map(|d| d.serial.clone())
         .collect();
 
@@ -150,7 +146,7 @@ async fn refresh_inner(state: &AppState) -> CatalogResult {
 
     let settings = state.settings.snapshot();
     for device in &devices {
-        if device.state == DeviceState::Online {
+        if device_is_online(device.state) {
             let serial = device.serial.clone();
             let force = start_force_forward(&settings, &device.connection);
             let mirror = Arc::clone(&state.mirror);
@@ -175,4 +171,40 @@ async fn refresh_inner(state: &AppState) -> CatalogResult {
     }
 
     Ok(devices)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ipc_map::{ipc_adb, ipc_catalog};
+    use yohu_adb::AdbError;
+
+    #[test]
+    fn catalog_adb_uses_the_transport_ipc() {
+        let via = ipc_catalog(AdbError::Cancelled.into());
+        let direct = ipc_adb(&AdbError::Cancelled);
+        assert_eq!(via.code, direct.code);
+        assert_eq!(via.message, direct.message);
+        let ipc = include_str!("ipc_map.rs");
+        assert!(!ipc.contains("message: adb.to_string()"));
+    }
+
+    #[test]
+    fn devices_lock_sentence_once() {
+        let owner_line = "self.last_devices.lock().expect(\"devices lock poisoned\")";
+        let needle = "devices lock poisoned";
+        let files = [
+            include_str!("state.rs"),
+            include_str!("device_catalog.rs"),
+        ];
+        assert_eq!(files[0].matches(owner_line).count(), 1);
+        assert_eq!(files[1].matches(owner_line).count(), 0);
+        for src in files {
+            let scanned = match src.split_once("fn devices_lock_sentence_once") {
+                Some((head, tail)) => format!("{head}{}", tail.replace(needle, "")),
+                None => src.to_string(),
+            };
+            let scanned = scanned.replace(owner_line, "");
+            assert!(!scanned.contains(needle), "{needle}");
+        }
+    }
 }

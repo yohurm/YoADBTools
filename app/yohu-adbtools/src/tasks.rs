@@ -9,6 +9,11 @@ use tokio::sync::mpsc;
 
 use yohu_protocol::{AppEvent, TaskInfo};
 
+/// 设备任务的悬停明细。
+pub fn device_detail(serial: &str) -> String {
+    format!("设备 {serial}")
+}
+
 /// 任务登记中心。
 pub struct TaskCenter {
     inner: Mutex<HashMap<u32, TaskInfo>>,
@@ -17,6 +22,10 @@ pub struct TaskCenter {
 }
 
 impl TaskCenter {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, HashMap<u32, TaskInfo>> {
+        self.inner.lock().expect("tasks lock poisoned")
+    }
+
     pub fn new(sink: mpsc::Sender<AppEvent>) -> Self {
         Self {
             inner: Mutex::new(HashMap::new()),
@@ -28,7 +37,7 @@ impl TaskCenter {
     /// 登记一个活动任务（name 展示名，detail 悬停明细，run_id 仅组/块），返回任务 id。
     pub fn register(&self, name: String, detail: String, run_id: Option<u32>) -> u32 {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
-        self.inner.lock().expect("tasks lock poisoned").insert(
+        self.lock_inner().insert(
             id,
             TaskInfo {
                 id,
@@ -44,20 +53,14 @@ impl TaskCenter {
 
     /// 完成任务（保留在列表中，状态栏短暂展示后由 UI 清理展示逻辑决定）。
     pub fn finish(&self, id: u32) {
-        if let Some(task) = self.inner.lock().expect("tasks lock poisoned").get_mut(&id) {
+        if let Some(task) = self.lock_inner().get_mut(&id) {
             task.active = false;
         }
         self.emit_finish();
     }
 
     pub fn summary(&self) -> Vec<TaskInfo> {
-        let mut tasks: Vec<TaskInfo> = self
-            .inner
-            .lock()
-            .expect("tasks lock poisoned")
-            .values()
-            .cloned()
-            .collect();
+        let mut tasks: Vec<TaskInfo> = self.lock_inner().values().cloned().collect();
         tasks.sort_by_key(|t| t.id);
         tasks
     }

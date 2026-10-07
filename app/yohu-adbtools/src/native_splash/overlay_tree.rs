@@ -313,7 +313,7 @@ impl Overlay {
             return;
         };
         unsafe {
-            let _ = effect.SetOpacity2(opacity.clamp(0.0, 1.0));
+            let _ = effect.SetOpacity2(unit_opacity(opacity));
         }
         self.commit();
     }
@@ -325,8 +325,8 @@ impl Overlay {
         let Some(effect) = self.effect.as_ref() else {
             return;
         };
-        let o0 = from.clamp(0.0, 1.0);
-        let o1 = to.clamp(0.0, 1.0);
+        let o0 = unit_opacity(from);
+        let o1 = unit_opacity(to);
         if let Some(anim) = eased_anim(device, o0, o1, spec) {
             unsafe {
                 let _ = effect.SetOpacity(&anim);
@@ -432,6 +432,10 @@ pub fn attach(
     })
 }
 
+fn unit_opacity(opacity: f32) -> f32 {
+    opacity.clamp(0.0, 1.0)
+}
+
 fn apply_clip_radius(clip: &IDCompositionRectangleClip, r: f32) {
     unsafe {
         let _ = clip.SetTopLeftRadiusX2(r);
@@ -480,5 +484,20 @@ fn apply_pose_anim(
         } else {
             let _ = scale.SetScaleY2(sy1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unit_opacity;
+
+    #[test]
+    fn opacity_range_is_decided_once() {
+        let src = include_str!("overlay_tree.rs");
+        let needle = format!(".clamp({}", "0.0, 1.0)");
+        assert_eq!(src.matches(&needle).count(), 1);
+        assert_eq!(unit_opacity(-1.0), 0.0);
+        assert_eq!(unit_opacity(0.4), 0.4);
+        assert_eq!(unit_opacity(2.0), 1.0);
     }
 }

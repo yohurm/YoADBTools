@@ -1,6 +1,6 @@
 //! BGRA 截图落 PNG。Win / mac 宿主只提供像素与路径。
 
-pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), String> {
+pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), ()> {
     let mut rgba = vec![0u8; bgra.len()];
     for (i, chunk) in bgra.as_chunks::<4>().0.iter().enumerate() {
         rgba[i * 4] = chunk[2];
@@ -8,12 +8,12 @@ pub fn write_bgra_png(path: &str, w: u32, h: u32, bgra: &[u8]) -> Result<(), Str
         rgba[i * 4 + 2] = chunk[0];
         rgba[i * 4 + 3] = 255;
     }
-    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    let file = std::fs::File::create(path).map_err(|_| ())?;
     let mut encoder = png::Encoder::new(file, w, h);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
-    writer.write_image_data(&rgba).map_err(|e| e.to_string())?;
+    let mut writer = encoder.write_header().map_err(|_| ())?;
+    writer.write_image_data(&rgba).map_err(|_| ())?;
     Ok(())
 }
 

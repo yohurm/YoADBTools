@@ -2,7 +2,7 @@
 
 use tauri::{AppHandle, State};
 
-use crate::commands::{ipc_eval, ipc_group};
+use crate::commands::{ipc_eval, ipc_group, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
     BlockRunRequest, GroupRunRequest, IpcError, SerialEvalResult, TerminalEvalRequest,
@@ -15,7 +15,9 @@ pub async fn terminal_eval(
     state: State<'_, AppState>,
     req: TerminalEvalRequest,
 ) -> Result<Vec<SerialEvalResult>, IpcError> {
-    state.require_online_many(&req.serials)?;
+    state
+        .require_online_many(&req.serials)
+        .map_err(ipc_session)?;
     crate::terminal_eval::eval(&state, req)
         .await
         .map_err(ipc_eval)
@@ -27,7 +29,9 @@ pub async fn terminal_exec(
     state: State<'_, AppState>,
     req: TerminalExecRequest,
 ) -> Result<Vec<SerialEvalResult>, IpcError> {
-    state.require_online_many(&req.serials)?;
+    state
+        .require_online_many(&req.serials)
+        .map_err(ipc_session)?;
     crate::terminal_eval::exec(&state, req)
         .await
         .map_err(ipc_eval)
@@ -40,7 +44,9 @@ pub fn group_run(
     app: AppHandle,
     req: GroupRunRequest,
 ) -> Result<u32, IpcError> {
-    state.require_online_many(&req.serials)?;
+    state
+        .require_online_many(&req.serials)
+        .map_err(ipc_session)?;
     crate::group_runs::start(app, &state, req).map_err(ipc_group)
 }
 
@@ -51,7 +57,9 @@ pub fn block_run(
     app: AppHandle,
     req: BlockRunRequest,
 ) -> Result<u32, IpcError> {
-    state.require_online_many(&req.serials)?;
+    state
+        .require_online_many(&req.serials)
+        .map_err(ipc_session)?;
     crate::group_runs::start_block(app, &state, req).map_err(ipc_group)
 }
 

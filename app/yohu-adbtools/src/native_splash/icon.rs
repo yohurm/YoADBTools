@@ -3,8 +3,7 @@
 
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject,
-    SelectObject, SetStretchBltMode, StretchBlt, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    DIB_RGB_COLORS, HALFTONE, HBITMAP, HDC, SRCCOPY,
+    SelectObject, SetStretchBltMode, StretchBlt, DIB_RGB_COLORS, HALFTONE, HBITMAP, HDC, SRCCOPY,
 };
 
 pub struct IconRgba {
@@ -79,18 +78,7 @@ pub fn load_icon() -> Option<IconRgba> {
 }
 
 pub unsafe fn create_bitmap(hdc: HDC, image: &IconRgba) -> Result<HBITMAP, String> {
-    let bmi = BITMAPINFO {
-        bmiHeader: BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: image.width as i32,
-            biHeight: -(image.height as i32),
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let bmi = super::paint::top_down_dib(image.width as i32, image.height as i32);
     let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
     let bitmap = CreateDIBSection(Some(hdc), &bmi, DIB_RGB_COLORS, &mut bits, None, 0)
         .map_err(|e| e.to_string())?;
@@ -99,10 +87,12 @@ pub unsafe fn create_bitmap(hdc: HDC, image: &IconRgba) -> Result<HBITMAP, Strin
         let dest = std::slice::from_raw_parts_mut(bits as *mut u8, n * 4);
         for i in 0..n {
             let s = i * 4;
-            dest[s] = image.data[s + 2];
-            dest[s + 1] = image.data[s + 1];
-            dest[s + 2] = image.data[s];
-            dest[s + 3] = image.data[s + 3];
+            dest[s..s + 4].copy_from_slice(&crate::theme_spec::bgra(
+                image.data[s],
+                image.data[s + 1],
+                image.data[s + 2],
+                image.data[s + 3],
+            ));
         }
     }
     Ok(bitmap)
@@ -205,7 +195,12 @@ mod tests {
         assert_eq!(&painted.data[0..4], [r, g, b, 255]);
         let last = painted.data.len() - 4;
         assert_eq!(&painted.data[last..], [r, g, b, 255]);
-        assert!(painted.data.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
+        assert!(painted
+            .data
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|px| px[3] == 255));
     }
 
     #[test]
@@ -214,6 +209,11 @@ mod tests {
         let (r, g, b) = crate::tokens::CANVAS_DARK_RGB;
         let painted = icon.onto_canvas(r, g, b);
         assert_eq!(&painted.data[0..4], [r, g, b, 255]);
-        assert!(painted.data.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
+        assert!(painted
+            .data
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|px| px[3] == 255));
     }
 }

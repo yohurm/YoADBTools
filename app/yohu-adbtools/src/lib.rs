@@ -13,6 +13,7 @@ mod dnd;
 mod events;
 mod group_runs;
 mod ipc_map;
+mod ipc_update;
 mod library_store;
 mod limits;
 mod mirror_plan;
@@ -36,8 +37,6 @@ mod transfer_runs;
 mod update_runs;
 mod window_boot;
 mod yolog;
-
-use std::path::PathBuf;
 
 use tauri::{Manager, RunEvent};
 use tokio::sync::mpsc;
@@ -184,8 +183,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             let server_jar = resource_dir.join(yohu_protocol::dir::SCRCPY_SERVER);
 
             // 4) core 服务装配
-            let user_adb =
-                (!snapshot.adb_path.is_empty()).then(|| PathBuf::from(&snapshot.adb_path));
+            let user_adb = crate::settings_apply::user_adb_path(&snapshot.adb_path);
             let tool = std::sync::Arc::new(ToolResolver::new(
                 user_adb,
                 resource_dir,
@@ -334,6 +332,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminal::group_cancel,
             commands::commandlib::commandlib_load,
             commands::commandlib::commandlib_save,
+            commands::commandlib::commandlib_preview,
+            commands::commandlib::commandlib_apply,
             commands::files::files_list,
             commands::files::files_session_attach,
             commands::files::files_session_detach,

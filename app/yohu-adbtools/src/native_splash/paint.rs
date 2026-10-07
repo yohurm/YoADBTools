@@ -180,23 +180,29 @@ pub fn brand_origin(client_w: i32, client_h: i32, icon: i32, gap: i32, text_h: i
 }
 
 fn to_colorref((r, g, b): (u8, u8, u8)) -> COLORREF {
-    COLORREF(u32::from(b) | (u32::from(g) << 8) | (u32::from(r) << 16))
+    let px = crate::theme_spec::bgra(r, g, b, 0);
+    COLORREF(u32::from_le_bytes(px))
 }
 
-unsafe fn alloc_dib(hdc: HDC, w: i32, h: i32) -> Result<(HBITMAP, *mut u8), String> {
-    let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
-    let info = BITMAPINFO {
+/// 启动面 GDI 位图：顶向下、32 位 BI_RGB。图标和整框共用这一份头。
+pub(super) fn top_down_dib(width: i32, height: i32) -> BITMAPINFO {
+    BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: w,
-            biHeight: -h,
+            biWidth: width,
+            biHeight: -height,
             biPlanes: 1,
             biBitCount: 32,
             biCompression: BI_RGB.0,
             ..Default::default()
         },
         bmiColors: [RGBQUAD::default()],
-    };
+    }
+}
+
+unsafe fn alloc_dib(hdc: HDC, w: i32, h: i32) -> Result<(HBITMAP, *mut u8), String> {
+    let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
+    let info = top_down_dib(w, h);
     let bmp = CreateDIBSection(Some(hdc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
         .map_err(|e| e.to_string())?;
     if bits.is_null() {
@@ -295,5 +301,17 @@ mod tests {
             data.destroy();
             ReleaseDC(None, hdc);
         }
+    }
+
+    #[test]
+    fn top_down_dib_is_the_only_header() {
+        let icon = include_str!("icon.rs");
+        assert!(!icon.contains("biBitCount"));
+        assert!(!icon.contains("biHeight"));
+        let info = top_down_dib(3, 4);
+        assert_eq!(info.bmiHeader.biWidth, 3);
+        assert_eq!(info.bmiHeader.biHeight, -4);
+        assert_eq!(info.bmiHeader.biBitCount, 32);
+        assert_eq!(info.bmiHeader.biCompression, BI_RGB.0);
     }
 }

@@ -3,6 +3,8 @@
 use std::ffi::c_void;
 use std::ptr;
 
+use yohu_mirror::content_size_usable;
+
 use super::super::annexb::{h264_parameter_sets, hevc_parameter_sets, split_nals, vcl_avcc};
 use super::super::backend::AnnexBDecoder;
 
@@ -630,7 +632,7 @@ impl AnnexBDecoder for VideoToolboxDecoder {
         height: u32,
         _bind: Option<&Self::Bind>,
     ) -> Result<Self, String> {
-        if width == 0 || height == 0 {
+        if !content_size_usable(width, height) {
             return Err("VideoToolbox 需要有效宽高".into());
         }
         Ok(Self {

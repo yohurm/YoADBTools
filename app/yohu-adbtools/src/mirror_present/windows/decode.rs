@@ -7,13 +7,16 @@ use std::time::Instant;
 
 use tokio::sync::oneshot;
 use windows::Win32::Media::MediaFoundation::IMFDXGIDeviceManager;
-use yohu_mirror::{EncodedFrame, FramePipe, PIPE_H265};
+use yohu_mirror::{EncodedFrame, FramePipe};
 
 use super::d3d::D3dDevice;
 use super::mf::{DecodedPicture, MfDecoder};
 use super::slot::{PictureBank, ReadyFrame};
 use crate::limits::PRESENT_BEAT;
-use crate::mirror_present::annexb::{access_unit, select_live_frames};
+use crate::mirror_present::annexb::{
+    begin_feed, claim_first, note_content_size, note_decode_beat, seat_elapsed_ms, select_live_frames,
+    should_open_decoder, sticky_config, take_feed, take_open, DecodeSeatKind, FeedOutcome,
+};
 
 /// 解码座句柄。丢弃即取消本代际解码任务。
 pub struct DecodeSeat {
@@ -59,11 +62,7 @@ async fn run_seat(
             _ = &mut stop_rx => break,
             _ = beat.tick() => tick.log_beat(),
             frame = pipe.recv() => {
-                let Some(first) = frame else { break };
-                let mut frames = vec![first];
-                while let Some(next) = pipe.try_recv() {
-                    frames.push(next);
-                }
+                let Some(frames) = pipe.recv_batch(frame) else { break };
                 let manager = device.dxgi_manager.clone();
                 if let Some((content_w, content_h, picture_w, picture_h, picture)) =
                     tick.ingest(manager.as_ref(), frames)
@@ -133,11 +132,11 @@ impl DecodeTick {
     }
 
     pub fn seed_config(&mut self, frame: Option<EncodedFrame>) {
-        let Some(frame) = frame else {
+        let Some((codec, payload)) = sticky_config(frame) else {
             return;
         };
-        self.last_codec = Some(frame.codec);
-        self.last_config = Some(frame.payload);
+        self.last_codec = Some(codec);
+        self.last_config = Some(payload);
     }
 
     pub fn ingest(
@@ -161,35 +160,37 @@ impl DecodeTick {
         last
     }
 
+    /// 喂帧或 drain 失败：丢掉解码器，本会话不再重试。
+    fn end_session(&mut self) {
+        self.decoder = None;
+        self.failed = true;
+    }
+
     pub fn drain(&mut self) -> Option<(u32, u32, u32, u32, DecodedPicture)> {
         let dec = self.decoder.as_mut()?;
-        match dec.drain() {
-            Ok(Some(pic)) => {
-                self.decoded += 1;
-                Some((
-                    self.last_content_w.max(1),
-                    self.last_content_h.max(1),
-                    dec.width,
-                    dec.height,
-                    pic,
-                ))
-            }
-            Ok(None) => None,
-            Err(e) => {
+        match take_feed(&mut self.decoded, dec.drain()) {
+            FeedOutcome::Picture(pic) => Some((
+                self.last_content_w.max(1),
+                self.last_content_h.max(1),
+                dec.width,
+                dec.height,
+                pic,
+            )),
+            FeedOutcome::Empty => None,
+            FeedOutcome::Failed(e) => {
                 tracing::error!(error = %e, "MF drain 失败");
-                self.decoder = None;
-                self.failed = true;
+                self.end_session();
                 None
             }
         }
     }
 
     pub fn log_beat(&mut self) {
-        if self.fed > 0 || self.decoded > 0 {
-            tracing::info!(fed = self.fed, decoded = self.decoded, "MF 解码节拍");
-        }
-        self.fed = 0;
-        self.decoded = 0;
+        note_decode_beat(
+            &mut self.fed,
+            &mut self.decoded,
+            DecodeSeatKind::MediaFoundation,
+        );
     }
 
     pub fn note_first_nv12(
@@ -200,12 +201,11 @@ impl DecodeTick {
         picture_h: u32,
         gpu: bool,
     ) {
-        if self.first_nv12 {
+        if !claim_first(&mut self.first_nv12) {
             return;
         }
-        self.first_nv12 = true;
         tracing::info!(
-            elapsed_ms = self.started.elapsed().as_millis() as u64,
+            elapsed_ms = seat_elapsed_ms(self.started),
             content_w,
             content_h,
             picture_w,
@@ -220,10 +220,12 @@ impl DecodeTick {
         manager: Option<&IMFDXGIDeviceManager>,
         frame: EncodedFrame,
     ) -> Option<DecodedPicture> {
-        let size_changed = self.last_content_w > 0
-            && (self.last_content_w, self.last_content_h) != (frame.width, frame.height);
-        self.last_content_w = frame.width;
-        self.last_content_h = frame.height;
+        let size_changed = note_content_size(
+            &mut self.last_content_w,
+            &mut self.last_content_h,
+            frame.width,
+            frame.height,
+        );
         let codec_changed = self.last_codec.is_some() && self.last_codec != Some(frame.codec);
         if size_changed || codec_changed {
             self.decoder = None;
@@ -232,9 +234,12 @@ impl DecodeTick {
                 self.last_config = None;
             }
         }
-        if self.decoder.is_none() && !self.failed && frame.width > 0 && frame.height > 0 {
-            let hevc = frame.codec == PIPE_H265;
-            match MfDecoder::open_with(hevc, frame.width, frame.height, manager) {
+        if should_open_decoder(self.decoder.is_some(), self.failed, frame.has_content_size()) {
+            let hevc = frame.is_hevc();
+            match take_open(
+                &mut self.failed,
+                MfDecoder::open_with(hevc, frame.width, frame.height, manager),
+            ) {
                 Ok(dec) => {
                     tracing::info!(
                         hevc,
@@ -242,7 +247,7 @@ impl DecodeTick {
                         d3d11 = dec.uses_d3d(),
                         width = frame.width,
                         height = frame.height,
-                        elapsed_ms = self.started.elapsed().as_millis() as u64,
+                        elapsed_ms = seat_elapsed_ms(self.started),
                         "MF 解码器已启动"
                     );
                     self.decoder = Some(dec);
@@ -253,27 +258,26 @@ impl DecodeTick {
                         error = %e,
                         width = frame.width,
                         height = frame.height,
-                        hevc = frame.codec == PIPE_H265,
+                        hevc,
                         "MF 解码器启动失败，本会话不再重试"
                     );
-                    self.failed = true;
                     return None;
                 }
             }
         }
         let dec = self.decoder.as_mut()?;
-        let payload = access_unit(self.last_config.as_deref(), &frame.payload, frame.keyframe);
-        self.fed += 1;
-        match dec.feed(&payload, frame.keyframe) {
-            Ok(Some(pic)) => {
-                self.decoded += 1;
-                Some(pic)
-            }
-            Ok(None) => None,
-            Err(e) => {
+        let payload = begin_feed(
+            &mut self.fed,
+            self.last_config.as_deref(),
+            &frame.payload,
+            frame.keyframe,
+        );
+        match take_feed(&mut self.decoded, dec.feed(&payload, frame.keyframe)) {
+            FeedOutcome::Picture(pic) => Some(pic),
+            FeedOutcome::Empty => None,
+            FeedOutcome::Failed(e) => {
                 tracing::error!(error = %e, "MF 解码失败，本会话不再重试");
-                self.decoder = None;
-                self.failed = true;
+                self.end_session();
                 None
             }
         }

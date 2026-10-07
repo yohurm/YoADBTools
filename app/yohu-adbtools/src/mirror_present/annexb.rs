@@ -2,7 +2,28 @@
 //!
 //! 与 OS 解码器无关。Windows MF 与 macOS VideoToolbox 共用。
 
+use std::time::Instant;
+
 use yohu_mirror::EncodedFrame;
+
+/// 首帧只认一次。已经记过就返回 false。
+pub fn claim_first(seen: &mut bool) -> bool {
+    if *seen {
+        return false;
+    }
+    *seen = true;
+    true
+}
+
+/// 解码座启动到现在的毫秒。
+pub fn seat_elapsed_ms(started: Instant) -> u64 {
+    started.elapsed().as_millis() as u64
+}
+
+/// 粘滞配置帧的编码号和载荷。没有帧就没有配置。
+pub fn sticky_config(frame: Option<EncodedFrame>) -> Option<(u8, Vec<u8>)> {
+    frame.map(|frame| (frame.codec, frame.payload))
+}
 
 pub fn select_live_frames(
     last_config: &mut Option<Vec<u8>>,
@@ -14,6 +35,73 @@ pub fn select_live_frames(
         }
     }
     frames.into_iter().filter(|f| !f.config).collect()
+}
+
+/// 第一帧只记下内容尺寸。之后宽高变了才返回 true。
+pub fn note_content_size(last_w: &mut u32, last_h: &mut u32, width: u32, height: u32) -> bool {
+    let changed = *last_w > 0 && (*last_w, *last_h) != (width, height);
+    *last_w = width;
+    *last_h = height;
+    changed
+}
+
+/// 还没有解码器、启动失败没钉死本会话、并且这一帧有内容尺寸，才打开。
+pub fn should_open_decoder(has_decoder: bool, failed: bool, has_size: bool) -> bool {
+    !has_decoder && !failed && has_size
+}
+
+/// 打开失败就钉死本会话。成功把解码器交回，错误交回给平台打日志。
+pub fn take_open<T, E>(failed: &mut bool, result: Result<T, E>) -> Result<T, E> {
+    result.map_err(|err| {
+        *failed = true;
+        err
+    })
+}
+
+/// 解码节拍属于哪一端。日志句不同，计数规则相同。
+pub enum DecodeSeatKind {
+    MediaFoundation,
+    VideoToolbox,
+}
+
+/// 这一秒有喂入或解出才记一拍，然后两个计数都清零。
+pub fn note_decode_beat(fed: &mut u32, decoded: &mut u32, kind: DecodeSeatKind) {
+    if *fed > 0 || *decoded > 0 {
+        match kind {
+            DecodeSeatKind::MediaFoundation => {
+                tracing::info!(fed = *fed, decoded = *decoded, "MF 解码节拍");
+            }
+            DecodeSeatKind::VideoToolbox => {
+                tracing::info!(fed = *fed, decoded = *decoded, "VT 解码节拍");
+            }
+        }
+    }
+    *fed = 0;
+    *decoded = 0;
+}
+
+/// 喂进一帧：先计一次，再拼这一帧的访问单元。
+pub fn begin_feed(fed: &mut u32, config: Option<&[u8]>, payload: &[u8], keyframe: bool) -> Vec<u8> {
+    *fed += 1;
+    access_unit(config, payload, keyframe)
+}
+
+/// 一次 feed 或 drain 的结果。解出画面才增加解码计数。
+pub enum FeedOutcome<T, E> {
+    Picture(T),
+    Empty,
+    Failed(E),
+}
+
+pub fn take_feed<T, E>(decoded: &mut u32, result: Result<Option<T>, E>) -> FeedOutcome<T, E> {
+    match result {
+        Ok(Some(picture)) => {
+            *decoded += 1;
+            FeedOutcome::Picture(picture)
+        }
+        Ok(None) => FeedOutcome::Empty,
+        Err(err) => FeedOutcome::Failed(err),
+    }
 }
 
 pub fn access_unit(config: Option<&[u8]>, payload: &[u8], keyframe: bool) -> Vec<u8> {
@@ -203,5 +291,139 @@ mod tests {
         assert_eq!(last.as_deref(), Some(&[7][..]));
         assert_eq!(live.len(), 1);
         assert!(live[0].keyframe);
+    }
+
+    #[test]
+    fn first_content_size_is_not_a_change() {
+        let mut w = 0;
+        let mut h = 0;
+        assert!(!note_content_size(&mut w, &mut h, 10, 20));
+        assert_eq!((w, h), (10, 20));
+        assert!(!note_content_size(&mut w, &mut h, 10, 20));
+        assert!(note_content_size(&mut w, &mut h, 11, 20));
+        assert_eq!((w, h), (11, 20));
+    }
+
+    #[test]
+    fn content_size_change_is_shared() {
+        let here = include_str!("annexb.rs");
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(here.contains("fn note_content_size"));
+        assert!(!windows.contains("last_content_w > 0"));
+        assert!(!macos.contains("last_content_w > 0"));
+    }
+
+    #[test]
+    fn open_decoder_only_when_absent_unfailed_and_sized() {
+        assert!(!should_open_decoder(true, false, true));
+        assert!(!should_open_decoder(false, true, true));
+        assert!(!should_open_decoder(false, false, false));
+        assert!(should_open_decoder(false, false, true));
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(!windows.contains("decoder.is_none()"));
+        assert!(!macos.contains("decoder.is_none()"));
+    }
+
+    #[test]
+    fn decode_beat_logs_then_clears_both_counts() {
+        let mut fed = 0;
+        let mut decoded = 0;
+        note_decode_beat(&mut fed, &mut decoded, DecodeSeatKind::MediaFoundation);
+        assert_eq!((fed, decoded), (0, 0));
+        fed = 2;
+        decoded = 1;
+        note_decode_beat(&mut fed, &mut decoded, DecodeSeatKind::VideoToolbox);
+        assert_eq!((fed, decoded), (0, 0));
+        let here = include_str!("annexb.rs");
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(here.contains("MF 解码节拍"));
+        assert!(here.contains("VT 解码节拍"));
+        assert!(!windows.contains("解码节拍"));
+        assert!(!macos.contains("解码节拍"));
+    }
+
+    #[test]
+    fn sticky_config_is_codec_and_payload() {
+        assert!(sticky_config(None).is_none());
+        let got = sticky_config(Some(EncodedFrame {
+            generation: 1,
+            width: 8,
+            height: 8,
+            config: true,
+            keyframe: false,
+            pts: 3,
+            codec: 1,
+            payload: vec![9],
+            dropped: 0,
+        }))
+        .expect("config");
+        assert_eq!(got, (1, vec![9]));
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(!windows.contains("Some(frame.payload)"));
+        assert!(!macos.contains("Some(frame.payload)"));
+    }
+
+    #[test]
+    fn feed_counts_a_picture_and_not_an_empty_result() {
+        let mut fed = 0;
+        let mut decoded = 0;
+        let au = begin_feed(&mut fed, Some(&[1]), &[2], true);
+        assert_eq!(fed, 1);
+        assert_eq!(au, vec![1, 2]);
+        assert!(matches!(
+            take_feed(&mut decoded, Ok::<Option<u8>, &str>(None)),
+            FeedOutcome::Empty
+        ));
+        assert_eq!(decoded, 0);
+        assert!(matches!(
+            take_feed(&mut decoded, Ok::<Option<u8>, &str>(Some(7))),
+            FeedOutcome::Picture(7)
+        ));
+        assert_eq!(decoded, 1);
+        assert!(matches!(
+            take_feed(&mut decoded, Err::<Option<u8>, &str>("x")),
+            FeedOutcome::Failed("x")
+        ));
+        assert_eq!(decoded, 1);
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(!windows.contains("decoded += 1"));
+        assert!(!macos.contains("decoded += 1"));
+        assert!(!windows.contains("fed += 1"));
+        assert!(!macos.contains("fed += 1"));
+    }
+
+    #[test]
+    fn first_frame_is_claimed_once() {
+        let mut seen = false;
+        assert!(claim_first(&mut seen));
+        assert!(!claim_first(&mut seen));
+        let started = std::time::Instant::now();
+        let ms = seat_elapsed_ms(started);
+        assert!(ms < 5_000);
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert!(!windows.contains("if self.first"));
+        assert!(!macos.contains("if self.first"));
+        assert!(!windows.contains(".as_millis()"));
+        assert!(!macos.contains(".as_millis()"));
+    }
+
+    #[test]
+    fn open_failure_latches_the_session() {
+        let mut failed = false;
+        assert_eq!(take_open(&mut failed, Ok::<u8, &str>(1)).expect("open"), 1);
+        assert!(!failed);
+        assert!(take_open(&mut failed, Err::<u8, &str>("x")).is_err());
+        assert!(failed);
+        let windows = include_str!("windows/decode.rs");
+        let macos = include_str!("macos/decode.rs");
+        assert_eq!(windows.matches("self.failed = true").count(), 1);
+        assert_eq!(windows.matches("self.end_session()").count(), 2);
+        assert_eq!(macos.matches("self.failed = true").count(), 0);
     }
 }

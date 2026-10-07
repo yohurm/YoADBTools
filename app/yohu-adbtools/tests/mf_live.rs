@@ -58,7 +58,7 @@ async fn real_hevc_mf_keeps_emitting_nv12() {
         .expect("devices");
     let Some(dev) = devices
         .iter()
-        .find(|d| d.state == yohu_protocol::DeviceState::Online)
+        .find(|d| yohu_domain::device_is_online(d.state))
     else {
         eprintln!("跳过：无在线设备");
         return;
@@ -101,12 +101,12 @@ async fn real_hevc_mf_keeps_emitting_nv12() {
         if frame.config {
             last_config = Some(frame.payload.clone());
         }
-        if decoder.is_none() && frame.width > 0 && frame.height > 0 {
-            match MfDecoder::open(frame.codec == 1, frame.width, frame.height) {
+        if decoder.is_none() && frame.has_content_size() {
+            match MfDecoder::open(frame.is_hevc(), frame.width, frame.height) {
                 Ok(dec) => {
                     eprintln!(
                         "[真机 MF] 解码器 hevc={} async={} d3d={} {}x{}",
-                        frame.codec == 1,
+                        frame.is_hevc(),
                         dec.is_async(),
                         dec.uses_d3d(),
                         frame.width,

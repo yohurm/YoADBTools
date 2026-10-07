@@ -12,9 +12,11 @@ pub fn write(log: &AppLog, level: LogLevel, module: &str, message: &str) {
 }
 
 pub fn parse_level(level: &str) -> LogLevel {
-    match level {
-        "warn" => LogLevel::Warn,
-        "error" => LogLevel::Error,
-        _ => LogLevel::Info,
+    if level == LogLevel::Warn.as_str() {
+        LogLevel::Warn
+    } else if level == LogLevel::Error.as_str() {
+        LogLevel::Error
+    } else {
+        LogLevel::Info
     }
 }

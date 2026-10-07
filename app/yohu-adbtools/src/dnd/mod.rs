@@ -24,6 +24,8 @@ use yohu_protocol::{Direction, TransferRequest};
 
 use crate::state::AppState;
 
+#[cfg(target_os = "macos")]
+use self::names::{host_relative, RELATIVE_SEP};
 use self::names::{posix_to_win_relative, relative_ok};
 
 /// 启动/退出时清掉上次残留的拖出临时目录。
@@ -58,14 +60,14 @@ pub enum DndError {
     #[error("拖出文件尚未就绪")]
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     NotReady,
-    #[error("DoDragDrop 失败: {0}")]
+    #[error("拖出失败")]
     #[cfg_attr(not(windows), allow(dead_code))]
-    OleFailed(String),
+    OleFailed,
     #[error("拖出宿主调度失败")]
     Host,
 }
 
-fn local_fail(path: &Path) -> FileError {
+pub(super) fn local_fail(path: &Path) -> FileError {
     FileError::Local(path.display().to_string())
 }
 
@@ -108,24 +110,25 @@ pub async fn drag_out(
     let session_dir = root.join(format!("{session_id}"));
     fs::create_dir_all(&session_dir).map_err(|_| local_fail(&session_dir))?;
 
-    let live = Arc::new(Mutex::new(roots));
+    let payload = DragPayload {
+        items: Arc::new(Mutex::new(roots)),
+        serial: req.serial,
+        session_dir: session_dir.clone(),
+        app: app.clone(),
+        #[cfg(windows)]
+        rt: tokio::runtime::Handle::current(),
+    };
     #[cfg(windows)]
-    if live
-        .lock()
-        .expect("dnd live")
-        .iter()
-        .any(|entry| entry.is_dir)
-    {
+    if payload.lock_items().iter().any(|entry| entry.is_dir) {
         let browser = state.browser.clone();
-        let serial = req.serial.clone();
+        let serial = payload.serial.clone();
         let generation = req.generation;
-        let remotes: Vec<String> = live
-            .lock()
-            .expect("dnd live")
+        let remotes: Vec<String> = payload
+            .lock_items()
             .iter()
             .map(|entry| entry.remote.clone())
             .collect();
-        let live = Arc::clone(&live);
+        let live = payload.clone();
         tokio::spawn(async move {
             let Ok(tree) = browser
                 .list_tree(&serial, &remotes, generation, CancellationToken::new())
@@ -137,18 +140,9 @@ pub async fn drag_out(
             if mapped.is_empty() {
                 return;
             }
-            *live.lock().expect("dnd live") = mapped;
+            *live.lock_items() = mapped;
         });
     }
-
-    let payload = DragPayload {
-        items: live,
-        serial: req.serial,
-        session_dir: session_dir.clone(),
-        app: app.clone(),
-        #[cfg(windows)]
-        rt: tokio::runtime::Handle::current(),
-    };
 
     #[cfg(windows)]
     {
@@ -162,13 +156,7 @@ pub async fn drag_out(
     }
     #[cfg(target_os = "macos")]
     {
-        if payload
-            .items
-            .lock()
-            .expect("dnd live")
-            .iter()
-            .any(|entry| entry.is_dir)
-        {
+        if payload.lock_items().iter().any(|entry| entry.is_dir) {
             let remotes: Vec<String> = req.items.iter().map(|item| item.remote.clone()).collect();
             let tree = state
                 .browser
@@ -185,10 +173,10 @@ pub async fn drag_out(
                     FileError::EmptyTree(remotes.first().cloned().unwrap_or_default()).into(),
                 );
             }
-            *payload.items.lock().expect("dnd live") = mapped;
+            *payload.lock_items() = mapped;
         }
         materialize(&payload).await?;
-        let snapshot = payload.items.lock().expect("dnd live").clone();
+        let snapshot = payload.lock_items().clone();
         let paths = top_locals(&payload.session_dir, &snapshot);
         let (tx, rx) = tokio::sync::oneshot::channel();
         app.run_on_main_thread(move || {
@@ -207,6 +195,7 @@ pub async fn drag_out(
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(windows, derive(Clone))]
 pub(crate) struct DragPayload {
     pub items: Arc<Mutex<Vec<TreeEntry>>>,
     pub serial: String,
@@ -218,6 +207,10 @@ pub(crate) struct DragPayload {
 
 #[cfg(any(windows, target_os = "macos"))]
 impl DragPayload {
+    fn lock_items(&self) -> std::sync::MutexGuard<'_, Vec<TreeEntry>> {
+        self.items.lock().expect("dnd live")
+    }
+
     fn pull_request(&self, local: &Path, remote: &str) -> TransferRequest {
         TransferRequest {
             serial: self.serial.clone(),
@@ -252,7 +245,11 @@ fn top_locals(session_dir: &Path, items: &[TreeEntry]) -> Vec<PathBuf> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
     for item in items {
-        let first = item.relative.split('\\').next().unwrap_or(&item.relative);
+        let first = item
+            .relative
+            .split(RELATIVE_SEP)
+            .next()
+            .unwrap_or(&item.relative);
         if seen.insert(first.to_string()) {
             out.push(session_dir.join(first));
         }
@@ -262,11 +259,11 @@ fn top_locals(session_dir: &Path, items: &[TreeEntry]) -> Vec<PathBuf> {
 
 #[cfg(target_os = "macos")]
 async fn materialize(payload: &DragPayload) -> Result<(), FileError> {
-    let items = payload.items.lock().expect("dnd live").clone();
+    let items = payload.lock_items().clone();
     for item in &items {
         let local = payload
             .session_dir
-            .join(item.relative.replace('\\', std::path::MAIN_SEPARATOR_STR));
+            .join(host_relative(&item.relative));
         if item.is_dir {
             fs::create_dir_all(&local).map_err(|_| local_fail(&local))?;
             continue;
@@ -277,4 +274,19 @@ async fn materialize(payload: &DragPayload) -> Result<(), FileError> {
         payload.pull(&local, &item.remote).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_failure_text_is_decided_once() {
+        let mac = include_str!("macos.rs");
+        assert!(!mac.contains("FileError::Local("));
+        match local_fail(Path::new("drop-a")) {
+            FileError::Local(text) => assert_eq!(text, "drop-a"),
+            other => panic!("expected local, got {other}"),
+        }
+    }
 }

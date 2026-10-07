@@ -8,7 +8,24 @@ use yohu_domain::apply_setting;
 use yohu_protocol::{AppSettings, SettingKey};
 use yohu_runtime::{atomic_write, backup_corrupt};
 
-/// 文件设置存储。
+/// 设置写入失败。校验失败走 [`SettingError`]。操作系统原文只留在日志。
+#[derive(Debug, thiserror::Error)]
+pub enum SettingsStoreError {
+    #[error(transparent)]
+    Setting(#[from] yohu_domain::SettingError),
+    #[error("无法写入设置文件")]
+    Io,
+}
+
+fn io_failed(context: &str, err: impl std::fmt::Display) -> SettingsStoreError {
+    tracing::warn!(error = %err, "{context}");
+    SettingsStoreError::Io
+}
+
+fn lock_settings<T>(result: Result<T, std::sync::PoisonError<T>>) -> T {
+    result.expect("settings lock poisoned")
+}
+
 pub struct SettingsStore {
     file: PathBuf,
     inner: RwLock<AppSettings>,
@@ -35,21 +52,26 @@ impl SettingsStore {
     }
 
     pub fn snapshot(&self) -> AppSettings {
-        self.inner.read().expect("settings lock poisoned").clone()
+        lock_settings(self.inner.read()).clone()
     }
 
-    pub fn set(&self, key: SettingKey, value: &serde_json::Value) -> Result<AppSettings, String> {
+    pub fn set(
+        &self,
+        key: SettingKey,
+        value: &serde_json::Value,
+    ) -> Result<AppSettings, SettingsStoreError> {
         let mut s = self.snapshot();
-        apply_setting(&mut s, key, value).map_err(|e| e.to_string())?;
-        *self.inner.write().expect("settings lock poisoned") = s.clone();
+        apply_setting(&mut s, key, value)?;
+        *lock_settings(self.inner.write()) = s.clone();
         self.save_atomic()?;
         Ok(s)
     }
 
-    pub fn save_atomic(&self) -> Result<(), String> {
+    pub fn save_atomic(&self) -> Result<(), SettingsStoreError> {
         let snapshot = self.snapshot();
-        let text = serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())?;
-        atomic_write(&self.file, text).map_err(|e| e.to_string())
+        let text =
+            serde_json::to_string_pretty(&snapshot).map_err(|e| io_failed("序列化设置失败", e))?;
+        atomic_write(&self.file, text).map_err(|e| io_failed("写入设置失败", e))
     }
 }
 

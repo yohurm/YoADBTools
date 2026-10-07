@@ -4,7 +4,8 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use yohu_motion::MotionSpec;
-use yohu_protocol::{MirrorLayout, MirrorStageMode, MIRROR_MIN_LAYOUT_PX};
+use yohu_mirror::content_size_usable;
+use yohu_protocol::{layout_is_presentable, MirrorLayout, MirrorStageMode};
 
 use super::scale::{present_dest, Letterbox};
 
@@ -106,7 +107,7 @@ pub enum OccupancyKind {
 
 impl OccupancyKind {
     pub fn of(bound: bool, video_w: u32, video_h: u32) -> Self {
-        if bound && video_w > 0 && video_h > 0 {
+        if bound && content_size_usable(video_w, video_h) {
             Self::Dest
         } else {
             Self::Fill
@@ -143,6 +144,17 @@ impl OccupancyMotion {
             Self::DestToFill => Some(MotionSpec::SpatialEnter),
         }
     }
+}
+
+/// 这一拍能不能把解码图交上去。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PictureAdmit {
+    /// 可见且客户区够大，并且不是空态或暂停。
+    Ready,
+    /// 还没有有效 layout。
+    WaitingLayout,
+    /// 铬占用表面：空态或暂停。
+    Held,
 }
 
 /// 舞台可见性寿命上的状态（HWND 在）；解码寿命只体现在 `bound` / 画面尺寸。
@@ -245,6 +257,18 @@ impl Stage {
         true
     }
 
+    /// 编码尺寸有变化才记下。Windows 与 macOS 都走这一份。
+    pub fn adopt_encoded_size(&mut self, width: u32, height: u32) {
+        if self.set_video_size(width, height) {
+            tracing::info!(
+                serial = %self.serial,
+                width,
+                height,
+                "投屏记下编码尺寸"
+            );
+        }
+    }
+
     pub fn mark_frame(&mut self) {
         self.has_frame = true;
         self.refresh();
@@ -317,7 +341,7 @@ impl Stage {
     }
 
     pub fn presentable(&self) -> bool {
-        self.visible && self.host_w >= MIRROR_MIN_LAYOUT_PX && self.host_h >= MIRROR_MIN_LAYOUT_PX
+        self.visible && layout_is_presentable(self.host_w, self.host_h)
     }
 
     pub fn shows_chrome(&self) -> bool {
@@ -331,9 +355,36 @@ impl Stage {
         self.mode == MirrorStageMode::Video
     }
 
+    /// 启动中。转圈和加载文案都认这一把。
+    pub fn is_loading(&self) -> bool {
+        self.mode == MirrorStageMode::Loading
+    }
+
+    /// 舞台文案的入参只在这里收集。
+    pub fn copy(&self) -> (&'static str, String) {
+        stage_copy(
+            self.mode,
+            self.has_device(),
+            self.failed(),
+            self.error(),
+            content_size_usable(self.video_w, self.video_h),
+        )
+    }
+
     /// 解码图可画：Loading 首帧也要 Present，之后 `mark_frame` 才进 Video。
     pub fn allows_video_present(&self) -> bool {
         !matches!(self.mode, MirrorStageMode::Empty | MirrorStageMode::Paused)
+    }
+
+    /// 这一拍收不收解码图。等待 layout、铬占用、可以收，只在这里分。
+    pub fn admit_picture(&self) -> PictureAdmit {
+        if !self.presentable() {
+            PictureAdmit::WaitingLayout
+        } else if !self.allows_video_present() {
+            PictureAdmit::Held
+        } else {
+            PictureAdmit::Ready
+        }
     }
 
     pub fn control(&self) -> bool {
@@ -359,7 +410,7 @@ impl Stage {
 
     /// Fit：contain(avail, 内容)，相对 avail 原点。Compose 不得再算一遍。
     pub fn fit(&self) -> Letterbox {
-        if self.bound && self.video_w > 0 && self.video_h > 0 {
+        if self.bound && content_size_usable(self.video_w, self.video_h) {
             self.contain_content()
         } else {
             Letterbox {
@@ -443,13 +494,7 @@ impl Stage {
         if !self.presentable() || !self.shows_chrome() {
             return None;
         }
-        let (title, description) = stage_copy(
-            self.mode,
-            self.has_device(),
-            self.failed(),
-            self.error(),
-            self.video_w > 0 && self.video_h > 0,
-        );
+        let (title, description) = self.copy();
         let pal = stage_palette(self.dark());
         let (icon_px, title_px, body_px) = stage_type_px(self.dpr());
         Some(ChromeDraw {
@@ -567,8 +612,27 @@ mod tests {
         s.apply_layout(&layout());
         s.bind("S1".into(), 3);
         assert_eq!(s.mode(), MirrorStageMode::Loading);
+        assert!(s.is_loading());
+        assert_eq!(s.copy().0, "启动中");
         assert_eq!(s.generation, 3);
         assert!(!s.control());
+    }
+
+    #[test]
+    fn admit_picture_waits_holds_then_ready() {
+        let mut s = Stage::new("S1".into());
+        assert_eq!(s.admit_picture(), PictureAdmit::WaitingLayout);
+        s.apply_layout(&layout());
+        s.set_host_size(900, 950);
+        assert_eq!(s.admit_picture(), PictureAdmit::Held);
+        s.bind("S1".into(), 1);
+        assert_eq!(s.admit_picture(), PictureAdmit::Ready);
+        s.set_video_size(10, 20);
+        s.mark_frame();
+        let mut paused = layout();
+        paused.paused = true;
+        s.apply_layout(&paused);
+        assert_eq!(s.admit_picture(), PictureAdmit::Held);
     }
 
     #[test]
@@ -580,6 +644,7 @@ mod tests {
         assert!(s.set_video_size(1088, 2400));
         s.mark_frame();
         assert_eq!(s.mode(), MirrorStageMode::Video);
+        assert!(!s.is_loading());
         assert!(s.shows_video());
         assert!(s.control());
         let (x, y, w, h) = s.occupancy();
@@ -740,6 +805,25 @@ mod tests {
     }
 
     #[test]
+    fn adopt_encoded_size_keeps_the_same_size() {
+        let mut s = Stage::new("S1".into());
+        s.adopt_encoded_size(10, 20);
+        assert_eq!(s.video_size(), (10, 20));
+        s.adopt_encoded_size(10, 20);
+        assert_eq!(s.video_size(), (10, 20));
+        s.adopt_encoded_size(11, 21);
+        assert_eq!(s.video_size(), (11, 21));
+        let stage = include_str!("stage.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert_eq!(stage.matches("投屏记下编码尺寸").count(), 4);
+        assert!(!windows.contains("投屏记下编码尺寸"));
+        assert!(!macos.contains("投屏记下编码尺寸"));
+        assert!(!windows.contains("ScreenshotRead"));
+        assert!(!macos.contains("ScreenshotRead"));
+    }
+
+    #[test]
     fn chrome_owns_backbuffer_every_tick_while_empty() {
         let mut s = Stage::new("S1".into());
         s.apply_layout(&layout());
@@ -754,5 +838,98 @@ mod tests {
         assert!(s.shows_chrome());
         assert!(s.chrome_draw().is_some());
         assert!(s.chrome_draw().is_some());
+    }
+
+    #[test]
+    fn present_log_words_live_in_the_beat() {
+        let beat = include_str!("present_beat.rs");
+        let hosts = [
+            include_str!("windows/host.rs"),
+            include_str!("macos/host.rs"),
+            include_str!("windows/surface.rs"),
+            include_str!("macos/surface.rs"),
+        ];
+        let words = [
+            "投屏解码管道已绑定",
+            "投屏解码管道已解开，舞台改画 chrome",
+            "投屏 Present 失败",
+            "投屏首帧已 Present",
+            "投屏呈现退出",
+        ];
+        for word in words {
+            assert!(beat.contains(word), "{word}");
+            for host in hosts {
+                assert!(!host.contains(word), "{word}");
+            }
+        }
+    }
+
+    #[test]
+    fn pointer_injection_lives_in_the_control_hand() {
+        let hand = include_str!("control_hand.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(hand.contains("MirrorControlMessage::Touch"));
+        assert!(!windows.contains("MirrorControlMessage::Touch"));
+        assert!(!macos.contains("MirrorControlMessage::Touch"));
+        assert!(!windows.contains("gesture.feed"));
+        assert!(!macos.contains("gesture.feed"));
+        assert!(!windows.contains("map_client_to_video"));
+        assert!(!macos.contains("map_client_to_video"));
+    }
+
+    #[test]
+    fn loading_and_copy_live_on_the_stage() {
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(!windows.contains("MirrorStageMode::Loading"));
+        assert!(!macos.contains("MirrorStageMode::Loading"));
+        assert!(!windows.contains("stage_copy("));
+        assert!(!macos.contains("stage_copy("));
+    }
+
+    #[test]
+    fn presented_frame_is_accepted_once() {
+        let beat = include_str!("present_beat.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(beat.contains("fn accept_presented_frame"));
+        assert!(!windows.contains("note_presented"));
+        assert!(!macos.contains("note_presented"));
+    }
+
+    #[test]
+    fn pipe_lifetime_lives_in_the_beat() {
+        let beat = include_str!("present_beat.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(beat.contains("fn open_pipe"));
+        assert!(beat.contains("fn release_pipe"));
+        assert!(!windows.contains("log_pipe_bound"));
+        assert!(!macos.contains("log_pipe_bound"));
+        assert!(!windows.contains("log_pipe_unbound"));
+        assert!(!macos.contains("log_pipe_unbound"));
+    }
+
+    #[test]
+    fn lost_control_lifts_in_the_hand() {
+        let hand = include_str!("control_hand.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(hand.contains("fn lift_without_control"));
+        assert!(!windows.contains("!self.stage.control()"));
+        assert!(!macos.contains("!self.stage.control()"));
+    }
+
+    #[test]
+    fn picture_admit_lives_on_the_stage() {
+        let stage = include_str!("stage.rs");
+        let windows = include_str!("windows/host.rs");
+        let macos = include_str!("macos/host.rs");
+        assert!(stage.contains("fn admit_picture"));
+        assert!(!windows.contains("allows_video_present"));
+        assert!(!macos.contains("allows_video_present"));
+        assert!(!windows.contains("presentable()"));
+        assert!(!macos.contains("presentable()"));
     }
 }

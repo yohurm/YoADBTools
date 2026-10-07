@@ -3,7 +3,7 @@
 use tauri::State;
 use tokio_util::sync::CancellationToken;
 
-use crate::commands::ipc_adb;
+use crate::commands::{ipc_adb, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{AdbExecRequest, ExecOutcome, IpcError};
 
@@ -13,7 +13,7 @@ pub async fn adb_exec(
     state: State<'_, AppState>,
     req: AdbExecRequest,
 ) -> Result<ExecOutcome, IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .client
         .run(
@@ -23,5 +23,5 @@ pub async fn adb_exec(
             CancellationToken::new(),
         )
         .await
-        .map_err(ipc_adb)
+        .map_err(|err| ipc_adb(&err))
 }

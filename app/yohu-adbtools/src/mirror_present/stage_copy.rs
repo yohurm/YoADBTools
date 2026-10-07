@@ -1,5 +1,6 @@
-//! 舞台文案。与色板、模型分文件。
+//! 舞台文案。与色板、模型分文件。空面板标题用领域 `DEVICE_UNSELECTED`。
 
+use yohu_domain::DEVICE_UNSELECTED;
 use yohu_protocol::MirrorStageMode;
 
 pub fn stage_copy(
@@ -25,11 +26,24 @@ pub fn stage_copy(
 
 fn empty_copy(has_device: bool, failed: bool, error: &str) -> (&'static str, String) {
     if !has_device {
-        ("未选择设备", "在左侧设备栏选择一台在线设备".into())
+        (DEVICE_UNSELECTED, "在左侧设备栏选择一台在线设备".into())
     } else if !error.is_empty() {
         let title = if failed { "启动失败" } else { "已停止" };
         (title, error.to_string())
     } else {
         ("未开始", "点击开始将画面嵌在此面板内".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_without_device_uses_unselected_title() {
+        let (title, _) = stage_copy(MirrorStageMode::Empty, false, false, "", false);
+        assert_eq!(title, DEVICE_UNSELECTED);
+        let src = include_str!("stage_copy.rs");
+        assert_eq!(src.matches(DEVICE_UNSELECTED).count(), 0);
     }
 }

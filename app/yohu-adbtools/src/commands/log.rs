@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::commands::ipc_log;
+use crate::commands::{ipc_log, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
     CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogBatch, ProcessEntry,
@@ -14,7 +14,7 @@ pub async fn log_capture_start(
     state: State<'_, AppState>,
     serial: String,
 ) -> Result<CaptureStart, IpcError> {
-    state.require_online(&serial)?;
+    state.require_online(&serial).map_err(ipc_session)?;
     crate::capture_runs::start(&state, &serial)
         .await
         .map_err(ipc_log)

@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::commands::{ipc_mirror, ipc_present};
+use crate::commands::{ipc_mirror, ipc_present, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
     IpcError, MirrorInjectRequest, MirrorLayout, MirrorPointer, MirrorScreenshotRequest,
@@ -14,7 +14,7 @@ pub async fn mirror_start(
     state: State<'_, AppState>,
     req: MirrorStartRequest,
 ) -> Result<MirrorStart, IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     crate::mirror_sessions::start(&state, req)
         .await
         .map_err(ipc_mirror)
@@ -32,7 +32,7 @@ pub async fn mirror_inject(
     state: State<'_, AppState>,
     req: MirrorInjectRequest,
 ) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .mirror
         .inject(&req.serial, req.message)

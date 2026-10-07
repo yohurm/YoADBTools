@@ -28,15 +28,16 @@ use windows::Win32::System::Ole::{
     DROPEFFECT_COPY,
 };
 use windows::Win32::System::SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS};
+use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
 use windows::Win32::UI::Shell::{
     IDataObjectAsyncCapability, IDataObjectAsyncCapability_Impl, SHCreateStdEnumFmtEtc,
     SHCreateStreamOnFileEx, FD_ATTRIBUTES, FD_FILESIZE, FD_PROGRESSUI, FD_UNICODE, FILEDESCRIPTORW,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
 use windows_core::{implement, BOOL};
 
 use yohu_files::TreeEntry;
 
+use super::names::{host_relative, FILE_NAME_UNITS};
 use super::{DndError, DragPayload};
 
 fn clip(name: PCWSTR) -> u16 {
@@ -110,6 +111,10 @@ impl IDropSource_Impl for CopySource_Impl {
 }
 
 impl VirtualFiles {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().expect("dnd lock")
+    }
+
     fn query_format(fmt: &FORMATETC) -> windows_core::HRESULT {
         if fmt.dwAspect != DVASPECT_CONTENT.0 {
             return DV_E_FORMATETC;
@@ -139,7 +144,7 @@ impl VirtualFiles {
     }
 
     fn descriptor_medium(&self) -> WinResult<STGMEDIUM> {
-        let items = self.payload.items.lock().expect("dnd live");
+        let items = self.payload.lock_items();
         let n = items.len();
         let desc_size = std::mem::size_of::<FILEDESCRIPTORW>();
         let bytes = 4 + n * desc_size;
@@ -176,7 +181,7 @@ impl VirtualFiles {
     }
 
     fn contents_medium(&self, lindex: i32) -> WinResult<STGMEDIUM> {
-        let in_op = self.inner.lock().expect("dnd lock").in_operation;
+        let in_op = self.lock_inner().in_operation;
         let dropped = self.dropped.load(Ordering::SeqCst);
         if !in_op && !dropped {
             return Err(Error::from_hresult(DV_E_FORMATETC));
@@ -202,13 +207,13 @@ impl VirtualFiles {
 
     fn ensure_pulled(&self, lindex: i32) -> WinResult<PathBuf> {
         {
-            let inner = self.inner.lock().expect("dnd lock");
+            let inner = self.lock_inner();
             if let Some(path) = inner.pulled.get(&lindex) {
                 return Ok(path.clone());
             }
         }
         let item = {
-            let items = self.payload.items.lock().expect("dnd live");
+            let items = self.payload.lock_items();
             if lindex < 0 || lindex as usize >= items.len() {
                 return Err(Error::from_hresult(DV_E_LINDEX));
             }
@@ -220,18 +225,14 @@ impl VirtualFiles {
         let local = self
             .payload
             .session_dir
-            .join(item.relative.replace('\\', std::path::MAIN_SEPARATOR_STR));
+            .join(host_relative(&item.relative));
         if let Some(parent) = local.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error::new(E_FAIL, e.to_string()))?;
         }
         self.payload
             .pull(&local, &item.remote)
             .map_err(|e| Error::new(E_FAIL, e.to_string()))?;
-        self.inner
-            .lock()
-            .expect("dnd lock")
-            .pulled
-            .insert(lindex, local.clone());
+        self.lock_inner().pulled.insert(lindex, local.clone());
         Ok(local)
     }
 }
@@ -256,7 +257,7 @@ fn file_descriptor(item: &TreeEntry) -> FILEDESCRIPTORW {
         nFileSizeHigh: (item.size >> 32) as u32,
         ..Default::default()
     };
-    let mut name = [0u16; 260];
+    let mut name = [0u16; FILE_NAME_UNITS];
     for (dst, src) in name.iter_mut().zip(item.relative.encode_utf16()) {
         *dst = src;
     }
@@ -264,7 +265,7 @@ fn file_descriptor(item: &TreeEntry) -> FILEDESCRIPTORW {
         std::ptr::copy_nonoverlapping(
             name.as_ptr(),
             std::ptr::addr_of_mut!(fd.cFileName).cast(),
-            260,
+            FILE_NAME_UNITS,
         );
     }
     fd
@@ -388,13 +389,13 @@ impl IDataObjectAsyncCapability_Impl for VirtualFiles_Impl {
         &self,
         _pbcreserved: windows::core::Ref<'_, windows::Win32::System::Com::IBindCtx>,
     ) -> WinResult<()> {
-        self.inner.lock().expect("dnd lock").in_operation = true;
+        self.lock_inner().in_operation = true;
         Ok(())
     }
 
     fn InOperation(&self) -> WinResult<BOOL> {
         Ok(BOOL::from(
-            self.inner.lock().expect("dnd lock").in_operation,
+            self.lock_inner().in_operation,
         ))
     }
 
@@ -404,7 +405,7 @@ impl IDataObjectAsyncCapability_Impl for VirtualFiles_Impl {
         _pbcreserved: windows::core::Ref<'_, windows::Win32::System::Com::IBindCtx>,
         _dweffects: u32,
     ) -> WinResult<()> {
-        let mut inner = self.inner.lock().expect("dnd lock");
+        let mut inner = self.lock_inner();
         inner.in_operation = false;
         Ok(())
     }
@@ -440,6 +441,7 @@ pub(super) fn do_drag_drop(payload: DragPayload) -> Result<(), DndError> {
     if hr == DRAGDROP_S_DROP || hr == DRAGDROP_S_CANCEL || hr == S_OK {
         Ok(())
     } else {
-        Err(DndError::OleFailed(format!("{hr:?}")))
+        tracing::warn!(hr = ?hr, "DoDragDrop 失败");
+        Err(DndError::OleFailed)
     }
 }

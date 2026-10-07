@@ -5,6 +5,7 @@
 //! UI 上报稳定可用区；表面独占像素。解码会话跟 `mirror.start`/`stop` 走，表面跟舞台可见性走。
 
 mod annexb;
+mod control_hand;
 mod backend;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -12,6 +13,7 @@ mod linux;
 mod macos;
 mod png;
 mod pointer;
+mod present_beat;
 mod scale;
 mod stage;
 mod stage_copy;
@@ -28,8 +30,8 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc as tokio_mpsc;
-use yohu_mirror::{FramePipe, MirrorService};
-use yohu_protocol::{AppEvent, MirrorLayout, MIRROR_MIN_LAYOUT_PX};
+use yohu_mirror::{content_size_usable, FramePipe, MirrorService};
+use yohu_protocol::{layout_is_presentable, AppEvent, MirrorLayout};
 
 use backend::Cmd;
 
@@ -47,8 +49,12 @@ pub enum PresentError {
     Exited,
     #[error("截图超时")]
     Timeout,
-    #[error("{0}")]
-    Internal(String),
+    #[error("当前平台没有投屏硬解")]
+    Unimplemented,
+    #[error("截图写入失败")]
+    ScreenshotWrite,
+    #[error("截图读取失败")]
+    ScreenshotRead,
 }
 
 pub struct PresentHost {
@@ -107,6 +113,21 @@ pub fn probe() -> Caps {
     }
 }
 
+pub(crate) fn lock_present<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().expect("present lock poisoned")
+}
+
+pub(crate) fn present_thread_name(serial: &str) -> String {
+    format!("mirror-present-{serial}")
+}
+
+pub(crate) fn spawn_present_thread(name: String, body: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .name(name)
+        .spawn(body)
+        .expect("spawn present thread");
+}
+
 impl PresentHost {
     pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
         // HEVC 探测会走 Media Foundation，冷启动可达数秒；禁止挡 setup / 首屏。
@@ -152,7 +173,7 @@ impl PresentHost {
     }
 
     pub fn set_owner(&self, owner: isize) {
-        self.inner.lock().expect("present lock poisoned").owner = owner;
+        lock_present(&self.inner).owner = owner;
         #[cfg(windows)]
         self.geom.set_owner(owner);
     }
@@ -162,7 +183,7 @@ impl PresentHost {
         #[cfg(windows)]
         let d3d = self.ensure_d3d();
         let (tx, last) = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             #[cfg(windows)]
             let same = inner
                 .live_bind
@@ -192,7 +213,7 @@ impl PresentHost {
 
     /// 停解码座、舞台改画 chrome。表面仍在。同 serial 的 live_bind 丢掉；异 serial 保留。
     pub fn unbind(&self, serial: &str) {
-        let mut inner = self.inner.lock().expect("present lock poisoned");
+        let mut inner = lock_present(&self.inner);
         #[cfg(windows)]
         let drop_seat = inner.live_bind.as_ref().is_some_and(|(s, ..)| s == serial);
         apply_pending_unbind(&mut inner.live_bind, serial);
@@ -219,7 +240,7 @@ impl PresentHost {
     /// 激活时用上次 avail 建窗；解码座继续跑。
     pub fn set_active(&self, active: bool) {
         let replay = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             inner.active = active;
             if active {
                 inner.last_layout.clone()
@@ -245,7 +266,7 @@ impl PresentHost {
     }
 
     pub fn layout(&self, layout: MirrorLayout) {
-        let active = self.inner.lock().expect("present lock poisoned").active;
+        let active = lock_present(&self.inner).active;
         if !active {
             tracing::info!(
                 serial = %layout.serial,
@@ -255,7 +276,7 @@ impl PresentHost {
             return;
         }
         if layout_replayable(&layout) {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             inner.last_layout = Some(layout.clone());
         }
         if !layout_replayable(&layout) {
@@ -275,7 +296,7 @@ impl PresentHost {
             SurfaceEnsure::Ready => false,
         };
         let tx = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             inner.stage_serial = Some(layout.serial.clone());
             inner.surface.clone()
         };
@@ -291,7 +312,7 @@ impl PresentHost {
     /// avail 上报的指针，主窗客户区物理坐标。HWND 不参与命中。
     pub fn pointer(&self, req: yohu_protocol::MirrorPointer) {
         let tx = {
-            let inner = self.inner.lock().expect("present lock poisoned");
+            let inner = lock_present(&self.inner);
             if !inner.active {
                 return;
             }
@@ -311,11 +332,11 @@ impl PresentHost {
 
     /// session 内容宽高写入 Stage。Loading 即可把占用卡片收到设备比例。
     pub fn adopt_content(&self, serial: &str, width: u32, height: u32) {
-        if width == 0 || height == 0 {
+        if !content_size_usable(width, height) {
             return;
         }
         let tx = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             let live = inner.live_bind.as_ref().is_some_and(|(s, ..)| s == serial);
             let stage = inner.stage_serial.as_deref() == Some(serial);
             if inner.live_bind.is_some() && !live && !stage {
@@ -332,7 +353,7 @@ impl PresentHost {
     pub fn screenshot(&self, serial: &str, path: &str) -> Result<(), PresentError> {
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
         {
-            let inner = self.inner.lock().expect("present lock poisoned");
+            let inner = lock_present(&self.inner);
             assert_screenshot_serial(inner.stage_serial.as_deref(), serial)?;
             let tx = inner.surface.as_ref().ok_or(PresentError::Empty)?;
             tx.send(Cmd::Screenshot {
@@ -350,7 +371,7 @@ impl PresentHost {
     /// 解码座与上次 avail 留下。
     pub fn shutdown(&self) {
         let tx = {
-            let mut inner = self.inner.lock().expect("present lock poisoned");
+            let mut inner = lock_present(&self.inner);
             inner.stage_serial = None;
             inner.surface.take()
         };
@@ -361,7 +382,7 @@ impl PresentHost {
 
     fn ensure_surface(&self, serial: &str) -> SurfaceEnsure {
         {
-            let inner = self.inner.lock().expect("present lock poisoned");
+            let inner = lock_present(&self.inner);
             if inner.surface.is_some() {
                 return SurfaceEnsure::Ready;
             }
@@ -370,7 +391,7 @@ impl PresentHost {
                 return SurfaceEnsure::Failed;
             }
         }
-        let owner = self.inner.lock().expect("present lock poisoned").owner;
+        let owner = lock_present(&self.inner).owner;
         #[cfg(windows)]
         let Some(d3d) = self.ensure_d3d() else {
             return SurfaceEnsure::Failed;
@@ -387,13 +408,13 @@ impl PresentHost {
             #[cfg(windows)]
             Arc::clone(&self.pictures),
         );
-        self.inner.lock().expect("present lock poisoned").surface = Some(tx);
+        lock_present(&self.inner).surface = Some(tx);
         SurfaceEnsure::Created
     }
 
     fn flush_live_bind(&self) {
         let bind = {
-            let inner = self.inner.lock().expect("present lock poisoned");
+            let inner = lock_present(&self.inner);
             match (
                 inner.surface.clone(),
                 inner.live_bind.clone(),
@@ -438,7 +459,19 @@ pub(crate) fn screenshot_from_pixels(
     pixels: Option<(u32, u32, Vec<u8>)>,
 ) -> Result<(), PresentError> {
     let (w, h, bgra) = pixels.ok_or(PresentError::Empty)?;
-    png::write_bgra_png(path, w, h, &bgra).map_err(PresentError::Internal)
+    png::write_bgra_png(path, w, h, &bgra).map_err(|_| PresentError::ScreenshotWrite)
+}
+
+/// 没有采样是空画面。采样失败是读失败。有像素才写盘。
+pub(crate) fn screenshot_sampled(
+    path: &str,
+    sample: Option<Result<(u32, u32, Vec<u8>), ()>>,
+) -> Result<(), PresentError> {
+    match sample {
+        None => screenshot_from_pixels(path, None),
+        Some(Ok(pixels)) => screenshot_from_pixels(path, Some(pixels)),
+        Some(Err(())) => Err(PresentError::ScreenshotRead),
+    }
 }
 
 /// `with_host` 空：线程已拆 → Exited，不是 Empty。
@@ -456,7 +489,7 @@ enum SurfaceEnsure {
 }
 
 fn layout_replayable(layout: &MirrorLayout) -> bool {
-    layout.visible && layout.width >= MIRROR_MIN_LAYOUT_PX && layout.height >= MIRROR_MIN_LAYOUT_PX
+    layout.visible && layout_is_presentable(layout.width, layout.height)
 }
 
 fn send_bind(tx: &Sender<Cmd>, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
@@ -471,7 +504,7 @@ fn send_last_content(tx: &Sender<Cmd>, last: &Option<(String, u32, u32)>, serial
     let Some((s, width, height)) = last else {
         return;
     };
-    if s == serial && *width > 0 && *height > 0 {
+    if s == serial && content_size_usable(*width, *height) {
         let _ = tx.send(Cmd::AdoptContent {
             width: *width,
             height: *height,
@@ -529,7 +562,7 @@ fn spawn_backend_surface(
 mod tests {
     use super::{
         apply_pending_unbind, assert_screenshot_serial, layout_replayable, probe,
-        screenshot_from_pixels, screenshot_host_reply, PresentError,
+        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError,
     };
     use yohu_protocol::MirrorLayout;
 
@@ -549,16 +582,20 @@ mod tests {
         let err = screenshot_from_pixels("/unused.png", None).unwrap_err();
         assert_eq!(err, PresentError::Empty);
         assert_eq!(err.to_string(), "当前没有投屏画面");
-        assert!(!matches!(err, PresentError::Internal(_)));
+        assert!(!matches!(err, PresentError::ScreenshotWrite));
+        let sampled = screenshot_sampled("/unused.png", None).unwrap_err();
+        assert_eq!(sampled, PresentError::Empty);
+        let read = screenshot_sampled("/unused.png", Some(Err(()))).unwrap_err();
+        assert_eq!(read, PresentError::ScreenshotRead);
     }
 
     #[test]
-    fn screenshot_write_fail_is_internal() {
+    fn screenshot_write_fail_is_write_not_empty() {
         let dir = std::env::temp_dir();
         let path = dir.to_str().expect("temp utf8");
         let err = screenshot_from_pixels(path, Some((1, 1, vec![0, 0, 0, 255]))).unwrap_err();
-        assert!(matches!(err, PresentError::Internal(_)));
-        assert_ne!(err, PresentError::Empty);
+        assert_eq!(err, PresentError::ScreenshotWrite);
+        assert_eq!(err.to_string(), "截图写入失败");
     }
 
     #[test]

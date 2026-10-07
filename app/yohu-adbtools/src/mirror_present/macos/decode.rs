@@ -3,9 +3,12 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use yohu_mirror::{EncodedFrame, FramePipe, PIPE_H265};
+use yohu_mirror::{EncodedFrame, FramePipe};
 
-use super::super::annexb::{access_unit, select_live_frames};
+use super::super::annexb::{
+    begin_feed, claim_first, note_content_size, note_decode_beat, seat_elapsed_ms, select_live_frames,
+    should_open_decoder, sticky_config, take_feed, take_open, DecodeSeatKind, FeedOutcome,
+};
 use super::super::backend::AnnexBDecoder;
 use super::vt::{Picture, VideoToolboxDecoder};
 
@@ -19,14 +22,6 @@ impl DecodeBind {
         let mut tick = DecodeTick::new();
         tick.seed_config(pipe.sticky_config());
         Self { pipe, tick }
-    }
-
-    pub fn pull(&self) -> Vec<EncodedFrame> {
-        let mut frames = Vec::new();
-        while let Some(frame) = self.pipe.try_recv() {
-            frames.push(frame);
-        }
-        frames
     }
 }
 
@@ -62,10 +57,10 @@ impl DecodeTick {
     }
 
     pub fn seed_config(&mut self, frame: Option<EncodedFrame>) {
-        let Some(frame) = frame else {
+        let Some((_, payload)) = sticky_config(frame) else {
             return;
         };
-        self.last_config = Some(frame.payload);
+        self.last_config = Some(payload);
     }
 
     pub fn ingest(&mut self, frames: Vec<EncodedFrame>) -> Option<Picture> {
@@ -81,20 +76,15 @@ impl DecodeTick {
     }
 
     pub fn log_beat(&mut self) {
-        if self.fed > 0 || self.decoded > 0 {
-            tracing::info!(fed = self.fed, decoded = self.decoded, "VT 解码节拍");
-        }
-        self.fed = 0;
-        self.decoded = 0;
+        note_decode_beat(&mut self.fed, &mut self.decoded, DecodeSeatKind::VideoToolbox);
     }
 
     pub fn note_first(&mut self, width: u32, height: u32) {
-        if self.first {
+        if !claim_first(&mut self.first) {
             return;
         }
-        self.first = true;
         tracing::info!(
-            elapsed_ms = self.started.elapsed().as_millis() as u64,
+            elapsed_ms = seat_elapsed_ms(self.started),
             width,
             height,
             "VideoToolbox 首帧"
@@ -114,10 +104,12 @@ impl DecodeTick {
     }
 
     fn decode(&mut self, frame: EncodedFrame) -> Option<Picture> {
-        let size_changed = self.last_content_w > 0
-            && (self.last_content_w, self.last_content_h) != (frame.width, frame.height);
-        self.last_content_w = frame.width;
-        self.last_content_h = frame.height;
+        let size_changed = note_content_size(
+            &mut self.last_content_w,
+            &mut self.last_content_h,
+            frame.width,
+            frame.height,
+        );
         if size_changed {
             self.decoder = None;
             self.need_keyframe = true;
@@ -132,9 +124,12 @@ impl DecodeTick {
         if self.need_keyframe && !frame.keyframe {
             return None;
         }
-        if self.decoder.is_none() && !self.failed && frame.width > 0 && frame.height > 0 {
-            let hevc = frame.codec == PIPE_H265;
-            match VideoToolboxDecoder::open(hevc, frame.width, frame.height, None) {
+        if should_open_decoder(self.decoder.is_some(), self.failed, frame.has_content_size()) {
+            let hevc = frame.is_hevc();
+            match take_open(
+                &mut self.failed,
+                VideoToolboxDecoder::open(hevc, frame.width, frame.height, None),
+            ) {
                 Ok(dec) => self.decoder = Some(dec),
                 Err(e) => {
                     tracing::error!(
@@ -144,22 +139,24 @@ impl DecodeTick {
                         hevc,
                         "VideoToolbox 解码器启动失败，本会话不再重试"
                     );
-                    self.failed = true;
                     return None;
                 }
             }
         }
         let dec = self.decoder.as_mut()?;
-        let payload = access_unit(self.last_config.as_deref(), &frame.payload, frame.keyframe);
-        self.fed += 1;
-        match dec.feed(&payload, frame.keyframe) {
-            Ok(Some(pic)) => {
-                self.decoded += 1;
+        let payload = begin_feed(
+            &mut self.fed,
+            self.last_config.as_deref(),
+            &frame.payload,
+            frame.keyframe,
+        );
+        match take_feed(&mut self.decoded, dec.feed(&payload, frame.keyframe)) {
+            FeedOutcome::Picture(pic) => {
                 self.need_keyframe = false;
                 Some(pic)
             }
-            Ok(None) => None,
-            Err(e) => {
+            FeedOutcome::Empty => None,
+            FeedOutcome::Failed(e) => {
                 tracing::warn!(error = %e, keyframe = frame.keyframe, "VideoToolbox 解码失败，等待下一关键帧");
                 dec.reset();
                 self.need_keyframe = true;

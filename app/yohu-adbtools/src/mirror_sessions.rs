@@ -19,18 +19,16 @@ impl MirrorSessions {
         }
     }
 
+    fn lock_tasks(&self) -> std::sync::MutexGuard<'_, std::collections::HashMap<String, u32>> {
+        self.tasks.lock().expect("mirror task lock poisoned")
+    }
+
     pub fn register_task(&self, serial: &str, task_id: u32) {
-        self.tasks
-            .lock()
-            .expect("mirror task lock poisoned")
-            .insert(serial.to_string(), task_id);
+        self.lock_tasks().insert(serial.to_string(), task_id);
     }
 
     pub fn finish_task(&self, serial: &str) -> Option<u32> {
-        self.tasks
-            .lock()
-            .expect("mirror task lock poisoned")
-            .remove(serial)
+        self.lock_tasks().remove(serial)
     }
 }
 
@@ -62,7 +60,7 @@ pub async fn start(state: &AppState, req: MirrorStartRequest) -> Result<MirrorSt
     if !result.adopted {
         let task_id = state.tasks.register(
             format!("投屏: {}", serial),
-            format!("设备 {}", serial),
+            crate::tasks::device_detail(&serial),
             None,
         );
         state.mirror_sessions.register_task(&serial, task_id);
