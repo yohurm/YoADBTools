@@ -33,6 +33,28 @@ function walk(dir, out = []) {
   return out;
 }
 
+/** 引擎与几何目录，不是产品族。新产品视图必须进 PRODUCT_FAMILIES，禁止再开 ops/ 这类外包一层。 */
+const ENGINE_DIRS = new Set([
+  "context-menu",
+  "corner",
+  "dom",
+  "keymap",
+  "list-frame",
+  "list-row",
+  "motion",
+  "placement",
+  "search",
+  "spinner",
+  "tokens",
+]);
+
+for (const name of readdirSync(UI_SRC)) {
+  const full = join(UI_SRC, name);
+  if (!statSync(full).isDirectory()) continue;
+  if (PRODUCT_FAMILIES.includes(name) || ENGINE_DIRS.has(name)) continue;
+  fail(`${name}/ 不在产品族也不在引擎目录：禁止再包一层产品视图`);
+}
+
 const leftover = join(UI_SRC, "components");
 try {
   if (statSync(leftover).isDirectory() && walk(leftover).length > 0) {
