@@ -5,10 +5,11 @@
 
 import { Component, onCleanup } from "solid-js";
 
-import { errorText, ModuleTitle, type SettingKey } from "@yohu/api";
+import { dialogFailureText, dialogPickAccepted, saveFailedText, ModuleTitle, type DialogPick, type SettingKey } from "@yohu/api";
 import { YoChrome, YoPage, YoToaster, createToaster } from "@yohu/ui";
 
-import { settingsStore, updateStore } from "../stores";
+import { deviceStore, settingsStore, updateStore } from "../stores";
+import { updateHasNewVersion } from "../stores/update-store";
 import { SettingsForm } from "./SettingsForm";
 import { UpdateDialogs } from "./UpdateDialogs";
 import "./settings.css";
@@ -17,29 +18,48 @@ export const SettingsView: Component = () => {
   const toaster = createToaster();
   onCleanup(() => toaster.destroy());
 
+  function successTone() {
+    return "success" as const;
+  }
+
+  function showFailure(text: string): void {
+    toaster.show(text, settingsStore.errorTone());
+  }
+
+  function showSuccess(text: string): void {
+    toaster.show(text, successTone());
+  }
+
+  function showSaveFailed(e: unknown): void {
+    showFailure(saveFailedText(deviceStore.caughtText(e)));
+  }
+
   const save = (key: SettingKey, value: unknown, okText: string): void => {
     void settingsStore
       .set(key, value)
-      .then(() => toaster.show(okText, "success"))
-      .catch((e) => toaster.show(`保存失败: ${errorText(e)}`, "error"));
+      .then(() => showSuccess(okText))
+      .catch(showSaveFailed);
   };
 
-  const savedBrowse = (run: () => Promise<string | null>, okText: string): void => {
+  const savedBrowse = (run: () => Promise<DialogPick>, okText: string): void => {
     void run()
-      .then((path) => {
-        if (path) toaster.show(okText, "success");
+      .then((picked) => {
+        const failure = dialogFailureText(picked);
+        if (failure) showFailure(failure);
+        if (!dialogPickAccepted(picked)) return;
+        showSuccess(okText);
       })
-      .catch((e) => toaster.show(`保存失败: ${errorText(e)}`, "error"));
+      .catch(showSaveFailed);
   };
 
   const checkAppUpdate = async (): Promise<void> => {
     try {
       const result = await updateStore.check();
-      if (!result.has_new_version) {
-        toaster.show("已是最新版本", "success");
+      if (!updateHasNewVersion(result)) {
+        showSuccess("已是最新版本");
       }
     } catch (e) {
-      toaster.show(`检查更新失败: ${errorText(e)}`, "error");
+      showFailure(deviceStore.caughtText(e));
     }
   };
 

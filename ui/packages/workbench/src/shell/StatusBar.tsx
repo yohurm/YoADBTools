@@ -13,7 +13,7 @@ import { deviceStore, settingsStore, taskStore } from "../stores";
 export const StatusBar: Component = () => {
   const activeTasks = () => taskStore.state.tasks.filter((t) => t.active);
   const versionLabel = () => {
-    const name = settingsStore.identity.display_name;
+    const name = settingsStore.displayName();
     const ver = settingsStore.identity.version;
     return ver ? `${name} v${ver}` : name;
   };

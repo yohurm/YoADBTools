@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -6,13 +9,24 @@ const mocks = vi.hoisted(() => ({
   updateInstall: vi.fn(),
   updateCancel: vi.fn(),
   updateOpen: vi.fn(),
+  onProgress: null as
+    | ((e: {
+        version: string;
+        stage: string;
+        received_bytes: number;
+        total_bytes: number;
+        error?: { code: string; message: string };
+      }) => void)
+    | null,
 }));
 
 vi.mock("@yohu/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@yohu/api")>();
   return {
     ...actual,
-    onUpdateProgress: vi.fn(),
+    onUpdateProgress: (handler: NonNullable<typeof mocks.onProgress>) => {
+      mocks.onProgress = handler;
+    },
     updateCancel: (...a: unknown[]) => mocks.updateCancel(...a),
     updateCheck: (...a: unknown[]) => mocks.updateCheck(...a),
     updateDownload: (...a: unknown[]) => mocks.updateDownload(...a),
@@ -21,7 +35,13 @@ vi.mock("@yohu/api", async (importOriginal) => {
   };
 });
 
-import { createUpdateStore } from "./update-store";
+import {
+  createUpdateStore,
+  updateHasInstallerPath,
+  updateHasNewVersion,
+  updateOfferHasInstaller,
+  updateProgressHasTotal,
+} from "./update-store";
 
 const FOUND = {
   has_new_version: true,
@@ -68,6 +88,150 @@ describe("createUpdateStore.download", () => {
       message: "没有可下载的安装包",
     });
     expect(mocks.updateDownload).not.toHaveBeenCalled();
+  });
+
+  it("失败事件原样拒绝 IPC 错误", async () => {
+    mocks.updateCheck.mockResolvedValueOnce(FOUND);
+    mocks.updateDownload.mockResolvedValueOnce(undefined);
+    const store = createUpdateStore();
+    store.bindIpc();
+    await store.check();
+    const pending = store.download();
+    await vi.waitFor(() => expect(mocks.updateDownload).toHaveBeenCalled());
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "failed",
+      received_bytes: 0,
+      total_bytes: 0,
+      error: { code: "cancelled", message: "更新已取消" },
+    });
+    await expect(pending).rejects.toEqual({ code: "cancelled", message: "更新已取消" });
+    expect(store.phase()).toBe("idle");
+  });
+
+  it("下载百分比取整并夹在 100", () => {
+    const store = createUpdateStore();
+    store.bindIpc();
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 1,
+      total_bytes: 3,
+    });
+    expect(store.percent()).toBe(33);
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 500,
+      total_bytes: 200,
+    });
+    expect(store.percent()).toBe(100);
+  });
+
+  it("总量为 0 时百分比是 0", () => {
+    const store = createUpdateStore();
+    store.bindIpc();
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 1,
+      total_bytes: 0,
+    });
+    expect(store.percent()).toBe(0);
+    expect(updateProgressHasTotal(null)).toBe(false);
+    expect(
+      updateProgressHasTotal({
+        version: "1.2.0",
+        stage: "downloading",
+        received_bytes: 1,
+        total_bytes: 0,
+      }),
+    ).toBe(false);
+    expect(
+      updateProgressHasTotal({
+        version: "1.2.0",
+        stage: "downloading",
+        received_bytes: 1,
+        total_bytes: 3,
+      }),
+    ).toBe(true);
+  });
+});
+
+function productionSources(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...productionSources(path));
+    else if (
+      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
+      !entry.name.includes(".test.")
+    ) {
+      out.push(path);
+    }
+  }
+  return out;
+}
+
+describe("更新要约只判一次", () => {
+  it("新版本、下载地址、本机路径分开认", () => {
+    expect(updateHasNewVersion(FOUND)).toBe(true);
+    expect(updateHasNewVersion({ ...FOUND, has_new_version: false })).toBe(false);
+    expect(updateOfferHasInstaller(null)).toBe(false);
+    expect(updateOfferHasInstaller({ ...FOUND, installer_url: null })).toBe(false);
+    expect(updateOfferHasInstaller({ ...FOUND, installer_url: "" })).toBe(false);
+    expect(updateOfferHasInstaller(FOUND)).toBe(true);
+    expect(updateHasInstallerPath(null)).toBe(false);
+    expect(updateHasInstallerPath(undefined)).toBe(false);
+    expect(updateHasInstallerPath("")).toBe(false);
+    expect(updateHasInstallerPath("C:\\setup.exe")).toBe(true);
+  });
+
+  it("生产源不再自己比这三把", () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const version = "return result.has_new_version;";
+    const offer = 'return typeof update?.installer_url === "string" && update.installer_url.length > 0;';
+    const localPath = 'return typeof path === "string" && path.length > 0;';
+    for (const file of productionSources(root)) {
+      let body = readFileSync(file, "utf8");
+      if (file.endsWith("update-store.ts")) {
+        body = body.replace(version, "").replace(offer, "").replace(localPath, "");
+      }
+      expect(body, file).not.toContain(".has_new_version");
+      expect(body, file).not.toContain("?.installer_url");
+      expect(body, file).not.toContain("&& e.installer_path");
+      expect(body, file).not.toContain("if (!path)");
+    }
+  });
+});
+
+describe("更新快照只写一处", () => {
+  it("总量比较和空闲清空不再散落", () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const knownTotal = "return progress != null && progress.total_bytes > 0;";
+    const idle = 'setPhase("idle");';
+    const progressNull = "setProgress(null);";
+    const installerNull = "setInstallerPath(null);";
+    const pendingNull = "setPending(null);";
+    for (const file of productionSources(root)) {
+      let body = readFileSync(file, "utf8");
+      if (file.endsWith("update-store.ts")) {
+        body = body
+          .replace(knownTotal, "")
+          .replace(idle, "")
+          .replace(progressNull, "")
+          .replace(installerNull, "")
+          .replace(pendingNull, "");
+      }
+      expect(body, file).not.toContain("total_bytes > 0");
+      expect(body, file).not.toContain("total_bytes <=");
+      expect(body, file).not.toContain("total_bytes ?");
+      expect(body, file).not.toContain("?.total_bytes");
+      expect(body, file).not.toContain(idle);
+      expect(body, file).not.toContain(progressNull);
+      expect(body, file).not.toContain(installerNull);
+      expect(body, file).not.toContain(pendingNull);
+    }
   });
 });
 

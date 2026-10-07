@@ -14,9 +14,13 @@ const css = load("settings.css");
 
 describe("设置页滚轴", () => {
   it("更新对话框正文走 YoScroller", () => {
+    expect(dialogs).toContain("ToastTone");
+    expect(dialogs).not.toContain('"success" | "error"');
     expect(dialogs).toContain("YoScroller");
     expect(dialogs.match(/<YoScroller/g)?.length).toBe(2);
     expect(dialogs).toContain("yohu-settings__update-progress--pinned");
+    expect(dialogs).toContain("smSize()");
+    expect(css).not.toContain(".yohu-progress");
     expect(dialogs).toContain("yohu-settings__update-desc");
     expect(dialogs).toContain("yohu-settings__update-copy");
   });
@@ -45,7 +49,8 @@ describe("设置页滚轴", () => {
     expect(form).not.toContain("YoPage");
     expect(form).not.toContain("yohu-settings__body");
     expect(form.match(/<YoPanel\b/g)?.length).toBe(7);
-    expect(form.match(/overflow="visible"/g)?.length).toBe(7);
+    expect(form.match(/overflow="visible"/g)?.length ?? 0).toBe(0);
+    expect(form.match(/panelOverflow\(\)/g)?.length).toBe(8);
     expect(form).not.toContain("deviceLabel");
     expect(form).toContain("LOG_DISPLAY_COLUMN_CATALOG");
     expect(form).not.toContain("LOG_COLUMN_OPTIONS");
@@ -66,10 +71,16 @@ describe("设置页滚轴", () => {
   });
 
   it("设备自动刷新是开关，无间隔秒数字段", () => {
-    expect(form).toContain('title="设备自动刷新"');
-    expect(form).toContain('ariaLabel="设备自动刷新"');
+    expect(form).toContain("autoRefreshCopy()");
+    expect(form).toContain('return "设备自动刷新"');
     expect(form).not.toContain("自动刷新间隔");
     expect(form).not.toContain("间隔（秒");
     expect(form).not.toContain("0 = 关");
+  });
+
+  it("待装包大小零默认只写在 pendingBytes", () => {
+    const needle = "size_bytes " + "?? 0";
+    expect(dialogs.split(needle).length - 1).toBe(1);
+    expect(dialogs).toContain("pendingBytes()");
   });
 });

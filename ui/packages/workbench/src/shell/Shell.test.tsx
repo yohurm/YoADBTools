@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import type { Component } from "solid-js";
@@ -27,6 +27,14 @@ const mocks = vi.hoisted(() => ({
   updateDownload: vi.fn(),
   updateInstall: vi.fn(),
   updateCancel: vi.fn(),
+  updateProgress: null as null | ((e: {
+    version: string;
+    stage: string;
+    received_bytes: number;
+    total_bytes: number;
+    installer_path?: string;
+    message?: string;
+  }) => void),
   windowShow: vi.fn(async () => undefined),
   mirrorPresentSetActive: vi.fn(async (..._args: unknown[]) => undefined),
   taskHandler: null as null | ((e: unknown) => void),
@@ -56,7 +64,19 @@ vi.mock("@yohu/api", async (importOriginal) => {
     updateDownload: (...a: unknown[]) => mocks.updateDownload(...a),
     updateInstall: (...a: unknown[]) => mocks.updateInstall(...a),
     updateCancel: (...a: unknown[]) => mocks.updateCancel(...a),
-    onUpdateProgress: noop,
+    onUpdateProgress: (handler: (e: {
+      version: string;
+      stage: string;
+      received_bytes: number;
+      total_bytes: number;
+      installer_path?: string;
+      error?: { code: string; message: string };
+    }) => void) => {
+      mocks.updateProgress = handler;
+      return () => {
+        mocks.updateProgress = null;
+      };
+    },
     adbExec: notConfigured,
     terminalEval: notConfigured,
     groupRun: notConfigured,
@@ -210,9 +230,9 @@ beforeEach(() => {
   mocks.deviceList.mockResolvedValue([]);
   mocks.deviceRefresh.mockResolvedValue([]);
   mocks.deviceStatus.mockResolvedValue([]);
-  mocks.dialogOpenFile.mockResolvedValue(null);
-  mocks.dialogOpenDirectory.mockResolvedValue(null);
-  mocks.dialogSaveFile.mockResolvedValue(null);
+  mocks.dialogOpenFile.mockResolvedValue({ ok: false, reason: "cancelled" });
+  mocks.dialogOpenDirectory.mockResolvedValue({ ok: false, reason: "cancelled" });
+  mocks.dialogSaveFile.mockResolvedValue({ ok: false, reason: "cancelled" });
   mocks.systemOpenPath.mockResolvedValue(undefined);
   mocks.updateInfo.mockResolvedValue({
     remote: "yohurm/Windows-YoADBTools",
@@ -411,15 +431,20 @@ describe("DeviceRail（§3 设备卡片）", () => {
         /\/\*[\s\S]*?\*\//g,
         "",
       );
+    expect(decls("yohu-device-rail__body")).toMatch(/flex:\s*1 1 auto/);
     expect(decls("yohu-device-rail__list")).toMatch(/overflow:\s*hidden/);
     expect(decls("yohu-device-rail__list")).not.toMatch(/overflow:\s*auto/);
     expect(css).not.toContain(".yohu-device-rail__scroller");
     expect(css).not.toContain(".yohu-device-rail__fold");
+    expect(css).not.toContain(".yohu-collapse");
     expect(css).not.toMatch(/overflow:\s*auto/);
     expect(decls("yohu-device-rail")).toMatch(/max-height:\s*var\(--yohu-layout-device-rail-max\)/);
     expect(css).toMatch(
       /\.yohu-device-rail\[data-stream="open"\] \.yohu-device-rail__heading\s*\{[^}]*flex:\s*1 1 auto/,
     );
+    expect(decls("yohu-device-rail__heading")).toBe("");
+    expect(decls("yohu-layout__rail")).not.toMatch(/min-width:\s*0/);
+    expect(decls("yohu-layout__rail")).not.toMatch(/overflow:\s*hidden/);
     expect(css).toMatch(
       /\.yohu-device-rail:not\(\[data-stream="open"\]\) \.yohu-device-rail__header\s*\{[^}]*gap:\s*0/,
     );
@@ -430,22 +455,14 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(css).not.toContain(".yohu-device-rail__header .yohu-subheader");
     expect(css).not.toMatch(/max-height:\s*42%/);
     expect(css.includes("collapse__inner")).toBe(false);
-    expect(css).toContain('data-rail="icons"');
     expect(css).not.toContain("data-presentation");
     expect(css).not.toMatch(
       /\.yohu-layout__rail:not\(\[data-phase="expanded"\]\).*display:\s*none/,
     );
-    expect(css).toContain("--yohu-layout-shell-nav-icons");
+    expect(css).not.toContain("--yohu-layout-shell-nav");
+    expect(css).not.toMatch(/\.yohu-layout__rail\[data-rail/);
     expect(css).toMatch(/\.yohu-layout__work\s*\{[^}]*display:\s*flex/);
-    expect(css).toMatch(
-      /\.yohu-layout__rail\[data-rail="expanded"\]\s*\{[^}]*flex-basis:\s*var\(--yohu-layout-shell-nav\)/,
-    );
-    expect(css).toMatch(
-      /\.yohu-layout__rail\[data-rail="expanded"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
-    );
-    expect(css).toMatch(
-      /\.yohu-layout__rail\[data-rail="icons"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav-icons\)/,
-    );
+    expect(css).not.toContain(".yohu-layout__content > *");
     expect(css).not.toMatch(
       /(?:^|\n)\.yohu-layout__rail\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
     );
@@ -468,6 +485,7 @@ describe("DeviceRail（§3 设备卡片）", () => {
     const emptyCollapse = empty.container.querySelector(".yohu-collapse");
     expect(emptyRail?.getAttribute("data-empty")).toBe("true");
     expect(emptyCollapse?.getAttribute("data-recipe")).toBe("collapse");
+    expect(emptyCollapse?.getAttribute("data-flex")).toBe("hug");
     expect(emptyCollapse?.getAttribute("data-open")).toBe("true");
     expect(emptyRail?.querySelector(".yohu-device-rail__body")).toBeTruthy();
     expect(emptyRail?.querySelector(".yohu-device-rail__list")).toBeNull();
@@ -483,6 +501,7 @@ describe("DeviceRail（§3 设备卡片）", () => {
     const collapse = container.querySelector(".yohu-collapse");
     expect(rail?.hasAttribute("data-empty")).toBe(false);
     expect(collapse?.getAttribute("data-recipe")).toBe("fill");
+    expect(collapse?.getAttribute("data-flex")).toBe("grow");
     expect(collapse?.getAttribute("data-open")).toBe("true");
     expect(rail?.querySelector(".yohu-device-rail__body")).toBeTruthy();
     expect(rail?.querySelector(".yohu-device-rail__list")).toBeTruthy();
@@ -519,6 +538,38 @@ describe("DeviceRail（§3 设备卡片）", () => {
     expect(src).not.toMatch(/<YoTooltip[\s\S]*?<YoListItem/);
     expect(src).toContain("<YoTooltip content={tip()}>{statusDot()}</YoTooltip>");
     expect(src).toContain("railTooltipEnabled");
+  });
+});
+
+/** 开着写成 true，关着省略。先从测试源码剥掉针，再扫工作台生产源码。 */
+const TRUE_ATTR_NEEDLE = "? true : undefined";
+
+function workbenchSources(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = resolve(dir, entry.name);
+    if (entry.isDirectory()) out.push(...workbenchSources(path));
+    else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) out.push(path);
+  }
+  return out;
+}
+
+describe("开着写成 true", () => {
+  it("设备栏空态只调 trueAttr，生产源不再手写省略三元", () => {
+    const roots = [
+      resolve(process.cwd(), "src"),
+      resolve(process.cwd(), "packages/workbench/src"),
+    ];
+    const root = roots.find((path) => existsSync(path));
+    expect(root).toBeTruthy();
+    const rail = readFileSync(resolve(root!, "shell/DeviceRail.tsx"), "utf-8");
+    expect(rail).toContain("data-empty={trueAttr(empty())}");
+    const offenders = workbenchSources(root!).filter((file) => {
+      let text = readFileSync(file, "utf-8");
+      if (file.includes(".test.")) text = text.replaceAll(TRUE_ATTR_NEEDLE, "");
+      return text.includes(TRUE_ATTR_NEEDLE);
+    });
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -682,7 +733,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     render(() => <SettingsView />);
     const title = screen.getByText("日志显示列");
     const row = title.closest(".yohu-form-row");
-    expect(row?.getAttribute("data-has-note")).toBe("true");
+    expect(row?.getAttribute("data-has-note")).toBe("");
     expect(row?.hasAttribute("data-has-description")).toBe(false);
     expect(row?.querySelector(".yohu-settings__checks")).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "时间" })).toBeTruthy();
@@ -700,7 +751,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   });
 
   it("浏览按钮：选择 adb.exe 后写入 adb_path 并弹保存 toast", async () => {
-    mocks.dialogOpenFile.mockResolvedValue("C:\\tools\\adb.exe");
+    mocks.dialogOpenFile.mockResolvedValue({ ok: true, path: "C:\\tools\\adb.exe" });
     render(() => <SettingsView />);
     fireEvent.click(screen.getAllByText("浏览")[0] as HTMLElement);
     await waitFor(() => {
@@ -723,11 +774,11 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(screen.getAllByText("打开")).toHaveLength(1);
     for (const name of ["ADB 路径", "数据目录"]) {
       const row = screen.getByLabelText(name).closest(".yohu-form-row");
-      expect(row?.getAttribute("data-has-note")).toBe("true");
+      expect(row?.getAttribute("data-has-note")).toBe("");
       expect(row?.hasAttribute("data-has-description")).toBe(false);
     }
 
-    mocks.dialogOpenDirectory.mockResolvedValue("D:\\YohuData");
+    mocks.dialogOpenDirectory.mockResolvedValue({ ok: true, path: "D:\\YohuData" });
     fireEvent.click(screen.getAllByText("浏览")[1] as HTMLElement);
     await waitFor(() => {
       expect(mocks.dialogOpenDirectory).toHaveBeenCalledWith(
@@ -903,6 +954,7 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
   });
 
   it("关于面板可检查更新；已最新提示；有新版本则下载后确认安装", async () => {
+    updateStore.bindIpc();
     render(() => <SettingsView />);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "检查更新" })).toBeTruthy();
@@ -940,6 +992,15 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
         size_bytes: 0,
         version: "1.2.0",
       });
+    });
+    mocks.updateProgress?.({
+      version: "1.2.0",
+      stage: "ready",
+      received_bytes: 0,
+      total_bytes: 0,
+      installer_path: "C:\\Temp\\YohuAdbTools-update\\setup.exe",
+    });
+    await waitFor(() => {
       expect(mocks.updateInstall).not.toHaveBeenCalled();
       expect(screen.getByText("安装更新")).toBeTruthy();
     });
@@ -1009,8 +1070,8 @@ describe("AppLayout 窗口铬", () => {
     navStore.navigate(ModuleId.Terminal);
     render(() => <AppLayout />);
     fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
-    const layout = document.querySelector(".yohu-layout");
-    expect(layout?.getAttribute("data-rail")).toBe("icons");
+    expect(document.querySelector(".yohu-layout")?.hasAttribute("data-rail")).toBe(false);
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-rail")).toBe("icons");
     expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-phase")).toBe("icons");
     expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-stream")).toBe("closed");
     expect(document.querySelector(".yohu-layout__rail.yohu-recipe-rail")).toBeTruthy();
@@ -1024,8 +1085,8 @@ describe("AppLayout 窗口铬", () => {
     fireEvent.click(screen.getByRole("button", { name: "设置" }));
     expect(navStore.activeModuleId()).toBe(ModuleId.Settings);
     fireEvent.click(screen.getByRole("button", { name: "展开侧栏" }));
-    const opened = document.querySelector(".yohu-layout");
-    expect(opened?.getAttribute("data-rail")).toBe("expanded");
+    expect(document.querySelector(".yohu-layout")?.hasAttribute("data-rail")).toBe(false);
+    expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-rail")).toBe("expanded");
     expect(document.querySelector(".yohu-layout__rail")?.getAttribute("data-phase")).toBe(
       "expanded",
     );

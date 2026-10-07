@@ -6,7 +6,6 @@
 import { Component, onCleanup, onMount } from "solid-js";
 
 import { systemReportError, YoLog } from "@yohu/api";
-import { setDensity, setTheme } from "@yohu/ui";
 
 import { runBootPipeline } from "./boot";
 import { formatWindowError } from "./js-error";
@@ -18,8 +17,6 @@ import { deviceStore, settingsStore, taskStore, updateStore, windowStore } from 
 export const App: Component = () => {
   onMount(() => {
     let disposed = false;
-    setTheme(settingsStore.state.theme);
-    setDensity(settingsStore.state.density);
     deviceStore.bindIpc();
     taskStore.bindIpc();
     updateStore.bindIpc();
@@ -29,31 +26,49 @@ export const App: Component = () => {
     void runBootPipeline({
       load: async () => {
         await Promise.all([settingsStore.load(), deviceStore.load()]);
-        YoLog.info("shell", "设置已加载", { theme: settingsStore.state.theme });
+        YoLog.info(windowStore.shellChannel(), "设置已加载", { theme: settingsStore.state.theme });
       },
       refresh: () => {
         if (!disposed) {
-          void deviceStore.refresh();
+          deviceStore.refreshNow();
         }
       },
     });
 
-    YoLog.info("shell", "UI 已挂载", { href: window.location.href, bundle: import.meta.url });
+    YoLog.info(windowStore.shellChannel(), "UI 已挂载", { href: window.location.href, bundle: import.meta.url });
     const onError = (e: ErrorEvent): void => {
       const text = formatWindowError(e);
-      YoLog.error("shell", text);
+      YoLog.error(windowStore.shellChannel(), text);
       void systemReportError(text);
     };
-    window.addEventListener("error", onError);
     const onContextMenu = (event: MouseEvent): void => {
       if (!allowNativeContextMenu(event.target)) event.preventDefault();
     };
-    document.addEventListener("contextmenu", onContextMenu);
+    function listen<K extends keyof WindowEventMap>(
+      target: Window,
+      type: K,
+      handler: (this: Window, ev: WindowEventMap[K]) => void,
+    ): () => void;
+    function listen<K extends keyof DocumentEventMap>(
+      target: Document,
+      type: K,
+      handler: (this: Document, ev: DocumentEventMap[K]) => void,
+    ): () => void;
+    function listen(
+      target: Window | Document,
+      type: string,
+      handler: EventListenerOrEventListenerObject,
+    ): () => void {
+      target.addEventListener(type, handler);
+      return () => target.removeEventListener(type, handler);
+    }
+    const stopError = listen(window, "error", onError);
+    const stopContextMenu = listen(document, "contextmenu", onContextMenu);
     onCleanup(() => {
       disposed = true;
       detachWindow();
-      window.removeEventListener("error", onError);
-      document.removeEventListener("contextmenu", onContextMenu);
+      stopError();
+      stopContextMenu();
     });
   });
 

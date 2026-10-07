@@ -25,21 +25,33 @@ import {
   YoStatusDot,
   YoSubheader,
   YoTooltip,
+  isModKey,
+  listActivateKey,
   railSlotOpen,
   railStreamAttr,
   railStreamOpen,
   railTooltipEnabled,
+  trueAttr,
   useRail,
   type RailIntent,
 } from "@yohu/ui";
-import { deviceDisplayName } from "@yohu/api";
+import {
+  deviceDisplayName,
+  deviceIsOnline,
+  deviceIsUnauthorized,
+  selectionModeIsMulti,
+  type DeviceInfo,
+  type DeviceState,
+} from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
-import { deviceStore } from "../stores";
+import { deviceStore, settingsStore } from "../stores";
+import { deviceCatalogIsEmpty, deviceScanHasError } from "../stores/device-store";
 import {
   formatDeviceRailTip,
   formatDeviceStatusHint,
   formatDeviceStatusMeta,
+  DEVICE_UNAUTHORIZED_LABEL,
 } from "./device-status-format";
 
 export const DeviceRail: Component<{
@@ -48,36 +60,63 @@ export const DeviceRail: Component<{
   /** 壳外单测可指定意图；工作台内跟 YoRail。 */
   intent?: RailIntent;
 }> = (props) => {
+  function rowSerial(device: DeviceInfo): string {
+    return device.serial;
+  }
+
+  function rowState(device: DeviceInfo): DeviceState {
+    return device.state;
+  }
+
+  function moduleId(): string | undefined {
+    return props.moduleId;
+  }
+
+  function mode(): SelectionMode | undefined {
+    return props.selectionMode;
+  }
+
+  function scanError(): string {
+    return deviceStore.state.lastError;
+  }
+
+  function inlineAxis() {
+    return "inline" as const;
+  }
+
   const rail = useRail();
   const phase = () => rail?.phase() ?? props.intent ?? "expanded";
   const [expanded, setExpanded] = createSignal(true);
-  const multi = () => props.selectionMode === "multiOptional";
+  const multi = () => selectionModeIsMulti(mode());
   const compact = () => !railStreamOpen(phase());
   const slotOpen = () => railSlotOpen(phase());
   const listOpen = () => compact() || expanded();
 
   const targets = (): string[] => {
-    if (props.moduleId && props.selectionMode) {
-      return deviceStore.selectedSerials(props.moduleId, props.selectionMode);
+    const id = moduleId();
+    const selection = mode();
+    if (id && selection) {
+      return deviceStore.selectedSerials(id, selection);
     }
-    return deviceStore.state.focusSerial ? [deviceStore.state.focusSerial] : [];
+    const focused = deviceStore.focus();
+    return focused ? [focused] : [];
   };
 
   const isSelected = (serial: string): boolean => targets().includes(serial);
-  const empty = (): boolean => deviceStore.state.devices.length === 0;
-  const emptyHint = (): string =>
-    deviceStore.state.lastError || "连接设备并授权后刷新";
+  const empty = (): boolean => deviceCatalogIsEmpty(deviceStore.catalog());
+  const scanFailed = (): boolean => deviceScanHasError(scanError());
+  const emptyHint = (): string => (scanFailed() ? scanError() : "连接设备并授权后刷新");
 
   const select = (serial: string, event?: MouseEvent | KeyboardEvent): void => {
     deviceStore.selectDevice(serial, {
-      moduleId: props.moduleId,
-      mode: props.selectionMode,
-      additive: multi() && Boolean(event && (event.ctrlKey || event.metaKey)),
+      moduleId: moduleId(),
+      mode: mode(),
+      additive: multi() && Boolean(event && isModKey(event)),
     });
   };
 
   const onItemKeyDown = (serial: string, event: KeyboardEvent): void => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (listActivateKey(event.key)) {
       event.preventDefault();
       select(serial, event);
     }
@@ -86,11 +125,11 @@ export const DeviceRail: Component<{
   return (
     <div
       class="yohu-device-rail"
-      data-empty={empty() ? true : undefined}
+      data-empty={trueAttr(empty())}
       data-stream={railStreamAttr(phase())}
     >
       <div class="yohu-device-rail__header">
-        <YoRailSlot axis="inline" open={slotOpen()}>
+          <YoRailSlot axis={inlineAxis()} open={slotOpen()}>
           <YoIconButton
             icon={listOpen() && !compact() ? "chevron-down" : "chevron-right"}
             title={expanded() ? "折叠设备列表" : "展开设备列表"}
@@ -98,14 +137,14 @@ export const DeviceRail: Component<{
             onClick={() => setExpanded((v) => !v)}
           />
         </YoRailSlot>
-        <YoRailSlot axis="inline" class="yohu-device-rail__heading" open={slotOpen()}>
+        <YoRailSlot axis={inlineAxis()} class="yohu-device-rail__heading" open={slotOpen()}>
           <YoSubheader
             title="设备"
             tone="content"
             pad="flush"
             meta={
-              deviceStore.state.devices.length > 0 ? (
-                <YoBadge text={String(deviceStore.state.devices.length)} tone="neutral" />
+              !empty() ? (
+                <YoBadge text={String(deviceStore.catalog().length)} tone={settingsStore.neutralTone()} />
               ) : undefined
             }
           />
@@ -114,26 +153,26 @@ export const DeviceRail: Component<{
           icon="refresh"
           title="刷新设备"
           loading={deviceStore.state.refreshing}
-          onClick={() => void deviceStore.refresh()}
+          onClick={deviceStore.refreshNow}
         />
       </div>
-      <YoCollapse open={listOpen()} recipe={empty() ? "collapse" : "fill"}>
+      <YoCollapse open={listOpen()} recipe={empty() ? "collapse" : "fill"} flex={empty() ? "hug" : "grow"}>
         <div class="yohu-device-rail__body">
           <Show
             when={!empty()}
             fallback={
               <YoRailSlot open={slotOpen()}>
                 <YoEmptyState
-                  size="sm"
+                  size={settingsStore.smSize()}
                   title="无设备"
                   description={emptyHint()}
                   action={
-                    deviceStore.state.lastError ? (
+                    scanFailed() ? (
                       <YoButton
-                        size="sm"
-                        buttonStyle="normal"
-                        tone="neutral"
-                        onClick={() => void deviceStore.refresh()}
+                        size={settingsStore.smSize()}
+                        buttonStyle={settingsStore.normalStyle()}
+                        tone={settingsStore.neutralTone()}
+                        onClick={deviceStore.refreshNow}
                       >
                         重试扫描
                       </YoButton>
@@ -151,39 +190,44 @@ export const DeviceRail: Component<{
             >
               <YoScroller>
                 <div class="yohu-device-rail__stack">
-                    <YoListPresence each={deviceStore.state.devices} key={(device) => device.serial}>
+                    <YoListPresence each={deviceStore.catalog()} key={(device) => rowSerial(device)}>
                       {(device) => {
-                        const focused = () => deviceStore.state.focusSerial === device.serial;
-                        const runtime = () => deviceStore.state.statuses[device.serial];
+                        const serial = () => rowSerial(device);
+                        const state = () => rowState(device);
+                        const focused = () => deviceStore.focus() === serial();
+                        const runtime = () => deviceStore.state.statuses[serial()];
                         const meta = () => formatDeviceStatusMeta(runtime());
                         const hint = () => formatDeviceStatusHint(runtime());
-                        const first = () => deviceStore.state.devices[0]?.serial === device.serial;
+                        const first = (): boolean => {
+                          const head = deviceStore.catalog()[0];
+                          return head ? rowSerial(head) === serial() : false;
+                        };
                         const name = () => deviceDisplayName(device);
                         const tip = () =>
                           formatDeviceRailTip({
                             name: name(),
-                            serial: device.serial,
-                            unauthorized: device.state === "unauthorized",
+                            serial: serial(),
+                            state: state(),
                             hint: hint(),
                           });
                         const iconTip = () => railTooltipEnabled(phase());
                         const statusDot = () => (
                           <YoStatusDot
-                            tone={device.state === "online" ? "success" : "offline"}
+                            tone={deviceIsOnline(state()) ? "success" : "offline"}
                           />
                         );
                         return (
                           <YoListItem
                             size="device"
-                            selected={isSelected(device.serial)}
+                            selected={isSelected(serial())}
                             tabIndex={
-                              focused() || (deviceStore.state.focusSerial === null && first())
+                              focused() || (deviceStore.focus() === null && first())
                                 ? 0
                                 : -1
                             }
                             label={iconTip() ? tip() : name()}
                             title={name()}
-                            description={device.serial}
+                            description={serial()}
                             meta={meta()}
                             leading={
                               iconTip() ? (
@@ -193,12 +237,12 @@ export const DeviceRail: Component<{
                               )
                             }
                             trailing={
-                              device.state === "unauthorized" ? (
-                                <YoBadge text="未授权" tone="warning" />
+                              deviceIsUnauthorized(state()) ? (
+                                <YoBadge text={DEVICE_UNAUTHORIZED_LABEL} tone="warning" />
                               ) : undefined
                             }
-                            onClick={(event) => select(device.serial, event)}
-                            onKeyDown={(event) => onItemKeyDown(device.serial, event)}
+                            onClick={(event) => select(serial(), event)}
+                            onKeyDown={(event) => onItemKeyDown(serial(), event)}
                           />
                         );
                       }}

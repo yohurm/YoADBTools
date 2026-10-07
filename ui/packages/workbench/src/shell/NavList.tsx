@@ -5,7 +5,7 @@
  * 设置是壳内建页（kind=system）：钉在侧栏底部，与模块用横线隔开。
  */
 
-import { Component, For, Show } from "solid-js";
+import { Component, For, Show, type JSX } from "solid-js";
 
 import {
   Icon,
@@ -17,16 +17,22 @@ import {
   YoScroller,
   YoSubheader,
   YoTooltip,
+  listActivateKey,
   railSlotOpen,
   railTooltipEnabled,
   useRail,
   type RailIntent,
 } from "@yohu/ui";
 
-import { systemModules, workspaceModules, type ModuleDescriptor } from "../registry";
+import { moduleIsActive, moduleIsPlanned, systemModules, workspaceModules, type ModuleDescriptor } from "../registry";
+import { settingsStore } from "../stores";
+
+function moduleTitle(mod: ModuleDescriptor): string {
+  return mod.title;
+}
 
 function navItemLabel(mod: ModuleDescriptor): string {
-  return mod.isPlanned ? `${mod.title}（开发中）` : mod.title;
+  return moduleIsPlanned(mod) ? `${moduleTitle(mod)}（开发中）` : moduleTitle(mod);
 }
 
 const NavItem: Component<{
@@ -35,14 +41,26 @@ const NavItem: Component<{
   iconTip: boolean;
   onNavigate: (id: string) => void;
 }> = (props) => {
-  const active = () => props.mod.id === props.activeId;
+  function itemId(): string {
+    return props.mod.id;
+  }
+
+  function showIconTip(): boolean {
+    return props.iconTip;
+  }
+
+  function openItem(): void {
+    props.onNavigate(itemId());
+  }
+
+  const active = () => moduleIsActive(itemId(), props.activeId);
   const onItemKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (listActivateKey(event.key)) {
       event.preventDefault();
-      props.onNavigate(props.mod.id);
+      openItem();
     }
   };
-  const name = () => props.mod.title;
+  const name = () => moduleTitle(props.mod);
   const tip = () => navItemLabel(props.mod);
   const icon = () => <Icon name={props.mod.icon} size={Layout.IconSm} />;
 
@@ -55,17 +73,17 @@ const NavItem: Component<{
         current={active()}
         selected={active()}
         tabIndex={active() ? 0 : -1}
-        label={props.iconTip ? tip() : name()}
+        label={showIconTip() ? tip() : name()}
         title={name()}
         leading={
-          props.iconTip ? (
+          showIconTip() ? (
             <YoTooltip content={tip()}>{icon()}</YoTooltip>
           ) : (
             icon()
           )
         }
-        trailing={props.mod.isPlanned ? <YoBadge text="开发中" tone="neutral" /> : undefined}
-        onClick={() => props.onNavigate(props.mod.id)}
+        trailing={moduleIsPlanned(props.mod) ? <YoBadge text="开发中" tone={settingsStore.neutralTone()} /> : undefined}
+        onClick={openItem}
         onKeyDown={onItemKeyDown}
       />
     </li>
@@ -80,6 +98,22 @@ export const NavList: Component<{
   const rail = useRail();
   const phase = () => rail?.phase() ?? props.intent ?? "expanded";
   const iconTip = () => railTooltipEnabled(phase());
+
+  function navListClass(): string {
+    return "yohu-nav__list";
+  }
+
+  function navEntry(mod: ModuleDescriptor): JSX.Element {
+    return (
+      <NavItem
+        mod={mod}
+        activeId={props.activeId}
+        iconTip={iconTip()}
+        onNavigate={props.onNavigate}
+      />
+    );
+  }
+
   return (
     <nav class="yohu-nav" aria-label="侧栏导航">
       <div class="yohu-nav__modules">
@@ -87,34 +121,16 @@ export const NavList: Component<{
           <YoSubheader title="模块" />
         </YoRailSlot>
         <YoScroller>
-          <ul class="yohu-nav__list">
-            <For each={[...workspaceModules()]}>
-              {(mod) => (
-                <NavItem
-                  mod={mod}
-                  activeId={props.activeId}
-                  iconTip={iconTip()}
-                  onNavigate={props.onNavigate}
-                />
-              )}
-            </For>
+          <ul class={navListClass()}>
+            <For each={[...workspaceModules()]}>{navEntry}</For>
           </ul>
         </YoScroller>
       </div>
       <Show when={systemModules().length > 0}>
         <div class="yohu-nav__footer">
           <YoDivider />
-          <ul class="yohu-nav__list" aria-label="系统">
-            <For each={[...systemModules()]}>
-              {(mod) => (
-                <NavItem
-                  mod={mod}
-                  activeId={props.activeId}
-                  iconTip={iconTip()}
-                  onNavigate={props.onNavigate}
-                />
-              )}
-            </For>
+          <ul class={navListClass()} aria-label="系统">
+            <For each={[...systemModules()]}>{navEntry}</For>
           </ul>
         </div>
       </Show>

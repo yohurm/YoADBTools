@@ -232,4 +232,12 @@ describe("启动编排", () => {
     expect(tauri.build?.devUrl).toBeTruthy();
     expect(new URL(tauri.build!.devUrl!).port).toBe("1420");
   });
+
+  it("error 与 contextmenu 只经 listen 登记和摘掉", () => {
+    const app = readFileSync(findRepoFile(["packages/workbench/src/App.tsx", "src/App.tsx"]), "utf8");
+    expect(app.split("add" + "EventListener").length - 1).toBe(1);
+    expect(app.split("remove" + "EventListener").length - 1).toBe(1);
+    expect(app).toContain('listen(window, "error", onError)');
+    expect(app).toContain('listen(document, "contextmenu", onContextMenu)');
+  });
 });

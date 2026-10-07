@@ -1,5 +1,4 @@
 export { createDeviceStore, type DeviceStoreApi } from "./device-store";
-export { resolveTargetSerials } from "./selection";
 export { createSettingsStore, type SettingsStoreApi } from "./settings-store";
 export { createTaskStore, type TaskStoreApi } from "./task-store";
 export { createUpdateStore, type UpdateStoreApi } from "./update-store";

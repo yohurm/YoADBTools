@@ -39,9 +39,14 @@ export interface ModuleDescriptor {
 const registry: ModuleDescriptor[] = [];
 
 /** 注册模块（仅 apps/shell 与壳内建页调用）。 */
+function descriptorId(descriptor: ModuleDescriptor): string {
+  return descriptor.id;
+}
+
 export function registerModule(descriptor: ModuleDescriptor): void {
-  if (registry.some((m) => m.id === descriptor.id)) {
-    throw new Error(`模块重复注册: ${descriptor.id}`);
+  const id = descriptorId(descriptor);
+  if (registry.some((m) => m.id === id)) {
+    throw new Error(`模块重复注册: ${id}`);
   }
   registry.push(descriptor);
 }
@@ -53,6 +58,16 @@ export function modules(): readonly ModuleDescriptor[] {
 
 function kindOf(mod: ModuleDescriptor): ModuleKind {
   return mod.kind ?? "workspace";
+}
+
+/** 这个模块 id 就是当前导航。舞台「正在显示的是不是下一块」、重复注册，都不是这一把。 */
+export function moduleIsActive(moduleId: string, activeId: string): boolean {
+  return moduleId === activeId;
+}
+
+/** 占位模块。侧栏文案和徽章都认这一把。 */
+export function moduleIsPlanned(mod: Pick<ModuleDescriptor, "isPlanned">): boolean {
+  return mod.isPlanned === true;
 }
 
 /** 侧栏「模块」区：效率型/占位模块。 */
