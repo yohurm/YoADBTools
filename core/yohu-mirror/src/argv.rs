@@ -7,7 +7,7 @@ use crate::session::MirrorSessionRequest;
 
 pub fn server_argv(req: &MirrorSessionRequest, scid: u32, forward: bool) -> Vec<String> {
     let mut kv = vec![
-        format!("scid={scid:08x}"),
+        format!("scid={}", crate::tunnel::scid_hex(scid)),
         "log_level=info".into(),
         "audio=false".into(),
         "video=true".into(),
@@ -56,6 +56,7 @@ mod tests {
     #[test]
     fn argv_uses_request_limits_without_fps_when_zero() {
         let line = &server_argv(&req(0, 0, "h265"), 0x11, false)[1];
+        assert!(line.contains("scid=00000011"));
         assert!(line.contains("video_codec=h265"));
         assert!(line.contains("power_on=true"));
         assert!(line.contains("max_size=0"));
@@ -69,6 +70,7 @@ mod tests {
     #[test]
     fn argv_forward_and_fps() {
         let line = &server_argv(&req(1280, 30, "h264"), 1, true)[1];
+        assert!(line.contains("scid=00000001"));
         assert!(line.contains("max_size=1280"));
         assert!(line.contains("max_fps=30"));
         assert!(line.contains("tunnel_forward=true"));

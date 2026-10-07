@@ -6,6 +6,13 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::Notify;
 
+use crate::codec::PIPE_H265;
+
+/// 宽和高都大于 0 才是一帧内容尺寸。0 只表示还没有画面。
+pub fn content_size_usable(width: u32, height: u32) -> bool {
+    width > 0 && height > 0
+}
+
 const QUEUE_CAP: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +29,14 @@ pub struct EncodedFrame {
 }
 
 impl EncodedFrame {
+    pub fn has_content_size(&self) -> bool {
+        content_size_usable(self.width, self.height)
+    }
+
+    pub fn is_hevc(&self) -> bool {
+        self.codec == PIPE_H265
+    }
+
     fn is_delta(&self) -> bool {
         !self.config && !self.keyframe
     }
@@ -35,6 +50,10 @@ pub struct FramePipe {
     notify: Notify,
     closed: AtomicBool,
     dropped: AtomicU32,
+}
+
+fn lock_pipe<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().expect("frame pipe lock poisoned")
 }
 
 impl FramePipe {
@@ -64,12 +83,12 @@ impl FramePipe {
         }
         frame.dropped = self.dropped.load(Ordering::SeqCst);
         if frame.config {
-            *self.last_config.lock().expect("frame pipe lock poisoned") = Some(frame);
+            *lock_pipe(&self.last_config) = Some(frame);
             self.pending_config.store(true, Ordering::SeqCst);
             self.notify.notify_one();
             return;
         }
-        let mut queue = self.queue.lock().expect("frame pipe lock poisoned");
+        let mut queue = lock_pipe(&self.queue);
         if queue.len() >= QUEUE_CAP && !evict_for(&mut queue, &frame, &self.dropped) {
             return;
         }
@@ -81,19 +100,11 @@ impl FramePipe {
 
     fn pop(&self) -> Option<EncodedFrame> {
         if self.pending_config.swap(false, Ordering::SeqCst) {
-            if let Some(config) = self
-                .last_config
-                .lock()
-                .expect("frame pipe lock poisoned")
-                .clone()
-            {
+            if let Some(config) = lock_pipe(&self.last_config).clone() {
                 return Some(config);
             }
         }
-        self.queue
-            .lock()
-            .expect("frame pipe lock poisoned")
-            .pop_front()
+        lock_pipe(&self.queue).pop_front()
     }
 
     pub async fn recv(&self) -> Option<EncodedFrame> {
@@ -113,22 +124,33 @@ impl FramePipe {
         self.pop()
     }
 
+    /// 把现在已经在队列里的帧一次取完。不等下一帧。
+    pub fn drain_ready(&self) -> Vec<EncodedFrame> {
+        let mut frames = Vec::new();
+        while let Some(frame) = self.try_recv() {
+            frames.push(frame);
+        }
+        frames
+    }
+
+    /// 阻塞拿到的第一帧，再带上队列里现成的。管道已关时返回 None。
+    pub fn recv_batch(&self, first: Option<EncodedFrame>) -> Option<Vec<EncodedFrame>> {
+        let first = first?;
+        let mut frames = vec![first];
+        frames.extend(self.drain_ready());
+        Some(frames)
+    }
+
     /// 会话级 SPS/PPS 快照。新解码座入座时读取，不走一次性 pending。
     pub fn sticky_config(&self) -> Option<EncodedFrame> {
-        self.last_config
-            .lock()
-            .expect("frame pipe lock poisoned")
-            .clone()
+        lock_pipe(&self.last_config).clone()
     }
 
     /// 同代下一 attempt 入队前清空内容。不关管道、不改 dropped。
     pub fn reset_content(&self) {
-        *self.last_config.lock().expect("frame pipe lock poisoned") = None;
+        *lock_pipe(&self.last_config) = None;
         self.pending_config.store(false, Ordering::SeqCst);
-        self.queue
-            .lock()
-            .expect("frame pipe lock poisoned")
-            .clear();
+        lock_pipe(&self.queue).clear();
     }
 }
 
@@ -179,6 +201,41 @@ mod tests {
             codec: PIPE_H264,
             payload: vec![pts as u8],
             dropped: 0,
+        }
+    }
+
+    #[test]
+    fn content_size_needs_both_edges_and_hevc_is_the_pipe_id() {
+        assert!(!content_size_usable(0, 10));
+        assert!(!content_size_usable(10, 0));
+        assert!(content_size_usable(10, 20));
+        let mut sample = frame(false, true, 1);
+        assert!(sample.has_content_size());
+        assert!(!sample.is_hevc());
+        sample.codec = crate::codec::PIPE_H265;
+        sample.width = 0;
+        assert!(!sample.has_content_size());
+        assert!(sample.is_hevc());
+    }
+
+    #[test]
+    fn content_size_and_hevc_are_not_rewritten_downstream() {
+        let files = [
+            include_str!("../../../app/yohu-adbtools/src/events.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/mod.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/stage.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/host.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/decode.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/macos/decode.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/macos/surface.rs"),
+            include_str!("../../../app/yohu-adbtools/tests/mf_live.rs"),
+        ];
+        for file in files {
+            assert!(!file.contains("height > 0"), "height");
+            assert!(!file.contains("video_h > 0"), "video");
+            assert!(!file.contains("content_h > 0"), "content");
+            assert!(!file.contains("codec == PIPE_H265"), "hevc");
+            assert!(!file.contains("codec == 1"), "magic");
         }
     }
 
@@ -272,5 +329,23 @@ mod tests {
         assert!(pipe.try_recv().is_none());
         pipe.push(frame(true, false, 9));
         assert_eq!(pipe.try_recv().expect("new attempt config").pts, 9);
+    }
+
+    #[test]
+    fn drain_ready_takes_what_is_queued() {
+        let pipe = FramePipe::new();
+        pipe.push(frame(true, false, 0));
+        pipe.push(frame(false, true, 1));
+        let ready = pipe.drain_ready();
+        assert_eq!(ready.len(), 2);
+        assert!(pipe.drain_ready().is_empty());
+        let batch = pipe.recv_batch(Some(frame(false, false, 2))).expect("batch");
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].pts, 2);
+        assert!(pipe.recv_batch(None).is_none());
+        let windows = include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/decode.rs");
+        let macos = include_str!("../../../app/yohu-adbtools/src/mirror_present/macos/decode.rs");
+        assert!(!windows.contains("try_recv"));
+        assert!(!macos.contains("try_recv"));
     }
 }

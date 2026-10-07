@@ -14,16 +14,45 @@ use crate::consts::{
     ACCEPT, ADB_PUSH_MS, ADB_REMOVE_MS, ADB_STAT_MS, ADB_TUNNEL_MS, FORWARD_ATTEMPTS,
     FORWARD_DUMMY, FORWARD_RETRY, LOOPBACK_HOST, TCP_RETRY,
 };
-use crate::error::MirrorError;
+use crate::error::{MirrorError, ProtocolFault, ServerFault};
 
-const SERVER_EXITED_BEFORE_TUNNEL: &str = "server 在建立隧道前退出";
-
-fn server_exited() -> MirrorError {
-    MirrorError::ServerFailed(SERVER_EXITED_BEFORE_TUNNEL.into())
+/// scrcpy 把 scid 写成 8 位小写十六进制。socket 名与 `scid=` 参数共用。
+pub(crate) fn scid_hex(scid: u32) -> String {
+    format!("{scid:08x}")
 }
 
 pub fn socket_name(scid: u32) -> String {
-    format!("scrcpy_{scid:08x}")
+    format!("scrcpy_{}", scid_hex(scid))
+}
+
+fn tcp_spec(port: u16) -> String {
+    format!("tcp:{port}")
+}
+
+fn command_failed(exit_code: i32) -> bool {
+    exit_code != 0
+}
+
+/// 进程已经退出：隧道还没起来，算 server 失败，不算协议超时。
+fn reject_if_server_gone(process_alive: &AtomicBool) -> Result<(), MirrorError> {
+    if process_alive.load(Ordering::Relaxed) {
+        Ok(())
+    } else {
+        Err(ServerFault::ExitedBeforeTunnel.into())
+    }
+}
+
+async fn server_exit_watch(process_alive: &AtomicBool, pace: Duration) -> MirrorError {
+    loop {
+        if let Err(err) = reject_if_server_gone(process_alive) {
+            return err;
+        }
+        tokio::time::sleep(pace).await;
+    }
+}
+
+fn mirror_socket(stream: &TcpStream) {
+    let _ = stream.set_nodelay(true);
 }
 
 pub fn abstract_spec(scid: u32) -> String {
@@ -146,7 +175,7 @@ async fn remote_jar_size(adb: &AdbClient, serial: &str, cancel: CancellationToke
         )
         .await
         .ok()?;
-    if out.exit_code != 0 {
+    if command_failed(out.exit_code) {
         return None;
     }
     out.stdout
@@ -217,16 +246,13 @@ pub async fn setup_reverse(
     let out = adb
         .run(
             serial,
-            &["reverse".into(), abstract_spec(scid), format!("tcp:{port}")],
+            &["reverse".into(), abstract_spec(scid), tcp_spec(port)],
             Some(ADB_TUNNEL_MS),
             cancel,
         )
         .await?;
-    if out.exit_code != 0 {
-        return Err(MirrorError::ServerFailed(format!(
-            "reverse 失败(退出码 {})",
-            out.exit_code
-        )));
+    if command_failed(out.exit_code) {
+        return Err(ServerFault::Reverse(out.exit_code).into());
     }
     Ok(())
 }
@@ -241,16 +267,13 @@ pub async fn setup_forward(
     let out = adb
         .run(
             serial,
-            &["forward".into(), format!("tcp:{port}"), abstract_spec(scid)],
+            &["forward".into(), tcp_spec(port), abstract_spec(scid)],
             Some(ADB_TUNNEL_MS),
             cancel,
         )
         .await?;
-    if out.exit_code != 0 {
-        return Err(MirrorError::ServerFailed(format!(
-            "forward 失败(退出码 {})",
-            out.exit_code
-        )));
+    if command_failed(out.exit_code) {
+        return Err(ServerFault::Forward(out.exit_code).into());
     }
     Ok(())
 }
@@ -270,7 +293,7 @@ pub async fn remove_forward(adb: &AdbClient, serial: &str, port: u16) {
     let _ = adb
         .run(
             serial,
-            &["forward".into(), "--remove".into(), format!("tcp:{port}")],
+            &["forward".into(), "--remove".into(), tcp_spec(port)],
             Some(ADB_REMOVE_MS),
             CancellationToken::new(),
         )
@@ -295,11 +318,8 @@ pub async fn push_server(
             cancel,
         )
         .await?;
-    if out.exit_code != 0 {
-        return Err(MirrorError::ServerFailed(format!(
-            "push server 失败(退出码 {})",
-            out.exit_code
-        )));
+    if command_failed(out.exit_code) {
+        return Err(ServerFault::Push(out.exit_code).into());
     }
     Ok(())
 }
@@ -314,21 +334,15 @@ pub async fn accept_one(
     if cancel.is_cancelled() {
         return Err(MirrorError::Cancelled);
     }
-    if !process_alive.load(Ordering::Relaxed) {
-        return Err(server_exited());
-    }
+    reject_if_server_gone(process_alive)?;
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(MirrorError::Cancelled),
-        _ = tokio::time::sleep(timeout) => Err(MirrorError::Protocol("等待设备连接超时".into())),
-        _ = async {
-            while process_alive.load(Ordering::Relaxed) {
-                tokio::time::sleep(FORWARD_RETRY).await;
-            }
-        } => Err(server_exited()),
+        _ = tokio::time::sleep(timeout) => Err(ProtocolFault::DeviceConnectTimeout.into()),
+        err = server_exit_watch(process_alive, FORWARD_RETRY) => Err(err),
         accepted = listener.accept() => {
             let (stream, _) = accepted?;
-            let _ = stream.set_nodelay(true);
+            mirror_socket(&stream);
             Ok(stream)
         }
     }
@@ -364,20 +378,14 @@ async fn connect_forward_loop(
         if cancel.is_cancelled() {
             return Err(MirrorError::Cancelled);
         }
-        if !process_alive.load(Ordering::Relaxed) {
-            return Err(server_exited());
-        }
+        reject_if_server_gone(process_alive)?;
         if let Ok(mut stream) = TcpStream::connect(&addr).await {
-            let _ = stream.set_nodelay(true);
+            mirror_socket(&stream);
             let mut dummy = [0u8; 1];
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return Err(MirrorError::Cancelled),
-                _ = async {
-                    while process_alive.load(Ordering::Relaxed) {
-                        tokio::time::sleep(TCP_RETRY).await;
-                    }
-                } => return Err(server_exited()),
+                err = server_exit_watch(process_alive, TCP_RETRY) => return Err(err),
                 read = tokio::time::timeout(dummy_wait, stream.read_exact(&mut dummy)) => {
                     if let Ok(Ok(_)) = read {
                         return Ok(stream);
@@ -394,10 +402,8 @@ async fn connect_forward_loop(
     if cancel.is_cancelled() {
         return Err(MirrorError::Cancelled);
     }
-    if !process_alive.load(Ordering::Relaxed) {
-        return Err(server_exited());
-    }
-    Err(MirrorError::Protocol("forward 隧道连接失败".into()))
+    reject_if_server_gone(process_alive)?;
+    Err(ProtocolFault::ForwardTunnel.into())
 }
 
 /// forward 后续 socket（4.1 只在第一路发 dummy；控制通道不要再读那一字节）。
@@ -413,23 +419,17 @@ pub async fn connect_tcp(
     if cancel.is_cancelled() {
         return Err(MirrorError::Cancelled);
     }
-    if !process_alive.load(Ordering::Relaxed) {
-        return Err(server_exited());
-    }
+    reject_if_server_gone(process_alive)?;
     let addr = (LOOPBACK_HOST, port);
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(MirrorError::Cancelled),
-        _ = tokio::time::sleep(timeout) => Err(MirrorError::Protocol("forward 控制通道连接失败".into())),
-        _ = async {
-            while process_alive.load(Ordering::Relaxed) {
-                tokio::time::sleep(TCP_RETRY).await;
-            }
-        } => Err(server_exited()),
+        _ = tokio::time::sleep(timeout) => Err(ProtocolFault::ForwardControl.into()),
+        err = server_exit_watch(process_alive, TCP_RETRY) => Err(err),
         stream = async {
             loop {
                 if let Ok(stream) = TcpStream::connect(&addr).await {
-                    let _ = stream.set_nodelay(true);
+                    mirror_socket(&stream);
                     return stream;
                 }
                 tokio::time::sleep(TCP_RETRY).await;
@@ -526,7 +526,7 @@ mod tests {
         let err = connect_forward(1, &cancel, &alive).await.unwrap_err();
         assert!(matches!(
             err,
-            MirrorError::ServerFailed(ref m) if m == SERVER_EXITED_BEFORE_TUNNEL
+            MirrorError::ServerFailed(ServerFault::ExitedBeforeTunnel)
         ));
     }
 
@@ -547,7 +547,7 @@ mod tests {
         hold.abort();
         assert!(matches!(
             err,
-            MirrorError::ServerFailed(ref m) if m == SERVER_EXITED_BEFORE_TUNNEL
+            MirrorError::ServerFailed(ServerFault::ExitedBeforeTunnel)
         ));
     }
 

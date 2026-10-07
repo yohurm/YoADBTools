@@ -23,7 +23,7 @@ pub fn start_action(phase: Option<Phase>) -> StartAction {
 }
 
 pub fn start_must_wait(phase: Option<Phase>) -> bool {
-    matches!(phase, Some(Phase::Starting | Phase::Stopping))
+    matches!(start_action(phase), StartAction::Wait)
 }
 
 pub fn is_stopping(phase: Option<Phase>) -> bool {

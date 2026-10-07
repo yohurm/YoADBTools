@@ -54,6 +54,10 @@ fn drain_child_logs(child: &mut ChildHandle, serial: String, logs: Arc<Mutex<Str
     }
 }
 
+fn lock_server_logs(logs: &std::sync::Mutex<String>) -> std::sync::MutexGuard<'_, String> {
+    logs.lock().expect("mirror log lock poisoned")
+}
+
 async fn pump_text<R>(reader: R, serial: String, logs: Arc<Mutex<String>>)
 where
     R: tokio::io::AsyncRead + Unpin,
@@ -62,7 +66,7 @@ where
     let mut lines = tokio::io::BufReader::new(reader).lines();
     while let Ok(Some(line)) = lines.next_line().await {
         tracing::info!(serial = %serial, "scrcpy-server {line}");
-        let mut buf = logs.lock().expect("mirror log lock poisoned");
+        let mut buf = lock_server_logs(&logs);
         if buf.len() > SERVER_LOG_CAP {
             continue;
         }
@@ -72,10 +76,7 @@ where
 }
 
 fn snapshot_logs(logs: &Arc<Mutex<String>>) -> String {
-    logs.lock()
-        .expect("mirror log lock poisoned")
-        .trim()
-        .to_string()
+    lock_server_logs(logs).trim().to_string()
 }
 
 async fn wait_kill(child: &mut ChildHandle) {
@@ -157,9 +158,7 @@ async fn run_attempt(
             "缺少 scrcpy-server"
         );
         drop_taken(reused, &adb, &serial).await;
-        return Err(MirrorError::ServerMissing(
-            opts.server_path.display().to_string(),
-        ));
+        return Err(MirrorError::ServerMissing);
     }
     match crate::codec::VideoCodec::from_name(&opts.req.video_codec) {
         Ok(codec) => opts.req.video_codec = codec.name().to_string(),
@@ -414,9 +413,32 @@ mod tests {
         )
         .await
         .expect_err("missing server");
-        assert!(matches!(err, MirrorError::ServerMissing(_)));
+        assert!(matches!(err, MirrorError::ServerMissing));
+        assert_eq!(err.to_string(), "缺少投屏组件");
+        assert!(!err.to_string().contains("setup-scrcpy"));
+        assert!(!err.to_string().contains("missing-scrcpy"));
         assert!(attempt.is_cancelled());
         assert!(!slot.is_cancelled());
         assert!(pipe_open(&frames));
+    }
+
+    #[test]
+    fn mirror_lock_sentence_once() {
+        let src = include_str!("service.rs");
+        let stripped = src.replacen("self.inner.lock().expect(\"mirror lock poisoned\")", "", 1);
+        assert!(
+            !stripped.contains("mirror lock poisoned"),
+            "锁句只应留在 lock_inner 方法体"
+        );
+    }
+
+    #[test]
+    fn frame_pipe_lock_sentence_once() {
+        let src = include_str!("frame.rs");
+        let stripped = src.replacen("mutex.lock().expect(\"frame pipe lock poisoned\")", "", 1);
+        assert!(
+            !stripped.contains("frame pipe lock poisoned"),
+            "锁句只应留在 lock_pipe 函数体"
+        );
     }
 }

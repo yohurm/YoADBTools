@@ -63,6 +63,10 @@ pub struct MirrorService {
 }
 
 impl MirrorService {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().expect("mirror lock poisoned")
+    }
+
     pub fn new(
         adb: Arc<AdbClient>,
         sink: mpsc::Sender<AppEvent>,
@@ -84,7 +88,7 @@ impl MirrorService {
     }
 
     fn decide_start(&self, serial: &str) -> StartDecision {
-        let mut inner = self.inner.lock().expect("mirror lock poisoned");
+        let mut inner = self.lock_inner();
         match slot::start_action(inner.slots.get(serial).map(|s| s.phase)) {
             StartAction::Adopt => {
                 let slot = inner.slots.get(serial).expect("Live slot");
@@ -124,14 +128,12 @@ impl MirrorService {
     }
 
     fn start_must_wait(&self, serial: &str) -> bool {
-        let inner = self.inner.lock().expect("mirror lock poisoned");
+        let inner = self.lock_inner();
         slot::start_must_wait(inner.slots.get(serial).map(|s| s.phase))
     }
 
     pub fn frame_pipe(&self, serial: &str) -> Option<Arc<FramePipe>> {
-        self.inner
-            .lock()
-            .expect("mirror lock poisoned")
+        self.lock_inner()
             .slots
             .get(serial)
             .map(|slot| Arc::clone(&slot.frames))
@@ -180,7 +182,7 @@ impl MirrorService {
         .await;
 
         {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             if let Some(slot) = inner.slots.get_mut(&serial) {
                 if slot::can_mark_live(slot.phase, slot.generation, my_generation) {
                     slot.control = req.control;
@@ -214,7 +216,7 @@ impl MirrorService {
 
         let mut handle = Some(handle);
         let published = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             match inner.slots.get_mut(&serial) {
                 Some(slot)
                     if slot::can_publish_handle(slot.phase, slot.generation, my_generation) =>
@@ -303,7 +305,7 @@ impl MirrorService {
     }
 
     fn mark_live(&self, serial: &str, generation: u64) {
-        let mut inner = self.inner.lock().expect("mirror lock poisoned");
+        let mut inner = self.lock_inner();
         if let Some(slot) = inner.slots.get_mut(serial) {
             if slot::can_mark_live(slot.phase, slot.generation, generation) {
                 slot.phase = Phase::Live;
@@ -315,7 +317,7 @@ impl MirrorService {
     pub async fn stop(&self, serial: &str) {
         let (generation, handle) = loop {
             let wait = {
-                let mut inner = self.inner.lock().expect("mirror lock poisoned");
+                let mut inner = self.lock_inner();
                 match inner.slots.get_mut(serial) {
                     None => return,
                     Some(slot) if slot::is_stopping(Some(slot.phase)) => true,
@@ -331,7 +333,7 @@ impl MirrorService {
             if wait {
                 let notified = self.changed.notified();
                 let still_stopping = {
-                    let inner = self.inner.lock().expect("mirror lock poisoned");
+                    let inner = self.lock_inner();
                     slot::is_stopping(inner.slots.get(serial).map(|s| s.phase))
                 };
                 if still_stopping {
@@ -344,7 +346,7 @@ impl MirrorService {
             let _ = handle.await;
         }
         let emit = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner.slots.get(serial).is_some_and(|slot| {
                 slot::can_emit_stopped(slot.phase, slot.generation, generation)
             });
@@ -371,7 +373,7 @@ impl MirrorService {
 
     pub async fn stop_all(&self) {
         let (slot_serials, warm_serials): (Vec<String>, Vec<String>) = {
-            let inner = self.inner.lock().expect("mirror lock poisoned");
+            let inner = self.lock_inner();
             (
                 inner.slots.keys().cloned().collect(),
                 inner.warm.keys().cloned().collect(),
@@ -391,7 +393,7 @@ impl MirrorService {
         message: MirrorControlMessage,
     ) -> Result<(), MirrorError> {
         let tx = {
-            let inner = self.inner.lock().expect("mirror lock poisoned");
+            let inner = self.lock_inner();
             match inner.slots.get(serial) {
                 Some(slot) if slot::is_live(Some(slot.phase)) => slot.control_tx.clone(),
                 Some(_) | None => return Err(MirrorError::NotLive),
@@ -407,7 +409,7 @@ impl MirrorService {
 
     pub fn close_control(&self, serial: &str) -> Result<(), MirrorError> {
         let tx = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             match inner.slots.get_mut(serial) {
                 Some(slot) if slot::is_live(Some(slot.phase)) => {
                     slot.control = false;
@@ -424,7 +426,7 @@ impl MirrorService {
 
     async fn abandon_starting(&self, serial: &str, generation: u64) {
         let dropped = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner
                 .slots
                 .get(serial)
@@ -456,7 +458,7 @@ impl MirrorService {
         result: Result<(), MirrorError>,
     ) {
         let taken = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner
                 .slots
                 .get(serial)
@@ -482,7 +484,7 @@ impl MirrorService {
     }
 
     fn slot_still_starting(&self, serial: &str, generation: u64) -> bool {
-        let inner = self.inner.lock().expect("mirror lock poisoned");
+        let inner = self.lock_inner();
         inner
             .slots
             .get(serial)
@@ -491,9 +493,9 @@ impl MirrorService {
 
     fn new_control_rx(&self, serial: &str, generation: u64) -> mpsc::Receiver<ControlCmd> {
         let (tx, rx) = mpsc::channel(CONTROL_CHAN);
-        let mut inner = self.inner.lock().expect("mirror lock poisoned");
+        let mut inner = self.lock_inner();
         if let Some(slot) = inner.slots.get_mut(serial) {
-            if slot.generation == generation && slot.control {
+            if slot::same_generation(slot.generation, generation) && slot.control {
                 slot.control_tx = Some(tx);
             }
         }
@@ -503,7 +505,7 @@ impl MirrorService {
     /// 设备扫描成功后对在线设备后台预热（跳过 push + 预挂隧道）。
     pub async fn warmup(self: &Arc<Self>, serial: &str, force_forward: bool) {
         let cancel = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             if inner.slots.contains_key(serial) {
                 return;
             }
@@ -532,7 +534,7 @@ impl MirrorService {
         )
         .await;
         let stale = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             let slot_live = inner
                 .slots
                 .get(serial)
@@ -553,7 +555,7 @@ impl MirrorService {
 
     pub async fn drop_warm(&self, serial: &str) {
         let taken = {
-            let mut inner = self.inner.lock().expect("mirror lock poisoned");
+            let mut inner = self.lock_inner();
             inner.warm.remove(serial)
         };
         match taken {
@@ -576,7 +578,7 @@ impl MirrorService {
     ) -> Option<WarmTunnel> {
         loop {
             let step = {
-                let mut inner = self.inner.lock().expect("mirror lock poisoned");
+                let mut inner = self.lock_inner();
                 warm::take_warm_step(&mut inner.warm, serial, force_forward)
             };
             match step {
@@ -593,7 +595,7 @@ impl MirrorService {
                 TakeStep::Wait => {
                     let notified = self.changed.notified();
                     let still_busy = {
-                        let inner = self.inner.lock().expect("mirror lock poisoned");
+                        let inner = self.lock_inner();
                         matches!(inner.warm.get(serial), Some(WarmEntry::Busy { .. }))
                     };
                     if still_busy {
@@ -612,6 +614,7 @@ impl MirrorService {
 mod tests {
     use super::*;
     use crate::codec::PIPE_H264;
+    use crate::error::{CodecFault, ServerFault};
     use crate::frame::EncodedFrame;
 
     fn pipe_open(frames: &FramePipe) -> bool {
@@ -642,9 +645,9 @@ mod tests {
                 let attempt = slot.child_token();
                 let result = if attempts == 1 {
                     Err(if codec_fail {
-                        MirrorError::Codec("设备视频配置失败".into())
+                        MirrorError::Codec(CodecFault::ConfigFailed)
                     } else {
-                        MirrorError::ServerFailed("encoder".into())
+                        MirrorError::ServerFailed(ServerFault::ExitedBeforeTunnel)
                     })
                 } else {
                     Ok(())
@@ -715,7 +718,7 @@ mod tests {
         let svc = test_service();
         let session_cancel = CancellationToken::new();
         let warm_cancel = {
-            let mut inner = svc.inner.lock().expect("mirror lock poisoned");
+            let mut inner = svc.lock_inner();
             let cancel = CancellationToken::new();
             inner.slots.insert("S1".into(), test_slot(Phase::Starting));
             inner.warm.insert(
@@ -736,7 +739,7 @@ mod tests {
 
         tokio::task::yield_now().await;
         let stale = {
-            let mut inner = svc.inner.lock().expect("mirror lock poisoned");
+            let mut inner = svc.lock_inner();
             let slot_live = inner
                 .slots
                 .get("S1")
@@ -759,5 +762,18 @@ mod tests {
         let got = got.expect("Starting 等待 Busy 时必须拿到 Ready 隧道");
         assert!(got.used_forward());
         assert_eq!(got.scid(), 7);
+    }
+
+    #[test]
+    fn mirror_log_lock_sentence_once() {
+        let owner_line = "logs.lock().expect(\"mirror log lock poisoned\")";
+        let needle = "mirror log lock poisoned";
+        let src = include_str!("session.rs");
+        let scanned = match src.split_once("mod tests") {
+            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
+            None => src.to_string(),
+        };
+        let scanned = scanned.replacen(owner_line, "", 1);
+        assert!(!scanned.contains(needle), "{needle}");
     }
 }
