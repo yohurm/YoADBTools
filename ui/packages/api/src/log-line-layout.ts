@@ -29,3 +29,8 @@ export const LOG_LINE_LAYOUT_CATALOG: readonly {
 export function isLogLineLayout(value: unknown): value is LogLineLayout {
   return typeof value === "string" && LOG_LINE_LAYOUT_CATALOG.some((item) => item.value === value);
 }
+
+/** Soft-Wrap 开。清单、可视行和内容宽度都认这一把。 */
+export function logLineWraps(layout: LogLineLayout): boolean {
+  return layout === "wrap";
+}

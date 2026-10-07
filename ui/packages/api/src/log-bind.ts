@@ -20,6 +20,16 @@ export function copyBinding(binding: PidBinding): PidBinding {
   return { current: [...binding.current], history: [...binding.history] };
 }
 
+/** 进程名就是这个包。含子进程时也先认这一把。 */
+function processNameIsPackage(name: string, pkg: string): boolean {
+  return name === pkg;
+}
+
+/** 子进程名是 `包名:` 再加后缀。 */
+function processNameIsChild(name: string, pkg: string): boolean {
+  return name.startsWith(`${pkg}:`);
+}
+
 export function rebindPids(
   prev: PidBinding,
   index: readonly ProcessEntry[],
@@ -28,7 +38,10 @@ export function rebindPids(
   historyCap: number = HISTORY_PID_CAP,
 ): PidBinding {
   const current = index
-    .filter((entry) => (includeChild ? entry.name === pkg || entry.name.startsWith(`${pkg}:`) : entry.name === pkg))
+    .filter(
+      (entry) =>
+        processNameIsPackage(entry.name, pkg) || (includeChild && processNameIsChild(entry.name, pkg)),
+    )
     .map((entry) => entry.pid);
   let history = [...prev.history];
   for (const pid of current) {

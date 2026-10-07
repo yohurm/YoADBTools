@@ -22,6 +22,7 @@ import {
 } from "./log-display-columns";
 import {
   isLogLineLayout,
+  logLineWraps,
   LOG_LINE_LAYOUT_CATALOG,
   LOG_LINE_LAYOUT_DEFAULT,
 } from "./log-line-layout";
@@ -515,6 +516,8 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     expect(LOG_LINE_LAYOUT_CATALOG.map((item) => item.value)).toEqual(["clip", "wrap"]);
     expect(isLogLineLayout(LOG_LINE_LAYOUT_DEFAULT)).toBe(true);
     expect(isLogLineLayout("soft")).toBe(false);
+    expect(logLineWraps("wrap")).toBe(true);
+    expect(logLineWraps("clip")).toBe(false);
     expect(COMMAND_LIBRARY_SCHEMA_VERSION).toBe(3);
     expect([...COMMAND_BLOCK_GAPS_MS]).toEqual([0, 200, 500, 1000, 2000, 5000]);
     expect(DEFAULT_BROWSE_ROOT).toBe(SAFETY_ROOTS[0]);

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -7,6 +7,12 @@ import { SAFETY_ROOTS } from "./identity";
 import {
   checkDescendant,
   guardBrowsePath,
+  ENTRY_NAME_EMPTY,
+  ENTRY_NAME_SEPARATOR,
+  invalidNameText,
+  notAbsoluteText,
+  outsideRootText,
+  traversalText,
   joinPath,
   parentOf,
   parentWithinSafety,
@@ -70,12 +76,55 @@ describe("safety（与 domain testdata 同一套向量）", () => {
       return;
     }
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe(c.error);
+    if (result.ok) return;
+    expect(result.error).toBe(c.error);
+    if (c.error === "outside_root") expect(result.reason).toBe(outsideRootText(c.path));
+    if (c.error === "not_absolute") expect(result.reason).toBe(notAbsoluteText(c.path));
+    if (c.error === "traversal") expect(result.reason).toBe(traversalText(c.path));
   });
 
-  const names = JSON.parse(readFileSync(entryName, "utf8")) as { name: string; valid: boolean }[];
+  const names = JSON.parse(readFileSync(entryName, "utf8")) as {
+    name: string;
+    valid: boolean;
+    detail?: string;
+  }[];
 
   it.each(names)("name=$name", (c) => {
-    expect(validateEntryName(c.name) === null).toBe(c.valid);
+    if (c.valid) {
+      expect(validateEntryName(c.name)).toBeNull();
+      expect(c.detail).toBeUndefined();
+      return;
+    }
+    expect(validateEntryName(c.name)).toBe(invalidNameText(c.detail ?? ""));
+  });
+
+  it("空名和分隔符载荷只写一次", () => {
+    const src = readFileSync(resolve(root, "safety.ts"), "utf8");
+    expect(src.split(ENTRY_NAME_EMPTY).length - 1).toBe(1);
+    expect(src.split(ENTRY_NAME_SEPARATOR).length - 1).toBe(1);
+  });
+
+  it("根前缀只写一次", () => {
+    const owner = readFileSync(resolve(root, "safety.ts"), "utf8").replace(
+      "return path.startsWith(`${root}/`)",
+      "",
+    );
+    expect(owner).not.toContain("path.startsWith(`${root}/`)");
+    expect(owner).not.toContain("path === root || path.startsWith");
+  });
+
+  it("绝对路径和尾斜杠只写一次", () => {
+    const owner = readFileSync(resolve(root, "safety.ts"), "utf8");
+    expect(owner).toContain('return path.startsWith("/");');
+    expect(owner).toContain('return path.replace(/\\/+$/, "");');
+    const files = readdirSync(root).filter((name) => name.endsWith(".ts") && !name.includes(".test."));
+    for (const name of files) {
+      let body = readFileSync(resolve(root, name), "utf8");
+      if (name === "safety.ts") {
+        body = body.replace('return path.startsWith("/");', "").replace('return path.replace(/\\/+$/, "");', "");
+      }
+      expect(body, name).not.toContain('startsWith("/")');
+      expect(body, name).not.toContain('replace(/\\/+$/, "")');
+    }
   });
 });

@@ -15,6 +15,52 @@ export const TIME_MILLIS_DISPLAY_LEN = 12;
 /** `17:20:45` */
 export const TIME_DISPLAY_LEN = 8;
 
+function dateStamp(year: number, month: number, day: number): string {
+  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`;
+}
+
+function clockStamp(hour: number, minute: number, second: number): string {
+  return `${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}`;
+}
+
+function millisStamp(millis: number): string {
+  return `.${pad(millis, 3)}`;
+}
+
+function dateClock(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string {
+  return `${dateStamp(year, month, day)} ${clockStamp(hour, minute, second)}`;
+}
+
+function millisPartsOk(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  millis: number,
+): boolean {
+  return validParts(year, month, day, hour, minute, second, millis);
+}
+
+function secondPartsOk(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
+  return validParts(year, month, day, hour, minute, second, 0);
+}
+
 export function formatDateTime(
   year: number,
   month: number,
@@ -24,8 +70,8 @@ export function formatDateTime(
   second: number,
   millis: number,
 ): string | null {
-  if (!validParts(year, month, day, hour, minute, second, millis)) return null;
-  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)} ${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}.${pad(millis, 3)}`;
+  if (!millisPartsOk(year, month, day, hour, minute, second, millis)) return null;
+  return `${dateClock(year, month, day, hour, minute, second)}${millisStamp(millis)}`;
 }
 
 export function formatDateTimeSeconds(
@@ -36,19 +82,25 @@ export function formatDateTimeSeconds(
   minute: number,
   second: number,
 ): string | null {
-  if (!validParts(year, month, day, hour, minute, second, 0)) return null;
-  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)} ${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}`;
+  if (!secondPartsOk(year, month, day, hour, minute, second)) return null;
+  return dateClock(year, month, day, hour, minute, second);
+}
+
+function clockUnparsed(
+  p: [number, number, number, number, number, number, number] | null,
+): p is null {
+  return !p;
 }
 
 export function canonicalizeDateTime(raw: string): string | null {
   const p = parseParts(raw);
-  if (!p) return null;
+  if (clockUnparsed(p)) return null;
   return formatDateTime(p[0], p[1], p[2], p[3], p[4], p[5], p[6]);
 }
 
 export function canonicalizeDateTimeSeconds(raw: string): string | null {
   const p = parseParts(raw);
-  if (!p) return null;
+  if (clockUnparsed(p)) return null;
   return formatDateTimeSeconds(p[0], p[1], p[2], p[3], p[4], p[5]);
 }
 
@@ -65,11 +117,11 @@ export function formatClock(
 ): string | null {
   switch (format) {
     case "time_millis":
-      if (!validParts(year, month, day, hour, minute, second, millis)) return null;
-      return `${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}.${pad(millis, 3)}`;
+      if (!millisPartsOk(year, month, day, hour, minute, second, millis)) return null;
+      return `${clockStamp(hour, minute, second)}${millisStamp(millis)}`;
     case "time":
-      if (!validParts(year, month, day, hour, minute, second, 0)) return null;
-      return `${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}`;
+      if (!secondPartsOk(year, month, day, hour, minute, second)) return null;
+      return clockStamp(hour, minute, second);
     case "datetime_millis":
       return formatDateTime(year, month, day, hour, minute, second, millis);
     case "datetime":
@@ -159,10 +211,10 @@ function parseParts(raw: string): [number, number, number, number, number, numbe
     time = split[1]!;
   } else if (tokens.length === 2) {
     date = tokens[0]!;
-    time = tokens[1]!;
+    time = clockTimeToken(tokens);
   } else if (tokens.length === 3 && isZoneToken(tokens[2]!)) {
     date = tokens[0]!;
-    time = tokens[1]!;
+    time = clockTimeToken(tokens);
   } else {
     return null;
   }
@@ -191,9 +243,17 @@ function parseDigits(s: string): number | null {
   return Number(s);
 }
 
+function clockTimeToken(tokens: string[]): string {
+  return tokens[1]!;
+}
+
+function notThreeParts(parts: string[]): boolean {
+  return parts.length !== 3;
+}
+
 function parseDate(s: string): [number, number, number] | null {
   const parts = s.split("-");
-  if (parts.length !== 3) return null;
+  if (notThreeParts(parts)) return null;
   const [year, month, day] = parts;
   if (!year || !month || !day || year.length !== 4 || month.length !== 2 || day.length !== 2) {
     return null;
@@ -210,7 +270,7 @@ function parseTime(s: string): [number, number, number, number] | null {
   const hms = dot < 0 ? s : s.slice(0, dot);
   const frac = dot < 0 ? null : s.slice(dot + 1);
   const parts = hms.split(":");
-  if (parts.length !== 3) return null;
+  if (notThreeParts(parts)) return null;
   const [hour, minute, second] = parts;
   if (!hour || !minute || !second || hour.length !== 2 || minute.length !== 2 || second.length !== 2) {
     return null;

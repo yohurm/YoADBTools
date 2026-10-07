@@ -222,6 +222,9 @@ export type TransferState = "running" | "done" | "failed" | "cancelled";
 /** 传输失败分类。只带 kind + 路径/serial；禁止用户句子。 */
 export type TransferFault =
   | { kind: "path"; path: string }
+  | { kind: "not_absolute"; path: string }
+  | { kind: "traversal"; path: string }
+  | { kind: "invalid_name"; detail: string }
   | { kind: "outside_root"; path: string }
   | { kind: "remote_not_found"; path: string }
   | { kind: "not_a_directory"; path: string }
@@ -229,11 +232,19 @@ export type TransferFault =
   | { kind: "read_only"; path: string }
   | { kind: "already_exists"; path: string }
   | { kind: "remote_failed"; path: string }
+  | { kind: "readlink_unparseable"; path: string }
   | { kind: "local_not_found"; path: string }
   | { kind: "local"; path: string }
   | { kind: "device_offline"; serial: string }
   | { kind: "timeout" }
   | { kind: "io" }
+  | { kind: "truncated" }
+  | { kind: "pump_panic" }
+  | { kind: "shell_no_stdin" }
+  | { kind: "shell_no_stdout" }
+  | { kind: "shell_handshake" }
+  | { kind: "shell_ended" }
+  | { kind: "shell_exec" }
   | { kind: "tool_unavailable" }
   | { kind: "progress_join" };
 
@@ -381,9 +392,11 @@ export interface CommandBlockDto {
   steps: CommandStepDto[];
 }
 
+export type LibraryEntryKind = "command" | "block";
+
 export type LibraryEntryDto =
-  | ({ kind: "command" } & CommandDto)
-  | ({ kind: "block" } & CommandBlockDto);
+  | ({ kind: Extract<LibraryEntryKind, "command"> } & CommandDto)
+  | ({ kind: Extract<LibraryEntryKind, "block"> } & CommandBlockDto);
 
 export interface CommandGroupDto {
   id: string;
@@ -401,6 +414,28 @@ export interface BlockRunRequest {
 export interface CommandLibraryDto {
   schema_version: number;
   groups: CommandGroupDto[];
+}
+
+/** 导入预览：相对当前库。 */
+export type ImportPresence = "new" | "existing";
+
+export interface ImportEntryPreviewDto {
+  id: string;
+  name: string;
+  kind: LibraryEntryKind;
+  presence: ImportPresence;
+}
+
+export interface ImportGroupPreviewDto {
+  id: string;
+  name: string;
+  presence: ImportPresence;
+  entries: ImportEntryPreviewDto[];
+}
+
+/** `commandlib.preview` 响应。不含 template。 */
+export interface ImportPreviewDto {
+  groups: ImportGroupPreviewDto[];
 }
 
 /** `update.check` 响应。 */
@@ -437,8 +472,8 @@ export interface UpdateProgress {
   total_bytes: number;
   /** ready 时已校验安装包路径 */
   installer_path?: string;
-  /** failed 时展示用短句 */
-  message?: string;
+  /** failed 时为 ipc_update 的结果 */
+  error?: IpcError;
 }
 
 /** `update.info` 响应（不含密钥）。 */
@@ -534,10 +569,12 @@ export interface TaskInfo {
 export interface GroupProgress {
   run_id: number;
   serial: string;
-  name?: string;
+  /** 命令名。空串表示没有名字。 */
+  name: string;
   template: string;
   ok: boolean;
-  message?: string;
+  /** 原始输出。空串表示没有正文。 */
+  message: string;
   /** 单命令用时（毫秒） */
   duration_ms: number;
 }

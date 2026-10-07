@@ -13,6 +13,14 @@ export function parseLevelLetter(level: string): LevelLetter | null {
   return (LEVELS as readonly string[]).includes(upper) && upper.length === 1 ? (upper as LevelLetter) : null;
 }
 
+/** `--yohu-level-*` 后缀。只接受级别表里的字母，筛选钮和着色共用这一把。 */
+export type LevelKey = Lowercase<LevelLetter>;
+
+export function levelKey(level: string): LevelKey | null {
+  const letter = parseLevelLetter(level);
+  return letter ? (letter.toLowerCase() as LevelKey) : null;
+}
+
 export function isLogLevelLetter(token: string): boolean {
   return parseLevelLetter(token) !== null;
 }
@@ -41,16 +49,31 @@ export function tagFilterActive(raw: string): boolean {
   return parseTagNeedles(raw).length > 0;
 }
 
+/** A–Z 折成 a–z。精确、前缀、子串都用这一把，非 ASCII 原样。 */
+function foldAscii(code: number): number {
+  return code >= 65 && code <= 90 ? code + 32 : code;
+}
+
+function codeUnit(text: string, index: number): number {
+  return text.charCodeAt(index);
+}
+
+function codesEqual(left: number, right: number): boolean {
+  return left === right;
+}
+
+function foldedDiffer(left: number, right: number): boolean {
+  return foldAscii(left) !== foldAscii(right);
+}
+
 /** ASCII 忽略大小写精确等价（已提交 Tag 针，不是子串；避免 libc 命中 libcomposer_ext）。 */
 export function equalsAsciiIgnoreCase(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    const x = a.charCodeAt(i);
-    const y = b.charCodeAt(i);
-    if (x === y) continue;
-    const xl = x >= 65 && x <= 90 ? x + 32 : x;
-    const yl = y >= 65 && y <= 90 ? y + 32 : y;
-    if (xl !== yl) return false;
+    const x = codeUnit(a, i);
+    const y = codeUnit(b, i);
+    if (codesEqual(x, y)) continue;
+    if (foldedDiffer(x, y)) return false;
   }
   return true;
 }
@@ -59,12 +82,10 @@ export function equalsAsciiIgnoreCase(a: string, b: string): boolean {
 export function startsWithAsciiIgnoreCase(haystack: string, prefix: string): boolean {
   if (prefix.length > haystack.length) return false;
   for (let i = 0; i < prefix.length; i++) {
-    const x = haystack.charCodeAt(i);
-    const y = prefix.charCodeAt(i);
-    if (x === y) continue;
-    const xl = x >= 65 && x <= 90 ? x + 32 : x;
-    const yl = y >= 65 && y <= 90 ? y + 32 : y;
-    if (xl !== yl) return false;
+    const x = codeUnit(haystack, i);
+    const y = codeUnit(prefix, i);
+    if (codesEqual(x, y)) continue;
+    if (foldedDiffer(x, y)) return false;
   }
   return true;
 }
@@ -80,12 +101,10 @@ export function indexOfAsciiIgnoreCase(haystack: string, needle: string, from = 
   const last = haystack.length - n;
   outer: for (let i = start; i <= last; i++) {
     for (let j = 0; j < n; j++) {
-      const a = haystack.charCodeAt(i + j);
-      const b = needle.charCodeAt(j);
-      if (a === b) continue;
-      const al = a >= 65 && a <= 90 ? a + 32 : a;
-      const bl = b >= 65 && b <= 90 ? b + 32 : b;
-      if (al !== bl) continue outer;
+      const a = codeUnit(haystack, i + j);
+      const b = codeUnit(needle, j);
+      if (codesEqual(a, b)) continue;
+      if (foldedDiffer(a, b)) continue outer;
     }
     return i;
   }

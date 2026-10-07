@@ -40,6 +40,36 @@ export function ipcErrorCode(e: unknown): IpcErrorCode | undefined {
   return readIpcError(e)?.code;
 }
 
+/** 调用方取消。浏览和采集都认这一把，不把取消句弹成错误。 */
+export function isCancelledError(e: unknown): boolean {
+  return ipcErrorCode(e) === "cancelled";
+}
+
 export function errorText(e: unknown): string {
   return decodeIpcError(e).message;
 }
+
+/** 设置保存和截图落盘失败。错误句本身不带这个动作。 */
+export function saveFailedText(detail: string): string {
+  return `保存失败: ${detail}`;
+}
+
+/** 与领域 `device_offline_text` 同一句。事件只带 serial 时用这一份。 */
+export function deviceOfflineText(serial: string): string {
+  return `设备掉线: ${serial}`;
+}
+
+/** 与宿主 `EXEC_TIMEOUT` 同一句。 */
+export const EXEC_TIMEOUT = "执行超时";
+/** 与宿主 `CAPTURE_TRUNCATED` 同一句。 */
+export const CAPTURE_TRUNCATED = "输出超过捕获预算";
+/** 与宿主 `PUMP_PANIC` 同一句。 */
+export const PUMP_PANIC = "输出泵任务异常结束";
+/** 与领域 `TOOL_UNAVAILABLE` 同一句。 */
+export const TOOL_UNAVAILABLE = "ADB 不可用";
+/** 与领域 `SHELL_*` 同一句。 */
+export const SHELL_NO_STDIN = "浏览 shell 无 stdin";
+export const SHELL_NO_STDOUT = "浏览 shell 无 stdout";
+export const SHELL_HANDSHAKE = "浏览 shell 握手失败";
+export const SHELL_ENDED = "浏览 shell 已结束";
+export const SHELL_EXEC = "浏览 shell exec 失败";

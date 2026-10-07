@@ -5,20 +5,24 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+function currentWindow() {
+  return getCurrentWindow();
+}
+
 export async function windowMinimize(): Promise<void> {
-  await getCurrentWindow().minimize();
+  await currentWindow().minimize();
 }
 
 export async function windowToggleMaximize(): Promise<void> {
-  await getCurrentWindow().toggleMaximize();
+  await currentWindow().toggleMaximize();
 }
 
 export async function windowClose(): Promise<void> {
-  await getCurrentWindow().close();
+  await currentWindow().close();
 }
 
 export async function windowIsMaximized(): Promise<boolean> {
-  return getCurrentWindow().isMaximized();
+  return currentWindow().isMaximized();
 }
 
 /** 揭主窗并关掉原生启动小窗。只走 boot.showMain，不另开 JS show。 */
@@ -27,7 +31,7 @@ export async function windowShow(): Promise<void> {
 }
 
 export async function listenWindowResize(onChange: () => void): Promise<() => void> {
-  return getCurrentWindow().onResized(() => {
+  return currentWindow().onResized(() => {
     onChange();
   });
 }

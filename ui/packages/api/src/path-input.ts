@@ -1,8 +1,10 @@
 /**
  * 用户输入 → 设备绝对 POSIX 路径（只做句法，不管安全根）。
  * 与 yohu-domain::path_input 同一套 testdata/path_input.json。
- * 不折叠 `.` / `..` / `//`；穿越只由 safety 判定。
+ * 斜杠拼接走 safety.joinPath（domain join_path 的镜像）。不折叠 `.` / `..` / `//`。
  */
+
+import { joinPath, pathIsAbsolute, posixSlashes } from "./safety";
 
 export type PathStrategy = "unquote" | "file-uri" | "separators" | "host-reject" | "alias" | "relative";
 
@@ -22,17 +24,25 @@ const BARE_ALIASES: readonly (readonly [string, string])[] = [
   ["sdcard", "/sdcard"],
 ];
 
+function inputBlank(text: string): boolean {
+  return !text;
+}
+
+function aliasHit(next: string | null): next is string {
+  return next != null;
+}
+
 export function parseRemotePath(raw: string, current: string): PathParseResult {
   const applied: PathStrategy[] = [];
   let text = raw.trim();
-  if (!text) return fail("路径为空", applied);
+  if (inputBlank(text)) return pathEmpty(applied);
   if (text.includes("\0")) return fail("路径含非法字符", applied);
 
   const unquoted = unquote(text);
   if (unquoted !== text) {
     applied.push("unquote");
     text = unquoted;
-    if (!text) return fail("路径为空", applied);
+    if (inputBlank(text)) return pathEmpty(applied);
   }
 
   const withoutUri = stripFileUri(text);
@@ -41,7 +51,7 @@ export function parseRemotePath(raw: string, current: string): PathParseResult {
     text = withoutUri;
   }
 
-  const posix = text.replace(/\\/g, "/");
+  const posix = posixSlashes(text);
   if (posix !== text) {
     applied.push("separators");
     text = posix;
@@ -55,7 +65,7 @@ export function parseRemotePath(raw: string, current: string): PathParseResult {
     text = aliased;
   }
 
-  if (!text.startsWith("/")) {
+  if (!pathIsAbsolute(text)) {
     applied.push("relative");
     text = joinAbs(current, text);
   }
@@ -65,6 +75,10 @@ export function parseRemotePath(raw: string, current: string): PathParseResult {
 
 function fail(reason: string, applied: PathStrategy[]): PathParseErr {
   return { ok: false, reason, applied };
+}
+
+function pathEmpty(applied: PathStrategy[]): PathParseErr {
+  return fail("路径为空", applied);
 }
 
 function unquote(text: string): string {
@@ -98,23 +112,24 @@ function isHostPath(text: string): boolean {
 
 function expandOne(text: string, from: string, to: string): string | null {
   if (text === from) return to;
-  if (text.startsWith(`${from}/`)) return `${to}${text.slice(from.length)}`;
+  const prefix = `${from}/`;
+  if (text.startsWith(prefix)) return joinPath(to, text.slice(prefix.length));
   return null;
 }
 
 function expandAliases(text: string): string {
   for (const [from, to] of BARE_ALIASES) {
     const next = expandOne(text, from, to);
-    if (next != null) return next;
+    if (aliasHit(next)) return next;
   }
   for (const [from, to] of PATH_ALIASES) {
     const next = expandOne(text, from, to);
-    if (next != null) return next;
+    if (aliasHit(next)) return next;
   }
   return text;
 }
 
 function joinAbs(base: string, rel: string): string {
-  const root = base.startsWith("/") ? base : `/${base}`;
-  return `${root.replace(/\/+$/, "")}/${rel}`;
+  const root = pathIsAbsolute(base) ? base : `/${base}`;
+  return joinPath(root, rel);
 }

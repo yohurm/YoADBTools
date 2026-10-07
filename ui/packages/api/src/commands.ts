@@ -22,6 +22,7 @@ import type {
   ExportRequest,
   ExportResult,
   GroupRunRequest,
+  ImportPreviewDto,
   LogBatch,
   PathOpRequest,
   ProcessEntry,
@@ -83,6 +84,12 @@ export const commandlibLoad = () => invoke<CommandLibraryDto>("commandlib.load")
 
 export const commandlibSave = (dto: CommandLibraryDto) =>
   invoke<void>("commandlib.save", { dto });
+
+export const commandlibPreview = (paths: string[]) =>
+  invoke<ImportPreviewDto>("commandlib.preview", { paths });
+
+export const commandlibApply = (paths: string[], entryIds: string[]) =>
+  invoke<CommandLibraryDto>("commandlib.apply", { paths, entryIds });
 
 // ===== files =====
 
