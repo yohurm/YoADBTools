@@ -29,6 +29,10 @@ pub struct DeviceStatusHub {
 }
 
 impl DeviceStatusHub {
+    fn lock_slots(&self) -> std::sync::MutexGuard<'_, HashMap<String, Slot>> {
+        self.slots.lock().expect("status slots lock poisoned")
+    }
+
     pub fn new(
         client: Arc<AdbClient>,
         sink: mpsc::Sender<AppEvent>,
@@ -45,7 +49,7 @@ impl DeviceStatusHub {
     /// 与当前 Online serial 对齐：新设备开采样，离开集合的停任务并丢缓存。
     pub fn sync_online(self: &Arc<Self>, serials: &[String]) {
         let wanted: HashSet<&str> = serials.iter().map(String::as_str).collect();
-        let mut slots = self.slots.lock().expect("status slots lock poisoned");
+        let mut slots = self.lock_slots();
         let stale: Vec<String> = slots
             .keys()
             .filter(|s| !wanted.contains(s.as_str()))
@@ -81,18 +85,14 @@ impl DeviceStatusHub {
     }
 
     pub fn snapshot(&self, serial: &str) -> Option<DeviceStatus> {
-        self.slots
-            .lock()
-            .expect("status slots lock poisoned")
+        self.lock_slots()
             .get(serial)
             .and_then(|s| s.status.clone())
     }
 
     pub fn snapshot_all(&self) -> Vec<DeviceStatus> {
         let mut out: Vec<DeviceStatus> = self
-            .slots
-            .lock()
-            .expect("status slots lock poisoned")
+            .lock_slots()
             .values()
             .filter_map(|s| s.status.clone())
             .collect();
@@ -109,9 +109,7 @@ impl DeviceStatusHub {
         cancel: CancellationToken,
     ) -> Result<DeviceStatus, crate::AdbError> {
         let slot_cancel = self
-            .slots
-            .lock()
-            .expect("status slots lock poisoned")
+            .lock_slots()
             .get(serial)
             .map(|s| s.cancel.clone())
             .ok_or_else(|| crate::AdbError::NotOnline(serial.to_string()))?;
@@ -148,7 +146,7 @@ impl DeviceStatusHub {
 
     /// 槽已不在 Online 集合时不写缓存。返回 (快照, 内容是否变化)。
     fn upsert(&self, serial: &str, fields: DeviceStatusFields) -> Option<(DeviceStatus, bool)> {
-        let mut slots = self.slots.lock().expect("status slots lock poisoned");
+        let mut slots = self.lock_slots();
         let slot = slots.get_mut(serial)?;
         let fields = overlay_fields(slot.status.as_ref(), fields);
         let generation = slot

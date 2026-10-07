@@ -9,6 +9,7 @@ pub mod offline;
 pub mod packages;
 pub mod ps;
 pub mod readlink;
+pub mod remote_stderr;
 pub mod shell_option;
 pub mod status;
 pub mod uimode;

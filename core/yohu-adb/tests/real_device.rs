@@ -21,7 +21,7 @@ async fn online_device(client: &AdbClient) -> Option<String> {
     let devices = client.devices(CancellationToken::new()).await.ok()?;
     devices
         .into_iter()
-        .find(|d| d.state == yohu_protocol::DeviceState::Online)
+        .find(|d| yohu_domain::device_is_online(d.state))
         .map(|d| d.serial)
 }
 

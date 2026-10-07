@@ -43,6 +43,29 @@ pub fn parse_end_line(line: &str, nonce: u64) -> Option<i32> {
     parts.next()?.parse().ok()
 }
 
+/// 一趟会话帧里的一行。回显、BEGIN、正文、END 只在这里判。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionLine {
+    Skip,
+    Begin,
+    Body,
+    End(i32),
+}
+
+pub fn session_line(line: &str, begin: &str, nonce: u64, seen_begin: bool) -> SessionLine {
+    if !seen_begin {
+        if line == begin {
+            SessionLine::Begin
+        } else {
+            SessionLine::Skip
+        }
+    } else if let Some(code) = parse_end_line(line, nonce) {
+        SessionLine::End(code)
+    } else {
+        SessionLine::Body
+    }
+}
+
 /// 从可能夹杂回显的 stdout 切出一趟 body + 退出码。
 pub fn parse_session_frame(stdout: &str, nonce: u64) -> Result<(String, i32), BrowseParseError> {
     let begin = begin_line(nonce);
@@ -50,17 +73,15 @@ pub fn parse_session_frame(stdout: &str, nonce: u64) -> Result<(String, i32), Br
     let mut body = String::new();
     for line in stdout.lines() {
         let line = line.trim_end_matches('\r');
-        if !seen_begin {
-            if line == begin {
-                seen_begin = true;
+        match session_line(line, &begin, nonce, seen_begin) {
+            SessionLine::Skip => {}
+            SessionLine::Begin => seen_begin = true,
+            SessionLine::End(code) => return Ok((body, code)),
+            SessionLine::Body => {
+                body.push_str(line);
+                body.push('\n');
             }
-            continue;
         }
-        if let Some(code) = parse_end_line(line, nonce) {
-            return Ok((body, code));
-        }
-        body.push_str(line);
-        body.push('\n');
     }
     Err(BrowseParseError::Malformed)
 }
@@ -126,8 +147,14 @@ pub fn parse_list_output(
     exit_code: i32,
     stderr: &str,
 ) -> Result<BrowseListRaw, BrowseParseError> {
-    if stdout.contains(MARK_FAIL) || (exit_code != 0 && !stdout.contains(MARK_LS)) {
+    if stdout.contains(MARK_FAIL) {
         return Err(BrowseParseError::ResolveFailed);
+    }
+    if exit_code != 0 && !stdout.contains(MARK_LS) {
+        return Err(BrowseParseError::LsFailed {
+            exit_code,
+            stderr: stderr.to_string(),
+        });
     }
     let res_idx = stdout
         .find(MARK_RESOLVED)
@@ -201,6 +228,26 @@ mod tests {
     }
 
     #[test]
+    fn early_nonzero_without_frame_keeps_stderr() {
+        let stderr = "ls: /sdcard/nope: No such file or directory";
+        assert_eq!(
+            parse_list_output("boom", 1, stderr),
+            Err(BrowseParseError::LsFailed {
+                exit_code: 1,
+                stderr: stderr.into(),
+            })
+        );
+    }
+
+    #[test]
+    fn zero_exit_without_marks_is_malformed() {
+        assert_eq!(
+            parse_list_output("not a listing", 0, "error: device offline"),
+            Err(BrowseParseError::Malformed)
+        );
+    }
+
+    #[test]
     fn parse_fail_marker() {
         assert_eq!(
             parse_list_output(&format!("{MARK_FAIL}\n"), 1, ""),
@@ -223,6 +270,21 @@ mod tests {
         assert!(wrapped.contains("(\nexit 1\n)"));
         assert!(wrapped.contains(&begin_line(3)));
         assert!(wrapped.contains(&end_prefix(3)));
+    }
+
+    #[test]
+    fn session_line_classifies_echo_begin_body_and_end() {
+        let nonce = 7;
+        let begin = begin_line(nonce);
+        let echo = format!("printf '%s\\n' '{begin}'");
+        assert_eq!(session_line(&echo, &begin, nonce, false), SessionLine::Skip);
+        assert_eq!(
+            session_line(&begin, &begin, nonce, false),
+            SessionLine::Begin
+        );
+        assert_eq!(session_line("ok", &begin, nonce, true), SessionLine::Body);
+        let end = format!("{} 0", end_prefix(nonce));
+        assert_eq!(session_line(&end, &begin, nonce, true), SessionLine::End(0));
     }
 
     #[test]

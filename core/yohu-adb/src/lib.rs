@@ -13,10 +13,10 @@ pub mod shell;
 pub mod status;
 pub mod tool;
 
-pub use client::{AdbClient, BROWSE_LIST_TIMEOUT_MS};
+pub use client::{AdbClient, BrowseListError, BROWSE_LIST_TIMEOUT_MS};
 pub use device_shell::{DeviceShell, DeviceShellError};
-pub use error::AdbError;
-pub use parse::browse::BrowseListRaw;
+pub use error::{AdbError, ShellFault};
+pub use parse::browse::{BrowseListRaw, BrowseParseError};
 pub use parse::readlink::ReadlinkF;
 pub use shell::shell_quote;
 pub use status::DeviceStatusHub;

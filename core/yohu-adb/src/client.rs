@@ -41,6 +41,19 @@ pub struct AdbClient {
     limit: Arc<Semaphore>,
 }
 
+/// 一次浏览列举。运输失败与帧解析失败分开，解析失败不再装进空的 `BadExit`。
+#[derive(Debug)]
+pub enum BrowseListError {
+    Adb(AdbError),
+    Parse(browse_parse::BrowseParseError),
+}
+
+impl From<AdbError> for BrowseListError {
+    fn from(err: AdbError) -> Self {
+        Self::Adb(err)
+    }
+}
+
 impl AdbClient {
     pub fn new(tool: ToolResolver, max_concurrency: usize) -> Self {
         Self {
@@ -106,7 +119,7 @@ impl AdbClient {
             .runner
             .run_capture(&adb, &Self::argv_with_serial(serial, argv), timeout, cancel)
             .await?;
-        outcome_or_offline(out)
+        outcome_or_offline(serial, out)
     }
 
     /// 长驻进程：不占短命令信号量；调用方负责泵输出与 [`ChildHandle::kill_tree`]。
@@ -160,10 +173,12 @@ impl AdbClient {
         };
         match result {
             Ok(code) => Ok(code),
-            Err(ProcessError::BadExit { stderr, .. })
-                if offline::stderr_is_device_offline(&stderr) =>
-            {
-                Err(AdbError::DeviceOffline(stderr.trim().to_string()))
+            Err(ProcessError::BadExit { exit_code, stderr }) => {
+                if let Some(err) = offline::transport_offline(serial, &stderr) {
+                    Err(err)
+                } else {
+                    Err(ProcessError::BadExit { exit_code, stderr }.into())
+                }
             }
             Err(e) => Err(e.into()),
         }
@@ -171,20 +186,15 @@ impl AdbClient {
 
     /// 清设备日志缓冲（`logcat -c`）。
     pub async fn clear_log(&self, serial: &str, cancel: CancellationToken) -> Result<(), AdbError> {
-        let out = self
-            .run(
+        require_zero_exit(
+            self.run(
                 serial,
                 &["logcat".into(), "-c".into()],
                 Some(CLEAR_LOG_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
-        if out.exit_code != 0 {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
+            .await?,
+        )?;
         Ok(())
     }
 
@@ -196,10 +206,11 @@ impl AdbClient {
         serial: &str,
         path: &str,
         cancel: CancellationToken,
-    ) -> Result<browse_parse::BrowseListRaw, AdbError> {
+    ) -> Result<browse_parse::BrowseListRaw, BrowseListError> {
         let script = Self::browse_list_script(path);
         let out = self.browse_oneshot(serial, &script, cancel).await?;
         Self::parse_browse_list(&out.stdout, out.exit_code, &out.stderr)
+            .map_err(BrowseListError::Parse)
     }
 
     pub fn browse_list_script(path: &str) -> String {
@@ -210,17 +221,8 @@ impl AdbClient {
         stdout: &str,
         exit_code: i32,
         stderr: &str,
-    ) -> Result<browse_parse::BrowseListRaw, AdbError> {
-        browse_parse::parse_list_output(stdout, exit_code, stderr).map_err(|e| match e {
-            browse_parse::BrowseParseError::LsFailed { exit_code, stderr } => {
-                AdbError::BadExit { exit_code, stderr }
-            }
-            browse_parse::BrowseParseError::ResolveFailed
-            | browse_parse::BrowseParseError::Malformed => AdbError::BadExit {
-                exit_code: exit_code.max(1),
-                stderr: String::new(),
-            },
-        })
+    ) -> Result<browse_parse::BrowseListRaw, browse_parse::BrowseParseError> {
+        browse_parse::parse_list_output(stdout, exit_code, stderr)
     }
 
     async fn browse_oneshot(
@@ -245,8 +247,8 @@ impl AdbClient {
         path: &str,
         cancel: CancellationToken,
     ) -> Result<Vec<RemoteEntry>, AdbError> {
-        let out = self
-            .run(
+        let out = require_zero_exit(
+            self.run(
                 serial,
                 &[
                     "shell".into(),
@@ -257,13 +259,8 @@ impl AdbClient {
                 Some(LIST_LS_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
-        if out.exit_code != 0 {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
+            .await?,
+        )?;
         Ok(ls_parse::parse_ls(&out.stdout))
     }
 
@@ -303,8 +300,8 @@ impl AdbClient {
         serial: &str,
         cancel: CancellationToken,
     ) -> Result<Vec<ProcessEntry>, AdbError> {
-        let out = self
-            .run(
+        let out = require_zero_exit(
+            self.run(
                 serial,
                 &[
                     "shell".into(),
@@ -316,13 +313,8 @@ impl AdbClient {
                 Some(LIST_PS_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
-        if out.exit_code != 0 {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
+            .await?,
+        )?;
         Ok(ps_parse::parse_ps(&out.stdout))
     }
 
@@ -363,14 +355,13 @@ impl AdbClient {
             )
             .await?;
         if cmd.exit_code != 0 {
-            return Err(AdbError::BadExit {
-                exit_code: if pm.exit_code != 0 {
-                    pm.exit_code
-                } else {
-                    cmd.exit_code
-                },
-                stderr: format!("pm: {}; cmd package: {}", pm.stderr, cmd.stderr),
-            });
+            tracing::warn!(
+                pm_exit = pm.exit_code,
+                pm_stderr = %pm.stderr.trim(),
+                cmd_exit = cmd.exit_code,
+                "pm list packages 回退失败"
+            );
+            return Err(concluding_bad_exit(cmd.exit_code, cmd.stderr));
         }
         Ok(packages_parse::parse_pm_list_packages(&cmd.stdout))
     }
@@ -415,10 +406,13 @@ impl AdbClient {
                 )
                 .await?;
             if put.exit_code != 0 {
-                return Err(AdbError::BadExit {
-                    exit_code: out.exit_code,
-                    stderr: format!("cmd uimode: {}; settings: {}", out.stderr, put.stderr),
-                });
+                tracing::warn!(
+                    uimode_exit = out.exit_code,
+                    uimode_stderr = %out.stderr.trim(),
+                    settings_exit = put.exit_code,
+                    "cmd uimode 回退 settings 失败"
+                );
+                return Err(concluding_bad_exit(put.exit_code, put.stderr));
             }
         }
         Ok(())
@@ -430,8 +424,8 @@ impl AdbClient {
         serial: &str,
         cancel: CancellationToken,
     ) -> Result<status_parse::DeviceStatusFields, AdbError> {
-        let out = self
-            .run(
+        status_fields_or_fail(
+            self.run(
                 serial,
                 &[
                     "shell".into(),
@@ -442,14 +436,9 @@ impl AdbClient {
                 Some(STATUS_PROPS_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
-        if out.exit_code != 0 && out.stdout.trim().is_empty() {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
-        Ok(status_parse::parse_props_output(&out.stdout))
+            .await?,
+            status_parse::parse_props_output,
+        )
     }
 
     /// 一次 shell 采齐夜览/电量/SDK/亮屏等运行时字段。
@@ -458,8 +447,8 @@ impl AdbClient {
         serial: &str,
         cancel: CancellationToken,
     ) -> Result<status_parse::DeviceStatusFields, AdbError> {
-        let out = self
-            .run(
+        status_fields_or_fail(
+            self.run(
                 serial,
                 &[
                     "shell".into(),
@@ -470,26 +459,47 @@ impl AdbClient {
                 Some(STATUS_SAMPLE_TIMEOUT_MS),
                 cancel,
             )
-            .await?;
-        if out.exit_code != 0 && out.stdout.trim().is_empty() {
-            return Err(AdbError::BadExit {
-                exit_code: out.exit_code,
-                stderr: out.stderr,
-            });
-        }
-        Ok(status_parse::parse_status_bundle(&out.stdout))
+            .await?,
+            status_parse::parse_status_bundle,
+        )
     }
 }
 
-fn outcome_or_offline(out: ProcessOutput) -> Result<ExecOutcome, AdbError> {
-    if out.exit_code != 0 && offline::stderr_is_device_offline(&out.stderr) {
-        return Err(AdbError::DeviceOffline(out.stderr.trim().to_string()));
+fn outcome_or_offline(serial: &str, out: ProcessOutput) -> Result<ExecOutcome, AdbError> {
+    if out.exit_code != 0 {
+        if let Some(err) = offline::transport_offline(serial, &out.stderr) {
+            return Err(err);
+        }
     }
     Ok(ExecOutcome {
         exit_code: out.exit_code,
         stdout: out.stdout,
         stderr: out.stderr,
     })
+}
+
+/// 回退链收尾失败。用户句只含这一次的退出码和 stderr。
+fn concluding_bad_exit(exit_code: i32, stderr: String) -> AdbError {
+    AdbError::BadExit { exit_code, stderr }
+}
+
+fn require_zero_exit(out: ExecOutcome) -> Result<ExecOutcome, AdbError> {
+    if out.exit_code != 0 {
+        Err(concluding_bad_exit(out.exit_code, out.stderr))
+    } else {
+        Ok(out)
+    }
+}
+
+fn status_fields_or_fail(
+    out: ExecOutcome,
+    parse: impl FnOnce(&str) -> status_parse::DeviceStatusFields,
+) -> Result<status_parse::DeviceStatusFields, AdbError> {
+    if out.exit_code != 0 && out.stdout.trim().is_empty() {
+        Err(concluding_bad_exit(out.exit_code, out.stderr))
+    } else {
+        Ok(parse(&out.stdout))
+    }
 }
 
 /// 实现 domain 执行端口（依赖倒置：适配层映射错误类型）。
@@ -504,5 +514,50 @@ impl yohu_domain::Runner for AdbClient {
         self.run(serial, &argv, timeout_ms, cancel)
             .await
             .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_offline_payload_is_serial() {
+        let err = outcome_or_offline(
+            "S1",
+            ProcessOutput {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: "error: device offline".into(),
+            },
+        )
+        .expect_err("offline");
+        assert!(matches!(err, AdbError::DeviceOffline(ref serial) if serial == "S1"));
+        assert_eq!(err.to_string(), "设备掉线: S1");
+        assert!(!err.to_string().contains("error:"));
+        assert!(!err.to_string().contains("offline"));
+    }
+
+    #[test]
+    fn concluding_bad_exit_keeps_one_attempt() {
+        let err = concluding_bad_exit(3, "permission denied".into());
+        assert_eq!(
+            err.to_string(),
+            yohu_runtime::bad_exit_text(3, "permission denied")
+        );
+        assert!(!err.to_string().contains(';'));
+        assert!(!err.to_string().contains("cmd uimode"));
+        assert!(!err.to_string().contains("pm:"));
+    }
+
+    #[test]
+    fn status_slots_lock_sentence_once() {
+        let src = include_str!("status.rs");
+        let stripped = src.replacen(
+            "self.slots.lock().expect(\"status slots lock poisoned\")",
+            "",
+            1,
+        );
+        assert!(!stripped.contains("status slots lock poisoned"));
     }
 }
