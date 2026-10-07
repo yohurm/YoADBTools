@@ -1,21 +1,25 @@
 /**
- * files/model.ts 展示层：排序 / 体积 / 列尺。路径规则在 @yohu/api。
+ * files/model.ts 展示层：排序 / 列尺 / 文件体积。单位算法在 @yohu/ui formatByteCount。路径规则在 @yohu/api。
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ENTRY_NAME_EMPTY, ENTRY_NAME_SEPARATOR, entryIsDir, entryIsFile, entryIsSymlink, invalidNameText, splitPath, validateEntryName } from "@yohu/api";
+
 import {
+  FILE_COLUMNS,
   childPath,
   defaultFileColWidths,
   fileColTemplate,
+  fileColumnHeader,
   fileTypeLabel,
-  formatSize,
+  entryOpensAsDir,
+  entrySizeText,
+  sortDirIsAsc,
   sortEntries,
-  splitPath,
-  validateEntryName,
   type ListingEntry,
 } from "./model";
 
@@ -26,8 +30,13 @@ describe("model 零 IPC", () => {
     expect(src).not.toContain("ipcErrorCode");
     expect(src).not.toContain("isCancelledError");
     expect(src).not.toContain("isNotFoundError");
-    expect(src).toContain("parentWithinSafety");
+    expect(src).not.toContain("export { joinPath");
     expect(src).toContain("ListingEntry");
+    expect(src).toContain("EntryKind");
+    expect(src).not.toContain("ListingKind");
+    expect(src).not.toContain("FileColAlign");
+    expect(src).not.toContain('"start" | "end"');
+    expect(src).not.toContain('"dir" | "file" | "symlink" | "other"');
     expect(src).not.toContain("fileCategory");
     expect(src).not.toContain("FileCategory");
     expect(src).not.toContain("RemoteEntry");
@@ -49,6 +58,8 @@ describe("sortEntries", () => {
   });
 
   it("目录优先 + 名称升序", () => {
+    expect(sortDirIsAsc("asc")).toBe(true);
+    expect(sortDirIsAsc("desc")).toBe(false);
     const sorted = sortEntries([e("b.txt", "file"), e("Alarms", "dir"), e("a.txt", "file"), e("DCIM", "dir")]);
     expect(sorted.map((x) => x.name)).toEqual(["Alarms", "DCIM", "a.txt", "b.txt"]);
   });
@@ -96,25 +107,16 @@ describe("sortEntries", () => {
 
 describe("validateEntryName 产品文案", () => {
   it("拒绝空、穿越、分隔符", () => {
-    expect(validateEntryName("")).toBe("名称为空");
-    expect(validateEntryName("..")).toBe("..");
-    expect(validateEntryName("a/b")).toBe("含路径分隔符");
+    expect(validateEntryName("")).toBe(invalidNameText(ENTRY_NAME_EMPTY));
+    expect(validateEntryName("..")).toBe(invalidNameText(".."));
+    expect(validateEntryName("a/b")).toBe(invalidNameText(ENTRY_NAME_SEPARATOR));
     expect(validateEntryName("ok.txt")).toBeNull();
   });
 
   it("childPath 拒绝非法名，避免拼出安全根", () => {
-    expect(() => childPath("/sdcard", "")).toThrow();
-    expect(() => childPath("/sdcard", "..")).toThrow();
-    expect(childPath("/sdcard", "a.txt")).toBe("/sdcard/a.txt");
-  });
-});
-
-describe("formatSize", () => {
-  it("B/KB/MB/GB 阶梯", () => {
-    expect(formatSize(512)).toBe("512 B");
-    expect(formatSize(2048)).toBe("2.0 KB");
-    expect(formatSize(5 * 1024 * 1024)).toBe("5.0 MB");
-    expect(formatSize(3 * 1024 * 1024 * 1024)).toBe("3.00 GB");
+    expect(childPath("/sdcard", "")).toEqual({ ok: false, reason: invalidNameText(ENTRY_NAME_EMPTY) });
+    expect(childPath("/sdcard", "..")).toEqual({ ok: false, reason: invalidNameText("..") });
+    expect(childPath("/sdcard", "a.txt")).toEqual({ ok: true, path: "/sdcard/a.txt" });
   });
 });
 
@@ -131,6 +133,19 @@ describe("splitPath（面包屑分段）", () => {
   });
 });
 
+describe("fileColumnHeader", () => {
+  it("列名和调宽句只认这一份", () => {
+    expect(FILE_COLUMNS.map((col) => fileColumnHeader(col.key))).toEqual(["名称", "类型", "大小", "日期"]);
+    expect(FILE_COLUMNS.map((col) => col.header)).toEqual(["名称", "类型", "大小", "日期"]);
+    expect(FILE_COLUMNS.map((col) => col.resizeLabel)).toEqual([
+      "调节名称列宽",
+      "调节类型列宽",
+      "调节大小列宽",
+      "调节日期列宽",
+    ]);
+  });
+});
+
 describe("fileTypeLabel（类型列）", () => {
   it("目录/链接/扩展名/无扩展名", () => {
     const base = { size: 0, permission: "-rw-r--r--", mtime: "" };
@@ -138,11 +153,68 @@ describe("fileTypeLabel（类型列）", () => {
     expect(fileTypeLabel({ ...base, name: "link", kind: "symlink" })).toBe("链接");
     expect(fileTypeLabel({ ...base, name: "a.apk", kind: "file" })).toBe("APK");
     expect(fileTypeLabel({ ...base, name: "README", kind: "file" })).toBe("文件");
+    expect(entryOpensAsDir("dir")).toBe(true);
+    expect(entryOpensAsDir("symlink")).toBe(true);
+    expect(entryOpensAsDir("file")).toBe(false);
+    expect(entryOpensAsDir("other")).toBe(false);
+    expect(entryIsDir("dir")).toBe(true);
+    expect(entryIsDir("symlink")).toBe(false);
+    expect(entryIsFile("file")).toBe(true);
+    expect(entryIsFile("dir")).toBe(false);
+    expect(entryIsSymlink("symlink")).toBe(true);
+    expect(entrySizeText("file", 2048, "")).toBe("2.0 KB");
+    expect(entrySizeText("dir", 4096, "")).toBe("");
+    expect(entrySizeText("symlink", 0, "—")).toBe("—");
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const table = readFileSync(resolve(dir, "FileTable.tsx"), "utf8");
+    const preview = readFileSync(resolve(dir, "PreviewPane.tsx"), "utf8");
+    expect(table).toContain("entrySizeText");
+    expect(preview).toContain("entrySizeText");
+    expect(table).not.toContain("formatByteCount");
+    expect(table).not.toContain('"ascending" | "descending" | "none"');
+    expect(preview).not.toContain("formatByteCount");
   });
 });
 
 describe("fileColTemplate", () => {
   it("前三列定宽，日期列吃剩余", () => {
     expect(fileColTemplate(defaultFileColWidths())).toBe("240px 72px 80px minmax(168px, 1fr)");
+  });
+});
+
+describe("清单排序只写一处", () => {
+  it("升序比较和文本序各只在 model", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const sources = readdirSync(dir).filter(
+      (name) => (name.endsWith(".ts") || name.endsWith(".tsx")) && !name.includes(".test."),
+    );
+    for (const name of sources) {
+      const text = readFileSync(join(dir, name), "utf8");
+      const ascBody = name === "model.ts" ? text.replace('return dir === "asc"', "") : text;
+      const textBody = name === "model.ts" ? ascBody.replace("a.localeCompare(b, \"en\", { sensitivity: \"base\" })", "") : text;
+      expect(ascBody, name).not.toContain('=== "asc"');
+      expect(textBody, name).not.toContain("localeCompare");
+    }
+  });
+});
+
+describe("进入目录与手势选择只写一处", () => {
+  it("视图不再自己判断能不能进入，也不再自己改选择", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const sources = readdirSync(dir).filter(
+      (name) => (name.endsWith(".ts") || name.endsWith(".tsx")) && !name.includes(".test."),
+    );
+    for (const name of sources) {
+      let text = readFileSync(join(dir, name), "utf8");
+      if (name === "listing.ts") text = text.replace("selectedSet().has(name)", "");
+      if (name === "listing.ts") text = text.replace("return generation === 0", "");
+      expect(text, name).not.toContain("entryOpensAsDir(current.kind)");
+      expect(text, name).not.toContain("entry && entryOpensAsDir");
+      expect(text, name).not.toContain('select(entry().name, "replace")');
+      expect(text, name).not.toContain('select(entry.name, "replace")');
+      expect(text, name).not.toContain("selectedSet().has");
+      expect(text, name).not.toContain("generation === 0");
+      expect(text, name).not.toContain("coreGeneration === 0");
+    }
   });
 });

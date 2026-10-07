@@ -2,12 +2,16 @@
  * 路径栏提交入口：句法解析 + 安全根。只由 listing.goTo 与测试调用。
  */
 
-import { guardBrowsePath, type PathGuardError } from "./path-guard";
-import { parseRemotePath, type PathParseErr, type PathParseOk } from "./path-parse";
+import {
+  guardBrowsePath,
+  parseRemotePath,
+  type PathGuardError,
+  type PathParseErr,
+  type PathParseOk,
+} from "@yohu/api";
 
-export type PathResolveOk = PathParseOk;
 export type PathResolveErr = PathParseErr & { error?: PathGuardError };
-export type PathResolveResult = PathResolveOk | PathResolveErr;
+export type PathResolveResult = PathParseOk | PathResolveErr;
 
 export function resolveRemotePath(raw: string, current: string): PathResolveResult {
   const parsed = parseRemotePath(raw, current);

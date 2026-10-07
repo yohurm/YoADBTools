@@ -2,18 +2,16 @@
  * 路径行：上级钮 + YoAddressField。地址策略在库内，本槽不 import 交互函数、不自造输入。
  */
 
+import { parentWithinSafety, splitPath } from "@yohu/api";
 import { YoAddressField, YoIconButton, type YoAddressFieldApi } from "@yohu/ui";
 
 import { listingStore } from "./listing";
-import { parentWithinSafety, splitPath } from "./model";
 
-export type AddressSlotApi = YoAddressFieldApi;
-
-export function AddressSlot(props: { api?: (slot: AddressSlotApi) => void }) {
-  let field: AddressSlotApi | undefined;
+export function AddressSlot(props: { api?: (slot: YoAddressFieldApi) => void }) {
+  let field: YoAddressFieldApi | undefined;
   return (
     <div class="yohu-files__path">
-      <span data-address="up">
+      <span class="yohu-files__up">
         <YoIconButton
           icon="chevron-up"
           title="上级目录"

@@ -4,9 +4,8 @@
  */
 import { createEffect, onCleanup } from "solid-js";
 
-import type { Toaster, ToastInput } from "@yohu/ui";
-
-import { formatSize } from "./model";
+import { transferIsRunning } from "@yohu/api";
+import { formatByteCount, type Toaster, type ToastInput } from "@yohu/ui";
 import {
   transferToastDetail,
   transferToastLeading,
@@ -17,9 +16,9 @@ import {
 import { transferStore } from "./transfers";
 
 function transferToastMeta(job: TransferJob): string {
-  const bytes = formatSize(job.bytes);
-  const total = job.total ? ` / ${formatSize(job.total)}` : "";
-  const speed = job.speed !== undefined && job.state === "running" ? ` · ${formatSize(job.speed)}/s` : "";
+  const bytes = formatByteCount(job.bytes);
+  const total = job.total ? ` / ${formatByteCount(job.total)}` : "";
+  const speed = job.speed !== undefined && transferIsRunning(job.state) ? ` · ${formatByteCount(job.speed)}/s` : "";
   return `${bytes}${total}${speed}`;
 }
 
@@ -37,6 +36,9 @@ function transferToastInput(job: TransferJob): ToastInput {
 
 export function TransferToasts(props: { toaster: Toaster }) {
   const jobToToast = new Map<number, number>();
+  const dismissToast = (toastId: number): void => {
+    props.toaster.dismiss(toastId);
+  };
 
   createEffect(() => {
     const jobs = transferStore.transfers;
@@ -60,7 +62,7 @@ export function TransferToasts(props: { toaster: Toaster }) {
     }
     for (const [jobId, toastId] of [...jobToToast]) {
       if (!seen.has(jobId)) {
-        props.toaster.dismiss(toastId);
+        dismissToast(toastId);
         jobToToast.delete(jobId);
       }
     }
@@ -68,7 +70,7 @@ export function TransferToasts(props: { toaster: Toaster }) {
 
   onCleanup(() => {
     for (const toastId of jobToToast.values()) {
-      props.toaster.dismiss(toastId);
+      dismissToast(toastId);
     }
     jobToToast.clear();
   });

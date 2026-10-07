@@ -18,16 +18,19 @@ import {
   YoFileIcon,
   YoLoading,
   YoVirtualList,
+  controlRowHeight,
   pointerSelectMode,
+  type YoColHeaderSort,
 } from "@yohu/ui";
 import { listingStore } from "./listing";
-import { listingPaint } from "./listing-paint";
-import { controlRowHeight } from "./layout";
+import { listingPaint, listingPaintIsCold, listingPaintIsEmpty, listingPaintIsRows } from "./listing-paint";
 import {
   FILE_COLUMNS,
   fileColTemplate,
   fileTypeLabel,
-  formatSize,
+  entryOpensAsDir,
+  entrySizeText,
+  sortDirIsAsc,
   type FileColumnSpec,
   type ListingEntry,
 } from "./model";
@@ -36,9 +39,9 @@ import { transferStore } from "./transfers";
 const FILE_COLUMN_LIST = [...FILE_COLUMNS];
 
 function ColHead(props: { col: FileColumnSpec }) {
-  const ariaSort = (): "ascending" | "descending" | "none" => {
+  const ariaSort = (): YoColHeaderSort => {
     if (listingStore.sort.key !== props.col.key) return "none";
-    return listingStore.sort.dir === "asc" ? "ascending" : "descending";
+    return sortDirIsAsc(listingStore.sort.dir) ? "ascending" : "descending";
   };
   return (
     <YoColHeader
@@ -58,13 +61,13 @@ function ColHead(props: { col: FileColumnSpec }) {
 
 function FileCell(props: { entry: ListingEntry; col: FileColumnSpec }) {
   const type = (): string => fileTypeLabel(props.entry);
-  const size = (): string => (props.entry.kind === "file" ? formatSize(props.entry.size) : "");
+  const size = (): string => entrySizeText(props.entry.kind, props.entry.size, "");
   const mtime = (): string => props.entry.mtime;
   switch (props.col.key) {
     case "name":
       return (
         <YoColCell class="yohu-files__name">
-          <YoFileIcon name={props.entry.name} kind={props.entry.kind} size={Layout.IconSm} />
+          <YoFileIcon name={props.entry.name} folder={entryOpensAsDir(props.entry.kind)} size={Layout.IconSm} />
           <span class="yohu-files__name-text">{props.entry.name}</span>
         </YoColCell>
       );
@@ -85,18 +88,21 @@ function FileRow(props: { item: ListingEntry; index: number }) {
       data-kind={entry().kind}
       draggable="true"
       onDragStart={(event) => {
-        event.preventDefault();
-        if (!listingStore.selectedSet().has(entry().name)) listingStore.select(entry().name, "replace");
+        cancelNative(event);
+        listingStore.selectGestureTarget(entry().name);
         void transferStore.dragOut(entry().name);
       }}
       onDblClick={() => {
-        const current = entry();
-        if (current.kind === "dir" || current.kind === "symlink") void listingStore.enterDirectory(current.name);
+        void listingStore.enterDirectory(entry().name);
       }}
     >
       <For each={FILE_COLUMN_LIST}>{(col) => <FileCell entry={entry()} col={col} />}</For>
     </YoColTrack>
   );
+}
+
+function cancelNative(event: { preventDefault(): void }): void {
+  event.preventDefault();
 }
 
 export function FileTable(props: {
@@ -105,26 +111,29 @@ export function FileTable(props: {
   listRef?: (el: HTMLDivElement) => void;
   onOffset?: (block: number) => void;
 }) {
+  const openMenuAt = (event: { clientX: number; clientY: number }): void => {
+    props.onContextMenu(event.clientX, event.clientY);
+  };
   const colTemplate = (): string => fileColTemplate(listingStore.ui.colWidths);
   const entries = (): ListingEntry[] => listingStore.entries;
   const paint = (): ReturnType<typeof listingPaint> =>
     listingPaint(entries().length, listingStore.session.loading, listingStore.session.cold);
 
   return (
-    <YoColFrame class="yohu-files__table" template={colTemplate()}>
-      <YoColRow class="yohu-files__cols yohu-files__cols--head">
+    <YoColFrame template={colTemplate()}>
+      <YoColRow class="yohu-files__cols--head">
         <For each={FILE_COLUMN_LIST}>{(col) => <ColHead col={col} />}</For>
       </YoColRow>
       <div
         class="yohu-files__table-list"
         onContextMenu={(event) => {
-          event.preventDefault();
+          cancelNative(event);
           listingStore.clearSelection();
-          props.onContextMenu(event.clientX, event.clientY);
+          openMenuAt(event);
         }}
       >
         <Switch>
-          <Match when={paint() === "rows"}>
+          <Match when={listingPaintIsRows(paint())}>
             <YoVirtualList<ListingEntry>
               items={entries}
               itemHeight={controlRowHeight()}
@@ -139,16 +148,16 @@ export function FileTable(props: {
                 listingStore.select(entry.name, pointerSelectMode(event));
               }}
               onRowContextMenu={(entry, _key, event) => {
-                if (!listingStore.selectedSet().has(entry.name)) listingStore.select(entry.name, "replace");
-                props.onContextMenu(event.clientX, event.clientY);
+                listingStore.selectGestureTarget(entry.name);
+                openMenuAt(event);
               }}
               renderRow={FileRow}
             />
           </Match>
-          <Match when={paint() === "cold"}>
+          <Match when={listingPaintIsCold(paint())}>
             <YoLoading fill title="加载中" description="正在读取目录" />
           </Match>
-          <Match when={paint() === "empty"}>
+          <Match when={listingPaintIsEmpty(paint())}>
             <YoEmptyState fill icon="folder" title="此文件夹为空" />
           </Match>
         </Switch>

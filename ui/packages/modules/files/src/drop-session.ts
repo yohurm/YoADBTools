@@ -1,16 +1,16 @@
 /**
  * 官方拖放会话：订事件、rAF 热态 dest、松手 commit。
  * dest 一律清单下标 destDirFromEntries；禁止扫行盒。
- * devicePixelRatio 只在此读，传给纯函数 scale。
+ * 比例经 hostPixelRatio() 读取，传给纯函数 scale。
  */
 
 import { createSignal, onCleanup, onMount, type Accessor } from "solid-js";
 
-import { onNativeDragDrop, YoLog } from "@yohu/api";
+import { bindNativeDragDrop, dragEventIsDrop, NATIVE_DRAG_SUBSCRIBE_FAILED, YoLog } from "@yohu/api";
+import { controlRowHeight, cssPointFromPhysical, hostPixelRatio } from "@yohu/ui";
 
 import {
   adoptDropSession,
-  cssPointFromPhysical,
   destDirFromEntries,
   DROP_IDLE,
   dropCommit,
@@ -20,7 +20,6 @@ import {
   type DropSession,
   type ListHitEntry,
 } from "./drop";
-import { controlRowHeight } from "./layout";
 
 export interface DropSessionHost {
   listEl: () => Element | undefined;
@@ -38,86 +37,97 @@ export function createDropSession(host: DropSessionHost): {
   const [session, setSession] = createSignal<DropSession>(DROP_IDLE);
 
   onMount(() => {
-    let stopDrag: (() => void) | undefined;
-    let cancelled = false;
-    let destFrame = 0;
+    let destFrame: number;
     let destPoint = { x: 0, y: 0 };
 
-    const stopDestFrame = (): void => {
-      if (destFrame === 0) return;
-      cancelAnimationFrame(destFrame);
+    const clearDestFrame = (): void => {
       destFrame = 0;
+    };
+    const destFrameIdle = (): boolean => destFrame === 0;
+    const clearDropDir = (): void => {
+      setSession((prev) => dropSessionWithDir(prev, null));
+    };
+    const currentList = (): Element | undefined => host.listEl();
+    const dropEntries = (): readonly ListHitEntry[] => host.entries();
+    const listHitSpace = (list: Element) => readListHitSpace(list, controlRowHeight(), host.listOffset());
+    clearDestFrame();
+
+    const stopDestFrame = (): void => {
+      if (destFrameIdle()) return;
+      cancelAnimationFrame(destFrame);
+      clearDestFrame();
     };
 
     const applyDest = (): void => {
-      destFrame = 0;
-      const list = host.listEl();
+      clearDestFrame();
+      if (!host.intoFolder()) {
+        clearDropDir();
+        return;
+      }
+      const list = currentList();
       if (!list) return;
       const dirName = destDirFromEntries(
         destPoint.x,
         destPoint.y,
-        readListHitSpace(list, controlRowHeight(), host.listOffset()),
-        host.entries(),
+        listHitSpace(list),
+        dropEntries(),
       );
       setSession((prev) => dropSessionWithDir(prev, dirName));
     };
 
-    void onNativeDragDrop((event) => {
-      const gate = {
-        hasDevice: host.hasDevice(),
-        blocked: host.blocked(),
-      };
-      setSession((prev) => adoptDropSession(prev, dropSessionForEvent(event, gate)));
-      const intoFolder = host.intoFolder();
-      const scale = window.devicePixelRatio;
-      if (
-        (event.type === "enter" || event.type === "over") &&
-        intoFolder &&
-        gate.hasDevice &&
-        !gate.blocked
-      ) {
-        destPoint = cssPointFromPhysical(event.position.x, event.position.y, scale);
-        if (destFrame === 0) {
-          destFrame = requestAnimationFrame(applyDest);
+    const stopDrag = bindNativeDragDrop(
+      (event) => {
+        const gate = {
+          hasDevice: host.hasDevice(),
+          blocked: host.blocked(),
+        };
+        const admitted = dropSessionForEvent(event, gate);
+        setSession((prev) => adoptDropSession(prev, admitted));
+        const intoFolder = host.intoFolder();
+        const scale = hostPixelRatio();
+        if (admitted.hot && intoFolder) {
+          destPoint = cssPointFromPhysical(event.position.x, event.position.y, scale);
+          if (destFrameIdle()) {
+            destFrame = requestAnimationFrame(applyDest);
+          }
+          return;
         }
-        return;
-      }
-      if (event.type !== "drop") {
+        if (admitted.hot) {
+          stopDestFrame();
+          clearDropDir();
+          return;
+        }
+        if (!dragEventIsDrop(event)) {
+          stopDestFrame();
+          return;
+        }
         stopDestFrame();
-        return;
-      }
-      stopDestFrame();
-      const list = host.listEl();
-      const commit = dropCommit(event, {
-        ...gate,
-        intoFolder,
-        scale,
-        space: list ? readListHitSpace(list, controlRowHeight(), host.listOffset()) : undefined,
-        entries: host.entries(),
-      });
-      if (!commit) {
-        YoLog.info("files", "投放未提交", {
-          x: event.position.x,
-          y: event.position.y,
-          paths: event.paths.length,
+        const list = currentList();
+        const commit = dropCommit(event, {
+          ...gate,
+          intoFolder,
+          scale,
+          space: list ? listHitSpace(list) : undefined,
+          entries: dropEntries(),
         });
-        return;
-      }
-      host.onCommit(commit.paths, commit.dirName);
-    }).then(
-      (unlisten) => {
-        if (cancelled) unlisten();
-        else stopDrag = unlisten;
+        if (!commit) {
+          YoLog.info("files", "投放未提交", {
+            x: event.position.x,
+            y: event.position.y,
+            paths: event.paths.length,
+          });
+          return;
+        }
+        host.onCommit(commit.paths, commit.dirName);
       },
-      (error: unknown) => {
-        YoLog.error("files", "订阅官方拖放失败", error);
+      (error) => {
+        YoLog.error("files", NATIVE_DRAG_SUBSCRIBE_FAILED, error);
       },
     );
 
     onCleanup(() => {
-      cancelled = true;
       stopDestFrame();
-      stopDrag?.();
+      stopDrag();
     });
   });
 

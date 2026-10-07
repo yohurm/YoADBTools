@@ -1,14 +1,40 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  ENTRY_NAME_EMPTY,
+  CAPTURE_TRUNCATED,
+  EXEC_TIMEOUT,
+  PROGRESS_JOIN,
+  PUMP_PANIC,
+  SHELL_ENDED,
+  SHELL_EXEC,
+  SHELL_HANDSHAKE,
+  SHELL_NO_STDIN,
+  SHELL_NO_STDOUT,
+  TOOL_UNAVAILABLE,
+  invalidNameText,
+  isTerminalTransfer,
+  localFailedText,
+  readlinkUnparseableText,
+  remoteNotFoundText,
+  transferIsDone,
+  transferIsFailed,
+  transferIsPush,
+  transferIsRunning,
+} from "@yohu/api";
 
 import {
   applyProgressToJob,
   createTransferJob,
-  isTerminalTransfer,
   resolveJobName,
   shouldAcceptProgress,
   transferFallbackName,
   transferFaultText,
   transferIndeterminate,
+  transferKnownTotal,
   transferLabel,
   transferPercent,
   transferToastDetail,
@@ -46,6 +72,8 @@ describe("shouldAcceptProgress", () => {
 
 describe("isTerminalTransfer", () => {
   it("仅 running 非终态", () => {
+    expect(transferIsRunning("running")).toBe(true);
+    expect(transferIsRunning("done")).toBe(false);
     expect(isTerminalTransfer("running")).toBe(false);
     expect(isTerminalTransfer("done")).toBe(true);
   });
@@ -62,6 +90,16 @@ describe("transferPercent / indeterminate", () => {
     expect(transferPercent(50, 200)).toBe(25);
     expect(transferPercent(300, 200)).toBe(100);
     expect(transferIndeterminate("running", 200)).toBe(false);
+  });
+
+  it("非正总量与缺省同一结果", () => {
+    expect(transferKnownTotal(undefined)).toBeUndefined();
+    expect(transferKnownTotal(0)).toBeUndefined();
+    expect(transferKnownTotal(-3)).toBeUndefined();
+    expect(transferKnownTotal(8)).toBe(8);
+    expect(transferPercent(1, 0)).toBeUndefined();
+    expect(transferIndeterminate("running", 0)).toBe(true);
+    expect(transferIndeterminate("done", 0)).toBe(false);
   });
 });
 
@@ -113,19 +151,36 @@ describe("transferTone / label / name", () => {
     expect(next.state).toBe("failed");
     expect(next.fault).toEqual({ kind: "remote_not_found", path: "/sdcard/a.bin" });
     expect(next).not.toHaveProperty("message");
-    expect(transferFaultText(next.fault)).toBe("远端不存在: /sdcard/a.bin");
+    expect(transferFaultText(next.fault)).toBe(remoteNotFoundText("/sdcard/a.bin"));
   });
 });
 
 describe("transferFaultText", () => {
   it("缺省空串；分类+路径；运输无句子", () => {
     expect(transferFaultText(undefined)).toBe("");
-    expect(transferFaultText({ kind: "local", path: "C:/tmp/a.bin" })).toBe("本地操作失败: C:/tmp/a.bin");
+    expect(transferFaultText({ kind: "local", path: "C:/tmp/a.bin" })).toBe(localFailedText("C:/tmp/a.bin"));
     expect(transferFaultText({ kind: "device_offline", serial: "S1" })).toBe("设备掉线: S1");
-    expect(transferFaultText({ kind: "timeout" })).toBe("执行超时");
+    expect(transferFaultText({ kind: "timeout" })).toBe(EXEC_TIMEOUT);
     expect(transferFaultText({ kind: "io" })).toBe("IO 错误");
-    expect(transferFaultText({ kind: "tool_unavailable" })).toBe("ADB 不可用");
-    expect(transferFaultText({ kind: "progress_join" })).toBe("传输进度任务已中断");
+    expect(transferFaultText({ kind: "truncated" })).toBe(CAPTURE_TRUNCATED);
+    expect(transferFaultText({ kind: "pump_panic" })).toBe(PUMP_PANIC);
+    expect(transferFaultText({ kind: "shell_no_stdin" })).toBe(SHELL_NO_STDIN);
+    expect(transferFaultText({ kind: "shell_no_stdout" })).toBe(SHELL_NO_STDOUT);
+    expect(transferFaultText({ kind: "shell_handshake" })).toBe(SHELL_HANDSHAKE);
+    expect(transferFaultText({ kind: "shell_ended" })).toBe(SHELL_ENDED);
+    expect(transferFaultText({ kind: "shell_exec" })).toBe(SHELL_EXEC);
+    expect(transferFaultText({ kind: "tool_unavailable" })).toBe(TOOL_UNAVAILABLE);
+    expect(transferFaultText({ kind: "readlink_unparseable", path: "/sdcard/a" })).toBe(
+      readlinkUnparseableText("/sdcard/a"),
+    );
+    expect(transferFaultText({ kind: "progress_join" })).toBe(PROGRESS_JOIN);
+    expect(transferFaultText({ kind: "invalid_name", detail: ENTRY_NAME_EMPTY })).toBe(
+      invalidNameText(ENTRY_NAME_EMPTY),
+    );
+    expect(transferFaultText({ kind: "not_absolute", path: "sdcard/a" })).toBe("路径必须是绝对路径: sdcard/a");
+    expect(transferFaultText({ kind: "traversal", path: "/sdcard/../etc" })).toBe(
+      "路径含 .. 穿越: /sdcard/../etc",
+    );
     expect(transferFaultText({ kind: "remote_not_found", path: "/sdcard/a" })).not.toContain(
       "没有这个目录",
     );
@@ -136,6 +191,12 @@ describe("传输 toast 快照", () => {
   it("方向图标、失败文案、运行中才带进度", () => {
     expect(transferToastLeading("push")).toBe("arrow-up");
     expect(transferToastLeading("pull")).toBe("arrow-down");
+    expect(transferIsPush("push")).toBe(true);
+    expect(transferIsPush("pull")).toBe(false);
+    expect(transferIsDone("done")).toBe(true);
+    expect(transferIsDone("failed")).toBe(false);
+    expect(transferIsFailed("failed")).toBe(true);
+    expect(transferIsFailed("done")).toBe(false);
     expect(transferToastTone("done")).toBe("success");
     expect(transferToastTone("failed")).toBe("error");
     expect(transferToastTone("running")).toBe("info");
@@ -150,7 +211,60 @@ describe("传输 toast 快照", () => {
       state: "failed",
       fault: { kind: "remote_not_found", path: "/sdcard/shot.png" },
     });
-    expect(transferToastDetail(failed)).toBe("远端不存在: /sdcard/shot.png");
+    expect(transferToastDetail(failed)).toBe(remoteNotFoundText("/sdcard/shot.png"));
     expect(transferToastProgress(failed)).toBeUndefined();
+  });
+});
+
+describe("传输方向与提示色", () => {
+  it("作业模型不再另写 push/pull 和提示色联合", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "transfer-model.ts"),
+      "utf8",
+    );
+    expect(src).toContain("Direction");
+    expect(src).toContain("ToastTone");
+    expect(src).toContain("YoBadgeTone");
+    expect(src).not.toContain('"push" | "pull"');
+    expect(src).not.toContain('"success" | "error" | "info"');
+    expect(src).not.toContain('"success" | "danger" | "accent" | "neutral"');
+    expect(src).toContain("IconName");
+    expect(src).not.toContain('"arrow-up" | "arrow-down"');
+  });
+});
+
+describe("作业名裁空白只写一处", () => {
+  it("trimmed_job_name_once", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "transfer-model.ts"),
+      "utf8",
+    );
+    expect(src.match(/\?\.trim\(\)/g)?.length ?? 0).toBe(1);
+  });
+});
+
+describe("进行中判定只写一处", () => {
+  it("生产源里只有 transferIsRunning 比较 running", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const sources = readdirSync(dir).filter(
+      (name) => (name.endsWith(".ts") || name.endsWith(".tsx")) && !name.includes(".test."),
+    );
+    for (const name of sources) {
+      const text = readFileSync(join(dir, name), "utf8");
+      const body = name === "transfer-model.ts" ? text.replace('return state === "running"', "") : text;
+      expect(body, name).not.toContain('=== "running"');
+      expect(body, name).not.toContain('!== "running"');
+      const pushBody = name === "transfer-model.ts" ? text.replace('return direction === "push"', "") : text;
+      expect(pushBody, name).not.toContain('=== "push"');
+      const doneBody =
+        name === "transfer-model.ts" ? text.replace('return state === "done"', "") : text;
+      const failedBody =
+        name === "transfer-model.ts" ? text.replace('return state === "failed"', "") : text;
+      expect(doneBody, name).not.toContain('=== "done"');
+      expect(failedBody, name).not.toContain('=== "failed"');
+      const totalBody = name === "transfer-model.ts" ? text.replace("total <= 0", "") : text;
+      expect(totalBody, name).not.toContain("total <= 0");
+      expect(text, name).not.toContain("expectedBytes > 0");
+    }
   });
 });

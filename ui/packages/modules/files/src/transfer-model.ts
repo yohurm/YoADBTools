@@ -2,11 +2,48 @@
  * 传输作业：发号即出生，进度只补字节。零 DOM / 零 IPC。
  */
 
-import type { TransferFault, TransferProgress, TransferState } from "@yohu/api";
+import {
+  CAPTURE_TRUNCATED,
+  EXEC_TIMEOUT,
+  PROGRESS_JOIN,
+  PUMP_PANIC,
+  SHELL_ENDED,
+  SHELL_EXEC,
+  SHELL_HANDSHAKE,
+  SHELL_NO_STDIN,
+  SHELL_NO_STDOUT,
+  TOOL_UNAVAILABLE,
+  alreadyExistsText,
+  deviceOfflineText,
+  illegalPathText,
+  invalidNameText,
+  localFailedText,
+  localNotFoundText,
+  notADirectoryText,
+  notAbsoluteText,
+  outsideRootText,
+  permissionDeniedText,
+  readOnlyText,
+  readlinkUnparseableText,
+  remoteFailedText,
+  remoteNotFoundText,
+  traversalText,
+  isTerminalTransfer,
+  transferIsCancelled,
+  transferIsDone,
+  transferIsFailed,
+  transferIsPush,
+  transferIsRunning,
+  type Direction,
+  type TransferFault,
+  type TransferProgress,
+  type TransferState,
+} from "@yohu/api";
+import { ratioPercent, trimmedTextPresent, type IconName, type ToastTone, type YoBadgeTone } from "@yohu/ui";
 
 export interface TransferJob {
   id: number;
-  direction: "push" | "pull";
+  direction: Direction;
   name: string;
   bytes: number;
   total?: number;
@@ -15,38 +52,47 @@ export interface TransferJob {
   speed?: number;
 }
 
-export function isTerminalTransfer(state: TransferState): boolean {
-  return state !== "running";
-}
-
 /** 终态不可被迟到的 running 覆盖。 */
 export function shouldAcceptProgress(
   current: TransferState | undefined,
   incoming: TransferState,
 ): boolean {
-  return !(current !== undefined && isTerminalTransfer(current) && incoming === "running");
+  return !(current !== undefined && isTerminalTransfer(current) && transferIsRunning(incoming));
+}
+
+/** 非正总量当作没有总量。百分比、不定进度、下载预期字节都问这里。 */
+export function transferKnownTotal(total: number | undefined): number | undefined {
+  if (total === undefined || total <= 0) return undefined;
+  return total;
 }
 
 export function transferPercent(bytes: number, total: number | undefined): number | undefined {
-  if (total === undefined || total <= 0) return undefined;
-  return Math.min(100, Math.max(0, (bytes / total) * 100));
+  const known = transferKnownTotal(total);
+  if (known === undefined) return undefined;
+  return ratioPercent(bytes, known);
 }
 
 export function transferIndeterminate(state: TransferState, total: number | undefined): boolean {
-  return state === "running" && (total === undefined || total <= 0);
+  return transferIsRunning(state) && transferKnownTotal(total) === undefined;
 }
 
-export function transferTone(state: TransferState): "success" | "danger" | "accent" | "neutral" {
-  if (state === "done") return "success";
-  if (state === "failed") return "danger";
-  if (state === "running") return "accent";
+function successWhenDone(state: TransferState): "success" | undefined {
+  if (transferIsDone(state)) return "success";
+  return undefined;
+}
+
+export function transferTone(state: TransferState): YoBadgeTone {
+  const done = successWhenDone(state);
+  if (done) return done;
+  if (transferIsFailed(state)) return "danger";
+  if (transferIsRunning(state)) return "accent";
   return "neutral";
 }
 
 export function transferLabel(state: TransferState): string {
-  if (state === "running") return "传输中";
-  if (state === "done") return "完成";
-  if (state === "cancelled") return "已取消";
+  if (transferIsRunning(state)) return "传输中";
+  if (transferIsDone(state)) return "完成";
+  if (transferIsCancelled(state)) return "已取消";
   return "失败";
 }
 
@@ -55,46 +101,70 @@ export function transferFaultText(fault: TransferFault | undefined): string {
   if (!fault) return "";
   switch (fault.kind) {
     case "path":
-      return `路径非法: ${fault.path}`;
+      return illegalPathText(fault.path);
+    case "not_absolute":
+      return notAbsoluteText(fault.path);
+    case "traversal":
+      return traversalText(fault.path);
+    case "invalid_name":
+      return invalidNameText(fault.detail);
     case "outside_root":
-      return `路径不在安全根内: ${fault.path}`;
+      return outsideRootText(fault.path);
     case "remote_not_found":
-      return `远端不存在: ${fault.path}`;
+      return remoteNotFoundText(fault.path);
     case "not_a_directory":
-      return `不是目录: ${fault.path}`;
+      return notADirectoryText(fault.path);
     case "permission_denied":
-      return `没有权限: ${fault.path}`;
+      return permissionDeniedText(fault.path);
     case "read_only":
-      return `文件系统只读: ${fault.path}`;
+      return readOnlyText(fault.path);
     case "already_exists":
-      return `路径已存在: ${fault.path}`;
+      return alreadyExistsText(fault.path);
     case "remote_failed":
-      return `远端操作失败: ${fault.path}`;
+      return remoteFailedText(fault.path);
+    case "readlink_unparseable":
+      return readlinkUnparseableText(fault.path);
     case "local_not_found":
-      return `本地路径不存在: ${fault.path}`;
+      return localNotFoundText(fault.path);
     case "local":
-      return `本地操作失败: ${fault.path}`;
+      return localFailedText(fault.path);
     case "device_offline":
-      return `设备掉线: ${fault.serial}`;
+      return deviceOfflineText(fault.serial);
     case "timeout":
-      return "执行超时";
+      return EXEC_TIMEOUT;
     case "io":
       return "IO 错误";
+    case "truncated":
+      return CAPTURE_TRUNCATED;
+    case "pump_panic":
+      return PUMP_PANIC;
+    case "shell_no_stdin":
+      return SHELL_NO_STDIN;
+    case "shell_no_stdout":
+      return SHELL_NO_STDOUT;
+    case "shell_handshake":
+      return SHELL_HANDSHAKE;
+    case "shell_ended":
+      return SHELL_ENDED;
+    case "shell_exec":
+      return SHELL_EXEC;
     case "tool_unavailable":
-      return "ADB 不可用";
+      return TOOL_UNAVAILABLE;
     case "progress_join":
-      return "传输进度任务已中断";
+      return PROGRESS_JOIN;
   }
 }
 
-export function transferToastTone(state: TransferState): "success" | "error" | "info" {
-  if (state === "done") return "success";
-  if (state === "failed") return "error";
+export function transferToastTone(state: TransferState): ToastTone {
+  const done = successWhenDone(state);
+  if (done) return done;
+  if (transferIsFailed(state)) return "error";
   return "info";
 }
 
-export function transferToastLeading(direction: "push" | "pull"): "arrow-up" | "arrow-down" {
-  return direction === "push" ? "arrow-up" : "arrow-down";
+/** 上传用上箭头。方向成员在 @yohu/api。 */
+export function transferToastLeading(direction: Direction): IconName {
+  return transferIsPush(direction) ? "arrow-up" : "arrow-down";
 }
 
 export function transferToastDetail(job: TransferJob): string {
@@ -106,15 +176,21 @@ export function transferToastDetail(job: TransferJob): string {
 export function transferToastProgress(
   job: TransferJob,
 ): { value?: number; indeterminate?: boolean } | undefined {
-  if (job.state !== "running") return undefined;
+  if (!transferIsRunning(job.state)) return undefined;
   return {
     value: transferPercent(job.bytes, job.total),
     indeterminate: transferIndeterminate(job.state, job.total),
   };
 }
 
-export function transferFallbackName(direction: "push" | "pull", id: number): string {
-  return `${direction === "push" ? "上传" : "下载"} #${id}`;
+export function transferFallbackName(direction: Direction, id: number): string {
+  return `${transferIsPush(direction) ? "上传" : "下载"} #${id}`;
+}
+
+function trimmedJobName(value: string | undefined): string | undefined {
+  const text = value?.trim();
+  if (text !== undefined && trimmedTextPresent(text)) return text;
+  return undefined;
 }
 
 export function resolveJobName(
@@ -122,16 +198,12 @@ export function resolveJobName(
   existing: string | undefined,
   fallback: string,
 ): string {
-  const next = incoming?.trim();
-  if (next) return next;
-  const keep = existing?.trim();
-  if (keep) return keep;
-  return fallback;
+  return trimmedJobName(incoming) ?? trimmedJobName(existing) ?? fallback;
 }
 
 export function createTransferJob(input: {
   id: number;
-  direction: "push" | "pull";
+  direction: Direction;
   name: string;
   total?: number;
 }): TransferJob {

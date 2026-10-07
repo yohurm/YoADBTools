@@ -7,9 +7,11 @@ import { Show, createSignal, type Accessor } from "solid-js";
 import { YoButton, YoCorner, YoDialog, YoScroller, YoTextField, closeContextMenu } from "@yohu/ui";
 
 import { listingStore } from "./listing";
-import { validateEntryName } from "./model";
+import { createKindFieldLabel, createKindSeed, createKindTitle, type CreateKind } from "./create-kind";
+import { entryIsDir, validateEntryName } from "@yohu/api";
+import { fileColumnHeader } from "./model";
 
-export type CreateKind = "file" | "dir";
+export type { CreateKind };
 
 export interface CreateDialogApi {
   isOpen: Accessor<boolean>;
@@ -22,6 +24,10 @@ export function CreateDialog(props: { api?: (api: CreateDialogApi) => void }) {
   const [createName, setCreateName] = createSignal("");
   const [createError, setCreateError] = createSignal("");
 
+  const clearCreateError = (): void => {
+    setCreateError("");
+  };
+
   const closeCreate = (): void => {
     setCreateOpen(false);
   };
@@ -29,31 +35,33 @@ export function CreateDialog(props: { api?: (api: CreateDialogApi) => void }) {
   const finishCreate = (): void => {
     setCreateKind(null);
     setCreateName("");
-    setCreateError("");
+    clearCreateError();
   };
 
   const openCreate = (kind: CreateKind): void => {
     setCreateKind(kind);
-    setCreateName(kind === "dir" ? "新建文件夹" : "新建文件.txt");
-    setCreateError("");
+    setCreateName(createKindSeed(kind));
+    clearCreateError();
     setCreateOpen(true);
     closeContextMenu();
   };
 
+  const draftName = (): string => createName().trim();
+
   const createReady = (): boolean =>
-    validateEntryName(createName().trim()) === null && !listingStore.session.mutating;
+    validateEntryName(draftName()) === null && !listingStore.session.mutating;
 
   const confirmCreate = (): void => {
-    const name = createName().trim();
+    const name = draftName();
     const kind = createKind();
     const invalid = validateEntryName(name);
     if (invalid) {
       setCreateError(invalid);
       return;
     }
-    setCreateOpen(false);
+    closeCreate();
     if (!kind) return;
-    if (kind === "dir") void listingStore.mkdir(name);
+    if (entryIsDir(kind)) void listingStore.mkdir(name);
     else void listingStore.createFile(name);
   };
 
@@ -62,7 +70,7 @@ export function CreateDialog(props: { api?: (api: CreateDialogApi) => void }) {
   return (
     <YoDialog
       open={createOpen}
-      title={createKind() === "dir" ? "新建目录" : "新建文件"}
+      title={createKindTitle(createKind() ?? "file")}
       onClose={closeCreate}
       onExitComplete={finishCreate}
       footer={
@@ -79,13 +87,13 @@ export function CreateDialog(props: { api?: (api: CreateDialogApi) => void }) {
       <YoScroller>
         <YoTextField
           block
-          label="名称"
+          label={fileColumnHeader("name")}
           value={createName()}
           onInput={(v) => {
             setCreateName(v);
             setCreateError(validateEntryName(v) ?? "");
           }}
-          ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}
+          ariaLabel={createKindFieldLabel(createKind() ?? "file")}
         />
         <Show when={createError()}>
           <YoCorner role="control" class="yohu-files__error" flex="hug" pad="xs">

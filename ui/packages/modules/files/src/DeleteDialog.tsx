@@ -20,19 +20,23 @@ export function DeleteDialog(props: { api?: (api: DeleteDialogApi) => void }) {
   const [deleteNames, setDeleteNames] = createSignal<string[]>([]);
   const [deleteExpanded, setDeleteExpanded] = createSignal(false);
 
+  const collapseDelete = (): void => {
+    setDeleteExpanded(false);
+  };
+
   const closeDelete = (): void => {
     setDeleteOpen(false);
   };
 
   const finishDelete = (): void => {
     setDeleteNames([]);
-    setDeleteExpanded(false);
+    collapseDelete();
   };
 
   const askDelete = (names: string[]): void => {
     if (names.length === 0) return;
     closeContextMenu();
-    setDeleteExpanded(false);
+    collapseDelete();
     setDeleteNames(names);
     setDeleteOpen(true);
   };
@@ -40,16 +44,16 @@ export function DeleteDialog(props: { api?: (api: DeleteDialogApi) => void }) {
   const dropFromDelete = (name: string): void => {
     const next = dropDeleteName(deleteNames(), name);
     if (next.length === 0) {
-      setDeleteOpen(false);
+      closeDelete();
       return;
     }
     setDeleteNames(next);
-    if (next.length <= DELETE_PREVIEW_LIMIT) setDeleteExpanded(false);
+    if (next.length <= DELETE_PREVIEW_LIMIT) collapseDelete();
   };
 
   const confirmDelete = (): void => {
     const names = deleteNames();
-    setDeleteOpen(false);
+    closeDelete();
     void listingStore.removeMany(names);
   };
 

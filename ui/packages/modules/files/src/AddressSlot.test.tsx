@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
-import { AddressSlot, type AddressSlotApi } from "./AddressSlot";
+import type { YoAddressFieldApi } from "@yohu/ui";
+
+import { AddressSlot } from "./AddressSlot";
 import { listingStore } from "./listing";
 
 async function nextFrames(count = 4): Promise<void> {
@@ -90,7 +92,7 @@ describe("AddressSlot", () => {
 
   it("点上级钮不打开输入", () => {
     render(() => <AddressSlot />);
-    fireEvent.click(document.querySelector("[data-address='up'] button")!);
+    fireEvent.click(document.querySelector(".yohu-files__up button")!);
     expect(fieldHost()).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
   });
@@ -123,7 +125,7 @@ describe("AddressSlot", () => {
   });
 
   it("api.open 打开同一格输入", () => {
-    let api: AddressSlotApi | undefined;
+    let api: YoAddressFieldApi | undefined;
     render(() => <AddressSlot api={(slot) => { api = slot; }} />);
     expect(api).toBeTruthy();
     api!.open();

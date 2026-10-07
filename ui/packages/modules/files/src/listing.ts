@@ -6,6 +6,7 @@
 import { createStore } from "solid-js/store";
 
 import {
+  selectedSerial,
   filesCreate,
   filesDelete,
   filesList,
@@ -13,23 +14,29 @@ import {
   filesSessionAttach,
   filesSessionDetach,
   DEFAULT_BROWSE_ROOT,
+  entryIsFile,
+  isCancelledError,
+  parentWithinSafety,
   YoLog,
 } from "@yohu/api";
 import type { RemoteEntry } from "@yohu/api";
 import {
   nextKeys,
   setColWidth as applyColWidth,
+  trimmedTextPresent,
   type SelectMode,
 } from "@yohu/ui";
 
-import { filesFaultText, isCancelledError } from "./fault";
+import { caughtFaultLine, faultLine, filesFaultText, joinFaultLines } from "./fault";
 import {
   DEFAULT_SORT_DIR,
   FILE_COLUMNS,
   defaultFileColWidths,
   childPath,
-  parentWithinSafety,
+  entryOpensAsDir,
+  sortDirIsAsc,
   sortEntries,
+  type ChildPathResult,
   type ListingEntry,
   type SortDir,
   type SortKey,
@@ -40,8 +47,23 @@ import { resolveRemotePath } from "./path-resolve";
 export type ListingReason = "bind" | "attach" | "user" | "mutate" | "transfer";
 export type ListingCommit = "stay" | "now" | "on-ok";
 
+/** 成功或失败都留在当前路径。冷启动、选区修剪和失败回放都认这一把。 */
+export function listingCommitStays(commit: ListingCommit): boolean {
+  return commit === "stay";
+}
+
+/** 请求一开始就改地址，失败再退回。 */
+export function listingCommitNow(commit: ListingCommit): boolean {
+  return commit === "now";
+}
+
 /** 传输终态合并 list，不跟每张卡绑一次。 */
 export const TRANSFER_LISTING_MS = 300;
+
+/** 还没有浏览世代。拉清单、卸会话、拖出都问这里。 */
+export function browseGenerationAbsent(generation: number): boolean {
+  return generation === 0;
+}
 
 export function listingEntryFromWire(entry: RemoteEntry): ListingEntry {
   return {
@@ -81,13 +103,120 @@ export function createListingStore() {
   let listGen = 0;
   let sessionGen = 0;
   /** core `BrowseAttach.generation`；0 = 未 attach。与 sessionGen（视图世代）独立。 */
-  let coreGeneration = 0;
-  let viewAttached = false;
+  let coreGeneration: number;
+  let viewAttached: boolean;
   let transferListTimer: number | undefined;
   const dirCache = new Map<string, ListingEntry[]>();
 
   const serial = (): string | null => session.serial;
   const generation = (): number => coreGeneration;
+
+  function markWarm(): void {
+    setSession("cold", false);
+  }
+
+  function markCold(): void {
+    setSession("cold", true);
+  }
+
+  function markIdle(): void {
+    setSession("loading", false);
+  }
+
+  function markBusy(): void {
+    setSession("loading", true);
+  }
+
+  function clearEntries(): void {
+    setEntries([]);
+  }
+
+  function bumpSessionGen(): void {
+    sessionGen += 1;
+  }
+
+  function bumpListGen(): void {
+    listGen += 1;
+  }
+
+  function clearCoreGeneration(): void {
+    coreGeneration = 0;
+  }
+
+  function sessionGenStale(gen: number): boolean {
+    return gen !== sessionGen;
+  }
+
+  function listGenStale(gen: number): boolean {
+    return gen !== listGen;
+  }
+
+  function clearDirCache(): void {
+    dirCache.clear();
+  }
+
+  function pickedSerial(): ReturnType<typeof selectedSerial> {
+    return selectedSerial(serial());
+  }
+
+  function markViewDetached(): void {
+    viewAttached = false;
+  }
+
+  function markViewAttached(): void {
+    viewAttached = true;
+  }
+
+  function showTargetPath(target: string): void {
+    setSession("path", target);
+  }
+
+  function childAt(name: string): ChildPathResult {
+    return childPath(session.path, name);
+  }
+
+  function showEntries(next: ListingEntry[]): void {
+    setEntries(next);
+  }
+
+  function forgetTransferTimer(): void {
+    transferListTimer = undefined;
+  }
+
+  function paintCached(cached: ListingEntry[] | undefined): void {
+    paintSnapshot(cached);
+  }
+
+  function readSessionGen(): number {
+    const gen = sessionGen;
+    return gen;
+  }
+
+  function readCoreGeneration(): number {
+    const prevGen = coreGeneration;
+    return prevGen;
+  }
+
+  function clearListedError(): void {
+    notifyError("");
+  }
+
+  function selectionNames(): string[] {
+    return listingStore.selection.names;
+  }
+
+  function childPathRejected(child: ChildPathResult): child is Extract<ChildPathResult, { ok: false }> {
+    return !child.ok;
+  }
+
+  function pickRejected(
+    picked: { ok: true; serial: string } | { ok: false; reason: string },
+  ): picked is { ok: false; reason: string } {
+    return !picked.ok;
+  }
+
+  markViewDetached();
+  clearCoreGeneration();
 
   function clearSelection(): void {
     setSelection({ names: [], pivot: null });
@@ -103,10 +232,16 @@ export function createListingStore() {
     if (message && viewAttached) setSession("errorTick", session.errorTick + 1);
   }
 
+  function notifyCaught(e: unknown): string {
+    const message = filesFaultText(e);
+    notifyError(message);
+    return message;
+  }
+
   function cancelTransferListing(): void {
     if (transferListTimer === undefined) return;
     window.clearTimeout(transferListTimer);
-    transferListTimer = undefined;
+    forgetTransferTimer();
   }
 
   function snapshotOf(serial: string, path: string): ListingEntry[] | undefined {
@@ -127,74 +262,74 @@ export function createListingStore() {
     reason?: ListingReason,
   ): Promise<boolean> {
     cancelTransferListing();
-    const current = serial();
-    if (!current) {
-      if (commit === "stay") {
-        setEntries([]);
-        setSession("cold", false);
-      } else notifyError("未选择设备");
+    const picked = pickedSerial();
+    if (pickRejected(picked)) {
+      if (listingCommitStays(commit)) {
+        clearEntries();
+        markWarm();
+      } else notifyError(picked.reason);
       return false;
     }
-    if (coreGeneration === 0) {
+    const current = picked.serial;
+    if (browseGenerationAbsent(coreGeneration)) {
       return false;
     }
     const gen = ++listGen;
     const pathBefore = session.path;
     const cached = snapshotOf(current, target);
-    if (commit === "now" && target !== session.path) {
-      setSession("path", target);
+    if (listingCommitNow(commit) && target !== session.path) {
+      showTargetPath(target);
       clearSelection();
-      paintSnapshot(cached);
-      setSession("cold", false);
-    } else if (commit === "stay" && (reason === "bind" || reason === "attach")) {
+      paintCached(cached);
+      markWarm();
+    } else if (listingCommitStays(commit) && (reason === "bind" || reason === "attach")) {
       if (cached) {
-        paintSnapshot(cached);
-        setSession("cold", false);
+        paintCached(cached);
+        markWarm();
       } else {
-        setEntries([]);
-        setSession("cold", true);
+        clearEntries();
+        markCold();
       }
     } else {
-      setSession("cold", false);
+      markWarm();
     }
-    setSession("loading", true);
+    markBusy();
     try {
       const list = await filesList(current, target, coreGeneration);
-      if (gen !== listGen) return false;
+      if (listGenStale(gen)) return false;
       const next = sortEntries(list.map(listingEntryFromWire), sort.key, sort.dir);
       remember(current, target, next);
       if (commit === "on-ok" && target !== session.path) {
-        setSession("path", target);
+        showTargetPath(target);
         clearSelection();
       }
-      setEntries(next);
-      setSession("cold", false);
-      if (reason !== "mutate") notifyError("");
+      showEntries(next);
+      markWarm();
+      if (reason !== "mutate") clearListedError();
       YoLog.info("files", "浏览", { serial: current, path: target, count: list.length });
-      if (commit === "stay") {
+      if (listingCommitStays(commit)) {
         const alive = new Set(list.map((e) => e.name));
         setSelection("names", selection.names.filter((n) => alive.has(n)));
       }
       return true;
     } catch (e) {
-      if (gen !== listGen) return false;
+      if (listGenStale(gen)) return false;
       if (isCancelledError(e)) return false;
-      const message = filesFaultText(e);
-      notifyError(message);
+      const message = notifyCaught(e);
       YoLog.error("files", "浏览失败", { path: target, error: message });
-      if (commit === "now" && target !== pathBefore) {
+      if (listingCommitNow(commit) && target !== pathBefore) {
         setSession("path", pathBefore);
         clearSelection();
         paintSnapshot(snapshotOf(current, pathBefore));
-      } else if (commit === "stay") {
+      } else if (listingCommitStays(commit)) {
         const keep = snapshotOf(current, session.path);
         if (keep) paintSnapshot(keep);
-        else setEntries([]);
+        else clearEntries();
       }
-      setSession("cold", false);
+      markWarm();
       return false;
     } finally {
-      if (gen === listGen) setSession("loading", false);
+      if (gen === listGen) markIdle();
     }
   }
 
@@ -202,7 +337,7 @@ export function createListingStore() {
     if (reason === "transfer") {
       if (transferListTimer !== undefined) return true;
       transferListTimer = window.setTimeout(() => {
-        transferListTimer = undefined;
+        forgetTransferTimer();
         void loadListing(session.path, "stay", "transfer");
       }, TRANSFER_LISTING_MS);
       return true;
@@ -214,22 +349,22 @@ export function createListingStore() {
   async function attachCore(serial: string, gen: number): Promise<boolean> {
     try {
       const attach = await filesSessionAttach(serial);
-      if (gen !== sessionGen) {
+      if (sessionGenStale(gen)) {
         detachCore(serial, attach.generation);
         return false;
       }
       coreGeneration = attach.generation;
       return true;
     } catch (e) {
-      if (gen !== sessionGen) return false;
-      notifyError(filesFaultText(e));
-      YoLog.error("files", "浏览会话失败", { serial, error: filesFaultText(e) });
+      if (sessionGenStale(gen)) return false;
+      const message = notifyCaught(e);
+      YoLog.error("files", "浏览会话失败", { serial, error: message });
       return false;
     }
   }
 
   function detachCore(serial: string | null, generation: number): void {
-    if (!serial || generation === 0) return;
+    if (!serial || browseGenerationAbsent(generation)) return;
     void filesSessionDetach(serial, generation).catch((e) => {
       YoLog.warn("files", "关闭浏览会话失败", { serial, error: filesFaultText(e) });
     });
@@ -241,70 +376,70 @@ export function createListingStore() {
     const changed = next !== prev;
     setSession("serial", next);
     if (!next) {
-      const prevGen = coreGeneration;
-      sessionGen += 1;
-      listGen += 1;
+      const prevGen = readCoreGeneration();
+      bumpSessionGen();
+      bumpListGen();
       cancelTransferListing();
-      dirCache.clear();
-      setEntries([]);
+      clearDirCache();
+      clearEntries();
       clearFault();
       clearSelection();
-      setSession("loading", false);
-      setSession("cold", false);
-      viewAttached = false;
-      coreGeneration = 0;
+      markIdle();
+      markWarm();
+      markViewDetached();
+      clearCoreGeneration();
       detachCore(prev, prevGen);
       return;
     }
     if (!changed) return;
-    sessionGen += 1;
-    listGen += 1;
-    const gen = sessionGen;
-    const prevGen = coreGeneration;
-    coreGeneration = 0;
+    bumpSessionGen();
+    bumpListGen();
+    const gen = readSessionGen();
+    const prevGen = readCoreGeneration();
+    clearCoreGeneration();
     cancelTransferListing();
     clearFault();
     if (prev) detachCore(prev, prevGen);
-    dirCache.clear();
+    clearDirCache();
     setSession("path", DEFAULT_BROWSE_ROOT);
-    setSession("cold", true);
-    setSession("loading", true);
+    markCold();
+    markBusy();
     clearSelection();
-    viewAttached = true;
+    markViewAttached();
     void (async () => {
       if (!(await attachCore(next, gen))) {
         if (gen === sessionGen) {
-          setSession("loading", false);
-          setSession("cold", false);
+          markIdle();
+          markWarm();
         }
         return;
       }
-      if (gen !== sessionGen) return;
+      if (sessionGenStale(gen)) return;
       await requestListing("bind");
     })();
   }
 
   function attachView(): void {
     if (!session.serial || viewAttached) return;
-    viewAttached = true;
-    sessionGen += 1;
-    const gen = sessionGen;
+    markViewAttached();
+    bumpSessionGen();
+    const gen = readSessionGen();
     const current = session.serial;
     void (async () => {
       if (!(await attachCore(current, gen))) return;
-      if (gen !== sessionGen) return;
+      if (sessionGenStale(gen)) return;
       await requestListing("attach");
     })();
   }
 
   function detachView(): void {
-    viewAttached = false;
-    sessionGen += 1;
-    listGen += 1;
+    markViewDetached();
+    bumpSessionGen();
+    bumpListGen();
     cancelTransferListing();
     clearFault();
     detachCore(session.serial, coreGeneration);
-    coreGeneration = 0;
+    clearCoreGeneration();
   }
 
   async function refresh(): Promise<boolean> {
@@ -317,7 +452,14 @@ export function createListingStore() {
   }
 
   async function enterDirectory(name: string): Promise<void> {
-    await navigate(childPath(session.path, name));
+    const found = entries.find((item) => item.name === name);
+    if (!found || !entryOpensAsDir(found.kind)) return;
+    const child = childAt(name);
+    if (childPathRejected(child)) {
+      notifyError(child.reason);
+      return;
+    }
+    await navigate(child.path);
   }
 
   async function goUp(): Promise<void> {
@@ -334,12 +476,13 @@ export function createListingStore() {
     return loadListing(resolved.path, "on-ok");
   }
 
-  async function mutate(op: (serial: string) => Promise<void>, dropNames?: string[]): Promise<void> {
-    const current = serial();
-    if (!current) {
-      notifyError("未选择设备");
+  async function mutate(op: (serial: string) => Promise<void | string>, dropNames?: string[]): Promise<void> {
+    const picked = pickedSerial();
+    if (pickRejected(picked)) {
+      notifyError(picked.reason);
       return;
     }
+    const current = picked.serial;
     if (dropNames && dropNames.length > 0) {
       const drop = new Set(dropNames);
       const kept = entries.filter((entry) => !drop.has(entry.name));
@@ -350,10 +493,10 @@ export function createListingStore() {
     }
     setSession("mutating", true);
     try {
-      await op(current);
-      notifyError("");
+      const fault = await op(current);
+      notifyError(fault ?? "");
     } catch (e) {
-      notifyError(filesFaultText(e));
+      notifyCaught(e);
     } finally {
       setSession("mutating", false);
       await requestListing("mutate");
@@ -361,40 +504,58 @@ export function createListingStore() {
   }
 
   async function removeMany(names: string[]): Promise<void> {
-    const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+    const unique = [...new Set(names.map((n) => n.trim()).filter(trimmedTextPresent))];
     if (unique.length === 0) return;
     await mutate(async (current) => {
       const failures: string[] = [];
       for (const name of unique) {
+        const child = childAt(name);
+        if (childPathRejected(child)) {
+          failures.push(faultLine(name, child.reason));
+          continue;
+        }
         try {
-          await filesDelete({ serial: current, path: childPath(session.path, name) });
+          await filesDelete({ serial: current, path: child.path });
         } catch (e) {
-          failures.push(`${name}: ${filesFaultText(e)}`);
+          failures.push(caughtFaultLine(name, e));
         }
       }
-      if (failures.length > 0) throw new Error(failures.join("；"));
+      return joinFaultLines(failures);
     }, unique);
   }
 
-  async function mkdir(name: string): Promise<void> {
+  async function mutateNewEntry(
+    name: string,
+    write: (serial: string, path: string) => Promise<void>,
+  ): Promise<void> {
     await mutate(async (current) => {
-      await filesMkdir({ serial: current, path: childPath(session.path, name.trim()) });
+      const child = childPath(session.path, name.trim());
+      if (childPathRejected(child)) return child.reason;
+      await write(current, child.path);
     });
+  }
+
+  async function mkdir(name: string): Promise<void> {
+    await mutateNewEntry(name, (serial, path) => filesMkdir({ serial, path }));
   }
 
   async function createFile(name: string): Promise<void> {
-    await mutate(async (current) => {
-      await filesCreate({ serial: current, path: childPath(session.path, name.trim()) });
-    });
+    await mutateNewEntry(name, (serial, path) => filesCreate({ serial, path }));
   }
 
   function setSort(key: SortKey): void {
-    const dir: SortDir = sort.key === key ? (sort.dir === "asc" ? "desc" : "asc") : DEFAULT_SORT_DIR[key];
+    const dir: SortDir = sort.key === key ? (sortDirIsAsc(sort.dir) ? "desc" : "asc") : DEFAULT_SORT_DIR[key];
     setSortState({ key, dir });
     const next = sortEntries(entries, key, dir);
-    setEntries(next);
+    showEntries(next);
     const current = serial();
     if (current) remember(current, session.path, next);
+  }
+
+  /** 拖出和行上菜单：这一行已在选择里就保持整组，否则换成这一行。 */
+  function selectGestureTarget(name: string): void {
+    if (selectedSet().has(name)) return;
+    select(name, "replace");
   }
 
   function select(name: string, mode: SelectMode): void {
@@ -431,7 +592,7 @@ export function createListingStore() {
 
   const singleFile = (): ListingEntry | undefined => {
     const only = selectedEntries()[0];
-    return selectedEntries().length === 1 && only?.kind === "file" ? only : undefined;
+    return selectedEntries().length === 1 && only && entryIsFile(only.kind) ? only : undefined;
   };
 
   return {
@@ -452,6 +613,7 @@ export function createListingStore() {
     mkdir,
     createFile,
     setSort,
+    selectGestureTarget,
     select,
     selectAll,
     clearSelection,
@@ -463,7 +625,12 @@ export function createListingStore() {
     serial,
     generation,
     notifyError,
+    notifyCaught,
     requestListing,
+    clearListedError,
+    selectionNames,
+    childPathRejected,
+    pickRejected,
   };
 }
 

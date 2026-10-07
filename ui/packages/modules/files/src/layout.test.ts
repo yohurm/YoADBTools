@@ -1,10 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { Density, setDensity } from "@yohu/ui";
-
-import { controlRowHeight } from "./layout";
+import { Density, controlRowHeight, setDensity } from "@yohu/ui";
 
 function loadFilesCss(): string {
   const candidates = [
@@ -22,6 +21,23 @@ function loadFilesCss(): string {
 const filesCss = loadFilesCss();
 
 describe("文件表头布局契约", () => {
+  it("列架盒子归 YoColFrame，模块不改它的伸缩和高度", () => {
+    const table = [
+      resolve(process.cwd(), "src/FileTable.tsx"),
+      resolve(process.cwd(), "packages/modules/files/src/FileTable.tsx"),
+    ]
+      .map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : ""))
+      .find(Boolean) ?? "";
+    expect(table).not.toContain('class="yohu-files__table"');
+    expect(filesCss).not.toContain(".yohu-files__table {");
+    expect(filesCss).toContain(".yohu-files__table-list");
+    expect(table).toContain('class="yohu-files__cols--head"');
+    expect(table).not.toContain("yohu-files__cols yohu-files__cols--head");
+    expect(filesCss).not.toMatch(/\.yohu-files__cols--head\s*\{[^}]*height:/);
+    expect(filesCss).not.toMatch(/\.yohu-files__cols--head\s*\{[^}]*flex-shrink:/);
+    expect(filesCss).not.toMatch(/\.yohu-files__cols--head\s*\{[^}]*align-items:/);
+  });
+
   it("清单行不承担左右 padding，避免把首列悬浮片推离左缘", () => {
     expect(filesCss).toMatch(/\.yohu-files__cols\s*\{[^}]*padding:\s*0/);
     expect(filesCss).not.toMatch(/\.yohu-files__cols\s*\{[^}]*padding:[^;}]*space-/);
@@ -68,6 +84,15 @@ describe("文件表头布局契约", () => {
     expect(filesCss).not.toContain("container-type");
     expect(filesCss).not.toContain(".yohu-text-field");
     expect(filesCss).not.toContain(".yohu-address");
+    expect(filesCss).not.toContain("data-address");
+    const slotCandidates = [
+      resolve(process.cwd(), "src/AddressSlot.tsx"),
+      resolve(process.cwd(), "packages/modules/files/src/AddressSlot.tsx"),
+    ];
+    const slot =
+      slotCandidates.map((path) => (existsSync(path) ? readFileSync(path, "utf-8") : "")).find(Boolean) ?? "";
+    expect(slot).toContain('class="yohu-files__up"');
+    expect(slot).not.toContain("data-address");
   });
 
   it("拖入高亮走 YoPanel edge + VirtualList hotKey，模块不写行铬", () => {
@@ -82,6 +107,8 @@ describe("文件表头布局契约", () => {
     expect(table).not.toContain("FileTableBind");
     expect(table).not.toContain("yohu-files__row--drop");
     expect(filesCss).not.toContain(".yohu-files__row--drop");
+    expect(filesCss).not.toMatch(/\.yohu-files__row\s*\{[^}]*height:/);
+    expect(filesCss).not.toMatch(/\.yohu-files__row\s*\{[^}]*user-select:/);
     expect(filesCss).not.toContain("yohu-files__explorer-pane--drop");
     expect(filesCss).not.toContain("--yohu-corner-edge");
     expect(filesCss).not.toMatch(/\.yohu-files__explorer--drop\s*\{[^}]*outline:/);
@@ -97,7 +124,12 @@ describe("文件表头布局契约", () => {
 });
 
 describe("文件清单行高", () => {
-  it("与日志 controlRowHeight 同池", () => {
+  it("跟密度入口的控件高，模块不再自备一份", () => {
+    const copies = [
+      resolve(process.cwd(), "src/layout.ts"),
+      resolve(process.cwd(), "packages/modules/files/src/layout.ts"),
+    ];
+    expect(copies.some((path) => existsSync(path))).toBe(false);
     setDensity("compact");
     expect(controlRowHeight()).toBe(Density.Compact.controlHeight);
     setDensity("comfortable");
@@ -192,6 +224,10 @@ describe("预览图标尺寸", () => {
     expect(previewPane).toContain('overflow="hidden"');
     expect(previewPane).toContain("YoEmptyState");
     expect(previewPane).toContain("YoScroller");
+    expect(previewPane).not.toContain("yohu-files__preview-scroll");
+    expect(filesCss).not.toContain(".yohu-files__preview-scroll");
+    expect(filesCss).not.toMatch(/\.yohu-files__preview\s*\{[^}]*height:/);
+    expect(filesCss).not.toMatch(/\.yohu-files__preview\s*\{[^}]*min-height:/);
     expect(previewPane).toContain("YoDescriptionList");
     expect(previewPane).not.toContain("<dl");
     expect(previewPane).not.toContain("yohu-files__preview-empty");
@@ -225,6 +261,14 @@ describe("页眉按钮样式", () => {
     expect(chrome).toContain('buttonStyle="normal" tone="neutral"');
     expect(chrome).not.toContain('buttonStyle="textual"');
     expect(chrome).toContain("togglePreview");
+    expect(chrome).toContain("previewToggleLabel");
+    expect(fileView).not.toContain("收起预览");
+    expect(previewPane).toContain("PREVIEW_TITLE");
+    expect(previewPane).toContain("PREVIEW_COLLAPSE");
+    expect(previewPane).not.toContain('title="收起预览"');
+    expect(previewPane).toContain('fileColumnHeader("type")');
+    expect(previewPane).toContain('fileColumnHeader("size")');
+    expect(previewPane).toContain('term: "修改时间"');
   });
 });
 
@@ -284,7 +328,15 @@ describe("官方拖放契约", () => {
     expect(fileView).not.toContain('querySelector(".yohu-virtual-list")');
     expect(fileView).not.toContain("files.dropIn");
     expect(fileView).not.toContain("ondrop=");
-    expect(fileView).toContain('edge={dropHot() ? "drop" : undefined}');
+    expect(fileView).toContain("edge={panelHotEdge(dropHot())}");
+    const dropEdge = '? "drop" : undefined';
+    const filesRoot = dirname(fileURLToPath(import.meta.url));
+    const dropEdgeOffenders = filesModuleSources(filesRoot).filter((file) => {
+      let text = readFileSync(file, "utf8");
+      if (file.includes(".test.")) text = text.replaceAll(dropEdge, "");
+      return text.includes(dropEdge);
+    });
+    expect(dropEdgeOffenders).toEqual([]);
     expect(fileView).not.toContain("explorer-pane--drop");
     expect(fileView).not.toContain("yohu-files__explorer-pane");
     expect(fileView).not.toContain("deviceLabel");
@@ -298,9 +350,12 @@ describe("官方拖放契约", () => {
     expect(dropSessionSrc).toContain("host.listOffset()");
     expect(dropSrc).not.toContain("list.scrollTop");
     expect(dropSessionSrc).toContain("dropCommit");
-    expect(dropSessionSrc).toContain("devicePixelRatio");
+    expect(dropSessionSrc).toContain("hostPixelRatio()");
+    expect(dropSessionSrc).not.toContain("window.devicePixelRatio");
     expect(dropSessionSrc).toContain("requestAnimationFrame");
-    expect(dropSessionSrc).toContain("onNativeDragDrop");
+    expect(dropSessionSrc).toContain("bindNativeDragDrop");
+    expect(dropSessionSrc).toContain("NATIVE_DRAG_SUBSCRIBE_FAILED");
+    expect(dropSessionSrc).not.toContain("订阅官方拖放失败");
     expect(dropSessionSrc).toContain("event.position");
     expect(dropSessionSrc).not.toContain("readFolderTargets");
     expect(dropSessionSrc).not.toContain("destDirName(");
@@ -415,8 +470,13 @@ describe("确认删除多文件契约", () => {
     expect(createDialog).toContain("finishCreate");
     expect(createDialog).toContain("open={createOpen}");
     expect(createDialog).not.toContain("open={() => createKind() !== null}");
-    expect(createDialog).toContain('title={createKind() === "dir" ? "新建目录" : "新建文件"}');
-    expect(createDialog).toContain('ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}');
+    expect(createDialog).toContain("createKindTitle");
+    expect(createDialog).toContain("createKindSeed");
+    expect(createDialog).toContain("createKindFieldLabel");
+    expect(createDialog).toContain('fileColumnHeader("name")');
+    expect(createDialog).not.toContain('label="名称"');
+    expect(createDialog).not.toContain('title={createKind() === "dir" ? "新建目录" : "新建文件"}');
+    expect(createDialog).not.toContain('ariaLabel={createKind() === "dir" ? "新目录名" : "新文件名"}');
     const closeBlock = createDialog.slice(createDialog.indexOf("const closeCreate"), createDialog.indexOf("const finishCreate"));
     expect(closeBlock).toContain("setCreateOpen(false)");
     expect(closeBlock).not.toContain("setCreateKind");
@@ -425,9 +485,9 @@ describe("确认删除多文件契约", () => {
     const finishBlock = createDialog.slice(createDialog.indexOf("const finishCreate"), createDialog.indexOf("const openCreate"));
     expect(finishBlock).toContain("setCreateKind(null)");
     expect(finishBlock).toContain("setCreateName");
-    expect(finishBlock).toContain("setCreateError");
+    expect(finishBlock).toContain("clearCreateError");
     const confirmBlock = createDialog.slice(createDialog.indexOf("const confirmCreate"), createDialog.indexOf("props.api"));
-    expect(confirmBlock).toContain("setCreateOpen(false)");
+    expect(confirmBlock).toContain("closeCreate()");
     expect(confirmBlock).not.toContain("setCreateKind");
   });
 
@@ -476,6 +536,39 @@ describe("确认删除多文件契约", () => {
   });
 });
 
+/** 开着省略、关掉写成 true。先从测试源码剥掉针，再扫生产源码。 */
+const CLOSED_TERNARY = "? true : undefined";
+
+function filesModuleSources(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = resolve(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesModuleSources(path));
+    else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) out.push(path);
+  }
+  return out;
+}
+
+describe("关掉写成 true", () => {
+  it("预览槽只调 closedAttr，生产源不再手写开合省略", () => {
+    expect(fileView).toContain("inert={closedAttr(previewShown())}");
+    const root = dirname(fileURLToPath(import.meta.url));
+    const offenders = filesModuleSources(root).filter((file) => {
+      let text = readFileSync(file, "utf8");
+      if (file.includes(".test.")) text = text.replaceAll(CLOSED_TERNARY, "");
+      return text.includes(CLOSED_TERNARY);
+    });
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("新建草稿名裁空白只写一处", () => {
+  it("create_draft_name_once", () => {
+    const src = loadCreateDialog();
+    expect(src.split("createName().trim()").length - 1).toBe(1);
+  });
+});
+
 describe("磁盘幽灵", () => {
   it("address-edit / TransferPanel / TransferDock / store / progress 已不在磁盘", () => {
     const names = [
@@ -497,5 +590,12 @@ describe("磁盘幽灵", () => {
       ];
       expect(candidates.some((path) => existsSync(path)), name).toBe(false);
     }
+  });
+});
+
+describe("投放提交走当前清单", () => {
+  it("drop_uses_push_dest", () => {
+    expect(fileView).not.toContain("pushLocals(paths, listingStore.session.path)");
+    expect(fileView).toContain("pushLocals(paths)");
   });
 });

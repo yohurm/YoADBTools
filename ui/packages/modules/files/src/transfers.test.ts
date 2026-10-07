@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BrowseAttach, RemoteEntry } from "@yohu/api";
@@ -117,5 +121,21 @@ describe("拖出世代", () => {
     expect(mocks.filesDragOut).not.toHaveBeenCalled();
     expect(listingStore.session.error).toBe("");
     releaseAttach({ serial: "S1", generation: 1, adopted: false });
+  });
+});
+
+describe("批量传输未选设备只提示一次", () => {
+  it("require_listing_serial_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "transfers.ts"), "utf8");
+    const needle = "listingStore.notifyError(picked.reason)";
+    expect(src.split(needle).length - 1).toBe(1);
+  });
+});
+
+describe("上传目标目录未指定时用当前清单路径", () => {
+  it("push_dest_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "transfers.ts"), "utf8");
+    const needle = "destDir ?? listingStore.session.path";
+    expect(src.split(needle).length - 1).toBe(1);
   });
 });
