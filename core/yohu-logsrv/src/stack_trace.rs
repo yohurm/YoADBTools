@@ -76,13 +76,17 @@ fn process_line(ctx: &mut Context, line: &str) -> Vec<String> {
     vec![line.to_string()]
 }
 
+fn stack_prefix(line: &str) -> &str {
+    line.trim_start()
+}
+
 fn is_frame_line(line: &str) -> bool {
-    let t = line.trim_start();
+    let t = stack_prefix(line);
     t.starts_with("at ") && t.contains('(') && t.ends_with(')')
 }
 
 fn is_cause_line(line: &str) -> bool {
-    line.trim_start().starts_with("Caused by:")
+    stack_prefix(line).starts_with("Caused by:")
 }
 
 fn elided_count(line: &str) -> Option<usize> {

@@ -50,7 +50,7 @@ impl MessageAssembler {
     }
 
     fn flush(&mut self) -> Option<LogLine> {
-        if self.header.is_none() || self.body.is_empty() {
+        if !self.has_pending() {
             return None;
         }
         let header = self.header.take()?;
@@ -257,5 +257,99 @@ Message 3
             flutter.msg,
             "[2026-09-19T16:09:33.187210] INFO Luci: lifecycle"
         );
+    }
+
+    #[test]
+    fn header_clock_facts_stay_with_their_owners() {
+        let src = include_str!("parse.rs");
+        assert!(!src.contains("fn is_zone_token"));
+        assert!(!src.contains("b'+' | b'-'"));
+        assert!(!src.contains("fn is_ymd"));
+        assert!(!src.contains("'V' | 'D' | 'I' | 'W' | 'E' | 'F'"));
+    }
+
+    fn without_fn(src: &str, name: &str) -> String {
+        let marker = format!("fn {name}");
+        let mut kept = String::new();
+        let mut body = String::new();
+        let mut dropping = false;
+        let mut depth = 0i32;
+        let mut seen_brace = false;
+        for line in src.lines() {
+            if !dropping && line.contains(&marker) {
+                dropping = true;
+                depth = 0;
+                seen_brace = false;
+                body.clear();
+            }
+            if dropping {
+                body.push_str(line);
+                body.push('\n');
+                depth += line.matches('{').count() as i32;
+                depth -= line.matches('}').count() as i32;
+                if line.contains('{') {
+                    seen_brace = true;
+                }
+                if seen_brace && depth <= 0 {
+                    dropping = false;
+                }
+                continue;
+            }
+            kept.push_str(line);
+            kept.push('\n');
+        }
+        let _ = body;
+        kept
+    }
+
+    fn fn_text(src: &str, name: &str) -> String {
+        let marker = format!("fn {name}");
+        let mut body = String::new();
+        let mut dropping = false;
+        let mut depth = 0i32;
+        let mut seen_brace = false;
+        for line in src.lines() {
+            if !dropping && line.contains(&marker) {
+                dropping = true;
+                depth = 0;
+                seen_brace = false;
+            }
+            if dropping {
+                body.push_str(line);
+                body.push('\n');
+                depth += line.matches('{').count() as i32;
+                depth -= line.matches('}').count() as i32;
+                if line.contains('{') {
+                    seen_brace = true;
+                }
+                if seen_brace && depth <= 0 {
+                    break;
+                }
+            }
+        }
+        assert!(body.contains(&marker), "{name}");
+        body
+    }
+
+    #[test]
+    fn cut_log_parse_and_follow_stay_with_owner() {
+        let src = include_str!("parse.rs");
+        let ymd = fn_text(src, "take_ymd");
+        let md = fn_text(src, "take_md");
+        assert!(!ymd.contains("split_once"));
+        assert!(!ymd.contains("trim_start"));
+        assert!(!md.contains("split_once"));
+        assert!(!md.contains("trim_start"));
+        let digits = without_fn(src, "all_ascii_digits");
+        assert!(!digits.contains("is_ascii_digit"));
+
+        let follow = without_fn(include_str!("follow.rs"), "admit_line");
+        assert!(!follow.contains("skip_resume(known"));
+        assert!(!follow.contains("line.ts != known.ts"));
+        assert!(!include_str!("follow.rs").contains("skip_resume(s, &line)"));
+        assert!(!include_str!("follow.rs").contains("line.ts != s.ts"));
+
+        let stack = without_fn(include_str!("stack_trace.rs"), "stack_prefix");
+        assert!(!stack.contains("trim_start()"));
     }
 }

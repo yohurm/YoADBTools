@@ -26,12 +26,15 @@ use yohu_protocol::{
 pub enum LogError {
     #[error("采集已取消")]
     Cancelled,
-    #[error("采集失败: {0}")]
+    /// 运输失败。句子就是 `AdbError` 的句子，不再加前缀。
+    #[error(transparent)]
     Adb(#[from] yohu_adb::AdbError),
     #[error("导出失败: {0}")]
     Io(#[from] std::io::Error),
     #[error("无法生成导出时间戳")]
     ExportStamp,
+    #[error("未指定导出目录")]
+    ExportDir,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -65,6 +68,35 @@ enum StartDecision {
     Wait,
 }
 
+/// Starting 与 Live 占着采集。Stopping 要等，不在这一把里。
+fn phase_occupies(phase: Phase) -> bool {
+    matches!(phase, Phase::Starting | Phase::Live)
+}
+
+fn phase_is_starting(phase: Phase) -> bool {
+    phase == Phase::Starting
+}
+
+fn phase_is_stopping(phase: Phase) -> bool {
+    phase == Phase::Stopping
+}
+
+fn same_generation(slot_generation: u64, expected: u64) -> bool {
+    slot_generation == expected
+}
+
+async fn join_workers(
+    capture: Option<tokio::task::JoinHandle<()>>,
+    index: Option<tokio::task::JoinHandle<()>>,
+) {
+    if let Some(handle) = capture {
+        join_or_abort(handle).await;
+    }
+    if let Some(handle) = index {
+        join_or_abort(handle).await;
+    }
+}
+
 fn remember_and_remove(inner: &mut Inner, serial: &str) -> Option<CaptureSlot> {
     let slot = inner.captures.remove(serial)?;
     inner
@@ -86,6 +118,10 @@ pub struct CaptureService {
 }
 
 impl CaptureService {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().expect("capture lock poisoned")
+    }
+
     pub fn new(
         adb: Arc<AdbClient>,
         sink: mpsc::Sender<AppEvent>,
@@ -97,7 +133,7 @@ impl CaptureService {
             adb,
             index,
             sink,
-            ring_capacity: AtomicUsize::new(ring_capacity.max(1)),
+            ring_capacity: AtomicUsize::new(crate::ring::ring_capacity(ring_capacity)),
             inner: Mutex::new(Inner {
                 rings: HashMap::new(),
                 captures: HashMap::new(),
@@ -110,12 +146,13 @@ impl CaptureService {
     }
 
     pub fn set_ring_capacity(&self, capacity: usize) {
-        self.ring_capacity.store(capacity.max(1), Ordering::Relaxed);
+        self.ring_capacity
+            .store(crate::ring::ring_capacity(capacity), Ordering::Relaxed);
     }
 
     pub(crate) fn ring(&self, serial: &str) -> Arc<RingBuffer> {
         let cap = self.ring_capacity.load(Ordering::Relaxed);
-        let mut inner = self.inner.lock().expect("capture lock poisoned");
+        let mut inner = self.lock_inner();
         inner
             .rings
             .entry(serial.to_string())
@@ -136,9 +173,9 @@ impl CaptureService {
     }
 
     pub fn status(&self, serial: &str) -> CaptureStatus {
-        let inner = self.inner.lock().expect("capture lock poisoned");
+        let inner = self.lock_inner();
         let (capturing, generation) = match inner.captures.get(serial) {
-            Some(slot) if slot.phase == Phase::Starting || slot.phase == Phase::Live => {
+            Some(slot) if phase_occupies(slot.phase) => {
                 (true, slot.generation)
             }
             Some(slot) => (false, slot.generation),
@@ -157,7 +194,7 @@ impl CaptureService {
     }
 
     fn decide_start(&self, serial: &str) -> StartDecision {
-        let mut inner = self.inner.lock().expect("capture lock poisoned");
+        let mut inner = self.lock_inner();
         match inner.captures.get(serial) {
             Some(slot) if slot.phase == Phase::Live => StartDecision::Adopt(CaptureStart {
                 serial: serial.to_string(),
@@ -185,10 +222,10 @@ impl CaptureService {
     }
 
     fn start_must_wait(&self, serial: &str) -> bool {
-        let inner = self.inner.lock().expect("capture lock poisoned");
+        let inner = self.lock_inner();
         matches!(
             inner.captures.get(serial),
-            Some(slot) if slot.phase == Phase::Starting || slot.phase == Phase::Stopping
+            Some(slot) if phase_is_starting(slot.phase) || phase_is_stopping(slot.phase)
         )
     }
 
@@ -261,7 +298,8 @@ impl CaptureService {
         let serial_owned = serial.to_string();
         let follow_cancel = cancel.clone();
         let capture_handle = tokio::spawn(async move {
-            let end = supervise_follow(adb, serial_owned.clone(), ring, batcher, follow_cancel).await;
+            let end =
+                supervise_follow(adb, serial_owned.clone(), ring, batcher, follow_cancel).await;
             if matches!(end, FollowEnd::Offline) {
                 service
                     .release_if_current(&serial_owned, my_generation)
@@ -274,9 +312,9 @@ impl CaptureService {
         let mut capture_handle = Some(capture_handle);
         let mut index_handle = Some(index_handle);
         let published = {
-            let mut inner = self.inner.lock().expect("capture lock poisoned");
+            let mut inner = self.lock_inner();
             match inner.captures.get_mut(serial) {
-                Some(slot) if slot.generation == my_generation && slot.phase == Phase::Starting => {
+                Some(slot) if same_generation(slot.generation, my_generation) && phase_is_starting(slot.phase) => {
                     slot.phase = Phase::Live;
                     slot.capture_handle = capture_handle.take();
                     slot.index_handle = index_handle.take();
@@ -288,12 +326,7 @@ impl CaptureService {
 
         if !published {
             cancel.cancel();
-            if let Some(handle) = capture_handle {
-                join_or_abort(handle).await;
-            }
-            if let Some(handle) = index_handle {
-                join_or_abort(handle).await;
-            }
+            join_workers(capture_handle, index_handle).await;
             return Err(LogError::Cancelled);
         }
         self.changed.notify_waiters();
@@ -308,10 +341,10 @@ impl CaptureService {
     pub async fn stop(&self, serial: &str) {
         let (generation, cap_h, idx_h) = loop {
             let wait = {
-                let mut inner = self.inner.lock().expect("capture lock poisoned");
+                let mut inner = self.lock_inner();
                 match inner.captures.get_mut(serial) {
                     None => return,
-                    Some(slot) if slot.phase == Phase::Stopping => true,
+                    Some(slot) if phase_is_stopping(slot.phase) => true,
                     Some(slot) => {
                         slot.phase = Phase::Stopping;
                         slot.cancel.cancel();
@@ -326,10 +359,10 @@ impl CaptureService {
             if wait {
                 let notified = self.changed.notified();
                 let still_stopping = {
-                    let inner = self.inner.lock().expect("capture lock poisoned");
+                    let inner = self.lock_inner();
                     matches!(
                         inner.captures.get(serial),
-                        Some(slot) if slot.phase == Phase::Stopping
+                        Some(slot) if phase_is_stopping(slot.phase)
                     )
                 };
                 if still_stopping {
@@ -339,19 +372,14 @@ impl CaptureService {
         };
         self.changed.notify_waiters();
 
-        if let Some(handle) = cap_h {
-            join_or_abort(handle).await;
-        }
-        if let Some(handle) = idx_h {
-            join_or_abort(handle).await;
-        }
+        join_workers(cap_h, idx_h).await;
 
         let emit = {
-            let mut inner = self.inner.lock().expect("capture lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner
                 .captures
                 .get(serial)
-                .is_some_and(|slot| slot.generation == generation && slot.phase == Phase::Stopping);
+                .is_some_and(|slot| same_generation(slot.generation, generation) && phase_is_stopping(slot.phase));
             if matches {
                 let _ = remember_and_remove(&mut inner, serial);
                 true
@@ -360,8 +388,7 @@ impl CaptureService {
             }
         };
         if emit {
-            self.emit_state(serial, generation, CaptureState::Stopped)
-                .await;
+            self.publish_stopped(serial, generation).await;
             tracing::info!(serial, generation, "采集停止");
         } else {
             tracing::info!(serial, generation, "采集停止被更新世代取代，丢弃 Stopped");
@@ -374,7 +401,7 @@ impl CaptureService {
     }
 
     pub fn clear(&self, serial: &str) {
-        let inner = self.inner.lock().expect("capture lock poisoned");
+        let inner = self.lock_inner();
         if let Some(ring) = inner.rings.get(serial) {
             ring.clear();
         }
@@ -408,6 +435,11 @@ impl CaptureService {
             .map_err(Into::into)
     }
 
+    async fn publish_stopped(&self, serial: &str, generation: u64) {
+        self.emit_state(serial, generation, CaptureState::Stopped)
+            .await;
+    }
+
     async fn emit_state(&self, serial: &str, generation: u64, state: CaptureState) {
         let _ = self
             .sink
@@ -421,11 +453,11 @@ impl CaptureService {
 
     async fn abandon_starting(&self, serial: &str, generation: u64) {
         let dropped = {
-            let mut inner = self.inner.lock().expect("capture lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner
                 .captures
                 .get(serial)
-                .is_some_and(|slot| slot.generation == generation && slot.phase == Phase::Starting);
+                .is_some_and(|slot| same_generation(slot.generation, generation) && phase_is_starting(slot.phase));
             if matches {
                 let _ = remember_and_remove(&mut inner, serial);
                 true
@@ -434,8 +466,7 @@ impl CaptureService {
             }
         };
         if dropped {
-            self.emit_state(serial, generation, CaptureState::Stopped)
-                .await;
+            self.publish_stopped(serial, generation).await;
             tracing::info!(serial, generation, "采集 Starting 已放弃");
             self.changed.notify_waiters();
         }
@@ -443,10 +474,9 @@ impl CaptureService {
 
     async fn release_if_current(&self, serial: &str, generation: u64) {
         let taken = {
-            let mut inner = self.inner.lock().expect("capture lock poisoned");
+            let mut inner = self.lock_inner();
             let matches = inner.captures.get(serial).is_some_and(|slot| {
-                slot.generation == generation
-                    && (slot.phase == Phase::Live || slot.phase == Phase::Starting)
+                same_generation(slot.generation, generation) && phase_occupies(slot.phase)
             });
             if matches {
                 remember_and_remove(&mut inner, serial)
@@ -456,10 +486,35 @@ impl CaptureService {
         };
         if let Some(slot) = taken {
             slot.cancel.cancel();
-            self.emit_state(serial, generation, CaptureState::Stopped)
-                .await;
+            self.publish_stopped(serial, generation).await;
             tracing::info!(serial, generation, "采集流结束");
             self.changed.notify_waiters();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LogError;
+    use yohu_adb::AdbError;
+
+    #[test]
+    fn adb_display_is_the_transport_sentence() {
+        let err = LogError::Adb(AdbError::ToolUnavailable);
+        assert_eq!(err.to_string(), AdbError::ToolUnavailable.to_string());
+        assert!(!err.to_string().contains("采集失败"));
+    }
+
+    #[test]
+    fn ring_lock_sentence_once() {
+        let owner_line = "self.inner.lock().expect(\"ring lock poisoned\")";
+        let needle = "ring lock poisoned";
+        let src = include_str!("ring.rs");
+        let scanned = match src.split_once("mod tests") {
+            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
+            None => src.to_string(),
+        };
+        let scanned = scanned.replacen(owner_line, "", 1);
+        assert!(!scanned.contains(needle), "{needle}");
     }
 }

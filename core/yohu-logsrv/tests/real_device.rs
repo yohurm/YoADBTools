@@ -30,7 +30,7 @@ async fn online_device(client: &AdbClient) -> Option<String> {
         .ok()?;
     devices
         .into_iter()
-        .find(|d| d.state == yohu_protocol::DeviceState::Online)
+        .find(|d| yohu_domain::device_is_online(d.state))
         .map(|d| d.serial)
 }
 
@@ -44,13 +44,21 @@ fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::Lo
         .lines
 }
 
-fn spawn_event_pump(mut rx: mpsc::Receiver<AppEvent>) -> (Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>, tokio::task::JoinHandle<()>) {
+fn spawn_event_pump(
+    mut rx: mpsc::Receiver<AppEvent>,
+) -> (
+    Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>,
+    tokio::task::JoinHandle<()>,
+) {
     let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
     let collected = Arc::clone(&lines);
     let handle = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             if let AppEvent::LogBatch(payload) = event {
-                collected.lock().expect("event pump").extend(payload.batch.lines);
+                collected
+                    .lock()
+                    .expect("event pump")
+                    .extend(payload.batch.lines);
             }
         }
     });

@@ -13,7 +13,7 @@
 //! 产品采集 `long,uid,year`。不是头返回 `None`（正文）。
 
 use time::{Duration as TimeDuration, OffsetDateTime, UtcOffset};
-use yohu_domain::{canonicalize_datetime, format_datetime, is_log_level_letter};
+use yohu_domain::{canonicalize_datetime, format_datetime, is_log_level_letter, is_zone_token};
 use yohu_protocol::LogLine;
 
 const SYSTEM_LINE_PREFIX: &str = "--------- beginning of ";
@@ -69,16 +69,20 @@ fn take_level_tag(rest: &str) -> Option<(&str, char, String)> {
         return None;
     }
     let raw = level_tok.chars().next()?;
-    Some((before[..level_at].trim(), normalize_header_priority(raw), tag))
+    Some((
+        before[..level_at].trim(),
+        normalize_header_priority(raw),
+        tag,
+    ))
 }
 
-/// AS `LogcatHeaderParser` / ddmlib：头里允许 `[VDIWEAF]`；`F` 映射为 ASSERT（显示 `A`）。
+/// 头里的优先级是大写级别字母，另加 ASSERT `A`。级别表只问 `is_log_level_letter`。
 fn is_header_priority_letter(token: &str) -> bool {
-    matches!(
-        token.chars().next(),
-        Some('V' | 'D' | 'I' | 'W' | 'E' | 'F' | 'A')
-            if token.len() == 1
-    )
+    let mut chars = token.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_uppercase() => is_log_level_letter(token) || c == 'A',
+        _ => false,
+    }
 }
 
 fn normalize_header_priority(raw: char) -> char {
@@ -100,9 +104,11 @@ fn parse_process_ids(ids: &str) -> Option<(Option<String>, u32, u32)> {
         [pid, tid] if !pid.is_empty() && !tid.is_empty() => {
             Some((None, parse_pid(pid), parse_thread_id(tid)))
         }
-        [uid, pid, tid] if !uid.is_empty() && !pid.is_empty() && !tid.is_empty() => {
-            Some((Some((*uid).to_string()), parse_pid(pid), parse_thread_id(tid)))
-        }
+        [uid, pid, tid] if !uid.is_empty() && !pid.is_empty() && !tid.is_empty() => Some((
+            Some((*uid).to_string()),
+            parse_pid(pid),
+            parse_thread_id(tid),
+        )),
         _ => None,
     }
 }
@@ -127,7 +133,10 @@ fn parse_thread_id(s: &str) -> u32 {
     if trimmed.is_empty() {
         return u32::MAX;
     }
-    if let Some(hex) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+    if let Some(hex) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
         return u32::from_str_radix(hex, 16).unwrap_or(u32::MAX);
     }
     trimmed.parse().unwrap_or(u32::MAX)
@@ -139,36 +148,41 @@ fn take_timestamp(inner: &str) -> Option<(String, &str)> {
         .or_else(|| take_epoch(inner))
 }
 
-fn take_ymd(inner: &str) -> Option<(String, &str)> {
+/// 墙钟头是日期、空白、时间、空白、其余。年月日形状和月日形状仍各问各的。
+fn split_date_time(inner: &str) -> Option<(&str, &str, &str)> {
     let (date, rest) = inner.split_once(char::is_whitespace)?;
-    if !is_ymd(date) {
-        return None;
-    }
     let rest = rest.trim_start();
     let (time, rest) = rest.split_once(char::is_whitespace)?;
+    Some((date, time, rest))
+}
+
+fn take_ymd(inner: &str) -> Option<(String, &str)> {
+    let (date, time, rest) = split_date_time(inner)?;
     let ts = canonicalize_datetime(&format!("{date} {time}"))?;
     Some((ts, rest))
 }
 
 fn take_md(inner: &str) -> Option<(String, &str)> {
-    let (date, rest) = inner.split_once(char::is_whitespace)?;
+    let (date, time, rest) = split_date_time(inner)?;
     if !is_md(date) {
         return None;
     }
-    let rest = rest.trim_start();
-    let (time, rest) = rest.split_once(char::is_whitespace)?;
     let year = local_now().year();
     let ts = canonicalize_datetime(&format!("{year:04}-{date} {time}"))?;
     Some((ts, rest))
 }
 
+fn all_ascii_digits(token: &str) -> bool {
+    token.bytes().all(|b| b.is_ascii_digit())
+}
+
 fn take_epoch(inner: &str) -> Option<(String, &str)> {
     let (token, rest) = inner.split_once(char::is_whitespace)?;
     let (sec, milli) = token.split_once('.')?;
-    if sec.is_empty() || !sec.bytes().all(|b| b.is_ascii_digit()) {
+    if sec.is_empty() || !all_ascii_digits(sec) {
         return None;
     }
-    if milli.len() < 3 || !milli.bytes().all(|b| b.is_ascii_digit()) {
+    if milli.len() < 3 || !all_ascii_digits(milli) {
         return None;
     }
     let seconds: i64 = sec.parse().unwrap_or(0);
@@ -187,19 +201,6 @@ fn skip_zone(rest: &str) -> &str {
     } else {
         rest
     }
-}
-
-fn is_zone_token(token: &str) -> bool {
-    matches!(token.as_bytes().first(), Some(b'+' | b'-'))
-        && token.chars().filter(|c| c.is_ascii_digit()).count() >= 4
-}
-
-fn is_ymd(date: &str) -> bool {
-    let mut parts = date.split('-');
-    matches!(
-        (parts.next(), parts.next(), parts.next(), parts.next()),
-        (Some(y), Some(m), Some(d), None) if y.len() == 4 && m.len() == 2 && d.len() == 2
-    )
 }
 
 fn is_md(date: &str) -> bool {
@@ -358,8 +359,7 @@ mod tests {
         let header =
             parse_long_header("[ 2026-01-02 03:04:05.678  1234: 0x2a I/TestTag ]").expect("hex");
         assert_eq!(header.tid, 42);
-        let tight =
-            parse_long_header("[ 1517266949.472 5755:0x100 I/Tag ]").expect("as fixture");
+        let tight = parse_long_header("[ 1517266949.472 5755:0x100 I/Tag ]").expect("as fixture");
         assert_eq!(tight.pid, 5755);
         assert_eq!(tight.tid, 256);
     }
@@ -377,10 +377,9 @@ mod tests {
 
     #[test]
     fn invalid_epoch_seconds_defaults_to_zero() {
-        let header = parse_long_header(
-            "[ 1234567890123456789012345678901234567890.472 5755:601 I/Tag ]",
-        )
-        .expect("header");
+        let header =
+            parse_long_header("[ 1234567890123456789012345678901234567890.472 5755:601 I/Tag ]")
+                .expect("header");
         assert_eq!(header.pid, 5755);
         assert!(header.ts.ends_with(".472") || header.ts.contains("1970"));
     }

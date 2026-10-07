@@ -6,7 +6,7 @@
 //! - 过滤不在本环：导出在 `export` 调 domain `log_filter_matches`
 
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use yohu_protocol::LogLine;
 
@@ -14,6 +14,28 @@ struct State {
     buf: VecDeque<LogLine>,
     next_seq: u64,
     capacity: usize,
+}
+
+/// 环容量至少为 1。采集服务存的也是这一把。
+pub(crate) fn ring_capacity(capacity: usize) -> usize {
+    capacity.max(1)
+}
+
+impl State {
+    fn evict_overflow(&mut self) {
+        while self.buf.len() > self.capacity {
+            self.buf.pop_front();
+        }
+    }
+
+    fn lines_from(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
+        self.buf
+            .iter()
+            .filter(|line| line.seq >= from_seq)
+            .take(limit)
+            .cloned()
+            .collect()
+    }
 }
 
 /// `-T` 续流时要跳过的已入环身份（同一墙钟可有多条）。
@@ -29,8 +51,12 @@ pub(crate) struct RingBuffer {
 }
 
 impl RingBuffer {
+    fn lock_state(&self) -> MutexGuard<'_, State> {
+        self.inner.lock().expect("ring lock poisoned")
+    }
+
     pub(crate) fn new(capacity: usize) -> Self {
-        let capacity = capacity.max(1);
+        let capacity = ring_capacity(capacity);
         Self {
             inner: Mutex::new(State {
                 buf: VecDeque::with_capacity(capacity.min(4096)),
@@ -42,49 +68,33 @@ impl RingBuffer {
 
     /// 下次写入起生效；已超出的旧记录立即从头部淘汰。
     pub(crate) fn set_capacity(&self, capacity: usize) {
-        let capacity = capacity.max(1);
-        let mut state = self.inner.lock().expect("ring lock poisoned");
+        let capacity = ring_capacity(capacity);
+        let mut state = self.lock_state();
         state.capacity = capacity;
-        while state.buf.len() > state.capacity {
-            state.buf.pop_front();
-        }
+        state.evict_overflow();
     }
 
     /// 写入一条 logd 记录（分配 seq）；返回该记录 seq。
     pub(crate) fn push(&self, mut line: LogLine) -> u64 {
-        let mut state = self.inner.lock().expect("ring lock poisoned");
+        let mut state = self.lock_state();
         let seq = state.next_seq;
         line.seq = seq;
         state.buf.push_back(line);
-        while state.buf.len() > state.capacity {
-            state.buf.pop_front();
-        }
+        state.evict_overflow();
         state.next_seq += 1;
         seq
     }
 
-    /// 快照：`seq >= from_seq` 的前 `limit` 条记录（回补用）。
+    /// 快照：从指定序号起的前 `limit` 条记录（回补用）。
     pub(crate) fn snapshot(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
-        let state = self.inner.lock().expect("ring lock poisoned");
-        state
-            .buf
-            .iter()
-            .filter(|l| l.seq >= from_seq)
-            .take(limit)
-            .cloned()
-            .collect()
+        let state = self.lock_state();
+        state.lines_from(from_seq, limit)
     }
 
     /// 从 `from_seq` 取至多 `limit` 条记录；`truncated` 表示环内还有更大 seq。
     pub(crate) fn snapshot_page(&self, from_seq: u64, limit: usize) -> (Vec<LogLine>, bool) {
-        let state = self.inner.lock().expect("ring lock poisoned");
-        let lines: Vec<LogLine> = state
-            .buf
-            .iter()
-            .filter(|l| l.seq >= from_seq)
-            .take(limit)
-            .cloned()
-            .collect();
+        let state = self.lock_state();
+        let lines = state.lines_from(from_seq, limit);
         let ring_last = state.buf.back().map(|l| l.seq);
         let truncated = match (lines.last(), ring_last) {
             (Some(last), Some(newest)) => last.seq < newest,
@@ -95,14 +105,14 @@ impl RingBuffer {
 
     /// 清空缓冲（用户清空 / 设备切换 / 掉线）。
     pub(crate) fn clear(&self) {
-        let mut state = self.inner.lock().expect("ring lock poisoned");
+        let mut state = self.lock_state();
         state.buf.clear();
         // seq 不回退：防止旧批次/旧回补被误判为新数据
     }
 
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
-        self.inner.lock().expect("ring lock poisoned").buf.len()
+        self.lock_state().buf.len()
     }
 
     #[cfg(test)]
@@ -112,13 +122,13 @@ impl RingBuffer {
 
     /// 当前已分配的最大 seq（UI 判断滞后量的参考）。
     pub(crate) fn last_seq(&self) -> u64 {
-        let state = self.inner.lock().expect("ring lock poisoned");
+        let state = self.lock_state();
         state.next_seq.saturating_sub(1)
     }
 
     /// 工人重启用：末条墙钟 + 同一时刻已入环身份，避免 `-T` 含时刻重入。
     pub(crate) fn resume_skip(&self) -> Option<ResumeSkip> {
-        let state = self.inner.lock().expect("ring lock poisoned");
+        let state = self.lock_state();
         let last = state.buf.back()?;
         let ts = last.ts.clone();
         let identities = state
@@ -132,7 +142,7 @@ impl RingBuffer {
 
     #[cfg(test)]
     pub(crate) fn capacity(&self) -> usize {
-        self.inner.lock().expect("ring lock poisoned").capacity
+        self.lock_state().capacity
     }
 }
 
@@ -197,6 +207,14 @@ mod tests {
     }
 
     #[test]
+    fn capacity_below_one_is_one() {
+        assert_eq!(RingBuffer::new(0).capacity(), 1);
+        let ring = RingBuffer::new(4);
+        ring.set_capacity(0);
+        assert_eq!(ring.capacity(), 1);
+    }
+
+    #[test]
     fn set_capacity_trims_oldest() {
         let ring = RingBuffer::new(5);
         for _ in 0..5 {
@@ -234,5 +252,18 @@ mod tests {
         assert_eq!(skip.identities, vec![(2, 2, "B".into(), "new".into())]);
         ring.clear();
         assert!(ring.resume_skip().is_none());
+    }
+
+    #[test]
+    fn capture_lock_sentence_once() {
+        let owner_line = "self.inner.lock().expect(\"capture lock poisoned\")";
+        let needle = "capture lock poisoned";
+        let src = include_str!("capture.rs");
+        let scanned = match src.split_once("mod tests") {
+            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
+            None => src.to_string(),
+        };
+        let scanned = scanned.replacen(owner_line, "", 1);
+        assert!(!scanned.contains(needle), "{needle}");
     }
 }
