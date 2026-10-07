@@ -40,3 +40,5 @@
 | [034](ADR-v6-034.md) | HTTP 下载原语 | `yohu-download`；update 只编排 |
 | [035](ADR-v6-035.md) | GitHub Provider | manifest → Atom → Web Latest → REST；免配额优先 |
 | [036](ADR-v6-036.md) | 文本解析引擎 | `yohu-textparsing`：Html / Markdown / Xml / Plain；update 只调 API |
+| [037](ADR-v6-037.md) | 命令库拖入导入 | 预览/合并在 domain；虚线只复用 YoPanel；确认框在终端 |
+| [038](ADR-v6-038.md) | 盒子归组件 | 产品数据链路不改层；禁止用 prop 换掉调用方选择器 |

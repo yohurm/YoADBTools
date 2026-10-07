@@ -43,7 +43,7 @@ View（UpdateDialogs / SettingsForm）
 1. `update.download` → **`spawn_download` 立即返回**（与 `files.pull` 同纪律；禁止 invoke 内 await 整段 HTTP，否则 WebView 收不到进度）
 2. 后台 `download_configured(request)` → `yohu_download::fetch`
 3. `installer_dest(url)` → 绝对 `dest`；`load_github_source` + `url_policy` 拼 `DownloadSpec`
-4. 回调：`DownloadProgress` → `UpdateProgress`（`downloading` / `verifying` / `ready`+`installer_path` / `failed`+`message`）
+4. 回调：`DownloadProgress` → `UpdateProgress`（`downloading` / `verifying` / `ready`+`installer_path` / `failed`+`error`）
 5. 壳 `update_runs` → `AppEvent::UpdateProgress` → `update/progress`；UI `updateStore` 等 `ready` 再切安装对话框
 
 ## 覆盖安装

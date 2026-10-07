@@ -2,7 +2,7 @@
 
 事件名 `/` 分层（ADR-v6-020，Tauri 2.9 禁止点号）；invoke **命令名**仍点分。常量：`yohu-protocol::event_names` ↔ `@yohu/api` `EVENT_NAMES`。
 
-错误：各 crate 自有 Error → 壳映射 `IpcError { code, message }`。不设统一 `YohuError`。
+错误：各 crate 自有 Error → 壳 `ipc_map` 映射 `IpcError { code, message }`。`require_online` 只返回领域 `DeviceSessionError`，命令用 `ipc_session` 收码。不设统一 `YohuError`。
 
 ## invoke
 
@@ -14,7 +14,7 @@
 | `device.setNightMode` | 写连接设备深浅色，返回更新后的 `DeviceStatus` 并推 `device/status` |
 | `adb.exec` | 短命令 |
 | `terminal.eval` / `terminal.exec` / `block.run` / `group.run` / `group.cancel` | `eval` 按库 id 填充执行（UI 不用）；`exec` 发送命令行；`block.run` 跑组下同级命令块（步间按块级间隔）；组编排；取消兼取消块 |
-| `commandlib.load` / `save` | 命令库 schemaVersion 3 only；缺文件写默认库；损坏或其他 schema 则备份后写默认库 |
+| `commandlib.load` / `save` / `preview` / `apply` | 命令库 schemaVersion 3 only；缺文件写默认库；损坏或其他 schema 则备份后写默认库。`preview` 读拖入 JSON（缺省 schema 补当前版本，显式其他版本拒绝），不写盘。`apply` 重读同一批路径，按条目 id 合并后原子提交。产品库加载不接受缺省 schema |
 | `files.session.attach` / `files.session.detach` | 浏览能力会话（ADR-v6-033）。`attach(serial)` 返回 BrowseAttach { serial, generation, adopted }（Empty→Starting→Live 或 adopt）。attach Ok 表示该世代在槽位提交时已发布 Live；不表示稍后一次 IPC 观察时槽位仍 Live。握手 `Unsupported`（无 `-T` 或 非 sh / 从未打印 `__YOHU_SHELL_READY__`）才记 oneshot；Timeout / Cancelled / DeviceOffline 不记 oneshot。files.session.detach(serial, generation) 走 browse_runs::release：世代不符空操作（不关槽、不 replace 取消在途 list，不得杀掉更新 Live）；命中才关槽并取消在途 list。UI 持有 `BrowseAttach.generation`。视图卸载 / `bindSerial(null)` 带所持世代 detach。went_offline（壳目录，不是 IPC）：browse_runs.replace + FileBrowser.detach(serial) 与 replace 同一拍强制关当时槽，不得把无世代 detach 接在采集 join 之后。改 `adb.path`：`drop_workers`、槽位仍 Live、世代不变 |
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `dragOut` | 安全根在 core。files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。设备侧 `ls`/`rm`/`push` 失败由 `yohu-files::file_error_from_adb` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等；未分类 BadExit → `RemoteFailed(path)`，不带 stderr。`FileError` 不 `From<AdbError>`。拖出树触顶 `TreeLimit(项)` / `TreeDepth(层)` fail-closed，禁止当成功截断。壳 `ipc_file`：远端不存在 → `not_found`，本地不存在与其余路径类（含 `TreeLimit` / `TreeDepth` / `NotAttached`）→ `invalid_args`，`Adb`（含 `Cancelled`）→ `ipc_adb`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI；UI 禁止再扫 stderr |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
@@ -95,7 +95,7 @@ App onMount bindIpc()（listen 已可用）→ 各 store 订阅
 | `mirror/state` | 必达 |
 | `mirror/painted` | 首帧必达；之后 1s 窗口 fps |
 | `update/progress` | 下载 200ms 可丢；阶段切换必达 |
-| 官方 `tauri://drag-*` | 框架把 wry 拖放发给 webview；不是 AppEvent；`@yohu/api` `onNativeDragDrop` 原样转发。禁止几何换算。换算只在 files dest。禁止自造 `window/drag` |
+| 官方 `tauri://drag-*` | 框架把 wry 拖放发给 webview；不是 AppEvent；`@yohu/api` `onNativeDragDrop` 原样转发。禁止门面做几何换算。物理点除以 scale 在 `@yohu/ui` placement。禁止自造 `window/drag` |
 
 ## 背压
 
