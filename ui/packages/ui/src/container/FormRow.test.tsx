@@ -19,8 +19,8 @@ describe("YoFormRow", () => {
     const control = row?.querySelector(":scope > .yohu-form-row__control");
     expect(info).toBeTruthy();
     expect(control).toBeTruthy();
-    expect(row?.getAttribute("data-has-description")).toBe("true");
-    expect(row?.getAttribute("data-has-note")).toBe("true");
+    expect(row?.getAttribute("data-has-description")).toBe("");
+    expect(row?.getAttribute("data-has-note")).toBe("");
     const heading = info?.querySelector(".yohu-form-row__heading");
     expect(heading?.querySelector(".yohu-form-row__title")?.textContent).toBe("主题");
     expect(heading?.querySelector(".yohu-form-row__note")?.textContent).toBe("立即生效");

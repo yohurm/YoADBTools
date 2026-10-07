@@ -35,6 +35,7 @@
  *
  * `open` 支持 `boolean` 或响应式 `Accessor<boolean>`。
  */
+import { presenceAttr } from "../dom/flag";
 import { Show, children, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import type { Accessor, JSX } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -43,6 +44,8 @@ import { YoPresence } from "../motion/engines/presence";
 import { YoTravel, useTravel } from "../motion/engines/travel";
 import {
   dialogHugsContent,
+  dialogNodeOn,
+  dialogRegionIsSplit,
   resolveDialogBox,
   resolveDialogInitial,
   type DialogBoxLock,
@@ -50,6 +53,7 @@ import {
   type YoDialogBodyOverflow,
   type YoDialogBodyPad,
   type YoDialogInitial,
+  type DialogTailAlign,
 } from "./dialog-model";
 import {
   attachDialog,
@@ -58,12 +62,13 @@ import {
   dialogBodyAttrs,
   dialogExitLock,
   dialogLayerStyle,
+  dialogTailAttr,
   resolveDialogOpen,
   type DialogStackEntry,
 } from "./dialog-policy";
 import "./Dialog.css";
 
-export type { YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad, YoDialogInitial };
+export type { YoDialogBodyLayout, YoDialogBodyOverflow, YoDialogBodyPad, YoDialogInitial, DialogTailAlign };
 
 export interface YoDialogProps {
   /** 是否打开（布尔值或响应式访问器） */
@@ -84,6 +89,8 @@ export interface YoDialogProps {
   bodyLead?: JSX.Element;
   /** 滚槽之下的钉住铬（展开/收起）。 */
   bodyTail?: JSX.Element;
+  /** 尾槽交叉轴。默认 start（hug）；stretch 铺满，给钉底进度条。 */
+  bodyTailAlign?: DialogTailAlign;
   /** 入场首焦。默认 auto；破坏性确认用 footer（取消）。 */
   initial?: YoDialogInitial;
   /** 关闭回调（Esc 触发） */
@@ -119,8 +126,11 @@ function DialogFrame(props: {
   title?: string;
   titleId: string;
   body: ReturnType<typeof dialogBodyAttrs>;
+  showLead: boolean;
+  showTail: boolean;
   lead?: JSX.Element;
   tail?: JSX.Element;
+  tailAlign?: "stretch";
   footer?: JSX.Element;
   footerLayout: ReturnType<typeof dialogActionsAttrs>["data-layout"];
   onTraveling: (traveling: boolean) => void;
@@ -139,13 +149,14 @@ function DialogFrame(props: {
         data-overflow={props.body["data-overflow"]}
         data-pad={props.body["data-pad"]}
         data-region={props.body["data-region"]}
+        data-tail={props.tailAlign}
       >
-        <Show when={props.body["data-region"] === "split"} fallback={props.children}>
-          <Show when={props.lead != null}>
+        <Show when={dialogRegionIsSplit(props.body["data-region"])} fallback={props.children}>
+          <Show when={props.showLead}>
             <div class="yohu-dialog__lead">{props.lead}</div>
           </Show>
           <div class="yohu-dialog__scroller">{props.children}</div>
-          <Show when={props.tail != null}>
+          <Show when={props.showTail}>
             <div class="yohu-dialog__tail">{props.tail}</div>
           </Show>
         </Show>
@@ -206,13 +217,15 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
     onCleanup(snap);
   });
 
+  const leadOn = (): boolean => dialogNodeOn(props.bodyLead);
+  const tailOn = (): boolean => dialogNodeOn(props.bodyTail);
   const body = () =>
     dialogBodyAttrs({
       layout: props.bodyLayout,
       overflow: props.bodyOverflow,
       pad: props.bodyPad,
-      lead: props.bodyLead != null,
-      tail: props.bodyTail != null,
+      lead: leadOn(),
+      tail: tailOn(),
     });
 
   const footer = () => dialogActionsAttrs(countDialogActions(footerKids.toArray()));
@@ -222,8 +235,11 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
       title={props.title}
       titleId={titleId}
       body={body()}
+      showLead={leadOn()}
+      showTail={tailOn()}
       lead={props.bodyLead}
       tail={props.bodyTail}
+      tailAlign={dialogTailAttr(props.bodyTailAlign)}
       footer={footerKids()}
       footerLayout={footer()["data-layout"]}
       onTraveling={setTrip}
@@ -243,17 +259,18 @@ export function YoDialog(props: YoDialogProps): JSX.Element {
         }}
       >
         <div class="yohu-dialog" style={dialogLayerStyle() as JSX.CSSProperties}>
-          <div class="yohu-dialog__backdrop" aria-hidden="true" />
+          <div class="yohu-dialog__backdrop" data-enter="fade" aria-hidden="true" />
           <div
             class="yohu-dialog__panel"
+            data-enter="scale"
             role="dialog"
             aria-modal="true"
             aria-labelledby={props.title ? titleId : undefined}
             tabindex={-1}
             ref={setPanelEl}
             data-box={box().kind}
-            data-locked={box().locked ? "" : undefined}
-            data-sized={box().sized ? "" : undefined}
+            data-locked={presenceAttr(box().locked)}
+            data-sized={presenceAttr(box().sized)}
             data-clip={clip() ? "on" : undefined}
             style={box().style}
           >

@@ -4,6 +4,8 @@
  * 不写色值、不画铬。
  */
 
+import { presenceAttr, flagAttr, type FlagAttr } from "../dom/flag";
+import { controlIsDisabled } from "./control-busy";
 import {
   resolveSwitchSpec,
   switchPaintKind,
@@ -20,7 +22,7 @@ export interface SwitchInteractive {
 }
 
 export function resolveSwitchInteractive(input: SwitchInteractiveInput): SwitchInteractive {
-  return { disabled: Boolean(input.disabled) };
+  return { disabled: controlIsDisabled(input.disabled) };
 }
 
 /** 禁用拒绝取反。返回 null 表示不提交。 */
@@ -30,9 +32,9 @@ export function switchNextChecked(checked: boolean, disabled: boolean): boolean 
 }
 
 export interface SwitchHostAttrs {
-  "data-checked": "true" | "false";
+  "data-checked": FlagAttr;
   "data-paint": SwitchPaintKind;
-  "data-disabled": true | undefined;
+  "data-disabled": "" | undefined;
   disabled: boolean;
   "aria-checked": boolean;
 }
@@ -41,9 +43,9 @@ export function switchHostAttrs(input: SwitchInput & SwitchInteractiveInput): Sw
   const spec = resolveSwitchSpec(input);
   const interactive = resolveSwitchInteractive(input);
   return {
-    "data-checked": spec.checked ? "true" : "false",
+    "data-checked": flagAttr(spec.checked),
     "data-paint": switchPaintKind(spec),
-    "data-disabled": interactive.disabled ? true : undefined,
+    "data-disabled": presenceAttr(interactive.disabled),
     disabled: interactive.disabled,
     "aria-checked": spec.checked,
   };

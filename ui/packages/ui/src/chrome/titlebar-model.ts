@@ -26,6 +26,34 @@ export interface TitleBarSpec {
   showCaptions: boolean;
 }
 
+/** 位图品牌。字形图标是另一档。 */
+export function titleBarBrandIsLogo(brand?: string): boolean {
+  return brand === "logo";
+}
+
+/** 字形品牌。窗口三键图标不是这一把。 */
+export function titleBarBrandIsIcon(brand?: string): boolean {
+  return brand === "icon";
+}
+
+export function titleBarCaptionIsMin(kind?: string): boolean {
+  return kind === "min";
+}
+
+export function titleBarCaptionIsMax(kind?: string): boolean {
+  return kind === "max";
+}
+
+/** 关闭键。涂装走 close，其余走 window。 */
+export function titleBarCaptionIsClose(kind?: string): boolean {
+  return kind === "close";
+}
+
+/** 已最大化，三键改还原。 */
+export function titleBarMaxIsRestore(action?: string): boolean {
+  return action === "restore";
+}
+
 export function resolveTitleBarBrand(input: Pick<TitleBarInput, "logoSrc" | "icon">): TitleBarBrand {
   if (input.logoSrc) return "logo";
   if (input.icon) return "icon";
@@ -43,5 +71,5 @@ export function resolveTitleBarSpec(input: TitleBarInput): TitleBarSpec {
 }
 
 export function captionPaint(kind: TitleBarCaptionKind): TitleBarCaptionPaint {
-  return kind === "close" ? "close" : "window";
+  return titleBarCaptionIsClose(kind) ? "close" : "window";
 }

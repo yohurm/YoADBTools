@@ -15,9 +15,13 @@ import {
   addressDismissOutside,
   addressOpenCaret,
   addressScrollPin,
+  addressScrollPinIsEnd,
+  addressScrollPinIsStart,
   isAddressVacantClick,
 } from "./address-field-model";
 import "./AddressField.css";
+import { presenceAttr } from "../dom/flag";
+import { dismissKey, enterKey } from "../keymap/list-index";
 
 export type YoAddressFieldApi = {
   open: () => void;
@@ -55,11 +59,11 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
       { start: input.selectionStart ?? 0, end: input.selectionEnd ?? 0 },
       input.value.length,
     );
-    if (pin === "start") {
+    if (addressScrollPinIsStart(pin)) {
       field.scrollLeft = 0;
       return;
     }
-    if (pin === "end") {
+    if (addressScrollPinIsEnd(pin)) {
       field.scrollLeft = Math.max(0, field.scrollWidth - field.clientWidth);
     }
   };
@@ -82,17 +86,25 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
     if (focus) requestAnimationFrame(() => focusField(true));
   };
 
+  const listen = (
+    type: "pointerup" | "pointercancel" | "pointerdown",
+    handler: (event: PointerEvent) => void,
+  ): (() => void) => {
+    document.addEventListener(type, handler);
+    return () => document.removeEventListener(type, handler);
+  };
+
   const armPointerGate = (): void => {
     setPointerGate(true);
     const release = (event: PointerEvent): void => {
       event.preventDefault();
       clearPointerGate(true);
     };
-    document.addEventListener("pointerup", release);
-    document.addEventListener("pointercancel", release);
+    const stopPointerUp = listen("pointerup", release);
+    const stopPointerCancel = listen("pointercancel", release);
     releasePointer = () => {
-      document.removeEventListener("pointerup", release);
-      document.removeEventListener("pointercancel", release);
+      stopPointerUp();
+      stopPointerCancel();
     };
   };
 
@@ -142,8 +154,12 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
     if (inputEl) inputEl.value = path;
   });
 
+  function addressEditBlocked(): boolean {
+    return !open() || pointerGate();
+  }
+
   createEffect(() => {
-    if (!open() || pointerGate()) return;
+    if (addressEditBlocked()) return;
     const frame = requestAnimationFrame(() => focusField(true));
     onCleanup(() => cancelAnimationFrame(frame));
   });
@@ -158,13 +174,13 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
   });
 
   createEffect(() => {
-    if (!open() || pointerGate()) return;
+    if (addressEditBlocked()) return;
     const onPointerDown = (event: PointerEvent): void => {
       if (!addressDismissOutside(event.target, fieldEl ?? null)) return;
       stopEdit();
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    onCleanup(() => document.removeEventListener("pointerdown", onPointerDown));
+    const stopPointerDown = listen("pointerdown", onPointerDown);
+    onCleanup(stopPointerDown);
   });
 
   return (
@@ -203,7 +219,7 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
           classList={{ "yohu-address__field--invalid": invalid() }}
           data-address="field"
           data-reveal={open() ? "1" : "0"}
-          data-gate={pointerGate() ? "" : undefined}
+          data-gate={presenceAttr(pointerGate())}
           onTransitionEnd={(event) => {
             if (event.target !== fieldEl || event.propertyName !== "clip-path") return;
             if (!open()) finishClose();
@@ -226,12 +242,12 @@ export function YoAddressField(props: YoAddressFieldProps): JSX.Element {
               }}
               onSelect={pinFieldToCaret}
               onKeyDown={(event) => {
-                if (event.key === "Escape") {
+                if (dismissKey(event.key)) {
                   event.preventDefault();
                   stopEdit();
                   return;
                 }
-                if (event.key === "Enter") {
+                if (enterKey(event.key)) {
                   event.preventDefault();
                   commit();
                 }

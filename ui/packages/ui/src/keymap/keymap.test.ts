@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   allKeys,
@@ -12,6 +15,8 @@ import {
   matchesChord,
   modPlatform,
   nextKeys,
+  isActionableTarget,
+  isShellTarget,
   panelKeyContext,
   pointerSelectMode,
   whenIdle,
@@ -25,6 +30,50 @@ import {
 function keyEvent(init: Pick<KeyboardEventInit, "key" | "code" | "ctrlKey" | "metaKey" | "shiftKey">): KeyboardEvent {
   return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
 }
+
+function productionSources(root: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(root)) {
+    const full = join(root, name);
+    if (statSync(full).isDirectory()) {
+      out.push(...productionSources(full));
+      continue;
+    }
+    if (!/\.(ts|tsx)$/.test(name) || name.includes(".test.")) continue;
+    out.push(readFileSync(full, "utf8"));
+  }
+  return out;
+}
+
+describe("焦点身份", () => {
+  it("可激活控件认按钮和角色，不认选择器 class", () => {
+    const host = document.createElement("div");
+    host.className = "yohu-select";
+    const button = document.createElement("button");
+    host.append(button);
+    document.body.append(host);
+    expect(isActionableTarget(button)).toBe(true);
+    expect(isActionableTarget(host)).toBe(false);
+    host.remove();
+  });
+
+  it("对话框认 role=dialog，不认对话框 class", () => {
+    const layer = document.createElement("div");
+    layer.className = "yohu-dialog";
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "dialog");
+    const field = document.createElement("input");
+    panel.append(field);
+    layer.append(panel);
+    document.body.append(layer);
+    const ctx = panelKeyContext(document.body, field, { listSelector: ".list" });
+    expect(ctx.inDialog).toBe(true);
+    const backdrop = document.createElement("div");
+    layer.append(backdrop);
+    expect(panelKeyContext(document.body, backdrop, { listSelector: ".list" }).inDialog).toBe(false);
+    layer.remove();
+  });
+});
 
 describe("chord", () => {
   it("空格与修饰键归一", () => {
@@ -43,6 +92,18 @@ describe("chord", () => {
     // macOS：Cmd(meta) 作为命令修饰键；字面 Ctrl 不算。
     expect(isCommandModifier("mac", keyEvent({ key: "f", metaKey: true }))).toBe(true);
     expect(isCommandModifier("mac", keyEvent({ key: "f", ctrlKey: true }))).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const roots = [
+      resolve(here, ".."),
+      resolve(here, "../../../workbench/src"),
+      resolve(here, "../../../modules"),
+    ];
+    for (const root of roots) {
+      for (const src of productionSources(root)) {
+        expect(src).not.toContain("ctrlKey || event.metaKey");
+        expect(src).not.toContain("event.ctrlKey || event.metaKey");
+      }
+    }
   });
 
   it("matchesChord 对 ctrl:true 绑定只认当前平台命令修饰键（Win 键不触发）", () => {
@@ -69,6 +130,7 @@ describe("selection", () => {
     expect(allKeys(ordered).size).toBe(4);
     expect(pointerSelectMode(keyEvent({ key: "a", shiftKey: true }))).toBe("range");
     expect(pointerSelectMode(keyEvent({ key: "a", ctrlKey: true }))).toBe("toggle");
+    expect(pointerSelectMode(keyEvent({ key: "a", metaKey: true }))).toBe("replace");
     expect(pointerSelectMode()).toBe("replace");
   });
 
@@ -138,6 +200,28 @@ describe("scope + bindings", () => {
     expect(panelKeyContext(null, input, { listSelector: ".yohu-logs__list", ownership: "host" }).inPanel).toBe(true);
     expect(panelKeyContext(null, input, { listSelector: ".yohu-logs__list", ownership: "host" }).inList).toBe(false);
     panel.remove();
+  });
+});
+
+describe("壳铬", () => {
+  it("认轨配方、标题栏、状态栏，不认工作台布局 class", () => {
+    const rail = document.createElement("aside");
+    rail.className = "yohu-recipe-rail yohu-layout__rail";
+    const card = document.createElement("div");
+    rail.append(card);
+    document.body.append(rail);
+    expect(isShellTarget(card)).toBe(true);
+    rail.className = "yohu-layout__rail";
+    expect(isShellTarget(card)).toBe(false);
+    rail.remove();
+
+    const bar = document.createElement("header");
+    bar.className = "yohu-titlebar";
+    const title = document.createElement("span");
+    bar.append(title);
+    document.body.append(bar);
+    expect(isShellTarget(title)).toBe(true);
+    bar.remove();
   });
 });
 

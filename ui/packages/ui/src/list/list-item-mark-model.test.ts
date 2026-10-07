@@ -34,6 +34,8 @@ describe("list-item-mark-model", () => {
     expect(css.length).toBeGreaterThan(0);
     expect(css).toContain(`.${LIST_ITEM_MARK_CLASS}`);
     expect(css).toContain(`.${LIST_ITEM_MARK_FILL_CLASS}`);
+    expect(css).not.toContain(".yohu-list-item >");
+    expect(css).not.toContain(".yohu-interactive");
     expect(css).toContain("inset-inline-start: 0");
     expect(css).toContain(`inset-block: var(${LIST_ITEM_MARK_INSET_BLOCK_VAR})`);
     expect(css).toContain(`width: var(${LIST_ITEM_MARK_WIDTH_VAR})`);

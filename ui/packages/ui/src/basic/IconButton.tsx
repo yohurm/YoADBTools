@@ -7,13 +7,15 @@
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { presenceIsOn } from "../dom/flag";
 import { Icon, type IconName } from "../icons";
-import type { YoIconButtonPaint, YoIconButtonSize } from "./icon-button-model";
+import type { ControlIconSize, YoIconButtonPaint } from "./icon-button-model";
 import { iconButtonHostAttrs } from "./icon-button-policy";
+import { controlIconPx } from "./control-icon";
 import { YoTooltip } from "../overlay/Tooltip";
 import "./IconButton.css";
 
-export type { YoIconButtonPaint, YoIconButtonSize };
+export type { ControlIconSize, YoIconButtonPaint };
 
 export interface YoIconButtonProps {
   /** 具名图标。有 children 时只作缺省内容 */
@@ -27,7 +29,7 @@ export interface YoIconButtonProps {
   /** 加载中：内容区图标按 `--yohu-dur-loop` 旋转 */
   loading?: boolean;
   /** 控件尺寸。禁止传 px */
-  size?: YoIconButtonSize;
+  size?: ControlIconSize;
   /** 窗铬：满高直角热区。标题栏 actions 用。缺省透明圆角钮。 */
   paint?: YoIconButtonPaint;
   /** 点击回调 */
@@ -55,19 +57,31 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
     }),
   );
 
+  function iconButtonSize(): ReturnType<typeof iconButtonHostAttrs>["data-size"] {
+    return host()["data-size"];
+  }
+
+  function iconButtonDisabled(): boolean {
+    return host().disabled;
+  }
+
+  function iconButtonTitle(): string | undefined {
+    return props.title;
+  }
+
   const button = (
     <button
       type="button"
       class="yohu-icon-button yohu-focus-ring"
-      data-size={host()["data-size"]}
+      data-size={iconButtonSize()}
       data-paint={host()["data-paint"]}
       data-pressed={host()["data-pressed"]}
       data-busy={host()["data-busy"]}
-      aria-label={props.title}
+      aria-label={iconButtonTitle()}
       aria-busy={host()["aria-busy"]}
       aria-expanded={props["aria-expanded"]}
       aria-pressed={host()["aria-pressed"]}
-      disabled={host().disabled}
+      disabled={iconButtonDisabled()}
       onClick={props.onClick}
     >
       <YoCorner
@@ -77,12 +91,19 @@ export function YoIconButton(props: YoIconButtonProps): JSX.Element {
         align="center"
         justify="center"
       >
-        {props.children ?? (props.icon ? <Icon name={props.icon} /> : null)}
+        {props.children ??
+          (props.icon ? (
+            <Icon
+              name={props.icon}
+              size={controlIconPx(iconButtonSize())}
+              spin={presenceIsOn(host()["data-busy"])}
+            />
+          ) : null)}
       </YoCorner>
     </button>
   );
-  return props.title ? (
-    <YoTooltip content={props.title} disabled={Boolean(host().disabled)}>
+  return iconButtonTitle() ? (
+    <YoTooltip content={iconButtonTitle() ?? ""} disabled={iconButtonDisabled()}>
       {button}
     </YoTooltip>
   ) : (

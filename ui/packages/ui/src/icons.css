@@ -4,4 +4,10 @@
   flex-shrink: 0;
   color: inherit;
   pointer-events: none;
+  transform: var(--yohu-icon-transform, none);
+  transition: transform var(--yohu-icon-transform-move);
+}
+
+.yohu-icon[data-spin] {
+  animation: yohu-spin var(--yohu-dur-loop) linear infinite;
 }

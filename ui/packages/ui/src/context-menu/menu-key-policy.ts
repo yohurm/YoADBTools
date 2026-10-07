@@ -3,10 +3,10 @@
  * Host 只管开合；List 消费本文件意图。不写坐标、不画条目。
  */
 
+import { dismissKey, enabledIndexes, itemIsEnabled, listActivateKey, listEdgeKey, tabKey, verticalListDelta } from "../keymap/list-index";
 import { motionDurationMs } from "../tokens/motion";
 import {
   edgeEnabledIndex,
-  enabledMenuIndexes,
   stepEnabledIndex,
   type MenuListItem,
 } from "./menu-list-model";
@@ -23,6 +23,27 @@ export type MenuKeyIntent =
   | { type: "select" }
   | { type: "typeahead"; char: string };
 
+/** 关闭菜单。typeahead 是其余分支，不另判。 */
+export function menuIntentIsClose(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "close" }> {
+  return intent.type === "close";
+}
+
+/** 移动焦点。 */
+export function menuIntentIsMove(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "move" }> {
+  return intent.type === "move";
+}
+
+/** 激活当前项。 */
+export function menuIntentIsSelect(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "select" }> {
+  return intent.type === "select";
+}
+
 export interface MenuKeyInput {
   focusIndex: number;
   items: readonly MenuListItem[];
@@ -33,38 +54,25 @@ export interface MenuKeyInput {
 
 export function menuKeyIntent(key: string, input: MenuKeyInput): MenuKeyIntent | null {
   if (input.altKey || input.metaKey || input.ctrlKey) {
-    if (key === "Escape") return { type: "close", reason: "escape" };
+    if (dismissKey(key)) return { type: "close", reason: "escape" };
     return null;
   }
-  const enabled = enabledMenuIndexes(input.items);
-  switch (key) {
-    case "Escape":
-      return { type: "close", reason: "escape" };
-    case "Tab":
-      return { type: "close", reason: "tab" };
-    case "ArrowDown": {
-      const index = stepEnabledIndex(enabled, input.focusIndex, 1);
-      return index === null ? null : { type: "move", index };
-    }
-    case "ArrowUp": {
-      const index = stepEnabledIndex(enabled, input.focusIndex, -1);
-      return index === null ? null : { type: "move", index };
-    }
-    case "Home": {
-      const index = edgeEnabledIndex(enabled, "start");
-      return index === null ? null : { type: "move", index };
-    }
-    case "End": {
-      const index = edgeEnabledIndex(enabled, "end");
-      return index === null ? null : { type: "move", index };
-    }
-    case "Enter":
-    case " ":
-      return { type: "select" };
-    default:
-      if (key.length === 1 && key !== " ") return { type: "typeahead", char: key };
-      return null;
+  const enabled = enabledIndexes(input.items);
+  const delta = verticalListDelta(key);
+  if (delta !== null) {
+    const index = stepEnabledIndex(enabled, input.focusIndex, delta);
+    return index === null ? null : { type: "move", index };
   }
+  const edge = listEdgeKey(key);
+  if (edge) {
+    const index = edgeEnabledIndex(enabled, edge);
+    return index === null ? null : { type: "move", index };
+  }
+  if (tabKey(key)) return { type: "close", reason: "tab" };
+  if (dismissKey(key)) return { type: "close", reason: "escape" };
+  if (listActivateKey(key)) return { type: "select" };
+  if (key.length === 1) return { type: "typeahead", char: key };
+  return null;
 }
 
 export function nextTypeaheadQuery(
@@ -87,7 +95,7 @@ export interface MenuItemHostAttrs {
 }
 
 export function menuItemHostAttrs(item: YoMenuItem, focused: boolean): MenuItemHostAttrs {
-  const disabled = Boolean(item.disabled);
+  const disabled = !itemIsEnabled(item);
   return {
     role: "menuitem",
     disabled,
@@ -98,5 +106,5 @@ export function menuItemHostAttrs(item: YoMenuItem, focused: boolean): MenuItemH
 }
 
 export function firstEnabledIndex(items: readonly MenuListItem[]): number {
-  return enabledMenuIndexes(items)[0] ?? 0;
+  return enabledIndexes(items)[0] ?? 0;
 }

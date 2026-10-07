@@ -4,6 +4,8 @@
  * 不碰 DOM、不判定 disabled。
  */
 
+import { controlIsChecked } from "./control-busy";
+
 export type SwitchPaintKind = "off" | "on";
 
 export interface SwitchInput {
@@ -15,7 +17,7 @@ export interface SwitchSpec {
 }
 
 export function resolveSwitchSpec(input: SwitchInput): SwitchSpec {
-  return { checked: Boolean(input.checked) };
+  return { checked: controlIsChecked(input) };
 }
 
 /** CSS 只消费这个名字。disabled 由 L3 另写，不进涂装。 */

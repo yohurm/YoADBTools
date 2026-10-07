@@ -1,22 +1,15 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { Layout } from "../tokens/layout";
-import { applyTooltipBox, placeTooltip, readTooltipTrigger, tooltipLayerStyle } from "./tooltip-place";
+import { applyTooltipBox, placeTooltip, tooltipLayerStyle } from "./tooltip-place";
 
 const VIEW = { width: 800, height: 600 };
 const TRIGGER = { top: 200, left: 200, bottom: 232, width: 40, height: 32 };
 
 describe("tooltip-place", () => {
-  it("无锚点时测量为零盒", () => {
-    expect(readTooltipTrigger(undefined)).toEqual({
-      top: 0,
-      left: 0,
-      bottom: 0,
-      width: 0,
-      height: 0,
-    });
-  });
-
   it("上方够用时向上；宽 hug 内容并水平居中，箭头对锚点中心", () => {
     const box = placeTooltip(TRIGGER, { width: 80, height: 24 }, VIEW);
     expect(box.placement).toBe("top");
@@ -78,8 +71,42 @@ describe("tooltip-place", () => {
     expect(el.hasAttribute("data-overflow-y")).toBe(false);
     expect(el.style.getPropertyValue("--yohu-tooltip-arrow")).toBe(`${box.arrowLeft}px`);
     expect(el.dataset.placement).toBe(box.placement);
-    expect(el.dataset.placed).toBe("true");
+    expect(el.dataset.placed).toBe("");
     expect(el.style.transition).toBe("none");
     expect(el.style.zIndex).toBe("var(--yohu-z-overlay)");
+  });
+});
+
+describe("气泡盒边", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("宽高必填边长不小于 0", () => {
+    const body = readFileSync(join(root, "tooltip-place.ts"), "utf8");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "bubble.width)")).toBe(0);
+    expect(times("Math.max(0, " + "bubble.height)")).toBe(0);
+    expect(body).toContain("tooltipExtent(bubble.width)");
+    expect(body).toContain("tooltipExtent(bubble.height)");
+    expect(times("return Math.max(0, value)")).toBe(1);
+    expect(times("function tooltipExtent")).toBe(1);
+    expect(body).toContain("tooltipExtent(trigger.top - edge)");
+  });
+});
+
+describe("气泡剩余空间", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("上下剩余空间必填不小于 0", () => {
+    const body = readFileSync(join(root, "tooltip-place.ts"), "utf8");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "trigger.top - edge)")).toBe(0);
+    expect(times("Math.max(0, " + "viewport.height - trigger.bottom - edge)")).toBe(0);
+    expect(body).toContain("tooltipExtent(trigger.top - edge)");
+    expect(body).toContain("tooltipExtent(viewport.height - trigger.bottom - edge)");
+    expect(times("function tooltipExtent")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(1);
+    expect(body).toContain("tooltipExtent(bubble.width)");
+    expect(body).toContain("tooltipExtent(bubble.height)");
+    expect(body).toContain("function clamp");
   });
 });

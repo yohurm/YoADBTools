@@ -7,6 +7,10 @@
   overflow: visible;
 }
 
+.yohu-progress[data-size="sm"] {
+  height: var(--yohu-space-sm);
+}
+
 .yohu-progress__chrome {
   --yohu-corner-fill: var(--yohu-comp-gray);
   --yohu-corner-stroke: transparent;

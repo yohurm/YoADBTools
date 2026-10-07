@@ -7,17 +7,20 @@
  * 不是 YoTable：清单体仍是 YoVirtualList。
  */
 import type { JSX } from "solid-js";
+import type { YoListRowTone } from "../list-row/list-row-model";
+import { resolveColHeaderTone } from "./col-header-model";
+import type { YoColCellPad } from "./col-model";
 import "./ColFrame.css";
+import "./ColHead.css";
 
-export type YoColCellPad = "list" | "none";
-export type YoColFrameTone = "list" | "document";
+export type { YoColCellPad };
 
 export interface YoColFrameProps {
   template: string;
   /** 默认 list。日志表头是铬层；文档轨道走 Format.width() 换成 px，禁止再为对齐标题把列垫写进文档。 */
   cellPad?: YoColCellPad;
   /** list = 文件格子；document = 日志文档表头，等宽 caption 跟 Document 同一把尺。 */
-  tone?: YoColFrameTone;
+  tone?: YoListRowTone;
   class?: string;
   children: JSX.Element;
 }
@@ -30,10 +33,23 @@ export function YoColFrame(props: YoColFrameProps): JSX.Element {
     <div
       class={`yohu-col-frame${props.class ? ` ${props.class}` : ""}`}
       data-cell-pad={props.cellPad ?? "list"}
-      data-tone={props.tone ?? "list"}
+      data-tone={resolveColHeaderTone(props.tone)}
       style={{ "--yohu-col-tracks": props.template }}
     >
       {props.children}
     </div>
   );
+}
+
+export interface YoColHeadProps {
+  class?: string;
+  children: JSX.Element;
+}
+
+/**
+ * 横滑表头的裁切盒。侧轨垫打在这一层，里面的 YoColRow 只平移。
+ * 不横滑的表头直接用 YoColRow，不必再包。
+ */
+export function YoColHead(props: YoColHeadProps): JSX.Element {
+  return <div class={props.class ? `yohu-col-head ${props.class}` : "yohu-col-head"}>{props.children}</div>;
 }

@@ -16,5 +16,18 @@ describe("rail.css 契约", () => {
     expect(block).not.toContain(".yohu-list-item");
     expect(block).not.toContain("spatial-panel");
     expect(block).not.toContain("display: none");
+    expect(block).toMatch(
+      /\.yohu-recipe-rail\[data-rail="expanded"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(block).toMatch(
+      /\.yohu-recipe-rail\[data-rail="expanded"\]\s*\{[^}]*flex-basis:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(block).toMatch(
+      /\.yohu-recipe-rail\[data-rail="icons"\]\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav-icons\)/,
+    );
+    expect(block).not.toMatch(
+      /\.yohu-recipe-rail\s*\{[^}]*width:\s*var\(--yohu-layout-shell-nav\)/,
+    );
+    expect(block).not.toContain(".yohu-layout__rail");
   });
 });

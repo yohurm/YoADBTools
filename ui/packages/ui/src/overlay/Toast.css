@@ -53,8 +53,7 @@
 }
 
 .yohu-toast__leading,
-.yohu-toast__body,
-.yohu-toast .yohu-recipe-dismiss {
+.yohu-toast__body {
   position: relative;
   z-index: 1;
 }

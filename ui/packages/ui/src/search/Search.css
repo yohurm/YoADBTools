@@ -62,11 +62,6 @@
   height: 100%;
 }
 
-.yohu-search__entry .yohu-icon {
-  width: var(--yohu-layout-icon-md);
-  height: var(--yohu-layout-icon-md);
-}
-
 .yohu-search__entry:not(:disabled):hover {
   --yohu-corner-fill: var(--yohu-state-hover);
   color: var(--yohu-fg);

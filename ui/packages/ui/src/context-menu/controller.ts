@@ -7,7 +7,8 @@ import type { Accessor } from "solid-js";
 import { createSignal } from "solid-js";
 
 import { readViewport } from "../placement/viewport";
-import { clampContextMenuPoint, clampToRect } from "./place";
+import { clampContextMenuPoint } from "./place";
+import { clampToRect } from "../placement/clamp";
 import type { ContextMenuRequest, ContextMenuScene, ContextMenuSession } from "./types";
 
 /** 模块契约：只开合与二次夹紧。会话快照留给 Host。 */

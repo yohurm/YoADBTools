@@ -7,7 +7,9 @@
   align-items: stretch;
   flex-shrink: 0;
   height: var(--yohu-row-height-header);
-  min-width: 0;
+  min-width: var(--yohu-col-row-min, 0);
+  padding-inline-end: var(--yohu-col-gutter-pad, 0);
+  overflow: hidden;
   box-sizing: border-box;
   user-select: none;
 }

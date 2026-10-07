@@ -1,6 +1,8 @@
 .yohu-checkbox {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--yohu-space-sm);
   font-family: var(--yohu-font-sans);
   cursor: pointer;
@@ -20,6 +22,10 @@
   background-color: transparent;
   color: var(--yohu-fg-on);
   box-sizing: border-box;
+}
+
+.yohu-checkbox[data-block] {
+  flex: 1 1 auto;
 }
 
 .yohu-checkbox__chrome {
@@ -62,7 +68,7 @@
   --yohu-corner-stroke: var(--yohu-accent-pressed);
 }
 
-/* 勾选描边成形：pathLength=1 把笔画归一，dashoffset 1↔0 即画入/收回。 */
+/* 勾选描边成形：pathLength=1 把笔画归一。dashoffset 1→0 从短臂画到笔尖。 */
 .yohu-checkbox__check {
   width: calc(var(--yohu-space-md) + var(--yohu-space-xs));
   height: calc(var(--yohu-space-md) + var(--yohu-space-xs));
@@ -78,10 +84,27 @@
   stroke-dashoffset: 0;
 }
 
+.yohu-checkbox__mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--yohu-fg-2);
+}
+
 .yohu-checkbox__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   color: var(--yohu-fg);
+}
+
+.yohu-checkbox[data-tone="section"] .yohu-checkbox__label {
+  font-size: var(--yohu-font-caption);
+  font-weight: var(--yohu-font-weight-semibold);
+  line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg-2);
 }
 
 .yohu-checkbox[data-disabled] {
@@ -98,6 +121,7 @@
   --yohu-corner-stroke: var(--yohu-disabled);
 }
 
+.yohu-checkbox[data-disabled] .yohu-checkbox__mark,
 .yohu-checkbox[data-disabled] .yohu-checkbox__label {
   color: var(--yohu-disabled);
 }

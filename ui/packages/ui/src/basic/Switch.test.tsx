@@ -49,8 +49,36 @@ describe("YoSwitch", () => {
     render(() => <YoSwitch ariaLabel="禁用" checked={false} disabled onChange={onChange} />);
     const sw = screen.getByRole("switch") as HTMLButtonElement;
     expect(sw.disabled).toBe(true);
-    expect(sw.getAttribute("data-disabled")).toBe("true");
+    expect(sw.getAttribute("data-disabled")).toBe("");
     fireEvent.click(sw);
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+function switchSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Switch.tsx"), "utf8");
+}
+
+describe("开关勾选旗", () => {
+  it("下一步和宿主都读同一勾选旗", () => {
+    const src = switchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('host()["' + 'data-checked"]')).toBe(1);
+    expect(times("function switchChecked")).toBe(1);
+    expect(times("export function switchChecked")).toBe(0);
+    expect(times("switchChecked()")).toBe(3);
+    expect(times("flagIsOn(switchChecked())")).toBe(1);
+    expect(times("data-checked={switchChecked()}")).toBe(1);
+  });
+});
+
+describe("开关禁用", () => {
+  it("下一步和按钮都问同一把禁用", () => {
+    const src = switchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("host()." + "disabled")).toBe(1);
+    expect(times("function switchDisabled")).toBe(1);
+    expect(times("export function switchDisabled")).toBe(0);
+    expect(times("switchDisabled()")).toBe(3);
   });
 });

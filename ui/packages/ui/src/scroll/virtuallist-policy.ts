@@ -3,9 +3,11 @@
  * 键盘动作、贴底排放、聚焦确认与行/宿主 attrs 从快照组装。
  * 行铬在 list-row；本文件只出身份 / aria，不写色值、不画铬。
  */
+import { presenceAttr, trueAttr } from "../dom/flag";
+import type { YoListRowTone } from "../list-row/list-row-model";
 
 import {
-  VIRTUAL_DEFAULT_TONE,
+  resolveVirtualListTone,
   virtualKeyIntent,
   virtualListLayout,
   virtualRowTabIndex,
@@ -13,13 +15,11 @@ import {
   type VirtualListLayout,
 } from "./virtuallist-model";
 
-export type VirtualListKeyAction = VirtualKeyIntent;
-
 export function resolveVirtualListKeyAction(
   key: string,
   index: number,
   count: number,
-): VirtualListKeyAction | null {
+): VirtualKeyIntent | null {
   return virtualKeyIntent(key, index, count);
 }
 
@@ -81,7 +81,7 @@ export interface VirtualHostAttrs {
   role: "listbox" | undefined;
   "aria-label": string | undefined;
   "aria-multiselectable": true | undefined;
-  "data-tone": "document" | "list";
+  "data-tone": YoListRowTone;
   "data-layout": VirtualListLayout;
   "data-reordering": "" | undefined;
 }
@@ -89,16 +89,16 @@ export interface VirtualHostAttrs {
 export function virtualHostAttrs(input: {
   selectable: boolean;
   multi: boolean;
-  tone?: "document" | "list";
+  tone?: YoListRowTone;
   ariaLabel?: string;
   reordering?: boolean;
   layout?: VirtualListLayout;
 }): VirtualHostAttrs {
-  const tone = input.tone ?? VIRTUAL_DEFAULT_TONE;
+  const tone = resolveVirtualListTone(input.tone);
   return {
     role: input.selectable ? "listbox" : undefined,
     "aria-label": input.selectable ? input.ariaLabel : undefined,
-    "aria-multiselectable": input.multi ? true : undefined,
+    "aria-multiselectable": trueAttr(input.multi),
     "data-tone": tone,
     "data-layout":
       input.layout ??
@@ -107,6 +107,6 @@ export function virtualHostAttrs(input: {
         selectable: input.selectable,
         reordering: input.reordering === true,
       }),
-    "data-reordering": input.reordering ? "" : undefined,
+    "data-reordering": presenceAttr(input.reordering === true),
   };
 }

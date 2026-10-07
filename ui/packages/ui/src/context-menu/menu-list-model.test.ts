@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { enabledIndexes } from "../keymap/list-index";
 import {
   edgeEnabledIndex,
-  enabledMenuIndexes,
   stepEnabledIndex,
   typeaheadMatchIndex,
 } from "./menu-list-model";
@@ -16,7 +19,7 @@ const ITEMS = [
 
 describe("menu-list-model", () => {
   it("跳过禁用项", () => {
-    expect(enabledMenuIndexes(ITEMS)).toEqual([0, 2, 3]);
+    expect(enabledIndexes(ITEMS)).toEqual([0, 2, 3]);
   });
 
   it("箭头在可选项间循环", () => {
@@ -42,5 +45,17 @@ describe("menu-list-model", () => {
     expect(typeaheadMatchIndex(same, "c", 0)).toBe(0);
     expect(typeaheadMatchIndex(same, "cc", 0)).toBe(1);
     expect(typeaheadMatchIndex(same, "cl", 0)).toBe(2);
+  });
+
+  it("下标上的可用项只经 enabledAt", () => {
+    const src = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "menu-list-model.ts"),
+      "utf8",
+    );
+    const needle = "enabled[index] " + "?? null";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src.split("enabledAt(enabled, index)").length - 1).toBe(2);
+    expect(src).toContain("if (enabled.length === 0) return null");
+    expect(src).toContain("if (index < 0) return null");
   });
 });

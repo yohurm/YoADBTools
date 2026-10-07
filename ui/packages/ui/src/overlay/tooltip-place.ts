@@ -4,16 +4,11 @@
  * 高用气泡自身、贴边 6vp、箭头对准锚点中心。禁止再调 placePopover。
  */
 
-import { overlayLayerStyle, type PopoverPlacement } from "./popover-place";
+import { overlayLayerStyle, placementIsBottom, type PopoverPlacement } from "./popover-place";
+import { presenceAttr } from "../dom/flag";
+import type { AnchorBox } from "../placement/anchor";
 import { readViewport } from "../placement/viewport";
 import { Layout } from "../tokens/layout";
-import type { TooltipTriggerBox } from "./tooltip-policy";
-
-export function readTooltipTrigger(el: Element | undefined): TooltipTriggerBox {
-  const rect = el?.getBoundingClientRect();
-  if (!rect) return { top: 0, left: 0, bottom: 0, width: 0, height: 0 };
-  return { top: rect.top, left: rect.left, bottom: rect.bottom, width: rect.width, height: rect.height };
-}
 
 export interface PlaceTooltipResult {
   placement: PopoverPlacement;
@@ -27,9 +22,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function tooltipExtent(value: number): number {
+  return Math.max(0, value);
+}
+
 /** 气泡 hug 自身；箭头跟锚点中心，贴边后仍指向。 */
 export function placeTooltip(
-  trigger: TooltipTriggerBox,
+  trigger: AnchorBox,
   bubble: { width: number; height: number },
   viewport: { width: number; height: number } = readViewport(),
 ): PlaceTooltipResult {
@@ -37,11 +36,11 @@ export function placeTooltip(
   const arrowOut = Layout.TooltipArrow / 2;
   const gap = Layout.TooltipGap;
   const inset = Layout.TooltipArrowInset;
-  const width = Math.max(0, bubble.width);
-  const height = Math.max(0, bubble.height);
+  const width = tooltipExtent(bubble.width);
+  const height = tooltipExtent(bubble.height);
   const needed = height + arrowOut + gap;
-  const spaceAbove = Math.max(0, trigger.top - edge);
-  const spaceBelow = Math.max(0, viewport.height - trigger.bottom - edge);
+  const spaceAbove = tooltipExtent(trigger.top - edge);
+  const spaceBelow = tooltipExtent(viewport.height - trigger.bottom - edge);
 
   let placement: PopoverPlacement;
   if (spaceAbove >= needed) {
@@ -56,7 +55,7 @@ export function placeTooltip(
   const centered = trigger.left + trigger.width / 2 - width / 2;
   const left = clamp(centered, edge, maxLeft);
   const top =
-    placement === "bottom"
+    placementIsBottom(placement)
       ? trigger.bottom + gap + arrowOut
       : trigger.top - gap - arrowOut - height;
 
@@ -95,6 +94,7 @@ export function applyTooltipBox(layer: HTMLElement, box: PlaceTooltipResult): vo
   layer.style.zIndex = s.zIndex!;
   layer.style.setProperty("--yohu-tooltip-arrow", s["--yohu-tooltip-arrow"]!);
   layer.dataset.placement = box.placement;
-  layer.dataset.placed = "true";
+  const placed = presenceAttr(true);
+  if (placed !== undefined) layer.dataset.placed = placed;
   layer.removeAttribute("data-overflow-y");
 }

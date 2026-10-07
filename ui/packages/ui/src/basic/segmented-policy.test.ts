@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   resolveSegmentedCommit,
@@ -7,6 +10,9 @@ import {
   resolveSegmentedPointerAction,
   resolveSegmentedRoving,
   resolveSegmentedSelection,
+  segmentedActionIsCommitMulti,
+  segmentedActionIsCommitSingle,
+  segmentedActionIsRoving,
   segmentedHostAttrs,
   segmentedItemAttrs,
 } from "./segmented-policy";
@@ -225,5 +231,100 @@ describe("segmented-policy", () => {
     expect(
       resolveSegmentedKeyAction({ items: ITEMS, multiple: false, value: "package", roving: "package" }, "Enter"),
     ).toBeUndefined();
+  });
+
+  it("移焦、单选提交、多选提交各判一次", () => {
+    const roving = { kind: "roving" as const, index: 0, focusValue: "package" };
+    const single = {
+      kind: "commit-single" as const,
+      index: 0,
+      value: "package",
+      changed: true,
+      focus: false,
+      focusValue: "package",
+    };
+    const multi = {
+      kind: "commit-multi" as const,
+      index: 0,
+      values: ["package"],
+      changed: true,
+      focus: false,
+      focusValue: "package",
+    };
+    expect(segmentedActionIsRoving(roving)).toBe(true);
+    expect(segmentedActionIsCommitSingle(single)).toBe(true);
+    expect(segmentedActionIsCommitMulti(multi)).toBe(true);
+    expect(segmentedActionIsRoving(single)).toBe(false);
+    expect(segmentedActionIsCommitSingle(multi)).toBe(false);
+    expect(segmentedActionIsCommitMulti(roving)).toBe(false);
+  });
+});
+
+describe("分段动作只在策略判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图不再比较 action.kind", () => {
+    for (const name of ["segmented-policy.ts", "SegmentedButton.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return action.kind === "roving"', "");
+      body = body.replaceAll('return action.kind === "commit-single"', "");
+      body = body.replaceAll('return action.kind === "commit-multi"', "");
+      expect(body, name).not.toContain('action.kind === "roving"');
+      expect(body, name).not.toContain('action.kind === "commit-single"');
+      expect(body, name).not.toContain('action.kind === "commit-multi"');
+    }
+  });
+});
+
+describe("单选当前值缺省空串只写一处", () => {
+  it("指针与键盘提交共用 singleValue", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "segmented-policy.ts"), "utf8");
+    const needle = "input.value " + "?? \"\"";
+    expect(source.split(needle).length - 1).toBe(0);
+    expect(source.split("singleValue(input.value)").length - 1).toBe(2);
+    expect(source).toContain("input.values ?? []");
+    expect(source).toContain('input.roving ?? ""');
+  });
+});
+
+describe("按下标读项值只写一处", () => {
+  it("指针与键盘共用 itemValue", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "segmented-policy.ts"), "utf8");
+    const needle = "]?.value";
+    expect(source.split(needle).length - 1).toBe(1);
+    expect(source.split("itemValue(input.items,").length - 1).toBe(2);
+    expect(source.split("if (!value) return undefined").length - 1).toBe(0);
+    expect(source).toContain("singleValue(input.value)");
+  });
+});
+
+describe("分段提交先取可用项", () => {
+  it("单选与多选提交共用 segmentedCommitItem", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "segmented-policy.ts"), "utf8");
+    expect(source.split("if (groupDisabled) " + "return undefined").length - 1).toBe(1);
+    expect(source.split("const item = " + "items[index]").length - 1).toBe(1);
+    expect(source.split("if (!itemIsEnabled(item)) " + "return undefined").length - 1).toBe(1);
+    expect(source.split("function segmentedCommitItem").length - 1).toBe(1);
+    expect(source.split("export function segmentedCommitItem").length - 1).toBe(0);
+    expect(source.split("segmentedCommitItem(items, index, groupDisabled)").length - 1).toBe(2);
+    expect(source.split("if (!item) return undefined").length - 1).toBe(2);
+    expect(source).toContain("function resolveSegmentedCommit");
+    expect(source).toContain("function resolveSegmentedMultiCommit");
+    expect(source).toContain("item.value !== value");
+    expect(source).toContain("toggleSelectedValues");
+  });
+});
+
+describe("分段没有项值就停", () => {
+  it("指针与键盘空项值共用 segmentedHasValue", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "segmented-policy.ts"), "utf8");
+    expect(source.split("if (!value) " + "return undefined").length - 1).toBe(0);
+    expect(source.split("function segmentedHasValue").length - 1).toBe(1);
+    expect(source.split("export function segmentedHasValue").length - 1).toBe(0);
+    expect(source.split("return Boolean(value)").length - 1).toBe(1);
+    expect(source.split("segmentedHasValue(value)").length - 1).toBe(2);
+    expect(source.split("if (!segmentedHasValue(value)) return undefined").length - 1).toBe(2);
+    expect(source).toContain("function itemValue");
+    expect(source).toContain("function segmentedCommitItem");
   });
 });

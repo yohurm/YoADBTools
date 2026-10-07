@@ -8,14 +8,16 @@ import {
   type ToolbarChrome,
   type ToolbarInput,
   type ToolbarOverflow,
-  type ToolbarPad,
+  type YoToolbarPad,
 } from "./toolbar-model";
+
+export { toolbarChromeIsPlain } from "./toolbar-model";
 
 export interface ToolbarHostAttrs {
   role: "toolbar";
   "data-chrome": ToolbarChrome;
   "data-overflow": ToolbarOverflow;
-  "data-pad": ToolbarPad;
+  "data-pad": YoToolbarPad;
 }
 
 export function toolbarHostAttrs(input: ToolbarInput = {}): ToolbarHostAttrs {

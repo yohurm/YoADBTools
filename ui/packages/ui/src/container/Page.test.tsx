@@ -55,6 +55,8 @@ describe("YoPage", () => {
     expect(css).toMatch(/\[data-pad="margin"\]\s*\{[^}]*padding-inline:\s*var\(--yohu-layout-page-margin\)/);
     expect(css).toMatch(/\[data-column="measure"\]\s*\{[^}]*max-width:\s*var\(--yohu-layout-settings-max\)/);
     expect(css).toContain("margin-inline: auto");
+    expect(css).toContain("flex: 1 1 auto");
     expect(css).not.toContain("grid-max");
+    expect(css).not.toContain(".yohu-chrome");
   });
 });

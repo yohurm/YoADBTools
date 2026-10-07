@@ -4,6 +4,7 @@
  * 铬/几何在 L0：主题跟随 `TooltipBg/Fg/Border`，指向 `Layout.Tooltip*`。
  */
 
+import { trimmedTextPresent } from "../container/formrow-model";
 import type { MotionSpecName } from "../tokens/motion";
 
 /** 缺省出示延迟：浮层淡入规格（`--yohu-dur-normal`）。 */
@@ -18,7 +19,7 @@ export interface TooltipTip {
 
 export function tooltipIsEmpty(content: unknown): boolean {
   if (content === null || content === undefined) return true;
-  if (typeof content === "string") return content.trim().length === 0;
+  if (typeof content === "string") return !trimmedTextPresent(content);
   return false;
 }
 

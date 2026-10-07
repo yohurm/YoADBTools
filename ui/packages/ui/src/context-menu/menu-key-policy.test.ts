@@ -1,9 +1,15 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { motionDurationMs } from "../tokens/motion";
 import {
   MENU_TYPEAHEAD_WINDOW_MS,
   firstEnabledIndex,
+  menuIntentIsClose,
+  menuIntentIsMove,
+  menuIntentIsSelect,
   menuItemHostAttrs,
   menuKeyIntent,
   nextTypeaheadQuery,
@@ -54,5 +60,31 @@ describe("menu-key-policy", () => {
     });
     expect(firstEnabledIndex(ITEMS)).toBe(0);
     expect(firstEnabledIndex([{ label: "x", disabled: true }])).toBe(0);
+  });
+
+  it("关闭、移动、选中各判一次", () => {
+    expect(menuIntentIsClose({ type: "close", reason: "escape" })).toBe(true);
+    expect(menuIntentIsMove({ type: "move", index: 1 })).toBe(true);
+    expect(menuIntentIsSelect({ type: "select" })).toBe(true);
+    expect(menuIntentIsClose({ type: "select" })).toBe(false);
+    expect(menuIntentIsMove({ type: "typeahead", char: "a" })).toBe(false);
+    expect(menuIntentIsSelect({ type: "move", index: 0 })).toBe(false);
+  });
+});
+
+describe("菜单键盘意图只在策略判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图不再比较 intent.type", () => {
+    for (const name of ["menu-key-policy.ts", "ContextMenu.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return intent.type === "close"', "");
+      body = body.replaceAll('return intent.type === "move"', "");
+      body = body.replaceAll('return intent.type === "select"', "");
+      expect(body, name).not.toContain('intent.type === "close"');
+      expect(body, name).not.toContain('intent.type === "move"');
+      expect(body, name).not.toContain('intent.type === "select"');
+      expect(body, name).not.toContain('intent.type === "typeahead"');
+    }
   });
 });

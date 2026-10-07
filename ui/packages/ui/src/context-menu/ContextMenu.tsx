@@ -10,10 +10,14 @@ import { typeaheadMatchIndex } from "./menu-list-model";
 import {
   MENU_TYPEAHEAD_WINDOW_MS,
   firstEnabledIndex,
+  menuIntentIsClose,
+  menuIntentIsMove,
+  menuIntentIsSelect,
   menuItemHostAttrs,
   menuKeyIntent,
   nextTypeaheadQuery,
 } from "./menu-key-policy";
+import { itemIsEnabled } from "../keymap/list-index";
 import { YoCorner } from "../corner";
 import { YoPresence } from "../motion/engines/presence";
 import "./ContextMenu.css";
@@ -51,11 +55,14 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
     el?.focus();
   };
 
-  const selectIndex = (index: number): void => {
-    const item = props.items[index];
-    if (!item || item.disabled) return;
+  function chooseItem(item: YoMenuItem): void {
+    if (!itemIsEnabled(item)) return;
     props.onSelect(item.id);
     props.onClose();
+  }
+
+  const selectIndex = (index: number): void => {
+    chooseItem(props.items[index]);
   };
 
   const onDocMouse = (event: MouseEvent): void => {
@@ -73,17 +80,17 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
     });
     if (!intent) return;
     event.preventDefault();
-    if (intent.type === "close") {
+    if (menuIntentIsClose(intent)) {
       clearTypeahead();
       props.onClose();
       return;
     }
-    if (intent.type === "move") {
+    if (menuIntentIsMove(intent)) {
       setFocusIndex(intent.index);
       focusItem(intent.index);
       return;
     }
-    if (intent.type === "select") {
+    if (menuIntentIsSelect(intent)) {
       selectIndex(focusIndex());
       return;
     }
@@ -105,12 +112,19 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
     }
     const first = untrack(() => firstEnabledIndex(props.items));
     setFocusIndex(first);
-    document.addEventListener("mousedown", onDocMouse);
-    document.addEventListener("keydown", onDocKey);
+    const listen = <K extends keyof DocumentEventMap>(
+      type: K,
+      handler: (event: DocumentEventMap[K]) => void,
+    ): (() => void) => {
+      document.addEventListener(type, handler);
+      return () => document.removeEventListener(type, handler);
+    };
+    const stopMouse = listen("mousedown", onDocMouse);
+    const stopKey = listen("keydown", onDocKey);
     queueMicrotask(() => focusItem(first));
     onCleanup(() => {
-      document.removeEventListener("mousedown", onDocMouse);
-      document.removeEventListener("keydown", onDocKey);
+      stopMouse();
+      stopKey();
       clearTypeahead();
     });
   });
@@ -130,6 +144,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
           root = el;
         }}
         class="yohu-context-menu"
+        data-enter="rise"
         role="menu"
         style={{ left: `${props.x}px`, top: `${props.y}px` }}
       >
@@ -146,11 +161,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
                   data-slot={attrs()["data-slot"]}
                   disabled={attrs().disabled}
                   tabindex={attrs().tabindex}
-                  onClick={() => {
-                    if (item.disabled) return;
-                    props.onSelect(item.id);
-                    props.onClose();
-                  }}
+                  onClick={() => chooseItem(item)}
                 >
                   <span class="yohu-context-menu__slot" data-slot="label">
                     {item.label}

@@ -27,7 +27,7 @@ describe("YoSubheader", () => {
       <YoSubheader title="设备" meta={<span>2</span>} actions={<span>刷新</span>} />
     ));
     const host = container.querySelector(".yohu-subheader") as HTMLElement;
-    expect(host.getAttribute("data-has-meta")).toBe("true");
+    expect(host.getAttribute("data-has-meta")).toBe("");
     const kids = Array.from(host.children);
     expect(kids[0]?.classList.contains("yohu-subheader__title")).toBe(true);
     expect(kids[1]?.classList.contains("yohu-subheader__meta")).toBe(true);

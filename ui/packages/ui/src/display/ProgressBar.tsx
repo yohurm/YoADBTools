@@ -5,6 +5,7 @@
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import type { ProgressSize } from "./progress-model";
 import { progressFillWidth, progressHostAttrs } from "./progress-policy";
 import "./ProgressBar.css";
 
@@ -13,6 +14,8 @@ export interface YoProgressBarProps {
   value?: number;
   /** 不定态 */
   indeterminate?: boolean;
+  /** 轨高。缺省 xs；sm 写 data-size，禁止调用方改高度。 */
+  size?: ProgressSize;
 }
 
 /** 渲染一个确定态或不定态进度条。内容区 = 轨道内填充。 */
@@ -23,6 +26,7 @@ export function YoProgressBar(props: YoProgressBarProps): JSX.Element {
     <div
       class="yohu-progress"
       data-mode={host()["data-mode"]}
+      data-size={host()["data-size"]}
       role={host().role}
       aria-valuemin={host()["aria-valuemin"]}
       aria-valuemax={host()["aria-valuemax"]}

@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-  edgeIndex,
   findOption,
   optionDescription,
   optionDomId,
+  optionIsSelected,
   selectedIndex,
   selectKeyIntent,
   stepIndex,
@@ -20,6 +23,19 @@ describe("select-model", () => {
   it("空字符串 value 生成稳定 option id", () => {
     expect(optionDomId("")).toBe("yohu-option-empty");
     expect(optionDomId("a")).toBe("yohu-option-a");
+  });
+
+  it("选中只比较一次", () => {
+    expect(optionIsSelected(OPTIONS[0]!, "a")).toBe(true);
+    expect(optionIsSelected(OPTIONS[1]!, "a")).toBe(false);
+    expect(optionIsSelected(OPTIONS[2]!, "")).toBe(true);
+    expect(optionIsSelected(OPTIONS[0]!, null)).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["select-model.ts", "select-policy.ts", "Select.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "select-model.ts") body = body.replace("return option.value === value;", "");
+      expect(body, name).not.toContain("option.value ===");
+    }
   });
 
   it("按 value 查找选项", () => {
@@ -46,12 +62,6 @@ describe("select-model", () => {
     expect(stepIndex(3, 2, 1)).toBe(0);
     expect(stepIndex(3, 0, -1)).toBe(2);
     expect(stepIndex(0, 0, 1)).toBe(-1);
-  });
-
-  it("Home/End 落到首尾", () => {
-    expect(edgeIndex(3, "start")).toBe(0);
-    expect(edgeIndex(3, "end")).toBe(2);
-    expect(edgeIndex(0, "end")).toBe(-1);
   });
 
   it("键盘意图：开合与步进", () => {

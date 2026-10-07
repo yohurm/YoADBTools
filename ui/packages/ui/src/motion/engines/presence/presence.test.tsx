@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
+import { loadMotionCss, loadMotionLayerCss } from "../../css";
 import * as reduced from "../../reduced";
 import { YoPresence } from "./index";
 
@@ -13,6 +14,33 @@ function nextPaint(): Promise<void> {
 }
 
 describe("YoPresence", () => {
+  it("出场配方只认 data-enter，不点对话框和菜单的 class", () => {
+    const css = loadMotionLayerCss("engines/presence/presence.css");
+    expect(css).toContain('[data-enter="fade"]');
+    expect(css).toContain('[data-enter="scale"]');
+    expect(css).toContain('[data-enter="rise"]');
+    expect(css).toContain('[data-enter="tip"]');
+    expect(css).toContain("yohu-tip-in");
+    expect(css).not.toContain(".yohu-dialog__");
+    expect(css).not.toContain(".yohu-select__");
+    expect(css).not.toContain(".yohu-context-menu");
+    expect(css).not.toContain(".yohu-tooltip");
+    const reducedCss = loadMotionLayerCss("reduced.css");
+    expect(reducedCss).toContain("transition-duration: 0.01ms !important");
+    expect(reducedCss).toContain("animation-iteration-count: 1 !important");
+    expect(reducedCss).not.toContain(".yohu-dialog");
+    expect(reducedCss).not.toContain(".yohu-context-menu");
+    expect(reducedCss).not.toContain(".yohu-tooltip");
+  });
+
+  it("fade 自己铺满，不给子级写 flex", () => {
+    const css = loadMotionCss();
+    expect(css).toMatch(/\.yohu-presence\[data-recipe="fade"\]\s*\{[^}]*flex:\s*1 1 auto/);
+    expect(css).not.toMatch(/\.yohu-presence\[data-recipe="fade"\]\s*>\s*\*/);
+    expect(css).not.toContain(".yohu-presence__clip > *");
+    expect(css).toContain(".yohu-presence__face");
+  });
+
   it("when 从 false 到 true 同拍挂载，data-state=open", () => {
     const [open, setOpen] = createSignal(false);
     render(() => (

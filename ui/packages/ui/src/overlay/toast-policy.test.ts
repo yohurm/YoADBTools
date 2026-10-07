@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { motionDurationMs } from "../tokens/motion";
 import {
@@ -77,5 +80,13 @@ describe("toast-policy", () => {
 
   it("堆栈宿主是通知 region", () => {
     expect(toasterHostAttrs()).toEqual({ role: "region", "aria-label": "通知" });
+  });
+
+  it("空文案只在 toastTextPresent 里比较", () => {
+    const model = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "toast-model.ts"), "utf8").replace(
+      "return value.length > 0",
+      "",
+    );
+    expect(model).not.toContain("return value.length > 0");
   });
 });

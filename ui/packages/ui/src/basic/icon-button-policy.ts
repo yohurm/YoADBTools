@@ -3,12 +3,14 @@
  * 禁用与加载是同一写入口；宿主 data-* 从模型快照组装。
  * 不写色值、不画铬。
  */
+import { presenceAttr, trueAttr } from "../dom/flag";
 
+import { controlBusyAttr, resolveControlBusy } from "./control-busy";
 import {
   resolveIconButtonSpec,
   type IconButtonInput,
+  type ControlIconSize,
   type YoIconButtonPaint,
-  type YoIconButtonSize,
 } from "./icon-button-model";
 
 export interface IconButtonInteractiveInput {
@@ -24,12 +26,10 @@ export interface IconButtonInteractive {
   pressed: boolean;
 }
 
-/** loading 同时关掉输入并报 busy。只降透明度仍算可点，不算禁用。 */
+/** loading 同时关掉输入并报 busy。按下是图标钮自己的事实。 */
 export function resolveIconButtonInteractive(input: IconButtonInteractiveInput): IconButtonInteractive {
-  const busy = Boolean(input.loading);
   return {
-    disabled: Boolean(input.disabled) || busy,
-    busy,
+    ...resolveControlBusy(input),
     pressed: Boolean(input.pressed),
   };
 }
@@ -37,11 +37,11 @@ export function resolveIconButtonInteractive(input: IconButtonInteractiveInput):
 /** 显式 aria-pressed 优先；否则 pressed 才是切换钮。 */
 export function resolveIconButtonAriaPressed(input: IconButtonInteractiveInput): boolean | undefined {
   if (input.ariaPressed !== undefined) return input.ariaPressed;
-  return input.pressed ? true : undefined;
+  return trueAttr(Boolean(input.pressed));
 }
 
 export interface IconButtonHostAttrs {
-  "data-size": YoIconButtonSize;
+  "data-size": ControlIconSize;
   "data-paint": YoIconButtonPaint | undefined;
   "data-pressed": "" | undefined;
   "data-busy": "" | undefined;
@@ -58,10 +58,10 @@ export function iconButtonHostAttrs(
   return {
     "data-size": spec.size,
     "data-paint": spec.paint,
-    "data-pressed": interactive.pressed ? "" : undefined,
-    "data-busy": interactive.busy ? "" : undefined,
+    "data-pressed": presenceAttr(interactive.pressed),
+    "data-busy": presenceAttr(interactive.busy),
     disabled: interactive.disabled,
-    "aria-busy": interactive.busy ? true : undefined,
+    "aria-busy": controlBusyAttr(interactive.busy),
     "aria-pressed": resolveIconButtonAriaPressed(input),
   };
 }

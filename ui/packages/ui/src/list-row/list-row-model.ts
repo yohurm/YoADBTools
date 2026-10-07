@@ -6,6 +6,16 @@
  */
 
 export type YoListRowTone = "document" | "list";
+
+/** 文档面。虚拟列表流式布局和表头 document 都认这一把。 */
+export function listRowToneIsDocument(tone?: string): boolean {
+  return tone === "document";
+}
+
+/** 列表面。行半径走直角通栏。 */
+export function listRowToneIsList(tone?: string): boolean {
+  return tone === "list";
+}
 export type YoListRowFill = "none" | "selected" | "hot";
 /** none = 直角通栏；chip = document 单选圆角片。 */
 export type YoListRowRadius = "none" | "chip";
@@ -32,7 +42,7 @@ export interface ListRowChrome {
  */
 export function resolveListRowRadius(input: ListRowChromeInput = {}): YoListRowRadius {
   if (!input.selectable) return "none";
-  if (input.tone === "list") return "none";
+  if (listRowToneIsList(input.tone)) return "none";
   if (input.selectedKeys !== undefined && input.selectedKeys.size > 1) return "none";
   return "chip";
 }

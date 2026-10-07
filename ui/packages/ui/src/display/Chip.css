@@ -80,8 +80,3 @@
 .yohu-chip[data-block] .yohu-chip__label {
   flex: 1 1 auto;
 }
-
-.yohu-chip .yohu-recipe-dismiss {
-  position: relative;
-  z-index: 1;
-}

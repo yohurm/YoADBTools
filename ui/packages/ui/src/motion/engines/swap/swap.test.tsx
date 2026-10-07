@@ -52,7 +52,7 @@ describe("YoSwap", () => {
   it("先换目标文案再插槽宽，禁止收到尽头再换字", () => {
     const src = `${loadFile("src/motion/engines/swap/swap.tsx")}\n${loadFile("src/motion/engines/swap/swap-model.ts")}\n${loadFile("src/motion/engines/swap/swap-policy.ts")}`;
     expect(src).toContain("先换目标文案");
-    expect(src).toContain("inner.offsetWidth");
+    expect(src).toContain("el.offsetWidth");
     expect(src).not.toMatch(/\.getBoundingClientRect\s*\(/);
     expect(src).not.toContain("requestAnimationFrame");
     expect(src).toContain("setView(() => incoming)");

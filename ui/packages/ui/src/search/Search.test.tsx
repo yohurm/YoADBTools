@@ -71,7 +71,7 @@ describe("YoSearch", () => {
 
   it("收起后仍有查询时入口保持按下", () => {
     render(() => <YoSearch slot="entry" collapsible open={false} value="ping" title="搜索命令" />);
-    expect(screen.getByRole("button", { name: "搜索命令" }).getAttribute("data-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "搜索命令" }).getAttribute("data-pressed")).toBe("");
   });
 
   it("error 写 aria-invalid，禁用无清除", () => {
@@ -88,5 +88,99 @@ describe("YoSearch", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(css).not.toMatch(/rgba?\(/);
     expect(css).not.toContain(".yohu-search__clear");
+    expect(css).not.toContain(".yohu-icon");
+  });
+
+  it("查询非空只判一次", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const policy = readFileSync(resolve(dir, "search-policy.ts"), "utf8").replace(
+      'return (value ?? "").length > 0',
+      "",
+    );
+    const view = readFileSync(resolve(dir, "Search.tsx"), "utf8");
+    for (const [name, body] of [
+      ["search-policy.ts", policy],
+      ["Search.tsx", view],
+    ] as const) {
+      expect(body, name).not.toContain('(value ?? "").length > 0');
+      expect(body, name).not.toContain("value.length > 0");
+    }
+  });
+
+  it("当前检索文本只写一处", () => {
+    const view = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Search.tsx"), "utf8");
+    const needle = "props.value ?? inputEl?.value " + "?? \"\"";
+    expect(view.split(needle).length - 1).toBe(1);
+    expect(view).toContain("props.onSubmit?.(fieldValue())");
+    expect(view).toContain("const value = fieldValue()");
+    expect(view).toContain('props.title ?? ""');
+    expect(view).toContain('props.value ?? ""');
+  });
+});
+
+describe("搜索读事件文本", () => {
+  it("两处从事件读当前文本", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Search.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("event.currentTarget as " + "HTMLInputElement")).toBe(1);
+    expect(times("function searchEventValue")).toBe(1);
+    expect(times("export function searchEventValue")).toBe(0);
+    expect(times("searchEventValue(event)")).toBe(2);
+    expect(times("emit(searchEventValue(event), event)")).toBe(1);
+    expect(times("event as InputEvent")).toBe(1);
+    expect(src).toContain("const fieldValue");
+  });
+});
+
+function searchSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Search.tsx"), "utf8");
+}
+
+describe("搜索禁用", () => {
+  it("清空、开关和三处宿主都问同一把禁用", () => {
+    const src = searchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("host()." + "disabled")).toBe(1);
+    expect(times("function searchDisabled")).toBe(1);
+    expect(times("export function searchDisabled")).toBe(0);
+    expect(times("searchDisabled()")).toBe(6);
+    expect(times("if (searchDisabled()) return")).toBe(2);
+    expect(times("disabled={searchDisabled()}")).toBe(3);
+  });
+});
+
+describe("搜索展开", () => {
+  it("栏、入口和折叠都问同一把展开", () => {
+    const src = searchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('flagIsOn(host()["' + 'data-open"])')).toBe(1);
+    expect(times("function searchOpened")).toBe(1);
+    expect(times("export function searchOpened")).toBe(0);
+    expect(times("searchOpened()")).toBe(5);
+  });
+});
+
+describe("搜索栏槽", () => {
+  it("聚焦和绘制都问栏在不在", () => {
+    const src = searchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("searchShowsBar(" + "slot())")).toBe(1);
+    expect(times("function searchBarOn")).toBe(1);
+    expect(times("export function searchBarOn")).toBe(0);
+    expect(times("searchBarOn()")).toBe(3);
+  });
+});
+
+describe("搜索缺省名", () => {
+  it("入口和输入框都用同一句搜索", () => {
+    const src = searchSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('?? "' + '搜索"')).toBe(0);
+    expect(times('return "' + '搜索"')).toBe(1);
+    expect(times("function searchFallbackName")).toBe(1);
+    expect(times("export function searchFallbackName")).toBe(0);
+    expect(times("searchFallbackName()")).toBe(3);
+    expect(times("props.title ?? props.ariaLabel ?? searchFallbackName()")).toBe(1);
+    expect(times("props.ariaLabel ?? props.title ?? searchFallbackName()")).toBe(1);
   });
 });

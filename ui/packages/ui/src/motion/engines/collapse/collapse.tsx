@@ -8,6 +8,7 @@
  */
 import { createContext, createEffect, createMemo, createSignal, on, onCleanup, useContext } from "solid-js";
 import type { JSX } from "solid-js";
+import { closedAttr } from "../../../dom/flag";
 import { motionSpecMs } from "../../../tokens/motion";
 import { shouldSkipMotion } from "../../reduced";
 import { PRESENCE_EXIT_SAFETY_MS } from "../../spec/recipes";
@@ -15,6 +16,7 @@ import {
   COLLAPSE_TRIP_PROPERTY,
   resolveCollapseTripOnToggle,
   resolveCollapseTripSpec,
+  type CollapseFlex,
   type CollapseRecipe,
 } from "./collapse-model";
 import { collapseHostAttrs } from "./collapse-policy";
@@ -37,11 +39,15 @@ export interface YoCollapseProps {
   open: boolean;
   /** 默认 collapse（仅高度）。panel = 高度 + 内容淡入上移。fill = 内层填满可收缩。 */
   recipe?: CollapseRecipe;
+  /** 父级 flex 里的占位。缺省不写，调用方不得再点 .yohu-collapse。 */
+  flex?: CollapseFlex;
   children: JSX.Element;
 }
 
 export function YoCollapse(props: YoCollapseProps): JSX.Element {
-  const host = createMemo(() => collapseHostAttrs({ open: props.open, recipe: props.recipe }));
+  const host = createMemo(() =>
+    collapseHostAttrs({ open: props.open, recipe: props.recipe, flex: props.flex }),
+  );
   const [traveling, setTraveling] = createSignal(false);
   let safety = 0;
 
@@ -89,9 +95,10 @@ export function YoCollapse(props: YoCollapseProps): JSX.Element {
         class="yohu-collapse"
         data-open={host()["data-open"]}
         data-recipe={host()["data-recipe"]}
+        data-flex={host()["data-flex"]}
         onTransitionEnd={onTransitionEnd}
       >
-        <div class="yohu-collapse__inner" aria-hidden={!props.open || undefined} inert={!props.open ? true : undefined}>
+        <div class="yohu-collapse__inner" aria-hidden={closedAttr(props.open)} inert={closedAttr(props.open)}>
           <div class="yohu-collapse__content">{props.children}</div>
         </div>
       </div>

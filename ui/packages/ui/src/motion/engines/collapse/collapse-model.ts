@@ -19,9 +19,13 @@ export const COLLAPSE_INTERPOLATE_RECIPES = ["collapse", "panel", "fill"] as con
 
 export const DEFAULT_COLLAPSE_RECIPE: CollapseRecipe = "collapse";
 
+/** 折叠根在父级 flex 里怎么占高。缺省不写，树行不会被拉高。 */
+export type CollapseFlex = "grow" | "hug";
+
 export interface CollapseInput {
   open?: boolean;
   recipe?: CollapseRecipe;
+  flex?: CollapseFlex;
 }
 
 export interface CollapseSpec {
@@ -31,6 +35,11 @@ export interface CollapseSpec {
 
 export function resolveCollapseRecipe(recipe?: CollapseRecipe): CollapseRecipe {
   return recipe ?? DEFAULT_COLLAPSE_RECIPE;
+}
+
+/** 未知值不当一种新占位。 */
+export function resolveCollapseFlex(flex?: CollapseFlex): CollapseFlex | undefined {
+  return flex === "grow" || flex === "hug" ? flex : undefined;
 }
 
 export function resolveCollapseSpec(input: CollapseInput): CollapseSpec {

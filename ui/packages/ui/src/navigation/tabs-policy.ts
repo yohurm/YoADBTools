@@ -8,14 +8,21 @@ import {
   closeFocusIndex,
   tabAt,
   tabsActiveIndex,
+  tabsKeyIsActivate,
   tabsKeyIntent,
   type TabsIdentity,
   type TabsKeyIntent,
+  type TabsKeyKind,
 } from "./tabs-model";
 
 export interface TabsChrome {
   canClose: boolean;
   canNew: boolean;
+}
+
+/** 页签指示走底边。fill 与 thumb 不是这一把。 */
+export function tabsIndicatorVariant(): "underline" {
+  return "underline";
 }
 
 export function resolveTabsChrome(input: { onClose?: unknown; onNew?: unknown }): TabsChrome {
@@ -42,10 +49,15 @@ export function tabsTabAttrs(tabId: string, activeId?: string | null): TabsTabAt
 }
 
 export interface TabsKeyAction {
-  type: "activate" | "close";
+  type: TabsKeyKind;
   id: string;
   index: number;
   focusIndex: number;
+}
+
+/** 激活页签。关闭是另一档。判定在 tabsKeyIsActivate。 */
+export function tabsActionIsActivate(action: TabsKeyAction): boolean {
+  return tabsKeyIsActivate(action);
 }
 
 export function resolveTabsKeyAction(
@@ -64,7 +76,7 @@ export function applyTabsKeyIntent(
 ): TabsKeyAction | null {
   const tab = tabAt(tabs, intent.index);
   if (!tab) return null;
-  if (intent.type === "activate") {
+  if (tabsKeyIsActivate(intent)) {
     return { type: "activate", id: tab.id, index: intent.index, focusIndex: intent.index };
   }
   return {

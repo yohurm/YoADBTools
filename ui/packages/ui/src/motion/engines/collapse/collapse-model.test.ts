@@ -30,6 +30,9 @@ describe("collapse-model / policy", () => {
       "data-open": "true",
       "data-recipe": "fill",
     });
+    expect(collapseHostAttrs({ open: true, flex: "grow" })["data-flex"]).toBe("grow");
+    expect(collapseHostAttrs({ open: true, flex: "hug" })["data-flex"]).toBe("hug");
+    expect(collapseHostAttrs({ open: false })["data-flex"]).toBeUndefined();
   });
 
   it("行高只认 open", () => {
@@ -57,6 +60,7 @@ describe("collapse-model / policy", () => {
     const fill = css.slice(css.indexOf("配方 fill"));
     expect(fill.length).toBeGreaterThan(0);
     expect(fill).not.toMatch(/\.yohu-collapse__inner\s*>\s*\*[^{]*\{[^}]*min-height:\s*min-content/);
+    expect(fill).not.toContain(".yohu-collapse__content > *");
     expect(fill).not.toContain("min-height: min-content");
   });
 });

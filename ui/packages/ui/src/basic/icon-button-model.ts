@@ -4,22 +4,24 @@
  * 不碰 DOM、不判定 disabled / loading / pressed。
  */
 
-export type YoIconButtonSize = "sm" | "md";
+import type { ControlIconSize } from "./control-icon";
+
+export type { ControlIconSize };
 export type YoIconButtonPaint = "window";
 export type IconButtonContentKind = "icon" | "slot";
 
 export const ICON_BUTTON_SIZES = ["sm", "md"] as const;
-export const DEFAULT_ICON_BUTTON_SIZE: YoIconButtonSize = "md";
+export const DEFAULT_ICON_BUTTON_SIZE: ControlIconSize = "md";
 
 export interface IconButtonInput {
-  size?: YoIconButtonSize;
+  size?: ControlIconSize;
   paint?: YoIconButtonPaint;
   hasIcon?: boolean;
   hasSlot?: boolean;
 }
 
 export interface IconButtonSpec {
-  size: YoIconButtonSize;
+  size: ControlIconSize;
   paint?: YoIconButtonPaint;
   content: IconButtonContentKind;
 }

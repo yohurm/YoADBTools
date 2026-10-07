@@ -18,13 +18,28 @@ export interface PageSpec {
   column: YoPageColumn;
 }
 
+/** 设置页。页垫和列帽都认这一把。 */
+export function pageRoleIsSettings(role?: string): boolean {
+  return role === "settings";
+}
+
+/** 左右 page-margin。缺省 inset 不写 data-pad。 */
+export function pagePadIsMargin(pad?: string): boolean {
+  return pad === "margin";
+}
+
+/** 阅读列帽。缺省 fill 不写 data-column。 */
+export function pageColumnIsMeasure(column?: string): boolean {
+  return column === "measure";
+}
+
 export function resolvePageRole(role?: YoPageRole): YoPageRole {
-  return role === "settings" ? "settings" : DEFAULT_PAGE_ROLE;
+  return pageRoleIsSettings(role) ? "settings" : DEFAULT_PAGE_ROLE;
 }
 
 /** 设置页 PC 左右 40vp；效率型贴边 12vp。 */
 export function pagePadForRole(role: YoPageRole): YoPagePad {
-  return role === "settings" ? "margin" : DEFAULT_PAGE_PAD;
+  return pageRoleIsSettings(role) ? "margin" : DEFAULT_PAGE_PAD;
 }
 
 /**
@@ -32,7 +47,7 @@ export function pagePadForRole(role: YoPageRole): YoPagePad {
  * 全屏适配是居中，不是把表单拉满栅格（栅格帽是窗口 12 列）。
  */
 export function pageColumnForRole(role: YoPageRole): YoPageColumn {
-  return role === "settings" ? "measure" : DEFAULT_PAGE_COLUMN;
+  return pageRoleIsSettings(role) ? "measure" : DEFAULT_PAGE_COLUMN;
 }
 
 export function resolvePageSpec(role?: YoPageRole): PageSpec {

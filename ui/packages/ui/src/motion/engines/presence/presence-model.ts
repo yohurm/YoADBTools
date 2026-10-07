@@ -5,11 +5,14 @@
  * 对照 Vue TransitionGroup：enter 只加在新插入的节点，禁止一挂就是终态。
  */
 
+/** 出场挂载态。出生函数和视图信号都认这一份。轨的 open/closed 不是它。 */
+export type PresenceState = "open" | "closed";
+
 export function presenceBornState(input: {
   when: boolean;
   delayOpen: boolean;
   skipMotion: boolean;
-}): "open" | "closed" {
+}): PresenceState {
   if (!input.when) return "closed";
   if (input.delayOpen && !input.skipMotion) return "closed";
   return "open";

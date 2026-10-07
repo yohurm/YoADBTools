@@ -17,6 +17,9 @@ const TABS = [
 describe("YoTabs", () => {
   it("渲染标签并标记激活项", () => {
     render(() => <YoTabs tabs={TABS} activeId="a" />);
+    const tablist = screen.getByRole("tablist");
+    expect(tablist.classList.contains("yohu-indicator-host")).toBe(true);
+    expect(tablist.getAttribute("data-indicator-variant")).toBe("underline");
     const active = screen.getByRole("tab", { selected: true });
     expect(active.textContent).toContain("会话A");
     expect(screen.getByRole("tab", { name: /会话B/ })).toBeTruthy();

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { GROW_TRIP_PROPERTY, resolveGrow } from "./grow-model";
@@ -20,5 +23,14 @@ describe("grow", () => {
     expect(resolveGrow(139, 48)).toEqual({ from: 139, to: 48 });
     expect(growHostAttrs()["data-grow"]).toBe("used");
     expect(GROW_TRIP_PROPERTY).toBe("height");
+  });
+});
+
+describe("用后高不再自判行程", () => {
+  it("零盒与阈值只留在 travel", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "grow-model.ts"), "utf8");
+    expect(body).not.toContain("!(from > 0)");
+    expect(body).not.toContain("Number.isFinite(from)");
+    expect(body).not.toContain("Math.abs(to - from)");
   });
 });

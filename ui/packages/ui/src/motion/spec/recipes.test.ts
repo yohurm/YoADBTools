@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { MotionSpec, motionDurationMs } from "../../tokens/motion";
 import { loadMotionCss } from "../css";
-import { DISMISS_HOLD_DURATION, GROW_SPEC, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, TRAVEL_SPEC, presenceClipProperty, presenceExitWatchProperty, presenceUsesClip, presenceUsesTransition } from "./recipes";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { DISMISS_HOLD_DURATION, GROW_SPEC, INDICATOR_DURATION, PRESENCE_EXIT_DURATION, SWAP_DURATION, TRAVEL_SPEC, presenceClipProperty, presenceExitWatchProperty, presenceUsesClip } from "./recipes";
 
 describe("motion recipes", () => {
   it("配方时长从 MotionSpec 派生，禁止散落毫秒", () => {
@@ -32,7 +35,8 @@ describe("motion recipes", () => {
     expect(untilPopover).toContain("translateY(100%)");
     expect(untilPopover).toContain("scale(0.94)");
     expect(untilPopover).toContain("grid-template-rows");
-    expect(untilPopover).toContain(".yohu-presence__clip > *");
+    expect(untilPopover).toContain(".yohu-presence__face");
+    expect(untilPopover).not.toContain(".yohu-presence__clip > *");
     expect(untilPopover).toContain("overflow: visible");
     expect(untilPopover).toContain("opacity var(--yohu-motion-spatial-rail)");
     expect(untilPopover).toContain("opacity var(--yohu-motion-effects-exit)");
@@ -65,8 +69,17 @@ describe("motion recipes", () => {
     expect(presenceUsesClip("chip")).toBe(true);
     expect(presenceClipProperty("chip")).toBe("grid-template-columns");
     expect(presenceClipProperty("list")).toBe("grid-template-rows");
-    expect(presenceUsesTransition("toast")).toBe(true);
     expect(presenceUsesClip("toast")).toBe(true);
+    expect(presenceUsesClip("dialog")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["recipes.ts", "../engines/presence/presence.tsx"]) {
+      const text = readFileSync(resolve(here, name), "utf8");
+      expect(text, name).not.toContain("presenceUsesTransition");
+      expect(text, name).not.toContain("PRESENCE_TRANSITION_RECIPES");
+      expect(text, name).not.toContain('recipe === "list"');
+      expect(text, name).not.toContain('recipe === "chip"');
+      expect(text, name).not.toContain('recipe === "toast"');
+    }
     expect(presenceClipProperty("toast")).toBe("grid-template-rows");
     expect(presenceExitWatchProperty("toast")).toBe("grid-template-rows");
     const css = loadMotionCss();
@@ -132,8 +145,10 @@ describe("motion recipes", () => {
     expect(untilFill).not.toContain("yohu-dialog");
     expect(untilFill).not.toContain('[data-travel="hold"]');
     expect(untilFill).not.toContain("requestAnimationFrame");
-    expect(css).toContain('.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"]');
-    expect(css).toContain("overflow: clip");
+    expect(untilFill).toContain("--yohu-reveal-out-overflow: clip");
+    expect(untilFill).toContain("--yohu-reveal-out-overflow: visible");
+    expect(untilFill).not.toContain(".yohu-reveal");
+    expect(css).not.toContain(".yohu-travel:not([data-travel]) .yohu-reveal");
   });
 
   it("YoGrow 只裁切，插值不接 CSS transition", () => {
@@ -159,7 +174,9 @@ describe("motion recipes", () => {
     expect(untilFill).toContain("height: 0");
     expect(untilFill).toContain("min-height: 0");
     expect(untilFill).toContain("--yohu-reveal-span");
+    expect(untilFill).toContain("overflow: var(--yohu-reveal-out-overflow, visible)");
     expect(untilFill).toContain("overflow: visible");
+    expect(untilFill).not.toContain(".yohu-travel");
     expect(untilFill).not.toContain("overflow: hidden");
     expect(untilFill).toContain(".yohu-reveal__content");
     expect(untilFill).toContain("position: absolute");
@@ -177,6 +194,7 @@ describe("motion recipes", () => {
     expect(untilRail).toContain("flex-direction: column");
     expect(untilRail).toContain(".yohu-collapse__content");
     expect(untilRail).not.toContain(".yohu-collapse__inner > *");
+    expect(untilRail).not.toContain(".yohu-collapse__content > *");
     expect(untilRail).toContain("flex: 1");
     expect(untilRail).toContain("min-height: 0");
     expect(untilRail).not.toContain("grid-template-rows");
@@ -203,7 +221,9 @@ describe("motion recipes", () => {
   it("send-aim 有内容朝上，时长走 spatialSmall", () => {
     const css = loadMotionCss();
     expect(css).toContain("yohu-recipe-send-aim");
-    expect(css).toContain('.yohu-recipe-send-aim[data-armed="true"] .yohu-icon');
+    expect(css).toContain('.yohu-recipe-send-aim[data-armed="true"]');
+    expect(css).toContain("--yohu-icon-transform: rotate(-90deg)");
+    expect(css).not.toContain("[data-icon]");
     expect(css).toContain("rotate(-90deg)");
     const sendBlock = css.slice(css.indexOf("配方 send-aim"));
     const untilIndicator = sendBlock.slice(0, sendBlock.indexOf(".yohu-recipe-dismiss-fade"));
@@ -240,10 +260,9 @@ describe("motion recipes", () => {
     expect(untilChevron).toContain("grid-template-columns var(--yohu-motion-spatial-panel)");
     expect(untilChevron).not.toContain("transition: width");
     const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduce).toContain(".yohu-recipe-rail");
-    expect(reduce).toContain(".yohu-recipe-preview");
-    expect(reduce).toContain(".yohu-rail-slot");
-    expect(reduce).toContain(".yohu-list-item__info");
+    expect(reduce).toContain("transition-duration: 0.01ms !important");
+    expect(reduce).not.toContain(".yohu-recipe-rail");
+    expect(reduce).not.toContain(".yohu-list-item");
   });
 
   it("换位行铬在 L1，reduce 覆盖邻行让位", () => {
@@ -263,15 +282,11 @@ describe("motion recipes", () => {
     expect(untilReduce).not.toContain(".yohu-chip");
 
     const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduce).toContain("[data-reordering] [data-key]:not([data-reorder=\"source\"])");
-    expect(reduce).not.toContain("> * > [data-key]");
-    expect(reduce).not.toContain("__view");
-    expect(reduce).not.toContain('.yohu-chip[data-dismiss="hover"] .yohu-chip__remove');
-    expect(reduce).not.toContain(".yohu-chip__remove");
-    expect(reduce).toContain(".yohu-recipe-clear");
-    expect(reduce).toContain(".yohu-recipe-reorder-bar[data-ready]");
-    expect(reduce).toContain(".yohu-recipe-reorder-overlay[data-ready]");
-    expect(reduce).not.toContain(".yohu-virtual-list[data-reordering] .yohu-virtual-list__row");
-    expect(reduce).not.toContain(".yohu-reorder-list[data-reordering] .yohu-reorder-list__row");
+    expect(reduce).toContain("animation-iteration-count: 1 !important");
+    expect(reduce).not.toContain("[data-reordering]");
+    expect(reduce).not.toContain(".yohu-chip");
+    expect(reduce).not.toContain(".yohu-recipe-clear");
+    expect(reduce).not.toContain(".yohu-virtual-list");
+    expect(reduce).not.toContain(".yohu-reorder-list");
   });
 });

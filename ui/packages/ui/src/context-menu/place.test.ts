@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { clampContextMenuPoint, clampToRect, estimateContextMenuHeight } from "./place";
+import { clampToRect } from "../placement/clamp";
+import { clampContextMenuPoint, estimateContextMenuHeight } from "./place";
 
 describe("clampContextMenuPoint", () => {
   it("贴右下角时夹进视口", () => {
@@ -49,5 +53,25 @@ describe("clampToRect", () => {
       x: 0,
       y: 0,
     });
+  });
+});
+
+describe("夹紧分量", () => {
+  it("尺寸、原点和剩余限度必填不小于 0", () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "..", "placement", "clamp.ts"),
+      "utf8",
+    );
+    const times = (needle: string): number => source.split(needle).length - 1;
+    expect(times("Math.max(0, " + "size)")).toBe(0);
+    expect(times("Math.max(0, " + "origin)")).toBe(0);
+    expect(times("Math.max(0, " + "limit - span)")).toBe(0);
+    expect(source).toContain("spanExtent(size)");
+    expect(source).toContain("spanExtent(origin)");
+    expect(source).toContain("spanExtent(limit - span)");
+    expect(times("function spanExtent")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(1);
+    expect(source).toContain("export function clampSpan");
+    expect(source).toContain("export function clampToRect");
   });
 });

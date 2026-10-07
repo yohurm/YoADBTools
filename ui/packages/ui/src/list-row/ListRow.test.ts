@@ -10,6 +10,9 @@ describe("ListRow.css", () => {
     expect(css).toMatch(/\.yohu-list-row \{[\s\S]*?border-radius:\s*var\(--yohu-radius-none\);/);
     expect(css).toMatch(/\[data-radius="chip"\] \{\s*border-radius:\s*var\(--yohu-ripple-radius\);/);
     expect(css).toMatch(/\[data-tone="list"\] \{\s*border-bottom:/);
+    expect(css).toMatch(/\[data-tone="list"\] \{[^}]*display:\s*flex;/);
+    expect(css).toMatch(/\[data-tone="list"\] \{[^}]*align-items:\s*stretch;/);
+    expect(css).toMatch(/\[data-tone="list"\] > \* \{\s*flex:\s*1 1 auto;/);
     expect(css).toContain('[data-fill="selected"]');
     expect(css).toContain('[data-fill="hot"]');
     expect(css).toContain("var(--yohu-accent-soft)");

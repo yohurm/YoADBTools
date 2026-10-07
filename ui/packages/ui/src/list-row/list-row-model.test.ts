@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
   isListRowHot,
+  listRowToneIsDocument,
+  listRowToneIsList,
   resolveListRowChrome,
   resolveListRowRadius,
 } from "./list-row-model";
@@ -57,5 +62,43 @@ describe("list-row-model", () => {
   it("半径：list 直角，document 可选单选 chip", () => {
     expect(resolveListRowRadius({ tone: "list", selectable: true })).toBe("none");
     expect(resolveListRowRadius({ selectable: true })).toBe("chip");
+  });
+
+  it("document / list 只在行模型里比较", () => {
+    expect(listRowToneIsDocument("document")).toBe(true);
+    expect(listRowToneIsDocument("list")).toBe(false);
+    expect(listRowToneIsDocument(undefined)).toBe(false);
+    expect(listRowToneIsList("list")).toBe(true);
+    expect(listRowToneIsList("document")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const files = [
+      "list-row-model.ts",
+      "list-row-policy.ts",
+      "ListRow.tsx",
+      "../scroll/virtuallist-model.ts",
+      "../scroll/virtuallist-policy.ts",
+      "../scroll/VirtualList.tsx",
+      "../grid/col-header-model.ts",
+      "../grid/col-header-policy.ts",
+      "../grid/ColHeader.tsx",
+      "../grid/ColFrame.tsx",
+      "../index.ts",
+    ];
+    for (const name of files) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "list-row-model.ts") {
+        body = body.replace('return tone === "document"', "").replace('return tone === "list"', "");
+      } else {
+        expect(body, name).not.toContain('"document" | "list"');
+        expect(body, name).not.toContain('"list" | "document"');
+      }
+      expect(body, name).not.toContain('=== "document"');
+      expect(body, name).not.toContain('=== "list"');
+      expect(body, name).not.toContain('!== "document"');
+      expect(body, name).not.toContain('!== "list"');
+      expect(body, name).not.toContain("YoVirtualListTone");
+      expect(body, name).not.toContain("YoColHeaderTone");
+      expect(body, name).not.toContain("YoColFrameTone");
+    }
   });
 });

@@ -7,6 +7,7 @@
 import { Show, createMemo, createRenderEffect, createUniqueId, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { presenceIsOn } from "../dom/flag";
 import { Icon, isIconName, type IconName } from "../icons";
 import { ClearMark } from "./clear-mark";
 import { GROW_USED_ATTR, YoGrow, growUsedAttrs, useGrow } from "../motion/engines/grow";
@@ -15,14 +16,15 @@ import { Radius } from "../tokens/radius";
 import { bindTextFieldGrow } from "./textfield-grow";
 import {
   stepTextFieldNumber,
+  type TextFieldFont,
   type TextFieldStepDirection,
   type TextFieldWidthKind,
-  type YoTextFieldStatus,
 } from "./textfield-model";
+import type { FieldStatus } from "./field-status";
 import { textFieldHostAttrs, textFieldStepperState } from "./textfield-policy";
 import "./TextField.css";
 
-export type { TextFieldWidthKind, YoTextFieldStatus };
+export type { TextFieldFont, TextFieldWidthKind };
 
 export type YoTextFieldControl = HTMLInputElement | HTMLTextAreaElement;
 
@@ -71,7 +73,7 @@ export interface YoTextFieldProps {
   /** 盒外后附加 */
   addonAfter?: JSX.Element;
   /** 校验态。默认 none */
-  status?: YoTextFieldStatus;
+  status?: FieldStatus;
   /** 过滤/内容生效描边。与 status 正交，默认关 */
   active?: boolean;
   /** 铺满父级定宽（对话框 / 编辑栏）。默认 hug；type=number 走数字槽宽。路径槽用 width=control，禁止 block 套 hug 簇。 */
@@ -79,7 +81,7 @@ export interface YoTextFieldProps {
   /** 宽度契约。未写则 block→fill、type=number→number、否则 hug。control=路径定宽。 */
   width?: TextFieldWidthKind;
   /** 输入字族。默认 ui；命令/路径等用 mono。禁止模块再点 input。 */
-  font?: "ui" | "mono";
+  font?: TextFieldFont;
   /** 转发内部 input / textarea，供宿主快捷键聚焦。不进模型。 */
   inputRef?: (el: YoTextFieldControl) => void;
   /** 转发内部 input 的 keydown（Token 退格删泡等）。 */
@@ -96,6 +98,18 @@ function TextFieldAffix(props: { value: YoTextFieldAffix | undefined }): JSX.Ele
   );
 }
 
+function textOrEmpty(value: string | undefined) {
+  return value ?? "";
+}
+
+function accessibleName(field: YoTextFieldProps) {
+  return field.ariaLabel ?? field.label;
+}
+
+function stepperKeepFocus(event: MouseEvent): void {
+  event.preventDefault();
+}
+
 function TextFieldBody(props: {
   id: string;
   host: ReturnType<typeof textFieldHostAttrs>;
@@ -107,63 +121,101 @@ function TextFieldBody(props: {
   onClear: () => void;
   onStep: (direction: TextFieldStepDirection) => void;
 }): JSX.Element {
+  function forwardFieldKey(event: KeyboardEvent): void {
+    props.field.onKeyDown?.(event);
+  }
+  function bindField(el: YoTextFieldControl): void {
+    props.bind(el);
+  }
+  function fieldInvalid(): true | undefined {
+    return props.host["aria-invalid"];
+  }
+  function fieldDisabled(): boolean {
+    return props.host.disabled;
+  }
+  function fieldReadOnly(): boolean {
+    return props.host.readOnly;
+  }
+  function fieldDomId(): string {
+    return props.id;
+  }
+  function fieldInputClass(): string {
+    return "yohu-text-field__input";
+  }
+  function fieldValue(): string {
+    return textOrEmpty(props.field.value);
+  }
+  function fieldPlaceholder(): string {
+    return textOrEmpty(props.field.placeholder);
+  }
+  function fieldAccessibleName(): string | undefined {
+    return accessibleName(props.field);
+  }
+  function fieldOnInput(event: InputEvent): void {
+    props.onInput(event);
+  }
+  function fieldOnChange(event: Event): void {
+    props.onChange(event);
+  }
   return (
     <>
-      <Show when={props.host["data-prefix"]}>
+      <Show when={presenceIsOn(props.host["data-prefix"])}>
         <span class="yohu-text-field__affix" data-edge="start">
           <TextFieldAffix value={props.field.prefix} />
         </span>
       </Show>
-      <Show when={props.host["data-tokens"]}>
+      <Show when={presenceIsOn(props.host["data-tokens"])}>
         <span class="yohu-text-field__tokens">{props.field.tokens}</span>
       </Show>
       <Show
-        when={props.host["data-multiline"]}
+        when={presenceIsOn(props.host["data-multiline"])}
         fallback={
           <input
-            ref={(el) => props.bind(el)}
-            id={props.id}
-            class="yohu-text-field__input"
+            ref={bindField}
+            id={fieldDomId()}
+            class={fieldInputClass()}
             type={props.field.type ?? "text"}
             size={1}
-            value={props.field.value ?? ""}
-            placeholder={props.field.placeholder ?? ""}
-            aria-label={props.field.ariaLabel ?? props.field.label}
-            aria-invalid={props.host["aria-invalid"]}
+            value={fieldValue()}
+            placeholder={fieldPlaceholder()}
+            aria-label={fieldAccessibleName()}
+            aria-invalid={fieldInvalid()}
             min={props.field.min}
             max={props.field.max}
             step={props.field.step}
-            disabled={props.host.disabled}
-            readOnly={props.host.readOnly}
-            onInput={props.onInput}
-            onChange={props.onChange}
-            onKeyDown={(event) => props.field.onKeyDown?.(event)}
+            disabled={fieldDisabled()}
+            readOnly={fieldReadOnly()}
+            onInput={fieldOnInput}
+            onChange={fieldOnChange}
+            onKeyDown={forwardFieldKey}
           />
         }
       >
         <textarea
-          ref={(el) => props.bind(el)}
-          id={props.id}
-          class="yohu-text-field__input"
+          ref={bindField}
+          id={fieldDomId()}
+          class={fieldInputClass()}
           rows={props.host.rows}
-          value={props.field.value ?? ""}
-          placeholder={props.field.placeholder ?? ""}
-          aria-label={props.field.ariaLabel ?? props.field.label}
-          aria-invalid={props.host["aria-invalid"]}
-          disabled={props.host.disabled}
-          readOnly={props.host.readOnly}
-          onInput={props.onInput}
-          onChange={props.onChange}
-          onKeyDown={(event) => props.field.onKeyDown?.(event)}
+          value={fieldValue()}
+          placeholder={fieldPlaceholder()}
+          aria-label={fieldAccessibleName()}
+          aria-invalid={fieldInvalid()}
+          disabled={fieldDisabled()}
+          readOnly={fieldReadOnly()}
+          onInput={fieldOnInput}
+          onChange={fieldOnChange}
+          onKeyDown={forwardFieldKey}
         />
       </Show>
-      <Show when={props.host["data-suffix"]}>
+      <Show when={presenceIsOn(props.host["data-suffix"])}>
         <span class="yohu-text-field__affix" data-edge="end">
           <TextFieldAffix value={props.field.suffix} />
         </span>
       </Show>
-      <Show when={props.host["data-clearable"]}>
-        <ClearMark onClear={props.onClear} />
+      <Show when={presenceIsOn(props.host["data-clearable"])}>
+        <span class="yohu-text-field__affix" data-edge="end">
+          <ClearMark onClear={props.onClear} />
+        </span>
       </Show>
       <Show when={props.stepper.show}>
         <div class="yohu-text-field__stepper" data-no-focus>
@@ -174,7 +226,7 @@ function TextFieldBody(props: {
             tabindex="-1"
             aria-label="增加"
             disabled={props.stepper.incrementDisabled}
-            onMouseDown={(event) => event.preventDefault()}
+            onMouseDown={stepperKeepFocus}
             onClick={() => props.onStep(1)}
           >
             <Icon name="chevron-up" size={Layout.IconTiny} />
@@ -186,7 +238,7 @@ function TextFieldBody(props: {
             tabindex="-1"
             aria-label="减少"
             disabled={props.stepper.decrementDisabled}
-            onMouseDown={(event) => event.preventDefault()}
+            onMouseDown={stepperKeepFocus}
             onClick={() => props.onStep(-1)}
           >
             <Icon name="chevron-down" size={Layout.IconTiny} />
@@ -281,22 +333,26 @@ function TextFieldControl(props: {
         class="yohu-text-field__chrome"
         radii={props.chromeRadii}
         direction="row"
-        align={props.host["data-multiline"] ? undefined : "center"}
+        align={presenceIsOn(props.host["data-multiline"]) ? undefined : "center"}
         overflow="hidden"
         pad="inline-sm"
         gap="xs"
       >
-        <Show when={!props.host["data-multiline"]}>
+        <Show when={!presenceIsOn(props.host["data-multiline"])}>
           <TextFieldBody {...bodyProps} />
         </Show>
       </YoCorner>
-      <Show when={props.host["data-multiline"]}>
+      <Show when={presenceIsOn(props.host["data-multiline"])}>
         <div class="yohu-text-field__body" data-grow-used={growUsedAttrs()[GROW_USED_ATTR]}>
           <TextFieldBody {...bodyProps} />
         </div>
       </Show>
     </div>
   );
+}
+
+function textFieldControl(event: Event): YoTextFieldControl {
+  return event.currentTarget as YoTextFieldControl;
 }
 
 /** 渲染输入。内容区 = 盒内缀 + Token（无盒，气泡升为 flex 子项）+ input/textarea + 清除 + number 步进柱；圆角走 YoCorner。 */
@@ -316,8 +372,8 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
     }),
   );
   const chromeRadii = createMemo(() => {
-    const before = Boolean(host()["data-addon-before"]);
-    const after = Boolean(host()["data-addon-after"]);
+    const before = presenceIsOn(host()["data-addon-before"]);
+    const after = presenceIsOn(host()["data-addon-after"]);
     if (!before && !after) return undefined;
     return {
       ...(before ? { tl: 0, bl: 0 } : {}),
@@ -331,18 +387,17 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
   };
 
   const handleInput = (event: InputEvent): void => {
-    const target = event.currentTarget as YoTextFieldControl;
+    const target = textFieldControl(event);
     props.onInput?.(target.value, event);
   };
 
   /** UIA ValuePattern.SetValue 有时只触发 change，不走 input。 */
   const handleChange = (event: Event): void => {
-    const target = event.currentTarget as YoTextFieldControl;
+    const target = textFieldControl(event);
     props.onInput?.(target.value, event as InputEvent);
   };
 
   const handleClear = (): void => {
-    if (host().disabled || host().readOnly) return;
     if (inputRef) {
       inputRef.value = "";
       inputRef.focus();
@@ -351,7 +406,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
   };
 
   const handleStep = (direction: TextFieldStepDirection): void => {
-    if (!stepper().show || host().disabled || host().readOnly) return;
+    if (!stepper().show) return;
     if (direction > 0 ? stepper().incrementDisabled : stepper().decrementDisabled) return;
     const current = props.value ?? inputRef?.value ?? "";
     const next = stepTextFieldNumber({
@@ -406,7 +461,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
       data-stepper={host()["data-stepper"]}
       data-font={host()["data-font"]}
       style={
-        host()["data-multiline"]
+        presenceIsOn(host()["data-multiline"])
           ? { "--yohu-text-field-max-rows": String(host().maxRows) }
           : undefined
       }
@@ -417,7 +472,7 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
         </label>
       </Show>
       <div class="yohu-text-field__group">
-        <Show when={host()["data-addon-before"]}>
+        <Show when={presenceIsOn(host()["data-addon-before"])}>
           <span class="yohu-text-field__addon" data-edge="before">
             <YoCorner
               role="control"
@@ -431,12 +486,12 @@ export function YoTextField(props: YoTextFieldProps): JSX.Element {
             </YoCorner>
           </span>
         </Show>
-        <Show when={host()["data-multiline"]} fallback={<TextFieldControl {...controlProps} />}>
+        <Show when={presenceIsOn(host()["data-multiline"])} fallback={<TextFieldControl {...controlProps} />}>
           <YoGrow>
             <TextFieldControl {...controlProps} />
           </YoGrow>
         </Show>
-        <Show when={host()["data-addon-after"]}>
+        <Show when={presenceIsOn(host()["data-addon-after"])}>
           <span class="yohu-text-field__addon" data-edge="after">
             <YoCorner
               role="control"

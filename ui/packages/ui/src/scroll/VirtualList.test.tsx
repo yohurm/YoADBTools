@@ -105,6 +105,16 @@ describe("YoVirtualList", () => {
     expect(container.querySelector('[data-gap="lead"]')).toBeNull();
   });
 
+  it("class 挂在宿主上，不另包一层", () => {
+    const items = makeItems(2);
+    const { container } = render(() => (
+      <YoVirtualList class="yohu-cm__list" items={() => items} itemHeight={22} renderRow={TestRow} />
+    ));
+    const host = container.querySelector(".yohu-virtual-list");
+    expect(host?.classList.contains("yohu-cm__list")).toBe(true);
+    expect(host?.parentElement).toBe(container);
+  });
+
   it("文件清单显式 tone=list 才画行间线", () => {
     const items = makeItems(8);
     const { container } = render(() => (
@@ -174,7 +184,10 @@ describe("YoVirtualList", () => {
   it("VirtualList.css 只管槽位几何，行铬不在本文件", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.css"), "utf-8");
     expect(css).toMatch(
-      /\[data-layout="pool"\] \.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*\}/,
+      /\[data-layout="pool"\] \.yohu-virtual-list__row \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*right: 0;\s*display: flex;\s*align-items: stretch;\s*min-width: 0;\s*\}/,
+    );
+    expect(css).toMatch(
+      /\[data-layout="pool"\] \.yohu-virtual-list__row > \* \{\s*flex: 1 1 auto;\s*min-width: 0;\s*min-height: 0;\s*\}/,
     );
     expect(css).toMatch(/\[data-layout="flow"\] \.yohu-virtual-list__row \{\s*position: relative;/);
     expect(css).toContain("yohu-virtual-list__cluster");
@@ -629,6 +642,9 @@ describe("YoVirtualList", () => {
     firePointer(window, "pointermove", 12);
     expect(host.hasAttribute("data-reordering")).toBe(true);
     expect(row.getAttribute("data-reorder")).toBe("source");
+    expect(row.getAttribute("data-slot")).toBe("placeholder");
+    expect(row.textContent).toBe("");
+    expect(container.querySelector(".yohu-recipe-reorder-overlay")?.textContent).toBe("a");
     expect(container.querySelector(".yohu-recipe-reorder-overlay")?.hasAttribute("data-open")).toBe(
       true,
     );
@@ -736,7 +752,7 @@ describe("YoVirtualList", () => {
     expect(onSelect).toHaveBeenCalledWith("b");
   });
 
-  it("Ctrl/Meta+方向键换位，不抢普通方向键选区", () => {
+  it("Ctrl/方向键换位；Win 键不换位", () => {
     const onReorder = vi.fn();
     const { container } = render(() => (
       <YoVirtualList
@@ -756,7 +772,7 @@ describe("YoVirtualList", () => {
     expect(onReorder).toHaveBeenCalledWith(0, 1);
     const next = container.querySelector('[data-key="b"]') as HTMLElement;
     fireEvent.keyDown(next, { key: "ArrowUp", metaKey: true });
-    expect(onReorder).toHaveBeenCalledWith(1, 0);
+    expect(onReorder).toHaveBeenCalledTimes(1);
   });
 
   it("Escape 取消换位", () => {
@@ -793,5 +809,54 @@ describe("YoVirtualList", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(onReorder).not.toHaveBeenCalled();
     expect(host.hasAttribute("data-reordering")).toBe(false);
+  });
+
+  it("没有滚轴句柄时偏移收口为 scrollerOffset", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
+    expect(src.split("scrollerHandle?.offset() " + "?? 0").length - 1).toBe(1);
+    expect(src).toContain("scrollerOffset()");
+  });
+
+  it("热点键收口为 currentHotKey", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf-8");
+    const needle = "hotKey?.() " + "?? null";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("const key = currentHotKey()");
+    expect(src).toContain('isListRowHot(attrs()["data-key"], currentHotKey())');
+    expect(src).toContain("selectedKey() ?? null");
+  });
+});
+
+describe("虚拟列表待焦", () => {
+  it("点击、放弃和聚焦完成都清掉待焦", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("pendingFocusKey " + "= null")).toBe(1);
+    expect(times("function clearPendingFocus")).toBe(1);
+    expect(times("export function clearPendingFocus")).toBe(0);
+    expect(times("clearPendingFocus()")).toBe(5);
+  });
+});
+
+describe("虚拟列表缺行", () => {
+  it("选择、换位、移焦和槽位都问这一行在不在", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("item " + "=== undefined")).toBe(1);
+    expect(times("function rowMissing")).toBe(1);
+    expect(times("export function rowMissing")).toBe(0);
+    expect(times("rowMissing(item)")).toBe(4);
+  });
+});
+
+describe("虚拟列表视口高", () => {
+  it("挂上和尺寸变化都记下客户区高度", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "VirtualList.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("setViewportHeight(container." + "clientHeight)")).toBe(1);
+    expect(times("function noteViewport")).toBe(1);
+    expect(times("export function noteViewport")).toBe(0);
+    expect(times("noteViewport(container)")).toBe(2);
+    expect(times("setViewportHeight(" + "view)")).toBe(1);
   });
 });

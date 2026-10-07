@@ -30,16 +30,24 @@ export interface SubheaderSpec {
   ink: SubheaderInk;
 }
 
+export function subheaderToneIsContent(tone?: YoSubheaderTone): boolean {
+  return tone === "content";
+}
+
+export function subheaderPadIsFlush(pad?: YoSubheaderPad): boolean {
+  return pad === "flush";
+}
+
 export function resolveSubheaderInk(tone: YoSubheaderTone): SubheaderInk {
-  return tone === "content" ? SUBHEADER_CONTENT_INK : SUBHEADER_LIST_INK;
+  return subheaderToneIsContent(tone) ? SUBHEADER_CONTENT_INK : SUBHEADER_LIST_INK;
 }
 
 export function resolveSubheaderSpec(input: SubheaderInput): SubheaderSpec {
-  const tone = input.tone === "content" ? "content" : DEFAULT_SUBHEADER_TONE;
+  const tone = subheaderToneIsContent(input.tone) ? "content" : DEFAULT_SUBHEADER_TONE;
   return {
     title: input.title,
     tone,
-    pad: input.pad === "flush" ? "flush" : DEFAULT_SUBHEADER_PAD,
+    pad: subheaderPadIsFlush(input.pad) ? "flush" : DEFAULT_SUBHEADER_PAD,
     hasMeta: Boolean(input.hasMeta),
     ink: resolveSubheaderInk(tone),
   };

@@ -13,6 +13,7 @@
 import { Layout } from "../tokens/layout";
 import { motionDurationMs } from "../tokens/motion";
 import { Spacing } from "../tokens/spacing";
+import { ratioPercent } from "../display/progress-model";
 
 export type ScrollerPhase = "none" | "in" | "on" | "out";
 
@@ -22,13 +23,71 @@ export type ScrollerBarState = "auto" | "on" | "off";
 /** 默认只纵滚。both 才开横轴产品条（日志 clip）。 */
 export type ScrollerAxis = "block" | "both";
 
+/** end = 块轴末端淡出，避免钉底铬压住末行残影。 */
+export type ScrollerFade = "end";
+
+/** 视口溢出。hidden 不画条、不接滚轮。缺省 auto。 */
+export type ScrollerOverflow = "auto" | "hidden";
+
+/** 裁切视口。和面板 overflow、内容是否溢出不是同一份事实。 */
+export function scrollerOverflowIsHidden(overflow?: string): boolean {
+  return overflow === "hidden";
+}
+
+export function resolveScrollerFade(fade?: ScrollerFade): ScrollerFade | undefined {
+  return fade === "end" ? "end" : undefined;
+}
+
+/** 双轴才开横条与横滚。缺省只纵滚。 */
+export function scrollerAxisIsBoth(axis?: ScrollerAxis): boolean {
+  return axis === "both";
+}
+
+/** 没有滚动条。属性、无障碍和手势都认这一把。 */
+export function scrollerPhaseIsNone(phase: ScrollerPhase | undefined): phase is "none" {
+  return phase === "none";
+}
+
+/** 正在淡出。轨道不接指针。 */
+export function scrollerPhaseIsOut(phase: ScrollerPhase | undefined): phase is "out" {
+  return phase === "out";
+}
+
+/** 入场或常显。跳过动效时收成常显。 */
+export function scrollerPhaseIsShown(phase: ScrollerPhase | undefined): boolean {
+  return phase === "in" || phase === "on";
+}
+
+/** 跳过动效：已在场收成常显，否则相位与上一拍都空。纵轴与横轴同一把。 */
+export function resolveScrollerReducedPhase(phase: ScrollerPhase): {
+  phase: "on" | "none";
+  prev: "on" | undefined;
+} {
+  if (scrollerPhaseIsShown(phase)) return { phase: "on", prev: "on" };
+  return { phase: "none", prev: undefined };
+}
+
+/** 静置或淡出中不接轨道指针。 */
+export function scrollerPhaseAcceptsPointer(phase: ScrollerPhase): boolean {
+  return !scrollerPhaseIsNone(phase) && !scrollerPhaseIsOut(phase);
+}
+
 export function resolveScrollerAxis(axis?: ScrollerAxis): ScrollerAxis {
-  return axis === "both" ? "both" : "block";
+  return scrollerAxisIsBoth(axis) ? "both" : "block";
+}
+
+function scrollerPad(value: number): number {
+  return Math.max(0, value);
 }
 
 /** client 含 padding；滚动口用内容盒。 */
 export function resolveScrollerViewSize(client: number, paddingStart = 0, paddingEnd = 0): number {
-  return Math.max(0, client - Math.max(0, paddingStart) - Math.max(0, paddingEnd));
+  return Math.max(0, client - scrollerPad(paddingStart) - scrollerPad(paddingEnd));
+}
+
+/** aria-valuenow：偏移占可滚范围的整数百分比。范围无效时为 0。 */
+export function resolveScrollerValueNow(offset: number, range: number): number {
+  return Math.round(ratioPercent(offset, range));
 }
 
 /** 滑块最小高：鸿蒙滚动条最短 48vp（Layout.IconPreview）。 */
@@ -107,6 +166,11 @@ export function resolveScrollerDrive(declared: ScrollerExtent | undefined): Scro
   return declared != null ? "offset" : "flow";
 }
 
+/** 短名单把同一数字写进 scrollTop。声明尺走 offset，不进这一把。 */
+export function scrollerDriveIsFlow(drive: ScrollerDrive): boolean {
+  return drive === "flow";
+}
+
 /** 内容平面位移。负号把内容拉进视口；调用方写 DOM transform，不进 Solid。 */
 export function scrollerPlaneTransform(block: number, inline = 0): string {
   return `translate3d(${-inline}px, ${-block}px, 0)`;
@@ -117,6 +181,10 @@ export interface ScrollerMetrics {
   contentBlock: number;
   viewInline: number;
   contentInline: number;
+}
+
+function scrollerExtent(value: number): number {
+  return Math.max(0, value);
 }
 
 /** 有声明尺则用声明；横轴 0 / 缺省跟视口（不横滚）。 */
@@ -130,8 +198,8 @@ export function resolveScrollerContentBox(
     return { block: measuredBlock, inline: measuredInline };
   }
   return {
-    block: Math.max(0, declared.block),
-    inline: declared.inline != null && declared.inline > 0 ? declared.inline : Math.max(0, viewInline),
+    block: scrollerExtent(declared.block),
+    inline: declared.inline != null && declared.inline > 0 ? declared.inline : scrollerExtent(viewInline),
   };
 }
 
@@ -162,6 +230,19 @@ export function resolveScrollerBarState(state?: ScrollerBarState): ScrollerBarSt
   return state ?? "auto";
 }
 
+/** Auto 停滚后隐藏。侧轨让位和相位都认常驻 / 关闭。 */
+export function scrollerBarIsAuto(state: ScrollerBarState): boolean {
+  return state === "auto";
+}
+
+export function scrollerBarIsOn(state: ScrollerBarState): boolean {
+  return state === "on";
+}
+
+export function scrollerBarIsOff(state: ScrollerBarState): boolean {
+  return state === "off";
+}
+
 /** enableScrollInteraction：缺省 true；false 仍可用控制器接口。 */
 export function resolveScrollerInteractive(interactive?: boolean): boolean {
   return interactive !== false;
@@ -172,7 +253,7 @@ export function resolveScrollerGutter(input: {
   overflowing: boolean;
   barState?: ScrollerBarState;
 }): boolean {
-  return input.overflowing && resolveScrollerBarState(input.barState) !== "off";
+  return input.overflowing && !scrollerBarIsOff(resolveScrollerBarState(input.barState));
 }
 
 export function resolveScrollerPhase(input: {
@@ -184,17 +265,25 @@ export function resolveScrollerPhase(input: {
   prev?: ScrollerPhase;
 }): ScrollerPhase {
   const bar = resolveScrollerBarState(input.barState);
-  const shown = input.prev === "in" || input.prev === "on";
-  const fading = shown || input.prev === "out";
-  if (!input.overflowing || bar === "off") {
+  const shown = scrollerPhaseIsShown(input.prev);
+  const fading = shown || scrollerPhaseIsOut(input.prev);
+  if (!input.overflowing || scrollerBarIsOff(bar)) {
     return fading ? "out" : "none";
   }
   if (input.traveling && !shown) {
-    return input.prev === "out" ? "out" : "none";
+    return scrollerPhaseIsOut(input.prev) ? "out" : "none";
   }
-  const keep = bar === "on" || input.holding === true || input.idle !== true;
+  const keep = scrollerBarIsOn(bar) || input.holding === true || input.idle !== true;
   if (keep) return shown ? "on" : "in";
   return fading ? "out" : "none";
+}
+
+export function scrollerThumbRoom(view: number, thumb: number): number {
+  return Math.max(0, view - thumb);
+}
+
+function scrollerOffset(value: number): number {
+  return Math.max(0, value);
 }
 
 export function resolveScrollerThumb(input: {
@@ -208,9 +297,9 @@ export function resolveScrollerThumb(input: {
   const min = input.min ?? resolveScrollerThumbMin(view);
   if (!resolveScrollerOverflow(view, all)) return undefined;
   const height = Math.min(view, Math.max(min, (view / all) * view));
-  const room = Math.max(0, view - height);
+  const room = scrollerThumbRoom(view, height);
   const range = all - view;
-  const top = range > 0 ? (Math.max(0, input.top) / range) * room : 0;
+  const top = range > 0 ? (scrollerOffset(input.top) / range) * room : 0;
   return { top, height };
 }
 
@@ -227,7 +316,7 @@ export function resolveScrollerScrollTop(input: {
   thumbTop: number;
 }): number {
   const range = input.all - input.view;
-  const room = Math.max(0, input.view - input.thumbHeight);
+  const room = scrollerThumbRoom(input.view, input.thumbHeight);
   if (!(range > 0) || !(room > 0)) return 0;
   const ratio = Math.min(1, Math.max(0, input.thumbTop / room));
   return ratio * range;
@@ -261,7 +350,7 @@ export function resolveScrollerClampedTop(input: {
   view: number;
   all: number;
 }): number {
-  return Math.min(resolveScrollerScrollEnd(input.view, input.all), Math.max(0, input.top));
+  return Math.min(resolveScrollerScrollEnd(input.view, input.all), scrollerOffset(input.top));
 }
 
 /** 对照 Scroller.scrollPage：一页 = 视口高。 */

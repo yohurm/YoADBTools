@@ -5,6 +5,9 @@
 .yohu-grow {
   position: relative;
   display: block;
+  /* 行轴吃父级定宽。块轴只认锁行，禁止 stretch 写回 height，禁止 intrinsic basis。 */
+  flex: 1 1 0%;
+  align-self: flex-start;
   width: 100%;
   max-width: 100%;
   min-width: 0;

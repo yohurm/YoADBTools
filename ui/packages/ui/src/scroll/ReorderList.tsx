@@ -10,7 +10,7 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-j
 import type { Accessor, Component, JSX } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { YoPresence, useListPresenceSlots } from "../motion/engines/presence";
-import { ReorderBar } from "./ReorderBar";
+import { ReorderBar, scheduleReorderBarReady } from "./ReorderBar";
 import { ReorderOverlay } from "./ReorderOverlay";
 import { createReorderBinder } from "./reorder-binder";
 import {
@@ -19,13 +19,23 @@ import {
   overlayOffset,
   pointerContentY,
   reorderBarOffsetFromBoxes,
+  reorderKeyIsSource,
   reorderRowKey,
+  reorderSlotIsPlaceholder,
   shiftPxForReorder,
   type ReorderRowBox,
 } from "./reorder-model";
-import { applyReorderKey, shouldBeginReorderFromTarget } from "./reorder-policy";
+import {
+  applyReorderKey,
+  reorderResultIsNoop,
+  reorderSlotAttr,
+  reorderSourceAttr,
+  shouldBeginReorderFromTarget,
+} from "./reorder-policy";
+import { isModKey } from "../keymap/chord";
 import { useScrollerPort } from "./scroller-port";
 import "./ReorderList.css";
+import { presenceAttr } from "../dom/flag";
 
 export interface YoReorderListProps<T> {
   items: Accessor<T[]>;
@@ -102,20 +112,15 @@ export function YoReorderList<T>(props: YoReorderListProps<T>): JSX.Element {
   };
 
   const handleKeyDown = (index: number, event: KeyboardEvent): void => {
-    const moved = applyReorderKey(event.key, event.ctrlKey || event.metaKey, index, props.items().length);
-    if (moved === "noop" || moved === null) return;
+    const moved = applyReorderKey(event.key, isModKey(event), index, props.items().length);
+    if (reorderResultIsNoop(moved) || moved === null) return;
     event.preventDefault();
     props.onReorder(moved.from, moved.to);
   };
 
   onMount(() => {
     onCleanup(() => reorder.destroy());
-    if (typeof requestAnimationFrame === "function") {
-      const readyFrame = requestAnimationFrame(() => setBarReady(true));
-      onCleanup(() => cancelAnimationFrame(readyFrame));
-    } else {
-      setBarReady(true);
-    }
+    scheduleReorderBarReady(setBarReady, onCleanup);
   });
 
   const drag = createMemo(() => reorder.session());
@@ -128,7 +133,7 @@ export function YoReorderList<T>(props: YoReorderListProps<T>): JSX.Element {
           container = el;
         }}
         class="yohu-reorder-list"
-        data-reordering={drag() ? "" : undefined}
+        data-reordering={presenceAttr(drag() !== null)}
         aria-label={props.ariaLabel}
       >
         <div class="yohu-reorder-list__inner">
@@ -140,12 +145,15 @@ export function YoReorderList<T>(props: YoReorderListProps<T>): JSX.Element {
                 const live = liveIndex();
                 return live >= 0 ? live : slots.findIndex((entry) => entry.key === slot.key);
               };
+              const source = (): boolean =>
+                Boolean(slot.present && reorderKeyIsSource(drag()?.key, slot.key));
               return (
                 <div
                   class="yohu-reorder-list__row"
                   data-key={slot.key}
                   data-exiting={slot.present ? undefined : ""}
-                  data-reorder={slot.present && drag()?.key === slot.key ? "source" : undefined}
+                  data-reorder={reorderSourceAttr(source())}
+                  data-slot={reorderSlotAttr(source())}
                   tabIndex={slot.present ? -1 : undefined}
                   style={{
                     transform:
@@ -167,7 +175,9 @@ export function YoReorderList<T>(props: YoReorderListProps<T>): JSX.Element {
                     recipe="list"
                     onExitComplete={() => dismiss(slot.key)}
                   >
-                    <Dynamic component={props.renderRow} item={slot.item} index={rowIndex()} />
+                    <Show when={!reorderSlotIsPlaceholder(source())}>
+                      <Dynamic component={props.renderRow} item={slot.item} index={rowIndex()} />
+                    </Show>
                   </YoPresence>
                 </div>
               );

@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { Spacing } from "../tokens/spacing";
@@ -14,11 +17,41 @@ import {
   reorderBarOffset,
   rowTopInViewport,
   reorderBarOffsetFromBoxes,
+  reorderKeyIsSource,
+  reorderSlotIsPlaceholder,
+  resolveReorderSlot,
   shiftForReorder,
   shiftPxForReorder,
 } from "./reorder-model";
 
 describe("reorder-model", () => {
+  it("源行是占位槽，邻行与浮层仍是条目", () => {
+    expect(resolveReorderSlot(true)).toBe("placeholder");
+    expect(resolveReorderSlot(false)).toBe("item");
+    expect(reorderSlotIsPlaceholder(true)).toBe(true);
+    expect(reorderSlotIsPlaceholder(false)).toBe(false);
+    expect(reorderKeyIsSource("a", "a")).toBe(true);
+    expect(reorderKeyIsSource("a", "b")).toBe(false);
+    expect(reorderKeyIsSource(undefined, undefined)).toBe(true);
+    expect(reorderKeyIsSource(undefined, "a")).toBe(false);
+    expect(reorderKeyIsSource(0, 0)).toBe(true);
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["VirtualList.tsx", "ReorderList.tsx", "reorder-model.ts", "reorder-binder.ts"]) {
+      const body = readFileSync(join(root, name), "utf8");
+      expect(body, name).not.toContain('? "source"');
+      expect(body, name).not.toContain("()?.key ===");
+    }
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body =
+        name === "reorder-model.ts" ? text.replace('return resolveReorderSlot(isSource) === "placeholder"', "") : text;
+      expect(body, name).not.toContain('=== "placeholder"');
+      expect(body, name).not.toContain('!== "placeholder"');
+    }
+  });
+
   it("moveItemTo 把一项挪到目标下标", () => {
     expect(moveItemTo(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
     expect(moveItemTo(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
@@ -107,5 +140,18 @@ describe("reorder-model", () => {
     expect(contentTopInViewport(viewTop, scrollTop, 120)).toBe(160);
     expect(rowTopInViewport(viewTop, scrollTop, 0, 40)).toBe(40);
     expect(pointerContentY(40, scrollTop, 40)).not.toBe(0);
+  });
+
+  it("窗口监听成对登记并摘掉", () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(root, "reorder-binder.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("add" + "EventListener")).toBe(1);
+    expect(times("remove" + "EventListener")).toBe(1);
+    expect(times(", true)")).toBe(1);
+    expect(body).toContain('listen("pointermove", onMove)');
+    expect(body).toContain('listen("pointerup", onUp)');
+    expect(body).toContain('listen("pointercancel", onUp)');
+    expect(body).toContain('listen("keydown", onKey, true)');
   });
 });

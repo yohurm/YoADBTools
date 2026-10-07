@@ -24,6 +24,8 @@ describe("YoSegmentedButton", () => {
     expect(group.getAttribute("data-fill-owner")).toBe("thumb");
     expect(group.getAttribute("data-size")).toBe("md");
     expect(group.className).not.toContain("yohu-segmented--tab");
+    expect(group.classList.contains("yohu-indicator-host")).toBe(true);
+    expect(group.getAttribute("data-indicator-variant")).toBe("thumb");
     const thumb = container.querySelector(".yohu-recipe-indicator--thumb");
     const item = container.querySelector(".yohu-segmented__item");
     expect(thumb?.parentElement).toBe(group);
@@ -149,6 +151,8 @@ describe("YoSegmentedButton", () => {
     expect(group.getAttribute("data-fill-owner")).toBe("item");
     expect(group.getAttribute("aria-multiselectable")).toBe("true");
     expect(container.querySelector(".yohu-recipe-indicator")).toBeNull();
+    expect(group.classList.contains("yohu-indicator-host")).toBe(false);
+    expect(group.hasAttribute("data-indicator-variant")).toBe(false);
     expect(css).toContain("padding: var(--yohu-space-xs)");
     expect(css).not.toContain("column-gap: var(--yohu-stroke-hairline)");
     expect(screen.getByRole("button", { name: "粗体" }).getAttribute("aria-pressed")).toBe("true");
@@ -251,10 +255,13 @@ describe("YoSegmentedButton", () => {
     expect(css).toContain("background: var(--yohu-state-hover)");
     expect(css).toContain("box-shadow: inset 0 0 0 9999px var(--yohu-state-hover)");
     expect(css).not.toContain("--yohu-segmented-item-fill-hover");
+    expect(css).not.toContain(".yohu-icon");
     expect(css).not.toContain("--yohu-segmented-item-fill-pressed");
     expect(css).toContain('[data-join="mid"]');
     expect(css).toContain('data-fill-owner="thumb"');
     expect(css).toContain('data-fill-owner="item"');
+    expect(css).toContain("--yohu-indicator-thumb-fill");
+    expect(css).not.toContain(".yohu-recipe-indicator");
     expect(css).not.toMatch(/\.yohu-segmented__item\s*\{[^}]*overflow:\s*hidden/);
     expect(css).not.toMatch(/\[data-selected\][^{]*:hover[^{]*\{[^}]*background:\s*transparent/);
   });
@@ -299,5 +306,57 @@ describe("YoSegmentedButton", () => {
     expect(tsx).not.toContain("commitIndex");
     expect(tsx).not.toContain("日志");
     expect(tsx).toContain('mode="paint"');
+  });
+});
+
+function segmentedSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "SegmentedButton.tsx"), "utf8");
+}
+
+describe("分段选项表", () => {
+  it("宿主、游走和绘制都读同一份选项", () => {
+    const src = segmentedSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props." + "items")).toBe(1);
+    expect(times("function segmentedItems")).toBe(1);
+    expect(times("export function segmentedItems")).toBe(0);
+    expect(times("segmentedItems()")).toBe(7);
+  });
+});
+
+describe("分段禁用", () => {
+  it("宿主、按键和项都问同一把禁用", () => {
+    const src = segmentedSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props." + "disabled")).toBe(1);
+    expect(times("function segmentedDisabled")).toBe(1);
+    expect(times("export function segmentedDisabled")).toBe(0);
+    expect(times("segmentedDisabled()")).toBe(4);
+  });
+});
+
+describe("分段单值", () => {
+  it("选中、游走、按键和指示条都读同一单值", () => {
+    const src = segmentedSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("return props." + "value")).toBe(1);
+    expect(times("props.value" + ",")).toBe(0);
+    expect(times("follow={" + "props.value}")).toBe(0);
+    expect(times("function segmentedValue")).toBe(1);
+    expect(times("export function segmentedValue")).toBe(0);
+    expect(times("segmentedValue()")).toBe(5);
+    expect(src).toContain("props.values");
+  });
+});
+
+describe("分段项焦点", () => {
+  it("游走和提交后都把焦点交到同一项", () => {
+    const src = segmentedSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("itemRefs[action.index]?." + "focus()")).toBe(0);
+    expect(times("itemRefs[" + "index]?.focus()")).toBe(1);
+    expect(times("function focusSegmentedItem")).toBe(1);
+    expect(times("export function focusSegmentedItem")).toBe(0);
+    expect(times("focusSegmentedItem(action.index)")).toBe(2);
   });
 });

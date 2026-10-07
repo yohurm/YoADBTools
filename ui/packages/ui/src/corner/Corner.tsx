@@ -11,8 +11,12 @@
  */
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
+import { trueAttr } from "../dom/flag";
 import { CORNER_PAINT_VIEWBOX, resolveCornerPaint, type CornerRadii, type CornerRole } from "./corner-model";
 import {
+  cornerMeasureTarget,
+  cornerModeIsHost,
+  cornerModeIsPaint,
   resolveCornerContentSpec,
   resolveCornerHostSpec,
   type YoCornerAlign,
@@ -98,7 +102,7 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
 
   const bind = (el: HTMLDivElement): void => {
     setRoot(el);
-    const target = spec().mode === "paint" ? el.parentElement : el;
+    const target = cornerMeasureTarget(el, spec().mode);
     if (target) measure(target);
   };
 
@@ -106,7 +110,7 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
     const el = root();
     const mode = spec().mode;
     if (!el) return;
-    const target = mode === "paint" ? el.parentElement : el;
+    const target = cornerMeasureTarget(el, mode);
     if (!target) return;
     measure(target);
     if (typeof ResizeObserver === "undefined") return;
@@ -135,8 +139,8 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
       class={`yohu-corner${props.class ? ` ${props.class}` : ""}`}
       data-mode={spec().mode}
       data-role={spec().role}
-      data-flex={spec().mode === "host" ? (props.flex ?? "fill") : undefined}
-      aria-hidden={spec().mode === "paint" ? true : undefined}
+      data-flex={cornerModeIsHost(spec().mode) ? (props.flex ?? "fill") : undefined}
+      aria-hidden={trueAttr(cornerModeIsPaint(spec().mode))}
     >
       <svg
         class="yohu-corner__paint"
@@ -154,7 +158,7 @@ export function YoCorner(props: YoCornerProps): JSX.Element {
           <path class="yohu-corner__edge" d={paint().edgePath} />
         </Show>
       </svg>
-      <Show when={spec().mode === "host"}>
+      <Show when={cornerModeIsHost(spec().mode)}>
         <div
           class="yohu-corner__content"
           data-direction={content().direction}

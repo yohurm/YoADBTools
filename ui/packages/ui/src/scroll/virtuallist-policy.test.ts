@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -104,5 +107,15 @@ describe("virtuallist-policy", () => {
     expect(virtualHostAttrs({ selectable: true, multi: false, reordering: true })["data-reordering"]).toBe(
       "",
     );
+  });
+
+  it("缺省 tone 不再在视图里写字面量", () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["virtuallist-model.ts", "virtuallist-policy.ts", "VirtualList.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "virtuallist-model.ts") body = body.replace("return tone ?? VIRTUAL_DEFAULT_TONE", "");
+      expect(body, name).not.toContain('?? "document"');
+      expect(body, name).not.toContain("?? VIRTUAL_DEFAULT_TONE");
+    }
   });
 });

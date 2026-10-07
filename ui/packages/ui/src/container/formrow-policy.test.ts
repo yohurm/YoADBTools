@@ -11,8 +11,8 @@ describe("formrow-policy", () => {
 
   it("有说明/备注才写 data-*", () => {
     expect(formRowHostAttrs({ description: "跟随系统", note: "立即生效" })).toEqual({
-      "data-has-description": true,
-      "data-has-note": true,
+      "data-has-description": "",
+      "data-has-note": "",
     });
   });
 

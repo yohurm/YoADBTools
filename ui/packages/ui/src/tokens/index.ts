@@ -6,8 +6,11 @@
 import "./theme.css";
 import "./states.css";
 
-import type { DensityName } from "./density";
+import { densityIsCompact, densityScale, type DensityName } from "./density";
 import { bindFocusModality } from "./focus-modality";
+import { themeFromDark, themeIsDark, type ThemeName } from "./theme-name";
+
+export { themeFromDark, themeIsDark, type ThemeName } from "./theme-name";
 
 export * from "./colors";
 export * from "./logcat";
@@ -27,21 +30,27 @@ if (typeof document !== "undefined") {
   bindFocusModality();
 }
 
-/** 解析后的外观（写入 `data-theme`）。 */
-export type ThemeName = "light" | "dark";
-
 /** 用户偏好（写入 `data-theme-pref`；system 跟随系统）。 */
 export type ThemePreference = ThemeName | "system";
+
+/** 跟随系统。深色仍由 themeIsDark 判定。其余偏好读出来就是 light。 */
+export function themePreferenceIsSystem(theme: string | null | undefined): theme is "system" {
+  return theme === "system";
+}
 
 let systemMedia: MediaQueryList | null = null;
 let systemListener: ((event: MediaQueryListEvent) => void) | null = null;
 const resolvedThemeListeners = new Set<(theme: ThemeName) => void>();
 
-function prefersDark(): boolean {
+function colorSchemeMedia(): MediaQueryList | undefined {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
+    return undefined;
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return window.matchMedia("(prefers-color-scheme: dark)");
+}
+
+function prefersDark(): boolean {
+  return colorSchemeMedia()?.matches ?? false;
 }
 
 function applyResolved(theme: ThemeName): void {
@@ -62,11 +71,12 @@ function detachSystemListener(): void {
 
 function attachSystemListener(): void {
   detachSystemListener();
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+  const media = colorSchemeMedia();
+  if (!media) {
     return;
   }
-  systemMedia = window.matchMedia("(prefers-color-scheme: dark)");
-  systemListener = (event) => applyResolved(event.matches ? "dark" : "light");
+  systemMedia = media;
+  systemListener = (event) => applyResolved(themeFromDark(event.matches));
   systemMedia.addEventListener("change", systemListener);
 }
 
@@ -78,8 +88,8 @@ export function setTheme(theme: ThemePreference): void {
     return;
   }
   document.documentElement.setAttribute("data-theme-pref", theme);
-  if (theme === "system") {
-    applyResolved(prefersDark() ? "dark" : "light");
+  if (themePreferenceIsSystem(theme)) {
+    applyResolved(themeFromDark(prefersDark()));
     attachSystemListener();
     return;
   }
@@ -101,10 +111,8 @@ export function onResolvedThemeChange(listener: (theme: ThemeName) => void): () 
  * 读取已解析外观；未设置时视为 light。
  */
 export function getTheme(): ThemeName {
-  if (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark") {
-    return "dark";
-  }
-  return "light";
+  const attr = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
+  return themeFromDark(themeIsDark(attr));
 }
 
 /**
@@ -112,9 +120,7 @@ export function getTheme(): ThemeName {
  */
 export function getThemePreference(): ThemePreference {
   const pref = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme-pref") : null;
-  if (pref === "dark" || pref === "system" || pref === "light") {
-    return pref;
-  }
+  if (themeIsDark(pref) || themePreferenceIsSystem(pref)) return pref;
   return "light";
 }
 
@@ -127,8 +133,11 @@ export function setDensity(density: DensityName): void {
 
 /** 读取当前密度；未显式设置时视为 comfortable（鸿蒙 PC 默认）。 */
 export function getDensity(): DensityName {
-  if (typeof document !== "undefined" && document.documentElement.getAttribute("data-density") === "compact") {
-    return "compact";
-  }
-  return "comfortable";
+  const attr = typeof document !== "undefined" ? document.documentElement.getAttribute("data-density") : null;
+  return densityIsCompact(attr) ? "compact" : "comfortable";
+}
+
+/** 清单控件行高（px）。虚拟列表要数字，不能只靠 CSS 变量。 */
+export function controlRowHeight(): number {
+  return densityScale(getDensity()).controlHeight;
 }

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { flattenVisible } from "./tree-model";
@@ -7,6 +10,8 @@ import {
   isTreeExpanded,
   resolveTreeKeyAction,
   toggleExpandedSet,
+  treeActionIsFocus,
+  treeActionIsToggle,
   treeRowAttrs,
 } from "./tree-policy";
 
@@ -60,5 +65,29 @@ describe("tree-policy", () => {
     expect(resolveTreeKeyAction("Enter", rows, "a", null, () => false)).toEqual({ type: "select", key: "a" });
     expect(resolveTreeKeyAction("Enter", rows, "g", null, () => true)).toEqual({ type: "toggle", key: "g" });
     expect(resolveTreeKeyAction("x", rows, "g", null, () => false)).toBeNull();
+  });
+
+  it("焦点与开合各判一次", () => {
+    expect(treeActionIsFocus({ type: "focus", key: "a" })).toBe(true);
+    expect(treeActionIsToggle({ type: "toggle", key: "g" })).toBe(true);
+    expect(treeActionIsFocus({ type: "select", key: "a" })).toBe(false);
+    expect(treeActionIsToggle({ type: "focus", key: "a" })).toBe(false);
+  });
+});
+
+describe("树开合与焦点只在所属层判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图不再比较动作种类和点击开合", () => {
+    for (const name of ["tree-model.ts", "tree-policy.ts", "Tree.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return action.type === "focus"', "");
+      body = body.replaceAll('return action.type === "toggle"', "");
+      body = body.replaceAll('return treeActivateIntent(hasChildren) === "toggle"', "");
+      expect(body, name).not.toContain('action.type === "focus"');
+      expect(body, name).not.toContain('action.type === "toggle"');
+      expect(body, name).not.toContain('action.type === "select"');
+      expect(body, name).not.toContain('treeActivateIntent(hasChildren) === "toggle"');
+    }
   });
 });

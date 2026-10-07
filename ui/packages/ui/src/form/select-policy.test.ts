@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,8 +9,9 @@ import {
   closeSelect,
   idleSelectSession,
   openSelect,
+  selectEffectIsCommit,
+  selectEffectIsNone,
   selectHostAttrs,
-  selectIsDisabled,
   toggleSelect,
 } from "./select-policy";
 
@@ -21,7 +23,6 @@ const OPTIONS = [
 
 describe("select-policy", () => {
   it("禁用同时关掉开合", () => {
-    expect(selectIsDisabled(true)).toBe(true);
     expect(toggleSelect(false, OPTIONS, "a", true)).toEqual(idleSelectSession());
     expect(applySelectKey("ArrowDown", idleSelectSession(), OPTIONS, "a", true)).toEqual({
       type: "none",
@@ -103,5 +104,27 @@ describe("select-policy", () => {
     const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
     expect(src.length).toBeGreaterThan(0);
     expect(src).not.toMatch(/\bapplySelectHover\b/);
+  });
+
+  it("空效果与提交各判一次", () => {
+    expect(selectEffectIsNone({ type: "none" })).toBe(true);
+    expect(selectEffectIsCommit({ type: "commit", value: "a", session: closeSelect() })).toBe(true);
+    expect(selectEffectIsNone({ type: "session", session: idleSelectSession() })).toBe(false);
+    expect(selectEffectIsCommit({ type: "none" })).toBe(false);
+  });
+});
+
+describe("下拉键盘效果只在策略判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图不再比较 effect.type", () => {
+    for (const name of ["select-policy.ts", "Select.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return effect.type === "none"', "");
+      body = body.replaceAll('return effect.type === "commit"', "");
+      expect(body, name).not.toContain('effect.type === "none"');
+      expect(body, name).not.toContain('effect.type === "commit"');
+      expect(body, name).not.toContain('effect.type === "session"');
+    }
   });
 });

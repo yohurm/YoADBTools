@@ -12,7 +12,7 @@ export const Layout = {
    */
   ShellNav: 200,
   /**
-   * 侧栏收起：图标轨。与标题栏三键 / 投屏操作栏同一档 48vp 热区，
+   * 侧栏收起：图标轨。与标题栏三键同一档 48vp 热区，
    * 不是把展开宽裁到 0。文件预览仍走 Preview↔0。
    */
   ShellNavIcons: 48,
@@ -22,7 +22,7 @@ export const Layout = {
    */
   Sidebar: 240,
   Preview: 240,
-  /** 投屏设备操作栏（鸿蒙标题栏热区 48vp）。 */
+  /** 投屏设备操作栏（图标轨，鸿蒙标题栏热区 48vp）。底色走面板 surface，不另铺。 */
   MirrorOps: 48,
   /** 投屏质量栏；比文件预览窄，只够一列下拉。 */
   MirrorFunc: 200,

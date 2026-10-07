@@ -3,25 +3,29 @@ import { MotionSpec, type MotionDurationName } from "../../tokens/motion";
 /** Presence 配方名（与 motion.css data-recipe 对齐）。 */
 export type PresenceRecipe = "dialog" | "toast" | "popover" | "fade" | "rise" | "list" | "chip";
 
-/** 用 clip 层裁切进场的配方。list / toast 裁高度，chip 裁宽度。 */
-export const PRESENCE_CLIP_RECIPES: readonly PresenceRecipe[] = ["list", "chip", "toast"];
+/** 行向裁高度。列向裁宽度。可打断的 transition 就是这两组，不再另列一份。 */
+const PRESENCE_ROW_CLIP: readonly PresenceRecipe[] = ["list", "toast"];
+const PRESENCE_COLUMN_CLIP: readonly PresenceRecipe[] = ["chip"];
 
-/** transition 可打断：出生 closed，双 rAF 后 open。clip 配方。keyframes 配方不在此列。 */
-export const PRESENCE_TRANSITION_RECIPES: readonly PresenceRecipe[] = ["list", "chip", "toast"];
+export const PRESENCE_CLIP_RECIPES: readonly PresenceRecipe[] = [
+  ...PRESENCE_ROW_CLIP,
+  ...PRESENCE_COLUMN_CLIP,
+];
 
-export function presenceUsesClip(recipe: PresenceRecipe): boolean {
-  return recipe === "list" || recipe === "chip" || recipe === "toast";
+function presenceRecipeListed(recipe: PresenceRecipe, known: readonly PresenceRecipe[]): boolean {
+  return known.includes(recipe);
 }
 
-export function presenceUsesTransition(recipe: PresenceRecipe): boolean {
-  return recipe === "list" || recipe === "chip" || recipe === "toast";
+/** clip 层，也是可打断的 transition。keyframes 配方不在此列。 */
+export function presenceUsesClip(recipe: PresenceRecipe): boolean {
+  return presenceRecipeListed(recipe, PRESENCE_CLIP_RECIPES);
 }
 
 export function presenceClipProperty(
   recipe: PresenceRecipe,
 ): "grid-template-rows" | "grid-template-columns" | null {
-  if (recipe === "list" || recipe === "toast") return "grid-template-rows";
-  if (recipe === "chip") return "grid-template-columns";
+  if (presenceRecipeListed(recipe, PRESENCE_ROW_CLIP)) return "grid-template-rows";
+  if (presenceRecipeListed(recipe, PRESENCE_COLUMN_CLIP)) return "grid-template-columns";
   return null;
 }
 

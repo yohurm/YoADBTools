@@ -7,26 +7,36 @@
 
 export type ToolbarChrome = "band" | "plain";
 export type ToolbarOverflow = "hidden";
-export type ToolbarPad = "band" | "xs";
+export type YoToolbarPad = "band" | "xs";
 
 export const DEFAULT_TOOLBAR_CHROME: ToolbarChrome = "band";
 export const DEFAULT_TOOLBAR_OVERFLOW: ToolbarOverflow = "hidden";
-export const DEFAULT_TOOLBAR_PAD: ToolbarPad = "band";
+export const DEFAULT_TOOLBAR_PAD: YoToolbarPad = "band";
 
 export interface ToolbarInput {
-  pad?: ToolbarPad;
+  pad?: YoToolbarPad;
 }
 
 export interface ToolbarSpec {
   chrome: ToolbarChrome;
   overflow: ToolbarOverflow;
-  pad: ToolbarPad;
+  pad: YoToolbarPad;
+}
+
+/** 贴栏素底。才推出 plain 铬。 */
+export function toolbarPadIsXs(pad?: string): boolean {
+  return pad === "xs";
+}
+
+/** 素底。圆角收成直角。 */
+export function toolbarChromeIsPlain(chrome?: string): boolean {
+  return chrome === "plain";
 }
 
 export function resolveToolbarSpec(input: ToolbarInput = {}): ToolbarSpec {
   const pad = input.pad ?? DEFAULT_TOOLBAR_PAD;
   return {
-    chrome: pad === "xs" ? "plain" : DEFAULT_TOOLBAR_CHROME,
+    chrome: toolbarPadIsXs(pad) ? "plain" : DEFAULT_TOOLBAR_CHROME,
     overflow: DEFAULT_TOOLBAR_OVERFLOW,
     pad,
   };

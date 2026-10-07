@@ -128,3 +128,18 @@ describe("YoTree", () => {
     expect(document.activeElement?.getAttribute("data-tree-key")).toBe("root1");
   });
 });
+
+describe("树记下焦点", () => {
+  it("键盘与点击经 treeRememberFocus 记下焦点键", () => {
+    const source = readFileSync(resolve(here, "Tree.tsx"), "utf-8");
+    expect(source.split("setFocusedKey(" + "key)").length - 1).toBe(1);
+    expect(source.split("setFocusedKey(" + "node.key)").length - 1).toBe(0);
+    expect(source.split("function treeRememberFocus").length - 1).toBe(1);
+    expect(source.split("export function treeRememberFocus").length - 1).toBe(0);
+    expect(source.split("treeRememberFocus(key)").length - 1).toBe(1);
+    expect(source.split("treeRememberFocus(node.key)").length - 1).toBe(2);
+    expect(source.split("el?.focus()").length - 1).toBe(1);
+    expect(source.split("event.stopPropagation()").length - 1).toBe(1);
+    expect(source).toContain("const focusKey");
+  });
+});

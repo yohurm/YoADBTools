@@ -11,10 +11,12 @@ import {
   resolveDialogActionsLayout,
   resolveDialogBodySpec,
   resolveDialogExitLock,
+  dialogTailAlignIsStretch,
   type DialogActionsLayout,
   type DialogBodyInput,
   type DialogBoxLock,
   type DialogBodyRegion,
+  type DialogTailAlign,
   type YoDialogBodyLayout,
   type YoDialogBodyOverflow,
   type YoDialogBodyPad,
@@ -40,6 +42,11 @@ export interface DialogBodyAttrs {
   "data-overflow": YoDialogBodyOverflow;
   "data-pad": YoDialogBodyPad;
   "data-region": DialogBodyRegion;
+}
+
+/** 尾槽铺满才写 data-tail。缺省不写，保持 hug。 */
+export function dialogTailAttr(align?: DialogTailAlign): "stretch" | undefined {
+  return dialogTailAlignIsStretch(align) ? "stretch" : undefined;
 }
 
 /** 内容区契约写成 data-*；CSS 只认这些名字，禁止模块 :has 穿皮。 */

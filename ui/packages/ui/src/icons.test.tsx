@@ -1,10 +1,33 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { For } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { render } from "@solidjs/testing-library";
 import { ICON_NAMES, Icon, isIconName, type IconName } from "./icons";
 import { Layout } from "./tokens/layout";
 
+function loadIconCss(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    resolve(here, "icons.css"),
+    resolve(process.cwd(), "src/icons.css"),
+    resolve(process.cwd(), "packages/ui/src/icons.css"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return readFileSync(candidate, "utf-8");
+  }
+  return "";
+}
+
 describe("Icon", () => {
+  it("朝向吃 --yohu-icon-transform，不把旋转写进发送配方的选择器", () => {
+    const css = loadIconCss();
+    expect(css).toContain("transform: var(--yohu-icon-transform, none)");
+    expect(css).toContain("transition: transform var(--yohu-icon-transform-move);");
+    expect(css).toContain(".yohu-icon[data-spin]");
+  });
+
   it("同一图标可同时出现多份（工厂函数，不共享 DOM）", () => {
     const { container } = render(() => (
       <>

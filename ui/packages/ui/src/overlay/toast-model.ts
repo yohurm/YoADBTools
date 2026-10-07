@@ -63,20 +63,32 @@ export interface ToastPatch {
   meta?: string;
 }
 
-export function hasToastLeading(value: string): boolean {
+function toastTextPresent(value: string): boolean {
   return value.length > 0;
+}
+
+export function hasToastLeading(value: string): boolean {
+  return toastTextPresent(value);
 }
 
 export function hasToastDetail(value: string): boolean {
-  return value.length > 0;
+  return toastTextPresent(value);
 }
 
 export function hasToastMeta(value: string): boolean {
-  return value.length > 0;
+  return toastTextPresent(value);
 }
 
 export function hasToastProgress(progress: ToastProgress | undefined): boolean {
   return progress !== undefined;
+}
+
+function trimmedToastText(value: string | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function patchedToastText(next: string | undefined, current: string): string {
+  return next !== undefined ? next.trim() : current;
 }
 
 /** 解析缺省。未写 tone 即 info。 */
@@ -84,11 +96,11 @@ export function resolveToastSpec(input: ToastInput): ToastSpec {
   return {
     text: input.text,
     tone: input.tone ?? DEFAULT_TOAST_TONE,
-    detail: input.detail?.trim() ?? "",
-    leading: input.leading?.trim() ?? "",
+    detail: trimmedToastText(input.detail),
+    leading: trimmedToastText(input.leading),
     sticky: Boolean(input.sticky),
     progress: input.progress,
-    meta: input.meta?.trim() ?? "",
+    meta: trimmedToastText(input.meta),
   };
 }
 
@@ -99,11 +111,11 @@ export function applyToastPatch(item: ToastItem, patch: ToastPatch): ToastItem {
     ...item,
     text: patch.text ?? item.text,
     tone: patch.tone ?? item.tone,
-    detail: patch.detail !== undefined ? patch.detail.trim() : item.detail,
-    leading: patch.leading !== undefined ? patch.leading.trim() : item.leading,
+    detail: patchedToastText(patch.detail, item.detail),
+    leading: patchedToastText(patch.leading, item.leading),
     sticky: patch.sticky ?? item.sticky,
     progress,
-    meta: patch.meta !== undefined ? patch.meta.trim() : item.meta,
+    meta: patchedToastText(patch.meta, item.meta),
   };
 }
 

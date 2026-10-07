@@ -11,7 +11,8 @@ import type { JSX } from "solid-js";
 import type { MotionSpecName } from "../../../tokens/motion";
 import { TRAVEL_SPEC } from "../../spec/recipes";
 import { bindTravel, type TravelController } from "./travel-bind";
-import { normalizeTravelAxes, type TravelAxis } from "./travel-model";
+import type { LogicalAxis } from "../../../placement/axis";
+import { normalizeTravelAxes } from "./travel-model";
 import { travelAxisAttrs } from "./travel-policy";
 
 export interface TravelCommandApi {
@@ -25,12 +26,16 @@ const TravelCommand = createContext<TravelCommandApi | undefined>();
 
 export interface YoTravelProps {
   /** 要插值的轴。缺省 block。可同时走 inline。 */
-  axes?: TravelAxis[];
+  axes?: LogicalAxis[];
   /** 行程 spec。缺省 spatialPanel。 */
   spec?: MotionSpecName;
   /** 关则冻锁，不再起程。缺省 true。 */
   enabled?: boolean;
   children: JSX.Element;
+}
+
+function travelSpec(spec: MotionSpecName | undefined): MotionSpecName {
+  return spec ?? TRAVEL_SPEC;
 }
 
 export function YoTravel(props: YoTravelProps): JSX.Element {
@@ -45,8 +50,12 @@ export function YoTravel(props: YoTravelProps): JSX.Element {
     traveling,
   };
 
-  onCleanup(() => {
+  function travelDispose(): void {
     ctl?.dispose();
+  }
+
+  onCleanup(() => {
+    travelDispose();
     ctl = undefined;
   });
 
@@ -55,11 +64,11 @@ export function YoTravel(props: YoTravelProps): JSX.Element {
       <div
         class="yohu-travel"
         ref={(el) => {
-          ctl?.dispose();
+          travelDispose();
           ctl = bindTravel(el, {
             enabled: () => props.enabled !== false,
             axes: () => axes(),
-            spec: () => props.spec ?? TRAVEL_SPEC,
+            spec: () => travelSpec(props.spec),
             onTraveling: setTraveling,
           });
           ctl.snapshot();
@@ -67,7 +76,7 @@ export function YoTravel(props: YoTravelProps): JSX.Element {
         }}
         data-axis-block={host()["data-axis-block"]}
         data-axis-inline={host()["data-axis-inline"]}
-        data-spec={props.spec ?? TRAVEL_SPEC}
+        data-spec={travelSpec(props.spec)}
       >
         <div class="yohu-travel__slot">{props.children}</div>
       </div>

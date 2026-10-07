@@ -11,9 +11,13 @@ export interface TextFieldGrowHost {
 
 export function bindTextFieldGrow(field: HTMLTextAreaElement, host: TextFieldGrowHost): () => void {
   const onIntent = (): void => host.onIntent();
-  field.addEventListener("input", onIntent);
-  field.addEventListener("change", onIntent);
-  field.addEventListener("paste", onIntent);
+  const listen = (type: string): (() => void) => {
+    field.addEventListener(type, onIntent);
+    return () => field.removeEventListener(type, onIntent);
+  };
+  const stopInput = listen("input");
+  const stopChange = listen("change");
+  const stopPaste = listen("paste");
 
   let lastInline = field.clientWidth;
   let observer: ResizeObserver | undefined;
@@ -28,9 +32,9 @@ export function bindTextFieldGrow(field: HTMLTextAreaElement, host: TextFieldGro
   }
 
   return () => {
-    field.removeEventListener("input", onIntent);
-    field.removeEventListener("change", onIntent);
-    field.removeEventListener("paste", onIntent);
+    stopInput();
+    stopChange();
+    stopPaste();
     observer?.disconnect();
   };
 }

@@ -62,12 +62,16 @@ export function createReorderBinder(input: {
   let grabOffset = 0;
   let suppressClick = false;
   let captureId: number | null = null;
+  let stopMove = (): void => {};
+  let stopUp = (): void => {};
+  let stopCancel = (): void => {};
+  let stopKey = (): void => {};
 
   const unbind = (): void => {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onUp);
-    window.removeEventListener("keydown", onKey, true);
+    stopMove();
+    stopUp();
+    stopCancel();
+    stopKey();
   };
 
   const releaseCapture = (): void => {
@@ -134,15 +138,24 @@ export function createReorderBinder(input: {
     end(false);
   };
 
+  const listen = (
+    type: string,
+    handler: { bivarianceHack(event: Event): void }["bivarianceHack"],
+    capture?: boolean,
+  ): (() => void) => {
+    window.addEventListener(type, handler, capture);
+    return () => window.removeEventListener(type, handler, capture);
+  };
+
   const onPointerDown = (index: number, key: string | number, event: PointerEvent): void => {
     if (!input.enabled()) return;
     if (!shouldAcceptReorderPointer(event.button, input.count())) return;
     if (input.acceptTarget && !input.acceptTarget(event)) return;
     pending = { pointerId: event.pointerId, from: index, key, startY: event.clientY };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("keydown", onKey, true);
+    stopMove = listen("pointermove", onMove);
+    stopUp = listen("pointerup", onUp);
+    stopCancel = listen("pointercancel", onUp);
+    stopKey = listen("keydown", onKey, true);
   };
 
   const consumeClick = (): boolean => {

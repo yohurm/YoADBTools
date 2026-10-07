@@ -11,6 +11,7 @@ import {
   type SwapAnchor,
   type SwapPhase,
 } from "./swap-model";
+import { presenceAttr } from "../../../dom/flag";
 
 export interface SwapSessionPaint {
   clipW: number | undefined;
@@ -20,6 +21,13 @@ export interface SwapSessionPaint {
 export type SwapKeyAdvance =
   | { kind: "same"; key: string }
   | { kind: "change"; prevKey: string; nextKey: string };
+
+/** 身份未变。换牌是其余分支。 */
+export function swapAdvanceIsSame(
+  advance: SwapKeyAdvance,
+): advance is Extract<SwapKeyAdvance, { kind: "same" }> {
+  return advance.kind === "same";
+}
 
 /** 该代结束：idle hug，归还 clipW。finish / skip / 同 key 同一出口。 */
 export function releaseSwapSession(): SwapSessionPaint {
@@ -62,7 +70,7 @@ export function isSwapWidthTransitionEnd(
 export interface SwapHostAttrs {
   "data-anchor": SwapAnchor;
   "data-phase": SwapPhase;
-  "data-resizing": "true" | undefined;
+  "data-resizing": "" | undefined;
 }
 
 export function swapHostAttrs(
@@ -72,7 +80,7 @@ export function swapHostAttrs(
   return {
     "data-anchor": resolveSwapAnchor(anchor),
     "data-phase": swapPhase(paint.clipW),
-    "data-resizing": paint.resizing ? "true" : undefined,
+    "data-resizing": presenceAttr(paint.resizing),
   };
 }
 

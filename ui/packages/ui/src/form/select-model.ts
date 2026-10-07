@@ -4,6 +4,9 @@
  * 菜单落点的盒 / 高度估计只放数据，不碰 DOM。
  */
 
+import { listActivateKey, listEdgeKey, stepWrappedIndex, tabKey, verticalListDelta, type ListEdge } from "../keymap/list-index";
+import type { PopoverPlacement } from "../placement/side";
+
 export interface YoSelectOption {
   /** 选项值 */
   value: string;
@@ -19,15 +22,6 @@ export function optionDescription(option: YoSelectOption | undefined): string | 
   return text ? text : undefined;
 }
 
-/** 触发钮视口盒。视图读几何后交给 L3。 */
-export interface SelectTriggerBox {
-  top: number;
-  left: number;
-  bottom: number;
-  width: number;
-  height: number;
-}
-
 /** 菜单高度估计输入：实测高 + 选项行数。 */
 export interface SelectMenuMeasure {
   optionCount: number;
@@ -36,7 +30,7 @@ export interface SelectMenuMeasure {
 
 /** L3 落点写回视图的快照。 */
 export interface SelectMenuLayout {
-  placement: "bottom" | "top";
+  placement: PopoverPlacement;
   overflowY: boolean;
   style: Record<string, string>;
 }
@@ -44,55 +38,47 @@ export interface SelectMenuLayout {
 /** 空字符串 value（如级别「全部」）不能生成 `yohu-option-` 这种残缺 id。 */
 export const optionDomId = (value: string): string => `yohu-option-${value === "" ? "empty" : value}`;
 
+/** 这一项就是当前值。查找与描选中都认这一把。 */
+export function optionIsSelected(
+  option: { value: string },
+  value: string | null | undefined,
+): boolean {
+  return option.value === value;
+}
+
 export function findOption(
   options: readonly YoSelectOption[],
   value: string | null | undefined,
 ): YoSelectOption | undefined {
-  return options.find((option) => option.value === value);
+  return options.find((option) => optionIsSelected(option, value));
 }
 
 export function selectedIndex(
   options: readonly YoSelectOption[],
   value: string | null | undefined,
 ): number {
-  return options.findIndex((option) => option.value === value);
+  return options.findIndex((option) => optionIsSelected(option, value));
 }
 
 export function stepIndex(count: number, current: number, delta: number): number {
-  if (count === 0) return -1;
   const from = current >= 0 ? current : 0;
-  return (from + delta + count) % count;
-}
-
-export function edgeIndex(count: number, edge: "start" | "end"): number {
-  if (count === 0) return -1;
-  return edge === "start" ? 0 : count - 1;
+  return stepWrappedIndex(count, from, delta);
 }
 
 export type SelectKeyIntent =
   | { type: "step"; delta: number }
-  | { type: "edge"; edge: "start" | "end" }
+  | { type: "edge"; edge: ListEdge }
   | { type: "commit" }
   | { type: "toggle" }
   | { type: "tabCommit" };
 
 /** 触发钮键盘意图；未识别返回 null（视图不 preventDefault）。 */
 export function selectKeyIntent(key: string, isOpen: boolean): SelectKeyIntent | null {
-  switch (key) {
-    case "ArrowDown":
-      return { type: "step", delta: 1 };
-    case "ArrowUp":
-      return { type: "step", delta: -1 };
-    case "Home":
-      return isOpen ? { type: "edge", edge: "start" } : null;
-    case "End":
-      return isOpen ? { type: "edge", edge: "end" } : null;
-    case "Enter":
-    case " ":
-      return isOpen ? { type: "commit" } : { type: "toggle" };
-    case "Tab":
-      return isOpen ? { type: "tabCommit" } : null;
-    default:
-      return null;
-  }
+  const delta = verticalListDelta(key);
+  if (delta !== null) return { type: "step", delta };
+  const edge = listEdgeKey(key);
+  if (edge) return isOpen ? { type: "edge", edge } : null;
+  if (listActivateKey(key)) return isOpen ? { type: "commit" } : { type: "toggle" };
+  if (tabKey(key)) return isOpen ? { type: "tabCommit" } : null;
+  return null;
 }

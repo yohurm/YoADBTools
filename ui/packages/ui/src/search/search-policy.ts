@@ -4,23 +4,56 @@
  * 不写色、不画铬。
  */
 
-export type YoSearchStatus = "none" | "error" | "warning";
+import { presenceAttr, flagAttr, type FlagAttr } from "../dom/flag";
+import { controlIsDisabled } from "../basic/control-busy";
+import {
+  fieldPaintKind,
+  fieldStatusInvalid,
+  resolveFieldStatus,
+  type FieldPaintKind,
+  type FieldStatus,
+} from "../form/field-status";
+
 export type YoSearchSlot = "entry" | "bar" | "both";
 export type YoSearchCancel = "input" | "constant" | "invisible";
-export type SearchPaintKind = "neutral" | "error" | "warning";
 export type SearchWidthKind = "hug" | "fill";
 
+const SEARCH_SLOTS: readonly YoSearchSlot[] = ["entry", "bar", "both"];
+const SEARCH_CANCELS: readonly YoSearchCancel[] = ["input", "constant", "invisible"];
+
+function searchSlotIsBoth(slot: YoSearchSlot): boolean {
+  return slot === "both";
+}
+
+function searchSlotIsEntry(slot: YoSearchSlot): boolean {
+  return slot === "entry";
+}
+
+function searchSlotIsBar(slot: YoSearchSlot): boolean {
+  return slot === "bar";
+}
+
+function searchCancelIsInvisible(cancel: YoSearchCancel): boolean {
+  return cancel === "invisible";
+}
+
+function searchCancelIsConstant(cancel: YoSearchCancel): boolean {
+  return cancel === "constant";
+}
+
 export function resolveSearchSlot(slot?: string): YoSearchSlot {
-  if (slot === "entry" || slot === "bar" || slot === "both") return slot;
+  for (const known of SEARCH_SLOTS) {
+    if (slot === known) return known;
+  }
   return "bar";
 }
 
 export function searchShowsEntry(slot: YoSearchSlot): boolean {
-  return slot === "entry" || slot === "both";
+  return searchSlotIsEntry(slot) || searchSlotIsBoth(slot);
 }
 
 export function searchShowsBar(slot: YoSearchSlot): boolean {
-  return slot === "bar" || slot === "both";
+  return searchSlotIsBar(slot) || searchSlotIsBoth(slot);
 }
 
 /** 非折叠态栏始终开。折叠态只认受控 open。 */
@@ -30,18 +63,15 @@ export function resolveSearchOpen(input: { collapsible?: boolean; open?: boolean
 }
 
 export function resolveSearchCancel(cancel?: string): YoSearchCancel {
-  if (cancel === "constant" || cancel === "invisible") return cancel;
+  for (const known of SEARCH_CANCELS) {
+    if (cancel === known) return known;
+  }
   return "input";
 }
 
-export function resolveSearchStatus(status?: string): YoSearchStatus {
-  if (status === "error" || status === "warning") return status;
-  return "none";
-}
-
-export function searchPaintKind(status: YoSearchStatus): SearchPaintKind {
-  if (status === "error" || status === "warning") return status;
-  return "neutral";
+/** 查询串有字符。清除、描边、入口按下和 Escape 都认这一把。 */
+export function searchHasQuery(value?: string): boolean {
+  return (value ?? "").length > 0;
 }
 
 /** 栏默认铺宽。入口只 hug。block=false 才 hug。 */
@@ -55,22 +85,22 @@ export function searchShowClear(input: {
   value?: string;
   disabled?: boolean;
 }): boolean {
-  if (input.disabled) return false;
+  if (controlIsDisabled(input.disabled)) return false;
   const cancel = resolveSearchCancel(input.cancel);
-  if (cancel === "invisible") return false;
-  if (cancel === "constant") return true;
-  return (input.value ?? "").length > 0;
+  if (searchCancelIsInvisible(cancel)) return false;
+  if (searchCancelIsConstant(cancel)) return true;
+  return searchHasQuery(input.value);
 }
 
 /** 未写 active 时，有查询即描边。 */
 export function resolveSearchActive(input: { active?: boolean; value?: string }): boolean {
   if (input.active !== undefined) return Boolean(input.active);
-  return (input.value ?? "").length > 0;
+  return searchHasQuery(input.value);
 }
 
 /** 栏开着或仍有查询：入口保持按下，避免收起后过滤还在、钮却像闲置。 */
 export function searchEntryPressed(input: { open: boolean; value?: string }): boolean {
-  return input.open || (input.value ?? "").length > 0;
+  return input.open || searchHasQuery(input.value);
 }
 
 export interface SearchHostInput {
@@ -87,36 +117,36 @@ export interface SearchHostInput {
 
 export interface SearchHostAttrs {
   "data-slot": YoSearchSlot;
-  "data-open": "true" | "false";
-  "data-collapsible": true | undefined;
-  "data-status": YoSearchStatus;
-  "data-paint": SearchPaintKind;
+  "data-open": FlagAttr;
+  "data-collapsible": "" | undefined;
+  "data-status": FieldStatus;
+  "data-paint": FieldPaintKind;
   "data-width": SearchWidthKind;
-  "data-clearable": true | undefined;
-  "data-disabled": true | undefined;
-  "data-active": true | undefined;
+  "data-clearable": "" | undefined;
+  "data-disabled": "" | undefined;
+  "data-active": "" | undefined;
   disabled: boolean;
   "aria-invalid": true | undefined;
 }
 
 export function searchHostAttrs(input: SearchHostInput): SearchHostAttrs {
   const slot = resolveSearchSlot(input.slot);
-  const status = resolveSearchStatus(input.status);
+  const status = resolveFieldStatus(input.status);
   const open = resolveSearchOpen(input);
-  const disabled = Boolean(input.disabled);
+  const disabled = controlIsDisabled(input.disabled);
   return {
     "data-slot": slot,
-    "data-open": open ? "true" : "false",
-    "data-collapsible": input.collapsible ? true : undefined,
+    "data-open": flagAttr(open),
+    "data-collapsible": presenceAttr(Boolean(input.collapsible)),
     "data-status": status,
-    "data-paint": searchPaintKind(status),
+    "data-paint": fieldPaintKind(status),
     "data-width": resolveSearchWidth({ slot, block: input.block }),
-    "data-clearable": searchShowClear({ cancel: input.cancel, value: input.value, disabled })
-      ? true
-      : undefined,
-    "data-disabled": disabled ? true : undefined,
-    "data-active": resolveSearchActive(input) ? true : undefined,
+    "data-clearable": presenceAttr(
+      searchShowClear({ cancel: input.cancel, value: input.value, disabled }),
+    ),
+    "data-disabled": presenceAttr(disabled),
+    "data-active": presenceAttr(resolveSearchActive(input)),
     disabled,
-    "aria-invalid": status === "error" ? true : undefined,
+    "aria-invalid": fieldStatusInvalid(status),
   };
 }

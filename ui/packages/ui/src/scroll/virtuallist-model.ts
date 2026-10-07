@@ -3,27 +3,46 @@
  * 槽位池、选择投影与键盘目标下标是不变式；不碰 DOM / 不组装 aria。
  */
 
+import { listRowToneIsDocument, type YoListRowTone } from "../list-row/list-row-model";
 import { Spacing } from "../tokens/spacing";
+import { clampListIndex, listActivateKey, listEdgeIndex, listEdgeKey, verticalListDelta } from "../keymap/list-index";
 
 export const VIRTUAL_STICK_THRESHOLD = Spacing.TwoXl;
 export const VIRTUAL_DEFAULT_ITEM_HEIGHT = 22;
 export const VIRTUAL_DEFAULT_OVERSCAN = 10;
 export const VIRTUAL_DEFAULT_TONE = "document";
+
+/** 虚拟列表缺省文档面。行盒自己的 document 缺省不走这一把。 */
+export function resolveVirtualListTone(tone?: YoListRowTone): YoListRowTone {
+  return tone ?? VIRTUAL_DEFAULT_TONE;
+}
 export const VIRTUAL_FOCUS_RETRY_LIMIT = 3;
 
 export type VirtualKeyIntent = { type: "move"; index: number } | { type: "commit" };
+
+/** 激活当前行。移动是其余分支。 */
+export function virtualKeyIntentIsCommit(
+  intent: VirtualKeyIntent,
+): intent is Extract<VirtualKeyIntent, { type: "commit" }> {
+  return intent.type === "commit";
+}
 export type VirtualListLayout = "pool" | "flow";
 
 /** Family A 文档划选：未开 listbox / 换位时行在文档流里，原生 Selection 才是一份文档。 */
 export function virtualListLayout(input: {
-  tone: "document" | "list";
+  tone: YoListRowTone;
   selectable: boolean;
   reordering: boolean;
 }): VirtualListLayout {
-  if (input.tone === "document" && !input.selectable && !input.reordering) {
+  if (listRowToneIsDocument(input.tone) && !input.selectable && !input.reordering) {
     return "flow";
   }
   return "pool";
+}
+
+/** 文档流。槽位池是反面，视图不再比 layout 字面量。 */
+export function virtualListLayoutIsFlow(layout: VirtualListLayout): boolean {
+  return layout === "flow";
 }
 
 export interface VirtualIndicatorBox {
@@ -35,6 +54,10 @@ export interface VirtualIndicatorBox {
 
 export function virtualTotalHeight(count: number, itemHeight: number): number {
   return count * itemHeight;
+}
+
+function virtualOverscan(value: number): number {
+  return Math.max(0, value);
 }
 
 /**
@@ -49,7 +72,15 @@ export function virtualPoolSize(
 ): number {
   if (itemHeight <= 0 || count <= 0) return 0;
   const visible = Math.max(1, Math.ceil(Math.max(0, viewportHeight) / itemHeight) + 1);
-  return Math.min(count, visible + Math.max(0, overscan) * 2);
+  return Math.min(count, visible + virtualOverscan(overscan) * 2);
+}
+
+function virtualScroll(value: number): number {
+  return Math.max(0, value);
+}
+
+function virtualRemainder(total: number, used: number): number {
+  return Math.max(0, total - used);
 }
 
 /** 池原点：第一条槽对应的数据下标。夹在 [0, count - poolSize]。 */
@@ -61,13 +92,17 @@ export function virtualPoolOrigin(
   poolSize: number,
 ): number {
   if (itemHeight <= 0 || poolSize <= 0) return 0;
-  const raw = Math.floor(Math.max(0, scrollTop) / itemHeight) - Math.max(0, overscan);
-  const maxOrigin = Math.max(0, count - poolSize);
+  const raw = Math.floor(virtualScroll(scrollTop) / itemHeight) - virtualOverscan(overscan);
+  const maxOrigin = virtualRemainder(count, poolSize);
   return Math.min(maxOrigin, Math.max(0, raw));
 }
 
 export function virtualPoolIndex(origin: number, slot: number): number {
   return origin + slot;
+}
+
+function virtualOrigin(value: number): number {
+  return Math.max(0, value);
 }
 
 /**
@@ -81,7 +116,7 @@ export function virtualPoolBindIndex(
   count: number,
 ): number {
   if (poolSize <= 0 || slot < 0 || slot >= poolSize || count <= 0) return -1;
-  const cycle = Math.floor(Math.max(0, origin) / poolSize) * poolSize;
+  const cycle = Math.floor(virtualOrigin(origin) / poolSize) * poolSize;
   let index = slot + cycle;
   if (index < origin) index += poolSize;
   return index < count ? index : -1;
@@ -90,7 +125,7 @@ export function virtualPoolBindIndex(
 /** flow：可视下标按文档序。For 以数字为身份，origin 步进只卸一条、挂一条。 */
 export function virtualFlowWindow(origin: number, poolSize: number, count: number): number[] {
   if (poolSize <= 0 || count <= 0) return [];
-  const start = Math.max(0, origin);
+  const start = virtualOrigin(origin);
   const end = Math.min(count, start + poolSize);
   if (end <= start) return [];
   const window = new Array<number>(end - start);
@@ -197,7 +232,7 @@ export function virtualNearestScrollTop(
   view: number,
   scrollTop: number,
 ): number {
-  const start = Math.max(0, scrollTop);
+  const start = virtualScroll(scrollTop);
   if (!(itemHeight > 0) || !(view > 0)) return start;
   const top = Math.max(0, rowTop);
   if (top < start) return top;
@@ -242,9 +277,13 @@ export function virtualRowBoxStyle(
   };
 }
 
+function virtualItemHeight(value: number): number {
+  return Math.max(0, value);
+}
+
 /** flow 前导空白：未挂载原点之前的行高。 */
 export function virtualFlowLeadHeight(origin: number, itemHeight: number): number {
-  return Math.max(0, origin) * Math.max(0, itemHeight);
+  return virtualOrigin(origin) * virtualItemHeight(itemHeight);
 }
 
 /** flow 尾部空白：池外未挂载行高。 */
@@ -254,8 +293,8 @@ export function virtualFlowTailHeight(
   poolSize: number,
   itemHeight: number,
 ): number {
-  const mounted = Math.max(0, origin) + Math.max(0, poolSize);
-  return Math.max(0, count - mounted) * Math.max(0, itemHeight);
+  const mounted = virtualOrigin(origin) + Math.max(0, poolSize);
+  return virtualRemainder(count, mounted) * virtualItemHeight(itemHeight);
 }
 
 /** flow 簇钉在原点行顶。子行进文档流；禁止再用 lead/tail gap 改 spacer 触发整窗回流。 */
@@ -338,19 +377,10 @@ export function virtualIndexOfKey<T>(
 /** Arrow/Home/End 夹紧到 [0, count)；Enter/Space 是 commit 当前。未识别或空表为 null。 */
 export function virtualKeyIntent(key: string, index: number, count: number): VirtualKeyIntent | null {
   if (count <= 0) return null;
-  switch (key) {
-    case "ArrowDown":
-      return { type: "move", index: Math.min(count - 1, index + 1) };
-    case "ArrowUp":
-      return { type: "move", index: Math.max(0, index - 1) };
-    case "Home":
-      return { type: "move", index: 0 };
-    case "End":
-      return { type: "move", index: count - 1 };
-    case "Enter":
-    case " ":
-      return { type: "commit" };
-    default:
-      return null;
-  }
+  const delta = verticalListDelta(key);
+  if (delta !== null) return { type: "move", index: clampListIndex(index + delta, count) };
+  const edge = listEdgeKey(key);
+  if (edge) return { type: "move", index: listEdgeIndex(count, edge) };
+  if (listActivateKey(key)) return { type: "commit" };
+  return null;
 }

@@ -49,7 +49,7 @@ describe("YoTextField", () => {
     render(() => <YoTextField label="禁用" value="x" disabled clearable />);
     const host = screen.getByLabelText("禁用").closest(".yohu-text-field");
     expect((screen.getByLabelText("禁用") as HTMLInputElement).disabled).toBe(true);
-    expect(host?.getAttribute("data-disabled")).toBe("true");
+    expect(host?.getAttribute("data-disabled")).toBe("");
     expect(screen.queryByRole("button", { name: "清除" })).toBeNull();
   });
 
@@ -59,7 +59,7 @@ describe("YoTextField", () => {
     const host = input.closest(".yohu-text-field");
     expect(input.readOnly).toBe(true);
     expect(input.disabled).toBe(false);
-    expect(host?.getAttribute("data-readonly")).toBe("true");
+    expect(host?.getAttribute("data-readonly")).toBe("");
     expect(host?.getAttribute("data-disabled")).toBeNull();
     expect(screen.queryByRole("button", { name: "清除" })).toBeNull();
   });
@@ -72,7 +72,7 @@ describe("YoTextField", () => {
   it("盒内 prefix 图标名渲染到 control 内", () => {
     const { container } = render(() => <YoTextField label="检索" prefix="search" />);
     const host = container.querySelector(".yohu-text-field");
-    expect(host?.getAttribute("data-prefix")).toBe("true");
+    expect(host?.getAttribute("data-prefix")).toBe("");
     expect(host?.querySelector(".yohu-text-field__control [data-icon='search']")).toBeTruthy();
     expect(host?.querySelector(".yohu-text-field__addon")).toBeNull();
   });
@@ -93,8 +93,8 @@ describe("YoTextField", () => {
       <YoTextField label="地址" addonBefore="https://" addonAfter=".apk" />
     ));
     const host = container.querySelector(".yohu-text-field");
-    expect(host?.getAttribute("data-addon-before")).toBe("true");
-    expect(host?.getAttribute("data-addon-after")).toBe("true");
+    expect(host?.getAttribute("data-addon-before")).toBe("");
+    expect(host?.getAttribute("data-addon-after")).toBe("");
     const group = host?.querySelector(".yohu-text-field__group");
     const before = group?.querySelector("[data-edge='before']");
     const after = group?.querySelector("[data-edge='after']");
@@ -157,7 +157,7 @@ describe("YoTextField", () => {
     expect(input.type).toBe("number");
     expect(input.size).toBe(1);
     expect(host?.getAttribute("data-width")).toBe("number");
-    expect(host?.getAttribute("data-stepper")).toBe("true");
+    expect(host?.getAttribute("data-stepper")).toBe("");
     expect(host?.querySelector(".yohu-text-field__stepper")).toBeTruthy();
     expect(screen.getByRole("button", { name: "增加" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "减少" })).toBeTruthy();
@@ -198,7 +198,7 @@ describe("YoTextField", () => {
     render(() => <YoTextField ariaLabel="只读数字" type="number" value="3" readOnly />);
     expect((screen.getByRole("button", { name: "增加" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByLabelText("只读数字").closest(".yohu-text-field")?.getAttribute("data-stepper")).toBe(
-      "true",
+      "",
     );
   });
 
@@ -244,7 +244,7 @@ describe("YoTextField", () => {
   it("active 写 data-active，描边走 accent；默认不加", () => {
     const { container, unmount } = render(() => <YoTextField ariaLabel="关键字" active />);
     const host = container.querySelector(".yohu-text-field");
-    expect(host?.getAttribute("data-active")).toBe("true");
+    expect(host?.getAttribute("data-active")).toBe("");
     expect(host?.getAttribute("data-paint")).toBe("neutral");
     expect(css).toMatch(
       /\.yohu-text-field\[data-active\]\s*\{[^}]*--yohu-text-field-edge:\s*var\(--yohu-accent\)/,
@@ -261,7 +261,7 @@ describe("YoTextField", () => {
     const host = container.querySelector(".yohu-text-field");
     const control = host?.querySelector(".yohu-text-field__control");
     const tokens = host?.querySelector(".yohu-text-field__tokens");
-    expect(host?.getAttribute("data-tokens")).toBe("true");
+    expect(host?.getAttribute("data-tokens")).toBe("");
     expect(tokens).toBeTruthy();
     expect(control?.contains(screen.getByTestId("chip"))).toBe(true);
 
@@ -322,7 +322,7 @@ describe("YoTextField", () => {
     const area = screen.getByLabelText("命令") as HTMLTextAreaElement;
     expect(area.tagName).toBe("TEXTAREA");
     expect(area.rows).toBe(1);
-    expect(area.closest(".yohu-text-field")?.getAttribute("data-multiline")).toBe("true");
+    expect(area.closest(".yohu-text-field")?.getAttribute("data-multiline")).toBe("");
     expect(forwarded).toBe(area);
     fireEvent.input(area, { target: { value: "shell" } });
     expect(onInput).toHaveBeenCalledWith("shell", expect.anything());
@@ -340,7 +340,7 @@ describe("YoTextField", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
     expect(src).toMatch(/overflow="hidden"/);
     expect(src).toMatch(/direction="row"/);
-    expect(src).toMatch(/align=\{props\.host\["data-multiline"\] \? undefined : "center"\}/);
+    expect(src).toMatch(/align=\{presenceIsOn\(props\.host\["data-multiline"\]\) \? undefined : "center"\}/);
     expect(src).toMatch(/pad="inline-sm"/);
     expect(src).toMatch(/gap="xs"/);
     expect(src).toMatch(/host\(\)\["data-font"\]/);
@@ -390,9 +390,14 @@ describe("YoTextField", () => {
     expect(css).toContain("contain: inline-size");
     expect(css).toContain("--yohu-text-field-max-rows");
     expect(css).not.toContain("min-height: min-content");
-    expect(css).toContain(".yohu-grow");
-    expect(css).toContain("flex: 1 1 0%");
-    expect(css).toContain("align-self: flex-start");
+    expect(css).not.toContain(".yohu-grow");
+    expect(css).not.toContain(".yohu-recipe-clear");
+    const growCss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../motion/engines/grow/grow.css"),
+      "utf8",
+    );
+    expect(growCss).toContain("flex: 1 1 0%");
+    expect(growCss).toContain("align-self: flex-start");
     expect(css).toContain("align-items: flex-start");
     expect(css).toContain("min-height: 0");
     expect(css).toContain("yohu-text-field__body");
@@ -401,5 +406,259 @@ describe("YoTextField", () => {
     expect(css).toContain("inset: 0");
     expect(css).not.toContain("transition: height var(--yohu-motion-spatial-small)");
     expect(css).not.toContain("--yohu-text-field-rows");
+  });
+
+  it("文本框可选字符串缺省为空串", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props.field.value " + "?? \"\"")).toBe(0);
+    expect(times("props.field.placeholder " + "?? \"\"")).toBe(0);
+    expect(times("textOrEmpty(props.field.value)")).toBe(1);
+    expect(times("textOrEmpty(props.field.placeholder)")).toBe(1);
+    expect(src).toContain('props.value ?? inputRef?.value ?? ""');
+  });
+
+  it("有无障碍名就用它，否则用可见标签", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("field.ariaLabel " + "?? field.label")).toBe(1);
+    expect(times("accessibleName(props.field)")).toBe(1);
+    expect(src).toContain("textOrEmpty(props.field.value)");
+  });
+});
+
+describe("文本框读当前控件", () => {
+  it("两处从事件读同一控件", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("event.currentTarget as " + "YoTextFieldControl")).toBe(1);
+    expect(times("function textFieldControl")).toBe(1);
+    expect(times("export function textFieldControl")).toBe(0);
+    expect(times("textFieldControl(event)")).toBe(2);
+    expect(times("props.onInput?.(target.value, event)")).toBe(1);
+    expect(times("event as InputEvent")).toBe(1);
+  });
+});
+
+describe("步进按下不夺焦", () => {
+  it("两处步进共用按下处理", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("onMouseDown={(event) => " + "event.preventDefault()}")).toBe(0);
+    expect(times("function stepperKeepFocus")).toBe(1);
+    expect(times("export function stepperKeepFocus")).toBe(0);
+    expect(times("onMouseDown={stepperKeepFocus}")).toBe(2);
+    expect(times("event.preventDefault()")).toBe(2);
+    expect(times("props.onStep(1)")).toBe(1);
+    expect(times("props.onStep(-1)")).toBe(1);
+    expect(src).toContain("inputEl.focus()");
+  });
+});
+
+describe("文本框转发按键", () => {
+  it("两处按键转给字段", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("onKeyDown={(event) => " + "props.field.onKeyDown?.(event)}")).toBe(0);
+    expect(times("props.field.onKeyDown?.(" + "event)")).toBe(1);
+    expect(times("function forwardFieldKey")).toBe(1);
+    expect(times("export function forwardFieldKey")).toBe(0);
+    expect(times("onKeyDown={forwardFieldKey}")).toBe(2);
+    expect(src).toContain("function stepperKeepFocus");
+    expect(times("onMouseDown={stepperKeepFocus}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框绑上控件", () => {
+  it("两处把控件交给字段", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("ref={(el) => " + "props.bind(el)}")).toBe(0);
+    expect(times("props.bind(" + "el)")).toBe(1);
+    expect(times("function bindField")).toBe(1);
+    expect(times("export function bindField")).toBe(0);
+    expect(times("ref={bindField}")).toBe(2);
+    expect(src).toContain("function forwardFieldKey");
+    expect(times("onKeyDown={forwardFieldKey}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框无效状态", () => {
+  it("两处读宿主上的无效旗", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props.host[\"" + "aria-invalid\"]")).toBe(1);
+    expect(times("function fieldInvalid")).toBe(1);
+    expect(times("export function fieldInvalid")).toBe(0);
+    expect(times("fieldInvalid()")).toBe(3);
+    expect(times("aria-invalid={fieldInvalid()}")).toBe(2);
+    expect(src).toContain("function bindField");
+    expect(times("ref={bindField}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框禁用", () => {
+  it("两处读宿主上的禁用旗", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props.host." + "disabled")).toBe(1);
+    expect(times("function fieldDisabled")).toBe(1);
+    expect(times("export function fieldDisabled")).toBe(0);
+    expect(times("fieldDisabled()")).toBe(3);
+    expect(times("disabled={fieldDisabled()}")).toBe(2);
+    expect(times("props.host.readOnly")).toBe(1);
+    expect(src).toContain("function fieldInvalid");
+    expect(times("aria-invalid={fieldInvalid()}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框只读", () => {
+  it("两处读宿主上的只读旗", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props.host." + "readOnly")).toBe(1);
+    expect(times("function fieldReadOnly")).toBe(1);
+    expect(times("export function fieldReadOnly")).toBe(0);
+    expect(times("fieldReadOnly()")).toBe(3);
+    expect(times("readOnly={fieldReadOnly()}")).toBe(2);
+    expect(src).toContain("function fieldDisabled");
+    expect(times("disabled={fieldDisabled()}")).toBe(2);
+    expect(times("props.host." + "disabled")).toBe(1);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框控件标识", () => {
+  it("两处写宿主上的控件标识", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("id={" + "props.id}")).toBe(0);
+    expect(times("function fieldDomId")).toBe(1);
+    expect(times("export function fieldDomId")).toBe(0);
+    expect(times("fieldDomId()")).toBe(3);
+    expect(times("id={fieldDomId()}")).toBe(2);
+    expect(times("id: " + "props.id")).toBe(1);
+    expect(src).toContain("function fieldReadOnly");
+    expect(times("readOnly={fieldReadOnly()}")).toBe(2);
+    expect(times("props.host." + "readOnly")).toBe(1);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框输入类名", () => {
+  it("两处写同一条输入类名", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("class=\"" + "yohu-text-field__input\"")).toBe(0);
+    expect(times("yohu-text-field__input")).toBe(1);
+    expect(times("function fieldInputClass")).toBe(1);
+    expect(times("export function fieldInputClass")).toBe(0);
+    expect(times("fieldInputClass()")).toBe(3);
+    expect(times("class={fieldInputClass()}")).toBe(2);
+    expect(src).toContain("function fieldDomId");
+    expect(times("id={fieldDomId()}")).toBe(2);
+    expect(times("id={" + "props.id}")).toBe(0);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框当前值", () => {
+  it("两处把缺省值收成空串", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("value={textOrEmpty(" + "props.field.value)}")).toBe(0);
+    expect(times("textOrEmpty(props.field." + "value)")).toBe(1);
+    expect(times("function fieldValue")).toBe(1);
+    expect(times("export function fieldValue")).toBe(0);
+    expect(times("fieldValue()")).toBe(3);
+    expect(times("value={fieldValue()}")).toBe(2);
+    expect(times("textOrEmpty(props.field." + "placeholder)")).toBe(1);
+    expect(src).toContain("function fieldInputClass");
+    expect(times("class={fieldInputClass()}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框占位", () => {
+  it("两处把缺省占位收成空串", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("placeholder={textOrEmpty(" + "props.field.placeholder)}")).toBe(0);
+    expect(times("textOrEmpty(props.field." + "placeholder)")).toBe(1);
+    expect(times("function fieldPlaceholder")).toBe(1);
+    expect(times("export function fieldPlaceholder")).toBe(0);
+    expect(times("fieldPlaceholder()")).toBe(3);
+    expect(times("placeholder={fieldPlaceholder()}")).toBe(2);
+    expect(times("textOrEmpty(props.field." + "value)")).toBe(1);
+    expect(src).toContain("function fieldValue");
+    expect(times("value={fieldValue()}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框无障碍名", () => {
+  it("两处都用无障碍名", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("aria-label={accessibleName(" + "props.field})")).toBe(0);
+    expect(times("accessibleName(" + "props.field)")).toBe(1);
+    expect(times("function fieldAccessibleName")).toBe(1);
+    expect(times("export function fieldAccessibleName")).toBe(0);
+    expect(times("fieldAccessibleName()")).toBe(3);
+    expect(times("aria-label={fieldAccessibleName()}")).toBe(2);
+    expect(times("textOrEmpty(props.field." + "placeholder)")).toBe(1);
+    expect(src).toContain("function fieldPlaceholder");
+    expect(times("placeholder={fieldPlaceholder()}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框输入事件", () => {
+  it("两处都把输入交给同一回调", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("onInput={" + "props.onInput}")).toBe(0);
+    expect(times("function fieldOnInput")).toBe(1);
+    expect(times("export function fieldOnInput")).toBe(0);
+    expect(times("onInput={fieldOnInput}")).toBe(2);
+    expect(times("props.onInput(" + "event)")).toBe(1);
+    expect(times("onInput: " + "props.onInput")).toBe(1);
+    expect(times("onChange={" + "props.onChange}")).toBe(0);
+    expect(src).toContain("function fieldAccessibleName");
+    expect(times("aria-label={fieldAccessibleName()}")).toBe(2);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
+  });
+});
+
+describe("文本框变更事件", () => {
+  it("两处都把变更交给同一回调", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "TextField.tsx"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("onChange={" + "props.onChange}")).toBe(0);
+    expect(times("function fieldOnChange")).toBe(1);
+    expect(times("export function fieldOnChange")).toBe(0);
+    expect(times("onChange={fieldOnChange}")).toBe(2);
+    expect(times("props.onChange(" + "event)")).toBe(1);
+    expect(times("onChange: " + "props.onChange")).toBe(1);
+    expect(times("onInput={fieldOnInput}")).toBe(2);
+    expect(src).toContain("function fieldOnInput");
+    expect(times("props.onInput(" + "event)")).toBe(1);
+    expect(src).toContain("<input");
+    expect(src).toContain("<textarea");
   });
 });

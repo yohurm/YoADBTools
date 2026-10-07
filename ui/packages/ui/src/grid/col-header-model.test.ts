@@ -1,7 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_COL_HEADER_ALIGN,
   DEFAULT_COL_HEADER_SORT,
+  colHeaderSortIsAscending,
+  colHeaderSortIsDescending,
+  colHeaderSortIsNone,
   resolveColHeaderAlign,
   resolveColHeaderSort,
   resolveColHeaderSpec,
@@ -56,5 +62,43 @@ describe("col-header-model / policy", () => {
     expect(idle["aria-sort"]).toBe("ascending");
     expect(idle["data-resizing"]).toBeUndefined();
     expect(colHeaderHostAttrs({ resizing: true })["data-resizing"]).toBe("");
+  });
+
+  it("升序、降序、未排序各判一次", () => {
+    expect(colHeaderSortIsAscending("ascending")).toBe(true);
+    expect(colHeaderSortIsDescending("descending")).toBe(true);
+    expect(colHeaderSortIsNone("none")).toBe(true);
+    expect(colHeaderSortIsAscending("descending")).toBe(false);
+  });
+});
+
+describe("表头排序方向只在模型判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图和策略不再比较 ascending / descending / none", () => {
+    for (const name of ["col-header-model.ts", "col-header-policy.ts", "ColHeader.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return sort === "ascending"', "");
+      body = body.replaceAll('return sort === "descending"', "");
+      body = body.replaceAll('return sort === "none"', "");
+      expect(body, name).not.toContain('=== "ascending"');
+      expect(body, name).not.toContain('=== "descending"');
+      expect(body, name).not.toContain('=== "none"');
+      expect(body, name).not.toContain('!== "none"');
+    }
+  });
+});
+
+describe("列架 tone 缺省跟表头同一把", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("框不再自写 tone ?? list", () => {
+    for (const name of ["col-header-model.ts", "col-header-policy.ts", "ColHeader.tsx", "ColFrame.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "col-header-model.ts") {
+        body = body.replace('export const DEFAULT_COL_HEADER_TONE: YoListRowTone = "list";', "");
+      }
+      expect(body, name).not.toContain('tone ?? "list"');
+    }
   });
 });

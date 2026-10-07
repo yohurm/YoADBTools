@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { enabledIndexes } from "../keymap/list-index";
 import {
   DEFAULT_SEGMENTED_SIZE,
   DEFAULT_SEGMENTED_TYPE,
   YO_SEGMENTED_MAX_ITEMS,
   edgeEnabledIndex,
-  enabledItemIndexes,
   isHybridItems,
   itemAccessibleName,
   resolveKeyIndex,
@@ -15,11 +18,14 @@ import {
   resolveSegmentedGraphic,
   resolveSelectedValues,
   segmentKeyIntent,
+  segmentedGraphicIsIcon,
+  segmentedGraphicIsImage,
   segmentedFillCell,
   segmentedFillOwner,
   segmentedIconSize,
   segmentedItemContent,
   segmentedPaintKind,
+  segmentedTypeIsCapsule,
   stepEnabledIndex,
   toggleSelectedValues,
   type SegmentedInteract,
@@ -50,18 +56,18 @@ describe("segmented-model", () => {
   });
 
   it("enabled 跳过 disabled", () => {
-    expect(enabledItemIndexes(ITEMS)).toEqual([0, 1, 3]);
+    expect(enabledIndexes(ITEMS)).toEqual([0, 1, 3]);
   });
 
   it("步进循环且跳过禁用项", () => {
-    const enabled = enabledItemIndexes(ITEMS);
+    const enabled = enabledIndexes(ITEMS);
     expect(stepEnabledIndex(enabled, 1, 1)).toBe(3);
     expect(stepEnabledIndex(enabled, 3, 1)).toBe(0);
     expect(stepEnabledIndex(enabled, 0, -1)).toBe(3);
   });
 
   it("Home/End 落在可用首尾", () => {
-    const enabled = enabledItemIndexes(ITEMS);
+    const enabled = enabledIndexes(ITEMS);
     expect(edgeEnabledIndex(enabled, "start")).toBe(0);
     expect(edgeEnabledIndex(enabled, "end")).toBe(3);
   });
@@ -215,5 +221,62 @@ describe("segmented-model", () => {
     expect(resolveSegmentedJoin(flags, 4)).toBe("mid");
     expect(resolveSegmentedJoin(flags, 5)).toBe("end");
     expect(resolveSegmentedJoin([true], 0)).toBe("only");
+  });
+
+  it("胶囊和悬停按下各只比一次", () => {
+    expect(segmentedTypeIsCapsule("capsule")).toBe(true);
+    expect(segmentedTypeIsCapsule("tab")).toBe(false);
+    const owner = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "segmented-model.ts"), "utf8")
+      .replace('return type === "capsule"', "")
+      .replace('if (interact === "hover") return "--yohu-state-hover";', "")
+      .replace('if (interact === "pressed") return "--yohu-state-pressed";', "")
+      .replace('return paint === "tab-surface"', "");
+    expect(owner).not.toContain('=== "capsule"');
+    expect(owner).not.toContain('=== "hover"');
+    expect(owner).not.toContain('=== "pressed"');
+    expect(owner).not.toContain('=== "tab-surface"');
+    const overlay = owner.replace(
+      'export type SegmentedOverlay = "--yohu-state-hover" | "--yohu-state-pressed" | "none";',
+      "",
+    );
+    expect(overlay).not.toContain('"--yohu-state-hover" | "--yohu-state-pressed" | "none"');
+  });
+
+  it("图标槽与图片槽各判一次", () => {
+    expect(segmentedGraphicIsIcon({ kind: "icon", name: "search" })).toBe(true);
+    expect(segmentedGraphicIsImage({ kind: "image", src: "on.png" })).toBe(true);
+    expect(segmentedGraphicIsIcon({ kind: "image", src: "on.png" })).toBe(false);
+    expect(segmentedGraphicIsImage({ kind: "icon", name: "search" })).toBe(false);
+  });
+});
+
+describe("分段图形只在模型判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("视图和策略不再比较 graphic.kind", () => {
+    for (const name of ["segmented-model.ts", "segmented-policy.ts", "SegmentedButton.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replaceAll('return graphic.kind === "icon"', "");
+      body = body.replaceAll('return graphic.kind === "image"', "");
+      expect(body, name).not.toContain('graphic.kind === "icon"');
+      expect(body, name).not.toContain('graphic.kind === "image"');
+    }
+  });
+});
+
+describe("分段值按选项序", () => {
+  it("选项序过滤只留在函数体", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "segmented-model.ts"), "utf8");
+    const times = (needle: string): number => src.split(needle).length - 1;
+    expect(times("items.filter((item) => set.has(item.value)).map((item) => " + "item.value)")).toBe(1);
+    expect(times("function valuesInItemOrder")).toBe(1);
+    expect(times("export function valuesInItemOrder")).toBe(0);
+    expect(times("valuesInItemOrder(items, set)")).toBe(2);
+    expect(times("if (!values || values.length === 0) return []")).toBe(1);
+    expect(times("set.delete(value)")).toBe(1);
+    expect(times("set.add(value)")).toBe(1);
+    expect(src).toContain("function resolveSelectedValues");
+    expect(src).toContain("function toggleSelectedValues");
   });
 });

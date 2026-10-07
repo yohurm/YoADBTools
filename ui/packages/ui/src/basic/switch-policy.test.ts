@@ -33,7 +33,7 @@ describe("switch-policy", () => {
   it("disabled 写入 data-disabled，涂装仍跟开关", () => {
     const attrs = switchHostAttrs({ checked: true, disabled: true });
     expect(attrs.disabled).toBe(true);
-    expect(attrs["data-disabled"]).toBe(true);
+    expect(attrs["data-disabled"]).toBe("");
     expect(attrs["data-paint"]).toBe("on");
   });
 });

@@ -1,10 +1,11 @@
 /**
  * YoIndicator —— 轨上持续铬在项与项之间滑动（动画系统-v6.md 配方 indicator）。
  * 只给 Tabs 下划线与分段 thumb。列表 / 导航 / 树 / 下拉选项走配方 selected（项内弹出），禁止 fill 换行。
- * 必须作为 track 的子节点。默认给 track 挂 `yohu-indicator-host`；
- * `decorate={false}` 时不挂（虚拟列表滚轴自己纵滚）。
+ * 必须作为 track 的子节点。轨自己声明 `yohu-indicator-host` 与 `data-indicator-variant`。
+ * 实底测完后只把 `data-indicator-ready` 写在轨上，让选中片透明度继承到项。不改轨的 class。
  * 多选块（≥2）与「行级」虚拟列表过渡不要用。
  */
+import { presenceAttr } from "../../../dom/flag";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 
@@ -13,6 +14,8 @@ import {
   EMPTY_INDICATOR,
   indicatorDurationName,
   indicatorReady,
+  indicatorVariantIsFill,
+  indicatorVariantIsUnderline,
   measureIndicator,
   type IndicatorBox,
   type IndicatorVariant,
@@ -25,18 +28,47 @@ export interface YoIndicatorProps {
   follow: string | null | undefined;
   /** fill=列表实底；underline=Tabs 底边；thumb=分段选择块。 */
   variant?: IndicatorVariant;
-  /** 在 track 内查找目标。默认 `.yohu-interactive--selected`。 */
+  /** 在 track 内查找目标。默认公开标记 `[data-selected]`，不认交互态 class。 */
   selector?: string;
   /** 显式几何（虚拟列表 index×行高）。提供则不再测 DOM。 */
   anchor?: () => IndicatorBox | null;
-  /**
-   * 默认给父级挂 `yohu-indicator-host`（fill 会 overflow:hidden 裁切过冲）。
-   * 虚拟列表滚轴自己纵滚，禁止把宿主 overflow 打在 scroller / 超高 inner 上。
-   */
-  decorate?: boolean;
 }
 
-const DEFAULT_SELECTOR = ".yohu-interactive--selected";
+const DEFAULT_SELECTOR = "[data-selected]";
+
+function indicatorCssPx(value: number): string {
+  return `${value}px`;
+}
+
+function indicatorObserve(target: Element, layout: () => void): ResizeObserver {
+  const observer = new ResizeObserver(layout);
+  observer.observe(target);
+  return observer;
+}
+
+function indicatorCanObserve(): boolean {
+  return typeof ResizeObserver !== "undefined";
+}
+
+function indicatorSelected(root: ParentNode | null | undefined, selector: string): HTMLElement | null {
+  return root?.querySelector<HTMLElement>(selector) ?? null;
+}
+
+function indicatorClearMoving(setMoving: (moving: boolean) => void): void {
+  setMoving(false);
+}
+
+function indicatorFollowMissing(follow: string | null | undefined): boolean {
+  return follow == null;
+}
+
+function indicatorNextFrame(run: () => void): number {
+  return requestAnimationFrame(run);
+}
+
+function indicatorRect(el: Element): DOMRect {
+  return el.getBoundingClientRect();
+}
 
 function indicatorStyle(
   box: IndicatorBox,
@@ -44,18 +76,18 @@ function indicatorStyle(
   durationName: MotionDurationName | undefined,
 ): JSX.CSSProperties {
   const travel = durationName ? { "--yohu-indicator-dur": `var(--yohu-dur-${durationName})` } : {};
-  if (variant === "underline") {
+  if (indicatorVariantIsUnderline(variant)) {
     return {
-      width: `${box.width}px`,
-      transform: `translate3d(${box.x}px, 0, 0)`,
+      width: indicatorCssPx(box.width),
+      transform: `translate3d(${indicatorCssPx(box.x)}, 0, 0)`,
       ...travel,
     };
   }
   return {
-    width: `${box.width}px`,
-    height: `${box.height}px`,
-    top: `${box.y}px`,
-    left: `${box.x}px`,
+    width: indicatorCssPx(box.width),
+    height: indicatorCssPx(box.height),
+    top: indicatorCssPx(box.y),
+    left: indicatorCssPx(box.x),
     ...travel,
   };
 }
@@ -88,7 +120,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
 
   const stopMoving = (): void => {
     moveGen += 1;
-    setMoving(false);
+    indicatorClearMoving(setMoving);
   };
 
   const armMoving = (durationName: MotionDurationName): void => {
@@ -97,7 +129,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
     const ms = Math.max(motionDurationMs(durationName), motionSpecMs("spatialLocal"));
     window.setTimeout(() => {
       if (gen === moveGen) {
-        setMoving(false);
+        indicatorClearMoving(setMoving);
       }
     }, ms);
   };
@@ -132,16 +164,12 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
     }
     setBox(next);
     if (!ready()) {
-      requestAnimationFrame(() => setReady(true));
+      indicatorNextFrame(() => setReady(true));
     }
   };
 
-  const shouldDecorate = (): boolean => props.decorate !== false;
-
-  const decorate = (track: HTMLElement | undefined): void => {
-    if (!track || !shouldDecorate()) return;
-    track.classList.add("yohu-indicator-host");
-    track.setAttribute("data-indicator-variant", variant());
+  const markReady = (track: HTMLElement | undefined): void => {
+    if (!track || !indicatorVariantIsFill(variant())) return;
     if (ready()) {
       track.setAttribute("data-indicator-ready", "");
     } else {
@@ -151,7 +179,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
 
   const layout = (): void => {
     const track = trackOf();
-    if (!track || props.follow == null) {
+    if (!track || indicatorFollowMissing(props.follow)) {
       hide();
       return;
     }
@@ -164,14 +192,14 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
       commit(next);
       return;
     }
-    const item = track.querySelector<HTMLElement>(selector());
+    const item = indicatorSelected(track, selector());
     if (!item) {
-      requestAnimationFrame(() => {
-        if (props.follow == null || !trackOf()) {
+      indicatorNextFrame(() => {
+        if (indicatorFollowMissing(props.follow) || !trackOf()) {
           hide();
           return;
         }
-        const again = trackOf()?.querySelector<HTMLElement>(selector());
+        const again = indicatorSelected(trackOf(), selector());
         if (!again) {
           hide();
           return;
@@ -181,7 +209,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
       return;
     }
     commit(
-      measureIndicator(track.getBoundingClientRect(), item.getBoundingClientRect(), {
+      measureIndicator(indicatorRect(track), indicatorRect(item), {
         left: track.scrollLeft,
         top: track.scrollTop,
       }),
@@ -199,7 +227,7 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
   createEffect(() => {
     ready();
     variant();
-    decorate(trackOf());
+    markReady(trackOf());
   });
 
   createEffect(() => {
@@ -207,41 +235,38 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
     selector();
     if (props.anchor) return;
     const track = trackOf();
-    const item = track?.querySelector<HTMLElement>(selector());
-    if (typeof ResizeObserver === "undefined" || !item) return;
-    const observer = new ResizeObserver(() => layout());
-    observer.observe(item);
+    const item = indicatorSelected(track, selector());
+    if (!indicatorCanObserve() || !item) return;
+    const observer = indicatorObserve(item, layout);
     onCleanup(() => observer.disconnect());
   });
 
   onMount(() => {
     const track = trackOf();
-    decorate(track);
+    markReady(track);
     layout();
     if (!track) return;
 
-    const onTransition = (): void => layout();
+    const listen = (type: string): (() => void) => {
+      track.addEventListener(type, layout, true);
+      return () => track.removeEventListener(type, layout, true);
+    };
     const unbindScroll = bindScrollTree(track, layout);
-    track.addEventListener("transitionrun", onTransition, true);
-    track.addEventListener("transitionend", onTransition, true);
+    const stopTransitionRun = listen("transitionrun");
+    const stopTransitionEnd = listen("transitionend");
 
     let trackRo: ResizeObserver | undefined;
-    if (typeof ResizeObserver !== "undefined") {
-      trackRo = new ResizeObserver(() => layout());
-      trackRo.observe(track);
+    if (indicatorCanObserve()) {
+      trackRo = indicatorObserve(track, layout);
     }
 
     onCleanup(() => {
       unbindScroll();
-      track.removeEventListener("transitionrun", onTransition, true);
-      track.removeEventListener("transitionend", onTransition, true);
+      stopTransitionRun();
+      stopTransitionEnd();
       trackRo?.disconnect();
       stopMoving();
-      if (shouldDecorate()) {
-        track.classList.remove("yohu-indicator-host");
-        track.removeAttribute("data-indicator-variant");
-        track.removeAttribute("data-indicator-ready");
-      }
+      track.removeAttribute("data-indicator-ready");
     });
   });
 
@@ -252,8 +277,8 @@ export function YoIndicator(props: YoIndicatorProps): JSX.Element {
       }}
       class="yohu-recipe-indicator"
       classList={{ [`yohu-recipe-indicator--${variant()}`]: true }}
-      data-ready={ready() ? "" : undefined}
-      data-moving={moving() ? "" : undefined}
+      data-ready={presenceAttr(ready())}
+      data-moving={presenceAttr(moving())}
       style={indicatorStyle(box(), variant(), travel())}
       aria-hidden="true"
     />

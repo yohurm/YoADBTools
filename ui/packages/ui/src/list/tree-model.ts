@@ -3,6 +3,8 @@
  * 可见行扁平化、父子关系与键盘意图是不变式；不碰 DOM / 不组装 aria。
  */
 
+import { clampListIndex, horizontalListDelta, listActivateKey, verticalListDelta } from "../keymap/list-index";
+
 export type TreeKeyIntent =
   | { type: "focus"; index: number }
   | { type: "toggle" }
@@ -45,6 +47,11 @@ export function treeActivateIntent(hasChildren: boolean): "toggle" | "select" {
   return hasChildren ? "toggle" : "select";
 }
 
+/** 点击落在目录上。叶子是其余分支。 */
+export function treeActivateIsToggle(hasChildren: boolean): boolean {
+  return treeActivateIntent(hasChildren) === "toggle";
+}
+
 /** 未识别返回 null。 */
 export function treeKeyIntent(
   key: string,
@@ -54,24 +61,20 @@ export function treeKeyIntent(
   expanded: boolean,
 ): TreeKeyIntent | null {
   if (count === 0) return null;
-  const clamped = Math.min(Math.max(index, 0), count - 1);
-  switch (key) {
-    case "ArrowDown":
-      return { type: "focus", index: Math.min(clamped + 1, count - 1) };
-    case "ArrowUp":
-      return { type: "focus", index: Math.max(clamped - 1, 0) };
-    case "ArrowRight":
-      if (hasChildren && !expanded) return { type: "toggle" };
-      return { type: "focus", index: Math.min(clamped + 1, count - 1) };
-    case "ArrowLeft":
-      if (hasChildren && expanded) return { type: "toggle" };
-      return { type: "parent" };
-    case "Enter":
-    case " ":
-      return { type: treeActivateIntent(hasChildren) };
-    default:
-      return null;
+  const clamped = clampListIndex(index, count);
+  const delta = verticalListDelta(key);
+  if (delta !== null) return { type: "focus", index: clampListIndex(clamped + delta, count) };
+  const lateral = horizontalListDelta(key);
+  if (lateral === 1) {
+    if (hasChildren && !expanded) return { type: "toggle" };
+    return { type: "focus", index: clampListIndex(clamped + 1, count) };
   }
+  if (lateral === -1) {
+    if (hasChildren && expanded) return { type: "toggle" };
+    return { type: "parent" };
+  }
+  if (listActivateKey(key)) return { type: treeActivateIntent(hasChildren) };
+  return null;
 }
 
 /** 属性值选择器转义（引号/反斜杠），避免依赖 CSS.escape（jsdom 缺失）。 */

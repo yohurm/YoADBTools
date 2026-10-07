@@ -1,11 +1,12 @@
 /**
  * HarmonyOS Chip 16vp 正圆关闭。
- * Chip / Toast 共用；铬在 tokens/states.css `.yohu-recipe-dismiss`。
+ * Chip / Toast 共用。圆和叠层在本钮的样式里，宿主不点该类。
  * 不是产品 Yo*，不进 L5。禁止 YoIconButton。
  */
 import type { JSX } from "solid-js";
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
+import "./dismiss-mark.css";
 
 export interface DismissMarkProps {
   /** 无障碍名（移除 Chip 文案 / 关闭 Toast 文案）。 */

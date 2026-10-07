@@ -37,6 +37,10 @@ describe("YoScroller", () => {
     expect(css).toContain("padding-inline-end: var(--yohu-space-lg)");
     expect(css).toContain("inset-inline-end: 0");
     expect(css).toContain(".yohu-scroller__lane");
+    expect(css).toContain("opacity var(--yohu-motion-effects-enter)");
+    expect(css).toContain("opacity var(--yohu-motion-effects-exit)");
+    expect(css).toContain("background-color var(--yohu-motion-effects-fast)");
+    expect(css).toContain("width var(--yohu-motion-effects-fast)");
     expect(css).toContain("width: var(--yohu-space-lg)");
     expect(css).toContain("inset-inline-end: var(--yohu-space-xs)");
     expect(css).toContain("width: var(--yohu-space-xs)");
@@ -51,7 +55,8 @@ describe("YoScroller", () => {
     expect(css).toContain('[data-orient="inline"]');
     expect(css).not.toContain("flex: 0 0 var(--yohu-space-sm)");
     expect(css).not.toContain("!important");
-    expect(css).toContain("flex: 1 1 auto");
+    expect(css).toContain("flex: var(--yohu-scroll-flex, 1 1 auto)");
+    expect(css).toContain("max-height: var(--yohu-scroll-max-block, none)");
     expect(css).not.toContain("flex: 1 1 0");
     expect(css).not.toContain('[data-overflow="auto"] > .yohu-scroller__view');
     expect(css).toContain("overscroll-behavior: contain");
@@ -112,7 +117,11 @@ describe("YoScroller", () => {
     expect(binder).toContain("schedulePaint");
     expect(binder).toContain("host.extent");
     expect(binder).toContain("scrollLeft = 0");
-    expect(binder).toContain('host.axis() === "block"');
+    expect(binder).toContain("scrollerDriveIsFlow");
+    expect(binder).not.toContain('host.axis() === "block"');
+    expect(binder).not.toContain('drive() === "flow"');
+    expect(binder).not.toContain('drive() !== "flow"');
+    expect(binder).not.toContain('!== "out"');
     expect(binder).not.toContain("scrollHeight");
     expect(binder).not.toContain("yohu-dialog");
     expect(binder).not.toMatch(/overflow-y\s*:\s*auto/);
@@ -163,5 +172,121 @@ describe("YoScroller", () => {
     handle?.scrollTo(80);
     expect(handle?.offset()).toBe(80);
     expect(view.scrollTop).toBe(0);
+  });
+
+  it("视口监听经 listen 成对摘掉", () => {
+    const src = load("src/scroll/scroller-binder.ts");
+    expect(src.split("add" + "EventListener").length - 1).toBe(1);
+    expect(src.split("remove" + "EventListener").length - 1).toBe(1);
+    expect(src).toContain('listen(el, "scroll", onNativeScroll, { passive: true })');
+    expect(src).toContain('listen(el, "wheel", onWheel, { passive: false })');
+    expect(src).toContain('listen(el, "keydown", onKeyDown)');
+    expect(src).toContain("scrollerDriveIsFlow(drive())");
+  });
+});
+
+describe("滚轴拦住默认", () => {
+  it("滚轮、按键和两条滑轨都拦住默认", () => {
+    const src = load("src/scroll/scroller-binder.ts");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("event." + "preventDefault()")).toBe(1);
+    expect(times("function blockEvent")).toBe(1);
+    expect(times("export function blockEvent")).toBe(0);
+    expect(times("blockEvent(event)")).toBe(5);
+  });
+});
+
+describe("滚轴点在滑块", () => {
+  it("纵轨和横轨都问指针是不是在滑块上", () => {
+    const src = load("src/scroll/scroller-binder.ts");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('classList.contains("' + 'yohu-scroller__thumb")')).toBe(1);
+    expect(times("function pointerOnThumb")).toBe(1);
+    expect(times("export function pointerOnThumb")).toBe(0);
+    expect(times("pointerOnThumb(event)")).toBe(2);
+  });
+});
+
+describe("滚轴卸绑", () => {
+  it("宿主和视口都卸同一把绑定", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("binder." + "destroy()")).toBe(1);
+    expect(times("function releaseScroller")).toBe(1);
+    expect(times("export function releaseScroller")).toBe(0);
+    expect(times("onCleanup(releaseScroller)")).toBe(2);
+  });
+});
+
+describe("滚轴轨道类名", () => {
+  it("纵轨和横轨都用同一条轨道类名", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('class="' + 'yohu-scroller__lane"')).toBe(0);
+    expect(times('return "' + 'yohu-scroller__lane"')).toBe(1);
+    expect(times("function laneClass")).toBe(1);
+    expect(times("export function laneClass")).toBe(0);
+    expect(times("laneClass()")).toBe(3);
+  });
+});
+
+describe("滚轴滑块类名", () => {
+  it("纵滑块和横滑块都用同一条滑块类名", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('class="' + 'yohu-scroller__thumb"')).toBe(0);
+    expect(times('return "' + 'yohu-scroller__thumb"')).toBe(1);
+    expect(times("function thumbClass")).toBe(1);
+    expect(times("export function thumbClass")).toBe(0);
+    expect(times("thumbClass()")).toBe(3);
+  });
+});
+
+describe("滚轴视口标识", () => {
+  it("视口和两条滑块都用同一标识", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("id={" + "viewId}")).toBe(0);
+    expect(times("aria-controls={" + "viewId}")).toBe(0);
+    expect(times("return " + "viewId")).toBe(1);
+    expect(times("function scrollerViewId")).toBe(1);
+    expect(times("export function scrollerViewId")).toBe(0);
+    expect(times("scrollerViewId()")).toBe(4);
+  });
+});
+
+describe("滚轴最小值", () => {
+  it("两条滑块的最小值都是 0", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("aria-valuemin={" + "0}")).toBe(0);
+    expect(times("return " + "0")).toBe(1);
+    expect(times("function scrollerValueMin")).toBe(1);
+    expect(times("export function scrollerValueMin")).toBe(0);
+    expect(times("scrollerValueMin()")).toBe(3);
+  });
+});
+
+describe("滚轴最大值", () => {
+  it("两条滑块的最大值都是 100", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("aria-valuemax={" + "100}")).toBe(0);
+    expect(times("return " + "100")).toBe(1);
+    expect(times("function scrollerValueMax")).toBe(1);
+    expect(times("export function scrollerValueMax")).toBe(0);
+    expect(times("scrollerValueMax()")).toBe(3);
+  });
+});
+
+describe("滚轴过渡结束", () => {
+  it("两条滑块都把过渡结束交给同一回调", () => {
+    const src = load("src/scroll/Scroller.tsx");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("onTransitionEnd={" + "binder.onThumbTransitionEnd}")).toBe(0);
+    expect(times("binder.onThumbTransitionEnd(" + "event)")).toBe(1);
+    expect(times("function forwardThumbEnd")).toBe(1);
+    expect(times("export function forwardThumbEnd")).toBe(0);
+    expect(times("onTransitionEnd={forwardThumbEnd}")).toBe(2);
   });
 });

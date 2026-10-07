@@ -1,4 +1,4 @@
-/* 清单体单元格：与表头同一 --yohu-col-cell-pad，禁止模块再写一份列垫。 */
+/* 清单体单元格：只吃列架发布的 --yohu-col-cell-pad。 */
 
 .yohu-col-cell {
   min-width: 0;
@@ -6,7 +6,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   box-sizing: border-box;
-  padding: var(--yohu-col-cell-pad, var(--yohu-col-header-content-pad));
+  padding: var(--yohu-col-cell-pad);
 }
 
 .yohu-col-cell[data-span] {

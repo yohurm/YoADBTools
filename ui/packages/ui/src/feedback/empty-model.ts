@@ -8,6 +8,11 @@
 
 export type EmptyStateSize = "md" | "sm";
 
+/** 窄栏空态。模型和宿主 data-size 都认这一把。 */
+export function emptySizeIsSm(size: EmptyStateSize | undefined): boolean {
+  return size === "sm";
+}
+
 export interface EmptyStateInput {
   title: string;
   description?: string;
@@ -26,14 +31,24 @@ export interface EmptyStateSpec {
   size: EmptyStateSize;
 }
 
-export function resolveEmptyStateSpec(input: EmptyStateInput): EmptyStateSpec {
+/** 描述空串不算。空态和区域加载都认这一把。 */
+export function presentDescription(input: { description?: string }): string | undefined {
   const description = input.description;
+  return description ? description : undefined;
+}
+
+/** 参与父级伸缩。空态和区域加载都认这一把。不是盖住下层。 */
+export function fillIsOn(input: { fill?: boolean }): boolean {
+  return Boolean(input.fill);
+}
+
+export function resolveEmptyStateSpec(input: EmptyStateInput): EmptyStateSpec {
   return {
     title: input.title,
-    description: description ? description : undefined,
+    description: presentDescription(input),
     hasIcon: Boolean(input.hasIcon),
     hasAction: Boolean(input.hasAction),
-    fill: Boolean(input.fill),
-    size: input.size === "sm" ? "sm" : "md",
+    fill: fillIsOn(input),
+    size: emptySizeIsSm(input.size) ? "sm" : "md",
   };
 }

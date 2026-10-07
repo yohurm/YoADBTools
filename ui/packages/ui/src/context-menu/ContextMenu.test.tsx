@@ -120,4 +120,25 @@ describe("YoContextMenu", () => {
     );
     expect(cornerCss).toContain('.yohu-corner__content[data-overflow="auto"]::-webkit-scrollbar');
   });
+
+  it("文档监听经 listen 成对登记与摘除", () => {
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ContextMenu.tsx"), "utf-8");
+    expect(source.split("add" + "EventListener").length - 1).toBe(1);
+    expect(source.split("remove" + "EventListener").length - 1).toBe(1);
+    expect(source).toContain('listen("mousedown", onDocMouse)');
+    expect(source).toContain('listen("keydown", onDocKey)');
+  });
+});
+
+describe("菜单选中并关闭", () => {
+  it("启用项经 chooseItem 选中并关闭", () => {
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ContextMenu.tsx"), "utf-8");
+    expect(source.split("if (!itemIsEnabled(item)) " + "return").length - 1).toBe(1);
+    expect(source.split("props.onSelect(" + "item.id)").length - 1).toBe(1);
+    expect(source.split("function chooseItem").length - 1).toBe(1);
+    expect(source.split("export function chooseItem").length - 1).toBe(0);
+    expect(source.split("chooseItem(item)").length - 1).toBe(1);
+    expect(source.split("chooseItem(props.items[index])").length - 1).toBe(1);
+    expect(source.split("props.onClose()").length - 1).toBe(3);
+  });
 });

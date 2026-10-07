@@ -7,6 +7,7 @@
  */
 import { createRenderEffect } from "solid-js";
 import type { JSX } from "solid-js";
+import { closedAttr } from "../../../dom/flag";
 import { revealHostAttrs } from "./reveal-policy";
 import { useTravel } from "./travel";
 
@@ -54,8 +55,8 @@ export function YoReveal(props: YoRevealProps): JSX.Element {
         ref={(el) => {
           content = el;
         }}
-        aria-hidden={!props.open || undefined}
-        inert={!props.open ? true : undefined}
+        aria-hidden={closedAttr(props.open)}
+        inert={closedAttr(props.open)}
       >
         {props.children}
       </div>

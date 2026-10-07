@@ -3,8 +3,9 @@
  * 不包含页面选择器、不包含业务动作。
  */
 
-const ACTIONABLE = "button, a, [role='tab'], [role='combobox'], [role='menuitem'], .yohu-select";
-const DEFAULT_SHELL = ".yohu-layout__rail, .yohu-titlebar, .yohu-status-bar";
+const ACTIONABLE = "button, a, [role='tab'], [role='combobox'], [role='menuitem']";
+/** 壳铬公开根：轨配方、标题栏、状态栏。不认工作台布局 class。 */
+const DEFAULT_SHELL = ".yohu-recipe-rail, .yohu-titlebar, .yohu-status-bar";
 
 export function elementOf(target: EventTarget | null): HTMLElement | null {
   if (target instanceof HTMLElement) return target;

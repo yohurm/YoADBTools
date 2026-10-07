@@ -1,9 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Radius } from "../tokens/radius";
 import { Stroke } from "../tokens/layout";
 import {
   CORNER_PAINT_VIEWBOX,
   clampCornerRadii,
+  cornerExtentIsEmpty,
   cornerRadiusForRole,
   cornerEdgeHaloPath,
   cornerHaloOutset,
@@ -16,11 +20,19 @@ import {
   outsetCornerRadii,
   pointInRoundedRect,
   resolveCornerPaint,
+  resolveCornerRadius,
+  resolveCornerRole,
   roundedRectPath,
   roundedRectPathXY,
   uniformCornerRadii,
 } from "./corner-model";
-import { resolveCornerContentSpec, resolveCornerHostSpec } from "./corner-policy";
+import {
+  cornerMeasureTarget,
+  cornerModeIsHost,
+  cornerModeIsPaint,
+  resolveCornerContentSpec,
+  resolveCornerHostSpec,
+} from "./corner-policy";
 
 describe("corner-model", () => {
   it("PC 角色半径对照鸿蒙：控件 8、卡片/弹出框 16", () => {
@@ -192,5 +204,180 @@ describe("corner-policy", () => {
         gap: "xl" as never,
       }),
     ).toEqual(resolveCornerContentSpec());
+  });
+
+  it("缺省角色、缺省半径、空盒各判一次", () => {
+    expect(resolveCornerRole(undefined)).toBe("card");
+    expect(resolveCornerRole("control")).toBe("control");
+    expect(resolveCornerRadius("card", undefined)).toBe(Radius.Md);
+    expect(resolveCornerRadius("control", 3)).toBe(3);
+    expect(cornerExtentIsEmpty(0, 8)).toBe(true);
+    expect(cornerExtentIsEmpty(8, -1)).toBe(true);
+    expect(cornerExtentIsEmpty(8, 8)).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const files = [
+      "corner-model.ts",
+      "corner-policy.ts",
+      "Corner.tsx",
+      "../list-frame/list-frame-model.ts",
+      "../list-frame/ListFrame.tsx",
+    ];
+    for (const name of files) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "corner-model.ts") {
+        body = body
+          .replace("const DEFAULT_CORNER_ROLE: CornerRole = \"card\";", "")
+          .replace("return role ?? DEFAULT_CORNER_ROLE", "")
+          .replace("return radius ?? cornerRadiusForRole(role)", "")
+          .replace("return width <= 0 || height <= 0", "");
+      }
+      expect(body, name).not.toContain("?? DEFAULT_CORNER_ROLE");
+      expect(body, name).not.toContain("DEFAULT_CORNER_ROLE");
+      expect(body, name).not.toContain("?? cornerRadiusForRole");
+      expect(body, name).not.toContain("width <= 0 || height <= 0");
+      expect(body, name).not.toContain("innerW <= 0 || innerH <= 0");
+    }
+  });
+
+  it("paint 量父盒，host 量自己，只写一次", () => {
+    const parent = document.createElement("div");
+    const el = document.createElement("div");
+    parent.append(el);
+    expect(cornerMeasureTarget(el, "paint")).toBe(parent);
+    expect(cornerMeasureTarget(el, "host")).toBe(el);
+    expect(cornerMeasureTarget(el, undefined)).toBe(el);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["corner-policy.ts", "Corner.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "corner-policy.ts") {
+        body = body.replace("return cornerModeIsPaint(mode) ? el.parentElement : el", "");
+      }
+      expect(body, name).not.toContain("parentElement");
+    }
+  });
+
+  it("host 与 paint 只各比一次", () => {
+    expect(cornerModeIsHost("host")).toBe(true);
+    expect(cornerModeIsHost("paint")).toBe(false);
+    expect(cornerModeIsPaint("paint")).toBe(true);
+    expect(cornerModeIsPaint("host")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["corner-policy.ts", "Corner.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "corner-policy.ts") {
+        body = body.replace('return mode === "host"', "").replace('return mode === "paint"', "");
+      }
+      expect(body, name).not.toContain('=== "host"');
+      expect(body, name).not.toContain('=== "paint"');
+    }
+  });
+});
+
+describe("可选长度", () => {
+  it("没有就是 0，并且不小于 0，只判一次", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    const needle = "?? " + "0";
+    expect(source.split(needle).length - 1).toBe(1);
+    expect(source).toContain("nonNegative(input.stroke)");
+    expect(source).toContain("nonNegative(input.edgeOutset)");
+    expect(source).toContain("axisExtent(input.width)");
+    expect(source).toContain("axisExtent(input.height)");
+  });
+});
+
+describe("必填边长", () => {
+  it("盒的一条边不小于 0，不写在 input 上", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    const needle = "Math.max(0, input.";
+    expect(source.split(needle).length - 1).toBe(0);
+    expect(source).toContain("return Math.max(0, value ?? 0)");
+    expect(source).toContain("axisExtent(width)");
+  });
+});
+
+describe("四角半径", () => {
+  it("压到不小于 0 交给边长", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    for (const corner of ["tl", "tr", "br", "bl"]) {
+      const clamped = "Math.max(0, radii." + corner + ");";
+      expect(source.split(clamped).length - 1).toBe(0);
+      expect(source).toContain("axisExtent(radii." + corner + ")");
+    }
+    expect(source).toContain("axisExtent(radii.tl - step)");
+    expect(source).toContain("axisExtent(width)");
+  });
+});
+
+describe("内缩半径", () => {
+  it("四角减去步长后不小于 0 交给边长", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    for (const corner of ["tl", "tr", "br", "bl"]) {
+      const oldNeedle = "Math.max(0, radii." + corner + " - step)";
+      expect(source.split(oldNeedle).length - 1).toBe(0);
+      expect(source).toContain("axisExtent(radii." + corner + " - step)");
+    }
+    expect(source).toContain("const r = Math.max(0, radius)");
+    expect(source).toContain("axisExtent(width)");
+    expect(source).toContain("return Math.max(0, value ?? 0)");
+    expect(source).toContain("axisExtent(radii.tl)");
+  });
+});
+
+describe("收缩盒边", () => {
+  it("宽和高都交给边长", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    const widthNeedle = "Math.max(0, " + "width)";
+    const heightNeedle = "Math.max(0, " + "height)";
+    expect(source.split(widthNeedle).length - 1).toBe(0);
+    expect(source.split(heightNeedle).length - 1).toBe(0);
+    expect(source).toContain("axisExtent(width)");
+    expect(source).toContain("axisExtent(height)");
+    expect(source).toContain("axisExtent(input.width)");
+    expect(source).toContain("axisExtent(input.height)");
+    expect(source).toContain("const r = Math.max(0, radius)");
+    expect(source).toContain("axisExtent(gap)");
+    expect(source).toContain("axisExtent(inset)");
+    expect(source).toContain("return Math.max(0, value ?? 0)");
+    expect(source).toContain("return Math.max(0, value);");
+  });
+});
+
+describe("外圈长度", () => {
+  it("空隙和描边宽都交给边长", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    const gapNeedle = "Math.max(0, " + "gap)";
+    const strokeNeedle = "Math.max(0, " + "strokeWidth)";
+    expect(source.split(gapNeedle).length - 1).toBe(0);
+    expect(source.split(strokeNeedle).length - 1).toBe(0);
+    expect(source).toContain("axisExtent(gap)");
+    expect(source).toContain("axisExtent(strokeWidth)");
+    expect(source).toContain("axisExtent(inset)");
+    expect(source).toContain("const r = Math.max(0, radius)");
+    expect(source).toContain("return Math.max(0, value ?? 0)");
+    expect(source).toContain("return Math.max(0, value);");
+    expect(source).toContain(" / 2");
+  });
+});
+
+describe("步长", () => {
+  it("内缩外扩和内容裁切都交给边长", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, "corner-model.ts"), "utf8");
+    const insetNeedle = "Math.max(0, " + "inset)";
+    const outsetNeedle = "Math.max(0, " + "outset)";
+    expect(source.split(insetNeedle).length - 1).toBe(0);
+    expect(source.split(outsetNeedle).length - 1).toBe(0);
+    expect(source.split("axisExtent(inset)").length - 1).toBe(2);
+    expect(source.split("axisExtent(outset)").length - 1).toBe(1);
+    expect(source).toContain("const r = Math.max(0, radius)");
+    expect(source).toContain("return Math.max(0, value ?? 0)");
+    expect(source).toContain("return Math.max(0, value);");
+    expect(source).toContain("axisExtent(strokeWidth) / 2");
   });
 });

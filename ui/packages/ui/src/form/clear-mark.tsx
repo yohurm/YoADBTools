@@ -1,11 +1,12 @@
 /**
  * 写入盒内幽灵清除。
- * TextField / Search 共用；铬在 tokens/states.css `.yohu-recipe-clear`。
+ * TextField / Search 共用。铬在本钮的样式里。
  * 不是产品 Yo*，不进 L5。Tabs 会话关闭与窗口三键不走本图元。
  */
 import type { JSX } from "solid-js";
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
+import "./clear-mark.css";
 
 export interface ClearMarkProps {
   onClear: () => void;

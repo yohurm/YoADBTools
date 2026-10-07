@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { resolvePanelSpec } from "./panel-model";
-import { panelHostAttrs, resolvePanelHeaderKind } from "./panel-policy";
+import { panelHostAttrs, panelSlotOn, resolvePanelHeaderKind } from "./panel-policy";
 
 describe("panel-policy", () => {
+  it("顶栏槽空串与 false 不算有", () => {
+    expect(panelSlotOn(undefined)).toBe(false);
+    expect(panelSlotOn(null)).toBe(false);
+    expect(panelSlotOn(false)).toBe(false);
+    expect(panelSlotOn("")).toBe(false);
+    expect(panelSlotOn("标题")).toBe(true);
+  });
+
   it("缺省宿主是 card + md + 无顶栏 + 内容区默认", () => {
     expect(panelHostAttrs({})).toEqual({
       "data-variant": "card",
@@ -86,5 +94,10 @@ describe("panel-policy", () => {
   it("edge 仅 drop 才写 data-edge", () => {
     expect(panelHostAttrs({}).hasOwnProperty("data-edge")).toBe(false);
     expect(panelHostAttrs({ edge: "drop" })["data-edge"]).toBe("drop");
+  });
+
+  it("操作面板才写 data-role", () => {
+    expect(panelHostAttrs({})).not.toHaveProperty("data-role");
+    expect(panelHostAttrs({ variant: "pane", role: "ops" })["data-role"]).toBe("ops");
   });
 });

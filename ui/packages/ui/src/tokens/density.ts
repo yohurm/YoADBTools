@@ -33,3 +33,13 @@ export const Density = {
     titleBarHeight: 40,
   },
 } as const;
+
+/** 紧凑档。属性值和尺度表都认这一把。 */
+export function densityIsCompact(name: string | null | undefined): name is "compact" {
+  return name === "compact";
+}
+
+/** 当前密度对应的一整档尺度。控件高、数据行高都从这里读，不在模块里再抄一张表。 */
+export function densityScale(name: DensityName) {
+  return densityIsCompact(name) ? Density.Compact : Density.Comfortable;
+}

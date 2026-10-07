@@ -4,6 +4,8 @@
  * 不碰 DOM。
  */
 
+import { trimmedTextPresent } from "../container/formrow-model";
+
 export interface YoDescriptionItem {
   term: string;
   detail: string;
@@ -18,6 +20,6 @@ export interface DescriptionListSpec {
 }
 
 export function resolveDescriptionListSpec(input: DescriptionListInput): DescriptionListSpec {
-  const items = (input.items ?? []).filter((item) => item.term.trim().length > 0);
+  const items = (input.items ?? []).filter((item) => trimmedTextPresent(item.term));
   return { items };
 }

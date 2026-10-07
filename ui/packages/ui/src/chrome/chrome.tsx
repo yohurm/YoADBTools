@@ -33,7 +33,7 @@ export interface YoChromeProps {
 export function YoChrome(props: YoChromeProps): JSX.Element {
   const input = createMemo(() => ({
     hasLeading: props.leading != null,
-    hasBar: (props.actions?.length ?? 0) > 0,
+    actions: props.actions,
     hasExtra: Boolean(props.extra),
     dropIgnore: props.dropIgnore,
   }));
@@ -43,7 +43,7 @@ export function YoChrome(props: YoChromeProps): JSX.Element {
 
   createRenderEffect(() => {
     const next = props.leading;
-    if (next != null) setHeldLeading(() => next);
+    if (slots().showLeading) setHeldLeading(() => next);
   });
 
   return (

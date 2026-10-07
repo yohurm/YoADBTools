@@ -14,12 +14,20 @@ export interface FormRowSlotInput {
   note?: unknown;
 }
 
+export function formRowLayoutIsStacked(layout?: YoFormRowLayout): boolean {
+  return layout === "stacked";
+}
+
 export function resolveFormRowLayout(layout?: YoFormRowLayout): YoFormRowLayout {
-  return layout === "stacked" ? "stacked" : DEFAULT_FORM_ROW_LAYOUT;
+  return formRowLayoutIsStacked(layout) ? "stacked" : DEFAULT_FORM_ROW_LAYOUT;
+}
+
+export function formRowPadIsFlush(pad?: YoFormRowPad): boolean {
+  return pad === "flush";
 }
 
 export function resolveFormRowPad(pad?: YoFormRowPad): YoFormRowPad {
-  return pad === "flush" ? "flush" : DEFAULT_FORM_ROW_PAD;
+  return formRowPadIsFlush(pad) ? "flush" : DEFAULT_FORM_ROW_PAD;
 }
 
 export interface FormRowSlots {
@@ -27,10 +35,14 @@ export interface FormRowSlots {
   note: boolean;
 }
 
+export function trimmedTextPresent(value: string): boolean {
+  return value.trim().length > 0;
+}
+
 /** 空串 / 空白 / null / false 不算占槽。 */
 export function hasFormRowSlot(value: unknown): boolean {
   if (value === undefined || value === null || value === false) return false;
-  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "string") return trimmedTextPresent(value);
   return true;
 }
 

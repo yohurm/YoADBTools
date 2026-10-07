@@ -39,6 +39,7 @@ export {
   Elevation,
   DarkElevation,
   Density,
+  densityScale,
   MotionDuration,
   MotionEasing,
   MotionSpec,
@@ -47,10 +48,12 @@ export {
   StateFill,
   setTheme,
   getTheme,
+  themeIsDark,
   getThemePreference,
   onResolvedThemeChange,
   setDensity,
   getDensity,
+  controlRowHeight,
   bindFocusModality,
 } from "./tokens";
 export type {
@@ -82,18 +85,19 @@ export type {
 } from "./basic/SegmentedButton";
 
 export { YoIconButton } from "./basic/IconButton";
-export type { YoIconButtonProps } from "./basic/IconButton";
+export type { ControlIconSize, YoIconButtonProps } from "./basic/IconButton";
 export { YoThemeToggle } from "./basic/ThemeToggle";
 export type { YoThemeToggleProps } from "./basic/ThemeToggle";
 
 export { YoTextField } from "./form/TextField";
 export type {
   YoTextFieldProps,
-  YoTextFieldStatus,
   YoTextFieldAffix,
   YoTextFieldControl,
+  TextFieldFont,
   TextFieldWidthKind,
 } from "./form/TextField";
+export type { FieldStatus } from "./form/field-status";
 
 export { YoSelect } from "./form/Select";
 export type { YoSelectProps, YoSelectOption } from "./form/Select";
@@ -107,7 +111,7 @@ export type { YoSwitchProps } from "./basic/Switch";
 export { YoBadge } from "./display/Badge";
 export type { YoBadgeProps, YoBadgeTone } from "./display/Badge";
 export { YoChip } from "./display/Chip";
-export type { YoChipProps, YoChipTone, YoChipLeading } from "./display/Chip";
+export type { YoChipProps, YoChipLeading } from "./display/Chip";
 
 export { YoStatusDot } from "./display/StatusDot";
 export type { YoStatusDotProps, YoStatusDotTone } from "./display/StatusDot";
@@ -164,7 +168,6 @@ export type {
   YoSearchControl,
   YoSearchProps,
   YoSearchSlot,
-  YoSearchStatus,
   SearchCombine,
   SearchDocument,
   SearchEmpty,
@@ -177,8 +180,13 @@ export type {
   SearchRange,
 } from "./search";
 
+export { formatByteCount } from "./display/byte-count";
+export { cssPointFromPhysical, hostPixelRatio, pointInRect, positiveScale, rectOf } from "./placement/pointer";
+export type { PointerRect } from "./placement/pointer";
+export type { LogicalAxis } from "./placement/axis";
 export { YoProgressBar } from "./display/ProgressBar";
 export type { YoProgressBarProps } from "./display/ProgressBar";
+export { ratioPercent } from "./display/progress-model";
 
 // —— 容器 / 列表 / 滚动 / 栅格 / 导航 ——
 export { YoToolbar } from "./container/Toolbar";
@@ -191,13 +199,23 @@ export { YoTree } from "./list/Tree";
 export type { YoTreeProps, TreeNode } from "./list/Tree";
 
 export { YoScroller } from "./scroll/Scroller";
-export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState, ScrollerExtent } from "./scroll/Scroller";
+export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState, ScrollerExtent, ScrollerFade, ScrollerOverflow } from "./scroll/Scroller";
 
 export { YoVirtualList } from "./scroll/VirtualList";
-export type { YoVirtualListProps, YoVirtualListTone } from "./scroll/VirtualList";
+export type { YoVirtualListProps } from "./scroll/VirtualList";
+export type { YoListRowTone } from "./list-row/list-row-model";
 
 export { YoReorderList } from "./scroll/ReorderList";
 export type { YoReorderListProps } from "./scroll/ReorderList";
+
+export { YoOpsItem } from "./list/OpsItem";
+export type { YoOpsItemProps } from "./list/OpsItem";
+export { opsListBindings } from "./scroll/ops-list-policy";
+export type { OpsListBindings, OpsListHandlers } from "./scroll/ops-list-policy";
+export type { YoOpsFeature } from "./scroll/ops-feature-model";
+export { dismissKey, enterKey, listActivateKey } from "./keymap/list-index";
+export { documentIsHidden, documentIsVisible } from "./dom/document-visibility";
+export { closedAttr, flagAttr, trueAttr } from "./dom/flag";
 
 export {
   insertIndexFromPointerY,
@@ -211,10 +229,10 @@ export { YoColResizer } from "./grid/ColResizer";
 export type { YoColResizerProps } from "./grid/ColResizer";
 
 export { YoColHeader } from "./grid/ColHeader";
-export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone } from "./grid/ColHeader";
+export type { YoColHeaderProps, YoColHeaderAlign, YoColHeaderSort } from "./grid/ColHeader";
 
-export { YoColFrame } from "./grid/ColFrame";
-export type { YoColFrameProps, YoColCellPad, YoColFrameTone } from "./grid/ColFrame";
+export { YoColFrame, YoColHead } from "./grid/ColFrame";
+export type { YoColFrameProps, YoColHeadProps, YoColCellPad } from "./grid/ColFrame";
 
 export { YoColRow } from "./grid/ColRow";
 export type { YoColRowProps } from "./grid/ColRow";
@@ -234,6 +252,7 @@ export {
 export type { YoColSpec, YoColWidths } from "./grid/col-model";
 
 export { YoPanel } from "./container/Panel";
+export { panelHotEdge } from "./container/panel-model";
 export type {
   YoPanelProps,
   YoPanelAlign,
@@ -242,6 +261,7 @@ export type {
   YoPanelOverflow,
   YoPanelPadding,
   YoPanelVariant,
+  YoPanelRole,
 } from "./container/Panel";
 
 export { YoPage } from "./container/Page";
@@ -249,6 +269,7 @@ export type { YoPageProps, YoPageRole } from "./container/Page";
 
 export { YoFormRow } from "./container/FormRow";
 export type { YoFormRowProps, YoFormRowLayout, YoFormRowPad } from "./container/FormRow";
+export { trimmedTextPresent } from "./container/formrow-model";
 
 export { YoCorner, CornerPillRadius } from "./corner";
 export type {
@@ -300,12 +321,13 @@ export type {
 
 // —— 空态与加载 / 弹窗 ——
 export { YoEmptyState } from "./feedback/EmptyState";
-export type { YoEmptyStateProps } from "./feedback/EmptyState";
+export type { EmptyStateSize, YoEmptyStateProps } from "./feedback/EmptyState";
 
 export { YoLoading } from "./feedback/Loading";
 export type { YoLoadingProps } from "./feedback/Loading";
 
 export { YoDialog } from "./overlay/Dialog";
+export { resolveDialogOpen } from "./overlay/dialog-policy";
 export type {
   YoDialogProps,
   YoDialogBodyLayout,
@@ -354,7 +376,9 @@ export {
   railSlotOpen,
   railStreamAttr,
   railStreamOpen,
+  railIntentIsExpanded,
   railPhaseAfterWidthSettle,
+  railToggleIntent,
   railPhaseOnIntentChange,
   railTooltipEnabled,
   railTraveling,
@@ -372,14 +396,12 @@ export type {
   YoRevealProps,
   YoTravelProps,
   YoGrowProps,
-  TravelAxis,
   YoSwapProps,
   YoIndicatorProps,
   IndicatorVariant,
   YoRailProps,
   YoRailContextValue,
   YoRailSlotProps,
-  RailSlotAxis,
   RailIntent,
   RailPhase,
   PresenceRecipe,

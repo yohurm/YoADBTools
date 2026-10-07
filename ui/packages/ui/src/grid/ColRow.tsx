@@ -4,6 +4,7 @@
  */
 import type { JSX } from "solid-js";
 import "./ColRow.css";
+import { presenceAttr } from "../dom/flag";
 
 export interface YoColRowProps {
   /** 缺省吃 `--yohu-col-tracks`。仅在没有 YoColFrame 时传入。 */
@@ -21,7 +22,7 @@ export function YoColRow(props: YoColRowProps): JSX.Element {
   return (
     <div
       class={`yohu-col-row${props.class ? ` ${props.class}` : ""}`}
-      data-resizing={props.resizing ? "" : undefined}
+      data-resizing={presenceAttr(props.resizing)}
       role="row"
       style={{
         ...(props.template ? { "grid-template-columns": props.template } : {}),

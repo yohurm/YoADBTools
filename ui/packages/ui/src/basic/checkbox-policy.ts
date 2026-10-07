@@ -4,12 +4,18 @@
  * 不写色值、不画铬。
  */
 
+import { presenceAttr, flagAttr, type FlagAttr } from "../dom/flag";
+import { controlIsBlock, controlIsDisabled } from "./control-busy";
 import {
   checkboxPaintKind,
   resolveCheckboxSpec,
+  resolveCheckboxTone,
   type CheckboxInput,
   type CheckboxPaintKind,
+  type CheckboxTone,
 } from "./checkbox-model";
+
+export type { CheckboxTone };
 
 export interface CheckboxInteractiveInput {
   disabled?: boolean;
@@ -20,7 +26,7 @@ export interface CheckboxInteractive {
 }
 
 export function resolveCheckboxInteractive(input: CheckboxInteractiveInput): CheckboxInteractive {
-  return { disabled: Boolean(input.disabled) };
+  return { disabled: controlIsDisabled(input.disabled) };
 }
 
 /** 禁用拒绝提交。视图不得自行 if 判定后再读一份 checked。 */
@@ -29,9 +35,11 @@ export function canCommitCheckboxChange(disabled: boolean): boolean {
 }
 
 export interface CheckboxHostAttrs {
-  "data-checked": "true" | "false";
+  "data-checked": FlagAttr;
   "data-paint": CheckboxPaintKind;
-  "data-disabled": true | undefined;
+  "data-disabled": "" | undefined;
+  "data-block": "" | undefined;
+  "data-tone": CheckboxTone;
   disabled: boolean;
 }
 
@@ -39,9 +47,11 @@ export function checkboxHostAttrs(input: CheckboxInput & CheckboxInteractiveInpu
   const spec = resolveCheckboxSpec(input);
   const interactive = resolveCheckboxInteractive(input);
   return {
-    "data-checked": spec.checked ? "true" : "false",
+    "data-checked": flagAttr(spec.checked),
     "data-paint": checkboxPaintKind(spec),
-    "data-disabled": interactive.disabled ? true : undefined,
+    "data-disabled": presenceAttr(interactive.disabled),
+    "data-block": presenceAttr(controlIsBlock(input.block)),
+    "data-tone": resolveCheckboxTone(input.tone),
     disabled: interactive.disabled,
   };
 }

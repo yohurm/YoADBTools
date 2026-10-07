@@ -17,12 +17,14 @@ import type { JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/engines/collapse";
-import { flattenVisible, treeActivateIntent, treeHasChildren, treeKeySelector } from "./tree-model";
+import { flattenVisible, treeActivateIsToggle, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,
   isTreeExpanded,
   resolveTreeKeyAction,
   toggleExpandedSet,
+  treeActionIsFocus,
+  treeActionIsToggle,
   treeRowAttrs,
 } from "./tree-policy";
 import "./Tree.css";
@@ -82,8 +84,12 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
 
   const rows = createMemo(() => flattenVisible(props.data, isExpanded));
 
-  const focusKey = (key: string): void => {
+  function treeRememberFocus(key: string): void {
     setFocusedKey(key);
+  }
+
+  const focusKey = (key: string): void => {
+    treeRememberFocus(key);
     const el = root?.querySelector<HTMLElement>(treeKeySelector(key));
     el?.focus();
   };
@@ -92,13 +98,13 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
     const action = resolveTreeKeyAction(event.key, rows(), focusedKey(), selected(), isExpanded);
     if (!action) return;
     event.preventDefault();
-    if (action.type === "focus") {
+    if (treeActionIsFocus(action)) {
       focusKey(action.key);
       return;
     }
     const current = rows().find((row) => row.node.key === action.key)?.node;
     if (!current) return;
-    if (action.type === "toggle") {
+    if (treeActionIsToggle(action)) {
       toggle(current.key);
       return;
     }
@@ -135,8 +141,8 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                 "padding-left": `calc(${depth} * var(--yohu-space-lg))`,
               }}
               onClick={() => {
-                setFocusedKey(node.key);
-                if (treeActivateIntent(hasChildren) === "toggle") {
+                treeRememberFocus(node.key);
+                if (treeActivateIsToggle(hasChildren)) {
                   toggle(node.key);
                   return;
                 }
@@ -151,7 +157,7 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                   tabindex={-1}
                   onClick={(event) => {
                     event.stopPropagation();
-                    setFocusedKey(node.key);
+                    treeRememberFocus(node.key);
                     toggle(node.key);
                   }}
                 >

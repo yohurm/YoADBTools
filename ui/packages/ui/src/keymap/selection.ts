@@ -3,13 +3,13 @@
  * 只操作 key 序列，不碰 DOM。
  */
 
+import { isModKey } from "./chord";
+
 export type SelectMode = "replace" | "toggle" | "range";
 
 export function pointerSelectMode(event?: MouseEvent | KeyboardEvent): SelectMode {
   if (event && "shiftKey" in event && event.shiftKey) return "range";
-  if (event && ("ctrlKey" in event || "metaKey" in event) && (event.ctrlKey || event.metaKey)) {
-    return "toggle";
-  }
+  if (event && isModKey(event)) return "toggle";
   return "replace";
 }
 

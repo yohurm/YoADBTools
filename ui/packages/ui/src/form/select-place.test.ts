@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { Spacing } from "../tokens/spacing";
+import { controlRowHeight } from "../tokens";
 import { estimateMenuHeight } from "../overlay/popover-place";
-import { layoutSelectMenu, readSelectTrigger } from "./select-place";
+import { layoutSelectMenu } from "./select-place";
 
 const VIEW = { width: 800, height: 600 };
 const TRIGGER = { top: 40, left: 100, bottom: 72, width: 120, height: 32 };
@@ -18,16 +19,6 @@ function loadPlaceSrc(): string {
 }
 
 describe("select-place", () => {
-  it("无锚点时测量为零盒", () => {
-    expect(readSelectTrigger(undefined)).toEqual({
-      top: 0,
-      left: 0,
-      bottom: 0,
-      width: 0,
-      height: 0,
-    });
-  });
-
   it("下方够用时向下；高取实测与行估算的较大值；只返回盒", () => {
     const layer = document.createElement("div");
     const scrollHeight = 40;
@@ -63,6 +54,22 @@ describe("select-place", () => {
     expect(laid.style.minWidth).toBe(`${TRIGGER.width}px`);
     expect(laid.style.minWidth).not.toBe("0px");
     expect(laid.style.width).toBeUndefined();
+  });
+
+  it("触发钮没有高度时行高跟 controlRowHeight", () => {
+    document.documentElement.setAttribute("data-density", "compact");
+    try {
+      const trigger = { ...TRIGGER, height: 0 };
+      const estimated = estimateMenuHeight(2, controlRowHeight(), Spacing.Xs * 2);
+      const laid = layoutSelectMenu(trigger, { optionCount: 2, scrollHeight: 0 }, VIEW);
+      expect(controlRowHeight()).toBe(26);
+      expect(laid.style.maxHeight).toBe(`${estimated}px`);
+      const src = loadPlaceSrc();
+      expect(src).not.toContain("readCssPx");
+      expect(src).not.toContain("--yohu-control-height");
+    } finally {
+      document.documentElement.removeAttribute("data-density");
+    }
   });
 
   it("L3 不写 layer attribute，也不调 applyPopoverBox", () => {

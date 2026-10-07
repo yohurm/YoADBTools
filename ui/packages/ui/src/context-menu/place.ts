@@ -1,36 +1,19 @@
 /**
  * 右键菜单落点策略（L3）。按视口夹紧，避免贴边时整块溢出。
  * 打开时先按条目估算宽高夹紧（`clampContextMenuPoint`）；菜单挂载后应再以
- * **实测** `offsetWidth/offsetHeight` 二次夹紧（`clampToRect`），
+ * **实测** `offsetWidth/offsetHeight` 二次夹紧（placement `clampToRect`），
  * 因为 `Layout.MenuMin` 只是最小宽，更宽条目会让估算偏小，贴右/下边时会溢出。
- * 定位只用本文件，不走 Select 的 popover-place。
+ * 上下展开不走浮层 `placePopover`。夹紧数字在 placement。
  */
 
-import { getDensity } from "../tokens";
-import { Density } from "../tokens/density";
+import { clampToRect } from "../placement/clamp";
+import { controlRowHeight } from "../tokens";
 import { Layout } from "../tokens/layout";
 import { Spacing } from "../tokens/spacing";
 
 export function estimateContextMenuHeight(itemCount: number): number {
   const rows = Math.max(1, itemCount);
-  const density = getDensity();
-  const controlHeight = Density[density === "compact" ? "Compact" : "Comfortable"].controlHeight;
-  return Spacing.Xs * 2 + rows * controlHeight;
-}
-
-/** 按任意（真实）尺寸夹紧到视口内；只向内收，绝不放宽到溢出。 */
-export function clampToRect(
-  x: number,
-  y: number,
-  size: { width: number; height: number },
-  viewport: { width: number; height: number },
-): { x: number; y: number } {
-  const width = Math.max(0, size.width);
-  const height = Math.max(0, size.height);
-  return {
-    x: Math.min(Math.max(0, x), Math.max(0, viewport.width - width)),
-    y: Math.min(Math.max(0, y), Math.max(0, viewport.height - height)),
-  };
+  return Spacing.Xs * 2 + rows * controlRowHeight();
 }
 
 export function clampContextMenuPoint(

@@ -1,0 +1,23 @@
+/* 写入盒内幽灵清除。TextField / Search 共用。Tabs 关闭不走本钮。 */
+
+.yohu-recipe-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  height: calc(var(--yohu-space-lg) + var(--yohu-space-xs));
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-sm);
+  background: transparent;
+  color: var(--yohu-fg-3);
+  cursor: pointer;
+  transition:
+    color var(--yohu-motion-effects-fast),
+    background-color var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-clear:hover {
+  background-color: var(--yohu-state-hover);
+  color: var(--yohu-fg);
+}

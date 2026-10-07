@@ -1,6 +1,6 @@
 /**
  * YoTabs —— 多会话标签页（L4 视图）。
- * HarmonyOS 对照：Tabs；激活项 Accent 下划线由 YoIndicator 滑动。
+ * HarmonyOS 对照：Tabs。页签自己声明下划线宿主，滑块只在项之间移动。
  * 受控 API：tabs / activeId / onActivate / onClose / onNew / onContextMenu。
  *
  * 可达性：
@@ -10,12 +10,19 @@
  *
  * 视觉：激活是 underline，不是选中实底；hover 只走 yohu-interactive / ripple。
  */
+import { presenceAttr } from "../dom/flag";
 import { For } from "solid-js";
 import type { JSX } from "solid-js";
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoIndicator } from "../motion/engines/indicator";
-import { resolveTabsChrome, resolveTabsKeyAction, tabsTabAttrs } from "./tabs-policy";
+import {
+  resolveTabsChrome,
+  resolveTabsKeyAction,
+  tabsActionIsActivate,
+  tabsIndicatorVariant,
+  tabsTabAttrs,
+} from "./tabs-policy";
 import "./Tabs.css";
 
 /** 圆点色调 */
@@ -69,7 +76,7 @@ export function YoTabs(props: YoTabsProps): JSX.Element {
     const action = resolveTabsKeyAction(event.key, props.tabs, props.activeId, chrome().canClose);
     if (!action) return;
     event.preventDefault();
-    if (action.type === "activate") {
+    if (tabsActionIsActivate(action)) {
       props.onActivate?.(action.id);
       focusIndex(action.focusIndex);
       return;
@@ -83,19 +90,20 @@ export function YoTabs(props: YoTabsProps): JSX.Element {
       ref={(el) => {
         tablistRef = el;
       }}
-      class="yohu-tabs"
+      class="yohu-tabs yohu-indicator-host"
+      data-indicator-variant={tabsIndicatorVariant()}
       role="tablist"
       aria-label="会话"
       onKeyDown={onTablistKeyDown}
     >
-      <YoIndicator follow={props.activeId} variant="underline" selector=".yohu-tabs__tab[data-active]" />
+      <YoIndicator follow={props.activeId} variant={tabsIndicatorVariant()} selector=".yohu-tabs__tab[data-active]" />
       <For each={props.tabs}>
         {(tab) => {
           const attrs = () => tabsTabAttrs(tab.id, props.activeId);
           return (
             <div
               data-tab-id={tab.id}
-              data-active={attrs().active ? "" : undefined}
+              data-active={presenceAttr(attrs().active)}
               class="yohu-tabs__tab yohu-interactive yohu-focus-ring--inset"
               role="tab"
               aria-selected={attrs()["aria-selected"]}

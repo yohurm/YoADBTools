@@ -3,8 +3,8 @@
  * busy 关掉输入；宿主属性交给 YoIconButton，不复制按钮铬。
  */
 
-import type { ThemeName } from "../tokens";
-import { themeToggleDark, themeToggleTitle } from "./theme-toggle-model";
+import { themeIsDark, type ThemeName } from "../tokens";
+import { themeToggleTitle } from "./theme-toggle-model";
 
 export interface ThemeToggleInteractiveInput {
   busy?: boolean;
@@ -31,6 +31,6 @@ export function themeToggleHostAttrs(theme: ThemeName, busy?: boolean): ThemeTog
   return {
     title: themeToggleTitle(theme),
     disabled: interactive.disabled,
-    "aria-pressed": themeToggleDark(theme),
+    "aria-pressed": themeIsDark(theme),
   };
 }

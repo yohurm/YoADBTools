@@ -15,8 +15,15 @@ import {
   type YoPanelOverflow,
   type YoPanelPadding,
   type YoPanelVariant,
+  type YoPanelRole,
 } from "./panel-model";
-import { panelHostAttrs } from "./panel-policy";
+import {
+  panelHeaderIsCardTitle,
+  panelHeaderIsCustom,
+  panelHeaderIsPane,
+  panelHostAttrs,
+  panelSlotOn,
+} from "./panel-policy";
 import "./Panel.css";
 
 export type {
@@ -26,6 +33,7 @@ export type {
   YoPanelOverflow,
   YoPanelPadding,
   YoPanelVariant,
+  YoPanelRole,
 };
 
 export interface YoPanelProps {
@@ -49,6 +57,11 @@ export interface YoPanelProps {
   variant?: YoPanelVariant;
   /** 外壳高光；默认 none。drop = 填充盒外一圈虚线，不占用描边 */
   edge?: YoPanelEdge;
+  /**
+   * 面板角色。默认 surface（整块透出外壳）。
+   * ops = 操作面板：顶栏白、内容灰，配方由角色解析，不再另传底色。
+   */
+  role?: YoPanelRole;
   class?: string;
   classList?: Record<string, boolean | undefined>;
   "aria-label"?: string;
@@ -57,6 +70,11 @@ export interface YoPanelProps {
 
 /** 渲染圆角卡片分区。模块分区一律走本组件，不要再铺 surface + radius-md。 */
 export function YoPanel(props: YoPanelProps): JSX.Element {
+  const slots = createMemo(() => ({
+    header: panelSlotOn(props.header),
+    title: panelSlotOn(props.title),
+    actions: panelSlotOn(props.actions),
+  }));
   const host = createMemo(() =>
     panelHostAttrs({
       variant: props.variant,
@@ -66,9 +84,10 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       gap: props.gap,
       overflow: props.overflow,
       edge: props.edge,
-      header: Boolean(props.header),
-      title: Boolean(props.title),
-      actions: Boolean(props.actions),
+      role: props.role,
+      header: slots().header,
+      title: slots().title,
+      actions: slots().actions,
     }),
   );
 
@@ -84,6 +103,7 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
       data-overflow={host()["data-overflow"]}
       data-padding-block={host()["data-padding-block"]}
       data-edge={host()["data-edge"]}
+      data-role={host()["data-role"]}
       aria-label={props["aria-label"]}
     >
       <YoCorner
@@ -91,20 +111,20 @@ export function YoPanel(props: YoPanelProps): JSX.Element {
         class="yohu-panel__clip"
         edgeOutset={resolvePanelEdgeOutset(resolvePanelEdge(props.edge))}
       >
-        <Show when={host()["data-header"] === "custom"}>
+        <Show when={panelHeaderIsCustom(host()["data-header"])}>
           <div class="yohu-panel__header">{props.header}</div>
         </Show>
-        <Show when={host()["data-header"] === "pane"}>
+        <Show when={panelHeaderIsPane(host()["data-header"])}>
           <header class="yohu-panel__header">
-            <Show when={props.title}>
+            <Show when={slots().title}>
               <h3 class="yohu-panel__heading">{props.title}</h3>
             </Show>
-            <Show when={props.actions}>
+            <Show when={slots().actions}>
               <div class="yohu-panel__actions">{props.actions}</div>
             </Show>
           </header>
         </Show>
-        <Show when={host()["data-header"] === "card-title"}>
+        <Show when={panelHeaderIsCardTitle(host()["data-header"])}>
           <h3 class="yohu-panel__title">{props.title}</h3>
         </Show>
         <div class="yohu-panel__body">{props.children}</div>

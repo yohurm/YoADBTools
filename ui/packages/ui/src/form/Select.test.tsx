@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { YoDialog } from "../overlay/Dialog";
 import { YoSelect } from "./Select";
@@ -94,7 +95,7 @@ describe("YoSelect", () => {
     expect(listbox.closest(".yohu-select")).toBeNull();
     expect(layer?.classList.contains("yohu-select__layer")).toBe(true);
     expect(layer?.getAttribute("data-placement")).toMatch(/^(top|bottom)$/);
-    expect(layer?.getAttribute("data-placed")).toBe("true");
+    expect(layer?.getAttribute("data-placed")).toBe("");
     expect(layer?.style.position).toBe("fixed");
     expect(layer?.style.width).toBe("");
     expect(layer?.style.minWidth).not.toBe("");
@@ -266,10 +267,29 @@ describe("YoSelect 分层契约", () => {
     expect(src).not.toMatch(/\bgetBoundingClientRect\b/);
     expect(src).not.toMatch(/\blayoutMenu\b/);
     expect(src).toMatch(/\blayoutSelectMenu\b/);
-    expect(src).toMatch(/\breadSelectTrigger\b/);
+    expect(src).toMatch(/\breadAnchorBox\b/);
     expect(src).toMatch(/data-placed=/);
     expect(src).toMatch(/mode="paint"/);
     expect(src).toMatch(/class="yohu-select__chevron"/);
+  });
+
+  it("重排监听经 listen 成对登记与摘掉", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/form/Select.tsx"),
+      resolve(process.cwd(), "packages/ui/src/form/Select.tsx"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    const count = (needle: string): number => src.split(needle).length - 1;
+    expect(count("add" + "EventListener")).toBe(1);
+    expect(count("remove" + "EventListener")).toBe(1);
+    expect(count(", true)")).toBe(2);
+    expect(src).toContain('listen(window, "resize", onRelayout)');
+    expect(src).toContain('listen(window, "scroll", onRelayout, true)');
+    expect(src).toContain('listen(window.visualViewport, "resize", onRelayout)');
+    expect(src).toContain('listen(window.visualViewport, "scroll", onRelayout)');
+    expect(src).toContain('listen(document, "mousedown", handleDocPointerDown)');
+    expect(src).toContain('listen(document, "keydown", handleDocKeyDown, true)');
   });
 });
 
@@ -313,5 +333,76 @@ describe("YoSelect 触发布局契约", () => {
     expect(overflow).toContain("::-webkit-scrollbar");
     expect(overflow).toMatch(/width:\s*0/);
     expect(overflow).toMatch(/height:\s*0/);
+  });
+});
+
+describe("选择框回到空闲", () => {
+  it("空闲会话只写在 selectIdle，两处调用不并 onChange 与 focus", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/form/Select.tsx"),
+      resolve(process.cwd(), "packages/ui/src/form/Select.tsx"),
+    ];
+    const src = candidates.map((p) => (existsSync(p) ? readFileSync(p, "utf-8") : "")).find(Boolean) ?? "";
+    expect(src.length).toBeGreaterThan(0);
+    const count = (needle: string): number => src.split(needle).length - 1;
+    expect(count("setSession(" + "idleSelectSession())")).toBe(1);
+    expect(count("function selectIdle")).toBe(1);
+    expect(count("export function selectIdle")).toBe(0);
+    expect(count("selectIdle()")).toBe(3);
+    expect(count("idleSelectSession()")).toBe(2);
+    expect(count("triggerRef?." + "focus()")).toBe(1);
+    expect(count("props.onChange?.(value)")).toBe(1);
+  });
+});
+
+function selectSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Select.tsx"), "utf8");
+}
+
+describe("下拉焦点", () => {
+  it("提交和退出都把焦点交回触发钮", () => {
+    const src = selectSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("triggerRef?." + "focus()")).toBe(1);
+    expect(times("function selectFocusTrigger")).toBe(1);
+    expect(times("export function selectFocusTrigger")).toBe(0);
+    expect(times("selectFocusTrigger()")).toBe(3);
+    expect(times("props.onChange?.(" + "value)")).toBe(1);
+  });
+});
+
+describe("下拉落点", () => {
+  it("层和菜单都写同一落点", () => {
+    const src = selectSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("data-placement={" + "placement()}")).toBe(0);
+    expect(times("return " + "placement()")).toBe(1);
+    expect(times("function selectPlacement")).toBe(1);
+    expect(times("export function selectPlacement")).toBe(0);
+    expect(times("selectPlacement()")).toBe(3);
+    expect(times("data-placement={selectPlacement()}")).toBe(2);
+  });
+});
+
+describe("下拉挂上再量", () => {
+  it("层和菜单挂上后都再量一次", () => {
+    const src = selectSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("if (el) " + "syncMenuPlace()")).toBe(1);
+    expect(times("function placeIfMounted")).toBe(1);
+    expect(times("export function placeIfMounted")).toBe(0);
+    expect(times("placeIfMounted(el)")).toBe(2);
+  });
+});
+
+describe("下拉次文案", () => {
+  it("触发钮和选项都画同一条次文案", () => {
+    const src = selectSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("{(meta) => " + '<span class="yohu-select__description">{meta()}</span>}')).toBe(0);
+    expect(times("yohu-select__" + "description")).toBe(1);
+    expect(times("function selectDescription")).toBe(1);
+    expect(times("export function selectDescription")).toBe(0);
+    expect(times("selectDescription(meta)")).toBe(2);
   });
 });

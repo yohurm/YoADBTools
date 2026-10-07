@@ -21,6 +21,8 @@ export interface YoListRowProps {
   selectedKeys?: ReadonlySet<string | number>;
   dataKey?: string | number;
   dataReorder?: "source";
+  /** 源行占位。placeholder 时调用方不挂文本。 */
+  dataSlot?: "placeholder";
   role?: "option";
   ariaSelected?: boolean;
   tabIndex?: number;
@@ -52,6 +54,7 @@ export function YoListRow(props: YoListRowProps): JSX.Element {
       data-radius={host()["data-radius"]}
       data-key={props.dataKey}
       data-reorder={props.dataReorder}
+      data-slot={props.dataSlot}
       role={props.role}
       aria-selected={props.ariaSelected}
       tabIndex={props.tabIndex}

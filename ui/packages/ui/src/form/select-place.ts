@@ -3,29 +3,23 @@
  * 只调 popover-place 算盒并返回 placement / overflowY / style。不写 DOM。
  */
 
-import { Density } from "../tokens/density";
 import { Spacing } from "../tokens/spacing";
+import { controlRowHeight } from "../tokens";
+import type { AnchorBox } from "../placement/anchor";
 import {
   estimateMenuHeight,
   placePopover,
   popoverLayerStyle,
-  readCssPx,
   readViewport,
 } from "../overlay/popover-place";
-import type { SelectMenuLayout, SelectMenuMeasure, SelectTriggerBox } from "./select-model";
+import type { SelectMenuLayout, SelectMenuMeasure } from "./select-model";
 
-export function readSelectTrigger(el: Element | undefined): SelectTriggerBox {
-  const rect = el?.getBoundingClientRect();
-  if (!rect) return { top: 0, left: 0, bottom: 0, width: 0, height: 0 };
-  return { top: rect.top, left: rect.left, bottom: rect.bottom, width: rect.width, height: rect.height };
-}
-
-function selectRowHeight(trigger: SelectTriggerBox): number {
-  return trigger.height || readCssPx("--yohu-control-height", Density.Comfortable.controlHeight);
+function selectRowHeight(trigger: AnchorBox): number {
+  return trigger.height || controlRowHeight();
 }
 
 export function layoutSelectMenu(
-  trigger: SelectTriggerBox,
+  trigger: AnchorBox,
   measure: SelectMenuMeasure,
   viewport: { width: number; height: number } = readViewport(),
 ): SelectMenuLayout {

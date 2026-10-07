@@ -23,12 +23,16 @@ export function bindFocusModality(doc: Document = document): () => void {
     if (!isFocusActivationKey(event.key)) return;
     root.setAttribute(YOHU_FOCUS_ATTR, YOHU_FOCUS_KEYBOARD);
   };
-  doc.addEventListener("pointerdown", onPointer, true);
-  doc.addEventListener("keydown", onKey, true);
+  function listen(type: string, handler: EventListener): () => void {
+    doc.addEventListener(type, handler, true);
+    return () => doc.removeEventListener(type, handler, true);
+  }
+  const stopPointer = listen("pointerdown", onPointer);
+  const stopKey = listen("keydown", onKey);
   const current = (): void => {
     if (detach !== current) return;
-    doc.removeEventListener("pointerdown", onPointer, true);
-    doc.removeEventListener("keydown", onKey, true);
+    stopPointer();
+    stopKey();
     root.removeAttribute(YOHU_FOCUS_ATTR);
     detach = null;
   };

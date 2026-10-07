@@ -27,7 +27,7 @@ export interface PanelScopeOptions {
   ownership?: PanelKeyOwnership;
 }
 
-const DEFAULT_DIALOG = ".yohu-dialog";
+const DEFAULT_DIALOG = "[role='dialog']";
 
 export function panelKeyContext(
   root: Element | null | undefined,

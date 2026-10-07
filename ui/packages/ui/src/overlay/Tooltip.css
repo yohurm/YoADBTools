@@ -76,24 +76,3 @@
   border-top: none;
   border-left: none;
 }
-
-/* 进场只在落点之后播，避免藏着时就把 tip-in 播完。换锚不重播。 */
-.yohu-presence[data-recipe="popover"][data-state="open"]
-  .yohu-tooltip__layer[data-placed]
-  .yohu-tooltip {
-  animation: yohu-tip-in var(--yohu-motion-effects-enter) both;
-}
-
-.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip {
-  animation: yohu-tip-out var(--yohu-motion-effects-exit) both;
-}
-
-.yohu-presence[data-recipe="popover"][data-state="open"]
-  .yohu-tooltip__layer[data-placed]
-  .yohu-tooltip[data-placement="top"] {
-  animation-name: yohu-tip-drop-in;
-}
-
-.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-tooltip[data-placement="top"] {
-  animation-name: yohu-tip-drop-out;
-}

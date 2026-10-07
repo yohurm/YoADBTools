@@ -4,6 +4,7 @@
  * 1fr 兄弟（居中空态、结果流）被挤位时靠布局插值跟随。
  * 禁止 max-height:none / height:auto 离散跳变；禁止给空态写 keyframes。
  * 禁止 0fr auto ↔ minmax 1fr 0fr。禁止 container-type 写在本宿主上。
+ * 槽是 data-part=clip|pane|toggle。不靠第几个子节点认盒子。
  */
 .yohu-recipe-inline-end {
   position: relative;
@@ -27,7 +28,7 @@
   grid-template-rows: 1fr;
 }
 
-.yohu-recipe-inline-end > :first-child {
+.yohu-recipe-inline-end [data-part="clip"] {
   display: flex;
   justify-content: flex-end;
   /* 禁止 stretch：1fr 一旦定高，pane 被拉到旧行高，锁盒降不下来。 */
@@ -39,7 +40,7 @@
   width: 100%;
 }
 
-.yohu-recipe-inline-end > :first-child > * {
+.yohu-recipe-inline-end [data-part="pane"] {
   box-sizing: border-box;
   flex: 0 0 auto;
   width: 100cqi;
@@ -54,7 +55,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-recipe-inline-end[data-open="true"] > :first-child > * {
+.yohu-recipe-inline-end[data-open="true"] [data-part="pane"] {
   opacity: 1;
   transform: translateX(0);
   transition:
@@ -62,7 +63,7 @@
     transform var(--yohu-motion-effects-enter);
 }
 
-.yohu-recipe-inline-end > :last-child {
+.yohu-recipe-inline-end [data-part="toggle"] {
   position: absolute;
   inset-inline-end: 0;
   inset-block-end: 0;
@@ -71,18 +72,15 @@
   width: var(--yohu-control-height);
   height: var(--yohu-control-height);
   display: flex;
+  /* 方钮可缩进控制高方格。按钮自己吃这两条，不点子级。 */
+  --yohu-button-min-inline: 0;
+  --yohu-button-min-block: 0;
   opacity: 1;
   transition: opacity var(--yohu-motion-effects-exit);
 }
 
-.yohu-recipe-inline-end[data-open="true"] > :last-child {
+.yohu-recipe-inline-end[data-open="true"] [data-part="toggle"] {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--yohu-motion-effects-enter);
-}
-
-.yohu-recipe-inline-end > :last-child > * {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
 }

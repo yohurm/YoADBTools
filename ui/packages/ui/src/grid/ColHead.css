@@ -1,0 +1,10 @@
+/* 横滑表头的裁切盒。侧轨垫打在这一层，里面的行只平移。 */
+
+.yohu-col-head {
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline-end: var(--yohu-col-head-gutter, 0);
+  /* 垫留在裁切盒。行继承到的侧轨垫清零，避免和表头各垫一份。 */
+  --yohu-col-gutter-pad: 0;
+}

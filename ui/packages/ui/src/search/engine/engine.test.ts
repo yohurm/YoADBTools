@@ -82,3 +82,23 @@ describe("YoSearch 引擎（与 yohu-search testdata/search.json 同一套向量
     expect(engine.search("型号").map((match) => match.id)).toEqual(["c-model"]);
   });
 });
+
+describe("命中种类与拼音字符只判一次", () => {
+  const dir = dirname(fileURLToPath(import.meta.url));
+
+  it("字符命中与拼音命中共用 span 种类", () => {
+    const body = readFileSync(resolve(dir, "field.ts"), "utf8");
+    expect(body).not.toContain("function hitKind");
+    expect(body).not.toContain("hay.every");
+    expect(body).not.toContain("hay.length === needle.length");
+  });
+
+  it("拼音字母与分隔符只各写一次", () => {
+    const body = readFileSync(resolve(dir, "pinyin.ts"), "utf8")
+      .replace('return ch.length === 1 && ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z"));', "")
+      .replace("return ch === \"'\";", "");
+    expect(body).not.toContain('(ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z")');
+    expect(body).not.toContain("!== \"'\"");
+    expect(body).not.toContain("=== \"'\"");
+  });
+});

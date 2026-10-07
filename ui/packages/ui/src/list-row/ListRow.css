@@ -15,6 +15,16 @@
 
 .yohu-list-row[data-tone="list"] {
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* 行槽铺满行宽。调用方不再写 height / width 去撑这只盒子。 */
+.yohu-list-row[data-tone="list"] > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .yohu-list-row[data-selectable] {

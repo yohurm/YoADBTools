@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { Layout } from "../../../tokens/layout";
 import {
+  railIntentIsExpanded,
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
+  railToggleIntent,
   railSlotOpen,
   railStreamAttr,
   railStreamOpen,
@@ -60,13 +65,47 @@ describe("YoRail 时序", () => {
     expect(railTooltipEnabled("expanded")).toBe(false);
   });
 
+  it("展开意图只在 railIntentIsExpanded 里比较", () => {
+    expect(railIntentIsExpanded("expanded")).toBe(true);
+    expect(railIntentIsExpanded("icons")).toBe(false);
+    expect(railToggleIntent("expanded")).toBe("icons");
+    expect(railToggleIntent("icons")).toBe("expanded");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const files = [
+      resolve(here, "rail-model.ts"),
+      resolve(here, "rail.tsx"),
+      resolve(here, "../../../../../workbench/src/shell/AppLayout.tsx"),
+    ];
+    for (const path of files) {
+      const text = readFileSync(path, "utf8");
+      const body = path.endsWith("rail-model.ts") ? text.replace('return intent === "expanded"', "") : text;
+      expect(body, path).not.toContain('intent === "expanded"');
+      expect(body, path).not.toContain('next === "expanded"');
+      expect(body, path).not.toContain('current === "expanded"');
+      expect(body, path).not.toContain('intent() === "expanded"');
+      expect(body, path).not.toContain('railIntent() === "expanded"');
+    }
+  });
+
   it("宽度拍与休息相位一致", () => {
     expect(railWidthIntent("collapsing")).toBe("icons");
     expect(railWidthIntent("expanding")).toBe("expanded");
-    const expanded = `${Layout.ShellNav}px`;
-    const icons = `${Layout.ShellNavIcons}px`;
-    expect(railWidthMatchesIntent(Layout.ShellNavIcons, true, expanded, icons)).toBe(false);
-    expect(railWidthMatchesIntent(Layout.ShellNav, true, expanded, icons)).toBe(true);
-    expect(railWidthMatchesIntent(Layout.ShellNavIcons, false, expanded, icons)).toBe(true);
+    expect(railWidthMatchesIntent(Layout.ShellNavIcons, true)).toBe(false);
+    expect(railWidthMatchesIntent(Layout.ShellNav, true)).toBe(true);
+    expect(railWidthMatchesIntent(Layout.ShellNavIcons, false)).toBe(true);
+  });
+});
+
+describe("轨宽取整", () => {
+  it("实测与期望都先取整再比较", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const text = readFileSync(resolve(here, "rail-model.ts"), "utf8");
+    expect(text.split("Math.round(" + "usedPx)").length - 1).toBe(0);
+    expect(text.split("Math.round(" + "expected)").length - 1).toBe(0);
+    expect(text).toContain("railPx(usedPx)");
+    expect(text).toContain("railPx(expected)");
+    expect(text.split("function railPx").length - 1).toBe(1);
+    expect(text.split("return Math.round(value)").length - 1).toBe(1);
+    expect(text).toContain("Layout.ShellNavIcons");
   });
 });

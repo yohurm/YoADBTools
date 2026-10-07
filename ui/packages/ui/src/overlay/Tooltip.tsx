@@ -11,11 +11,13 @@ import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
+import { cornerExtentIsEmpty } from "../corner/corner-model";
 import { YoPresence } from "../motion/engines/presence";
 import type { MotionSpecName } from "../tokens/motion";
 import type { PopoverPlacement } from "./popover-place";
 import { allocTooltipId, tooltipDomId } from "./tooltip-model";
-import { applyTooltipBox, placeTooltip, readTooltipTrigger, tooltipLayerStyle } from "./tooltip-place";
+import { applyTooltipBox, placeTooltip, tooltipLayerStyle } from "./tooltip-place";
+import { readAnchorBox } from "../placement/anchor";
 import {
   bindTooltipInputModality,
   resolveTooltipDelay,
@@ -76,6 +78,14 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
     if (tooltipSessionOpen(tip)) setHeld(tip);
   });
 
+  function tooltipPlacement(): PopoverPlacement {
+    return placement();
+  }
+
+  function layoutIfMounted(el: HTMLElement | undefined): void {
+    if (el) layout();
+  }
+
   const layout = (): void => {
     const tip = paint();
     const layer = layerRef;
@@ -83,7 +93,7 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
     if (!tip || !layer || !content) return;
     const width = Math.max(content.offsetWidth, content.scrollWidth, content.getBoundingClientRect().width);
     const height = Math.max(content.offsetHeight, content.scrollHeight, content.getBoundingClientRect().height);
-    if (width <= 0 || height <= 0) {
+    if (cornerExtentIsEmpty(width, height)) {
       requestAnimationFrame(layout);
       return;
     }
@@ -113,23 +123,24 @@ export function YoTooltipHost(props: YoTooltipHostProps): JSX.Element {
           <div
             ref={(el) => {
               layerRef = el;
-              if (el) layout();
+              layoutIfMounted(el);
             }}
             class="yohu-tooltip__layer"
-            data-placement={placement()}
+            data-placement={tooltipPlacement()}
             style={layerStyle()}
           >
             <div
               id={paintId()}
               class="yohu-tooltip"
-              data-placement={placement()}
+              data-enter="tip"
+              data-placement={tooltipPlacement()}
               role="tooltip"
             >
               <YoCorner role="control" class="yohu-tooltip__chrome">
                 <div
                   ref={(el) => {
                     contentRef = el;
-                    if (el) layout();
+                    layoutIfMounted(el);
                   }}
                   class="yohu-tooltip__content"
                 >
@@ -156,7 +167,7 @@ export function YoTooltip(props: YoTooltipProps): JSX.Element {
   const show = (): void => {
     if (!tooltipCanShow(props.disabled, props.content)) return;
     unique.requestShow(
-      { id, content: props.content, trigger: readTooltipTrigger(anchorRef) },
+      { id, content: props.content, trigger: readAnchorBox(anchorRef) },
       resolveTooltipDelay(props.delay),
     );
   };

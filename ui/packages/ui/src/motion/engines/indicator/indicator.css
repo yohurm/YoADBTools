@@ -6,7 +6,7 @@
 /*
  * fill 滑块宽高走软弹簧过冲。fill / thumb 用 top/left 定位（虚拟列表 inner 不能
  * 再靠 transform 把未变换边框钉在 (0,0) 再平移，否则会撑大 scrollHeight）。
- * 设备栏等 decorate 宿主仍两轴 hidden：裁切过冲、不画条。
+ * 实底宿主仍两轴 hidden：裁切过冲、不画条。宿主 class 由轨自己声明。
  * 只写 overflow-x:hidden 时，CSS Overflow 会把另一轴 visible 算成 auto
  * （https://www.w3.org/TR/css-overflow-3/），Windows 在过冲瞬间画出右侧纵条
  * （命令管理组切换同症）。underline / thumb 不走这条：Tabs 要横向滚，分段钮要露出阴影。
@@ -14,6 +14,11 @@
  */
 .yohu-indicator-host[data-indicator-variant="fill"] {
   overflow: hidden;
+  --yohu-interactive-transition: color var(--yohu-motion-effects-fast);
+}
+
+.yohu-indicator-host[data-indicator-variant="fill"][data-indicator-ready] {
+  --yohu-interactive-selected-opacity: 0;
 }
 
 .yohu-recipe-indicator {
@@ -51,6 +56,17 @@
 
 .yohu-recipe-indicator--thumb {
   z-index: 0;
+  background: var(--yohu-indicator-thumb-fill, var(--yohu-surface));
+  box-shadow: var(--yohu-indicator-thumb-shadow, var(--yohu-shadow-xs));
+  border-radius: var(--yohu-radius-sm);
+}
+
+.yohu-indicator-host[data-indicator-variant="thumb"]:has([data-selected]:hover:not(:disabled)) .yohu-recipe-indicator--thumb {
+  box-shadow: var(--yohu-indicator-thumb-shadow, var(--yohu-shadow-xs)), inset 0 0 0 9999px var(--yohu-state-hover);
+}
+
+.yohu-indicator-host[data-indicator-variant="thumb"]:has([data-selected]:active:not(:disabled)) .yohu-recipe-indicator--thumb {
+  box-shadow: var(--yohu-indicator-thumb-shadow, var(--yohu-shadow-xs)), inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
 .yohu-recipe-indicator--underline {
@@ -61,30 +77,14 @@
   background: var(--yohu-accent);
 }
 
-/* 滑块承担选中实底；项上 ::before 只保留未选中 hover。字色与滑块同程过渡。 */
-.yohu-indicator-host[data-indicator-variant="fill"][data-indicator-ready] .yohu-interactive--selected::before,
-.yohu-indicator-host[data-indicator-variant="fill"][data-indicator-ready] .yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])::before,
-.yohu-indicator-host[data-indicator-variant="fill"][data-indicator-ready] .yohu-interactive--selected.yohu-interactive--active::before,
-.yohu-indicator-host[data-indicator-variant="fill"][data-indicator-ready] .yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])::before {
-  opacity: 0;
-}
-
-.yohu-indicator-host[data-indicator-variant="fill"]:has(.yohu-interactive--selected:hover:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
+.yohu-indicator-host[data-indicator-variant="fill"]:has([data-selected]:hover:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
   background: var(--yohu-state-selected);
   box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
-.yohu-indicator-host[data-indicator-variant="fill"]:has(.yohu-interactive--selected:active:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
+.yohu-indicator-host[data-indicator-variant="fill"]:has([data-selected]:active:not(:disabled):not([aria-disabled="true"])) .yohu-recipe-indicator--fill {
   background: var(--yohu-state-selected);
   box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
-}
-
-.yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive {
-  transition: color var(--yohu-motion-effects-fast);
-}
-
-.yohu-indicator-host[data-indicator-variant="fill"] .yohu-interactive *:not(.yohu-badge):not(.yohu-badge *):not(.yohu-tone):not(.yohu-tone *):not(.yohu-list-item__info):not(.yohu-list-item__extra):not(.yohu-list-item__extra-inner):not(.yohu-list-item__extra-content):not(.yohu-list-item__end):not(.yohu-list-item__end-inner) {
-  transition: color var(--yohu-motion-effects-fast);
 }
 
 /* L4 写 data-indicator-hot；只认属性 + 本配方滑块，禁止 :has list-row。 */

@@ -2,8 +2,10 @@
  * 列表项策略（L3）。
  * 组装 data-* / ARIA；不写色值、不画铬。
  */
+import { presenceAttr } from "../dom/flag";
 
 import {
+  listItemRoleIsButton,
   resolveListItemSpec,
   type ListItemInput,
   type YoListItemRing,
@@ -15,7 +17,7 @@ export interface ListItemHostAttrs {
   role: YoListItemRole;
   "data-size": YoListItemSize;
   "data-ring": YoListItemRing;
-  "data-selected": true | undefined;
+  "data-selected": "" | undefined;
   "aria-selected": boolean | undefined;
   "aria-current": "page" | undefined;
 }
@@ -26,8 +28,8 @@ export function listItemHostAttrs(input: ListItemInput): ListItemHostAttrs {
     role: spec.role,
     "data-size": spec.size,
     "data-ring": spec.ring,
-    "data-selected": spec.selected ? true : undefined,
-    "aria-selected": spec.role === "option" ? spec.selected : undefined,
-    "aria-current": spec.role === "button" && spec.current ? "page" : undefined,
+    "data-selected": presenceAttr(spec.selected),
+    "aria-selected": listItemRoleIsButton(spec.role) ? undefined : spec.selected,
+    "aria-current": listItemRoleIsButton(spec.role) && spec.current ? "page" : undefined,
   };
 }

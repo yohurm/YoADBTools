@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,5 +63,14 @@ describe("YoContextMenuHost", () => {
     } else {
       Object.defineProperty(window, "visualViewport", vvDesc);
     }
+  });
+
+  it("没有坐标时同一判断回退到 0", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "host.tsx"), "utf-8");
+    const needle = "?? " + "0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("coordOrZero(session()?.x)");
+    expect(src).toContain("coordOrZero(session()?.y)");
+    expect(src).toContain("session()?.items ?? []");
   });
 });

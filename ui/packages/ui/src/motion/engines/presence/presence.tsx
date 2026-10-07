@@ -1,6 +1,6 @@
 /**
  * YoPresence —— 进场挂载、出场播完再卸载（动画系统-v6.md L2）。
- * DOM：`.yohu-presence[data-state][data-recipe]` + display:contents（list/chip/toast 改为 grid 裁切）。
+ * DOM：`.yohu-presence[data-state][data-recipe]`。list/chip/toast 用 `__clip` 裁切，位移和最小尺寸在 `__face`。
  * transition：出生 closed，仅本实例 want 上升后双 rAF 开。邻项增删不重挂、不重播。
  */
 import { Show, createEffect, createMemo, createRenderEffect, createSignal, onCleanup } from "solid-js";
@@ -10,13 +10,13 @@ import {
   PRESENCE_EXIT_DURATION,
   PRESENCE_EXIT_SAFETY_MS,
   presenceUsesClip,
-  presenceUsesTransition,
   presenceExitWatchProperty,
   type PresenceRecipe,
 } from "../../spec/recipes";
 import { shouldSkipMotion } from "../../reduced";
-import { presenceBornState } from "./presence-model";
+import { presenceBornState, type PresenceState } from "./presence-model";
 import { presenceHostRecipe } from "./presence-policy";
+import { presenceAttr } from "../../../dom/flag";
 
 export type { PresenceRecipe };
 
@@ -29,13 +29,58 @@ export interface YoPresenceProps {
   children: JSX.Element;
 }
 
+function presenceWaitsToOpen(recipe: PresenceRecipe): boolean {
+  return presenceUsesClip(recipe) && !shouldSkipMotion();
+}
+
+function presenceNextGen(current: number): number {
+  return current + 1;
+}
+
+function presenceGenStale(gen: number, exitGen: number): boolean {
+  return gen !== exitGen;
+}
+
+function presenceFinishTimed(timer: number, finish: (gen: number) => void, gen: number): void {
+  window.clearTimeout(timer);
+  finish(gen);
+}
+
+function presenceMarkOpen(setState: (state: PresenceState) => void): void {
+  setState("open");
+}
+
+function presenceClearExiting(setExiting: (value: boolean) => void): void {
+  setExiting(false);
+}
+
+function presenceMarkPresent(setPresent: (value: boolean) => void): void {
+  setPresent(true);
+}
+
+function presenceCancelFrame(id: number): void {
+  if (id) window.cancelAnimationFrame(id);
+}
+
+function presenceNextFrame(run: () => void): number {
+  return window.requestAnimationFrame(run);
+}
+
+function presenceWhenFlag(when: boolean): boolean {
+  return Boolean(when);
+}
+
+function presenceGone(present: boolean): boolean {
+  return !present;
+}
+
 export function YoPresence(props: YoPresenceProps): JSX.Element {
   const recipeOf = (): PresenceRecipe => props.recipe ?? "fade";
-  const [present, setPresent] = createSignal(Boolean(props.when));
-  const [state, setState] = createSignal<"open" | "closed">(
+  const [present, setPresent] = createSignal(presenceWhenFlag(props.when));
+  const [state, setState] = createSignal<PresenceState>(
     presenceBornState({
-      when: Boolean(props.when),
-      delayOpen: presenceUsesTransition(recipeOf()),
+      when: presenceWhenFlag(props.when),
+      delayOpen: presenceUsesClip(recipeOf()),
       skipMotion: shouldSkipMotion(),
     }),
   );
@@ -47,8 +92,8 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   const want = createMemo(() => props.when === true);
 
   const cancelEnterRafs = (): void => {
-    if (enterRaf1) window.cancelAnimationFrame(enterRaf1);
-    if (enterRaf2) window.cancelAnimationFrame(enterRaf2);
+    presenceCancelFrame(enterRaf1);
+    presenceCancelFrame(enterRaf2);
     enterRaf1 = 0;
     enterRaf2 = 0;
   };
@@ -56,10 +101,10 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
   onCleanup(cancelEnterRafs);
 
   const finishExit = (gen: number): void => {
-    if (gen !== exitGen) return;
-    if (!present()) return;
+    if (presenceGenStale(gen, exitGen)) return;
+    if (presenceGone(present())) return;
     setPresent(false);
-    setExiting(false);
+    presenceClearExiting(setExiting);
     props.onExitComplete?.();
   };
 
@@ -70,36 +115,38 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
    */
   createRenderEffect(() => {
     if (!want()) return;
-    setPresent(true);
-    setExiting(false);
+    presenceMarkPresent(setPresent);
+    presenceClearExiting(setExiting);
     const recipe = recipeOf();
-    if (presenceUsesTransition(recipe) && !shouldSkipMotion()) return;
-    setState("open");
+    if (presenceWaitsToOpen(recipe)) return;
+    presenceMarkOpen(setState);
   });
 
   createEffect(() => {
     const next = want();
     const recipe = recipeOf();
     if (next) {
-      const gen = ++exitGen;
-      setExiting(false);
-      setPresent(true);
-      if (presenceUsesTransition(recipe) && !shouldSkipMotion()) {
+      exitGen = presenceNextGen(exitGen);
+      const gen = exitGen;
+      presenceClearExiting(setExiting);
+      presenceMarkPresent(setPresent);
+      if (presenceWaitsToOpen(recipe)) {
         cancelEnterRafs();
-        enterRaf1 = window.requestAnimationFrame(() => {
-          enterRaf2 = window.requestAnimationFrame(() => {
-            if (gen !== exitGen) return;
-            setState("open");
+        enterRaf1 = presenceNextFrame(() => {
+          enterRaf2 = presenceNextFrame(() => {
+            if (presenceGenStale(gen, exitGen)) return;
+            presenceMarkOpen(setState);
           });
         });
         return;
       }
-      setState("open");
+      presenceMarkOpen(setState);
       return;
     }
-    if (!present()) return;
+    if (presenceGone(present())) return;
     cancelEnterRafs();
-    const gen = ++exitGen;
+    exitGen = presenceNextGen(exitGen);
+    const gen = exitGen;
     setExiting(true);
     setState("closed");
     if (shouldSkipMotion()) {
@@ -110,22 +157,27 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
     const timer = window.setTimeout(() => finishExit(gen), ms);
     const onAnimationEnd = (event: AnimationEvent): void => {
       if (!String(event.animationName).includes("-out")) return;
-      window.clearTimeout(timer);
-      finishExit(gen);
+      presenceFinishTimed(timer, finishExit, gen);
     };
     const onTransitionEnd = (event: TransitionEvent): void => {
       if (event.target !== host) return;
       const watch = presenceExitWatchProperty(recipe);
       if (!watch || event.propertyName !== watch) return;
-      window.clearTimeout(timer);
-      finishExit(gen);
+      presenceFinishTimed(timer, finishExit, gen);
     };
-    host?.addEventListener("animationend", onAnimationEnd);
-    host?.addEventListener("transitionend", onTransitionEnd);
+    const listen = <K extends "animationend" | "transitionend">(
+      type: K,
+      handler: (event: HTMLElementEventMap[K]) => void,
+    ): (() => void) => {
+      host?.addEventListener(type, handler);
+      return () => host?.removeEventListener(type, handler);
+    };
+    const stopAnimationEnd = listen("animationend", onAnimationEnd);
+    const stopTransitionEnd = listen("transitionend", onTransitionEnd);
     onCleanup(() => {
       window.clearTimeout(timer);
-      host?.removeEventListener("animationend", onAnimationEnd);
-      host?.removeEventListener("transitionend", onTransitionEnd);
+      stopAnimationEnd();
+      stopTransitionEnd();
     });
   });
 
@@ -138,10 +190,16 @@ export function YoPresence(props: YoPresenceProps): JSX.Element {
         class="yohu-presence"
         data-state={state()}
         data-recipe={presenceHostRecipe(recipeOf())["data-recipe"]}
-        data-exiting={exiting() ? "" : undefined}
-        data-first={props.first ? "" : undefined}
+        data-exiting={presenceAttr(exiting())}
+        data-first={presenceAttr(props.first)}
       >
-        {presenceUsesClip(recipeOf()) ? <div class="yohu-presence__clip">{props.children}</div> : props.children}
+        {presenceUsesClip(recipeOf()) ? (
+          <div class="yohu-presence__clip">
+            <div class="yohu-presence__face">{props.children}</div>
+          </div>
+        ) : (
+          props.children
+        )}
       </div>
     </Show>
   );

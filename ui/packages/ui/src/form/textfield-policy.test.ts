@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { resolveTextFieldInteractive, textFieldHostAttrs, textFieldStepperState } from "./textfield-policy";
 
@@ -53,20 +56,20 @@ describe("textfield-policy", () => {
     expect(attrs["data-status"]).toBe("error");
     expect(attrs["data-paint"]).toBe("error");
     expect(attrs["aria-invalid"]).toBe(true);
-    expect(attrs["data-prefix"]).toBe(true);
+    expect(attrs["data-prefix"]).toBe("");
   });
 
   it("warning 不报 aria-invalid", () => {
     const attrs = textFieldHostAttrs({ status: "warning", addonAfter: ".apk" });
     expect(attrs["data-paint"]).toBe("warning");
     expect(attrs["aria-invalid"]).toBeUndefined();
-    expect(attrs["data-addon-after"]).toBe(true);
+    expect(attrs["data-addon-after"]).toBe("");
   });
 
   it("disabled 写入 data-disabled，涂装仍跟 status", () => {
     const attrs = textFieldHostAttrs({ status: "error", disabled: true });
     expect(attrs.disabled).toBe(true);
-    expect(attrs["data-disabled"]).toBe(true);
+    expect(attrs["data-disabled"]).toBe("");
     expect(attrs["data-paint"]).toBe("error");
   });
 
@@ -74,7 +77,7 @@ describe("textfield-policy", () => {
     const attrs = textFieldHostAttrs({ readOnly: true, clearable: true, value: "C:\\adb.exe" });
     expect(attrs.readOnly).toBe(true);
     expect(attrs.disabled).toBe(false);
-    expect(attrs["data-readonly"]).toBe(true);
+    expect(attrs["data-readonly"]).toBe("");
     expect(attrs["data-disabled"]).toBeUndefined();
     expect(attrs["data-clearable"]).toBeUndefined();
   });
@@ -89,7 +92,7 @@ describe("textfield-policy", () => {
 
   it("tokens 写 data-tokens", () => {
     expect(textFieldHostAttrs({})["data-tokens"]).toBeUndefined();
-    expect(textFieldHostAttrs({ tokens: true })["data-tokens"]).toBe(true);
+    expect(textFieldHostAttrs({ tokens: true })["data-tokens"]).toBe("");
   });
 
   it("active 只写 data-active，不改涂装", () => {
@@ -97,7 +100,7 @@ describe("textfield-policy", () => {
     expect(idle["data-active"]).toBeUndefined();
     expect(idle["data-paint"]).toBe("neutral");
     const attrs = textFieldHostAttrs({ active: true, status: "warning" });
-    expect(attrs["data-active"]).toBe(true);
+    expect(attrs["data-active"]).toBe("");
     expect(attrs["data-paint"]).toBe("warning");
     expect(attrs["data-status"]).toBe("warning");
   });
@@ -106,7 +109,7 @@ describe("textfield-policy", () => {
     expect(textFieldHostAttrs({})["data-multiline"]).toBeUndefined();
     expect(textFieldHostAttrs({}).rows).toBe(1);
     const attrs = textFieldHostAttrs({ multiline: true, rows: 1 });
-    expect(attrs["data-multiline"]).toBe(true);
+    expect(attrs["data-multiline"]).toBe("");
     expect(attrs.rows).toBe(1);
     expect(textFieldHostAttrs({ multiline: true, type: "number" })["data-width"]).toBe("hug");
     expect(textFieldHostAttrs({ multiline: true, rows: 1, value: "a\nb\nc" }).rows).toBe(1);
@@ -129,7 +132,7 @@ describe("textfield-policy", () => {
 
   it("type=number 写 data-stepper；multiline 不写", () => {
     expect(textFieldHostAttrs({})["data-stepper"]).toBeUndefined();
-    expect(textFieldHostAttrs({ type: "number" })["data-stepper"]).toBe(true);
+    expect(textFieldHostAttrs({ type: "number" })["data-stepper"]).toBe("");
     expect(textFieldHostAttrs({ type: "number", multiline: true })["data-stepper"]).toBeUndefined();
   });
 
@@ -141,5 +144,16 @@ describe("textfield-policy", () => {
     expect(textFieldStepperState({ type: "number", value: "10", max: 10 }).incrementDisabled).toBe(true);
     expect(textFieldStepperState({ type: "number", value: "1", disabled: true }).incrementDisabled).toBe(true);
     expect(textFieldStepperState({ type: "number", value: "1", readOnly: true }).decrementDisabled).toBe(true);
+  });
+
+  it("text_field_text_present_once", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const model = readFileSync(join(here, "textfield-model.ts"), "utf8").replace(
+      "return value.length > 0",
+      "",
+    );
+    const policy = readFileSync(join(here, "textfield-policy.ts"), "utf8");
+    expect(model).not.toContain("value.length > 0");
+    expect(policy).not.toContain("value.length > 0");
   });
 });

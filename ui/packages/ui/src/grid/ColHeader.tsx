@@ -11,22 +11,28 @@ import { Show } from "solid-js";
 
 import { Icon } from "../icons";
 import { Layout } from "../tokens/layout";
-import type { YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone } from "./col-header-model";
+import type { YoListRowTone } from "../list-row/list-row-model";
+import {
+  colHeaderSortIsAscending,
+  colHeaderSortIsNone,
+  type YoColHeaderAlign,
+  type YoColHeaderSort,
+} from "./col-header-model";
 import { colHeaderHostAttrs } from "./col-header-policy";
-import type { ColResizePhase } from "./col-model";
+import { colResizePhaseIsActive, type ColResizePhase, type YoColCellPad } from "./col-model";
 import { YoColResizer } from "./ColResizer";
 import "./ColHeader.css";
 
-export type { YoColHeaderAlign, YoColHeaderSort, YoColHeaderTone };
+export type { YoColHeaderAlign, YoColHeaderSort };
 
 export interface YoColHeaderProps {
   class?: string;
   /** 标题对齐；默认 start。单元格对齐由模块自己管。 */
   align?: YoColHeaderAlign;
   /** 列垫。none = 官方 LevelFormat 4ch 轨道，标题贴格。默认跟 cellPad=list。 */
-  pad?: "list" | "none";
+  pad?: YoColCellPad;
   /** list = 文件清单；document = 日志文档表头，字随列轨。 */
-  tone?: YoColHeaderTone;
+  tone?: YoListRowTone;
   /** 当前列排序态 */
   ariaSort?: YoColHeaderSort;
   /** 有则库内渲染排序钮；模块只传回调，不自绘 button / __label */
@@ -55,9 +61,9 @@ function ColHeaderLabel(props: {
   return (
     <span class="yohu-col-header__label">
       <span class="yohu-col-header__title">{props.children}</span>
-      <Show when={props.sortable && props.sort !== "none"}>
+      <Show when={props.sortable && !colHeaderSortIsNone(props.sort)}>
         <span class="yohu-col-header__sort-icon" aria-hidden="true">
-          <Icon name={props.sort === "ascending" ? "chevron-up" : "chevron-down"} size={Layout.IconTiny} />
+          <Icon name={colHeaderSortIsAscending(props.sort) ? "chevron-up" : "chevron-down"} size={Layout.IconTiny} />
         </span>
       </Show>
     </span>
@@ -79,7 +85,11 @@ function ColHeaderBody(props: {
         </ColHeaderLabel>
       }
     >
-      <button type="button" class="yohu-interactive yohu-focus-ring--inset" onClick={() => props.onSort?.()}>
+      <button
+        type="button"
+        class="yohu-col-header__sort yohu-interactive yohu-focus-ring--inset"
+        onClick={() => props.onSort?.()}
+      >
         <ColHeaderLabel sort={props.sort} sortable>
           {props.children}
         </ColHeaderLabel>
@@ -107,7 +117,7 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
   );
 
   const onWidthChange = (width: number, phase: ColResizePhase): void => {
-    setResizing(phase === "start" || phase === "move");
+    setResizing(colResizePhaseIsActive(phase));
     props.onWidthChange?.(width, phase);
   };
 
@@ -129,8 +139,8 @@ export function YoColHeader(props: YoColHeaderProps): JSX.Element {
       <Show when={host().edge}>
         <YoColResizer
           mark={!host().resizable}
-          width={props.width ?? 0}
-          minWidth={props.minWidth ?? 0}
+          width={props.width}
+          minWidth={props.minWidth}
           maxWidth={props.maxWidth}
           label={props.resizeLabel}
           onWidthChange={onWidthChange}

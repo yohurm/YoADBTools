@@ -16,6 +16,19 @@
  * 未选字色走可选 ink。项 fill 覆盖选中填（鸿蒙 selectedBackgroundColor）；缺省强调色。
  */
 
+import {
+  enabledIndexes,
+  horizontalListDelta,
+  itemIsEnabled,
+  listEdgeIndex,
+  listEdgeKey,
+  stepWrappedIndex,
+  verticalListDelta,
+  type ListEdge,
+} from "../keymap/list-index";
+import { controlIsBlock } from "./control-busy";
+import type { ControlIconSize } from "./control-icon";
+
 export type YoSegmentedType = "tab" | "capsule";
 export type YoSegmentedButtonSize = "sm" | "md";
 export type YoSegmentedKeyIntent = "next" | "prev" | "start" | "end";
@@ -23,13 +36,28 @@ export type YoSegmentedContent = "text" | "icon" | "image" | "hybrid";
 export type SegmentedGraphic =
   | { kind: "icon"; name: unknown }
   | { kind: "image"; src: string };
+
+/** 图标槽。内容种类 text/icon/image/hybrid 是另一份事实。 */
+export function segmentedGraphicIsIcon(
+  graphic: SegmentedGraphic,
+): graphic is Extract<SegmentedGraphic, { kind: "icon" }> {
+  return graphic.kind === "icon";
+}
+
+/** 图片槽。 */
+export function segmentedGraphicIsImage(
+  graphic: SegmentedGraphic,
+): graphic is Extract<SegmentedGraphic, { kind: "image" }> {
+  return graphic.kind === "image";
+}
 export type SegmentedPaintKind = "tab-surface" | "capsule-accent" | "capsule-multi";
-export type SegmentedIconSize = "sm" | "md";
 /** 多选相邻选中如何并角。none = 未选；only = 孤立选中。 */
 export type SegmentedJoin = "none" | "only" | "start" | "mid" | "end";
 /** 这一格的实底画在滑块还是项上。 */
 export type SegmentedFillOwner = "thumb" | "item";
 export type SegmentedInteract = "default" | "hover" | "pressed" | "disabled";
+/** 叠在实底上的交互层。未选时也可当作格子的 fill。 */
+export type SegmentedOverlay = "--yohu-state-hover" | "--yohu-state-pressed" | "none";
 export type SegmentedFillToken =
   | "--yohu-surface"
   | "--yohu-accent"
@@ -41,6 +69,12 @@ export const SEGMENTED_TYPES = ["tab", "capsule"] as const;
 export const SEGMENTED_SIZES = ["sm", "md"] as const;
 export const SEGMENTED_INTERACTS = ["default", "hover", "pressed", "disabled"] as const;
 export const DEFAULT_SEGMENTED_TYPE: YoSegmentedType = "tab";
+
+/** 胶囊。多选只在胶囊上成立；页签是它的另一面。 */
+export function segmentedTypeIsCapsule(type: YoSegmentedType): boolean {
+  return type === "capsule";
+}
+
 export const DEFAULT_SEGMENTED_SIZE: YoSegmentedButtonSize = "md";
 
 export interface YoSegmentedItemModel {
@@ -86,7 +120,7 @@ export interface SegmentedFillCell {
   owner: SegmentedFillOwner;
   fill: SegmentedFillToken | "none";
   /** 叠在 fill 上的交互层；选中 hover/pressed。 */
-  overlay: "--yohu-state-hover" | "--yohu-state-pressed" | "none";
+  overlay: SegmentedOverlay;
   color: SegmentedColorToken;
 }
 
@@ -96,8 +130,8 @@ export function resolveSegmentedSpec(input: SegmentedInput): SegmentedSpec {
   return {
     type,
     size: input.size ?? DEFAULT_SEGMENTED_SIZE,
-    multiple: type === "capsule" && Boolean(input.multiple),
-    block: Boolean(input.block),
+    multiple: segmentedTypeIsCapsule(type) && Boolean(input.multiple),
+    block: controlIsBlock(input.block),
   };
 }
 
@@ -114,8 +148,8 @@ export function resolveSegmentedJoin(selected: readonly boolean[], index: number
 
 /** CSS 只消费这个名字，不在视图里 if-else 上色。 */
 export function segmentedPaintKind(type: YoSegmentedType, multiple = false): SegmentedPaintKind {
-  if (type === "capsule" && multiple) return "capsule-multi";
-  return type === "capsule" ? "capsule-accent" : "tab-surface";
+  if (segmentedTypeIsCapsule(type) && multiple) return "capsule-multi";
+  return segmentedTypeIsCapsule(type) ? "capsule-accent" : "tab-surface";
 }
 
 /** 选中实底：多选在项上，单选在滑块上。 */
@@ -123,12 +157,24 @@ export function segmentedFillOwner(paint: SegmentedPaintKind): SegmentedFillOwne
   return paint === "capsule-multi" ? "item" : "thumb";
 }
 
+/** 页签实底。选中字色和填充都认这一把。 */
+function segmentedPaintIsTab(paint: SegmentedPaintKind): boolean {
+  return paint === "tab-surface";
+}
+
 function segmentedSelectedColor(paint: SegmentedPaintKind): SegmentedColorToken {
-  return paint === "tab-surface" ? "--yohu-fg" : "--yohu-fg-on";
+  return segmentedPaintIsTab(paint) ? "--yohu-fg" : "--yohu-fg-on";
 }
 
 function segmentedSelectedFill(paint: SegmentedPaintKind): SegmentedFillToken {
-  return paint === "tab-surface" ? "--yohu-surface" : "--yohu-accent";
+  return segmentedPaintIsTab(paint) ? "--yohu-surface" : "--yohu-accent";
+}
+
+/** 悬停与按下的状态层。未选填在项上，选中叠在实底上，都认这一把。 */
+function segmentedInteractLayer(interact: SegmentedInteract): SegmentedOverlay {
+  if (interact === "hover") return "--yohu-state-hover";
+  if (interact === "pressed") return "--yohu-state-pressed";
+  return "none";
 }
 
 /**
@@ -144,18 +190,19 @@ export function segmentedFillCell(
     interact === "disabled" ? "--yohu-disabled" : selected ? segmentedSelectedColor(paint) : "ink";
 
   if (!selected) {
-    const fill =
-      interact === "hover" ? "--yohu-state-hover" : interact === "pressed" ? "--yohu-state-pressed" : "none";
-    return { owner: "item", fill, overlay: "none", color };
+    return { owner: "item", fill: segmentedInteractLayer(interact), overlay: "none", color };
   }
 
-  const overlay =
-    interact === "hover" ? "--yohu-state-hover" : interact === "pressed" ? "--yohu-state-pressed" : "none";
-  return { owner: segmentedFillOwner(paint), fill: segmentedSelectedFill(paint), overlay, color };
+  return {
+    owner: segmentedFillOwner(paint),
+    fill: segmentedSelectedFill(paint),
+    overlay: segmentedInteractLayer(interact),
+    color,
+  };
 }
 
 /** 图文或 md 走中图标；仅 sm 纯文本/纯图标走小图标。 */
-export function segmentedIconSize(spec: SegmentedSpec, hybrid: boolean): SegmentedIconSize {
+export function segmentedIconSize(spec: SegmentedSpec, hybrid: boolean): ControlIconSize {
   return hybrid || spec.size === "md" ? "md" : "sm";
 }
 
@@ -205,6 +252,10 @@ export function resolveSelectedIndex(items: readonly YoSegmentedItemModel[], val
   return index >= 0 ? index : 0;
 }
 
+function valuesInItemOrder(items: readonly YoSegmentedItemModel[], set: Set<string>): string[] {
+  return items.filter((item) => set.has(item.value)).map((item) => item.value);
+}
+
 /** 多选：只保留仍在 items 里的值，顺序跟选项表。 */
 export function resolveSelectedValues(
   items: readonly YoSegmentedItemModel[],
@@ -212,7 +263,7 @@ export function resolveSelectedValues(
 ): string[] {
   if (!values || values.length === 0) return [];
   const set = new Set(values);
-  return items.filter((item) => set.has(item.value)).map((item) => item.value);
+  return valuesInItemOrder(items, set);
 }
 
 export function toggleSelectedValues(
@@ -223,40 +274,28 @@ export function toggleSelectedValues(
   const set = new Set(resolveSelectedValues(items, values));
   if (set.has(value)) set.delete(value);
   else set.add(value);
-  return items.filter((item) => set.has(item.value)).map((item) => item.value);
-}
-
-export function enabledItemIndexes(items: readonly YoSegmentedItemModel[]): number[] {
-  return items.flatMap((item, index) => (item.disabled ? [] : [index]));
+  return valuesInItemOrder(items, set);
 }
 
 export function stepEnabledIndex(enabled: readonly number[], current: number, delta: number): number | undefined {
   if (enabled.length === 0) return undefined;
   const pos = enabled.indexOf(current);
   const from = pos >= 0 ? pos : 0;
-  return enabled[(from + delta + enabled.length) % enabled.length];
+  const index = stepWrappedIndex(enabled.length, from, delta);
+  return enabled[index];
 }
 
-export function edgeEnabledIndex(enabled: readonly number[], edge: "start" | "end"): number | undefined {
-  if (enabled.length === 0) return undefined;
-  return edge === "start" ? enabled[0] : enabled[enabled.length - 1];
+export function edgeEnabledIndex(enabled: readonly number[], edge: ListEdge): number | undefined {
+  const index = listEdgeIndex(enabled.length, edge);
+  if (index < 0) return undefined;
+  return enabled[index];
 }
 
 export function segmentKeyIntent(key: string): YoSegmentedKeyIntent | null {
-  switch (key) {
-    case "ArrowRight":
-    case "ArrowDown":
-      return "next";
-    case "ArrowLeft":
-    case "ArrowUp":
-      return "prev";
-    case "Home":
-      return "start";
-    case "End":
-      return "end";
-    default:
-      return null;
-  }
+  const delta = verticalListDelta(key) ?? horizontalListDelta(key);
+  if (delta === 1) return "next";
+  if (delta === -1) return "prev";
+  return listEdgeKey(key);
 }
 
 export function resolveKeyIndex(
@@ -266,7 +305,7 @@ export function resolveKeyIndex(
 ): number | undefined {
   const intent = segmentKeyIntent(key);
   if (!intent) return undefined;
-  const enabled = enabledItemIndexes(items);
+  const enabled = enabledIndexes(items);
   if (intent === "start") return edgeEnabledIndex(enabled, "start");
   if (intent === "end") return edgeEnabledIndex(enabled, "end");
   return stepEnabledIndex(enabled, resolveSelectedIndex(items, value), intent === "next" ? 1 : -1);
@@ -277,8 +316,8 @@ export function resolveRovingValue(
   selected: readonly string[],
   focus?: string,
 ): string | undefined {
-  if (focus && items.some((item) => item.value === focus && !item.disabled)) return focus;
-  const firstSelected = selected.find((value) => items.some((item) => item.value === value && !item.disabled));
+  if (focus && items.some((item) => item.value === focus && itemIsEnabled(item))) return focus;
+  const firstSelected = selected.find((value) => items.some((item) => item.value === value && itemIsEnabled(item)));
   if (firstSelected) return firstSelected;
-  return items.find((item) => !item.disabled)?.value;
+  return items.find((item) => itemIsEnabled(item))?.value;
 }

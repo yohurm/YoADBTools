@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Density } from "../tokens/density";
 import { Stroke } from "../tokens/layout";
 import {
   DEFAULT_TEXT_FIELD_MAX_ROWS,
   DEFAULT_TEXT_FIELD_ROWS,
-  DEFAULT_TEXT_FIELD_STATUS,
   hasTextFieldSlot,
   resolveTextFieldActive,
   resolveTextFieldMaxRows,
@@ -16,40 +16,40 @@ import {
   parseTextFieldNumber,
   resolveTextFieldBound,
   resolveTextFieldSpec,
-  resolveTextFieldStatus,
   resolveTextFieldStep,
-  resolveTextFieldStepper,
+  textFieldFontIsMono,
+  textFieldIsNumber,
   resolveTextFieldWidthKind,
   stepTextFieldNumber,
   textFieldLineBoxPx,
-  textFieldPaintKind,
   DEFAULT_TEXT_FIELD_STEP,
 } from "./textfield-model";
+import { DEFAULT_FIELD_STATUS, fieldPaintKind, resolveFieldStatus } from "./field-status";
 
 describe("textfield-model", () => {
   it("缺省 status 是 none，涂装 neutral", () => {
     expect(resolveTextFieldSpec({})).toEqual({
-      status: DEFAULT_TEXT_FIELD_STATUS,
+      status: DEFAULT_FIELD_STATUS,
       slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "hug",
       active: false,
       multiline: false,
       rows: 1,
     });
-    expect(textFieldPaintKind("none")).toBe("neutral");
+    expect(fieldPaintKind("none")).toBe("neutral");
   });
 
   it("error / warning 原样保留并映射涂装", () => {
-    expect(resolveTextFieldStatus("error")).toBe("error");
-    expect(resolveTextFieldStatus("warning")).toBe("warning");
-    expect(textFieldPaintKind("error")).toBe("error");
-    expect(textFieldPaintKind("warning")).toBe("warning");
+    expect(resolveFieldStatus("error")).toBe("error");
+    expect(resolveFieldStatus("warning")).toBe("warning");
+    expect(fieldPaintKind("error")).toBe("error");
+    expect(fieldPaintKind("warning")).toBe("warning");
   });
 
   it("未知 status 归一成 none，不留别名", () => {
-    expect(resolveTextFieldStatus("success")).toBe("none");
-    expect(resolveTextFieldStatus("invalid")).toBe("none");
-    expect(resolveTextFieldStatus(undefined)).toBe("none");
+    expect(resolveFieldStatus("success")).toBe("none");
+    expect(resolveFieldStatus("invalid")).toBe("none");
+    expect(resolveFieldStatus(undefined)).toBe("none");
   });
 
   it("写入盒只 clip，Token 算占槽", () => {
@@ -122,7 +122,7 @@ describe("textfield-model", () => {
       multiline: false,
       rows: 1,
     });
-    expect(textFieldPaintKind(resolveTextFieldSpec({ active: true }).status)).toBe("neutral");
+    expect(fieldPaintKind(resolveTextFieldSpec({ active: true }).status)).toBe("neutral");
   });
 
   it("multiline 同一门面：缺省 2 行，不当数字槽", () => {
@@ -132,7 +132,7 @@ describe("textfield-model", () => {
     expect(resolveTextFieldRows({ multiline: true, rows: 1 })).toBe(1);
     expect(resolveTextFieldWidthKind({ type: "number", multiline: true })).toBe("hug");
     expect(resolveTextFieldSpec({ multiline: true, block: true })).toEqual({
-      status: DEFAULT_TEXT_FIELD_STATUS,
+      status: DEFAULT_FIELD_STATUS,
       slots: { prefix: false, suffix: false, addonBefore: false, addonAfter: false, tokens: false },
       width: "fill",
       active: false,
@@ -158,10 +158,33 @@ describe("textfield-model", () => {
   });
 
   it("单行 number 才画步进，multiline 不当数字槽", () => {
-    expect(resolveTextFieldStepper({})).toBe(false);
-    expect(resolveTextFieldStepper({ type: "text" })).toBe(false);
-    expect(resolveTextFieldStepper({ type: "number" })).toBe(true);
-    expect(resolveTextFieldStepper({ type: "number", multiline: true })).toBe(false);
+    expect(textFieldIsNumber({})).toBe(false);
+    expect(textFieldIsNumber({ type: "text" })).toBe(false);
+    expect(textFieldIsNumber({ type: "number" })).toBe(true);
+    expect(textFieldIsNumber({ type: "number", multiline: true })).toBe(false);
+    expect(resolveTextFieldWidthKind({ type: "number" })).toBe("number");
+    const owner = readFileSync(resolve(process.cwd(), "packages/ui/src/form/textfield-model.ts"), "utf8")
+      || readFileSync(resolve(process.cwd(), "src/form/textfield-model.ts"), "utf8");
+    const body = owner.replace('input.type === "number"', "");
+    expect(body).not.toContain('type === "number"');
+    const policy = readFileSync(resolve(process.cwd(), "packages/ui/src/form/textfield-policy.ts"), "utf8")
+      || readFileSync(resolve(process.cwd(), "src/form/textfield-policy.ts"), "utf8");
+    expect(policy).not.toContain('type === "number"');
+    expect(policy).not.toContain("resolveTextFieldStepper");
+  });
+
+  it("等宽字族只判一次", () => {
+    expect(textFieldFontIsMono("mono")).toBe(true);
+    expect(textFieldFontIsMono("ui")).toBe(false);
+    expect(textFieldFontIsMono(undefined)).toBe(false);
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["textfield-model.ts", "textfield-policy.ts", "TextField.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      body = body.replace('return font === "mono"', "");
+      body = body.replace('export type TextFieldFont = "ui" | "mono";', "");
+      expect(body, name).not.toContain('"ui" | "mono"');
+      expect(body, name).not.toContain('font === "mono"');
+    }
   });
 
   it("步进：空值当 0，默认步长 1，触边夹取", () => {

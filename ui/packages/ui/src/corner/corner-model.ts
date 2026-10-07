@@ -69,6 +69,21 @@ export function cornerRadiusForRole(role: CornerRole): number {
   }
 }
 
+/** 未写角色按卡片。绘制与宿主规格同一把。 */
+export function resolveCornerRole(role?: CornerRole): CornerRole {
+  return role ?? DEFAULT_CORNER_ROLE;
+}
+
+/** 未写半径走角色 token。绘制与宿主规格同一把。 */
+export function resolveCornerRadius(role: CornerRole, radius?: number): number {
+  return radius ?? cornerRadiusForRole(role);
+}
+
+/** 宽或高不是正数就没有盒。路径与投放框同一把。 */
+export function cornerExtentIsEmpty(width: number, height: number): boolean {
+  return width <= 0 || height <= 0;
+}
+
 export function uniformCornerRadii(radius: number): CornerRadii {
   const r = Math.max(0, radius);
   return { tl: r, tr: r, br: r, bl: r };
@@ -90,12 +105,12 @@ export function mergeCornerRadii(base: number, override?: Partial<CornerRadii>):
  * 禁止只 clamp 到 min(w,h)/2，否则相邻大圆角会互相穿帮。
  */
 export function clampCornerRadii(width: number, height: number, radii: CornerRadii): CornerRadii {
-  const w = Math.max(0, width);
-  const h = Math.max(0, height);
-  const tl = Math.max(0, radii.tl);
-  const tr = Math.max(0, radii.tr);
-  const br = Math.max(0, radii.br);
-  const bl = Math.max(0, radii.bl);
+  const w = axisExtent(width);
+  const h = axisExtent(height);
+  const tl = axisExtent(radii.tl);
+  const tr = axisExtent(radii.tr);
+  const br = axisExtent(radii.br);
+  const bl = axisExtent(radii.bl);
   const factors = [1];
   if (tl + tr > 0) factors.push(w / (tl + tr));
   if (bl + br > 0) factors.push(w / (bl + br));
@@ -107,18 +122,18 @@ export function clampCornerRadii(width: number, height: number, radii: CornerRad
 }
 
 export function insetCornerRadii(radii: CornerRadii, inset: number): CornerRadii {
-  const step = Math.max(0, inset);
+  const step = axisExtent(inset);
   return {
-    tl: Math.max(0, radii.tl - step),
-    tr: Math.max(0, radii.tr - step),
-    br: Math.max(0, radii.br - step),
-    bl: Math.max(0, radii.bl - step),
+    tl: axisExtent(radii.tl - step),
+    tr: axisExtent(radii.tr - step),
+    br: axisExtent(radii.br - step),
+    bl: axisExtent(radii.bl - step),
   };
 }
 
 /** 外扩后半径随中心线一起变大，保持同心四分之一圆。 */
 export function outsetCornerRadii(radii: CornerRadii, outset: number): CornerRadii {
-  const step = Math.max(0, outset);
+  const step = axisExtent(outset);
   return {
     tl: radii.tl + step,
     tr: radii.tr + step,
@@ -132,7 +147,7 @@ export function outsetCornerRadii(radii: CornerRadii, outset: number): CornerRad
  * 与 inset 描边环对偶：stroke 在盒内，edge 在盒外。
  */
 export function cornerHaloOutset(gap: number, strokeWidth: number): number {
-  return Math.max(0, gap) + Math.max(0, strokeWidth) / 2;
+  return axisExtent(gap) + axisExtent(strokeWidth) / 2;
 }
 
 /** 填充盒外侧的圆角矩形（中心线）。outset≤0 不画。 */
@@ -142,7 +157,7 @@ export function cornerEdgeHaloPath(
   radii: CornerRadii,
   outset: number,
 ): string {
-  if (outset <= 0 || width <= 0 || height <= 0) return "";
+  if (outset <= 0 || cornerExtentIsEmpty(width, height)) return "";
   return roundedRectPath(
     -outset,
     -outset,
@@ -175,7 +190,7 @@ export function cornerRadiiToUnit(width: number, height: number, radii: CornerRa
 
 /** 内容裁切跟 CSS 盒走，禁止量出来的 path() 冻在旧高。 */
 export function cssCornerClip(inset: number, radii: CornerRadii): string {
-  const step = Math.max(0, inset);
+  const step = axisExtent(inset);
   const r = insetCornerRadii(radii, step);
   return `inset(${formatCornerCoord(step)}px round ${formatCornerCoord(r.tl)}px ${formatCornerCoord(r.tr)}px ${formatCornerCoord(r.br)}px ${formatCornerCoord(r.bl)}px)`;
 }
@@ -192,7 +207,7 @@ export function roundedRectPath(
   height: number,
   radii: CornerRadii,
 ): string {
-  if (width <= 0 || height <= 0) return "";
+  if (cornerExtentIsEmpty(width, height)) return "";
   const r = clampCornerRadii(width, height, radii);
   const right = x + width;
   const bottom = y + height;
@@ -227,7 +242,7 @@ export function roundedRectPathCcw(
   height: number,
   radii: CornerRadii,
 ): string {
-  if (width <= 0 || height <= 0) return "";
+  if (cornerExtentIsEmpty(width, height)) return "";
   const r = clampCornerRadii(width, height, radii);
   const right = x + width;
   const bottom = y + height;
@@ -266,7 +281,7 @@ export function roundedRectPathXY(
   height: number,
   r: CornerRadiiXY,
 ): string {
-  if (width <= 0 || height <= 0) return "";
+  if (cornerExtentIsEmpty(width, height)) return "";
   const right = x + width;
   const bottom = y + height;
   const { tlx, tly, trx, try: tryR, brx, bry, blx, bly } = r;
@@ -299,7 +314,7 @@ export function roundedRectPathXYCcw(
   height: number,
   r: CornerRadiiXY,
 ): string {
-  if (width <= 0 || height <= 0) return "";
+  if (cornerExtentIsEmpty(width, height)) return "";
   const right = x + width;
   const bottom = y + height;
   const { tlx, tly, trx, try: tryR, brx, bry, blx, bly } = r;
@@ -331,12 +346,12 @@ export function cornerStrokeRingPath(
   radii: CornerRadii,
   stroke: number,
 ): string {
-  if (stroke <= 0 || width <= 0 || height <= 0) return "";
+  if (stroke <= 0 || cornerExtentIsEmpty(width, height)) return "";
   const outer = clampCornerRadii(width, height, radii);
   const innerW = width - stroke * 2;
   const innerH = height - stroke * 2;
   const outerPath = roundedRectPath(0, 0, width, height, outer);
-  if (innerW <= 0 || innerH <= 0) return outerPath;
+  if (cornerExtentIsEmpty(innerW, innerH)) return outerPath;
   return `${outerPath}${roundedRectPathCcw(stroke, stroke, innerW, innerH, insetCornerRadii(outer, stroke))}`;
 }
 
@@ -350,14 +365,14 @@ function cornerStrokeRingPathUnit(
   radii: CornerRadii,
   stroke: number,
 ): string {
-  if (stroke <= 0 || width <= 0 || height <= 0) return "";
+  if (stroke <= 0 || cornerExtentIsEmpty(width, height)) return "";
   const outerPx = clampCornerRadii(width, height, radii);
   const sx = stroke / width;
   const sy = stroke / height;
   const innerW = 1 - sx * 2;
   const innerH = 1 - sy * 2;
   const outer = roundedRectPathXY(0, 0, 1, 1, cornerRadiiToUnit(width, height, outerPx));
-  if (innerW <= 0 || innerH <= 0) return outer;
+  if (cornerExtentIsEmpty(innerW, innerH)) return outer;
   return `${outer}${roundedRectPathXYCcw(sx, sy, innerW, innerH, cornerRadiiToUnit(width, height, insetCornerRadii(outerPx, stroke)))}`;
 }
 
@@ -367,7 +382,7 @@ function cornerEdgeHaloPathUnit(
   radii: CornerRadii,
   outset: number,
 ): string {
-  if (outset <= 0 || width <= 0 || height <= 0) return "";
+  if (outset <= 0 || cornerExtentIsEmpty(width, height)) return "";
   const ox = outset / width;
   const oy = outset / height;
   return roundedRectPathXY(
@@ -412,17 +427,26 @@ export function pointInRoundedRect(
   return true;
 }
 
+function nonNegative(value: number | undefined): number {
+  return Math.max(0, value ?? 0);
+}
+
+function axisExtent(value: number): number {
+  return Math.max(0, value);
+}
+
 export function resolveCornerPaint(input: CornerPaintInput): CornerPaint {
-  const width = Math.max(0, input.width);
-  const height = Math.max(0, input.height);
-  const radius = input.radius ?? cornerRadiusForRole(input.role ?? DEFAULT_CORNER_ROLE);
-  const stroke = Math.max(0, input.stroke ?? 0);
+  const width = axisExtent(input.width);
+  const height = axisExtent(input.height);
+  const role = resolveCornerRole(input.role);
+  const radius = resolveCornerRadius(role, input.radius);
+  const stroke = nonNegative(input.stroke);
   const radii = clampCornerRadii(width, height, mergeCornerRadii(radius, input.radii));
-  const empty = width <= 0 || height <= 0;
+  const empty = cornerExtentIsEmpty(width, height);
   const unit = empty ? null : cornerRadiiToUnit(width, height, radii);
   const fillPath = unit ? roundedRectPathXY(0, 0, 1, 1, unit) : "";
   const strokePath = empty ? "" : cornerStrokeRingPathUnit(width, height, radii, stroke);
-  const edgePath = empty ? "" : cornerEdgeHaloPathUnit(width, height, radii, Math.max(0, input.edgeOutset ?? 0));
+  const edgePath = empty ? "" : cornerEdgeHaloPathUnit(width, height, radii, nonNegative(input.edgeOutset));
   return {
     width,
     height,
