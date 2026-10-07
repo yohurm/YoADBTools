@@ -5,9 +5,11 @@
 
 use tokio_util::sync::CancellationToken;
 
-use crate::fault::{file_error_from_adb, FileError};
+use crate::fault::{file_error_from_adb, reject_if_cancelled, FileError};
 use yohu_adb::{AdbClient, ReadlinkF};
-use yohu_domain::{validate_entry_name, PathError, RemotePath, SafetyError, SafetyRoot};
+use yohu_domain::{
+    join_path, parent_of, validate_entry_name, PathError, RemotePath, SafetyError, SafetyRoot,
+};
 
 /// 浏览允许安全根本身；突变/传输/拖出必须是真子路径。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,14 +18,18 @@ pub(crate) enum RecheckKind {
     Descendant,
 }
 
+fn from_path_error(err: PathError) -> FileError {
+    match err {
+        PathError::NotAbsolute(path) => FileError::NotAbsolute(path),
+        PathError::Traversal(path) => FileError::Traversal(path),
+        PathError::InvalidName(detail) => FileError::InvalidName(detail),
+    }
+}
+
 pub(crate) fn outside_root(err: SafetyError) -> FileError {
     match err {
         SafetyError::OutsideRoot(path) => FileError::OutsideRoot(path),
-        SafetyError::Path(
-            PathError::NotAbsolute(path)
-            | PathError::Traversal(path)
-            | PathError::InvalidName(path),
-        ) => FileError::Path(path),
+        SafetyError::Path(err) => from_path_error(err),
     }
 }
 
@@ -35,7 +41,7 @@ pub(crate) fn normalize_browse(safety: &SafetyRoot, path: &str) -> Result<Remote
 /// 突变/传输：真子路径 + 末段名合法。
 pub(crate) fn normalize_mut(safety: &SafetyRoot, path: &str) -> Result<RemotePath, FileError> {
     let normalized = safety.check_descendant(path).map_err(outside_root)?;
-    validate_entry_name(normalized.file_name()).map_err(|_| FileError::Path(path.to_string()))?;
+    validate_entry_name(normalized.file_name()).map_err(from_path_error)?;
     Ok(normalized)
 }
 
@@ -52,38 +58,36 @@ pub(crate) fn recheck_resolved(
     .map_err(outside_root)
 }
 
-pub(crate) fn parent_remote(path: &str) -> Option<&str> {
-    let trimmed = path.trim_end_matches('/');
-    let idx = trimmed.rfind('/')?;
-    if idx == 0 {
-        Some("/")
-    } else {
-        Some(&trimmed[..idx])
-    }
+fn unresolved_ancestor(path: &str) -> FileError {
+    FileError::RemoteNotFound(path.to_string())
 }
 
-pub(crate) fn last_segment(path: &str) -> &str {
-    path.trim_end_matches('/').rsplit('/').next().unwrap_or("")
+fn unparsed_readlink(path: &str) -> FileError {
+    FileError::ReadlinkUnparseable(path.to_string())
+}
+
+/// 空的已解析祖先就是根。
+fn canonical_base(resolved: &str) -> String {
+    if resolved.is_empty() {
+        "/".into()
+    } else {
+        resolved.to_string()
+    }
 }
 
 /// 已解析祖先 + 尚未存在的后缀 → 规范候选路径。
 pub(crate) fn join_canonical(resolved: &str, remainder: &[String]) -> Result<String, FileError> {
     for name in remainder {
-        validate_entry_name(name).map_err(|_| FileError::Path(name.clone()))?;
+        validate_entry_name(name).map_err(from_path_error)?;
     }
     if remainder.is_empty() {
-        return Ok(if resolved.is_empty() {
-            "/".into()
-        } else {
-            resolved.to_string()
-        });
+        return Ok(canonical_base(resolved));
     }
-    let base = if resolved == "/" {
-        String::new()
-    } else {
-        resolved.trim_end_matches('/').to_string()
-    };
-    Ok(format!("{base}/{}", remainder.join("/")))
+    let mut acc = canonical_base(resolved);
+    for name in remainder {
+        acc = join_path(&acc, name);
+    }
+    Ok(acc)
 }
 
 /// 设备端 realpath 复核。运输错误 / 无法解析失败；不存在则走最近已存在祖先。
@@ -98,9 +102,7 @@ pub(crate) async fn resolve_and_recheck(
     let mut current = path.as_str().to_string();
     let mut remainder: Vec<String> = Vec::new();
     loop {
-        if cancel.is_cancelled() {
-            return Err(FileError::Adb(yohu_adb::AdbError::Cancelled));
-        }
+        reject_if_cancelled(&cancel)?;
         match adb
             .readlink_f(serial, &current, cancel.clone())
             .await
@@ -111,18 +113,19 @@ pub(crate) async fn resolve_and_recheck(
                 return recheck_resolved(safety, &candidate, kind);
             }
             ReadlinkF::Missing => {
-                let Some(parent) = parent_remote(&current) else {
-                    return Err(FileError::RemoteFailed(path.as_str().to_string()));
+                let Some(parent) = parent_of(&current) else {
+                    return Err(unresolved_ancestor(path.as_str()));
                 };
-                let name = last_segment(&current);
+                let parsed = RemotePath::parse(&current).map_err(from_path_error)?;
+                let name = parsed.file_name();
                 if name.is_empty() {
-                    return Err(FileError::RemoteFailed(path.as_str().to_string()));
+                    return Err(unresolved_ancestor(path.as_str()));
                 }
                 remainder.insert(0, name.to_string());
-                current = parent.to_string();
+                current = parent;
             }
             ReadlinkF::Unparseable => {
-                return Err(FileError::RemoteFailed(path.as_str().to_string()));
+                return Err(unparsed_readlink(path.as_str()));
             }
         }
     }
@@ -131,6 +134,7 @@ pub(crate) async fn resolve_and_recheck(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fault::{readlink_unparseable_text, remote_not_found_text};
 
     #[test]
     fn recheck_resolved_accepts_legit_storage_and_rejects_escape() {
@@ -186,7 +190,7 @@ mod tests {
         ));
         assert!(matches!(
             normalize_mut(&safety, "/sdcard/../etc"),
-            Err(FileError::Path(_))
+            Err(FileError::Traversal(_))
         ));
         assert!(matches!(
             normalize_mut(&safety, "/sdcard/."),
@@ -208,12 +212,16 @@ mod tests {
     }
 
     #[test]
-    fn parent_remote_stops_at_root() {
-        assert_eq!(parent_remote("/sdcard/DCIM/a.jpg"), Some("/sdcard/DCIM"));
-        assert_eq!(parent_remote("/sdcard"), Some("/"));
-        assert_eq!(parent_remote("/"), None);
-        assert_eq!(last_segment("/sdcard/DCIM/a.jpg"), "a.jpg");
-        assert_eq!(last_segment("/sdcard"), "sdcard");
+    fn readlink_walk_end_is_not_remote_failed() {
+        let missing = unresolved_ancestor("/sdcard/nope");
+        assert!(matches!(missing, FileError::RemoteNotFound(ref p) if p == "/sdcard/nope"));
+        assert_eq!(missing.to_string(), remote_not_found_text("/sdcard/nope"));
+        assert!(!missing.to_string().contains("远端操作失败"));
+
+        let bad = unparsed_readlink("/sdcard/nope");
+        assert!(matches!(bad, FileError::ReadlinkUnparseable(ref p) if p == "/sdcard/nope"));
+        assert_eq!(bad.to_string(), readlink_unparseable_text("/sdcard/nope"));
+        assert!(!bad.to_string().contains("远端操作失败"));
     }
 
     #[test]
@@ -242,6 +250,8 @@ mod tests {
             join_canonical("/storage/emulated/0", &[]).unwrap(),
             "/storage/emulated/0"
         );
+        assert_eq!(join_canonical("", &[]).unwrap(), "/");
+        assert_eq!(join_canonical("", &["sdcard".into()]).unwrap(), "/sdcard");
     }
 
     #[test]

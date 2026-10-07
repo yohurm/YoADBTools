@@ -13,16 +13,25 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
-use crate::fault::{file_error_from_adb, FileError};
+use crate::fault::{
+    file_error_from_adb, file_error_from_browse, file_error_from_browse_parse,
+    reject_if_cancelled, FileError,
+};
 use crate::guard::{join_canonical, normalize_browse, recheck_resolved, RecheckKind};
-use yohu_adb::{AdbClient, AdbError, DeviceShell, DeviceShellError};
-use yohu_domain::SafetyRoot;
+use yohu_adb::{AdbClient, AdbError, DeviceShell, DeviceShellError, ShellFault};
+use yohu_domain::{path_segments, SafetyRoot};
 use yohu_protocol::{BrowseAttach, RemoteEntry};
 
 const EXEC_ATTEMPTS: u32 = 2;
 
 struct BrowseSlot {
     inner: std::sync::Mutex<SlotInner>,
+}
+
+impl BrowseSlot {
+    fn lock_slot(&self) -> std::sync::MutexGuard<'_, SlotInner> {
+        self.inner.lock().expect("browse slot lock poisoned")
+    }
 }
 
 enum SlotInner {
@@ -60,6 +69,10 @@ pub struct FileBrowser {
 }
 
 impl FileBrowser {
+    fn lock_sessions(&self) -> std::sync::MutexGuard<'_, HashMap<String, Arc<BrowseSlot>>> {
+        self.sessions.lock().expect("browse sessions lock poisoned")
+    }
+
     pub fn new(adb: Arc<AdbClient>) -> Self {
         Self {
             adb,
@@ -71,19 +84,15 @@ impl FileBrowser {
     }
 
     fn slot(&self, serial: &str) -> Option<Arc<BrowseSlot>> {
-        self.sessions
-            .lock()
-            .expect("browse sessions lock poisoned")
-            .get(serial)
-            .cloned()
+        self.lock_sessions().get(serial).cloned()
     }
 
     fn peek_attach(&self, serial: &str) -> AttachPeek {
-        let map = self.sessions.lock().expect("browse sessions lock poisoned");
+        let map = self.lock_sessions();
         let Some(slot) = map.get(serial) else {
             return AttachPeek::Vacant;
         };
-        let inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let inner = slot.lock_slot();
         match *inner {
             SlotInner::Live { generation, .. } => AttachPeek::Adopt(BrowseAttach {
                 serial: serial.to_string(),
@@ -100,7 +109,7 @@ impl FileBrowser {
             return false;
         };
         let starting = matches!(
-            *slot.inner.lock().expect("browse slot lock poisoned"),
+            *slot.lock_slot(),
             SlotInner::Starting { .. }
         );
         starting
@@ -108,15 +117,15 @@ impl FileBrowser {
 
     fn still_live(&self, slot: &BrowseSlot, generation: u64) -> bool {
         matches!(
-            *slot.inner.lock().expect("browse slot lock poisoned"),
+            *slot.lock_slot(),
             SlotInner::Live { generation: g, .. } if g == generation
         )
     }
 
     fn begin_attach(&self, serial: &str) -> Result<(u64, CancellationToken), BeginAttach> {
-        let mut map = self.sessions.lock().expect("browse sessions lock poisoned");
+        let mut map = self.lock_sessions();
         if let Some(slot) = map.get(serial).cloned() {
-            let inner = slot.inner.lock().expect("browse slot lock poisoned");
+            let inner = slot.lock_slot();
             match *inner {
                 SlotInner::Live { generation, .. } => {
                     return Err(BeginAttach::Adopt(BrowseAttach {
@@ -144,7 +153,7 @@ impl FileBrowser {
 
     fn slot_generation(&self, serial: &str) -> Option<u64> {
         let slot = self.slot(serial)?;
-        let inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let inner = slot.lock_slot();
         match *inner {
             SlotInner::Starting { generation, .. } | SlotInner::Live { generation, .. } => {
                 Some(generation)
@@ -169,9 +178,9 @@ impl FileBrowser {
         worker: Option<Box<DeviceShell>>,
         oneshot: bool,
     ) -> Option<BrowseAttach> {
-        let map = self.sessions.lock().expect("browse sessions lock poisoned");
+        let map = self.lock_sessions();
         let slot = map.get(serial)?;
-        let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let mut inner = slot.lock_slot();
         match *inner {
             SlotInner::Starting { generation: g, .. } if g == generation => {
                 *inner = SlotInner::Live {
@@ -194,7 +203,7 @@ impl FileBrowser {
             let Some(slot) = self.slot(serial) else {
                 return;
             };
-            let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+            let mut inner = slot.lock_slot();
             match *inner {
                 SlotInner::Starting { generation: g, .. } if g == generation => {
                     *inner = SlotInner::Closed;
@@ -204,10 +213,10 @@ impl FileBrowser {
             }
         };
         if remove {
-            let mut map = self.sessions.lock().expect("browse sessions lock poisoned");
+            let mut map = self.lock_sessions();
             if let Some(slot) = map.get(serial) {
                 let closed = matches!(
-                    *slot.inner.lock().expect("browse slot lock poisoned"),
+                    *slot.lock_slot(),
                     SlotInner::Closed
                 );
                 if closed {
@@ -257,13 +266,9 @@ impl FileBrowser {
             let (worker, oneshot) = match opened {
                 Ok(shell) => (Some(Box::new(shell)), false),
                 Err(DeviceShellError::Unsupported) => (None, true),
-                Err(DeviceShellError::Cancelled) => {
+                Err(err) => {
                     self.abandon_starting(serial, generation);
-                    return Err(FileError::Adb(AdbError::Cancelled));
-                }
-                Err(e) => {
-                    self.abandon_starting(serial, generation);
-                    return Err(file_error_from_adb(serial, e.into()));
+                    return Err(file_error_from_adb(serial, err.into()));
                 }
             };
 
@@ -277,7 +282,7 @@ impl FileBrowser {
     }
 
     fn close_slot(slot: &BrowseSlot) {
-        let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let mut inner = slot.lock_slot();
         if let SlotInner::Starting { cancel, .. } = &*inner {
             cancel.cancel();
         }
@@ -288,12 +293,12 @@ impl FileBrowser {
     /// Returns whether this generation was the current slot (shell then cancels in-flight list).
     pub async fn release(&self, serial: &str, generation: u64) -> bool {
         let slot = {
-            let mut map = self.sessions.lock().expect("browse sessions lock poisoned");
+            let mut map = self.lock_sessions();
             let Some(slot) = map.get(serial).cloned() else {
                 return false;
             };
             let matches = {
-                let inner = slot.inner.lock().expect("browse slot lock poisoned");
+                let inner = slot.lock_slot();
                 match *inner {
                     SlotInner::Starting { generation: g, .. }
                     | SlotInner::Live { generation: g, .. } => g == generation,
@@ -317,7 +322,7 @@ impl FileBrowser {
     /// 强制丢掉当前槽位（目录 went_offline，任意世代）。
     pub async fn detach(&self, serial: &str) {
         let slot = {
-            let mut map = self.sessions.lock().expect("browse sessions lock poisoned");
+            let mut map = self.lock_sessions();
             map.remove(serial)
         };
         if let Some(slot) = slot {
@@ -328,15 +333,9 @@ impl FileBrowser {
 
     /// 丢掉工人，槽位仍 Live。改 `adb.path` 后下一趟 list 用新工具再握手。
     pub async fn drop_workers(&self) {
-        let slots: Vec<Arc<BrowseSlot>> = self
-            .sessions
-            .lock()
-            .expect("browse sessions lock poisoned")
-            .values()
-            .cloned()
-            .collect();
+        let slots: Vec<Arc<BrowseSlot>> = self.lock_sessions().values().cloned().collect();
         for slot in slots {
-            let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+            let mut inner = slot.lock_slot();
             if let SlotInner::Live {
                 worker, oneshot, ..
             } = &mut *inner
@@ -362,11 +361,9 @@ impl FileBrowser {
         let raw = self
             .list_raw(serial, normalized.as_str(), generation, cancel)
             .await?;
-        let remainder: Vec<String> = raw
-            .remainder
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .map(String::from)
+        let remainder: Vec<String> = path_segments(&raw.remainder)
+            .into_iter()
+            .map(str::to_string)
             .collect();
         let candidate = join_canonical(&raw.resolved, &remainder)?;
         recheck_resolved(&self.safety, candidate.as_str(), RecheckKind::Inclusive)?;
@@ -384,12 +381,10 @@ impl FileBrowser {
         cancel: CancellationToken,
     ) -> Result<yohu_adb::BrowseListRaw, FileError> {
         loop {
-            if cancel.is_cancelled() {
-                return Err(FileError::Adb(AdbError::Cancelled));
-            }
+            reject_if_cancelled(&cancel)?;
             let slot = self.slot(serial).ok_or(FileError::NotAttached)?;
             let oneshot = {
-                let inner = slot.inner.lock().expect("browse slot lock poisoned");
+                let inner = slot.lock_slot();
                 match *inner {
                     SlotInner::Closed => return Err(FileError::NotAttached),
                     SlotInner::Starting { generation: g, .. } if g == generation => None,
@@ -408,7 +403,7 @@ impl FileBrowser {
                 None => {
                     let notified = self.changed.notified();
                     let waiting = matches!(
-                        *slot.inner.lock().expect("browse slot lock poisoned"),
+                        *slot.lock_slot(),
                         SlotInner::Starting { generation: g, .. } if g == generation
                     );
                     if waiting {
@@ -441,7 +436,7 @@ impl FileBrowser {
             .adb
             .browse_list(serial, path, cancel)
             .await
-            .map_err(|e| file_error_from_adb(path, e))?;
+            .map_err(|e| file_error_from_browse(path, e))?;
         if !self.still_live(slot, generation) {
             return Err(FileError::Adb(AdbError::Cancelled));
         }
@@ -485,13 +480,10 @@ impl FileBrowser {
                         return Err(FileError::Adb(AdbError::Cancelled));
                     }
                     return AdbClient::parse_browse_list(&out.stdout, out.exit_code, &out.stderr)
-                        .map_err(|e| file_error_from_adb(path, e));
+                        .map_err(|e| file_error_from_browse_parse(path, e));
                 }
-                Err(DeviceShellError::Cancelled) => {
-                    return Err(FileError::Adb(AdbError::Cancelled));
-                }
-                Err(DeviceShellError::Timeout) => {
-                    return Err(FileError::Adb(AdbError::Timeout));
+                Err(err @ (DeviceShellError::Cancelled | DeviceShellError::Timeout)) => {
+                    return Err(file_error_from_adb(path, err.into()));
                 }
                 Err(DeviceShellError::Unsupported) => {
                     self.mark_oneshot(&slot, generation);
@@ -511,7 +503,7 @@ impl FileBrowser {
         );
         Err(file_error_from_adb(
             path,
-            last_err.unwrap_or_else(|| AdbError::Io(std::io::Error::other("浏览 shell exec 失败"))),
+            last_err.unwrap_or(AdbError::Shell(ShellFault::Exec)),
         ))
     }
 
@@ -523,7 +515,7 @@ impl FileBrowser {
         cancel: CancellationToken,
     ) -> Result<Option<DeviceShell>, FileError> {
         {
-            let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+            let mut inner = slot.lock_slot();
             match &mut *inner {
                 SlotInner::Closed => {
                     return Err(FileError::NotAttached);
@@ -559,13 +551,12 @@ impl FileBrowser {
                 self.mark_oneshot(slot, generation);
                 Ok(None)
             }
-            Err(DeviceShellError::Cancelled) => Err(FileError::Adb(AdbError::Cancelled)),
-            Err(e) => Err(file_error_from_adb(serial, e.into())),
+            Err(err) => Err(file_error_from_adb(serial, err.into())),
         }
     }
 
     fn restore_worker(&self, slot: &BrowseSlot, generation: u64, shell: DeviceShell) {
-        let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let mut inner = slot.lock_slot();
         if let SlotInner::Live {
             generation: g,
             worker,
@@ -580,7 +571,7 @@ impl FileBrowser {
     }
 
     fn mark_oneshot(&self, slot: &BrowseSlot, generation: u64) {
-        let mut inner = slot.inner.lock().expect("browse slot lock poisoned");
+        let mut inner = slot.lock_slot();
         if let SlotInner::Live {
             generation: g,
             worker,

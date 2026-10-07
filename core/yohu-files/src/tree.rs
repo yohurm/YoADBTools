@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use tokio_util::sync::CancellationToken;
 
 use crate::browse::FileBrowser;
-use crate::fault::FileError;
-use crate::guard::{last_segment, normalize_mut, parent_remote, resolve_and_recheck, RecheckKind};
-use yohu_domain::RemotePath;
+use crate::fault::{reject_if_cancelled, FileError};
+use crate::guard::{normalize_mut, resolve_and_recheck, RecheckKind};
+use yohu_domain::{join_path, parent_of, RemotePath};
 use yohu_protocol::{DragOutItem, EntryKind};
 
 /// 单次拖出展开上限，避免巨大目录卡死 DoDragDrop 前的列举。
@@ -31,29 +31,24 @@ impl FileBrowser {
         let mut seen = HashSet::new();
         for item in items {
             let path = normalize_mut(&self.safety, &item.remote)?;
-            if !seen.insert(path.as_str().to_string()) {
+            if !claim_remote(&mut seen, path.as_str()) {
                 continue;
             }
-            let name = last_segment(path.as_str());
-            if name.is_empty() {
-                return Err(FileError::Path(path.as_str().into()));
-            }
+            let name = require_entry_name(&path)?;
             out.push(TreeEntry {
                 remote: path.as_str().to_string(),
                 relative: name.to_string(),
                 is_dir: item.is_dir,
-                size: if item.is_dir { 0 } else { item.size },
+                size: listed_size(item.is_dir, item.size),
             });
         }
-        if out.is_empty() {
-            return Err(FileError::EmptyTree(
-                items
-                    .first()
-                    .map(|item| item.remote.clone())
-                    .unwrap_or_default(),
-            ));
-        }
-        Ok(out)
+        ensure_drag_entries(
+            out,
+            items
+                .first()
+                .map(|item| item.remote.clone())
+                .unwrap_or_default(),
+        )
     }
 
     /// 把一组远端路径展开成 FILEDESCRIPTOR 树（目录递归；文件一条）。
@@ -71,7 +66,7 @@ impl FileBrowser {
         let mut seen = HashSet::new();
         for raw in remotes {
             let path = normalize_mut(&self.safety, raw)?;
-            if !seen.insert(path.as_str().to_string()) {
+            if !claim_remote(&mut seen, path.as_str()) {
                 continue;
             }
             let resolved = resolve_and_recheck(
@@ -100,12 +95,7 @@ impl FileBrowser {
             )
             .await?;
         }
-        if out.is_empty() {
-            return Err(FileError::EmptyTree(
-                remotes.first().cloned().unwrap_or_default(),
-            ));
-        }
-        Ok(out)
+        ensure_drag_entries(out, remotes.first().cloned().unwrap_or_default())
     }
 
     async fn classify(
@@ -116,17 +106,15 @@ impl FileBrowser {
         cancel: CancellationToken,
     ) -> Result<(bool, u64), FileError> {
         let parent =
-            parent_remote(path.as_str()).ok_or_else(|| FileError::Path(path.as_str().into()))?;
-        let name = last_segment(path.as_str());
-        let entries = self.list(serial, parent, generation, cancel).await?;
+            parent_of(path.as_str()).ok_or_else(|| FileError::Path(path.as_str().into()))?;
+        let name = path.file_name();
+        let entries = self.list(serial, &parent, generation, cancel).await?;
         let entry = entries
             .iter()
             .find(|e| e.name == name)
             .ok_or_else(|| FileError::RemoteNotFound(path.as_str().to_string()))?;
-        match dir_flag(entry.kind) {
-            Some(true) => Ok((true, 0)),
-            Some(false) | None => Ok((false, entry.size)),
-        }
+        let is_dir = dir_flag(entry.kind).unwrap_or(false);
+        Ok((is_dir, listed_size(is_dir, entry.size)))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -146,10 +134,7 @@ impl FileBrowser {
     {
         Box::pin(async move {
             tree_bounds(is_dir, depth, out.len())?;
-            let name = remote.file_name();
-            if name.is_empty() {
-                return Err(FileError::Path(remote.as_str().into()));
-            }
+            let name = require_entry_name(&remote)?;
             let relative = join_posix_relative(&parent_rel, name);
             out.push(TreeEntry {
                 remote: remote.as_str().to_string(),
@@ -164,12 +149,10 @@ impl FileBrowser {
                 .list(serial, remote.as_str(), generation, cancel.clone())
                 .await?;
             for child in children {
-                if cancel.is_cancelled() {
-                    return Err(FileError::Adb(yohu_adb::AdbError::Cancelled));
-                }
-                let child_raw = format!("{}/{}", remote.as_str(), child.name);
+                reject_if_cancelled(&cancel)?;
+                let child_raw = join_path(remote.as_str(), &child.name);
                 let child_path = normalize_mut(&self.safety, &child_raw)?;
-                if !seen.insert(child_path.as_str().to_string()) {
+                if !claim_remote(seen, child_path.as_str()) {
                     continue;
                 }
                 let child_resolved = resolve_and_recheck(
@@ -182,8 +165,7 @@ impl FileBrowser {
                 )
                 .await?;
                 let (child_dir, child_size) = match dir_flag(child.kind) {
-                    Some(true) => (true, 0),
-                    Some(false) => (false, child.size),
+                    Some(is_dir) => (is_dir, listed_size(is_dir, child.size)),
                     None => {
                         self.classify(serial, &child_resolved, generation, cancel.clone())
                             .await?
@@ -205,6 +187,35 @@ impl FileBrowser {
             }
             Ok(())
         })
+    }
+}
+
+/// 已经展开过的远端路径不再进入。
+fn claim_remote(seen: &mut HashSet<String>, remote: &str) -> bool {
+    seen.insert(remote.to_string())
+}
+
+/// 没有条目名的路径不能拖出。没有上级仍是另一句。
+fn require_entry_name(path: &RemotePath) -> Result<&str, FileError> {
+    let name = path.file_name();
+    if name.is_empty() {
+        Err(FileError::Path(path.as_str().into()))
+    } else {
+        Ok(name)
+    }
+}
+
+/// 目录在拖出清单里不带字节。符号链接是否目录仍由 `dir_flag` 决定。
+fn listed_size(is_dir: bool, size: u64) -> u64 {
+    if is_dir { 0 } else { size }
+}
+
+/// 展开结果为空时带上调用方给出的第一条路径。
+fn ensure_drag_entries(out: Vec<TreeEntry>, fallback: String) -> Result<Vec<TreeEntry>, FileError> {
+    if out.is_empty() {
+        Err(FileError::EmptyTree(fallback))
+    } else {
+        Ok(out)
     }
 }
 
@@ -248,6 +259,23 @@ mod tests {
             join_posix_relative("DCIM/Camera", "x.png"),
             "DCIM/Camera/x.png"
         );
+    }
+
+    #[test]
+    fn drag_name_size_and_empty_stay_with_owners() {
+        let root = RemotePath::parse("/").unwrap();
+        assert!(matches!(
+            require_entry_name(&root),
+            Err(FileError::Path(ref path)) if path == "/"
+        ));
+        let file = RemotePath::parse("/sdcard/a").unwrap();
+        assert_eq!(require_entry_name(&file).unwrap(), "a");
+        assert_eq!(listed_size(true, 9), 0);
+        assert_eq!(listed_size(false, 9), 9);
+        assert!(matches!(
+            ensure_drag_entries(Vec::new(), "/sdcard".into()),
+            Err(FileError::EmptyTree(ref path)) if path == "/sdcard"
+        ));
     }
 
     #[test]
