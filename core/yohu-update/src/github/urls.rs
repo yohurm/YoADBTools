@@ -33,7 +33,8 @@ impl GitHubUrls {
         )
     }
 
-    pub fn manifest_for_tag(&self, tag: &str, file: &str) -> String {
+    /// Release 附件直链（manifest 与约定安装包共用这一条）。
+    pub fn release_asset(&self, tag: &str, file: &str) -> String {
         format!(
             "https://github.com/{}/{}/releases/download/{tag}/{file}",
             self.owner, self.repo

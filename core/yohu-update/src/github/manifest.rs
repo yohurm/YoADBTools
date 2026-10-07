@@ -4,8 +4,8 @@ use serde::Deserialize;
 use yohu_protocol::RemoteUpdate;
 
 use crate::error::UpdateError;
-use crate::platform::PlatformInfo;
-use crate::release::{is_newer, strip_tag_prefix};
+use crate::platform::{cpu_arch, host_os, CpuArch, HostOs, PlatformInfo};
+use crate::release::{is_newer, release_version};
 use yohu_textparsing::{to_plain, TextFormat};
 
 pub const MANIFEST_PRIMARY: &str = "update-manifest.json";
@@ -41,12 +41,8 @@ pub fn remote_from_manifest_json(
     platform: &PlatformInfo,
     fallback_page_url: &str,
 ) -> Result<RemoteUpdate, UpdateError> {
-    let manifest: UpdateManifest =
-        serde_json::from_str(body).map_err(|e| UpdateError::Parse(e.to_string()))?;
-    let version = strip_tag_prefix(&manifest.version).to_string();
-    if version.is_empty() {
-        return Err(UpdateError::MissingTag);
-    }
+    let manifest: UpdateManifest = serde_json::from_str(body).map_err(|_| UpdateError::Parse)?;
+    let version = release_version(&manifest.version).ok_or(UpdateError::MissingTag)?;
     let key = platform_manifest_key(platform).ok_or(UpdateError::UnsupportedOs)?;
     let plat = manifest
         .platforms
@@ -78,17 +74,11 @@ pub fn remote_from_manifest_json(
 }
 
 pub fn platform_manifest_key(platform: &PlatformInfo) -> Option<&'static str> {
-    let os = platform.os.trim().to_ascii_lowercase();
-    let arch = platform.arch.trim().to_ascii_lowercase();
-    match (os.as_str(), arch.as_str()) {
-        ("windows", "x86_64") | ("windows", "amd64") => Some("windows-x86_64"),
-        ("macos", "aarch64") | ("darwin", "aarch64") | ("macos", "arm64") | ("darwin", "arm64") => {
-            Some("darwin-aarch64")
-        }
-        ("macos", "x86_64") | ("darwin", "x86_64") | ("macos", "amd64") | ("darwin", "amd64") => {
-            Some("darwin-x86_64")
-        }
-        _ => None,
+    match (host_os(&platform.os)?, cpu_arch(&platform.arch)?) {
+        (HostOs::Windows, CpuArch::X64) => Some("windows-x86_64"),
+        (HostOs::Macos, CpuArch::Arm64) => Some("darwin-aarch64"),
+        (HostOs::Macos, CpuArch::X64) => Some("darwin-x86_64"),
+        (HostOs::Windows, CpuArch::Arm64) => None,
     }
 }
 
@@ -124,5 +114,16 @@ mod tests {
         assert!(u.has_new_version);
         assert_eq!(u.version, "1.2.0");
         assert_eq!(u.sha256, "abc");
+    }
+
+    #[test]
+    fn darwin_arm64_manifest_key() {
+        let platform = PlatformInfo {
+            version: "0.1.0".into(),
+            identifier: "com.yohu.adbtools".into(),
+            os: "darwin".into(),
+            arch: "arm64".into(),
+        };
+        assert_eq!(platform_manifest_key(&platform), Some("darwin-aarch64"));
     }
 }

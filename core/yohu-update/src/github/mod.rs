@@ -12,7 +12,7 @@ mod http;
 mod manifest;
 mod provider;
 mod source;
-mod urls;
+pub(crate) mod urls;
 mod web_latest;
 
 pub use provider::GitHubReleaseProvider;

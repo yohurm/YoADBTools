@@ -64,13 +64,13 @@ pub fn installed_exe_path() -> Result<PathBuf, UpdateError> {
     #[cfg(windows)]
     {
         Ok(app_install_root(DATA_DIR_NAME)
-            .map_err(|e| UpdateError::Io(e.to_string()))?
+            .map_err(|_| UpdateError::HostRoot)?
             .join(format!("{PRODUCT_NAME}.exe")))
     }
     #[cfg(target_os = "macos")]
     {
         Ok(app_install_root(DATA_DIR_NAME)
-            .map_err(|e| UpdateError::Io(e.to_string()))?
+            .map_err(|_| UpdateError::HostRoot)?
             .join("Contents")
             .join("MacOS")
             .join(PRODUCT_NAME))
@@ -78,7 +78,7 @@ pub fn installed_exe_path() -> Result<PathBuf, UpdateError> {
     #[cfg(not(any(windows, target_os = "macos")))]
     {
         Ok(app_install_root(DATA_DIR_NAME)
-            .map_err(|e| UpdateError::Io(e.to_string()))?
+            .map_err(|_| UpdateError::HostRoot)?
             .join(PRODUCT_NAME))
     }
 }

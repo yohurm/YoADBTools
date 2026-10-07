@@ -1,10 +1,11 @@
-//! URL 策略：http(s) 校验、GitHub 主机判定（Authorization 范围）。
+//! URL 策略：查询串截断，以及 GitHub 主机判定（Authorization 范围）。
+//! http(s) 形态只认 `yohu-download`。
 
 use crate::error::UpdateError;
 
-pub fn is_http_url(url: &str) -> bool {
-    let lower = url.trim().to_ascii_lowercase();
-    lower.starts_with("https://") || lower.starts_with("http://")
+/// `?` 或 `#` 之前的原文。安装包文件名和发行标签都从这里再取段。
+pub(crate) fn before_query(text: &str) -> &str {
+    text.split(['?', '#']).next().unwrap_or(text)
 }
 
 /// 仅允许打开或下载 http(s) 地址，且必须带主机。
@@ -55,13 +56,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn http_and_https_ok() {
-        assert!(is_http_url("https://example.com/a.exe"));
-        assert!(is_http_url("http://example.com/a.exe"));
-        assert!(is_http_url("  https://cdn.example.com/setup.exe  "));
-        assert!(!is_http_url("ftp://x"));
-        assert!(!is_http_url(""));
-        assert!(!is_http_url(r"C:\setup.exe"));
+    fn before_query_drops_query_and_fragment() {
+        assert_eq!(
+            before_query("https://example.com/a.exe?x=1"),
+            "https://example.com/a.exe"
+        );
+        assert_eq!(
+            before_query("https://example.com/a.exe#notes"),
+            "https://example.com/a.exe"
+        );
+        assert_eq!(
+            before_query("https://example.com/a.exe"),
+            "https://example.com/a.exe"
+        );
     }
 
     #[test]

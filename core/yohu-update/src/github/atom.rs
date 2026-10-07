@@ -1,5 +1,5 @@
 use crate::error::UpdateError;
-use crate::release::strip_tag_prefix;
+use crate::release::release_version;
 use yohu_textparsing::{to_plain, TextFormat, Xml};
 
 /// Atom 里最新一条 Release 摘要（electron-updater 主路径，无 REST 配额）。
@@ -44,9 +44,7 @@ fn parse_entry(entry: &str) -> Option<AtomRelease> {
         return None;
     }
     let tag = tag_from_page_url(&page_url)?;
-    if strip_tag_prefix(&tag).is_empty() {
-        return None;
-    }
+    release_version(&tag)?;
     let title = extract_text(entry, "title").unwrap_or_default();
     let content = extract_text(entry, "content").unwrap_or_default();
     let notes_html = if content.is_empty() { title } else { content };
@@ -61,7 +59,7 @@ fn tag_from_page_url(url: &str) -> Option<String> {
     let marker = "/releases/tag/";
     let idx = url.find(marker)? + marker.len();
     let rest = url[idx..].trim_end_matches('/');
-    let tag = rest.split(['?', '#']).next()?.trim();
+    let tag = crate::url_policy::before_query(rest).trim();
     if tag.is_empty() {
         None
     } else {

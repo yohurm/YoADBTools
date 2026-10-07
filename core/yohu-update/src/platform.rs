@@ -7,6 +7,36 @@ pub fn user_agent(version: &str) -> String {
     format!("{PRODUCT_NAME}/{version}")
 }
 
+/// 产品交付的 CPU。`x86_64` 与 `amd64` 同一事实，`aarch64` 与 `arm64` 同一事实。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpuArch {
+    X64,
+    Arm64,
+}
+
+/// 产品交付的操作系统。`macos` 与 `darwin` 同一事实。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostOs {
+    Windows,
+    Macos,
+}
+
+pub fn cpu_arch(arch: &str) -> Option<CpuArch> {
+    match arch.trim().to_ascii_lowercase().as_str() {
+        "x86_64" | "amd64" => Some(CpuArch::X64),
+        "aarch64" | "arm64" => Some(CpuArch::Arm64),
+        _ => None,
+    }
+}
+
+pub fn host_os(os: &str) -> Option<HostOs> {
+    match os.trim().to_ascii_lowercase().as_str() {
+        "windows" => Some(HostOs::Windows),
+        "macos" | "darwin" => Some(HostOs::Macos),
+        _ => None,
+    }
+}
+
 /// 当前安装的平台身份（版本 / 包标识 / OS / 架构）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlatformInfo {
@@ -36,6 +66,19 @@ mod tests {
     #[test]
     fn user_agent_is_product_slash_version() {
         assert_eq!(user_agent("0.1.2"), format!("{PRODUCT_NAME}/0.1.2"));
+    }
+
+    #[test]
+    fn host_aliases_collapse() {
+        assert_eq!(host_os("windows"), Some(HostOs::Windows));
+        assert_eq!(host_os(" Darwin "), Some(HostOs::Macos));
+        assert_eq!(host_os("macos"), Some(HostOs::Macos));
+        assert_eq!(host_os("linux"), None);
+        assert_eq!(cpu_arch("AMD64"), Some(CpuArch::X64));
+        assert_eq!(cpu_arch("x86_64"), Some(CpuArch::X64));
+        assert_eq!(cpu_arch("arm64"), Some(CpuArch::Arm64));
+        assert_eq!(cpu_arch("aarch64"), Some(CpuArch::Arm64));
+        assert_eq!(cpu_arch("i686"), None);
     }
 
     #[test]

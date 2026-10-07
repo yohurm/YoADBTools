@@ -9,7 +9,7 @@ use crate::platform::PlatformInfo;
 
 use super::api::remote_from_api_body;
 use super::atom::{notes_from_atom_html, parse_latest_release};
-use super::http::{build_client, get_text, github_error_message, user_agent_for};
+use super::http::{build_client, document_fetched, get_text, github_error_message, user_agent_for};
 use super::manifest::{remote_from_manifest_json, MANIFEST_FILES};
 use super::source::GitHubReleaseSource;
 use super::urls::GitHubUrls;
@@ -35,17 +35,10 @@ impl GitHubReleaseProvider {
 
     async fn fetch_manifest_at(&self, url: &str, platform: &PlatformInfo) -> Option<RemoteUpdate> {
         let ua = user_agent_for(platform);
-        let resp = get_text(
-            &self.client,
-            url,
-            "application/json",
-            &ua,
-            None,
-            None,
-        )
-        .await
-        .ok()?;
-        if resp.status != 200 {
+        let resp = get_text(&self.client, url, "application/json", &ua, None, None)
+            .await
+            .ok()?;
+        if !document_fetched(resp.status) {
             return None;
         }
         remote_from_manifest_json(&resp.body, platform, url).ok()
@@ -69,7 +62,7 @@ impl GitHubReleaseProvider {
         page_url: &str,
     ) -> Option<RemoteUpdate> {
         for file in MANIFEST_FILES {
-            let url = self.urls.manifest_for_tag(tag, file);
+            let url = self.urls.release_asset(tag, file);
             if let Some(update) = self.fetch_manifest_at(&url, platform).await {
                 tracing::debug!(url = %url, tag = %tag, "update check via static manifest (tag)");
                 return Some(update);
@@ -102,7 +95,7 @@ impl GitHubReleaseProvider {
         )
         .await
         .ok()?;
-        if resp.status != 200 {
+        if !document_fetched(resp.status) {
             return None;
         }
         let entry = parse_latest_release(&resp.body).ok()?;
@@ -130,7 +123,7 @@ impl GitHubReleaseProvider {
         )
         .await
         .ok()?;
-        if resp.status != 200 {
+        if !document_fetched(resp.status) {
             return None;
         }
         let tag = parse_web_latest_tag(&resp.body).ok()?;
@@ -145,25 +138,18 @@ impl GitHubReleaseProvider {
 
     async fn try_api_latest(&self, platform: &PlatformInfo) -> Result<RemoteUpdate, UpdateError> {
         let ua = user_agent_for(platform);
-        let etag = self
-            .api_latest_etag
-            .lock()
-            .ok()
-            .and_then(|g| g.clone());
-        let bearer = (!self.source.token.is_empty()).then_some(self.source.token.as_str());
+        let etag = self.api_latest_etag.lock().ok().and_then(|g| g.clone());
         let resp = get_text(
             &self.client,
             &self.urls.api_latest(),
             "application/vnd.github+json",
             &ua,
-            bearer,
+            Some(self.source.token.as_str()),
             etag.as_deref(),
         )
         .await?;
         if resp.status == 304 {
-            return Err(UpdateError::Platform(
-                "更新元数据未变化（304），请稍后再试".into(),
-            ));
+            return Err(UpdateError::NotModified);
         }
         if resp.status == 404 {
             return Err(UpdateError::NoRelease);

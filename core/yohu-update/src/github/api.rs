@@ -3,7 +3,7 @@ use yohu_protocol::RemoteUpdate;
 
 use crate::error::UpdateError;
 use crate::platform::PlatformInfo;
-use crate::release::{remote_from_release, ReleaseAsset};
+use crate::release::{ensure_published, remote_from_release, ReleaseAsset};
 
 #[derive(Debug, Deserialize)]
 struct GhRelease {
@@ -20,12 +20,12 @@ struct GhRelease {
 }
 
 /// REST `/releases/latest` 响应（含 attachments 列表）。
-pub fn remote_from_api_body(body: &str, platform: &PlatformInfo) -> Result<RemoteUpdate, UpdateError> {
-    let release: GhRelease =
-        serde_json::from_str(body).map_err(|e| UpdateError::Parse(e.to_string()))?;
-    if release.draft {
-        return Err(UpdateError::DraftRelease);
-    }
+pub fn remote_from_api_body(
+    body: &str,
+    platform: &PlatformInfo,
+) -> Result<RemoteUpdate, UpdateError> {
+    let release: GhRelease = serde_json::from_str(body).map_err(|_| UpdateError::Parse)?;
+    ensure_published(release.draft)?;
     remote_from_release(
         &release.tag_name,
         &release.body,
@@ -68,5 +68,13 @@ mod tests {
         assert!(update.has_new_version);
         assert_eq!(update.version, "1.2.0");
         assert_eq!(update.sha256, "deadbeef");
+    }
+
+    #[test]
+    fn broken_json_is_parse_without_serde_text() {
+        let err = remote_from_api_body("{", &win64()).unwrap_err();
+        assert_eq!(err, UpdateError::Parse);
+        assert_eq!(err.to_string(), "解析更新响应失败");
+        assert!(!err.to_string().contains("EOF"));
     }
 }

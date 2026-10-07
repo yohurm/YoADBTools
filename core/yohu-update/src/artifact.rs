@@ -22,10 +22,9 @@ impl InstallerKind {
 
     /// 当前 OS 应安装的形态。
     pub fn for_os(os: &str) -> Option<Self> {
-        match os.trim().to_ascii_lowercase().as_str() {
-            "windows" => Some(Self::Nsis),
-            "macos" | "darwin" => Some(Self::Dmg),
-            _ => None,
+        match crate::platform::host_os(os)? {
+            crate::platform::HostOs::Windows => Some(Self::Nsis),
+            crate::platform::HostOs::Macos => Some(Self::Dmg),
         }
     }
 

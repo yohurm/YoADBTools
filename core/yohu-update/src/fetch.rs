@@ -56,7 +56,7 @@ pub async fn download_installer_from(
             received_bytes: p.received,
             total_bytes: p.total,
             installer_path: (stage == UpdateStage::Ready).then(|| dest_path.clone()),
-            message: None,
+            error: None,
         });
     })
     .await

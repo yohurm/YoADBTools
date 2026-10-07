@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::error::UpdateError;
+use crate::release::ensure_published;
 
 #[derive(Debug, Deserialize)]
 struct WebLatestRelease {
@@ -12,11 +13,8 @@ struct WebLatestRelease {
 
 /// `https://github.com/OWNER/REPO/releases/latest` + `Accept: application/json`（electron getLatestTagName）。
 pub fn parse_web_latest_tag(body: &str) -> Result<String, UpdateError> {
-    let release: WebLatestRelease =
-        serde_json::from_str(body).map_err(|e| UpdateError::Parse(e.to_string()))?;
-    if release.draft {
-        return Err(UpdateError::DraftRelease);
-    }
+    let release: WebLatestRelease = serde_json::from_str(body).map_err(|_| UpdateError::Parse)?;
+    ensure_published(release.draft)?;
     let tag = release.tag_name.trim();
     if tag.is_empty() {
         return Err(UpdateError::MissingTag);

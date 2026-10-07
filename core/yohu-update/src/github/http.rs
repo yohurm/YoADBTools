@@ -1,18 +1,23 @@
 use std::time::Duration;
 
-use reqwest::Client;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, IF_NONE_MATCH, USER_AGENT};
+use reqwest::Client;
 
 use crate::error::UpdateError;
 use crate::platform::PlatformInfo;
 
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// 静态文档、Atom、Web Latest 只有 200 带正文。REST 的 2xx 不走这里。
+pub fn document_fetched(status: u16) -> bool {
+    status == 200
+}
+
 pub fn build_client() -> Result<Client, UpdateError> {
     Client::builder()
         .timeout(CHECK_TIMEOUT)
         .build()
-        .map_err(|e| UpdateError::Network(e.to_string()))
+        .map_err(UpdateError::from)
 }
 
 pub struct TextResponse {
@@ -31,12 +36,17 @@ pub async fn get_text(
 ) -> Result<TextResponse, UpdateError> {
     let mut headers = HeaderMap::new();
     headers.insert(ACCEPT, HeaderValue::from_str(accept).map_err(parse_hdr)?);
-    headers.insert(USER_AGENT, HeaderValue::from_str(user_agent).map_err(parse_hdr)?);
-    if let Some(token) = bearer.filter(|t| !t.is_empty()) {
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {token}")).map_err(parse_hdr)?,
-        );
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_str(user_agent).map_err(parse_hdr)?,
+    );
+    if let Some(token) = bearer {
+        if let Some((_, value)) = crate::url_policy::authorization_header(url, token) {
+            headers.insert(
+                AUTHORIZATION,
+                HeaderValue::from_str(&value).map_err(parse_hdr)?,
+            );
+        }
     }
     if let Some(etag) = if_none_match.filter(|e| !e.is_empty()) {
         headers.insert(
@@ -55,8 +65,29 @@ pub async fn get_text(
     Ok(TextResponse { status, body, etag })
 }
 
-fn parse_hdr(e: reqwest::header::InvalidHeaderValue) -> UpdateError {
-    UpdateError::Network(e.to_string())
+fn parse_hdr(_e: reqwest::header::InvalidHeaderValue) -> UpdateError {
+    UpdateError::BadHeader
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::HeaderValue;
+
+    #[test]
+    fn invalid_header_is_not_a_network_payload() {
+        let err = parse_hdr(HeaderValue::from_str("\n").unwrap_err());
+        assert_eq!(err, UpdateError::BadHeader);
+        assert_eq!(err.to_string(), "检查更新请求头非法");
+        assert!(!err.to_string().contains('\n'));
+    }
+
+    #[test]
+    fn document_status_is_exact_200() {
+        assert!(document_fetched(200));
+        assert!(!document_fetched(201));
+        assert!(!document_fetched(304));
+    }
 }
 
 pub fn user_agent_for(platform: &PlatformInfo) -> String {
