@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { USB_ENCODE, WIFI_ENCODE } from "@yohu/api";
 import { describe, expect, it } from "vitest";
 
@@ -46,5 +49,24 @@ describe("质量档（选项含 @yohu/api USB/WIFI 默认档）", () => {
     expect(sizeLabel(USB_ENCODE.max_size)).toBe("原始");
     expect(rateLabel(USB_ENCODE.video_bit_rate)).toBe("16 Mbps");
     expect(fpsLabel(USB_ENCODE.max_fps)).toBe("不限");
+  });
+
+  it("表内文案只来自标签函数", () => {
+    for (const item of SIZE_OPTIONS) expect(item.label).toBe(sizeLabel(Number(item.value)));
+    for (const item of RATE_OPTIONS) expect(item.label).toBe(rateLabel(Number(item.value)));
+    for (const item of FPS_OPTIONS) expect(item.label).toBe(fpsLabel(Number(item.value)));
+  });
+});
+
+describe("质量数字十进制", () => {
+  it("长边标签和选项值都走十进制，当前值插项和零帧率不并", () => {
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "quality.ts"), "utf8");
+    const times = (needle: string) => source.split(needle).length - 1;
+    expect(times("String(" + "n)")).toBe(1);
+    expect(times("function optionText")).toBe(1);
+    expect(times("export function optionText")).toBe(0);
+    expect(times("optionText(n)")).toBe(2);
+    expect(times("String(" + "current)")).toBe(1);
+    expect(times("n === " + "0")).toBe(2);
   });
 });

@@ -6,9 +6,10 @@ import { Show } from "solid-js";
 import { YoBadge } from "@yohu/ui";
 
 import { mirrorStore } from "./store";
+import { mirrorPictureReady } from "./control-ready";
 
 export function MirrorStatus() {
-  const live = () => mirrorStore.state.phase === "live" && mirrorStore.state.hasFrame;
+  const live = () => mirrorPictureReady(mirrorStore.state);
   return (
     <Show when={live()}>
       <YoBadge

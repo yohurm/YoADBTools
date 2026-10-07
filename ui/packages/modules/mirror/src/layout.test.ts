@@ -135,7 +135,8 @@ describe("MirrorView 滚轴", () => {
     expect(ops).toContain("<For");
     const func = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__func"'));
     expect(func).toMatch(/<YoScroller>/);
-    expect(func).toContain("YoFormRow");
+    expect(func).toContain("QualityRow");
+    expect(viewSrc).toContain("YoFormRow");
     const avail = viewSrc.slice(viewSrc.indexOf('class="yohu-mirror__avail"'), viewSrc.indexOf('class="yohu-mirror__ops"'));
     expect(avail).not.toContain("YoScroller");
     expect(avail).toContain("yohu-mirror__hole");
@@ -147,6 +148,34 @@ describe("MirrorView 滚轴", () => {
     expect(viewSrc).not.toContain("Toast.success");
     expect(statusSrc).toContain("YoBadge");
     expect(statusSrc).not.toMatch(/<span[\s>]/);
+  });
+
+  it("滚动与可见性直接推布局", () => {
+    expect(viewSrc.split("function on" + "Win").length - 1).toBe(0);
+    expect(viewSrc.split("function on" + "Vis").length - 1).toBe(0);
+    expect(viewSrc).not.toContain("on" + "Win");
+    expect(viewSrc).not.toContain("on" + "Vis");
+    expect(viewSrc).toContain('listen(window, "scroll", pushLayout, true)');
+    expect(viewSrc).toContain('listen(document, "visibilitychange", pushLayout)');
+  });
+
+  it("监听只登记一次", () => {
+    expect(viewSrc.split("add" + "EventListener").length - 1).toBe(1);
+    expect(viewSrc.split("remove" + "EventListener").length - 1).toBe(1);
+    expect(viewSrc).toContain('listen(window, "keydown", onEsc)');
+  });
+
+  it("尺寸与主题直接推布局", () => {
+    expect(viewSrc.split("push" + "Layout()").length - 1).toBe(1);
+    expect(viewSrc).toContain("new ResizeObserver(pushLayout)");
+    expect(viewSrc).toContain("onResolvedThemeChange(pushLayout)");
+  });
+
+  it("没有视口轴时是 0", () => {
+    expect(viewSrc.split("?? " + "0").length - 1).toBe(1);
+    expect(viewSrc).toContain("viewportAxis(vv?.offsetLeft)");
+    expect(viewSrc).toContain("viewportAxis(vv?.offsetTop)");
+    expect(viewSrc).toContain("hostPixelRatio()");
   });
 });
 
@@ -177,5 +206,84 @@ describe("shouldReportLayout", () => {
         dark: false,
       }),
     ).toBe(false);
+  });
+});
+
+const layoutSrc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "layout.ts"), "utf-8");
+
+describe("客户区跨度", () => {
+  it("宽高都经 zoneSpan，旧跨度只留在函数里", () => {
+    expect(layoutSrc.split("Math.max(0, " + "far.x - origin.x)").length - 1).toBe(0);
+    expect(layoutSrc.split("Math.max(0, " + "far.y - origin.y)").length - 1).toBe(0);
+    expect(layoutSrc).toContain("zoneSpan(far.x, origin.x)");
+    expect(layoutSrc).toContain("zoneSpan(far.y, origin.y)");
+    expect(layoutSrc.split("function zoneSpan").length - 1).toBe(1);
+    expect(layoutSrc.split("return Math.max(0, far - origin)").length - 1).toBe(1);
+  });
+});
+
+describe("物理轴", () => {
+  it("横纵都经 physicalAxis，旧乘积只留在函数里", () => {
+    expect(layoutSrc.split("Math.round(" + "x * dpr)").length - 1).toBe(0);
+    expect(layoutSrc.split("Math.round(" + "y * dpr)").length - 1).toBe(0);
+    expect(layoutSrc).toContain("physicalAxis(x, dpr)");
+    expect(layoutSrc).toContain("physicalAxis(y, dpr)");
+    expect(layoutSrc.split("function physicalAxis").length - 1).toBe(1);
+    expect(layoutSrc.split("return Math.round(css * dpr)").length - 1).toBe(1);
+    expect(layoutSrc).toContain("function zoneSpan");
+    expect(layoutSrc).toContain("function finiteOrZero");
+  });
+});
+
+describe("客户区轴", () => {
+  it("横纵都经 cssAxis，旧偏移只留在函数里", () => {
+    expect(layoutSrc.split("cssX + " + "finiteOrZero(viewportOffset.left)").length - 1).toBe(0);
+    expect(layoutSrc.split("cssY + " + "finiteOrZero(viewportOffset.top)").length - 1).toBe(0);
+    expect(layoutSrc).toContain("cssAxis(cssX, viewportOffset.left)");
+    expect(layoutSrc).toContain("cssAxis(cssY, viewportOffset.top)");
+    expect(layoutSrc.split("function cssAxis").length - 1).toBe(1);
+    expect(layoutSrc.split("return css + finiteOrZero(offset)").length - 1).toBe(1);
+    expect(layoutSrc).toContain("function finiteOrZero");
+    expect(layoutSrc).toContain("function physicalAxis");
+    expect(layoutSrc).toContain("physicalAxis(x, dpr)");
+  });
+});
+
+function times(source: string, needle: string): number {
+  return source.split(needle).length - 1;
+}
+
+describe("视口零偏移", () => {
+  it("指针和可用区缺省都从零开始，字面只留在函数体", () => {
+    expect(times(layoutSrc, "{ left: " + "0, top: 0 }")).toBe(1);
+    expect(times(layoutSrc, "function zeroOffset")).toBe(1);
+    expect(times(layoutSrc, "export function zeroOffset")).toBe(0);
+    expect(times(layoutSrc, "zeroOffset()")).toBe(3);
+  });
+});
+
+describe("客户区远端", () => {
+  it("宽和高都是起点加上跨度，视口偏移不并", () => {
+    expect(times(layoutSrc, "css.left + " + "css.width")).toBe(0);
+    expect(times(layoutSrc, "css.top + " + "css.height")).toBe(0);
+    expect(times(layoutSrc, "return origin + " + "span")).toBe(1);
+    expect(times(layoutSrc, "function cssFar")).toBe(1);
+    expect(times(layoutSrc, "export function cssFar")).toBe(0);
+    expect(times(layoutSrc, "cssFar(css.left, css.width)")).toBe(1);
+    expect(times(layoutSrc, "cssFar(css.top, css.height)")).toBe(1);
+    expect(layoutSrc).toContain("function cssAxis");
+  });
+});
+
+describe("最小像素可呈现", () => {
+  it("宽和高都达到最小物理像素，隐藏上报不并", () => {
+    expect(times(layoutSrc, "width >= " + "MIRROR_MIN_LAYOUT_PX")).toBe(0);
+    expect(times(layoutSrc, "height >= " + "MIRROR_MIN_LAYOUT_PX")).toBe(0);
+    expect(times(layoutSrc, "px >= " + "MIRROR_MIN_LAYOUT_PX")).toBe(1);
+    expect(times(layoutSrc, "function spanPresentable")).toBe(1);
+    expect(times(layoutSrc, "export function spanPresentable")).toBe(0);
+    expect(times(layoutSrc, "spanPresentable(width)")).toBe(1);
+    expect(times(layoutSrc, "spanPresentable(height)")).toBe(1);
+    expect(layoutSrc).toContain("!avail.visible || layoutIsPresentable");
   });
 });

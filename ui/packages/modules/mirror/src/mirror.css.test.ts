@@ -16,6 +16,7 @@ describe("mirror.css", () => {
     expect(css).not.toContain(".yohu-panel__body");
     expect(css).not.toContain(".yohu-scroller__view");
     expect(css).toContain(".yohu-mirror__ops-stack");
+    expect(css).not.toContain("background");
     expect(css).not.toMatch(/overflow:\s*auto/);
     expect(css).not.toMatch(/overflow:\s*scroll/);
     expect(css).not.toMatch(/overflow-y:\s*auto/);
@@ -37,6 +38,9 @@ describe("mirror.css", () => {
     expect(css).not.toContain("yohu-mirror__group-label");
     expect(css).not.toMatch(/\.yohu-mirror__group\s*\{/);
     expect(css).not.toContain("justify-content: space-between");
+    expect(view).toContain("YoIconButton");
+    expect(view).toContain("yohu-mirror__ops-stack");
+    expect(view).not.toContain('well="canvas"');
     expect(view).toContain("YoFormRow");
     expect(view).toContain('title="质量"');
     expect(view).toContain("reportAvail");

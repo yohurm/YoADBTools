@@ -39,7 +39,7 @@
   max-width: var(--yohu-layout-mirror-ops);
 }
 
-/* 钮列自己排；禁止点 YoScroller 内部槽。 */
+/* 钮列只排轴和间隔，间隔走与面板同一档 space token。不铺第二套底色。 */
 .yohu-mirror__ops-stack {
   display: flex;
   flex-direction: column;
