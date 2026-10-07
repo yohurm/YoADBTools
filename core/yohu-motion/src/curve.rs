@@ -1,26 +1,32 @@
 //! L1：与 `--yohu-ease-*` 同值。禁止另起贝塞尔。
 
+/// 曲线参数停在单位区间。四条缓动的输入和牛顿步都问这一次。
+pub(crate) fn unit_interval(t: f64) -> f64 {
+    t.clamp(0.0, 1.0)
+}
+
 /// HarmonyOS 标准 `cubic-bezier(0.4, 0, 0.2, 1)`：持续在视线内。
 pub(crate) fn ease_standard(t: f64) -> f64 {
-    cubic_bezier(0.4, 0.0, 0.2, 1.0, t.clamp(0.0, 1.0))
+    cubic_bezier(0.4, 0.0, 0.2, 1.0, t)
 }
 
 /// 减速 `cubic-bezier(0, 0, 0.4, 1)`：进场。
 pub(crate) fn ease_decel(t: f64) -> f64 {
-    cubic_bezier(0.0, 0.0, 0.4, 1.0, t.clamp(0.0, 1.0))
+    cubic_bezier(0.0, 0.0, 0.4, 1.0, t)
 }
 
 /// 加速 `cubic-bezier(0.4, 0, 1, 1)`：出场。
 pub(crate) fn ease_accel(t: f64) -> f64 {
-    cubic_bezier(0.4, 0.0, 1.0, 1.0, t.clamp(0.0, 1.0))
+    cubic_bezier(0.4, 0.0, 1.0, 1.0, t)
 }
 
 /// 强调减速 `cubic-bezier(0.2, 0, 0, 1)`：折叠等局部空间。
 pub(crate) fn ease_emphasized(t: f64) -> f64 {
-    cubic_bezier(0.2, 0.0, 0.0, 1.0, t.clamp(0.0, 1.0))
+    cubic_bezier(0.2, 0.0, 0.0, 1.0, t)
 }
 
 pub(crate) fn cubic_bezier(x1: f64, y1: f64, x2: f64, y2: f64, x: f64) -> f64 {
+    let x = unit_interval(x);
     let mut t = x;
     for _ in 0..8 {
         let x_est = sample_curve(t, x1, x2);
@@ -28,7 +34,7 @@ pub(crate) fn cubic_bezier(x1: f64, y1: f64, x2: f64, y2: f64, x: f64) -> f64 {
         if dx.abs() < 1e-6 {
             break;
         }
-        t = (t - (x_est - x) / dx).clamp(0.0, 1.0);
+        t = unit_interval(t - (x_est - x) / dx);
     }
     sample_curve(t, y1, y2)
 }
@@ -57,5 +63,12 @@ mod tests {
         assert!(ease_decel(0.3) > ease_standard(0.3));
         assert!(ease_accel(0.3) < ease_standard(0.3));
         assert!(ease_emphasized(0.3) > ease_standard(0.3));
+    }
+
+    #[test]
+    fn zero_duration_is_single() {
+        let spec = include_str!("spec.rs");
+        let prod = spec.split("\n#[cfg(test)]").next().unwrap();
+        assert_eq!(prod.matches("duration_ms() == 0").count(), 1);
     }
 }

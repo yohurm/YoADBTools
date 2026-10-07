@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use windows::Win32::Graphics::DirectComposition::{IDCompositionAnimation, IDCompositionDevice};
 
+use crate::curve::unit_interval;
 use crate::spec::MotionSpec;
 
 /// DComp `AddCubic` 只接受时间多项式。L1 是 y(x) 贝塞尔，这里用等分折线逼近。
@@ -16,10 +17,10 @@ pub fn eased_anim(
     to: f32,
     spec: MotionSpec,
 ) -> Option<IDCompositionAnimation> {
-    let ms = spec.duration_ms();
-    if ms == 0 {
+    if spec.duration_is_zero() {
         return None;
     }
+    let ms = spec.duration_ms();
     let ease = spec.ease();
     let dur = ms as f32 / 1000.0;
     let anim = unsafe { device.CreateAnimation().ok()? };
@@ -41,11 +42,11 @@ pub fn eased_anim(
 
 /// 按已播时长在规格曲线上取样（打断进行中的 DComp 动画时用）。
 pub fn ease_at(spec: MotionSpec, elapsed: Duration) -> f32 {
-    let ms = spec.duration_ms();
-    if ms == 0 {
+    if spec.duration_is_zero() {
         return 1.0;
     }
-    let u = (elapsed.as_secs_f64() / (ms as f64 / 1000.0)).clamp(0.0, 1.0);
+    let ms = spec.duration_ms();
+    let u = unit_interval(elapsed.as_secs_f64() / (ms as f64 / 1000.0));
     spec.ease()(u) as f32
 }
 
