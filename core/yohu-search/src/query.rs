@@ -130,4 +130,27 @@ mod tests {
             }
         }
     }
+
+    fn production(src: &str) -> &str {
+        src.split("\n#[cfg(test)]").next().unwrap_or(src)
+    }
+
+    #[test]
+    fn search_fold_span_and_pinyin_letter_are_single() {
+        let field = production(include_str!("field.rs"));
+        let highlight = production(include_str!("highlight.rs"));
+        let chars = production(include_str!("chars.rs"));
+        let token = production(include_str!("token.rs"));
+        let pinyin = production(include_str!("pinyin.rs"));
+        assert!(!field.contains("hay == needle"));
+        assert!(!field.contains("normalize_search_query"));
+        assert!(!highlight.contains("normalize_search_query"));
+        assert!(!field.contains("to_lowercase()"));
+        assert!(!highlight.contains("to_lowercase()"));
+        assert!(!chars.contains("to_lowercase()"));
+        assert_eq!(token.matches("to_lowercase()").count(), 1);
+        assert_eq!(pinyin.matches("is_ascii_alphabetic()").count(), 1);
+        assert_eq!(pinyin.matches("'\\''").count(), 1);
+        assert!(pinyin.contains("is_ascii_lowercase()"));
+    }
 }

@@ -1,7 +1,11 @@
 //! 查询归一与空白分词。连字符 / 点号不拆。
 
+pub(crate) fn search_lowercase(text: &str) -> String {
+    text.to_lowercase()
+}
+
 pub fn normalize_search_query(query: &str) -> String {
-    query.trim().to_lowercase()
+    search_lowercase(query.trim())
 }
 
 pub fn tokenize_search_query(query: &str) -> Vec<String> {
