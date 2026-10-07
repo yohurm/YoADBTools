@@ -12,7 +12,7 @@ mod verify;
 
 pub use resume::{resume_plan, ResumeAction};
 
-pub use error::DownloadError;
+pub use error::{download_http_text, DownloadError, DOWNLOAD_FAILED, INVALID_URL};
 pub use fetch::{fetch, DOWNLOAD_ATTEMPTS};
 pub use policy::{assert_http_url, is_http_url};
 pub use spec::{DownloadOutcome, DownloadPhase, DownloadProgress, DownloadSpec};

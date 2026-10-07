@@ -2,16 +2,26 @@
 
 use thiserror::Error;
 
+/// 下载地址不是 http/https。更新层同一事实引用这一句。
+pub const INVALID_URL: &str = "下载地址非法";
+/// 没有 HTTP 状态的传输失败。更新层同一事实引用这一句。
+pub const DOWNLOAD_FAILED: &str = "下载失败";
+
+/// 下载响应的 HTTP 状态。检查更新不引用这一句。
+pub fn download_http_text(status: u16) -> String {
+    format!("下载 HTTP {status}")
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum DownloadError {
-    #[error("下载地址非法")]
+    #[error("{}", INVALID_URL)]
     InvalidUrl,
     #[error("文件过大")]
     TooLarge,
-    #[error("下载 HTTP {0}")]
+    #[error("{}", download_http_text(*.0))]
     Http(u16),
-    #[error("下载失败: {0}")]
-    Network(String),
+    #[error("{}", DOWNLOAD_FAILED)]
+    Network,
     #[error("校验失败（SHA-256 不匹配）")]
     ChecksumMismatch,
     #[error("大小不匹配")]
@@ -24,6 +34,24 @@ pub enum DownloadError {
 
 impl From<reqwest::Error> for DownloadError {
     fn from(e: reqwest::Error) -> DownloadError {
-        DownloadError::Network(e.to_string())
+        match e.status() {
+            Some(status) => DownloadError::Http(status.as_u16()),
+            None => DownloadError::Network,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_sentence_has_no_payload() {
+        assert_eq!(DownloadError::Network.to_string(), DOWNLOAD_FAILED);
+        assert_eq!(DownloadError::InvalidUrl.to_string(), INVALID_URL);
+        assert_eq!(
+            DownloadError::Http(404).to_string(),
+            download_http_text(404)
+        );
     }
 }

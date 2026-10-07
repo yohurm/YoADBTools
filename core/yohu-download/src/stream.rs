@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::error::DownloadError;
 use crate::policy::assert_http_url;
-use crate::resume::{resume_plan, ResumeAction};
+use crate::resume::{partial_path, resume_plan, ResumeAction};
 use crate::spec::{DownloadOutcome, DownloadPhase, DownloadProgress, DownloadSpec};
 use crate::verify::{hex_lower, sha256_hex, sha256_matches, MAX_FILE_BYTES};
 
@@ -57,12 +57,7 @@ pub(crate) async fn stream_once(
         let _ = tokio::fs::remove_file(dest).await;
     }
 
-    let part = dest.with_file_name(format!(
-        "{}.part",
-        dest.file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "file.part".into())
-    ));
+    let part = partial_path(dest);
     let mut have: u64 = 0;
     if tokio::fs::try_exists(&part).await.unwrap_or(false) {
         have = tokio::fs::metadata(&part)
@@ -75,7 +70,7 @@ pub(crate) async fn stream_once(
         .timeout(READ_TIMEOUT)
         .connect_timeout(CONNECT_TIMEOUT)
         .build()
-        .map_err(|e| DownloadError::Network(e.to_string()))?;
+        .map_err(DownloadError::from)?;
     let mut req = client
         .get(&url)
         .header("User-Agent", &spec.user_agent)
@@ -92,16 +87,7 @@ pub(crate) async fn stream_once(
         sent = req.send() => sent?,
     };
     let status = response.status().as_u16();
-    let action = if have > 0 {
-        resume_plan(have, status)?
-    } else if (200..300).contains(&status) {
-        ResumeAction::Fresh
-    } else {
-        return Err(DownloadError::Http(status));
-    };
-    if !(200..300).contains(&status) {
-        return Err(DownloadError::Http(status));
-    }
+    let action = resume_plan(have, status)?;
 
     let header_len = response.content_length().unwrap_or(0);
     let mut total = if spec.expected_size > 0 {
@@ -128,7 +114,9 @@ pub(crate) async fn stream_once(
                 .map_err(|e| DownloadError::Io(e.to_string()))?
         }
         ResumeAction::AppendFrom(offset) => {
-            let existing = tokio::fs::read(&part).await.map_err(|e| DownloadError::Io(e.to_string()))?;
+            let existing = tokio::fs::read(&part)
+                .await
+                .map_err(|e| DownloadError::Io(e.to_string()))?;
             if existing.len() as u64 != offset {
                 let _ = tokio::fs::remove_file(&part).await;
                 return Err(DownloadError::SizeMismatch);

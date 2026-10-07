@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::DownloadError;
+use crate::resume::partial_path;
 use crate::spec::{DownloadOutcome, DownloadProgress, DownloadSpec};
 use crate::stream::stream_once;
 
@@ -17,7 +18,7 @@ pub async fn fetch(
     mut on_progress: impl FnMut(DownloadProgress),
 ) -> Result<DownloadOutcome, DownloadError> {
     let mut delay = BACKOFF_BASE_MS;
-    let mut last_err = DownloadError::Network("no attempt".into());
+    let mut last_err = None;
     for attempt in 1..=DOWNLOAD_ATTEMPTS {
         if cancel.is_cancelled() {
             return Err(DownloadError::Cancelled);
@@ -29,22 +30,18 @@ pub async fn fetch(
             | Err(e @ DownloadError::SizeMismatch)
             | Err(e @ DownloadError::TooLarge)
             | Err(e @ DownloadError::InvalidUrl) => return Err(e),
-            Err(e @ DownloadError::Http(code)) if !(500..=599).contains(&code) && code != 408 && code != 429 => {
+            Err(e @ DownloadError::Http(code))
+                if !(500..=599).contains(&code) && code != 408 && code != 429 =>
+            {
                 return Err(e);
             }
             Err(e) => {
                 tracing::warn!(attempt, error = %e, "download attempt failed");
-                last_err = e;
+                last_err = Some(e);
                 if attempt == DOWNLOAD_ATTEMPTS {
                     break;
                 }
-                let part = spec.dest.with_file_name(format!(
-                    "{}.part",
-                    spec.dest
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| "file.part".into())
-                ));
+                let part = partial_path(&spec.dest);
                 let _ = tokio::fs::remove_file(&part).await;
                 tokio::select! {
                     biased;
@@ -55,7 +52,7 @@ pub async fn fetch(
             }
         }
     }
-    Err(last_err)
+    Err(last_err.expect("DOWNLOAD_ATTEMPTS >= 1"))
 }
 
 #[cfg(test)]

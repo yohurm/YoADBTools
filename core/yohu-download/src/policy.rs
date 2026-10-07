@@ -27,6 +27,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn accepts_http_and_https_only() {
+        assert!(is_http_url("https://example.com/a.exe"));
+        assert!(is_http_url("http://example.com/a.exe"));
+        assert!(is_http_url("  https://cdn.example.com/setup.exe  "));
+        assert!(!is_http_url("ftp://x"));
+        assert!(!is_http_url(""));
+        assert!(!is_http_url(r"C:\setup.exe"));
+    }
+
+    #[test]
     fn rejects_local_paths() {
         assert!(assert_http_url(r"C:\setup.exe").is_err());
         assert!(assert_http_url("https://").is_err());
