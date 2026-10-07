@@ -126,4 +126,11 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn positive_setting_is_single() {
+        let src = include_str!("settings.rs");
+        let prod = src.split("\n#[cfg(test)]").next().unwrap();
+        assert_eq!(prod.matches("n == 0").count(), 1);
+    }
 }

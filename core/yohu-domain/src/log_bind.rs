@@ -22,6 +22,14 @@ pub enum FilterScopeInput {
     Package,
 }
 
+fn process_name_is_package(name: &str, pkg: &str) -> bool {
+    name == pkg
+}
+
+fn process_name_is_child(name: &str, pkg: &str) -> bool {
+    name.starts_with(&format!("{pkg}:"))
+}
+
 pub fn rebind_pids(
     prev: &PidBinding,
     index: &[ProcessEntry],
@@ -32,11 +40,8 @@ pub fn rebind_pids(
     let current: Vec<u32> = index
         .iter()
         .filter(|entry| {
-            if include_child {
-                entry.name == pkg || entry.name.starts_with(&format!("{pkg}:"))
-            } else {
-                entry.name == pkg
-            }
+            process_name_is_package(&entry.name, pkg)
+                || (include_child && process_name_is_child(&entry.name, pkg))
         })
         .map(|entry| entry.pid)
         .collect();

@@ -35,18 +35,26 @@ pub fn lookup_selected_devices<'a>(
 /// 空列表 = 当前没有设备；禁止用上次快照顶替（那会让已拔线的设备继续显示在线）。
 /// 返回 (新目录, 先前 Online 且本次不再 Online 的 serial)。
 /// 含名单消失，以及 Online → unauthorized/offline（条目还在，采集/投屏/状态采样同样收敛）。
+pub fn device_is_online(state: DeviceState) -> bool {
+    state == DeviceState::Online
+}
+
+pub fn device_is_unauthorized(state: DeviceState) -> bool {
+    state == DeviceState::Unauthorized
+}
+
 pub fn catalog_after_scan(
     previous: &[DeviceInfo],
     scanned: Vec<DeviceInfo>,
 ) -> (Vec<DeviceInfo>, Vec<String>) {
     let online_now: std::collections::HashSet<&str> = scanned
         .iter()
-        .filter(|d| d.state == DeviceState::Online)
+        .filter(|d| device_is_online(d.state))
         .map(|d| d.serial.as_str())
         .collect();
     let went_offline = previous
         .iter()
-        .filter(|d| d.state == DeviceState::Online && !online_now.contains(d.serial.as_str()))
+        .filter(|d| device_is_online(d.state) && !online_now.contains(d.serial.as_str()))
         .map(|d| d.serial.clone())
         .collect();
     (scanned, went_offline)
@@ -117,6 +125,16 @@ mod tests {
     }
 
     #[test]
+    fn device_is_online_is_only_the_online_state() {
+        assert!(device_is_online(DeviceState::Online));
+        assert!(!device_is_online(DeviceState::Unauthorized));
+        assert!(!device_is_online(DeviceState::Offline));
+        assert!(device_is_unauthorized(DeviceState::Unauthorized));
+        assert!(!device_is_unauthorized(DeviceState::Online));
+        assert!(!device_is_unauthorized(DeviceState::Offline));
+    }
+
+    #[test]
     fn catalog_after_scan_empty_replaces_previous_online() {
         let previous = vec![device("A1", DeviceState::Online)];
         let (next, went_offline) = catalog_after_scan(&previous, Vec::new());
@@ -152,5 +170,12 @@ mod tests {
         let (next, went_offline) = catalog_after_scan(&previous, scanned);
         assert_eq!(next[0].state, DeviceState::Unauthorized);
         assert_eq!(went_offline, vec!["A1".to_string()]);
+    }
+
+    #[test]
+    fn applog_lock_sentence_once() {
+        let src = include_str!("applog.rs");
+        let stripped = src.replacen("self.inner.lock().expect(\"applog lock poisoned\")", "", 1);
+        assert!(!stripped.contains("applog lock poisoned"));
     }
 }

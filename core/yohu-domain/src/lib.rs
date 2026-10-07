@@ -20,23 +20,30 @@ pub mod safety;
 pub mod settings;
 
 pub use applog::{AppLog, AppLogEntry, LogLevel};
-pub use catalog::{catalog_after_scan, device_display_name, lookup_selected_devices};
+pub use catalog::{
+    catalog_after_scan, device_display_name, device_is_online, device_is_unauthorized,
+    lookup_selected_devices,
+};
 pub use command::{
-    align_params, combine_output, default_library, insert_placeholder, next_placeholder_index,
-    param_description, placeholder_arity, placeholder_slots, placeholder_tokens, preview_fill,
-    run_command, run_line, split_command_line, strip_leading_adb, step_param_slots, CommandBlock,
-    CommandDefinition, CommandGroup, CommandLibrary, CommandParam, CommandRun, CommandStep,
-    GroupExecutor, GroupRunEvent, LibraryEntry, LibraryError, PlaceholderToken, RunError, Runner,
-    StepParamSlot,
-    ScheduledStep,
+    align_params, apply_import, combine_imports, combine_output, default_library,
+    device_offline_text, insert_placeholder, next_placeholder_index, param_description,
+    parse_import_text, placeholder_arity, placeholder_slots, placeholder_tokens, preview_fill,
+    preview_import, run_command, run_line, screen_import_paths, split_command_line,
+    step_param_slots, strip_leading_adb, CommandBlock, CommandDefinition, CommandGroup,
+    CommandLibrary, CommandParam, CommandRun, CommandStep, GroupExecutor, GroupRunEvent,
+    ImportScreen, LibraryEntry, LibraryError, PlaceholderToken, RunError, RunShell, Runner,
+    ScheduledStep, StepParamSlot, CANDIDATES_FAILED, SHELL_ENDED, SHELL_EXEC, SHELL_HANDSHAKE,
+    SHELL_NO_STDIN, SHELL_NO_STDOUT, TOOL_UNAVAILABLE, UNSUPPORTED_SHELL,
 };
 pub use datetime::{
     canonicalize_datetime, canonicalize_datetime_seconds, clock_display_len, format_datetime,
-    format_datetime_seconds, format_log_ts, DATETIME_DISPLAY_LEN, DATETIME_SECONDS_LEN,
-    TIME_DISPLAY_LEN, TIME_MILLIS_DISPLAY_LEN,
+    format_datetime_seconds, format_log_ts, is_zone_token, DATETIME_DISPLAY_LEN,
+    DATETIME_SECONDS_LEN, TIME_DISPLAY_LEN, TIME_MILLIS_DISPLAY_LEN,
 };
 pub use focus::{
-    assert_device_online, assert_targets_online, reconcile_focus, DeviceSessionError, SelectionMode,
+    assert_device_online, assert_targets_online, device_not_online_text, reconcile_focus,
+    DEVICE_UNSELECTED,
+    DeviceSessionError, SelectionMode,
 };
 pub use log_bind::{
     pid_set_of, rebind_pids, to_wire_filter, FilterScopeInput, PidBinding, HISTORY_PID_CAP,
@@ -51,9 +58,13 @@ pub use mirror::{
     apply_protocol, is_tcp_connection, params_of, start_encode, start_force_forward,
     MirrorEncodeParams, USB_ENCODE, WIFI_ENCODE,
 };
-pub use path::{join_path, parent_of, path_segments, PathError, RemotePath};
+pub use path::{
+    invalid_name_text, join_path, not_absolute_text, parent_of, path_segments, traversal_text,
+    PathError, RemotePath,
+};
 pub use path_input::{parse_remote_path, PathParseErr, PathParseOk, PathStrategy};
 pub use safety::{
-    parent_within_safety, validate_entry_name, SafetyError, SafetyRoot,
+    outside_root_text, parent_within_safety, validate_entry_name, SafetyError, SafetyRoot,
+    ENTRY_NAME_EMPTY, ENTRY_NAME_SEPARATOR,
 };
 pub use settings::{apply_setting, SettingError};

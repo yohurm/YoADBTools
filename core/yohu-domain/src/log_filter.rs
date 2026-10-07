@@ -105,7 +105,10 @@ pub(crate) fn starts_with_ascii_ignore_case(haystack: &str, prefix: &str) -> boo
 }
 
 fn has_trailing_tag_sep(spec: &str) -> bool {
-    spec.trim_end().chars().last().is_some_and(is_tag_needle_sep)
+    spec.trim_end()
+        .chars()
+        .last()
+        .is_some_and(is_tag_needle_sep)
 }
 
 /// 拆解为已提交针（精确匹配）与输入草稿针（前缀匹配）。

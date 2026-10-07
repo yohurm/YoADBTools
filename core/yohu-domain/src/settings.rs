@@ -51,6 +51,14 @@ fn must_bool(key: SettingKey, value: &serde_json::Value) -> Result<bool, Setting
         .ok_or(SettingError::ExpectBool(key.as_str()))
 }
 
+fn require_positive(key: SettingKey, n: u64) -> Result<u64, SettingError> {
+    if n == 0 {
+        Err(SettingError::MustPositive(key.as_str()))
+    } else {
+        Ok(n)
+    }
+}
+
 fn must_clock_format(
     key: SettingKey,
     value: &serde_json::Value,
@@ -75,10 +83,7 @@ pub fn apply_setting(
             settings.devices_auto_refresh = must_bool(key, value)?;
         }
         SettingKey::BufferCapacity => {
-            let n = must_u64(key, value)?;
-            if n == 0 {
-                return Err(SettingError::MustPositive(key.as_str()));
-            }
+            let n = require_positive(key, must_u64(key, value)?)?;
             settings.buffer_capacity = n as usize;
         }
         SettingKey::ClearDeviceOnStart => {
@@ -118,10 +123,7 @@ pub fn apply_setting(
             settings.mirror_max_size = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::MirrorVideoBitRate => {
-            let n = must_u64(key, value)?;
-            if n == 0 {
-                return Err(SettingError::MustPositive(key.as_str()));
-            }
+            let n = require_positive(key, must_u64(key, value)?)?;
             settings.mirror_video_bit_rate =
                 u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
@@ -155,8 +157,8 @@ mod tests {
     use super::*;
     use serde_json::json;
     use yohu_protocol::{
-        default_wifi_mirror_max_fps, default_wifi_mirror_max_size, default_wifi_mirror_video_bit_rate,
-        LogColorScheme, LogLineLayout,
+        default_wifi_mirror_max_fps, default_wifi_mirror_max_size,
+        default_wifi_mirror_video_bit_rate, LogColorScheme, LogLineLayout,
     };
 
     #[test]
@@ -181,7 +183,10 @@ mod tests {
         let mut s = AppSettings::default();
         apply_setting(&mut s, SettingKey::MirrorProtocol, &json!("wifi")).unwrap();
         assert_eq!(s.mirror_max_size, default_wifi_mirror_max_size());
-        assert_eq!(s.mirror_video_bit_rate, default_wifi_mirror_video_bit_rate());
+        assert_eq!(
+            s.mirror_video_bit_rate,
+            default_wifi_mirror_video_bit_rate()
+        );
         assert_eq!(s.mirror_max_fps, default_wifi_mirror_max_fps());
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();

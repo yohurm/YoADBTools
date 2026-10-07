@@ -108,10 +108,41 @@ pub enum LibraryError {
     },
     #[error("命令组含需填值的条目 (group={group_id}, entry={entry_id})，请逐条执行")]
     GroupNeedsValues { group_id: String, entry_id: String },
+    #[error("导入条目不在文件中: {0}")]
+    UnknownImportEntry(String),
+    #[error("不是命令库文件")]
+    NotALibrary,
+    #[error("没有可导入的文件")]
+    EmptyImportPaths,
+    #[error("仅支持命令库 JSON")]
+    ImportPathsNotJson,
 }
 
 fn is_allowed_block_gap(ms: u64) -> bool {
     COMMAND_BLOCK_GAPS_MS.contains(&ms)
+}
+
+fn trimmed_is_blank(value: &str) -> bool {
+    value.trim().is_empty()
+}
+
+fn template_is_blank(template: &str) -> bool {
+    trimmed_is_blank(template)
+}
+
+fn arity_needs_values(arity: usize) -> bool {
+    arity > 0
+}
+
+fn reject_fill_len(id: &str, expected: usize, actual: usize) -> Result<(), LibraryError> {
+    if actual != expected {
+        return Err(LibraryError::FillValueMismatch {
+            id: id.to_string(),
+            expected,
+            actual,
+        });
+    }
+    Ok(())
 }
 
 impl CommandLibrary {
@@ -139,7 +170,7 @@ impl CommandLibrary {
                 return Err(LibraryError::DuplicateGroupId(g.id.clone()));
             }
             for entry in &g.entries {
-                if entry.name().trim().is_empty() {
+                if trimmed_is_blank(entry.name()) {
                     return Err(LibraryError::EmptyEntryName(entry.id().to_string()));
                 }
                 if !entry_ids.insert(entry.id()) {
@@ -147,7 +178,7 @@ impl CommandLibrary {
                 }
                 match entry {
                     LibraryEntry::Command(command) => {
-                        if command.template.trim().is_empty() {
+                        if template_is_blank(&command.template) {
                             return Err(LibraryError::EmptyTemplate(command.id.clone()));
                         }
                     }
@@ -284,7 +315,7 @@ impl CommandBlock {
             });
         }
         for (index, step) in self.steps.iter().enumerate() {
-            if step.template.trim().is_empty() {
+            if template_is_blank(&step.template) {
                 return Err(LibraryError::EmptyStep {
                     block_id: self.id.clone(),
                     index,
@@ -303,19 +334,13 @@ impl CommandBlock {
     }
 
     pub fn needs_values(&self) -> bool {
-        self.placeholder_arity() > 0
+        arity_needs_values(self.placeholder_arity())
     }
 
     /// 按步拼接填值：`1-0`、`1-1`、`2-0`…。每步只吃本步 `{n}`，不与邻步并集。
     pub fn fill(&self, values: &[String]) -> Result<Self, LibraryError> {
         let slots = self.param_slots();
-        if values.len() != slots.len() {
-            return Err(LibraryError::FillValueMismatch {
-                id: self.id.clone(),
-                expected: slots.len(),
-                actual: values.len(),
-            });
-        }
+        reject_fill_len(&self.id, slots.len(), values.len())?;
         let mut offset = 0usize;
         let mut steps = Vec::with_capacity(self.steps.len());
         for step in &self.steps {
@@ -362,7 +387,7 @@ impl CommandDefinition {
     }
 
     pub fn needs_values(&self) -> bool {
-        self.placeholder_arity() > 0
+        arity_needs_values(self.placeholder_arity())
     }
 
     /// 按独立槽位顺序替换 `{n}`。值个数必须等于互异 `{n}` 个数。
@@ -371,13 +396,7 @@ impl CommandDefinition {
     /// 因此若值本身含 `{1}` 等占位符样文本，会被当作字面量保留。
     pub fn fill(&self, values: &[String]) -> Result<Self, LibraryError> {
         let slots = self.placeholder_slots();
-        if values.len() != slots.len() {
-            return Err(LibraryError::FillValueMismatch {
-                id: self.id.clone(),
-                expected: slots.len(),
-                actual: values.len(),
-            });
-        }
+        reject_fill_len(&self.id, slots.len(), values.len())?;
         Ok(Self {
             template: apply_values(&self.template, &bind_values(&slots, values)),
             ..self.clone()
@@ -483,7 +502,7 @@ pub fn insert_placeholder(template: &str, start: usize, end: usize) -> (String, 
 pub fn align_params(slots: &[usize], params: &[CommandParam]) -> Vec<CommandParam> {
     let mut out: Vec<CommandParam> = params
         .iter()
-        .filter(|param| slots.contains(&param.index) && !param.description.trim().is_empty())
+        .filter(|param| slots.contains(&param.index) && !trimmed_is_blank(&param.description))
         .map(|param| CommandParam {
             index: param.index,
             description: param.description.trim().to_string(),
@@ -521,34 +540,20 @@ fn apply_values(template: &str, by_index: &HashMap<usize, &str>) -> String {
 }
 
 fn apply_placeholders(template: &str, by_index: &HashMap<usize, &str>, skip_empty: bool) -> String {
+    let tokens = placeholder_tokens(template);
     let mut out = String::with_capacity(template.len());
-    let mut rest = template;
-    loop {
-        let Some(pos) = rest.find('{') else {
-            out.push_str(rest);
-            break;
-        };
-        out.push_str(&rest[..pos]);
-        let after = &rest[pos + 1..];
-        if let Some(end) = after.find('}') {
-            if let Ok(n) = after[..end].parse::<usize>() {
-                if let Some(value) = by_index.get(&n) {
-                    if !skip_empty || !value.is_empty() {
-                        out.push_str(value);
-                        rest = &after[end + 1..];
-                        continue;
-                    }
-                }
-                out.push('{');
-                out.push_str(&after[..end]);
-                out.push('}');
-                rest = &after[end + 1..];
-                continue;
-            }
+    let mut chars = template.chars();
+    let mut cursor = 0usize;
+    for token in tokens {
+        out.extend(chars.by_ref().take(token.start - cursor));
+        let literal: String = chars.by_ref().take(token.end - token.start).collect();
+        match by_index.get(&token.index) {
+            Some(value) if !skip_empty || !value.is_empty() => out.push_str(value),
+            _ => out.push_str(&literal),
         }
-        out.push('{');
-        rest = after;
+        cursor = token.end;
     }
+    out.extend(chars);
     out
 }
 
@@ -1042,5 +1047,12 @@ mod tests {
             lib.validate(),
             Err(LibraryError::EmptyTemplate(_))
         ));
+    }
+
+    #[test]
+    fn push_arg_once() {
+        let src = include_str!("executor.rs");
+        let prod = src.split("mod tests").next().unwrap();
+        assert_eq!(prod.matches("!current.is_empty()").count(), 1);
     }
 }
