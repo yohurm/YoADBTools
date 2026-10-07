@@ -2,7 +2,7 @@
  * Markup 名：paint → ::highlight() 身份。不碰 DOM、不写色值。
  */
 
-import type { MarkupPaint } from "./markup-model";
+import { markupPaintIsInk, markupPaintIsMark, markupPaintIsWash, type MarkupPaint } from "./markup-model";
 
 export const MARKUP_MARK_NAME = "yohu-log-mark";
 
@@ -17,13 +17,14 @@ export function markupTokenId(cssVar: string): string | null {
 }
 
 export function markupHighlightName(paint: MarkupPaint): string | null {
-  if (paint.kind === "mark") {
+  if (markupPaintIsMark(paint)) {
     return MARKUP_MARK_NAME;
   }
-  if (paint.kind === "ink") {
+  if (markupPaintIsInk(paint)) {
     const id = markupTokenId(paint.color);
     return id ? `yohu-ink-${id}` : null;
   }
+  if (!markupPaintIsWash(paint)) return null;
   const id = markupTokenId(paint.background);
   return id ? `yohu-wash-${id}` : null;
 }

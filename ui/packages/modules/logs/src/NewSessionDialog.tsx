@@ -9,7 +9,7 @@
 
 import { Show, createContext, createEffect, createMemo, createSignal, untrack, useContext } from "solid-js";
 
-import { YoLog, type DeviceInfo } from "@yohu/api";
+import { YoLog, deviceIsOnline, type DeviceInfo } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -22,11 +22,22 @@ import {
   YoSearch,
   YoSelect,
   YoVirtualList,
+  controlRowHeight,
+  resolveDialogOpen,
+  type YoDialogProps,
   searchDocuments,
+  trimmedTextPresent,
 } from "@yohu/ui";
 
 import type { SessionScope } from "./filter";
-import { controlRowHeight, NEW_SESSION_DIALOG_HEIGHT } from "./layout";
+import { NEW_SESSION_DIALOG_HEIGHT } from "./layout";
+import {
+  newSessionIsPackage,
+  newSessionModeOf,
+  newSessionPackageName,
+  newSessionPid,
+  type NewSessionMode,
+} from "./new-session-mode";
 import { devicePickerFields } from "./session-device";
 import { logStore } from "./store";
 
@@ -63,14 +74,16 @@ function NewSessionActions(props: {
   );
 }
 
+function sliceList<T>(value: readonly T[] | undefined): readonly T[] { return value ?? []; }
+
 export function NewSessionDialog(props: {
-  open: () => boolean;
+  open: YoDialogProps["open"];
   onClose: () => void;
   onCreated?: () => void;
   devices: DeviceInfo[];
   focusSerial: string | null;
 }) {
-  const [mode, setMode] = createSignal<"package" | "pid">("package");
+  const [mode, setMode] = createSignal<NewSessionMode>("package");
   const [query, setQuery] = createSignal("");
   const [includeChild, setIncludeChild] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -85,6 +98,12 @@ export function NewSessionDialog(props: {
     setError("");
   };
 
+  const watchLoad = (begin: () => Promise<unknown>): void => {
+    setLoading(true);
+    const job = begin();
+    void job.finally(() => setLoading(false));
+  };
+
   const loadDevice = (serial: string): void => {
     setDeviceSerial(serial);
     setError("");
@@ -92,19 +111,18 @@ export function NewSessionDialog(props: {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const job =
-      untrack(mode) === "pid"
+    watchLoad(() =>
+      !newSessionIsPackage(untrack(mode))
         ? logStore.refreshProcesses(serial)
-        : logStore.refreshPackages(serial);
-    void job.finally(() => setLoading(false));
+        : logStore.refreshPackages(serial),
+    );
   };
 
   createEffect(() => {
-    if (!props.open()) return;
+    if (!resolveDialogOpen(props.open)) return;
     untrack(() => {
       resetForm();
-      const online = props.devices.filter((d) => d.state === "online");
+      const online = props.devices.filter((d) => deviceIsOnline(d.state));
       setDevices(online);
       const focus = props.focusSerial ?? logStore.serial() ?? "";
       const next =
@@ -113,46 +131,52 @@ export function NewSessionDialog(props: {
     });
   });
 
-  const switchMode = (next: "package" | "pid"): void => {
+  const switchMode = (next: NewSessionMode): void => {
     if (mode() === next) return;
     setMode(next);
     setQuery("");
     setError("");
     const serial = deviceSerial();
     if (!serial) return;
-    setLoading(true);
-    const job = next === "pid" ? logStore.refreshProcesses(serial) : logStore.refreshPackages(serial);
-    void job.finally(() => setLoading(false));
+    watchLoad(() =>
+      newSessionIsPackage(next) ? logStore.refreshPackages(serial) : logStore.refreshProcesses(serial),
+    );
   };
 
+  const deviceSlice = () => logStore.state.devices[deviceSerial()];
+
   const processEntries = createMemo(
-    () => logStore.state.devices[deviceSerial()]?.processEntries ?? [],
+    () => sliceList(deviceSlice()?.processEntries),
   );
 
-  const packageNames = createMemo(() => logStore.state.devices[deviceSerial()]?.packages ?? []);
+  const packageNames = createMemo(() => sliceList(deviceSlice()?.packages));
 
   const listDegraded = createMemo(() => {
-    const slice = logStore.state.devices[deviceSerial()];
+    const slice = deviceSlice();
     if (!slice) return false;
-    return mode() === "pid" ? slice.indexDegraded === true : slice.packagesDegraded === true;
+    return newSessionIsPackage(mode()) ? slice.packagesDegraded === true : slice.indexDegraded === true;
   });
+
+  function searchHitItems<T>(matches: readonly { item?: T }[]): T[] {
+    return matches.flatMap((match) => (match.item ? [match.item] : []));
+  }
 
   const pickerItems = createMemo((): PickerItem[] => {
     const q = query();
-    if (mode() === "package") {
-      return searchDocuments(
+    if (newSessionIsPackage(mode())) {
+      return searchHitItems(searchDocuments(
         packageNames().map((name) => ({
           id: name,
           item: { key: name, name },
           fields: [{ key: "name", text: name, weight: 1 }],
         })),
         q,
-      ).flatMap((match) => (match.item ? [match.item] : []));
+      ));
     }
     const entries = [...processEntries()].sort(
       (a, b) => a.name.localeCompare(b.name) || a.pid - b.pid,
     );
-    return searchDocuments(
+    return searchHitItems(searchDocuments(
       entries.map((entry) => ({
         id: String(entry.pid),
         item: { key: String(entry.pid), name: entry.name, pid: entry.pid },
@@ -162,7 +186,7 @@ export function NewSessionDialog(props: {
         ],
       })),
       q,
-    ).flatMap((match) => (match.item ? [match.item] : []));
+    ));
   });
 
   const deviceOptions = createMemo(() =>
@@ -174,17 +198,14 @@ export function NewSessionDialog(props: {
 
   const selectedKey = (): string | null => {
     const q = query().trim();
-    if (!q) return null;
+    if (!trimmedTextPresent(q)) return null;
     return pickerItems().some((item) => item.key === q) ? q : null;
   };
 
-  const parsedPid = (): number => Number.parseInt(query().trim(), 10);
-
   const canCreate = (): boolean => {
     if (!deviceSerial()) return false;
-    if (mode() === "package") return query().trim().length > 0;
-    const pid = parsedPid();
-    return Number.isInteger(pid) && pid > 0;
+    if (newSessionIsPackage(mode())) return newSessionPackageName(query()) !== null;
+    return newSessionPid(query()) !== null;
   };
 
   const create = (): void => {
@@ -195,17 +216,17 @@ export function NewSessionDialog(props: {
     }
     let scope: SessionScope;
     let title: string;
-    if (mode() === "package") {
-      const name = query().trim();
-      if (!name) {
+    if (newSessionIsPackage(mode())) {
+      const name = newSessionPackageName(query());
+      if (name === null) {
         setError("请选择或输入包名");
         return;
       }
       scope = { kind: "package", pkg: name, includeChild: includeChild() };
       title = name;
     } else {
-      const pid = parsedPid();
-      if (!Number.isInteger(pid) || pid <= 0) {
+      const pid = newSessionPid(query());
+      if (pid === null) {
         setError("请输入有效 PID");
         return;
       }
@@ -224,21 +245,24 @@ export function NewSessionDialog(props: {
   };
 
   const emptyTitle = (): string => {
-    if (query().trim()) return "无匹配";
-    return mode() === "package" ? "应用列表为空" : "进程列表为空";
+    if (trimmedTextPresent(query())) return "无匹配";
+    return newSessionIsPackage(mode()) ? "应用列表为空" : "进程列表为空";
   };
 
   const emptyDescription = (): string => {
     if (listDegraded()) {
-      return mode() === "package"
+      return newSessionIsPackage(mode())
         ? "已安装应用列表读取失败，可直接在上方输入包名。"
         : "进程列表读取失败，可直接在上方输入 PID。";
     }
-    if (query().trim()) {
-      return mode() === "package" ? "将使用上方输入创建" : "将使用上方 PID 创建";
+    if (trimmedTextPresent(query())) {
+      return newSessionIsPackage(mode()) ? "将使用上方输入创建" : "将使用上方 PID 创建";
     }
-    return mode() === "package" ? "可手动输入包名" : "可手动输入 PID";
+    return newSessionIsPackage(mode()) ? "可手动输入包名" : "可手动输入 PID";
   };
+
+  const filterPrompt = (): string =>
+    newSessionIsPackage(mode()) ? "过滤或输入包名" : "过滤进程或输入 PID";
 
   return (
     <YoDialog
@@ -276,7 +300,8 @@ export function NewSessionDialog(props: {
                 { value: "pid", label: "PID" },
               ]}
               onChange={(value) => {
-                if (value === "package" || value === "pid") switchMode(value);
+                const next = newSessionModeOf(value);
+                if (next) switchMode(next);
               }}
             />
           </div>
@@ -284,10 +309,10 @@ export function NewSessionDialog(props: {
 
         <div class="yohu-logs__new-search">
           <YoSearch
-            ariaLabel={mode() === "package" ? "过滤或输入包名" : "过滤进程或输入 PID"}
+            ariaLabel={filterPrompt()}
             value={query()}
             status={error() ? "error" : undefined}
-            placeholder={mode() === "package" ? "过滤或输入包名" : "过滤进程或输入 PID"}
+            placeholder={filterPrompt()}
             onInput={(v) => {
               setQuery(v);
               setError("");
@@ -297,13 +322,13 @@ export function NewSessionDialog(props: {
         </div>
 
         <div class="yohu-logs__new-list">
-          <YoCorner role="control" class="yohu-logs__new-list-chrome" flex="fill" overflow="hidden">
+          <YoCorner role="control" flex="fill" overflow="hidden">
             <Show
               when={!loading()}
               fallback={
                 <YoLoading
                   fill
-                  title={mode() === "package" ? "正在读取已安装应用…" : "正在读取进程…"}
+                  title={newSessionIsPackage(mode()) ? "正在读取已安装应用…" : "正在读取进程…"}
                 />
               }
             >
@@ -323,7 +348,7 @@ export function NewSessionDialog(props: {
                     getItemKey={(item) => item.key}
                     selectedKey={selectedKey}
                     onSelectRow={(item) => pickItem(item)}
-                    ariaLabel={mode() === "package" ? "包名列表" : "进程列表"}
+                    ariaLabel={newSessionIsPackage(mode()) ? "包名列表" : "进程列表"}
                     renderRow={NewSessionRow}
                   />
                 </NewSessionActivate.Provider>
@@ -332,12 +357,12 @@ export function NewSessionDialog(props: {
           </YoCorner>
         </div>
 
-        <Show when={mode() === "package"}>
+        <Show when={newSessionIsPackage(mode())}>
           <YoCheckbox label="包含子进程（pkg:xxx）" checked={includeChild()} onChange={setIncludeChild} />
         </Show>
         <Show when={listDegraded() && pickerItems().length > 0}>
           <YoBadge
-            text={mode() === "package" ? "应用列表读取失败，可手动输入" : "进程列表读取失败，可手动输入"}
+            text={newSessionIsPackage(mode()) ? "应用列表读取失败，可手动输入" : "进程列表读取失败，可手动输入"}
             tone="warning"
           />
         </Show>

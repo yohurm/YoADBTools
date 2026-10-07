@@ -8,6 +8,7 @@
 import type { LogLine, SignalKind } from "@yohu/api";
 
 import {
+  batchCursor,
   formatMessages,
   formatOptionsKey,
   type ContentBar,
@@ -15,10 +16,9 @@ import {
   type FormatOptions,
   type FormatRange,
   type FormattedMessage,
-  type LogFieldKind,
 } from "./format";
 
-export type { ContentBar, FormatOptions, FormatRange, LogFieldKind };
+export type { ContentBar, FormatOptions, FormatRange };
 
 export type DocRow = {
   line: LogLine;
@@ -40,12 +40,16 @@ export type DocMessage = {
 export const EMPTY_MESSAGES: DocMessage[] = [];
 export const EMPTY_ROWS: DocRow[] = [];
 
+export function extendStored<T>(current: readonly T[], empty: readonly T[], next: T[]): T[] {
+  return current === empty ? next : current.concat(next);
+}
+
 function duplicateSeed(items: readonly DocMessage[]): FormatBatchState {
   const last = items.at(-1)?.line;
   if (!last) {
     return {};
   }
-  return { previousTag: last.tag, previousPid: last.pid };
+  return batchCursor(last);
 }
 
 function toDocMessage(row: DocRow, formatted: FormattedMessage): DocMessage {
@@ -112,6 +116,10 @@ function overlapLen(prev: readonly DocRow[], next: readonly DocRow[]): number {
   return 0;
 }
 
+function rowsEmpty(rows: readonly DocRow[]): boolean {
+  return rows.length === 0;
+}
+
 export class LogDocument {
   private opts: FormatOptions | null = null;
   private key = "";
@@ -134,7 +142,7 @@ export class LogDocument {
     }
     this.opts = next;
     this.key = key;
-    if (this.source.length === 0) {
+    if (this.sourceEmpty()) {
       return false;
     }
     this.reload(this.source);
@@ -142,25 +150,24 @@ export class LogDocument {
   }
 
   append(rows: readonly DocRow[]): boolean {
-    if (!this.opts || rows.length === 0) {
+    if (!this.opts || rowsEmpty(rows)) {
       return false;
     }
     const painted = paintRows(rows, this.opts!, duplicateSeed(this.items));
     this.source = this.source === EMPTY_ROWS ? rows.slice() : [...this.source, ...rows];
-    this.items = this.items === EMPTY_MESSAGES ? painted : this.items.concat(painted);
+    this.items = extendStored(this.items, EMPTY_MESSAGES, painted);
     return true;
   }
 
   evictFront(count: number): boolean {
-    if (count <= 0 || this.items.length === 0) {
+    if (count <= 0 || this.itemsEmpty()) {
       return false;
     }
     const n = Math.min(count, this.items.length);
     this.source = this.source.slice(n);
     this.items = this.items.slice(n);
-    if (this.items.length === 0) {
-      this.source = EMPTY_ROWS;
-      this.items = EMPTY_MESSAGES;
+    if (this.itemsEmpty()) {
+      this.blankStored();
     }
     return true;
   }
@@ -169,12 +176,11 @@ export class LogDocument {
     if (!this.opts) {
       this.source = rows;
       this.items = EMPTY_MESSAGES;
-      return rows.length === 0 && this.items === EMPTY_MESSAGES ? false : true;
+      return rowsEmpty(rows) && this.items === EMPTY_MESSAGES ? false : true;
     }
-    if (rows.length === 0) {
+    if (rowsEmpty(rows)) {
       const changed = this.items !== EMPTY_MESSAGES;
-      this.source = EMPTY_ROWS;
-      this.items = EMPTY_MESSAGES;
+      this.blankStored();
       return changed;
     }
     this.source = rows;
@@ -191,10 +197,10 @@ export class LogDocument {
     if (rows === this.source) {
       return false;
     }
-    if (rows.length === 0) {
+    if (rowsEmpty(rows)) {
       return this.reload(rows);
     }
-    if (this.source.length === 0) {
+    if (this.sourceEmpty()) {
       return this.reload(rows);
     }
     const prefixed = prefixLen(this.source, rows);
@@ -210,7 +216,7 @@ export class LogDocument {
     const evicted = suffixOffset(this.source, rows);
     if (evicted > 0) {
       const changed = this.evictFront(evicted);
-      this.source = rows.length === 0 ? EMPTY_ROWS : rows;
+      this.source = rowsEmpty(rows) ? EMPTY_ROWS : rows;
       return changed;
     }
     const overlap = overlapLen(this.source, rows);
@@ -227,9 +233,21 @@ export class LogDocument {
   }
 
   clear(): void {
-    this.source = EMPTY_ROWS;
-    this.items = EMPTY_MESSAGES;
+    this.blankStored();
     this.opts = null;
     this.key = "";
+  }
+
+  private sourceEmpty(): boolean {
+    return this.source.length === 0;
+  }
+
+  private itemsEmpty(): boolean {
+    return this.items.length === 0;
+  }
+
+  private blankStored(): void {
+    this.source = EMPTY_ROWS;
+    this.items = EMPTY_MESSAGES;
   }
 }

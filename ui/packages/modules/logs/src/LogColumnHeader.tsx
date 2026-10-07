@@ -6,11 +6,13 @@
 
 import { For, type JSX } from "solid-js";
 
-import { YoColHeader, YoColRow } from "@yohu/ui";
+import { YoColHead, YoColHeader, YoColRow } from "@yohu/ui";
 
 import {
-  DEFAULT_CH_PX,
   headerColumns,
+  logChUnit,
+  logColPx,
+  logFieldIsMessage,
   minColChars,
   type FormatOptions,
   type LogHeaderColumn,
@@ -24,33 +26,32 @@ function LogHeaderCell(props: {
   onResize: (key: LogMetaColKey, chars: number) => void;
   onFit: (key: LogMetaColKey) => void;
 }): JSX.Element {
-  const px = (): number => (props.chPx > 0 ? props.chPx : DEFAULT_CH_PX);
   const widthPx = (): number | undefined =>
-    props.col.width == null ? undefined : Math.max(1, Math.round(props.col.width * px()));
+    props.col.width == null ? undefined : logColPx(props.col.width, props.chPx);
   const minPx = (): number =>
-    props.col.key === "msg"
+    logFieldIsMessage(props.col.key)
       ? 0
-      : Math.max(1, Math.round(minColChars(props.col.key, props.options) * px()));
+      : logColPx(minColChars(props.col.key, props.options), props.chPx);
   return (
     <YoColHeader
       tone="document"
       pad="none"
-      split={props.col.key !== "msg"}
+      split={!logFieldIsMessage(props.col.key)}
       resizable={props.col.resizable}
       resizeLabel={`调节${props.col.label}列宽`}
       width={widthPx()}
       minWidth={minPx()}
       onWidthChange={(next) => {
-        if (props.col.key === "msg") {
+        if (logFieldIsMessage(props.col.key)) {
           return;
         }
         props.onResize(
           props.col.key,
-          Math.max(minColChars(props.col.key, props.options), Math.round(next / px())),
+          Math.max(minColChars(props.col.key, props.options), Math.round(next / logChUnit(props.chPx))),
         );
       }}
       onFit={() => {
-        if (props.col.key !== "msg") {
+        if (!logFieldIsMessage(props.col.key)) {
           props.onFit(props.col.key);
         }
       }}
@@ -69,7 +70,7 @@ export function LogColumnHeader(props: {
 }): JSX.Element {
   const cols = () => headerColumns(props.options);
   return (
-    <div class="yohu-logs__head">
+    <YoColHead class="yohu-logs__head">
       <YoColRow
         class="yohu-logs__cols"
         style={{ transform: props.shift ? `translateX(-${props.shift}px)` : undefined }}
@@ -86,6 +87,6 @@ export function LogColumnHeader(props: {
           )}
         </For>
       </YoColRow>
-    </div>
+    </YoColHead>
   );
 }

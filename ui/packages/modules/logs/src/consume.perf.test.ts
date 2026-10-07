@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { LogLine } from "@yohu/api";
+import { LEVELS, matchesWireFilter, type LogLine } from "@yohu/api";
 
-import { LEVELS, matchesLine, type SessionFilter } from "./filter";
+import { sessionWire, type SessionFilter } from "./filter";
 import { RingMirror } from "./mirror";
 import { collapseStack } from "./stack";
 
@@ -61,13 +61,17 @@ describe("日志管线性能回归（50k 缓冲 · 3 会话）", () => {
       sessionFilter({ levels: ["V"], tagContains: "activity", scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [100] }),
     ];
     // 预热（JIT）
-    for (const f of filters) mirror.replay((l) => matchesLine(l, f), 2000);
+    for (const f of filters) {
+      const wire = sessionWire(f);
+      mirror.replay((l) => matchesWireFilter(l, wire), 2000);
+    }
     const start = performance.now();
     for (let i = 0; i < 50; i++) {
       const slice = mirror.replay(() => true, 0); // 空操作对齐开销基线
       void slice;
       for (const f of filters) {
-        const rows = mirror.replay((l) => matchesLine(l, f), 2000);
+        const wire = sessionWire(f);
+        const rows = mirror.replay((l) => matchesWireFilter(l, wire), 2000);
         collapseStack(rows);
       }
     }
@@ -85,7 +89,8 @@ describe("日志管线性能回归（50k 缓冲 · 3 会话）", () => {
     ];
     const start = performance.now();
     for (const f of filters) {
-      const rows = mirror.replay((l) => matchesLine(l, f), 2000);
+      const wire = sessionWire(f);
+      const rows = mirror.replay((l) => matchesWireFilter(l, wire), 2000);
       collapseStack(rows);
     }
     const elapsed = performance.now() - start;

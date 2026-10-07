@@ -63,23 +63,10 @@
   line-height: var(--yohu-font-leading-data);
 }
 
-.yohu-logs__table {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-
 .yohu-logs__head {
-  flex-shrink: 0;
-  overflow: hidden;
-  height: var(--yohu-row-height-header);
   border-bottom: var(--yohu-stroke-hairline) solid var(--yohu-border);
   color: var(--yohu-fg-2);
   user-select: none;
-}
-
-.yohu-logs__table:has(.yohu-scroller[data-gutter="on"]) > .yohu-logs__head {
-  padding-inline-end: var(--yohu-space-lg);
 }
 
 .yohu-logs__list-body {
@@ -281,19 +268,10 @@
   min-height: 0;
 }
 
-.yohu-logs__new-list-chrome {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  width: 100%;
-}
-
 .yohu-logs__new-item {
   display: flex;
   align-items: center;
   gap: var(--yohu-space-sm);
-  width: 100%;
-  height: 100%;
   padding: 0 var(--yohu-space-sm);
   box-sizing: border-box;
   font-family: var(--yohu-font-mono);

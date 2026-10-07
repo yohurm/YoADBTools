@@ -34,10 +34,6 @@ vi.mock("@yohu/api", async (importOriginal) => {
   return {
     ...actual,
     APP_SETTINGS_DEFAULT: { buffer_capacity: 10_000 },
-    DATETIME_DISPLAY_LEN: 23,
-    TIME_DISPLAY_LEN: 8,
-    clockDisplayLen: (format: string) =>
-      format === "time" || format === "time_millis" ? 8 : 23,
     deviceRefresh: notConfigured,
     deviceList: notConfigured,
     systemInfo: notConfigured,
@@ -136,7 +132,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
   };
 });
 
-import { pidSetOf } from "./binding";
+import { pidSetOf } from "@yohu/api";
 import { createLogStore, SYSTEM_SESSION_TITLE } from "./store";
 import type { LogStoreApi } from "./store";
 

@@ -146,4 +146,26 @@ describe("Board 不回调 Formatter", () => {
     expect(src).not.toContain("--yohu-log-board");
     expect(src).not.toContain("log_line_layout");
   });
+
+  it("hard_breaks_once", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { dirname, resolve } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "board.ts"), "utf-8");
+    const messageSplit = "message.text.split(" + "\"\\n\")";
+    const anySplit = ".split(" + "\"\\n\")";
+    expect(src.split(messageSplit).length - 1).toBe(0);
+    expect(src.split(anySplit).length - 1).toBe(1);
+    expect(src).toContain("hardBreaks(");
+  });
+
+  it("collapsed_after_once", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { dirname, resolve } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "board.ts"), "utf-8");
+    const needle = "collapsedAfter: " + "message.collapsedAfter";
+    expect(src.split(needle).length - 1).toBe(0);
+    expect(src).toContain("last ? message.collapsedAfter");
+  });
 });

@@ -8,10 +8,23 @@ import { isEditableTarget } from "@yohu/ui";
 
 import {
   applyCopyEvent,
+  copyScopeIsAll,
   LOG_COPY_NONE,
   logSelectionInList,
   type LogCopyScope,
 } from "./copy";
+
+function eventTargetIn(root: ParentNode, target: EventTarget | null): boolean {
+  return target instanceof Node && root.contains(target);
+}
+
+function listen<K extends keyof DocumentEventMap>(
+  type: K,
+  handler: (event: DocumentEventMap[K]) => void,
+): () => void {
+  document.addEventListener(type, handler);
+  return () => document.removeEventListener(type, handler);
+}
 
 export function attachLogCopyGestures(opts: {
   listRoot: () => ParentNode | null;
@@ -24,30 +37,29 @@ export function attachLogCopyGestures(opts: {
     const root = opts.listRoot();
     const selection = window.getSelection();
     const inList = Boolean(
-      root &&
-        ((event.target instanceof Node && root.contains(event.target)) || logSelectionInList(root, selection)),
+      root && (eventTargetIn(root, event.target) || logSelectionInList(root, selection)),
     );
-    if (!inList && opts.pick().kind !== "all") return;
+    if (!inList && !copyScopeIsAll(opts.pick())) return;
     applyCopyEvent(event, opts.copyText());
   };
   const onPointerDown = (event: PointerEvent): void => {
     const root = opts.listRoot();
-    if (!root || !(event.target instanceof Node) || !root.contains(event.target)) return;
+    if (!root || !eventTargetIn(root, event.target)) return;
     if (event.button !== 0) return;
-    if (opts.pick().kind !== "none") opts.setPick(LOG_COPY_NONE);
+    if (copyScopeIsAll(opts.pick())) opts.setPick(LOG_COPY_NONE);
   };
   const onSelectionChange = (): void => {
-    if (opts.pick().kind === "all") return;
+    if (copyScopeIsAll(opts.pick())) return;
     if (logSelectionInList(opts.listRoot(), window.getSelection())) {
       opts.setPick(LOG_COPY_NONE);
     }
   };
-  document.addEventListener("copy", onCopy);
-  document.addEventListener("pointerdown", onPointerDown);
-  document.addEventListener("selectionchange", onSelectionChange);
+  const stopCopy = listen("copy", onCopy);
+  const stopPointerDown = listen("pointerdown", onPointerDown);
+  const stopSelectionChange = listen("selectionchange", onSelectionChange);
   return () => {
-    document.removeEventListener("copy", onCopy);
-    document.removeEventListener("pointerdown", onPointerDown);
-    document.removeEventListener("selectionchange", onSelectionChange);
+    stopCopy();
+    stopPointerDown();
+    stopSelectionChange();
   };
 }

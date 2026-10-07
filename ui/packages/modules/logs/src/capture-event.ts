@@ -7,6 +7,18 @@ export type CaptureEventDecision =
   | { kind: "running"; generation: number }
   | { kind: "stopped"; generation: number };
 
+export function captureDecisionIsIgnore(
+  decision: CaptureEventDecision,
+): decision is { kind: "ignore" } {
+  return decision.kind === "ignore";
+}
+
+export function captureDecisionIsStopped(
+  decision: CaptureEventDecision,
+): decision is { kind: "stopped"; generation: number } {
+  return decision.kind === "stopped";
+}
+
 export function applyCaptureEvent(
   currentGeneration: number,
   eventGeneration: number,

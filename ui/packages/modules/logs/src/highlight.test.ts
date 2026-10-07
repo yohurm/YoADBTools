@@ -1,7 +1,10 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { containsAsciiIgnoreCase } from "./filter";
-import { keywordRanges, keywordRangesInWindows } from "./highlight";
+import { containsAsciiIgnoreCase } from "@yohu/api";
+import { keywordBlank, keywordRanges, keywordRangesInWindows } from "./highlight";
 
 describe("keywordRanges", () => {
   it("无关键字不标", () => {
@@ -42,5 +45,29 @@ describe("keywordRanges", () => {
         "D",
       ),
     ).toEqual([{ from: 9, to: 10 }]);
+  });
+});
+
+describe("空白关键字只判一次", () => {
+  it("空串不标，生产路径不再写 !keyword", () => {
+    expect(keywordBlank("")).toBe(true);
+    expect(keywordBlank("a")).toBe(false);
+    const root = dirname(fileURLToPath(import.meta.url));
+    const walk = (dir: string): void => {
+      for (const ent of readdirSync(dir, { withFileTypes: true })) {
+        const abs = join(dir, ent.name);
+        if (ent.isDirectory()) {
+          walk(abs);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(ent.name) || ent.name.includes(".test.")) continue;
+        let body = readFileSync(abs, "utf8");
+        const name = abs.slice(root.length + 1).replaceAll("\\", "/");
+        if (name === "highlight.ts") body = body.replace("return keyword.length === 0", "");
+        expect(body, name).not.toContain("!keyword");
+        expect(body, name).not.toContain("keyword.length === 0");
+      }
+    };
+    walk(root);
   });
 });

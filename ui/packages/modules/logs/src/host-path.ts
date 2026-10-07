@@ -1,18 +1,11 @@
 /**
- * 本机宿主路径拼接。分隔符从 dir 自身推断，不猜 OS。
- * 设备 POSIX 路径走 files 模块 joinPath，不要复用这里。
+ * 本机导出路径。分隔符拼接在 `@yohu/api` `joinHostPath`。
+ * 设备 POSIX 路径不走这里。
  */
 
-export const LOG_EXPORT_FILE = "logcat-export.txt";
+import { joinHostPath } from "@yohu/api";
 
-export function joinHostPath(dir: string, name: string): string {
-  if (dir === "") {
-    return name;
-  }
-  const sep = dir.includes("\\") ? "\\" : "/";
-  const base = dir.replace(/[\\/]+$/, "");
-  return `${base}${sep}${name}`;
-}
+export const LOG_EXPORT_FILE = "logcat-export.txt";
 
 export function suggestedExportPath(dir?: string): string {
   if (dir === undefined || dir === "") {

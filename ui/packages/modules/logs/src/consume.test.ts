@@ -1,27 +1,34 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
-import { rebindPids as apiRebindPids, scanSignal as apiScanSignal } from "@yohu/api";
-
-import { emptyBinding, pidSetOf, rebindPids } from "./binding";
 import {
+  emptyBinding,
   LEVELS,
-  joinTagInput,
   levelKey,
-  levelLabel,
-  matchesLine,
+  matchesWireFilter,
   normalizeLevels,
+  parseTagFilterNeedles,
   parseTagNeedles,
-  removeTagNeedle,
-  splitTagInput,
+  pidSetOf,
   tagFilterActive,
-  toggleLevel,
   toWireFilter,
+} from "@yohu/api";
+
+import {
+  joinTagInput,
+  levelLabel,
+  removeTagNeedle,
+  sessionWire,
+  toggleLevel,
+  scopeBadge,
+  scopeIsPackage,
   type SessionFilter,
 } from "./filter";
 import { RingMirror } from "./mirror";
-import { scanSignal } from "./signals";
-import { collapseStack } from "./stack";
+import { collapseStack, stackFrameMessage } from "./stack";
 
 const line = (over: Partial<LogLine>): LogLine => ({
   seq: 0,
@@ -63,6 +70,22 @@ describe("LEVELS 铬", () => {
   });
 });
 
+describe("scopeBadge", () => {
+  it("全范围、包名和 PID 各一句", () => {
+    expect(scopeBadge({ kind: "all" })).toBe("System");
+    expect(scopeBadge({ kind: "package", pkg: "com.foo", includeChild: true })).toBe("包名: com.foo");
+    expect(scopeBadge({ kind: "pid", pid: 12 })).toBe("PID: 12");
+  });
+
+  it("包名窗口只由 scopeIsPackage 判定", () => {
+    const pkg = { kind: "package" as const, pkg: "com.foo", includeChild: true };
+    expect(scopeIsPackage(pkg)).toBe(true);
+    if (scopeIsPackage(pkg)) expect(pkg.pkg).toBe("com.foo");
+    expect(scopeIsPackage({ kind: "all" })).toBe(false);
+    expect(scopeIsPackage({ kind: "pid", pid: 1 })).toBe(false);
+  });
+});
+
 describe("normalizeLevels / toggleLevel", () => {
   it("只收 LEVELS 字母，按 V→F 去重排序", () => {
     expect(normalizeLevels(["e", "W", "W", "X", "?"])).toEqual(["W", "E"]);
@@ -77,60 +100,64 @@ describe("normalizeLevels / toggleLevel", () => {
   });
 });
 
-describe("matchesLine", () => {
+function hit(sample: LogLine, f: SessionFilter): boolean {
+  return matchesWireFilter(sample, sessionWire(f));
+}
+
+describe("会话过滤走 wire 匹配", () => {
   it("级别精确集合：选 W 不含 E/I", () => {
     const f = filter({ levels: ["W"] });
-    expect(matchesLine(line({ level: "W" }), f)).toBe(true);
-    expect(matchesLine(line({ level: "E" }), f)).toBe(false);
-    expect(matchesLine(line({ level: "I" }), f)).toBe(false);
+    expect(hit(line({ level: "W" }), f)).toBe(true);
+    expect(hit(line({ level: "E" }), f)).toBe(false);
+    expect(hit(line({ level: "I" }), f)).toBe(false);
   });
 
   it("级别可多选：W+E 不含 I", () => {
     const f = filter({ levels: ["W", "E"] });
-    expect(matchesLine(line({ level: "W" }), f)).toBe(true);
-    expect(matchesLine(line({ level: "E" }), f)).toBe(true);
-    expect(matchesLine(line({ level: "I" }), f)).toBe(false);
+    expect(hit(line({ level: "W" }), f)).toBe(true);
+    expect(hit(line({ level: "E" }), f)).toBe(true);
+    expect(hit(line({ level: "I" }), f)).toBe(false);
   });
 
   it("空集合不限级别，含解析失败", () => {
-    expect(matchesLine(line({ level: "?" }), filter({ levels: [] }))).toBe(true);
-    expect(matchesLine(line({ level: "?" }), filter({ levels: ["V"] }))).toBe(false);
+    expect(hit(line({ level: "?" }), filter({ levels: [] }))).toBe(true);
+    expect(hit(line({ level: "?" }), filter({ levels: ["V"] }))).toBe(false);
   });
 
   it("Tag 打字前缀匹配与已提交气泡精确匹配（忽略大小写）", () => {
-    expect(matchesLine(line({ tag: "OkHttp" }), filter({ tagContains: "okhttp" }))).toBe(true);
-    expect(matchesLine(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-" }))).toBe(true);
-    expect(matchesLine(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-," }))).toBe(false);
-    expect(matchesLine(line({ tag: "libcomposer_ext" }), filter({ tagContains: "libc," }))).toBe(false);
-    expect(matchesLine(line({ tag: "libc" }), filter({ tagContains: "libc," }))).toBe(true);
-    expect(matchesLine(line({ msg: "Request Timeout" }), filter({ keyword: "timeout" }))).toBe(true);
-    expect(matchesLine(line({ msg: "ok" }), filter({ keyword: "timeout" }))).toBe(false);
+    expect(hit(line({ tag: "OkHttp" }), filter({ tagContains: "okhttp" }))).toBe(true);
+    expect(hit(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-" }))).toBe(true);
+    expect(hit(line({ tag: "GGEC-DeviceEventRouter" }), filter({ tagContains: "GGEC-," }))).toBe(false);
+    expect(hit(line({ tag: "libcomposer_ext" }), filter({ tagContains: "libc," }))).toBe(false);
+    expect(hit(line({ tag: "libc" }), filter({ tagContains: "libc," }))).toBe(true);
+    expect(hit(line({ msg: "Request Timeout" }), filter({ keyword: "timeout" }))).toBe(true);
+    expect(hit(line({ msg: "ok" }), filter({ keyword: "timeout" }))).toBe(false);
   });
 
   it("Tag 多针逗号分隔，任一精确命中", () => {
     const f = filter({ tagContains: "HfLooper, adbd" });
-    expect(matchesLine(line({ tag: "HfLooper" }), f)).toBe(true);
-    expect(matchesLine(line({ tag: "adbd" }), f)).toBe(true);
-    expect(matchesLine(line({ tag: "Other" }), f)).toBe(false);
+    expect(hit(line({ tag: "HfLooper" }), f)).toBe(true);
+    expect(hit(line({ tag: "adbd" }), f)).toBe(true);
+    expect(hit(line({ tag: "Other" }), f)).toBe(false);
   });
 
   it("Tag 针内空白保留，仅分隔符等于不限", () => {
-    expect(matchesLine(line({ tag: "wdt_dump_cntcv CPU" }), filter({ tagContains: "wdt_dump_cntcv CPU, x" }))).toBe(
+    expect(hit(line({ tag: "wdt_dump_cntcv CPU" }), filter({ tagContains: "wdt_dump_cntcv CPU, x" }))).toBe(
       true,
     );
-    expect(matchesLine(line({ tag: "Other" }), filter({ tagContains: " , ， " }))).toBe(true);
+    expect(hit(line({ tag: "Other" }), filter({ tagContains: " , ， " }))).toBe(true);
   });
 
   it("Scope=Pid 精确相等", () => {
     const f = filter({ scope: { kind: "pid", pid: 42 } });
-    expect(matchesLine(line({ pid: 42 }), f)).toBe(true);
-    expect(matchesLine(line({ pid: 43 }), f)).toBe(false);
+    expect(hit(line({ pid: 42 }), f)).toBe(true);
+    expect(hit(line({ pid: 43 }), f)).toBe(false);
   });
 
   it("Scope=Package 用 pidSet", () => {
     const f = filter({ scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [1, 2] });
-    expect(matchesLine(line({ pid: 2 }), f)).toBe(true);
-    expect(matchesLine(line({ pid: 3 }), f)).toBe(false);
+    expect(hit(line({ pid: 2 }), f)).toBe(true);
+    expect(hit(line({ pid: 3 }), f)).toBe(false);
   });
 });
 
@@ -149,10 +176,10 @@ describe("parseTagNeedles", () => {
   });
 
   it("逗号提交成气泡；草稿与已提交可还原", () => {
-    expect(splitTagInput("libc")).toEqual({ committed: [], draft: "libc" });
-    expect(splitTagInput("libc,")).toEqual({ committed: ["libc"], draft: "" });
-    expect(splitTagInput("libc, adbd")).toEqual({ committed: ["libc"], draft: "adbd" });
-    expect(splitTagInput("libc, adbd,")).toEqual({ committed: ["libc", "adbd"], draft: "" });
+    expect(parseTagFilterNeedles("libc")).toEqual({ committed: [], draft: "libc" });
+    expect(parseTagFilterNeedles("libc,")).toEqual({ committed: ["libc"], draft: "" });
+    expect(parseTagFilterNeedles("libc, adbd")).toEqual({ committed: ["libc"], draft: "adbd" });
+    expect(parseTagFilterNeedles("libc, adbd,")).toEqual({ committed: ["libc", "adbd"], draft: "" });
     expect(joinTagInput(["libc", "Libc"], "")).toBe("libc, ");
     expect(joinTagInput(["libc"], "adbd")).toBe("libc, adbd");
     expect(removeTagNeedle("libc, adbd,", "libc")).toBe("adbd, ");
@@ -160,8 +187,7 @@ describe("parseTagNeedles", () => {
 });
 
 describe("PidBinding 包名重绑（含历史集）", () => {
-  it("模块转发 @yohu/api", () => {
-    expect(rebindPids).toBe(apiRebindPids);
+  it("空绑定没有 pid", () => {
     expect(pidSetOf(emptyBinding())).toEqual([]);
   });
 
@@ -210,13 +236,30 @@ describe("PidBinding 包名重绑（含历史集）", () => {
   });
 });
 
-describe("scanSignal", () => {
-  it("模块转发 @yohu/api", () => {
-    expect(scanSignal).toBe(apiScanSignal);
-  });
-});
-
 describe("collapseStack", () => {
+  it("堆栈帧只认前缀 at ", () => {
+    expect(stackFrameMessage("at a()")).toBe(true);
+    expect(stackFrameMessage("at ")).toBe(true);
+    expect(stackFrameMessage("Exception")).toBe(false);
+    expect(stackFrameMessage("data at x")).toBe(false);
+    const root = dirname(fileURLToPath(import.meta.url));
+    const walk = (dir: string): void => {
+      for (const ent of readdirSync(dir, { withFileTypes: true })) {
+        const abs = join(dir, ent.name);
+        if (ent.isDirectory()) {
+          walk(abs);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(ent.name) || ent.name.includes(".test.")) continue;
+        let body = readFileSync(abs, "utf8");
+        const name = abs.slice(root.length + 1).replaceAll("\\", "/");
+        if (name === "stack.ts") body = body.replace('return msg.startsWith("at ")', "");
+        expect(body, name).not.toContain('startsWith("at ")');
+      }
+    };
+    walk(root);
+  });
+
   it("连续堆栈帧折叠为首帧+计数", () => {
     const lines = [
       line({ msg: "Exception" }),
@@ -247,6 +290,7 @@ describe("collapseStack", () => {
 describe("RingMirror 共享缓冲镜像", () => {
   it("seq 去重与容量环形", () => {
     const m = new RingMirror(3);
+    expect(m.nextSeq()).toBe(0);
     expect(
       m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 }), line({ seq: 1 })] }),
     ).toBe(2);
@@ -277,6 +321,7 @@ describe("RingMirror 共享缓冲镜像", () => {
     m.clear();
     expect(m.size()).toBe(0);
     expect(m.lastSeqNumber()).toBe(9);
+    expect(m.nextSeq()).toBe(10);
     expect(m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 })] })).toBe(0);
     expect(m.pushBatch({ serial: "s", from_seq: 10, truncated: false, lines: [line({ seq: 10 })] })).toBe(1);
   });

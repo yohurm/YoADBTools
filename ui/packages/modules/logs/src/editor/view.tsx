@@ -18,14 +18,14 @@ import {
   type JSX,
 } from "solid-js";
 
-import type { LogLine, LogLineLayout } from "@yohu/api";
+import { logLineWraps, type LogLine, type LogLineLayout } from "@yohu/api";
 import { YoVirtualList } from "@yohu/ui";
 
 import { keywordRangesInWindows } from "../highlight";
 import { documentMaxChars, LineBoard, visualRowKey, type VisualLine } from "./board";
 import { EMPTY_MESSAGES, LogDocument, type DocRow, type FormatOptions } from "./document";
 import "./markup.css";
-import { markupRunsFromRanges } from "./markup-model";
+import { markupRunsFromRanges, markupWashCells } from "./markup-model";
 import { MARKUP_MARK_NAME, nameMarkupRuns } from "./markup-policy";
 import { bindMarkupRuns } from "./markup-registry";
 import { bindWashPaint } from "./markup-wash";
@@ -63,9 +63,7 @@ function VisualRow(props: { item: VisualLine; index: number }) {
         name: MARKUP_MARK_NAME,
       })),
     ];
-    const wash = markup.flatMap((run) =>
-      run.paint.kind === "wash" ? [{ from: run.from, to: run.to, fill: run.paint.background }] : [],
-    );
+    const wash = markupWashCells(markup);
     const stopInk = bindMarkupRuns(node as Text, runs);
     const stopWash = bindWashPaint(el, wash);
     onCleanup(() => {
@@ -140,7 +138,7 @@ export function EditorView(props: {
   });
 
   const contentWidth = createMemo(() => {
-    if (props.layout() !== "clip") {
+    if (!logLineWraps(props.layout())) {
       return 0;
     }
     const px = props.chPx();

@@ -2,14 +2,17 @@
  * 堆叠折叠（显示层，纯函数）。
  */
 
-import type { LogLine } from "@yohu/api";
-
-import { scanSignal, type SignalKind } from "./signals";
+import { scanSignal, type LogLine, type SignalKind } from "@yohu/api";
 
 export interface ViewRow {
   line: LogLine;
   collapsedAfter?: number;
   signal?: SignalKind;
+}
+
+/** 堆栈帧。连续折叠和单帧计数都认这一把。 */
+export function stackFrameMessage(msg: string): boolean {
+  return msg.startsWith("at ");
 }
 
 export function collapseStack(lines: readonly LogLine[]): ViewRow[] {
@@ -18,9 +21,9 @@ export function collapseStack(lines: readonly LogLine[]): ViewRow[] {
   while (i < lines.length) {
     const line = lines[i]!;
     const signal = scanSignal(line)?.kind;
-    if (line.msg.startsWith("at ")) {
+    if (stackFrameMessage(line.msg)) {
       let j = i + 1;
-      while (j < lines.length && lines[j]!.msg.startsWith("at ")) {
+      while (j < lines.length && stackFrameMessage(lines[j]!.msg)) {
         j++;
       }
       const count = j - i - 1;

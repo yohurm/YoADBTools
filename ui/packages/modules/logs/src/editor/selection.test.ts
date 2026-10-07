@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { docSelCopyText, orderDocSel, readDocSel, selSlice, type DocSel, type SelLine } from "./selection";
@@ -150,5 +153,131 @@ describe("docSelCopyText", () => {
     expect(docSelCopyText({ start: { seq: 1, off: 2 }, end: { seq: 3, off: 3 } }, messages)).toBe(
       ["e-doc", "two-doc", "thr"].join("\n"),
     );
+  });
+});
+
+describe("文本节点长度只写一处", () => {
+  it("text_node_length_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "textContent?.length " + "?? 0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("textNodeLength(");
+  });
+});
+
+describe("夹取下标只写一处", () => {
+  it("clamp_index_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "Math.min(Math." + "max(";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("clampIndex(");
+  });
+});
+
+describe("文本节点判定只写一处", () => {
+  it("node_is_text_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "Node." + "TEXT_NODE";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("nodeIsText(");
+  });
+});
+
+describe("元素节点判定只写一处", () => {
+  it("node_is_element_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const elementNode = "Node." + "ELEMENT_NODE";
+    const asElement = "as " + "Element";
+    expect(src.split(elementNode).length - 1).toBe(1);
+    expect(src.split(asElement).length - 1).toBe(0);
+    expect(src).toContain("nodeIsElement(");
+  });
+});
+
+describe("列表根是 Node 只写一处", () => {
+  it("root_is_node_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "instanceof " + "Node";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("rootIsNode(");
+  });
+});
+
+describe("数字有限才采用只写一处", () => {
+  it("finite_or_null_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "Number." + "isFinite";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("finiteOrNull(");
+  });
+});
+
+describe("节点自己是元素否则用父元素只写一处", () => {
+  it("element_of_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const instanceofElement = "instanceof Element ? " + "node";
+    const nodeIsElementTernary = "nodeIsElement(node) ? node : " + "node.parentElement";
+    expect(src.split(instanceofElement).length - 1).toBe(0);
+    expect(src.split(nodeIsElementTernary).length - 1).toBe(1);
+    expect(src).toContain("elementOf(");
+  });
+});
+
+describe("元素包含判定走同一主人", () => {
+  it("element_contains_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "instanceof " + "Element";
+    expect(src.split(needle).length - 1).toBe(0);
+    expect(src).toContain("nodeIsElement(node) && node.contains");
+  });
+});
+
+describe("同一行序号只写一处", () => {
+  it("same_seq_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "start.seq === " + "end.seq";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("sameSeq(");
+  });
+});
+
+describe("当前走访节点就是目标只写一处", () => {
+  it("target_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = "node === " + "target";
+    expect(src.split(needle).length - 1).toBe(1);
+  });
+});
+
+describe("按序号取一条消息只写一处", () => {
+  it("message_by_seq_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const startSeq = "item.seq === " + "start.seq";
+    const endSeq = "item.seq === " + "end.seq";
+    const bySeq = "item.seq === " + "seq)";
+    expect(src.split(startSeq).length - 1).toBe(0);
+    expect(src.split(endSeq).length - 1).toBe(0);
+    expect(src.split(bySeq).length - 1).toBe(1);
+    expect(src).toContain("messageBySeq(");
+  });
+});
+
+describe("节点在列表根里面只写一处", () => {
+  it("root_has_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const listRootContains = "listRoot." + "contains";
+    const rootContainsNode = "root." + "contains(node)";
+    expect(src.split(listRootContains).length - 1).toBe(0);
+    expect(src.split(rootContainsNode).length - 1).toBe(1);
+    expect(src).toContain("rootHas(");
+  });
+});
+
+describe("序号行选择器只写一次", () => {
+  it("seq_row_mark_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "selection.ts"), "utf8");
+    const needle = '"[data-' + 'seq]"';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("seqRowMark(");
   });
 });

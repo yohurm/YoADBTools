@@ -5,9 +5,9 @@
  * 禁止视口预切进文档、禁止 CSS hang、禁止回调 Formatter。
  */
 
-import type { LogLine, LogLineLayout, SignalKind } from "@yohu/api";
+import { logLineWraps, type LogLine, type LogLineLayout, type SignalKind } from "@yohu/api";
 
-import type { ContentBar, DocMessage, FormatRange } from "./document";
+import { extendStored, type ContentBar, type DocMessage, type FormatRange } from "./document";
 
 export type VisualLine = {
   seq: number;
@@ -58,16 +58,24 @@ function lineOf(
   };
 }
 
-/** 只按文档硬 \\n 切开。hang 已在 Document 空格里。 */
-export function documentLines(message: DocMessage): VisualLine[] {
-  const parts = message.text.split("\n");
+function hardBreaks(text: string): { text: string; from: number }[] {
+  const parts = text.split("\n");
   let offset = 0;
   const last = parts.length - 1;
-  return parts.map((text, wrapIndex) => {
-    const row = lineOf(message, wrapIndex, offset, text, wrapIndex === last);
-    offset += text.length + (wrapIndex === last ? 0 : 1);
-    return row;
+  return parts.map((part, index) => {
+    const from = offset;
+    offset += part.length + (index === last ? 0 : 1);
+    return { text: part, from };
   });
+}
+
+/** 只按文档硬 \\n 切开。hang 已在 Document 空格里。 */
+export function documentLines(message: DocMessage): VisualLine[] {
+  const parts = hardBreaks(message.text);
+  const last = parts.length - 1;
+  return parts.map((part, wrapIndex) =>
+    lineOf(message, wrapIndex, part.from, part.text, wrapIndex === last),
+  );
 }
 
 export function clipMessage(message: DocMessage): VisualLine[] {
@@ -92,21 +100,11 @@ function wrapDocumentLine(text: string, from: number, width: number): { text: st
 /** Soft-Wrap 开：文档行再按视口切，续行第 0 列。 */
 export function wrapMessage(message: DocMessage, rowChars: number): VisualLine[] {
   const width = Math.max(1, Math.floor(rowChars) || Number.MAX_SAFE_INTEGER);
-  const rows: VisualLine[] = [];
-  const parts = message.text.split("\n");
-  let offset = 0;
-  for (let i = 0; i < parts.length; i += 1) {
-    const part = parts[i]!;
-    const slices = wrapDocumentLine(part, offset, width);
-    for (const slice of slices) {
-      rows.push(lineOf(message, rows.length, slice.from, slice.text, false));
-    }
-    offset += part.length + (i === parts.length - 1 ? 0 : 1);
-  }
-  if (rows.length > 0) {
-    rows[rows.length - 1] = { ...rows[rows.length - 1]!, collapsedAfter: message.collapsedAfter };
-  }
-  return rows.length > 0 ? rows : [lineOf(message, 0, 0, "", true)];
+  const slices = hardBreaks(message.text).flatMap((part) => wrapDocumentLine(part.text, part.from, width));
+  const last = slices.length - 1;
+  return slices.length > 0
+    ? slices.map((slice, wrapIndex) => lineOf(message, wrapIndex, slice.from, slice.text, wrapIndex === last))
+    : [lineOf(message, 0, 0, "", true)];
 }
 
 function documentLineChars(line: VisualLine): number {
@@ -122,7 +120,7 @@ export function documentMaxChars(lines: readonly VisualLine[]): number {
 }
 
 function projectMessage(message: DocMessage, rowChars: number, layout: LogLineLayout): VisualLine[] {
-  return layout === "wrap" ? wrapMessage(message, rowChars) : clipMessage(message);
+  return logLineWraps(layout) ? wrapMessage(message, rowChars) : clipMessage(message);
 }
 
 export class LineBoard {
@@ -132,7 +130,7 @@ export class LineBoard {
   private items: VisualLine[] = EMPTY_VISUAL;
 
   project(messages: readonly DocMessage[], rowChars: number, layout: LogLineLayout): VisualLine[] {
-    const widthKey = layout === "wrap" ? rowChars : 0;
+    const widthKey = logLineWraps(layout) ? rowChars : 0;
     if (messages === this.messages && widthKey === this.rowChars && layout === this.layout) {
       return this.items;
     }
@@ -161,7 +159,7 @@ export class LineBoard {
       const tail = messages
         .slice(this.messages.length)
         .flatMap((row) => projectMessage(row, this.rowChars, this.layout));
-      this.items = this.items === EMPTY_VISUAL ? tail : this.items.concat(tail);
+      this.items = extendStored(this.items, EMPTY_VISUAL, tail);
       this.messages = messages;
       return this.items;
     }

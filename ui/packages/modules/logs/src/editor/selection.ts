@@ -40,17 +40,33 @@ export function selSlice(line: SelLine, sel: DocSel | "all"): SelBand | null {
   return { fromCh: from - line.docFrom, chars: to - from };
 }
 
+function nodeIsElement(node: Node): node is Element {
+  return node.nodeType === Node.ELEMENT_NODE;
+}
+
+function elementOf(node: Node): Element | null {
+  return nodeIsElement(node) ? node : node.parentElement;
+}
+
 function isChrome(node: Node): boolean {
-  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  const el = elementOf(node);
   return Boolean(el?.closest("[data-log-chrome]"));
+}
+
+function textNodeLength(node: Node): number {
+  return node.textContent?.length ?? 0;
+}
+
+function nodeIsText(node: Node): boolean {
+  return node.nodeType === Node.TEXT_NODE;
 }
 
 function textLengthOf(node: Node): number {
   if (isChrome(node)) {
     return 0;
   }
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent?.length ?? 0;
+  if (nodeIsText(node)) {
+    return textNodeLength(node);
   }
   let n = 0;
   for (const child of node.childNodes) {
@@ -71,13 +87,11 @@ function textLengthBefore(root: Element, target: Node): number {
       return;
     }
     if (isChrome(node)) {
-      if (node === target || (node instanceof Element && node.contains(target))) {
-        found = true;
-      }
+      if (nodeIsElement(node) && node.contains(target)) { found = true; }
       return;
     }
-    if (node.nodeType === Node.TEXT_NODE) {
-      n += node.textContent?.length ?? 0;
+    if (nodeIsText(node)) {
+      n += textNodeLength(node);
       return;
     }
     for (const child of node.childNodes) {
@@ -91,67 +105,89 @@ function textLengthBefore(root: Element, target: Node): number {
   return n;
 }
 
+function clampIndex(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max);
+}
+
 export function textOffsetInDoc(rowEl: Element, node: Node, offset: number): number {
   if (!rowEl.contains(node) && rowEl !== node) {
     return 0;
   }
-  if (node.nodeType === Node.TEXT_NODE) {
+  if (nodeIsText(node)) {
     if (isChrome(node)) {
       return textLengthBefore(rowEl, node);
     }
-    const len = node.textContent?.length ?? 0;
-    return textLengthBefore(rowEl, node) + Math.min(Math.max(offset, 0), len);
+    const len = textNodeLength(node);
+    return textLengthBefore(rowEl, node) + clampIndex(offset, len);
   }
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const el = node as Element;
-    let n = rowEl === el ? 0 : textLengthBefore(rowEl, el);
-    const max = Math.min(Math.max(offset, 0), el.childNodes.length);
+  if (nodeIsElement(node)) {
+    let n = rowEl === node ? 0 : textLengthBefore(rowEl, node);
+    const max = clampIndex(offset, node.childNodes.length);
     for (let i = 0; i < max; i++) {
-      n += textLengthOf(el.childNodes[i]!);
+      n += textLengthOf(node.childNodes[i]!);
     }
     return n;
   }
   return 0;
 }
 
+function rootIsNode(root: ParentNode): root is Node {
+  return root instanceof Node;
+}
+
+function rootHas(root: Node, node: Node | null): node is Node {
+  return node != null && root.contains(node);
+}
+
 export function logSelectionInList(listRoot: ParentNode | null, selection: Selection | null): boolean {
   if (!listRoot || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
     return false;
   }
-  if (!(listRoot instanceof Node)) {
+  if (!rootIsNode(listRoot)) {
     return false;
   }
   const anchor = selection.anchorNode;
   const focus = selection.focusNode;
-  return Boolean((anchor && listRoot.contains(anchor)) || (focus && listRoot.contains(focus)));
+  return rootHas(listRoot, anchor) || rootHas(listRoot, focus);
 }
 
-function rowOf(node: Node): HTMLElement | null {
-  if (node instanceof HTMLElement && node.matches("[data-seq]")) {
+function seqRowMark(): string {
+  return "[data-seq]";
+}
+
+export function rowOf(node: Node): HTMLElement | null {
+  if (node instanceof HTMLElement && node.matches(seqRowMark())) {
     return node;
   }
-  return (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>("[data-seq]") ?? null;
+  return elementOf(node)?.closest<HTMLElement>(seqRowMark()) ?? null;
+}
+
+export function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
 }
 
 function rowDocFrom(row: HTMLElement): number {
-  const from = Number(row.dataset.docFrom ?? 0);
-  return Number.isFinite(from) ? from : 0;
+  return finiteOrNull(Number(row.dataset.docFrom ?? 0)) ?? 0;
 }
 
 /** caret 落在某可视行上时映回 Document {seq, off}。铬带不计长。 */
 export function docPointFromCaret(listRoot: ParentNode, node: Node | null, offset: number): DocPoint | null {
-  if (!node || !(listRoot instanceof Node) || !listRoot.contains(node)) {
+  if (!rootIsNode(listRoot) || !rootHas(listRoot, node)) {
     return null;
   }
   const row = rowOf(node);
-  if (!row || !listRoot.contains(row)) {
+  if (!rootHas(listRoot, row)) {
     return null;
   }
-  const seq = Number(row.dataset.seq);
-  if (!Number.isFinite(seq)) {
+  const seq = finiteOrNull(Number(row.dataset.seq));
+  if (seq === null) {
     return null;
   }
   return { seq, off: rowDocFrom(row) + textOffsetInDoc(row, node, offset) };
+}
+
+function sameSeq(start: DocPoint, end: DocPoint): boolean {
+  return start.seq === end.seq;
 }
 
 export function readDocSel(listRoot: ParentNode | null, selection: Selection | null): DocSel | null {
@@ -163,26 +199,30 @@ export function readDocSel(listRoot: ParentNode | null, selection: Selection | n
   if (!start || !end) {
     return null;
   }
-  if (start.seq === end.seq && start.off === end.off) {
+  if (sameSeq(start, end) && start.off === end.off) {
     return null;
   }
   return orderDocSel({ start, end });
 }
 
+function messageBySeq(messages: readonly { seq: number; text: string }[], seq: number): { seq: number; text: string } | undefined {
+  return messages.find((item) => item.seq === seq);
+}
+
 export function docSelCopyText(sel: DocSel, messages: readonly { seq: number; text: string }[]): string {
   const { start, end } = orderDocSel(sel);
-  const first = messages.find((item) => item.seq === start.seq);
-  const last = messages.find((item) => item.seq === end.seq);
+  const first = messageBySeq(messages, start.seq);
+  const last = messageBySeq(messages, end.seq);
   if (!first || !last) {
     return "";
   }
-  if (start.seq === end.seq) {
+  if (sameSeq(start, end)) {
     const a = Math.min(start.off, end.off);
     const b = Math.max(start.off, end.off);
     return first.text.slice(a, b);
   }
   const middle = messages.filter((item) => item.seq > start.seq && item.seq < end.seq).map((item) => item.text);
-  return [first.text.slice(Math.min(start.off, first.text.length)), ...middle, last.text.slice(0, Math.min(Math.max(end.off, 0), last.text.length))].join(
+  return [first.text.slice(Math.min(start.off, first.text.length)), ...middle, last.text.slice(0, clampIndex(end.off, last.text.length))].join(
     "\n",
   );
 }
