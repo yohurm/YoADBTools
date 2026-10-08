@@ -476,21 +476,13 @@ export function createListingStore() {
     return loadListing(resolved.path, "on-ok");
   }
 
-  async function mutate(op: (serial: string) => Promise<void | string>, dropNames?: string[]): Promise<void> {
+  async function mutate(op: (serial: string) => Promise<void | string>): Promise<void> {
     const picked = pickedSerial();
     if (pickRejected(picked)) {
       notifyError(picked.reason);
       return;
     }
     const current = picked.serial;
-    if (dropNames && dropNames.length > 0) {
-      const drop = new Set(dropNames);
-      const kept = entries.filter((entry) => !drop.has(entry.name));
-      setEntries(kept);
-      const currentSerial = serial();
-      if (currentSerial) remember(currentSerial, session.path, kept);
-      setSelection("names", selection.names.filter((name) => !drop.has(name)));
-    }
     setSession("mutating", true);
     try {
       const fault = await op(current);
@@ -521,7 +513,7 @@ export function createListingStore() {
         }
       }
       return joinFaultLines(failures);
-    }, unique);
+    });
   }
 
   async function mutateNewEntry(

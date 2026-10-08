@@ -276,28 +276,41 @@ describe("goTo / detach fault", () => {
   });
 });
 
-describe("删除乐观摘名", () => {
-  it("removeMany 先摘名，IPC 返回前列表已无该项", async () => {
+describe("删除后以 list 为准", () => {
+  it("removeMany 在 list 返回前不摘行，回来才换这份清单", async () => {
     mocks.filesList.mockResolvedValue([fileEntry("a.txt"), fileEntry("b.txt")]);
     const store = createListingStore();
     store.bindSerial("S1");
     await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]));
 
-    let release!: () => void;
+    let releaseDelete!: () => void;
     mocks.filesDelete.mockImplementation(
       () =>
         new Promise((resolveDelete) => {
-          release = resolveDelete;
+          releaseDelete = resolveDelete;
         }),
     );
-    mocks.filesList.mockResolvedValue([fileEntry("b.txt")]);
+    let releaseList!: (list: RemoteEntry[]) => void;
+    mocks.filesList.mockImplementationOnce(
+      () =>
+        new Promise((resolveList) => {
+          releaseList = resolveList;
+        }),
+    );
 
     const pending = store.removeMany(["a.txt"]);
-    await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]));
-    release();
+    await vi.waitFor(() =>
+      expect(mocks.filesDelete).toHaveBeenCalledWith({ serial: "S1", path: "/sdcard/a.txt" }),
+    );
+    expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]);
+    expect(mocks.filesSessionAttach).toHaveBeenCalledTimes(1);
+    releaseDelete();
+    await vi.waitFor(() => expect(mocks.filesList.mock.calls.length).toBeGreaterThan(1));
+    expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]);
+    expect(mocks.filesSessionAttach).toHaveBeenCalledTimes(1);
+    releaseList([fileEntry("b.txt")]);
     await pending;
-    expect(mocks.filesDelete).toHaveBeenCalledWith({ serial: "S1", path: "/sdcard/a.txt" });
-    await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]));
+    expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]);
   });
 
   it("removeMany 失败仍 list，并把错误写回 session", async () => {

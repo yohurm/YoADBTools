@@ -69,6 +69,18 @@ describe("传输作业关闭", () => {
   });
 });
 
+describe("取消不写终态", () => {
+  it("files.cancel 返回后作业仍是传输中", async () => {
+    listingStore.bindSerial("S1");
+    await vi.waitFor(() => expect(mocks.filesList).toHaveBeenCalled());
+    const store = createTransferStore();
+    await store.push("C:/tmp/shot.png", "shot.png");
+    await store.cancel(4);
+    expect(mocks.filesCancel).toHaveBeenCalledWith(4);
+    expect(store.transfers[0]).toMatchObject({ id: 4, state: "running" });
+  });
+});
+
 describe("传输作业出生", () => {
   it("push 发号后立刻用本机文件名建作业，不写 上传 #id", async () => {
     listingStore.bindSerial("S1");

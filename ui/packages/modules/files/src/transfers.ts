@@ -235,18 +235,6 @@ export function createTransferStore() {
         return;
       }
     }
-    const current = transfers.find((t) => t.id === id);
-    const running = runningJob(current);
-    if (running) {
-      upsertTransfer({
-        id,
-        direction: running.direction,
-        bytes: running.bytes,
-        total: running.total,
-        state: "cancelled",
-        name: running.name,
-      });
-    }
     listingStore.clearListedError();
   }
 
