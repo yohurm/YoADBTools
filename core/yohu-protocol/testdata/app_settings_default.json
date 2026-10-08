@@ -27,5 +27,9 @@
   "mirror_force_forward": false,
   "terminal_prepend_adb": false,
   "files_drop_into_folder": false,
-  "terminal_time_format": "time_millis"
+  "terminal_time_format": "time_millis",
+  "terminal_library_expand": {
+    "mode": "collapsed",
+    "ids": []
+  }
 }

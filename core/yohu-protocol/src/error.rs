@@ -100,6 +100,7 @@ mod tests {
             ("    Clip,", "LogLineLayout::Clip"),
             ("    Usb,", "MirrorProtocol::Usb"),
             ("    TimeMillis,", "TerminalTimeFormat::TimeMillis"),
+            ("    Collapsed,", "LibraryExpandMode::Collapsed"),
         ];
         for (owner, restated) in owners {
             assert!(settings.contains(owner), "missing owner {owner}");

@@ -11,6 +11,25 @@ pub fn layout_is_presentable(width: u32, height: u32) -> bool {
     width >= MIRROR_MIN_LAYOUT_PX && height >= MIRROR_MIN_LAYOUT_PX
 }
 
+/// 一条投屏投影（ADR-v6-040）。壳把槽位和呈现闩合成这一行。
+/// 没有会话的设备不出现。Stopping 不出现。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirrorSessionSnapshot {
+    pub serial: String,
+    pub generation: u64,
+    pub phase: MirrorSessionState,
+    pub width: u32,
+    pub height: u32,
+    pub codec: String,
+    pub control: bool,
+    pub has_frame: bool,
+    pub painted_fps: u32,
+    pub paused: bool,
+    pub fullscreen: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 /// 启动结果（对标 [`crate::CaptureStart`]：adopt = 已有 Live 会话）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirrorStart {
