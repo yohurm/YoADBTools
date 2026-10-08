@@ -59,6 +59,15 @@ describe("L3 recipe CSS", () => {
     expect(css).toContain("yohu-recipe-tree-chevron--open");
   });
 
+  it("gather 不把整沓淡出，也不按槽位延后", () => {
+    const css = loadMotionLayerCss("recipes/gather.css");
+    expect(css).toContain('data-recipe="gather"');
+    expect(css).toContain("transition: none");
+    expect(css).not.toContain("--yohu-drag-pile-slot");
+    expect(css).not.toContain("[data-phase=\"home\"]");
+    expect(css).not.toMatch(/\b\d+ms\b/);
+  });
+
   it("reorder 铬在 L3，不绑虚拟列表选择器", () => {
     const css = loadMotionLayerCss("recipes/reorder.css");
     expect(css).toContain("[data-reordering]");

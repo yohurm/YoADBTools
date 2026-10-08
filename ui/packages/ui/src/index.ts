@@ -112,6 +112,10 @@ export { YoBadge } from "./display/Badge";
 export type { YoBadgeProps, YoBadgeTone } from "./display/Badge";
 export { YoChip } from "./display/Chip";
 export type { YoChipProps, YoChipLeading } from "./display/Chip";
+export { YoDragPile } from "./display/DragPile";
+export type { YoDragPileProps } from "./display/DragPile";
+export { gatherHomeSpan } from "./display/gather-release";
+export type { DragPilePhase } from "./display/drag-pile-model";
 
 export { YoStatusDot } from "./display/StatusDot";
 export type { YoStatusDotProps, YoStatusDotTone } from "./display/StatusDot";

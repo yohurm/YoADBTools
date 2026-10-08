@@ -28,6 +28,7 @@ const REQUIRED_RECIPES = [
   "theme-wipe",
   "tree-chevron",
   "reorder",
+  "gather",
 ] as const;
 
 function catalogSpecs(spec: MotionCatalogEntry["spec"]): MotionSpecName[] {

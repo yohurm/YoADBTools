@@ -1,0 +1,64 @@
+/*
+ * Gather 预览的牌面。
+ * 每张牌绝对定位，left/top 是它自己的行。跟指针的平移和逐张飞回不在这里过渡。
+ */
+
+.yohu-drag-pile {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.yohu-drag-pile__plate {
+  position: absolute;
+  width: var(--yohu-drag-pile-width, var(--yohu-layout-cm-cmd-max));
+  transform-origin: 50% 50%;
+  pointer-events: none;
+}
+
+.yohu-drag-pile__chrome {
+  --yohu-corner-fill: var(--yohu-surface);
+  --yohu-corner-stroke: var(--yohu-border);
+  width: 100%;
+  height: var(--yohu-control-height);
+  color: var(--yohu-fg);
+}
+
+.yohu-drag-pile__leading {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.yohu-drag-pile__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline-end: var(--yohu-control-height-sm);
+}
+
+.yohu-drag-pile__badge {
+  --yohu-corner-fill: var(--yohu-accent);
+  --yohu-corner-stroke: transparent;
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--yohu-space-xs) * -1);
+  inset-inline-end: calc(var(--yohu-space-xs) * -1);
+  display: flex;
+  height: var(--yohu-control-height-sm);
+  min-width: var(--yohu-control-height-sm);
+  color: var(--yohu-fg-on);
+  font-family: var(--yohu-font-sans);
+  font-size: var(--yohu-font-caption);
+  font-weight: var(--yohu-font-weight-medium);
+  line-height: var(--yohu-font-leading-tight);
+}
+
+.yohu-drag-pile__badge > .yohu-corner {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 100%;
+}

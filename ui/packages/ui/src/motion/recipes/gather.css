@@ -1,0 +1,17 @@
+/*
+ * 配方 gather：跟指针时的投影。
+ * 飞回不走 CSS 过渡。playGatherRelease 按行序错开 effectsFast 起步，飞行 spatialLocal 彼此重叠，淡出走 effectsExit。
+ * 牌的 left/top 钉在自己的行上，禁止整沓一起淡出。
+ */
+
+.yohu-drag-pile[data-recipe="gather"] {
+  transition: filter var(--yohu-motion-effects-fast);
+}
+
+.yohu-drag-pile[data-recipe="gather"][data-phase="carry"] {
+  filter: var(--yohu-shadow-overlay-drop);
+}
+
+.yohu-drag-pile[data-recipe="gather"] .yohu-drag-pile__plate {
+  transition: none;
+}

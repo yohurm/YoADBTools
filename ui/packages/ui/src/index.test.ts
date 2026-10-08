@@ -18,6 +18,7 @@ const YO_PUBLIC = [
   "YoSwitch",
   "YoBadge",
   "YoChip",
+  "YoDragPile",
   "YoStatusDot",
   "YoDivider",
   "YoSubheader",

@@ -186,6 +186,13 @@ export const MotionCatalog = {
     properties: ["transform", "opacity", "top"],
     interruptible: true,
   },
+  gather: {
+    name: "gather",
+    engine: "one-shot",
+    spec: ["spatialLocal", "effectsExit", "effectsFast"],
+    properties: ["transform", "opacity", "filter"],
+    interruptible: false,
+  },
 } as const satisfies Record<string, MotionCatalogEntry>;
 
 export type MotionCatalog = typeof MotionCatalog;
