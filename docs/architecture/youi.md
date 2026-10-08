@@ -81,15 +81,15 @@ HarmonyOS 对照：官方「圆角半径控制圆弧曲率」= **四分之一圆
 | L3 | `corner-policy.ts` | host 默认描边并裁内容；paint 只铺在已有宿主上 |
 | L4 | `Corner.tsx` + `Corner.css` | SVG 三层：fill（盒）/ stroke（盒内 inset 环，面板边界）/ edge（盒外 halo，`edgeOutset` 中心线）。绘制空间永远是 CSS 盒：`viewBox="0 0 1 1"` + `preserveAspectRatio="none"`（铺满 dest，对照投屏 fill≠contain）。量盒只把 token 半径/描边换成单位方分数；量滞后只偏曲率，禁止把量到的 px 写成第二套 viewBox 再 `meet` letterbox。内容裁切走 CSS `inset()` + token 半径，跟盒走，禁止量出来的 `path()`。色认 `--yohu-corner-fill` / `--yohu-corner-stroke` / `--yohu-corner-edge`。`__content` 切断这组 token，嵌套 Corner 从透明基线起步。禁止 edge 复用 fill 路径 |
 
-PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 20）；`card` / `dialog` = `Radius.Md` 16（手机弹出框 32）。层级正相关：弹出框 ≥ 卡片 > 按钮。
+PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（按钮 / 输入 / ripple / 气泡）。特殊铬一律 `Radius.Md` 16：`card` / `dialog`，以及右键菜单、下拉菜单、通知。下拉触发钮显式 `Radius.Xl` 32，另加描边和 `--yohu-shadow-xs`。阶梯里的 20 不进产品铬。
 
-消费面：`YoDialog` / `YoButton` / `YoIconButton` / `YoPanel` / `YoSelect` / `YoContextMenu` / `YoTooltip` / `YoTextField` / `YoSearch` / `YoToast` / `YoCheckbox` / `YoChip` / `YoBadge` / `YoStatusDot` / `YoDivider` / `YoSubheader` / `YoListItem` / `YoDescriptionList` / `YoAddressField` / `YoToolbar` / `YoProgressBar`。`YoCorner` 已进 L5；不进 L5 的只是 `corner/` 路径函数。公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。内容槽 `box-sizing: border-box`，pad 是槽内 inset。禁止消费方点 `__content`。开关 thumb / 正圆点仍走 token；气泡胶囊走 `CornerPillRadius`。`YoScroller` 不在消费面。
+消费面：`YoDialog` / `YoButton` / `YoIconButton` / `YoPanel` / `YoSelect` / `YoContextMenu` / `YoTooltip` / `YoTextField` / `YoSearch` / `YoToast` / `YoCheckbox` / `YoChip` / `YoDragPile` / `YoBadge` / `YoStatusDot` / `YoDivider` / `YoSubheader` / `YoListItem` / `YoDescriptionList` / `YoAddressField` / `YoToolbar` / `YoProgressBar`。`YoCorner` 已进 L5；不进 L5 的只是 `corner/` 路径函数。公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。内容槽 `box-sizing: border-box`，pad 是槽内 inset。禁止消费方点 `__content`。开关 thumb / 正圆点仍走 token；气泡胶囊走 `CornerPillRadius`。`YoScroller` 不在消费面。
 
 ---
 
 ## 清单行盒（`list-row/`，L2–L4）
 
-独立模块。Family B（`tone=list`）数据网格行只负责格子：文件清单直角通栏 hairline + 底。`tone=document` 可选单选，以及操作清单显式 `radius=chip`，悬浮/按压/选中片同一 `--yohu-ripple-radius`（多选也不并成直角块）。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
+独立模块。Family B（`tone=list`）数据网格行只负责格子：文件清单直角通栏 hairline + 底。`tone=document` 可选单选，以及操作清单显式 `radius=chip`，悬浮/按压/选中片走特殊铬 `--yohu-radius-md`（多选也不并成直角块）。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。多选拖动预览 `YoDragPile` 牌面同样 `role=card`。
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
@@ -453,13 +453,13 @@ L1 主题订阅 / 圆形揭示
 
 ## 组件：YoToast / YoToaster（L0–L5）
 
-命令式 API 必须挂回树上的 `YoToaster`。禁止静态 `Toast.success`。普通消息停留 ≤ `MotionDuration.toast`；`sticky` 常驻直到 `dismiss`（传输作业用这条）。进出场走 `YoPresence` 配方 `toast`：对照 macOS 通知横幅（自盒外 `translateY(100%)` + `scale(0.94)`）与 HarmonyOS 电脑软弹簧（入 `spatialRail` / 出 `effectsExit` 倒放）。高度 0fr/1fr 只挤堆栈；位移画在卡片自身高上，clip `overflow:visible`。`YoToaster` 按代际 id 排 For，beginDismiss 不得换对象身份把 Presence 重挂成直切。CSS `transition` 可打断（出生 closed，双 rAF 后 open）。右上角始终画 `DismissMark`（与 Chip 同一 `.yohu-recipe-dismiss`），禁止 `YoIconButton`、禁止 absolute、禁止 Toast.css 再画 16vp 圆。堆栈钉窗口右下角（对照 VS Code / Win11 Toast / macOS 横幅），底边 `control-height-sm + space-md` 让过状态栏；禁止钉右上角（会挡住标题栏三键与页眉功能栏）。paint 默认不描边，横幅显式 `stroke`，色跟 tone。阴影 `--yohu-shadow-overlay`，圆角跟 control（`--yohu-radius-sm`）；盒透明，填充仍由 YoCorner 画。
+命令式 API 必须挂回树上的 `YoToaster`。禁止静态 `Toast.success`。普通消息停留 ≤ `MotionDuration.toast`；`sticky` 常驻直到 `dismiss`（传输作业用这条）。进出场走 `YoPresence` 配方 `toast`：对照 macOS 通知横幅（自盒外 `translateY(100%)` + `scale(0.94)`）与 HarmonyOS 电脑软弹簧（入 `spatialRail` / 出 `effectsExit` 倒放）。高度 0fr/1fr 只挤堆栈；位移画在卡片自身高上，clip `overflow:visible`。`YoToaster` 按代际 id 排 For，beginDismiss 不得换对象身份把 Presence 重挂成直切。CSS `transition` 可打断（出生 closed，双 rAF 后 open）。右上角始终画 `DismissMark`（与 Chip 同一 `.yohu-recipe-dismiss`），禁止 `YoIconButton`、禁止 absolute、禁止 Toast.css 再画 16vp 圆。堆栈钉窗口右下角（对照 VS Code / Win11 Toast / macOS 横幅），底边 `control-height-sm + space-md` 让过状态栏；禁止钉右上角（会挡住标题栏三键与页眉功能栏）。paint 默认不描边，横幅显式 `stroke`，色跟 tone。阴影 `--yohu-shadow-overlay`，圆角跟特殊铬（`role=card`，`--yohu-radius-md`）；盒透明，填充仍由 YoCorner 画。
 
 ```
 show(text, tone?) | show({ text, tone?, detail?, leading?, sticky?, progress?, meta? })
   → L2 resolveToastSpec（error→danger，info→accent；缺省空明细）
   → L3 队列 / 代际 / update / destroy 后拒写
-  → L4 按快照画 + Presence；铬走 YoCorner paint（显式 stroke，色跟 tone）+ `--yohu-shadow-overlay`（圆角跟 control）；进度走 progress-policy（不 import YoProgressBar）
+  → L4 按快照画 + Presence；铬走 YoCorner paint（显式 stroke，色跟 tone）+ `--yohu-shadow-overlay`（圆角 `role=card`）；进度走 progress-policy（不 import YoProgressBar）
 ```
 
 公开 `ToastTone` 仍是 `success | error | info`（调用方契约）。CSS 只消费 Button 涂装名。`createToaster` 的 `show` 返回代际，可 `update` / `dismiss` / `destroy`。
@@ -507,6 +507,26 @@ text / tone / leading? / block? / onDismiss?
 | L3 | `chip-policy.ts` | `data-tone` / `data-dismiss` / `data-leading` / `data-block` / `aria-label` |
 | L4 | `Chip.tsx` + `Chip.css` | 宿主排版；铬 paint；DismissMark 是宿主子级 |
 | L5 | `index.ts` | `YoChip` |
+
+---
+
+## 组件：YoDragPile（L0–L5）
+
+多选拖动的 Gather 预览。对照 ArkUI `CreateGatherNode`：主预览是 `surface` 白牌；第一张子预览不透明度 0.6、转 +8°；第二张 0.3、转 -8°；再往后的牌先透明。浮起 1.05 倍并加投影。每张牌的 `left/top` 钉在自己的行上，跟指针只是平移。阶段 `carry` / `home` / `drop`。`home` 按行从上到下错开 `effectsFast` 起步飞回（`spatialLocal`），飞行重叠，落到后 `effectsExit` 淡出。`drop` 整批同时飞到同一个落点。角标是本组件自己的 accent 小胶囊，不套 `YoBadge` / `YoChip`。模块传 `faces` / `count` / `phase` / `origins` / `stack`，不写角度和填色。
+
+```
+faces / count / phase?
+  → L2 gatherShownCount / gatherPaint / gatherScale
+  → L3 dragPileHostAttrs（data-phase）
+  → L4 每张钉在自己的行上；home 错开并行飞回；drop 整批飞向落点
+```
+
+| 层 | 文件 | 职责 |
+|----|------|------|
+| L2 | `drag-pile-model.ts` | Gather 张数、角度、透明度、浮起倍率、阶段 |
+| L3 | `drag-pile-policy.ts` | `data-phase` |
+| L4 | `DragPile.tsx` + `DragPile.css` | 白牌、扇开、抬起 / 松手收回 |
+| L5 | `index.ts` | `YoDragPile` |
 
 ---
 
@@ -559,7 +579,7 @@ props
 | L4 | Select.tsx / Select.css | 内容区 = `.yohu-select__menu`；不写测量算法 |
 | L5 | index.ts | YoSelect + YoSelectOption |
 
-公开 API：`options` / `value` / `onChange` / `disabled` / `placeholder` / `block`。`YoSelectOption` 可带 `description`（次文案，空串不算）。键盘 Arrow Home End Enter Space Esc Tab。触发钮默认 hug 文案簇（字 + 箭头，`gap=xs`），禁止 hug 写 `min-width`。`block` 才让主文案吃剩余、次文案与箭头贴尾；hug 触发钮不画次文案，菜单项始终画。底板 `--yohu-comp-gray`，菜单宽 hug（min=触发钮）。下拉列表可纵滚，关系统条（`scrollbar-width: none`），不 import YoScroller。
+公开 API：`options` / `value` / `onChange` / `disabled` / `placeholder` / `block`。`YoSelectOption` 可带 `description`（次文案，空串不算）。键盘 Arrow Home End Enter Space Esc Tab。触发钮默认 hug 文案簇（字 + 箭头，`gap=xs`），禁止 hug 写 `min-width`。`block` 才让主文案吃剩余、次文案与箭头贴尾；hug 触发钮不画次文案，菜单项始终画。触发钮圆角 `--yohu-radius-xl`（32），描边 `--yohu-border`，阴影 `--yohu-shadow-xs`；底板仍是 `--yohu-comp-gray`。下拉菜单圆角 `--yohu-radius-md`（16），描边与 `--yohu-shadow-overlay`。菜单宽 hug（min=触发钮）。下拉列表可纵滚，关系统条（`scrollbar-width: none`），不 import YoScroller。
 
 不做：不锁 `width` 为触发钮宽；不私写 z-index 魔法数；不引进 antd/arco Select。
 
@@ -1001,13 +1021,13 @@ size?: number   // 默认 Layout.IconSm
 
 ## 引擎：右键菜单（L0–L5）
 
-工作台菜单看 Primer ActionList，不看 Ant Dropdown。Host 管开合，List 管槽位。模块只交 `menu.ts`。细则见 [右键菜单-v6.md](右键菜单-v6.md)。
+工作台菜单看 Primer ActionList 与 Fluent Menu，不看 Ant Dropdown。Host 管开合，List 管槽位。宽跟最长标签，帽 `Layout.MenuMax`。圆角走特殊铬 `role=card`（16），描边与 `--yohu-shadow-overlay`。模块只交 `menu.ts`。细则见 [右键菜单-v6.md](右键菜单-v6.md)。
 
 ```
 openContextMenu(scene, {x,y,ctx})
   → L3 controller 唯一 session + place 夹紧（本目录 place.ts，不走 popover-place）
   → L4 Host Portal
-  → L4 List：data-slot=item/label；危险项 data-tone=danger
+  → L4 List：data-slot=label，有子项时 trail=chevron；宽 max-content，帽 MenuMax；悬停展开二级菜单；危险项 data-tone=danger
   → L3 menu-key-policy：Arrow / Home / End / Esc / Tab / Enter / Space / typeahead
 ```
 

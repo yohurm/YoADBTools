@@ -1,9 +1,35 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.120（2026-10-07，命令库投放一体、命令管理项圆角）
+> **状态：** v3.133（2026-10-08，多选松开后不再保持选中）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v3.133 变更（多选松开后不再保持选中）：** 牌落到自己的行时，选中填色退去。手势结束清空条目选区。迁到其他组后这些条目也不再是选中项。见 [modules/terminal.md](modules/terminal.md)。
+>
+> **v3.132 变更（多选放回错开并行）：** 松开没落到组时仍按行从上到下，但下一张不等上一张飞完。起步间隔是 `effectsFast`，飞行 `spatialLocal` 彼此重叠，落到后才淡出并收回该行蓝底。见 [动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.131 变更（多选逐张放回对应行）：** 每张预览的布局盒钉在自己的条目行上。松开没落到组时，按行从上到下逐张飞回，落到后淡出，该行蓝底才收回，然后才放下张。禁止整沓一起淡出。见 [动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.130 变更（选中片圆角）：** 操作清单选中/悬浮/按压和多选拖动预览不再用控件 8。片和牌面都走特殊铬 16。行盒填色合成一套选择器，直角通栏与 chip 不再各写一份。文件清单仍直角。见 [youi.md](youi.md)。
+>
+> **v3.129 变更（多选松开颜色跟飞回同一段）：** 源行蓝底的压暗和收回走 `spatialLocal`，与预览飞回同一段。回家时整沓淡出，子预览不再先涂成实白。见 [动画系统-v6.md](动画系统-v6.md)。
+>
+> **v3.128 变更（圆角分层、下拉钮）：** 控件仍是 8（按钮 / 输入 / ripple / 气泡）。特殊铬一律 16：卡片、对话框、右键菜单、下拉菜单、通知。`YoSelect` 触发钮圆角 32，描边 `--yohu-border`，阴影 `--yohu-shadow-xs`。阶梯里的 20 不进产品铬。见 [youi.md](youi.md)。
+>
+> **v3.127 变更（多选松开一起回家）：** 对照 ArkUI `RemoveGatherNodeWithAnimation`。没落到其他组时，每张预览在同一次 `spatialLocal` 里回到自己的条目行，到时卸掉浮层。不按槽位延后，不等子节点 `transitionend`。右栏不再摆第二沓静置牌。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
+>
+> **v3.126 变更（多选松开依次放回）：** 没落到其他组时，不再把整沓飞回抓起点。配方 `gather` 的 `return` 让每张预览延后一个 `--yohu-dur-fast`，飞回自己的条目行。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。v3.127 起这条作废。
+>
+> **v3.124 变更（右键移到二级菜单）：** 命令管理右键是「复制 / 移到 › / 删除」。指针停在「移到」上，或按向右，在右侧展开其他命令组。点组名才迁移。见 [youi.md](youi.md)、[右键菜单-v6.md](右键菜单-v6.md)、[modules/terminal.md](modules/terminal.md)。
+>
+> **v3.125 变更（多选拖动 Gather）：** 叠卡不再在同一格里错开几像素。对照 ArkUI Gather：主预览白牌在前，后面最多两张是其余选中项（0.6 / +8°，0.3 / -8°）。浮起 1.05 倍。松手时子预览转回并淡出。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
+>
+> **v3.123 变更（多选拖动白底叠卡）：** 叠卡从命令管理拆到 `YoDragPile`。牌面是 `surface` 白底，不是选中洗色。后面只露空牌边，字只在最前一张。抬起略放大并加投影；落入时后牌收平、整沓缩小。命令管理只传名字、条数和阶段。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
+>
+> **v3.122 变更（命令管理多选迁移）：** 选中两条及以上时，中栏不再组内换位。按住所选行或右栏气泡叠，拖到其他命令组：最多三张 `YoChip` 错开叠加，角标是条数，跟指针；经过的组走清单投放框。松手后气泡以 `spatialLocal` 飞到该组，抵达才改草稿，再淡出。右栏「移到」和右键「移到「组名」」走同一段飞行。单条仍在本组换位，跨组只走右键。减少动效则直接改草稿。见 [modules/terminal.md](modules/terminal.md)、[动画系统-v6.md](动画系统-v6.md)、[右键菜单-v6.md](右键菜单-v6.md)。
+>
+> **v3.121 变更（右键菜单 hug）：** 菜单宽跟最长标签，帽 `--yohu-layout-menu-max`（300，Fluent Menu）。左右内距 12vp。超帽单行省略。首帧按标签估宽夹紧，挂载后按实测再夹。见 [youi.md](youi.md)、[右键菜单-v6.md](右键菜单-v6.md)。
 >
 > **v3.120 变更（命令库投放一体、命令管理项圆角）：** ① 命令库树不自铺 `surface`。投放洗色是面板整栏 `accent-soft`，树内容不再抠出白块。② 命令管理组栏与条目栏每项悬浮/按压/选中都走 `data-radius=chip`（`--yohu-ripple-radius`），圆角画在行内容上。条目 hairline 仍是行盒直线，多选不再把 ripple 收成直角。文件清单仍直角通栏。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
 >
@@ -588,14 +614,14 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 |-------|----|------|
 | `--yohu-radius-2xs` | 2px | 微标（Fatal 块、检索高亮） |
 | `--yohu-radius-xs` | 4px | 面包屑级小控件 |
-| `--yohu-radius-sm` | 8px | 按钮/输入/列表 ripple / 导航片 |
-| `--yohu-radius-md` | 16px | 卡片/面板/对话框 |
-| `--yohu-radius-lg` | 20px | 大卡片 |
-| `--yohu-radius-xl` | 32px | 顶层浮层 |
+| `--yohu-radius-sm` | 8px | 控件：按钮 / 输入 / 列表 ripple / 气泡 |
+| `--yohu-radius-md` | 16px | 特殊铬：卡片 / 面板 / 对话框 / 菜单 / 通知 |
+| `--yohu-radius-lg` | 20px | 阶梯保留；产品铬不用 |
+| `--yohu-radius-xl` | 32px | 下拉触发钮 |
 | `--yohu-radius-full` | 50% | 正圆（状态点/spinner） |
 | `--yohu-radius-pill` | 999px | 胶囊（徽章） |
 
-`radius.ts` ↔ `theme.css` 契约测试强制一致。组件 CSS 禁止 `border-radius: <裸值>`。矩形铬（对话框/按钮/卡片/菜单/选择/气泡）的可见圆弧由 `corner/` 算法绘制，不靠 CSS `border` + `overflow:hidden` 叠圆角。`YoCorner` 公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。禁止消费方点 `__content`。
+`radius.ts` ↔ `theme.css` 契约测试强制一致。组件 CSS 禁止 `border-radius: <裸值>`。控件圆角 8；特殊铬（卡片、对话框、菜单、通知）一律 16；下拉触发钮 32。正圆、胶囊、微标不并进这三档。矩形铬（对话框/按钮/卡片/菜单/选择/气泡）的可见圆弧由 `corner/` 算法绘制，不靠 CSS `border` + `overflow:hidden` 叠圆角。`YoCorner` 公开 `flex` / `overflow`（含 `auto` 藏条）/ `pad` / `direction` / `align` / `justify` / `gap`。禁止消费方点 `__content`。
 
 ### 2.7 交互态与选中 Ripple（单源）
 
@@ -630,7 +656,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag / 已知级别消息，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
-- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。文件清单 `tone=list` 行盒走 `list-row/`：直角通栏，hairline 贴齐左右。命令管理组栏与条目栏由 `opsListBindings` 写 `rowRadius=chip`：每项悬浮/按压/选中都是 `--yohu-ripple-radius`，圆角在行内容上，多选不并成直角块；条目 hairline 仍是行盒直线。禁止在文件清单行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
+- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。文件清单 `tone=list` 行盒走 `list-row/`：直角通栏，hairline 贴齐左右。命令管理组栏与条目栏由 `opsListBindings` 写 `rowRadius=chip`：每项悬浮/按压/选中都是 `--yohu-radius-md`，圆角在行内容上，多选不并成直角块；条目 hairline 仍是行盒直线。多选拖动预览牌面同一 16。禁止在文件清单行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
 
 **焦点环（单源）**
 
@@ -689,7 +715,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 结果区对齐 Family A（文档）：`>>>` / `<<<` 是格式化文本块，不是网格行块。选区与复制跟日志同一思路。
 - 布局：内容区顶部模块页眉（标题 + 选中设备名 + `actions[{key,node}]`：清屏 / 取消（有在途组时）/ 命令管理；进出走库 chip）→ 左侧命令库 `YoPanel title="命令库"`（宽 `--yohu-layout-sidebar` 240vp）+ 右侧结果 `YoPanel title="执行结果"`（间距 12vp）。两栏标题走面板 `title`（鸿蒙 Compact 栏 + 一级字），禁止左栏无标题、禁止再套 Toolbar 灰带。页眉不放发送/执行。
 - 命令库树：组节点加条目数徽章；行高 `--yohu-row-height-header`，禁止套数据行 `--yohu-row-height`。产品默认全部折叠。设置 `terminal_library_expand`（立即）决定进入时哪些组展开：全部折叠 / 全部展开 / 指定命令组 id。停留中的手动开合不写回设置；检索命中仍展开可见组，清空检索回到停留开合。栏标题右侧 `YoSearch slot=entry`，栏下 `slot=bar` 折叠；过滤走 YoSearch 引擎（组名命中保留整组）。点击组行或展开箭头只开合该组，不选中、不入队。选中/hover 走 `.yohu-interactive`（只有叶子选中）。命令与命令块同级：命令图标 `terminal`，命令块图标 `block`；命令 `title` 为 `adb <具体命令>`（`aria-label`，不画气泡），不省略 `adb`；命令块 `title` 为条数与间隔。点击叶子入队（命令一行、块整块；需占位符则先填值）。
-- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。栏标题 `YoToolbar pad=xs` 贴栏素底，与清单名 12vp 同缘，禁止再嵌 control 灰带。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单是 `opsListBindings` 摊到 `YoVirtualList`，行内容 `YoOpsItem`，禁止再包一层清单视图、自写圆角底、`focus-ring` 或模块行盒。组栏与条目栏都是 `YoPanel role=ops`（顶栏白、内容灰）。条目声明 `rule` 才有名称间 hairline；块徽章是操作项尾槽。不走文件表列架。中栏可新增命令（`plus`）或命令块（`block`，禁止 `list`）。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。`{n}` 只活在一条模板上；按钮「插入参数」在本行光标写入下一个未用下标。命令描述标签 `{n}`；块描述与填参标签 `1-0` / `2-0`，跟步骤走，换位带着描述。禁止条目级并集。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令/该步（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；增删步骤走 `YoReorderList` 行内 Presence `list`（与参数描述同一 `useListPresenceSlots`）；删除与命令输入同一行。命令组与中栏条目整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键复制所选具体命令、删除所选。填参弹窗列出原始命令与填参栏（命令 `{n}`，块 `1-0`；有描述则跟在标签后），不展示预览；命令块一次按步序填多格。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
+- **命令管理**：`YoDialog` 定高三栏（组 | 条目 | 编辑），三栏都是 `YoPanel variant=pane`，高度与圆角对齐。栏标题 `YoToolbar pad=xs` 贴栏素底，与清单名 12vp 同缘，禁止再嵌 control 灰带。`YoTextField block` 只铺宽，不沿栏高 stretch。中栏比组栏窄（`--yohu-layout-cm-cmd-*`）。清单是 `opsListBindings` 摊到 `YoVirtualList`，行内容 `YoOpsItem`，禁止再包一层清单视图、自写圆角底、`focus-ring` 或模块行盒。组栏与条目栏都是 `YoPanel role=ops`（顶栏白、内容灰）。条目声明 `rule` 才有名称间 hairline；块徽章是操作项尾槽。不走文件表列架。中栏可新增命令（`plus`）或命令块（`block`，禁止 `list`）。具体命令/步骤编辑与展示同一 `formatAdbLine`（始终 `adb <正文>`；落盘仍存正文）。`{n}` 只活在一条模板上；按钮「插入参数」在本行光标写入下一个未用下标。命令描述标签 `{n}`；块描述与填参标签 `1-0` / `2-0`，跟步骤走，换位带着描述。禁止条目级并集。每个实际出现的 `{n}` 可编参数描述，紧跟具体命令/该步（具体命令槽只铺宽，不沿栏高 stretch）。命令块另编名称、步间间隔（常量集）、步骤拖动排序；增删步骤走 `YoReorderList` 行内 Presence `list`（与参数描述同一 `useListPresenceSlots`）；删除与命令输入同一行。命令组与中栏单条整行按住拖动换位（`YoVirtualList.onReorder`：浮层、占位、让位、缝间插条；一项禁用；点行不换序；`Ctrl/Meta+↑/↓` 换位）。选中两条及以上时中栏不换位，改为把整批迁到其他命令组：只有一张 `YoDragPile` 跟指针。落到其他组时整沓飞到该行再改草稿。没落到组上时每张按行错开起步飞回自己的条目行，飞行重叠，牌落到时选中填色退去，手势结束清空选区并卸掉浮层。落到其他组后这些条目不再保持选中。右栏不再摆静置牌。右栏「移到」与右键「移到 ›」里的组名同一段飞行。单条跨组只走右键。命令块步骤另用手感 grip。中栏条目 Ctrl 点选 / Shift 范围选；右键还有复制所选具体命令、删除所选。填参弹窗列出原始命令与填参栏（命令 `{n}`，块 `1-0`；有描述则跟在标签后），不展示预览；命令块一次按步序填多格。不提供成功/失败正则、输入提示、组条目间隔、失败中断。文件职责与设计前/后链路见 [modules/terminal.md](modules/terminal.md)。
 - **结果区**：一次输入一条输出块。`>>>`/`<<<` + 时间钉在首行，多行内容只在内容列换行。流自上而下。时间默认 `HH:mm:ss.SSS`（设置 `terminal_time_format`，立即投影已画出的行）。新块走 `YoListPresence` 配方 `list` 升起；清屏直切（`exit=false`）。空态 `YoEmptyState` 铺满当前流并居中；出现/消失直切，发送栏开合时跟随 `inline-end` 的高度插值，禁止空态自写 motion。不展示通过/失败徽章。模块功能栏「清屏」只清 UI 结果，不影响命令库。
 - **发送栏**：钉在结果面板底部，贴右双轴开合（`yohu-recipe-inline-end`：宽度 compact↔100%，高度 0fr↔1fr）。收起是右下角溢出把手（上+起边 hairline、起-起角 radius-sm）。展开：队列卡片在输入框上方（`YoListPresence` 进出场；Chip leading 命令 `terminal` / 块 `block` / 组 `folder`；名称 + `formatAdbLine` 完整命令 + 移除），输入框右侧水平纸飞机发送；无内容时按钮仍在，变灰禁用、机头向右；草稿或队列有内容时 `yohu-recipe-send-aim` 转到朝上。Enter 发送队列与草稿。是否把 `adb` 写入 exec 载荷走设置 `terminal_prepend_adb`（默认关）；展示始终带 `adb`。
 
@@ -721,7 +747,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - **关于**：末张分组卡片。应用图标（与安装包同源）+ 展示名 + 定位，块下不画分割线；版本（右侧版本号后跟「检查更新」，无单独更新卡片）/ 标识 / 版权；数据根、安装目录、配置目录、缓存、应用日志只读路径 + 「打开」（`system.openPath`）。禁止再写死版本号。发现新版本后先下载，完成后再确认覆盖安装。
 - 日志显示列：多选走 `YoCheckbox`（不是启用开关），进 `YoFormRow` 右侧槽、过窄时组内折行；消息列始终显示、不提供开关。立即生效。
 - `YoDialog`：`--yohu-scrim` 压暗 + `--yohu-shadow-dialog`（失焦 `-unfocused`）；最大宽 400；面板安全顶 90%；hug 滚槽预算 `--yohu-layout-dialog-body-max`。标题 Title_S Bold；电脑圆角 `YoCorner role=dialog`（16）。三区不画分割线。层 Portal 到 `body`。panel 自写 `data-clip`（=`hug∧open` 或 `traveling()`，DialogChrome 订）；fill 定高不套 Travel。禁止 CSS `:has(.yohu-travel)` / 点 `__view` / `__content`。`data-travel` 只属 `YoTravel`。最小 360×240 仅适用于独立子窗口，不套浮层。禁止遮罩再写 `fg` 10%。
-- `YoToast`：描边（跟 tone）+ `--yohu-shadow-overlay`（圆角 `--yohu-radius-sm`）；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。堆栈钉窗口右下角，底边让过状态栏；禁止钉右上角。入场下方 xs 微移升起；出场倒放同一位移；transition 可打断。
+- `YoToast`：描边（跟 tone）+ `--yohu-shadow-overlay`（圆角 `--yohu-radius-md`）；最大宽 400；展示 ≤ `--yohu-dur-toast`（3s）。堆栈钉窗口右下角，底边让过状态栏；禁止钉右上角。入场下方 xs 微移升起；出场倒放同一位移；transition 可打断。
 
 ---
 
