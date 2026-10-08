@@ -100,7 +100,7 @@ pub async fn run_session(
     generation: u64,
     mut opts: SessionOpts,
     control_rx: mpsc::Receiver<ControlCmd>,
-    on_live: impl FnOnce(),
+    on_live: impl FnOnce(u32, u32, &str),
 ) -> Result<(), MirrorError> {
     let result = run_attempt(
         adb,
@@ -123,7 +123,7 @@ async fn run_attempt(
     generation: u64,
     opts: &mut SessionOpts,
     control_rx: mpsc::Receiver<ControlCmd>,
-    on_live: impl FnOnce(),
+    on_live: impl FnOnce(u32, u32, &str),
 ) -> Result<(), MirrorError> {
     let serial = opts.req.serial.clone();
     let started = Instant::now();
@@ -273,7 +273,9 @@ struct AfterSpawn<'a, F> {
     on_live: F,
 }
 
-async fn run_after_spawn<F: FnOnce()>(ctx: AfterSpawn<'_, F>) -> Result<(), MirrorError> {
+async fn run_after_spawn<F: FnOnce(u32, u32, &str)>(
+    ctx: AfterSpawn<'_, F>,
+) -> Result<(), MirrorError> {
     let serial = ctx.opts.req.serial.clone();
     let control_wanted = ctx.opts.req.control;
 
@@ -308,7 +310,7 @@ async fn run_after_spawn<F: FnOnce()>(ctx: AfterSpawn<'_, F>) -> Result<(), Mirr
         elapsed_ms = ctx.started.elapsed().as_millis() as u64,
         "投屏 Live"
     );
-    (ctx.on_live)();
+    (ctx.on_live)(handshake.width, handshake.height, handshake.codec.name());
     emit::emit_live(
         &ctx.sink,
         &serial,
@@ -409,7 +411,7 @@ mod tests {
                 warm: Some(WarmTunnel::Forward { scid: 1, port: 2 }),
             },
             ctrl_rx,
-            || {},
+            |_width, _height, _codec| {},
         )
         .await
         .expect_err("missing server");

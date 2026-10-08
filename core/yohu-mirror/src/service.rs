@@ -14,11 +14,17 @@ use crate::consts::CONTROL_CHAN;
 use crate::control::ControlCmd;
 use crate::emit;
 use crate::error::MirrorError;
-use crate::frame::FramePipe;
+use crate::frame::{content_size_usable, FramePipe};
 use crate::session::{self, MirrorSessionRequest, SessionOpts};
 use crate::slot::{self, Phase, StartAction};
 use crate::tunnel::{self, WarmTunnel};
 use crate::warm::{self, TakeStep, WarmEntry};
+
+struct LivePicture {
+    width: u32,
+    height: u32,
+    codec: String,
+}
 
 struct MirrorSlot {
     generation: u64,
@@ -27,6 +33,7 @@ struct MirrorSlot {
     handle: Option<tokio::task::JoinHandle<()>>,
     control_tx: Option<mpsc::Sender<ControlCmd>>,
     control: bool,
+    picture: Option<LivePicture>,
     frames: Arc<FramePipe>,
 }
 
@@ -60,6 +67,18 @@ pub struct MirrorService {
     inner: Mutex<Inner>,
     changed: Notify,
     root_cancel: CancellationToken,
+}
+
+/// 投影用的槽位行。壳再叠呈现闩。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionRow {
+    pub serial: String,
+    pub generation: u64,
+    pub phase: MirrorSessionState,
+    pub width: u32,
+    pub height: u32,
+    pub codec: String,
+    pub control: bool,
 }
 
 impl MirrorService {
@@ -114,6 +133,7 @@ impl MirrorService {
                         handle: None,
                         control_tx: Some(control_tx),
                         control: false,
+                        picture: None,
                         frames: Arc::clone(&frames),
                     },
                 );
@@ -152,6 +172,7 @@ impl MirrorService {
                         generation = result.generation,
                         "投屏 adopt（已在 Live）"
                     );
+                    self.republish(&serial).await;
                     return Ok(result);
                 }
                 StartDecision::Begin {
@@ -277,8 +298,8 @@ impl MirrorService {
                     warm: warm.take(),
                 },
                 rx,
-                move || {
-                    live_service.mark_live(&live_serial, generation);
+                move |width, height, codec| {
+                    live_service.note_live(&live_serial, generation, width, height, codec);
                 },
             )
             .await;
@@ -304,14 +325,91 @@ impl MirrorService {
         self.release_if_current(&serial, generation, result).await;
     }
 
-    fn mark_live(&self, serial: &str, generation: u64) {
+    fn note_live(&self, serial: &str, generation: u64, width: u32, height: u32, codec: &str) {
         let mut inner = self.lock_inner();
         if let Some(slot) = inner.slots.get_mut(serial) {
             if slot::can_mark_live(slot.phase, slot.generation, generation) {
                 slot.phase = Phase::Live;
+                if content_size_usable(width, height) {
+                    slot.picture = Some(LivePicture {
+                        width,
+                        height,
+                        codec: codec.to_string(),
+                    });
+                }
             }
         }
         self.changed.notify_waiters();
+    }
+
+    /// Starting 与 Live。Stopping 不进投影。
+    pub fn session_rows(&self) -> Vec<SessionRow> {
+        let inner = self.lock_inner();
+        let mut rows: Vec<SessionRow> = inner
+            .slots
+            .iter()
+            .filter_map(|(serial, slot)| {
+                let phase = match slot.phase {
+                    Phase::Starting => MirrorSessionState::Starting,
+                    Phase::Live => MirrorSessionState::Live,
+                    Phase::Stopping => return None,
+                };
+                let (width, height, codec) = match &slot.picture {
+                    Some(picture) => (picture.width, picture.height, picture.codec.clone()),
+                    None => (0, 0, String::new()),
+                };
+                Some(SessionRow {
+                    serial: serial.clone(),
+                    generation: slot.generation,
+                    phase,
+                    width,
+                    height,
+                    codec,
+                    control: slot.control,
+                })
+            })
+            .collect();
+        rows.sort_by(|a, b| a.serial.cmp(&b.serial));
+        rows
+    }
+
+    /// 页面重载或再次 layout 时，把已在播的会话再送一次。原始 Live 事件不会重放。
+    pub async fn republish(&self, serial: &str) {
+        let shot = {
+            let inner = self.lock_inner();
+            let Some(slot) = inner.slots.get(serial) else {
+                return;
+            };
+            if slot.phase != Phase::Live {
+                return;
+            }
+            let Some(picture) = slot.picture.as_ref() else {
+                return;
+            };
+            if !content_size_usable(picture.width, picture.height) {
+                return;
+            }
+            (
+                slot.generation,
+                picture.width,
+                picture.height,
+                picture.codec.clone(),
+                slot.control,
+            )
+        };
+        let (generation, width, height, codec, control) = shot;
+        tracing::info!(
+            serial = %serial,
+            generation,
+            width,
+            height,
+            control,
+            "投屏 Live 快照重发"
+        );
+        emit::emit_live(
+            &self.sink, serial, generation, width, height, &codec, control,
+        )
+        .await;
     }
 
     pub async fn stop(&self, serial: &str) {
@@ -705,12 +803,60 @@ mod tests {
             handle: None,
             control_tx: None,
             control: false,
+            picture: None,
             frames: FramePipe::new(),
         }
     }
 
     fn forward_tunnel() -> WarmTunnel {
         WarmTunnel::Forward { scid: 7, port: 9 }
+    }
+
+    #[tokio::test]
+    async fn republish_resends_the_live_picture() {
+        let (sink, mut rx) = mpsc::channel(4);
+        let svc = MirrorService::new(
+            dummy_adb(),
+            sink,
+            PathBuf::from("missing-scrcpy-server"),
+            CancellationToken::new(),
+        );
+        let mut slot = test_slot(Phase::Live);
+        slot.generation = 4;
+        slot.control = true;
+        slot.picture = Some(LivePicture {
+            width: 1220,
+            height: 2712,
+            codec: "h265".into(),
+        });
+        svc.lock_inner().slots.insert("S1".into(), slot);
+
+        svc.republish("S1").await;
+        let event = rx.try_recv().expect("live snapshot");
+        match event {
+            AppEvent::MirrorState {
+                serial,
+                generation,
+                state,
+                width,
+                height,
+                codec,
+                control,
+                ..
+            } => {
+                assert_eq!(serial, "S1");
+                assert_eq!(generation, 4);
+                assert_eq!(state, MirrorSessionState::Live);
+                assert_eq!(
+                    (width, height, codec.as_str(), control),
+                    (1220, 2712, "h265", true)
+                );
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+
+        svc.republish("missing").await;
+        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]
