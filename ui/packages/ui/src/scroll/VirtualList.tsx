@@ -140,7 +140,7 @@ export interface YoVirtualListProps<T> {
    */
   tone?: YoListRowTone;
   /**
-   * 显式 chip：每项悬浮/按压/选中都走 `--yohu-ripple-radius`。
+   * 显式 chip：每项悬浮/按压/选中都走特殊铬 16。
    * 操作清单由 opsListBindings 写入。文件清单不传，hairline 行保持直角。
    */
   rowRadius?: "chip";

@@ -132,8 +132,8 @@ describe("YoToast", () => {
     expect(el?.getAttribute("data-tone")).toBe("success");
     expect(el?.getAttribute("role")).toBe("status");
     expect(el?.querySelector(".yohu-toast__chrome")).toBeTruthy();
-    expect(toasterSource()).toContain('mode="paint" role="control" stroke');
-    expect(toastCss).toContain("border-radius: var(--yohu-radius-sm)");
+    expect(toasterSource()).toContain('mode="paint" role="card" stroke');
+    expect(toastCss).toContain("border-radius: var(--yohu-radius-md)");
     expect(toastCss).toContain("box-shadow: var(--yohu-shadow-overlay)");
     expect(el?.querySelector(".yohu-recipe-dismiss")).toBeTruthy();
     expect(el?.querySelector(".yohu-recipe-dismiss")?.getAttribute("aria-label")).toBe("关闭 单条");

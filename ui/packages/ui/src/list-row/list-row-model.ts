@@ -31,7 +31,7 @@ export interface ListRowChromeInput {
   /** 多选 key 集。未显式 chip 且 size>1 时半径走 none。 */
   selectedKeys?: ReadonlySet<string | number>;
   /**
-   * 显式 chip：操作项每项同一 `--yohu-ripple-radius`。
+   * 显式 chip：操作项每项同一特殊铬 16。
    * 不因 list hairline 或多选块改成直角。文件清单不传。
    */
   radius?: "chip";

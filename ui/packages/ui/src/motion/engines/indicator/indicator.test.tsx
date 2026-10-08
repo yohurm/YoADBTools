@@ -76,7 +76,7 @@ describe("YoIndicator", () => {
     expect(css).not.toContain(".yohu-segmented");
   });
 
-  it("fill 滑块圆角走 --yohu-ripple-radius，与 document 行盒 chip 同一 token", () => {
+  it("fill 滑块圆角走 --yohu-ripple-radius", () => {
     const css = loadMotionLayerCss("engines/indicator/indicator.css");
     expect(css).toMatch(
       /\.yohu-recipe-indicator--fill\s*\{[^}]*border-radius:\s*var\(--yohu-ripple-radius\)/,

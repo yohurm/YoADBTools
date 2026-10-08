@@ -181,7 +181,7 @@ export function YoToast(props: YoToastProps): JSX.Element {
       data-sticky={host()["data-sticky"]}
       role={host().role}
     >
-      <YoCorner mode="paint" role="control" stroke class="yohu-toast__chrome" />
+      <YoCorner mode="paint" role="card" stroke class="yohu-toast__chrome" />
       <Show when={presenceIsOn(host()["data-leading"])}>
         <span class="yohu-toast__leading" aria-hidden="true">
           <ToastLeading name={props.toast.leading} />

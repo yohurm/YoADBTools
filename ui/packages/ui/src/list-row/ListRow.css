@@ -1,6 +1,6 @@
 /*
  * 清单行盒。文件清单直角通栏。
- * chip 圆角画在直接子级（--yohu-ripple-radius），行盒不带圆，hairline 保持直线。
+ * chip 圆角画在直接子级（特殊铬 16），行盒不带圆，hairline 保持直线。
  * 投放框不在本文件。
  */
 .yohu-list-row {
@@ -10,7 +10,7 @@
 }
 
 .yohu-list-row[data-radius="chip"] > * {
-  border-radius: var(--yohu-ripple-radius);
+  border-radius: var(--yohu-radius-md);
 }
 
 /* 有分割线时片与线分开，线不切进圆角。 */
@@ -37,50 +37,33 @@
   cursor: default;
 }
 
-.yohu-list-row[data-selectable]:hover:not([data-fill]):not([data-radius="chip"]) {
-  background-color: var(--yohu-state-hover);
-}
-
-.yohu-list-row[data-selectable]:active:not([data-fill]):not([data-radius="chip"]) {
-  background-color: var(--yohu-state-pressed);
-}
-
-.yohu-list-row[data-fill="selected"]:not([data-radius="chip"]) {
-  background-color: var(--yohu-state-selected);
-}
-
-.yohu-list-row[data-fill="selected"]:hover:not([data-radius="chip"]) {
-  box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
-}
-
-.yohu-list-row[data-fill="selected"]:active:not([data-radius="chip"]) {
-  box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
-}
-
-.yohu-list-row[data-fill="hot"]:not([data-radius="chip"]) {
-  background-color: var(--yohu-accent-soft);
-}
-
+/* 直角通栏底在行盒；chip 底在内容上。填色只写一份。 */
+.yohu-list-row[data-selectable]:hover:not([data-fill]):not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-selectable]:hover:not([data-fill]) > * {
   background-color: var(--yohu-state-hover);
 }
 
+.yohu-list-row[data-selectable]:active:not([data-fill]):not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-selectable]:active:not([data-fill]) > * {
   background-color: var(--yohu-state-pressed);
 }
 
+.yohu-list-row[data-fill="selected"]:not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-fill="selected"] > * {
   background-color: var(--yohu-state-selected);
 }
 
+.yohu-list-row[data-fill="selected"]:hover:not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-fill="selected"]:hover > * {
   box-shadow: inset 0 0 0 9999px var(--yohu-state-hover);
 }
 
+.yohu-list-row[data-fill="selected"]:active:not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-fill="selected"]:active > * {
   box-shadow: inset 0 0 0 9999px var(--yohu-state-pressed);
 }
 
+.yohu-list-row[data-fill="hot"]:not([data-radius="chip"]),
 .yohu-list-row[data-radius="chip"][data-fill="hot"] > * {
   background-color: var(--yohu-accent-soft);
 }

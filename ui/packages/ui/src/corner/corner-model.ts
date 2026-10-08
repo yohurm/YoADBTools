@@ -3,7 +3,7 @@
  * HarmonyOS 圆弧：四分之一圆（官方「圆角半径控制圆弧曲率」），不是超椭圆。
  * 描边整条落在外侧半径内侧（与投屏 HWND `stroke_frame` 同一 inset），
  * 禁止 CSS `border` + `overflow:hidden` 叠两层抗锯齿出毛边。
- * 电脑角色半径仍走 token 阶梯：控件 8、卡片/弹出框 16（手机弹出框 32 / 按钮 20 的 PC 收敛）。
+ * 电脑角色半径：控件 8；卡片/弹出框 16。菜单与通知也走 16。下拉触发钮显式 32。
  */
 import { Radius } from "../tokens/radius";
 

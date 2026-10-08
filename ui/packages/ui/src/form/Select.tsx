@@ -5,6 +5,7 @@
  * 选项可带 description（次文案）。block 触发钮才画出，菜单项始终画。
  * 默认 hug 文案簇（字 + 箭头）；禁止给 hug 写 min-width（短文案会被拉开）。
  * block 才让文案吃剩余、次文案与箭头贴尾。宿主是 button；YoCorner 只 paint。
+ * 触发钮圆角 32，带描边和轻阴影。下拉菜单是特殊铬，圆角 16。
  * 文案与箭头在钮上，禁止 clip-path 裁箭头。
  *
  * 交互：
@@ -22,6 +23,7 @@ import { YoCorner } from "../corner";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
+import { Radius } from "../tokens/radius";
 import {
   findOption,
   optionDescription,
@@ -244,7 +246,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         onClick={openMenu}
         onKeyDown={onTriggerKeyDown}
       >
-        <YoCorner mode="paint" role="control" class="yohu-select__chrome" />
+        <YoCorner mode="paint" role="control" radius={Radius.Xl} stroke class="yohu-select__chrome" />
         <span
           class="yohu-select__value"
           data-placeholder={selected() ? undefined : ""}
@@ -282,7 +284,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
               role="listbox"
             >
               <YoCorner
-                role="control"
+                role="card"
                 class="yohu-select__menu-chrome"
                 overflow={overflowY() ? "auto" : "hidden"}
                 pad="block-xs"

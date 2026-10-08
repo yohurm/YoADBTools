@@ -270,6 +270,8 @@ describe("YoSelect 分层契约", () => {
     expect(src).toMatch(/\breadAnchorBox\b/);
     expect(src).toMatch(/data-placed=/);
     expect(src).toMatch(/mode="paint"/);
+    expect(src).toMatch(/radius=\{Radius\.Xl\}/);
+    expect(src).toMatch(/role="card"/);
     expect(src).toMatch(/class="yohu-select__chevron"/);
   });
 
@@ -307,6 +309,10 @@ describe("YoSelect 触发布局契约", () => {
     expect(trigger).not.toMatch(/min-width/);
     expect(trigger).toMatch(/gap:\s*var\(--yohu-space-xs\)/);
     expect(trigger).toMatch(/--yohu-corner-fill:\s*var\(--yohu-comp-gray\)/);
+    expect(trigger).toMatch(/--yohu-corner-stroke:\s*var\(--yohu-border\)/);
+    expect(trigger).toMatch(/border-radius:\s*var\(--yohu-radius-xl\)/);
+    expect(trigger).toMatch(/box-shadow:\s*var\(--yohu-shadow-xs\)/);
+    expect(css).toMatch(/\.yohu-select__menu\s*\{[^}]*border-radius:\s*var\(--yohu-radius-md\)/);
     const value = css.match(/^\.yohu-select__value\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(value).toMatch(/flex:\s*0 1 auto/);
     expect(css).toMatch(

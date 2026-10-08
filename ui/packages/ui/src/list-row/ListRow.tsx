@@ -19,7 +19,7 @@ export interface YoListRowProps {
   selectable?: boolean;
   /** 多选 key 集；只给 L2 判 chip / 直角，行盒不读集合成员。 */
   selectedKeys?: ReadonlySet<string | number>;
-  /** 显式 chip：每项 ripple 走 `--yohu-ripple-radius`，不因 hairline 或多选改直角。 */
+  /** 显式 chip：每项圆角走特殊铬 16，不因 hairline 或多选改直角。 */
   radius?: "chip";
   dataKey?: string | number;
   dataReorder?: "source";

@@ -13,7 +13,7 @@
 
 .yohu-select__trigger {
   --yohu-corner-fill: var(--yohu-comp-gray);
-  --yohu-corner-stroke: transparent;
+  --yohu-corner-stroke: var(--yohu-border);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -23,7 +23,9 @@
   max-width: 100%;
   height: var(--yohu-control-height);
   padding-block: 0;
-  padding-inline: var(--yohu-space-sm);
+  padding-inline: var(--yohu-space-lg);
+  border-radius: var(--yohu-radius-xl);
+  box-shadow: var(--yohu-shadow-xs);
   overflow: visible;
   border: none;
   background-color: transparent;
@@ -32,6 +34,10 @@
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   cursor: pointer;
+}
+
+.yohu-select__trigger.yohu-focus-ring {
+  border-radius: var(--yohu-radius-xl);
 }
 
 .yohu-select[data-block] .yohu-select__trigger {
@@ -137,7 +143,7 @@
   list-style: none;
   border: none;
   background-color: transparent;
-  border-radius: var(--yohu-radius-sm);
+  border-radius: var(--yohu-radius-md);
   box-shadow: var(--yohu-shadow-overlay);
 }
 

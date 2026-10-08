@@ -8,7 +8,7 @@ const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ListR
 describe("ListRow.css", () => {
   it("行盒只画格子，不画投放框", () => {
     expect(css).toMatch(/\.yohu-list-row \{[\s\S]*?border-radius:\s*var\(--yohu-radius-none\);/);
-    expect(css).toMatch(/\[data-radius="chip"\] > \* \{\s*border-radius:\s*var\(--yohu-ripple-radius\);/);
+    expect(css).toMatch(/\[data-radius="chip"\] > \* \{\s*border-radius:\s*var\(--yohu-radius-md\);/);
     expect(css).toMatch(/\[data-tone="list"\]\[data-radius="chip"\] > \* \{\s*margin-block:\s*var\(--yohu-space-2xs\);/);
     expect(css).toMatch(/\[data-tone="list"\] \{\s*border-bottom:/);
     expect(css).toMatch(/\[data-tone="list"\] \{[^}]*display:\s*flex;/);
