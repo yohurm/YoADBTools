@@ -42,3 +42,5 @@
 | [036](ADR-v6-036.md) | 文本解析引擎 | `yohu-textparsing`：Html / Markdown / Xml / Plain；update 只调 API |
 | [037](ADR-v6-037.md) | 命令库拖入导入 | 预览/合并在 domain；虚线只复用 YoPanel；确认框在终端 |
 | [038](ADR-v6-038.md) | 盒子归组件 | 产品数据链路不改层；禁止用 prop 换掉调用方选择器 |
+| [039](ADR-v6-039.md) | 命令库默认展开 | 一键 `terminal_library_expand`；默认全部折叠；指定组认 id；停留开合不写回 |
+| [040](ADR-v6-040.md) | 流程标准步骤 | 每条流程单独登记；hydrate 读设置/目录/任务/投屏投影；禁止预写阶段与 `mirror.sync` |

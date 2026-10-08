@@ -89,13 +89,13 @@ PC 角色（Yohu 只交付桌面）：`control` = `Radius.Sm` 8（手机按钮 2
 
 ## 清单行盒（`list-row/`，L2–L4）
 
-独立模块。Family B（`tone=list`）数据网格行只负责格子：直角通栏 hairline + 底。`tone=document` 可选单选的悬浮/按压/选中片同一 `--yohu-ripple-radius`。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
+独立模块。Family B（`tone=list`）数据网格行只负责格子：文件清单直角通栏 hairline + 底。`tone=document` 可选单选，以及操作清单显式 `radius=chip`，悬浮/按压/选中片同一 `--yohu-ripple-radius`（多选也不并成直角块）。不是 `yohu-interactive` / `yohu-focus-ring`。投放框不在本模块。
 
 | 层 | 文件 | 职责 | 不做什么 |
 |----|------|------|----------|
 | L2 | `list-row-model.ts` | `resolveListRowChrome`（fill / radius none\|chip）/`resolveListRowRadius` / `isListRowHot` | 不碰 DOM、不画框 |
 | L3 | `list-row-policy.ts` | `listRowHostAttrs`（`data-tone` / `data-fill` / `data-selectable` / `data-radius`） | 不写 `data-ring` |
-| L4 | `ListRow.tsx` + `ListRow.css` | list 直角通栏；document 可选单选 `data-radius=chip` | 不挂 focus-ring、不画投放框 |
+| L4 | `ListRow.tsx` + `ListRow.css` | 文件清单直角通栏；chip 圆角画在直接子级，行盒 hairline 保持直线 | 不挂 focus-ring、不画投放框 |
 
 `tone=list` 行自绘选中底（radius=none）。`tone=document` 单选底也由行自绘（chip 半径）；行上悬浮必须同一 chip 半径，禁止方底配圆片。document 多选块（`selectedKeys.size>1`）仍直角。热态只改底（`fill=hot`）。L5 不导出 `YoListRow`。禁止挂 `YoIndicator` fill。
 
@@ -276,11 +276,13 @@ width?: "hug" | "fill" | "number" | "control"  // 未写则 block→fill、numbe
 
 多选/条件用本控件；启用类走 `YoSwitch`。可选 `icon` 画在盒与标签之间。`tone=section` 的标签用列表型 SubHeader 墨水（caption / semibold / fg-2）；缺省 `body`。勾选符从短臂起笔。
 
+视觉只认盒上的 `data-paint`（填充与 `stroke-dashoffset` 同一属性）。`data-checked` 只喂原生 input，CSS 不再读它。盒把 `--yohu-corner-move` 指到 `spatialTick`，与勾选描边同一拍，取消时底色还在，勾才收得回去。禁止在复选盒再写一份 `transition: fill`。
+
 ```
 checked / onChange / label / icon / tone / disabled
   → L2 checkboxPaintKind（idle | checked）
   → L3 canCommitCheckboxChange + data-*
-  → L4 只绑属性；按压走 :hover / :active
+  → L4 只绑属性；勾与填充都认 data-paint；按压走 :hover / :active
 ```
 
 | 层 | 文件 |
@@ -310,14 +312,16 @@ checked / onChange / ariaLabel / disabled
 
 ## 组件：YoFormRow（L0–L5）
 
-设置行壳：左标题栈、右控件 hug。不是 YoForm 引擎。公开 API：`title` / `layout` / `pad` / `description` / `note` / `children`。
+设置行壳：主行左标题栈、右控件 hug；子项缩进在主行下方。不是 YoForm 引擎。公开 API：`title` / `layout` / `pad` / `description` / `note` / `subTitle` / `subOpen` / `sub` / `children`。
 
 ```
-title / description / note / children / layout / pad
-  → L2 hasFormRowSlot / resolveFormRowLayout / resolveFormRowPad
-  → L3 formRowHostAttrs（data-has-description / data-has-note / data-layout / data-pad）
-  → L4 两列内容区；行主轴 flex-end；右槽 hug 贴尾且不收缩（`flex: 0 0 auto`，路径+浏览是同一簇）；行间不画分割线
+title / description / note / sub / subTitle / subOpen / children / layout / pad
+  → L2 hasFormRowSlot / formRowSubIsOpen / resolveFormRowLayout / resolveFormRowPad
+  → L3 formRowHostAttrs（data-has-description / data-has-note / data-has-sub / data-layout / data-pad）
+  → L4 主行两列；子项槽 YoCollapse（开闭高度）；行主轴 flex-end；右槽 hug 贴尾且不收缩（`flex: 0 0 auto`，路径+浏览是同一簇）；行间不画分割线
 ```
+
+`sub` 是依赖主项的内容（如「指定命令组」）。`subTitle` 用正文号 + 二级字（`font-body` / `fg-2`），与右侧控件同一字号，不降到 caption，不用三级字当标题。标题前是思维导图子节点连线：整段一条四分之一圆（上端切线竖直、右端切线水平），不在圆弧两侧再接直线，无箭头，色 `fg-3`。`subOpen` 缺省为开；关掉时子项仍挂载，高度收到 0。禁止再把子项拆成并列 `YoFormRow`。禁止用树箭头 `tree-chevron` 充当这根连接线。
 
 `layout=stacked` 才让控件槽 `width:100%`，`YoSelect block` 才能铺满（对话框 / 投屏质量栏）。`pad=flush` 去掉默认 `md` 行垫，给已经有 gap 的对话框字段。禁止模块点内部槽把横排右槽 stretch 成假 block。
 
@@ -449,13 +453,13 @@ L1 主题订阅 / 圆形揭示
 
 ## 组件：YoToast / YoToaster（L0–L5）
 
-命令式 API 必须挂回树上的 `YoToaster`。禁止静态 `Toast.success`。普通消息停留 ≤ `MotionDuration.toast`；`sticky` 常驻直到 `dismiss`（传输作业用这条）。进出场走 `YoPresence` 配方 `toast`：对照 macOS 通知横幅（自盒外 `translateY(100%)` + `scale(0.94)`）与 HarmonyOS 电脑软弹簧（入 `spatialRail` / 出 `effectsExit` 倒放）。高度 0fr/1fr 只挤堆栈；位移画在卡片自身高上，clip `overflow:visible`。`YoToaster` 按代际 id 排 For，beginDismiss 不得换对象身份把 Presence 重挂成直切。CSS `transition` 可打断（出生 closed，双 rAF 后 open）。右上角始终画 `DismissMark`（与 Chip 同一 `.yohu-recipe-dismiss`），禁止 `YoIconButton`、禁止 absolute、禁止 Toast.css 再画 16vp 圆。堆栈钉窗口右下角（对照 VS Code / Win11 Toast / macOS 横幅），底边 `control-height-sm + space-md` 让过状态栏；禁止钉右上角（会挡住标题栏三键与页眉功能栏）。
+命令式 API 必须挂回树上的 `YoToaster`。禁止静态 `Toast.success`。普通消息停留 ≤ `MotionDuration.toast`；`sticky` 常驻直到 `dismiss`（传输作业用这条）。进出场走 `YoPresence` 配方 `toast`：对照 macOS 通知横幅（自盒外 `translateY(100%)` + `scale(0.94)`）与 HarmonyOS 电脑软弹簧（入 `spatialRail` / 出 `effectsExit` 倒放）。高度 0fr/1fr 只挤堆栈；位移画在卡片自身高上，clip `overflow:visible`。`YoToaster` 按代际 id 排 For，beginDismiss 不得换对象身份把 Presence 重挂成直切。CSS `transition` 可打断（出生 closed，双 rAF 后 open）。右上角始终画 `DismissMark`（与 Chip 同一 `.yohu-recipe-dismiss`），禁止 `YoIconButton`、禁止 absolute、禁止 Toast.css 再画 16vp 圆。堆栈钉窗口右下角（对照 VS Code / Win11 Toast / macOS 横幅），底边 `control-height-sm + space-md` 让过状态栏；禁止钉右上角（会挡住标题栏三键与页眉功能栏）。paint 默认不描边，横幅显式 `stroke`，色跟 tone。阴影 `--yohu-shadow-overlay`，圆角跟 control（`--yohu-radius-sm`）；盒透明，填充仍由 YoCorner 画。
 
 ```
 show(text, tone?) | show({ text, tone?, detail?, leading?, sticky?, progress?, meta? })
   → L2 resolveToastSpec（error→danger，info→accent；缺省空明细）
   → L3 队列 / 代际 / update / destroy 后拒写
-  → L4 按快照画 + Presence；铬走 YoCorner paint；进度走 progress-policy（不 import YoProgressBar）
+  → L4 按快照画 + Presence；铬走 YoCorner paint（显式 stroke，色跟 tone）+ `--yohu-shadow-overlay`（圆角跟 control）；进度走 progress-policy（不 import YoProgressBar）
 ```
 
 公开 `ToastTone` 仍是 `success | error | info`（调用方契约）。CSS 只消费 Button 涂装名。`createToaster` 的 `show` 返回代际，可 `update` / `dismiss` / `destroy`。
@@ -464,7 +468,7 @@ show(text, tone?) | show({ text, tone?, detail?, leading?, sticky?, progress?, m
 |----|------|------|
 | L2 | `toast-model.ts` | 文案；tone；detail / leading / sticky / progress / meta |
 | L3 | `toast-policy.ts` | 队列代际；`updateToast`；`data-tone` / `data-leading` / `data-progress` |
-| L4 | `Toast.tsx` + `Toast.css` | 宿主排版（前导 + 标题/明细/进度/元数据 + DismissMark）；铬 paint |
+| L4 | `Toast.tsx` + `Toast.css` | 宿主排版（前导 + 标题/明细/进度/元数据 + DismissMark）；铬 paint + 描边 + overlay 阴影 |
 | L5 | `index.ts` | `YoToast` / `YoToaster` / `createToaster` |
 
 ---
@@ -720,7 +724,7 @@ tabs / activeId
 
 ## 组件：YoTree（L0–L5）
 
-选中只挂 `yohu-interactive--selected` + 配方 `selected`（项内弹出与字色过渡，禁止 fill 滑块）。目录行 / 箭头 / Enter / 空格只开合，叶子才 `onSelect`。缺省行高 `--yohu-row-height-header`（命令库目录清单，比导航项再收一档；不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行 header 尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
+选中只挂 `yohu-interactive--selected` + 配方 `selected`（项内弹出与字色过渡，禁止 fill 滑块）。树不自铺 `surface`，底色只跟所在面板（投放时整栏 `accent-soft`）。目录行 / 箭头 / Enter / 空格只开合，叶子才 `onSelect`。缺省行高 `--yohu-row-height-header`（命令库目录清单，比导航项再收一档；不是日志/文件数据行）。禁止套 `--yohu-row-height`，禁止写死 px。可选 `rowHeight` 只写 `--yohu-tree-row-height`，用 `min-height`，不锁 `height`。`YoCollapse` 的 `__inner` 只裁切高度，禁止变换裁切盒。`recipe=panel` 的高度与位移走 `spatial-stretch`（尺寸软弹簧），透明度走 effects；淡入上移打在自己的 `__content` 上，禁止选择器穿到消费者子树。`0fr/1fr` 只在高度不确定（auto）的流里成立；禁止把 Collapse 放进会吃剩余高的确定高 flex 子。对话框里 Collapse 不再承担名单高度。fit Dialog 里其余名单走 `YoReveal`（绘制轴始终绝对定位，出流由主槽裁），高度交给祖先 `YoTravel`；传输列表等不在 Dialog 里的 `panel` 仍走 0fr/1fr + 淡入。禁止给默认 collapse 的子项写 `min-height`（会盖掉树行 header 尺）。`recipe=fill`（DeviceRail **有列表**）才让 `__content` 吃剩余高；无设备走默认 collapse hug。壳只排折叠根，禁止再点 `__inner`。
 
 ```
 data / expandedKeys
@@ -729,7 +733,7 @@ data / expandedKeys
   → L4 内容区 = chevron + 图标 + 标签 + renderBadge 槽
 ```
 
-公开 API：`data` / `onSelect` / `expandedKeys` / `defaultExpandedKeys` / `rowHeight` / `renderBadge`。徽章由调用方组合。没有 `yohu-tree__row--selected`。
+公开 API：`data` / `onSelect` / `expandedKeys` / `defaultExpandedKeys` / `onToggle` / `rowHeight` / `renderBadge`。受控 `expandedKeys` 有 `onToggle` 时，目录行 / 箭头 / 键盘开合把 key 交回调用方，树不改本地展开；没有回调则受控树不响应开合（检索强制展开）。徽章由调用方组合。没有 `yohu-tree__row--selected`。
 
 ---
 

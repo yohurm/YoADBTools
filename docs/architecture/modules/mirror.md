@@ -173,7 +173,7 @@ macOS    macos/scale.rs                   按 Letterbox 设 CA 核
 ## 呈现
 
 - 占用：舞台是透明洞。Windows：HWND 铺满主窗客户区且不参与命中（创建即 `WS_DISABLED`）；可见占用卡片是 DComp clip（Fill=avail，Dest=contain）。操作走 `mirror.pointer`（与 layout 同一主窗客户区坐标）。Fill→Dest 走 `SpatialPanel`，Dest→Fill 走 `SpatialEnter`（ADR-v6-027）。呈现五层见 [ADR-v6-032](../adr/ADR-v6-032.md)。内容尺寸只来自 scrcpy session 包。框跟 dest。HWND 是主窗 **WS_CHILD**。UI 只报 `.yohu-mirror__avail`。Live 即 `adopt_content`。硬解纹理可更大：VP 裁到内容，RGB=内容，**禁止 GenerateMips**；缩小用面积核，禁止整数缩小 dest。禁止运行时 UI `containInZone`、禁止 CSS 占用过渡、禁止侧栏 `SetWindowPos`
-- `mirror.present.setActive`：工作台拥有舞台开关。`false` 立刻 `DestroyWindow`。未激活时 `mirror.layout` 不得建窗。
+- `mirror.present.setActive`：工作台拥有舞台开关，只在模块身份变化时调用一次。`false` 立刻 `DestroyWindow`；已经是关闭则不再拆。未激活时 `mirror.layout` 不得建窗。
 - `mirror.layout`：客户区物理像素 `{x,y,w,h,visible,…}` + 会话旗标 `{dpr,fullscreen,paused,control,has_device,failed,error,dark}`。`dark` 跟工作台 `data-theme`。报稳定 avail 格子，不是 contain 目标，不是视觉插值盒。禁止 `video_width` / `stroke_px` / `epoch`。编码尺寸只来自 FramePipe；present 在 stop 后保留上次尺寸
 - `mirror.pointer`：avail 上报 down/move/up/leave + 主窗客户区物理坐标。UI 不算 dest；Stage `dest()` 映射后 `inject`
 - 显示矩形在 `present_dest`：contain 一次算完。VP 只做 1:1 YUV→RGB（内容）。缩小是面积核。禁止 mip 链、禁止整数缩小 dest、禁止 VP 一次双线性压到 clip、禁止 YUV shader dest-rect。离开投屏页 `DestroyWindow`。解码座与 `PictureBank` 跟 start/stop。`setActive(true)` 用上次 avail 建窗。`FramePipe.sticky_config()` 会话级 SPS/PPS；同代 HEVC→H.264 先 `reset_content`。禁止 `rearm_config` / View `invalidateLayout`
@@ -181,7 +181,7 @@ macOS    macos/scale.rs                   按 Letterbox 设 CA 核
 - **舞台占用（ADR-v6-026）：** HWND 生命周期跟「当前模块是不是投屏」走（`mirror.present.setActive`），解码管道跟 start/stop 走。`Stage.mode` 决定回缓冲主人：Empty/Loading/Paused 每拍 Present 铬（文案、surface、描边）；Video 每拍 Present 帧。描边与铬画在当前可见 DComp clip 内侧，色走 `--yohu-border-strong`。呈现线程一拍 Cmd 排空后再 `flush_occupancy` 一次。禁止 dirty 一次画铬、禁止动画期跳过描边后不再 Present。浅色空态图标走 `fg` + `surface-2` 井。WebView 舞台是透明洞，不是 YoPanel。停止投屏不解 HWND，`unbind` 后 Dest→Fill 走 `OccupancyMotion::DestToFill`（`SpatialEnter`）。离开投屏页由工作台在淡出**之前**关舞台；进出投屏同一拍挂载/卸载 `MirrorView`。禁止 View 观察 Presence / 用 layout 代际补丁挡在途包
 - **呈现类型（两段寿命）：** `Stage`（OS 无关）是占用/模式/chrome 的唯一开关，`bound` 只在 BindPipe/UnbindPipe 写入。Windows 上 `Host` 持交换链+Stage+输入（跟 HWND）；`DecodeSeat` 持 FramePipe+MF+共享 `D3dDevice`（跟 start/stop）。呈现线程只调度 `Cmd` 并从 `PictureBank` 取帧，禁止在 HWND 线程重建解码器，禁止 `rearm` / layout 代际补丁
 - 截图：`mirror.screenshot` 按视频分辨率从 last NV12 纹理导出（不是交换链 letterbox）
-- 实测 fps：1s 窗口已 Present 帧，进状态栏右槽，不盖画面
+- 状态栏：Live 且内容尺寸可用就显示宽×高；上一拍 fps 大于 0 才接上。`has_frame` 与 fps 在呈现服务上，离开页面拆 HWND 不清，`stop` 与掉线才清。不盖画面
 
 ### 设计前（舞台铬）
 
@@ -240,4 +240,4 @@ Host 只提供 BGRA + 路径
 
 ## UI
 
-`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps；实测走 `Status.tsx` 的 `YoBadge` 进状态栏右槽。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏：图标轨 `YoPanel`（`role` 缺省 surface，不走 `role=ops`），`YoIconButton` 纵排，间隔走 `space-2xs`。月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。页眉 `YoChrome.leading` 组合 `YoBadge`，功能栏 `actions[{key,node}]`（开始/停止、暂停、截图、全屏、仅显示），进出走库 chip。禁止 `deviceLabel`，禁止模块自挂 Presence 补页眉。舞台 `.yohu-mirror__avail` 是透明洞，禁止套 `YoScroller`。操作栏 / 质量是 `YoPanel` pane + `YoScroller`；质量栏是表单（`padding` / `gap`），操作栏是图标轨。模块 CSS 只锁栏宽，不铺第二套底色，禁止 `overflow: auto`。状态采样见 [device.md](device.md)。
+`@yohu/module-mirror`；默认可操作；页眉「仅显示」关控制通道。指针按下后离开占用面（或拆舞台）立刻 `TOUCH_UP`，禁止设备停在按下。离开检测走 `TrackMouseEvent`，禁止在持 Host 锁时 `SetCapture`（会同步派 `WM_CAPTURECHANGED` 再抢同一把锁，卡死呈现泵）。质量参数下次 `mirror.start` 生效。页眉与画面都不放实测 fps。状态栏 `Status.tsx` 读 `mirror.session` 投影：Live 且有尺寸显示宽×高，fps 大于 0 才接上。导航/音量/电源/亮度在画面与设置栏之间的设备操作栏：图标轨 `YoPanel`（`role` 缺省 surface，不走 `role=ops`），`YoIconButton` 纵排，间隔走 `space-2xs`。月亮/太阳同一钮读 **`DeviceSession.deviceStatuses`** 的 `night` 并 `device.setNightMode`（不是工作台 theme，禁止本页轮询）。页眉 `YoChrome.leading` 组合 `YoBadge`，功能栏 `actions[{key,node}]`（开始/停止、暂停、截图、全屏、仅显示），进出走库 chip。禁止 `deviceLabel`，禁止模块自挂 Presence 补页眉。舞台 `.yohu-mirror__avail` 是透明洞，禁止套 `YoScroller`。操作栏 / 质量是 `YoPanel` pane + `YoScroller`；质量栏是表单（`padding` / `gap`），操作栏是图标轨。模块 CSS 只锁栏宽，不铺第二套底色，禁止 `overflow: auto`。状态采样见 [device.md](device.md)。
