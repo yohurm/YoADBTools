@@ -1,21 +1,22 @@
 /**
- * 投屏实测帧率：进壳状态栏右槽，不盖画面。
+ * 投屏分辨率：进壳状态栏右槽，不盖画面。
+ * Live 且有尺寸就显示；fps 大于 0 才接上。
  */
 
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 import { YoBadge } from "@yohu/ui";
 
+import { mirrorLiveBadge } from "./control-ready";
 import { mirrorStore } from "./store";
-import { mirrorPictureReady } from "./control-ready";
 
 export function MirrorStatus() {
-  const live = () => mirrorPictureReady(mirrorStore.state);
   return (
-    <Show when={live()}>
-      <YoBadge
-        text={`${mirrorStore.state.width}×${mirrorStore.state.height} · ${mirrorStore.state.paintedFps} fps`}
-        tone="neutral"
-      />
-    </Show>
+    <For each={mirrorStore.state.sessions}>
+      {(row) => (
+        <Show when={mirrorLiveBadge(row)}>
+          {(text) => <YoBadge text={text()} tone="neutral" />}
+        </Show>
+      )}
+    </For>
   );
 }

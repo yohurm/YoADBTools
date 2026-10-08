@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   mirrorInject: vi.fn(),
   mirrorCloseControl: vi.fn(),
   mirrorLayout: vi.fn(),
+  mirrorSession: vi.fn(),
   mirrorPointer: vi.fn(),
   mirrorScreenshot: vi.fn(),
   deviceSetNightMode: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
   mirrorInject: (...a: unknown[]) => mocks.mirrorInject(...a),
   mirrorCloseControl: (...a: unknown[]) => mocks.mirrorCloseControl(...a),
   mirrorLayout: (...a: unknown[]) => mocks.mirrorLayout(...a),
+  mirrorSession: (...a: unknown[]) => mocks.mirrorSession(...a),
   mirrorPointer: (...a: unknown[]) => mocks.mirrorPointer(...a),
   mirrorScreenshot: (...a: unknown[]) => mocks.mirrorScreenshot(...a),
   deviceSetNightMode: (...a: unknown[]) => mocks.deviceSetNightMode(...a),
@@ -73,6 +75,8 @@ describe("mirror store", () => {
     mocks.mirrorCloseControl.mockReset();
     mocks.mirrorLayout.mockReset();
     mocks.mirrorLayout.mockResolvedValue(undefined);
+    mocks.mirrorSession.mockReset();
+    mocks.mirrorSession.mockResolvedValue([]);
     mocks.mirrorPointer.mockReset();
     mocks.mirrorPointer.mockResolvedValue(undefined);
     mocks.mirrorScreenshot.mockReset();
@@ -146,6 +150,28 @@ describe("mirror store", () => {
     mocks.paintedHandlers.at(-1)!({ serial: "S1", generation: 1, painted_fps: 42 });
     expect(store.state.hasFrame).toBe(true);
     expect(store.state.paintedFps).toBe(42);
+  });
+
+  it("世代还是 0 时收下首帧，世代对不上则丢弃", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    await store.bindSerial("S1");
+    expect(store.state.generation).toBe(0);
+    mocks.paintedHandlers.at(-1)!({ serial: "S1", generation: 1, painted_fps: 7 });
+    expect(store.state.hasFrame).toBe(true);
+    expect(store.state.paintedFps).toBe(7);
+    mocks.stateHandlers.at(-1)!({
+      serial: "S1",
+      generation: 1,
+      state: "live",
+      width: 1220,
+      height: 2712,
+      codec: "h265",
+      control: true,
+    });
+    mocks.paintedHandlers.at(-1)!({ serial: "S1", generation: 9, painted_fps: 3 });
+    expect(store.state.paintedFps).toBe(7);
+    expect(store.state.hasFrame).toBe(true);
   });
 
   it("掉线清空当前设备画面状态，保留编码尺寸", async () => {
@@ -235,6 +261,50 @@ describe("mirror store", () => {
     await store.start();
     expect(mocks.mirrorStop).not.toHaveBeenCalled();
     expect(mocks.mirrorStart).toHaveBeenCalledTimes(1);
+    expect(store.state.phase).toBe("idle");
+    mocks.stateHandlers.at(-1)!({
+      serial: "S1",
+      generation: 3,
+      state: "live",
+      width: 1220,
+      height: 2712,
+      codec: "h265",
+      control: true,
+    });
+    expect(store.state.phase).toBe("live");
+    expect(store.state.generation).toBe(3);
+    expect(store.state.sessions[0]?.width).toBe(1220);
+    expect(store.state.sessions[0]?.painted_fps).toBe(0);
+  });
+
+  it("绑定设备套用已读到的投影", async () => {
+    const { createMirrorStore } = await import("./store");
+    const store = createMirrorStore();
+    mocks.mirrorSession.mockResolvedValueOnce([
+      {
+        serial: "S1",
+        generation: 2,
+        phase: "live",
+        width: 1220,
+        height: 2712,
+        codec: "h265",
+        control: true,
+        has_frame: true,
+        painted_fps: 0,
+        paused: false,
+        fullscreen: true,
+      },
+    ]);
+    await store.loadProjection();
+    expect(store.state.phase).toBe("idle");
+    expect(store.state.sessions).toHaveLength(1);
+    await store.bindSerial("S1");
+    expect(store.state.phase).toBe("live");
+    expect(store.state.width).toBe(1220);
+    expect(store.state.height).toBe(2712);
+    expect(store.state.fullscreen).toBe(true);
+    expect(store.state.paintedFps).toBe(0);
+    expect(mocks.mirrorStart).not.toHaveBeenCalled();
   });
 
   it("会话进行中 bindSerial(null) 显式 stop 并解绑", async () => {
@@ -523,6 +593,16 @@ describe("mirror store", () => {
       control: true,
     });
     await store.stop();
+    expect(store.state.phase).toBe("live");
+    mocks.stateHandlers.at(-1)!({
+      serial: "S1",
+      generation: 1,
+      state: "stopped",
+      width: 0,
+      height: 0,
+      codec: "",
+      control: false,
+    });
     expect(store.state.phase).toBe("idle");
     expect(store.state.hasFrame).toBe(false);
     expect(store.state.width).toBe(1080);
@@ -618,31 +698,31 @@ function storeSource(): string {
 }
 
 describe("阶段空闲", () => {
-  it("解绑、停止和掉线都写成空闲，字面只留在函数体", () => {
+  it("解绑和掉线写成空闲，停止不预写，字面只留在函数体", () => {
     const source = storeSource();
     expect(times(source, "phase: " + "\"idle\"")).toBe(1);
     expect(times(source, "function phaseIdle")).toBe(1);
     expect(times(source, "export function phaseIdle")).toBe(0);
-    expect(times(source, "phaseIdle()")).toBe(4);
-    expect(times(source, "phase: " + "\"starting\"")).toBe(1);
+    expect(times(source, "phaseIdle()")).toBe(3);
+    expect(times(source, "phase: " + "\"starting\"")).toBe(0);
     expect(times(source, "phase: " + "\"failed\"")).toBe(1);
   });
 });
 
 describe("错误收成空", () => {
-  it("解绑、开始和停止都清错误，掉线句不并", () => {
+  it("解绑清错误，开始和停止不预写，掉线句不并", () => {
     const source = storeSource();
     expect(times(source, "error: " + "null")).toBe(1);
     expect(times(source, "function clearedError")).toBe(1);
     expect(times(source, "export function clearedError")).toBe(0);
-    expect(times(source, "clearedError()")).toBe(4);
-    expect(source).toContain("deviceOfflineText(e.serial)");
+    expect(times(source, "clearedError()")).toBe(2);
+    expect(source).toContain("deviceOfflineText(event.serial)");
     expect(source).toContain("e.error ?? null");
   });
 });
 
 describe("控制通道关掉", () => {
-  it("解绑、只读和掉线都关掉控制，停止不写", () => {
+  it("解绑、空投影和掉线关掉控制，停止不写", () => {
     const source = storeSource();
     expect(times(source, "control: " + "false")).toBe(1);
     expect(times(source, "function controlOff")).toBe(1);
@@ -652,19 +732,19 @@ describe("控制通道关掉", () => {
 });
 
 describe("没有画面", () => {
-  it("收起、开始和失败都清已出画，失败不并实测帧率", () => {
+  it("收起和失败清已出画，开始不预写，失败不并实测帧率", () => {
     const source = storeSource();
     expect(times(source, "hasFrame: " + "false")).toBe(1);
     expect(times(source, "function frameOff")).toBe(1);
     expect(times(source, "export function frameOff")).toBe(0);
-    expect(times(source, "frameOff()")).toBe(4);
+    expect(times(source, "frameOff()")).toBe(3);
     expect(times(source, "paused: " + "false")).toBe(1);
     expect(times(source, "fullscreen: " + "false")).toBe(1);
   });
 });
 
 describe("实测帧率归零", () => {
-  it("收起和开始都归零，失败路径不写", () => {
+  it("收起和空投影归零，开始不预写，失败路径不写", () => {
     const source = storeSource();
     expect(times(source, "paintedFps: " + "0")).toBe(1);
     expect(times(source, "function fpsOff")).toBe(1);
@@ -745,7 +825,7 @@ describe("只处理当前绑定", () => {
     expect(times(source, "function onBound")).toBe(1);
     expect(times(source, "export function onBound")).toBe(0);
     expect(times(source, "onBound(")).toBe(3);
-    expect(source).toContain("e.generation !== state.generation");
+    expect(source).toContain("event.generation !== state.generation");
   });
 });
 
@@ -769,6 +849,6 @@ describe("初始会话就是解绑之后", () => {
     expect(times(source, "night: " + "null")).toBe(1);
     expect(times(source, "function idleAfterUnbind")).toBe(1);
     expect(times(source, "export function idleAfterUnbind")).toBe(0);
-    expect(times(source, "idleAfterUnbind()")).toBe(3);
+    expect(times(source, "idleAfterUnbind()")).toBe(4);
   });
 });

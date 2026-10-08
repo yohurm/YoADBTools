@@ -16,9 +16,21 @@ export function mirrorSessionAddressable(state: {
   return state.serial;
 }
 
-/** 已经画出一帧。状态栏帧率和截图共用。 */
+/** 已经画出一帧。截图认这一下。状态栏不拿它当整行开关。 */
 export function mirrorPictureReady(state: { phase: string; hasFrame: boolean }): boolean {
   return phaseIsLive(state) && state.hasFrame;
+}
+
+/** Live 且有尺寸就给出分辨率；fps 大于 0 才接上。否则没有徽章。 */
+export function mirrorLiveBadge(row: {
+  phase: string;
+  width: number;
+  height: number;
+  painted_fps: number;
+}): string | null {
+  if (!phaseIsLive(row) || row.width <= 0 || row.height <= 0) return null;
+  if (row.painted_fps > 0) return `${row.width}×${row.height} · ${row.painted_fps} fps`;
+  return `${row.width}×${row.height}`;
 }
 
 /** 开始和仅显示：已选定一台设备，且不在启动中。质量栏只认启动中，不走这里。 */

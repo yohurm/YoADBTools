@@ -16,6 +16,7 @@ import {
   mirrorCloseControl,
   mirrorInject,
   mirrorLayout,
+  mirrorSession,
   mirrorPointer,
   mirrorScreenshot,
   mirrorStart,
@@ -28,6 +29,7 @@ import {
   type MirrorControlMessage,
   type MirrorPointerKind,
   type MirrorProtocol,
+  type MirrorSessionSnapshot,
   type MirrorSessionState,
   type SettingKey,
   mirrorIsFailed,
@@ -69,6 +71,7 @@ export interface MirrorUiState {
   nightHub: boolean | null;
   nightPending: boolean | null;
   night: boolean | null;
+  sessions: MirrorSessionSnapshot[];
 }
 
 function phaseOf(state: MirrorSessionState): MirrorPhase {
@@ -132,6 +135,10 @@ function mirrorInfo(message: string, detail: unknown): void {
   YoLog.info("mirror", message, detail);
 }
 
+function mirrorError(message: string, detail: unknown): void {
+  YoLog.error("mirror", message, detail);
+}
+
 /** 画面会话收起：暂停、全屏、已出画、实测帧率。解绑、停止、结束和掉线都写这一份。 */
 function clearedPlayback(): Pick<MirrorUiState, "hasFrame" | "paused" | "fullscreen" | "paintedFps"> {
   return {
@@ -177,6 +184,7 @@ export function createMirrorStore() {
     height: 0,
     readOnly: false,
     ...settingsSlice(APP_SETTINGS_DEFAULT),
+    sessions: [],
   });
 
   let gate: Promise<void> = Promise.resolve();
@@ -278,7 +286,77 @@ export function createMirrorStore() {
       serial: next,
       ...idleAfterUnbind(),
     });
+    const row = next ? state.sessions.find((item) => item.serial === next) : undefined;
+    if (row) projectRow(row);
     flushLayout();
+  }
+
+  async function loadProjection(): Promise<void> {
+    try {
+      const rows = await mirrorSession();
+      setState("sessions", rows);
+      const bound = state.serial;
+      if (bound == null) return;
+      const row = rows.find((item) => item.serial === bound);
+      if (row) projectRow(row);
+    } catch (e) {
+      mirrorError("读投影失败", errorText(e));
+    }
+  }
+
+  function projectRow(row: MirrorSessionSnapshot): void {
+    setState({
+      phase: phaseOf(row.phase),
+      generation: row.generation,
+      ...(edgeOpen(row.width) && edgeOpen(row.height) ? { width: row.width, height: row.height } : {}),
+      control: row.control,
+      hasFrame: row.has_frame,
+      paintedFps: row.painted_fps,
+      paused: row.paused,
+      fullscreen: row.fullscreen,
+      error: row.error ?? null,
+      ...(mirrorIsLive(row.phase) ? { readOnly: !row.control } : {}),
+    });
+  }
+
+  function emptySession(serial: string): MirrorSessionSnapshot {
+    return {
+      serial,
+      generation: idleAfterUnbind().generation,
+      phase: "stopped",
+      width: 0,
+      height: 0,
+      codec: "",
+      ...controlOff(),
+      has_frame: false,
+      painted_fps: fpsOff().paintedFps,
+      paused: clearedPlayback().paused,
+      fullscreen: clearedPlayback().fullscreen,
+    };
+  }
+
+  function dropSession(serial: string): void {
+    setState(
+      "sessions",
+      state.sessions.filter((row) => row.serial !== serial),
+    );
+  }
+
+  function upsertSession(
+    serial: string,
+    edit: (row: MirrorSessionSnapshot) => MirrorSessionSnapshot,
+  ): void {
+    const rows = state.sessions;
+    const index = rows.findIndex((row) => row.serial === serial);
+    const current = index >= 0 ? rows[index]! : emptySession(serial);
+    const next = edit(current);
+    if (index < 0) {
+      setState("sessions", [...rows, next]);
+      return;
+    }
+    const copy = rows.slice();
+    copy[index] = next;
+    setState("sessions", copy);
   }
 
   /** 只读开关。开始时要不要控制、注入和指针各自判断，不并。 */
@@ -303,8 +381,6 @@ export function createMirrorStore() {
 
   async function start(): Promise<void> {
     await exclusiveWhenBound(async (serial) => {
-      setState({ phase: "starting", ...clearedError(), ...frameOff(), ...fpsOff() });
-      flushLayout();
       mirrorInfo("开始", {
         serial,
         connection: sessionConnection(),
@@ -318,11 +394,10 @@ export function createMirrorStore() {
           connection: sessionConnection(),
           session_quality_touched: sessionQualityTouched,
         });
-        setState({ generation: result.generation });
         mirrorInfo("start 返回", result);
       } catch (e) {
         const error = errorText(e);
-        YoLog.error("mirror", "start 失败", error);
+        mirrorError("start 失败", error);
         setState({
           phase: "failed",
           error,
@@ -337,18 +412,13 @@ export function createMirrorStore() {
     await exclusiveWhenBound(async (serial) => {
       mirrorInfo("停止", serial);
       await mirrorStop(serial);
-      setState({
-        ...phaseIdle(),
-        ...clearedError(),
-        ...clearedPlayback(),
-      });
-      flushLayout();
     });
   }
 
   async function inject(message: MirrorControlMessage): Promise<void> {
     const serial = mirrorSessionAddressable(state);
     if (!serial || readOnlyNow()) return;
+    if (!state.control) return;
     await mirrorInject({ serial, message });
   }
 
@@ -368,12 +438,10 @@ export function createMirrorStore() {
     }
     if (next) {
       await mirrorCloseControl(serial);
-      setState({ readOnly: true, ...controlOff() });
-      flushLayout();
       return;
     }
-    setState("readOnly", false);
     await stop();
+    setState("readOnly", false);
     await start();
   }
 
@@ -444,62 +512,83 @@ export function createMirrorStore() {
   }
 
   unlistens.push(
-    onMirrorState(
-      onBound((e) => {
-        mirrorInfo("状态", {
-          serial: e.serial,
-          state: e.state,
+    onMirrorState((e) => {
+      if (mirrorSessionEnded(e.state)) {
+        dropSession(e.serial);
+      } else {
+        upsertSession(e.serial, (row) => ({
+          ...row,
           generation: e.generation,
-          width: e.width,
-          height: e.height,
-          codec: e.codec,
-          error: e.error,
-        });
-        setState({
-          generation: e.generation,
-          phase: phaseOf(e.state),
+          phase: e.state,
           ...(edgeOpen(e.width) && edgeOpen(e.height) ? { width: e.width, height: e.height } : {}),
+          codec: e.codec || row.codec,
           control: e.control,
           error: e.error ?? null,
+        }));
+      }
+      onBound((event) => {
+        mirrorInfo("状态", {
+          serial: event.serial,
+          state: event.state,
+          generation: event.generation,
+          width: event.width,
+          height: event.height,
+          codec: event.codec,
+          error: event.error,
         });
-        if (mirrorSessionEnded(e.state)) {
+        setState({
+          generation: event.generation,
+          phase: phaseOf(event.state),
+          ...(edgeOpen(event.width) && edgeOpen(event.height)
+            ? { width: event.width, height: event.height }
+            : {}),
+          control: event.control,
+          error: event.error ?? null,
+          ...(mirrorIsLive(event.state) ? { readOnly: !event.control } : {}),
+        });
+        if (mirrorSessionEnded(event.state)) {
           setState(clearedPlayback());
         }
         flushLayout();
-      }),
-    ),
+      })(e);
+    }),
   );
   unlistens.push(
-    onMirrorPainted(
-      onBound((e) => {
-        if (e.generation && e.generation !== state.generation) return;
+    onMirrorPainted((e) => {
+      upsertSession(e.serial, (row) => {
+        if (e.generation && row.generation && e.generation !== row.generation) return row;
+        return { ...row, has_frame: true, painted_fps: e.painted_fps };
+      });
+      onBound((event) => {
+        if (event.generation && state.generation && event.generation !== state.generation) return;
         if (!state.hasFrame) {
           mirrorInfo("首帧已绘制", {
-            serial: e.serial,
-            generation: e.generation,
-            painted_fps: e.painted_fps,
+            serial: event.serial,
+            generation: event.generation,
+            painted_fps: event.painted_fps,
           });
         }
         setState({
           hasFrame: true,
-          paintedFps: e.painted_fps,
+          paintedFps: event.painted_fps,
         });
         flushLayout();
-      }),
-    ),
+      })(e);
+    }),
   );
   unlistens.push(
-    onDeviceOffline(
-      onBound((e) => {
+    onDeviceOffline((e) => {
+      dropSession(e.serial);
+      onBound((event) => {
         setState({
           ...phaseIdle(),
-          error: deviceOfflineText(e.serial),
+          error: deviceOfflineText(event.serial),
           ...clearedPlayback(),
           ...controlOff(),
         });
         flushLayout();
-      }),
-    ),
+      })(e);
+    }),
   );
 
   const hot = (import.meta as { hot?: { dispose: (cb: () => void) => void } }).hot;
@@ -510,6 +599,7 @@ export function createMirrorStore() {
   return {
     state,
     bindSerial,
+    loadProjection,
     bindConnection,
     bindNight,
     applySettings,

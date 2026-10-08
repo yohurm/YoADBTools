@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { mirrorIsFailed, mirrorIsLive, mirrorIsStarting, mirrorSessionEnded } from "@yohu/api";
 
-import { mirrorControlReady, mirrorPictureReady, mirrorSessionAddressable, mirrorSetupEnabled } from "./control-ready";
+import { mirrorControlReady, mirrorLiveBadge, mirrorPictureReady, mirrorSessionAddressable, mirrorSetupEnabled } from "./control-ready";
 
 const ready = {
   phase: "live",
@@ -53,8 +53,17 @@ describe("投屏在播只认一处", () => {
     expect(view).toContain("mirrorPictureReady");
     expect(view).not.toContain('phase === "live"');
     expect(view).not.toContain('phase === "starting"');
-    expect(status).toContain("mirrorPictureReady");
+    expect(status).toContain("mirrorLiveBadge");
+    expect(status).not.toContain("mirrorPictureReady");
     expect(status).not.toContain('phase === "live"');
+    expect(mirrorLiveBadge({ phase: "live", width: 1220, height: 2712, painted_fps: 0 })).toBe(
+      "1220×2712",
+    );
+    expect(mirrorLiveBadge({ phase: "live", width: 1220, height: 2712, painted_fps: 30 })).toBe(
+      "1220×2712 · 30 fps",
+    );
+    expect(mirrorLiveBadge({ phase: "live", width: 0, height: 2712, painted_fps: 30 })).toBeNull();
+    expect(mirrorLiveBadge({ phase: "starting", width: 1220, height: 2712, painted_fps: 30 })).toBeNull();
     expect(store).toContain("mirrorIsLive");
     expect(store).toContain("mirrorIsFailed");
     expect(store).toContain("mirrorSessionEnded");
