@@ -41,6 +41,7 @@ impl PresentBeat {
 
     /// 已画出一帧。`had_frame` 是本帧之前舞台有没有首帧。
     /// 首帧或节拍到了就给出 `mirror/painted`。
+    #[allow(clippy::too_many_arguments)]
     pub fn note_presented(
         &mut self,
         serial: &str,

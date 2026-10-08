@@ -69,6 +69,21 @@ fn parse_hdr(_e: reqwest::header::InvalidHeaderValue) -> UpdateError {
     UpdateError::BadHeader
 }
 
+pub fn user_agent_for(platform: &PlatformInfo) -> String {
+    crate::platform::user_agent(&platform.version)
+}
+
+pub fn github_error_message(body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| {
+            v.get("message")
+                .and_then(|m| m.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,19 +103,4 @@ mod tests {
         assert!(!document_fetched(201));
         assert!(!document_fetched(304));
     }
-}
-
-pub fn user_agent_for(platform: &PlatformInfo) -> String {
-    crate::platform::user_agent(&platform.version)
-}
-
-pub fn github_error_message(body: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .and_then(|v| {
-            v.get("message")
-                .and_then(|m| m.as_str())
-                .map(str::to_string)
-        })
-        .unwrap_or_default()
 }

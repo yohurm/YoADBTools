@@ -92,7 +92,7 @@ impl DeviceShell {
         let mut io = lock_io(self, &cancel).await?;
         let live = io
             .as_mut()
-            .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::Ended)))?;
+            .ok_or(DeviceShellError::Failed(AdbError::Shell(ShellFault::Ended)))?;
         let nonce = self.nonce.fetch_add(1, Ordering::Relaxed);
         let turn = browse_parse::wrap_session_script(nonce, inner);
         match exec_turn(live, &turn, nonce, timeout, &cancel, &self.halt).await {
@@ -158,11 +158,11 @@ async fn spawn_live(
     let stdin = child
         .stdin
         .take()
-        .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdin)))?;
+        .ok_or(DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdin)))?;
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdout)))?;
+        .ok_or(DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdout)))?;
     let stderr = child.stderr.take();
     let stderr_tail = Arc::new(Mutex::new(String::new()));
     let stderr_task = spawn_stderr_drain(stderr, Arc::clone(&stderr_tail));

@@ -61,6 +61,7 @@ pub fn pointer_target(stage: &Stage) -> PointerTarget {
 }
 
 /// 只可操作时映射进画面。不可操作则抬起。离开占用面也抬起。
+#[allow(clippy::too_many_arguments)]
 pub fn plan_wire(
     gesture: &mut PointerGesture,
     kind: MirrorPointerKind,
@@ -79,6 +80,7 @@ pub fn plan_wire(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn plan_feed(
     gesture: &mut PointerGesture,
     kind: PointerKind,

@@ -285,6 +285,7 @@ impl PresentHost {
         }
     }
 
+    #[cfg(test)]
     pub fn close_count(&self) -> u32 {
         lock_present(&self.inner).closes
     }
@@ -537,10 +538,9 @@ pub(crate) fn screenshot_from_pixels(
 }
 
 /// 没有采样是空画面。采样失败是读失败。有像素才写盘。
-pub(crate) fn screenshot_sampled(
-    path: &str,
-    sample: Option<Result<(u32, u32, Vec<u8>), ()>>,
-) -> Result<(), PresentError> {
+type ScreenshotSample = Option<Result<(u32, u32, Vec<u8>), ()>>;
+
+pub(crate) fn screenshot_sampled(path: &str, sample: ScreenshotSample) -> Result<(), PresentError> {
     match sample {
         None => screenshot_from_pixels(path, None),
         Some(Ok(pixels)) => screenshot_from_pixels(path, Some(pixels)),

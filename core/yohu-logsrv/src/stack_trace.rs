@@ -120,7 +120,7 @@ mod tests {
     fn expands_elided_frames_from_outer_stack() {
         let input = vec![
             "at com.foo.A.method(A.java:1)".into(),
-            "at com.foo.B.method(B.java:2)".into(),
+            "Caused by: java.lang.IllegalStateException".into(),
             "... 1 more".into(),
         ];
         let out = expand_stack_trace_lines(&input);

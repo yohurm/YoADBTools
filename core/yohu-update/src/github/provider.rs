@@ -77,9 +77,8 @@ impl GitHubReleaseProvider {
             platform,
         )
         .ok()
-        .map(|update| {
+        .inspect(|_update| {
             tracing::debug!(tag = %tag, "update check via conventional asset URL");
-            update
         })
     }
 
@@ -130,9 +129,8 @@ impl GitHubReleaseProvider {
         let page = self.urls.release_page(&tag);
         self.try_manifest_for_tag(&tag, platform, &page)
             .await
-            .map(|update| {
+            .inspect(|_update| {
                 tracing::debug!("update check via github.com releases/latest JSON");
-                update
             })
     }
 

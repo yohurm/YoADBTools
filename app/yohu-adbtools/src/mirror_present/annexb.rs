@@ -52,15 +52,16 @@ pub fn should_open_decoder(has_decoder: bool, failed: bool, has_size: bool) -> b
 
 /// 打开失败就钉死本会话。成功把解码器交回，错误交回给平台打日志。
 pub fn take_open<T, E>(failed: &mut bool, result: Result<T, E>) -> Result<T, E> {
-    result.map_err(|err| {
+    result.inspect_err(|_err| {
         *failed = true;
-        err
     })
 }
 
 /// 解码节拍属于哪一端。日志句不同，计数规则相同。
 pub enum DecodeSeatKind {
+    #[cfg_attr(not(windows), allow(dead_code))]
     MediaFoundation,
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     VideoToolbox,
 }
 

@@ -205,6 +205,7 @@ Message 3
         assert_eq!(last.msg, "Message 3");
     }
 
+    #[test]
     fn as_fixture_system_lines_order() {
         let mut asm = MessageAssembler::new();
         let lines = [
@@ -228,6 +229,7 @@ Message 3
         assert_eq!(out[3].msg, "Message 2");
     }
 
+    #[test]
     fn as_fixture_lines_without_header_dropped() {
         let mut asm = MessageAssembler::new();
         assert!(asm.ingest("Message 1").is_empty());
@@ -237,6 +239,7 @@ Message 3
         assert_eq!(line.msg, "Message 2");
     }
 
+    #[test]
     fn pixel_uid_pid_tid_header_closes_record() {
         let mut asm = MessageAssembler::new();
         asm.ingest("[ 2026-09-19 16:09:33.046 shell: 4310: 4310 W/libbinder.BackendUnifiedServiceManager ]");

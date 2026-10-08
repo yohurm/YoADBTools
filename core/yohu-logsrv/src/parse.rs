@@ -97,24 +97,27 @@ fn normalize_header_priority(raw: char) -> char {
     }
 }
 
-/// `pid:tid` 或 `uid:pid:tid`。uid 是数字或短名（`root`/`shell`）。
+/// `pid:tid` 或 `uid:pid:tid`。每一段是单个记号（数字或 `root`/`shell`）。
+/// 段内再出现空白是 threadtime 的空格分隔 uid，不是 FORMAT_LONG。
 fn parse_process_ids(ids: &str) -> Option<(Option<String>, u32, u32)> {
     let parts: Vec<&str> = ids.split(':').map(str::trim).collect();
     match parts.as_slice() {
-        [pid, tid] if !pid.is_empty() && !tid.is_empty() => {
-            Some((None, parse_pid(pid), parse_thread_id(tid)))
-        }
-        [uid, pid, tid] if !uid.is_empty() && !pid.is_empty() && !tid.is_empty() => Some((
-            Some((*uid).to_string()),
-            parse_pid(pid),
-            parse_thread_id(tid),
+        [pid, tid] => Some((None, parse_pid(id_token(pid)?), parse_thread_id(id_token(tid)?))),
+        [uid, pid, tid] => Some((
+            Some(id_token(uid)?.to_string()),
+            parse_pid(id_token(pid)?),
+            parse_thread_id(id_token(tid)?),
         )),
         _ => None,
     }
 }
 
-fn parse_u32(s: &str) -> Option<u32> {
-    s.parse().ok()
+fn id_token(part: &str) -> Option<&str> {
+    if part.is_empty() || part.chars().any(char::is_whitespace) {
+        None
+    } else {
+        Some(part)
+    }
 }
 
 /// 对照 AS `parsePid`：过长数字失败时返回 -1（wire 用 `u32::MAX` 占位）。

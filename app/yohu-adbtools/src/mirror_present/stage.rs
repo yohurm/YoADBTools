@@ -287,6 +287,7 @@ impl Stage {
         self.mode = stage_mode(self.paused, self.bound, self.has_frame);
     }
 
+    #[cfg(test)]
     pub fn mode(&self) -> MirrorStageMode {
         self.mode
     }

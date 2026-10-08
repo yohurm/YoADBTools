@@ -339,12 +339,9 @@ mod tests {
                 return;
             };
             // 已经收过尸就不要再按 pid 发信号，避免 pid 被复用后误杀。
-            match child.try_wait() {
-                Ok(None) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                }
-                _ => {}
+            if let Ok(None) = child.try_wait() {
+                let _ = child.kill();
+                let _ = child.wait();
             }
         }
     }
