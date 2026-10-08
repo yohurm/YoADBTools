@@ -19,8 +19,8 @@ export function bindFocusModality(doc: Document = document): () => void {
   const onPointer = (): void => {
     root.removeAttribute(YOHU_FOCUS_ATTR);
   };
-  const onKey = (event: KeyboardEvent): void => {
-    if (!isFocusActivationKey(event.key)) return;
+  const onKey: EventListener = (event) => {
+    if (!(event instanceof KeyboardEvent) || !isFocusActivationKey(event.key)) return;
     root.setAttribute(YOHU_FOCUS_ATTR, YOHU_FOCUS_KEYBOARD);
   };
   function listen(type: string, handler: EventListener): () => void {

@@ -120,7 +120,7 @@ export function createUpdateStore() {
     return update.size_bytes;
   }
 
-  function eventInstaller(e: UpdateProgress): string | null | undefined {
+  function eventInstaller(e: UpdateProgress): string | undefined {
     return e.installer_path;
   }
 
@@ -201,7 +201,7 @@ export function createUpdateStore() {
       }
 
       if (updateStageIsReady(e.stage) && updateHasInstallerPath(eventInstaller(e))) {
-        setInstallerPath(eventInstaller(e));
+        setInstallerPath(eventInstaller(e) ?? null);
         markReady();
         const waiter = readWaiter();
         clearWaiter();

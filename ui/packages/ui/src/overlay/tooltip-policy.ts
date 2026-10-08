@@ -95,7 +95,8 @@ export function bindTooltipInputModality(doc: Document = document): () => void {
   const onPointer = (): void => {
     inputModality = "pointer";
   };
-  const onKey = (event: KeyboardEvent): void => {
+  const onKey: EventListener = (event) => {
+    if (!(event instanceof KeyboardEvent)) return;
     if (event.key === "Shift" || event.key === "Control" || event.key === "Alt" || event.key === "Meta") return;
     inputModality = "keyboard";
   };

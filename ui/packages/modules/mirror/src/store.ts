@@ -526,7 +526,7 @@ export function createMirrorStore() {
           error: e.error ?? null,
         }));
       }
-      onBound((event) => {
+      onBound((event: typeof e) => {
         mirrorInfo("状态", {
           serial: event.serial,
           state: event.state,
@@ -559,7 +559,7 @@ export function createMirrorStore() {
         if (e.generation && row.generation && e.generation !== row.generation) return row;
         return { ...row, has_frame: true, painted_fps: e.painted_fps };
       });
-      onBound((event) => {
+      onBound((event: typeof e) => {
         if (event.generation && state.generation && event.generation !== state.generation) return;
         if (!state.hasFrame) {
           mirrorInfo("首帧已绘制", {

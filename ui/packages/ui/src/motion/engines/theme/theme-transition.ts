@@ -147,7 +147,7 @@ function endThemeTransition(transition: ViewTransitionLike): void {
 }
 
 function themeSettled(done: Promise<unknown>): Promise<void> {
-  return done.catch(() => undefined);
+  return done.catch(() => undefined) as Promise<void>;
 }
 
 /**

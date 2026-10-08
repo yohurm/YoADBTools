@@ -72,7 +72,7 @@ export function stepWrappedIndex(count: number, from: number, delta: number): nu
 }
 
 /** 没有这一项，或 disabled 为真，则不可选。缺省 disabled 算可选。 */
-export function itemIsEnabled(item: { disabled?: boolean } | undefined): boolean {
+export function itemIsEnabled<T extends { disabled?: boolean }>(item: T | undefined): item is T {
   return item !== undefined && item.disabled !== true;
 }
 

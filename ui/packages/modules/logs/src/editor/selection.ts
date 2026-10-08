@@ -131,7 +131,7 @@ export function textOffsetInDoc(rowEl: Element, node: Node, offset: number): num
   return 0;
 }
 
-function rootIsNode(root: ParentNode): root is Node {
+function rootIsNode(root: ParentNode): root is ParentNode & Node {
   return root instanceof Node;
 }
 

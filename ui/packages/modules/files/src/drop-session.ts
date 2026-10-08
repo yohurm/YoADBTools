@@ -6,7 +6,13 @@
 
 import { createSignal, onCleanup, onMount, type Accessor } from "solid-js";
 
-import { bindNativeDragDrop, dragEventIsDrop, NATIVE_DRAG_SUBSCRIBE_FAILED, YoLog } from "@yohu/api";
+import {
+  bindNativeDragDrop,
+  dragEventIsDrop,
+  dragEventIsHover,
+  NATIVE_DRAG_SUBSCRIBE_FAILED,
+  YoLog,
+} from "@yohu/api";
 import { controlRowHeight, cssPointFromPhysical, hostPixelRatio } from "@yohu/ui";
 
 import {
@@ -85,7 +91,7 @@ export function createDropSession(host: DropSessionHost): {
         setSession((prev) => adoptDropSession(prev, admitted));
         const intoFolder = host.intoFolder();
         const scale = hostPixelRatio();
-        if (admitted.hot && intoFolder) {
+        if (admitted.hot && intoFolder && dragEventIsHover(event)) {
           destPoint = cssPointFromPhysical(event.position.x, event.position.y, scale);
           if (destFrameIdle()) {
             destFrame = requestAnimationFrame(applyDest);

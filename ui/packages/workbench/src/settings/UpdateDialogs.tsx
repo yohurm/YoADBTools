@@ -184,7 +184,7 @@ export function UpdateDialogs(props: {
         >
         <YoScroller>
           <p class="yohu-settings__update-copy">
-            {settingsStore.macosHost()}
+            {settingsStore.macosHost()
               ? `已下载 ${pendingVersion()}。将打开 DMG，请拖入应用程序文件夹。`
               : `已下载 ${pendingVersion()}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
           </p>

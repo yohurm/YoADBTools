@@ -76,7 +76,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
     subEl?.querySelectorAll<HTMLElement>('[role="menuitem"]')[index]?.focus();
   };
 
-  function chooseItem(item: YoMenuItem): void {
+  function chooseItem(item: YoMenuItem | undefined): void {
     if (!itemIsEnabled(item)) return;
     props.onSelect(item.id);
     props.onClose();

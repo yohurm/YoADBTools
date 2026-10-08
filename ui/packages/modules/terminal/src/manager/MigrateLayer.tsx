@@ -8,7 +8,15 @@
 
 import { Show, createEffect, createSignal, onCleanup, type Accessor, type JSX } from "solid-js";
 
-import { Spacing, YoDragPile, gatherHomeSpan, motionSpecMs, shouldSkipMotion, type DragPilePhase } from "@yohu/ui";
+import {
+  Spacing,
+  YoDragPile,
+  dismissKey,
+  gatherHomeSpan,
+  motionSpecMs,
+  shouldSkipMotion,
+  type DragPilePhase,
+} from "@yohu/ui";
 
 import {
   migrateArmed,
@@ -328,7 +336,7 @@ export function MigrateLayer(props: {
   };
 
   const key = (event: KeyboardEvent): void => {
-    if (event.key !== "Escape") return;
+    if (!dismissKey(event.key)) return;
     const current = view();
     if (!current || current.phase !== "carry") return;
     event.preventDefault();

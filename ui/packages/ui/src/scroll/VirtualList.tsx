@@ -187,7 +187,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     pendingFocusKey = null;
   }
 
-  function rowMissing(item: T | undefined): boolean {
+  function rowMissing(item: T | undefined): item is undefined {
     return item === undefined;
   }
 

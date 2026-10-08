@@ -98,7 +98,7 @@ function times(source: string, needle: string): number {
 }
 
 function sourceOf(name: string): string {
-  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), name), "utf8");
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), name), "utf8").replace(/\r\n/g, "\n");
 }
 
 describe("会话已在播", () => {

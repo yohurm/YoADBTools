@@ -783,7 +783,10 @@ export function formatMessages(
   return { messages, state };
 }
 
-export function formatParts(formatted: FormattedMessage): { kind: LogColKey; text: string }[] {
+export function formatParts(formatted: {
+  text: string;
+  ranges: readonly FormatRange[];
+}): { kind: LogColKey; text: string }[] {
   const parts: { kind: LogColKey; text: string }[] = [];
   for (const range of formatted.ranges) {
     const text = formatted.text.slice(range.start, range.end);

@@ -13,7 +13,7 @@ export function flagIsOn(flag: FlagAttr): boolean {
 }
 
 /** 存在性旗。属性在则为开，值为空串。CSS 用 [data-x]，不比较 "true"。空串在 JS 里是假，视图用 presenceIsOn 读。 */
-export function presenceAttr(on: boolean): "" | undefined {
+export function presenceAttr(on: boolean | undefined): "" | undefined {
   return on ? "" : undefined;
 }
 

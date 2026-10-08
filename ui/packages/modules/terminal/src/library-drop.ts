@@ -20,11 +20,13 @@ function pointerInPane(position: { x: number; y: number }, rect: PointerRect, sc
   return pointInRect(rect, point.x, point.y);
 }
 
-function eventIsDrop(event: NativeDragDropEvent): boolean {
+function eventIsDrop(
+  event: NativeDragDropEvent,
+): event is Extract<NativeDragDropEvent, { type: "drop" }> {
   return dragEventIsDrop(event);
 }
 
-function paneMissing(rect: PointerRect | undefined): boolean {
+function paneMissing(rect: PointerRect | undefined): rect is undefined {
   return !rect;
 }
 

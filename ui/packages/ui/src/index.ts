@@ -207,7 +207,6 @@ export type { YoScrollerProps, YoScrollerHandle, ScrollerAxis, ScrollerBarState,
 
 export { YoVirtualList } from "./scroll/VirtualList";
 export type { YoVirtualListProps } from "./scroll/VirtualList";
-export type { YoListRowTone } from "./list-row/list-row-model";
 
 export { YoReorderList } from "./scroll/ReorderList";
 export type { YoReorderListProps } from "./scroll/ReorderList";

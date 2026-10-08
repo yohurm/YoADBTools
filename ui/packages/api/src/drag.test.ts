@@ -102,10 +102,10 @@ describe("bindNativeDragDrop", () => {
 
 describe("drag event phase", () => {
   it("松手和悬停只在 drag.ts 里比较", () => {
-    const drop = { type: "drop" as const, paths: ["a"], position: { x: 0, y: 0 } };
-    const enter = { type: "enter" as const, paths: ["a"], position: { x: 0, y: 0 } };
-    const over = { type: "over" as const, position: { x: 1, y: 1 } };
-    const leave = { type: "leave" as const };
+    const drop = { type: "drop" as const, paths: ["a"], position: { x: 0, y: 0 } } as NativeDragDropEvent;
+    const enter = { type: "enter" as const, paths: ["a"], position: { x: 0, y: 0 } } as NativeDragDropEvent;
+    const over = { type: "over" as const, position: { x: 1, y: 1 } } as NativeDragDropEvent;
+    const leave = { type: "leave" as const } as NativeDragDropEvent;
     expect(dragEventIsDrop(drop)).toBe(true);
     expect(dragEventIsDrop(enter)).toBe(false);
     expect(dragEventIsHover(enter)).toBe(true);

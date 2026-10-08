@@ -707,7 +707,7 @@ mod tests {
 
     #[test]
     fn arity_needs_values_once() {
-        let src = include_str!("library.rs");
+        let src = include_str!("library.rs").replace("\r\n", "\n");
         let stripped = src.replacen("    arity > 0\n", "", 1);
         assert_eq!(src.matches("    arity > 0\n").count(), 1);
         assert!(!stripped.contains("self.placeholder_arity() > 0"));

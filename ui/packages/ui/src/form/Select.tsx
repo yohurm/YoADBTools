@@ -144,25 +144,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
   function listen(
     target: EventTarget | null | undefined,
     type: string,
-    handler: () => void,
-    capture?: boolean,
-  ): () => void;
-  function listen(
-    target: EventTarget | null | undefined,
-    type: string,
-    handler: (event: MouseEvent) => void,
-    capture?: boolean,
-  ): () => void;
-  function listen(
-    target: EventTarget | null | undefined,
-    type: string,
-    handler: (event: KeyboardEvent) => void,
-    capture?: boolean,
-  ): () => void;
-  function listen(
-    target: EventTarget | null | undefined,
-    type: string,
-    handler: () => void,
+    handler: EventListener,
     capture?: boolean,
   ): () => void {
     target?.addEventListener(type, handler, capture);
@@ -170,12 +152,14 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
   }
 
   onMount(() => {
-    const handleDocPointerDown = (event: MouseEvent): void => {
-      const target = event.target as Node;
+    const handleDocPointerDown = (event: Event): void => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
       if (rootRef?.contains(target) || layerRef?.contains(target)) return;
       selectIdle();
     };
-    const handleDocKeyDown = (event: KeyboardEvent): void => {
+    const handleDocKeyDown = (event: Event): void => {
+      if (!(event instanceof KeyboardEvent)) return;
       if (!dismissKey(event.key)) return;
       const next = applySelectEscape(open(), props.disabled);
       if (!next) return;
@@ -270,7 +254,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
             class="yohu-select__layer"
             data-placement={selectPlacement()}
             data-overflow-y={presenceAttr(overflowY())}
-            data-placed={presenceAttr(menuStyle().position)}
+            data-placed={presenceAttr(Boolean(menuStyle().position))}
             style={menuStyle()}
           >
             <div

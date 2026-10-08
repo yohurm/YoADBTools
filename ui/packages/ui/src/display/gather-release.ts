@@ -6,6 +6,7 @@
  * 下一张不等上一张飞完，飞行彼此重叠。
  */
 
+import { listEdgeIndex } from "../keymap/list-index";
 import { MotionEasing, MotionSpec, motionDurationMs, motionSpecMs, type MotionSpecName } from "../tokens/motion";
 import { shouldSkipMotion } from "../motion/reduced";
 
@@ -57,7 +58,7 @@ export function gatherReleaseStartMs(rank: number): number {
 /** 从第一张起步到最后一张淡出结束。卸载超时与这段对齐。 */
 export function gatherHomeSpan(count: number): number {
   if (count <= 0) return 0;
-  return gatherReleaseStartMs(count - 1) + motionSpecMs("spatialLocal") + motionSpecMs("effectsExit");
+  return gatherReleaseStartMs(listEdgeIndex(count, "end")) + motionSpecMs("spatialLocal") + motionSpecMs("effectsExit");
 }
 
 function timing(spec: MotionSpecName, delay = 0): KeyframeAnimationOptions {

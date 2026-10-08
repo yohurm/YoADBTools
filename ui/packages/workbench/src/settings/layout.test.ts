@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const load = (name: string): string => readFileSync(resolve(here, name), "utf-8");
+const load = (name: string): string => readFileSync(resolve(here, name), "utf-8").replace(/\r\n/g, "\n");
 
 const dialogs = load("UpdateDialogs.tsx");
 const form = load("SettingsForm.tsx");

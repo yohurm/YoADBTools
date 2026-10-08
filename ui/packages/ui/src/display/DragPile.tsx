@@ -10,6 +10,7 @@ import type { JSX } from "solid-js";
 
 import { CornerPillRadius, YoCorner } from "../corner";
 import { Icon, isIconName, type IconName } from "../icons";
+import { presenceAttr } from "../dom/flag";
 import { Layout } from "../tokens/layout";
 import {
   playGatherRelease,
@@ -153,8 +154,8 @@ export function YoDragPile(props: YoDragPileProps): JSX.Element {
             <div
               class="yohu-drag-pile__plate"
               data-face={face.id}
-              data-front={index() === 0 ? "" : undefined}
-              data-back={index() > 0 ? "" : undefined}
+              data-front={presenceAttr(index() === 0)}
+              data-back={presenceAttr(index() > 0)}
               style={{
                 left: `${origin().x}px`,
                 top: `${origin().y}px`,
