@@ -75,9 +75,70 @@
   color: var(--yohu-fg-2);
 }
 
+.yohu-terminal__library {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.yohu-terminal__import-lead,
+.yohu-terminal__import-catalog,
+.yohu-terminal__import-section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.yohu-terminal__import-lead {
+  gap: var(--yohu-space-sm);
+  text-align: start;
+}
+
+.yohu-terminal__import-catalog {
+  gap: var(--yohu-space-md);
+}
+
+.yohu-terminal__import-scope,
+.yohu-terminal__import-effect,
+.yohu-terminal__import-count {
+  margin: 0;
+  font-size: var(--yohu-font-caption);
+  line-height: var(--yohu-font-leading-tight);
+  color: var(--yohu-fg-2);
+}
+
+.yohu-terminal__import-decision,
+.yohu-terminal__import-row {
+  display: flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  min-height: var(--yohu-control-height);
+}
+
+.yohu-terminal__import-effect {
+  margin-inline-start: auto;
+  color: var(--yohu-fg);
+  white-space: nowrap;
+}
+
+.yohu-terminal__import-count {
+  flex: 0 0 auto;
+}
+
+.yohu-terminal__import-row[data-role="entry"] {
+  padding-inline-start: calc(var(--yohu-space-lg) + var(--yohu-space-xs) + var(--yohu-space-sm));
+}
+
+.yohu-terminal__import-status {
+  margin-inline-start: auto;
+}
+
 .yohu-terminal__dock {
   flex-shrink: 0;
 }
+
 
 .yohu-terminal__composer-pane {
   background: var(--yohu-surface-2);

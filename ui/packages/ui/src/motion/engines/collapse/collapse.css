@@ -10,6 +10,15 @@
   grid-template-rows: 1fr;
 }
 
+.yohu-collapse[data-flex="grow"] {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.yohu-collapse[data-flex="hug"] {
+  flex: 0 0 auto;
+}
+
 .yohu-collapse__inner {
   overflow: hidden;
   min-height: 0;
@@ -42,8 +51,8 @@
 }
 
 /*
- * 配方 fill：高度仍 0fr/1fr。`__content` 吃剩余高并可收缩。
- * 禁止默认 collapse 给子项写 min-height（会压过 Tree 行高）。
+ * 配方 fill：高度仍 0fr/1fr。`__content` 自己吃剩余高并可收缩。
+ * 直接子级是否再吃剩余，由那个子级自己写。禁止点 `> *`。
  */
 .yohu-collapse[data-recipe="fill"] .yohu-collapse__inner {
   display: flex;
@@ -53,11 +62,6 @@
 .yohu-collapse[data-recipe="fill"] .yohu-collapse__content {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.yohu-collapse[data-recipe="fill"] .yohu-collapse__content > * {
   flex: 1;
   min-height: 0;
 }

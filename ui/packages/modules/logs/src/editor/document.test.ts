@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { LogLine } from "@yohu/api";
 
 import { LogDocument, type DocRow } from "./document";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions, formatParts } from "./format";
 
 function line(seq: number, over: Partial<LogLine> = {}): LogLine {
   return {
@@ -53,6 +53,16 @@ describe("LogDocument", () => {
     const first = doc.messages;
     expect(doc.sync(rows)).toBe(false);
     expect(doc.messages).toBe(first);
+  });
+
+  it("append 延续 previousTag 供 hideDuplicates", () => {
+    const doc = new LogDocument();
+    const dup = { ...options, hideDuplicateTag: true };
+    doc.setOptions(dup);
+    doc.reload([row(1, { tag: "Dup" })]);
+    doc.append([row(2, { tag: "Dup" })]);
+    const tag2 = formatParts(doc.messages[1]!).find((p) => p.kind === "tag");
+    expect(tag2?.text.trim()).toBe("");
   });
 
   it("append 前缀对象不动", () => {
@@ -132,6 +142,23 @@ describe("LogDocument", () => {
     expect(src).not.toContain("../signals");
   });
 
+  it("blank_stored_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
+    const needle = "this.source = " + "EMPTY_ROWS";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("blankStored(");
+  });
+
+  it("extend_stored_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const documentSrc = readFileSync(resolve(dir, "document.ts"), "utf-8");
+    const boardSrc = readFileSync(resolve(dir, "board.ts"), "utf-8");
+    expect(documentSrc.split("EMPTY_MESSAGES ? " + "painted").length - 1).toBe(0);
+    expect(boardSrc.split("EMPTY_VISUAL ? " + "tail").length - 1).toBe(0);
+    expect(documentSrc.split("current === empty ? " + "next : current.concat(next)").length - 1).toBe(1);
+    expect(boardSrc).toContain("extendStored(");
+  });
+
   it("10k adopt 同引用", () => {
     const doc = new LogDocument();
     doc.setOptions(options);
@@ -140,5 +167,32 @@ describe("LogDocument", () => {
     const t0 = performance.now();
     expect(doc.sync(rows)).toBe(false);
     expect(performance.now() - t0).toBeLessThan(2);
+  });
+});
+
+describe("进来的行是空的只判一次", () => {
+  it("rows_empty_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
+    const needle = "rows.length " + "=== 0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("rowsEmpty(");
+  });
+});
+
+describe("存着的源是空的只判一次", () => {
+  it("source_empty_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
+    const needle = "this.source.length " + "=== 0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("sourceEmpty(");
+  });
+});
+
+describe("画好的消息是空的只判一次", () => {
+  it("items_empty_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
+    const needle = "this.items.length " + "=== 0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("itemsEmpty(");
   });
 });

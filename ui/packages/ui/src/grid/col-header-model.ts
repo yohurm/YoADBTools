@@ -3,17 +3,17 @@
  * 对齐与排序缺省是不变式；不碰 DOM、不判定拖宽会话。
  */
 
+import { listRowToneIsDocument, type YoListRowTone } from "../list-row/list-row-model";
+
 export type YoColHeaderAlign = "start" | "end" | "center";
 export type YoColHeaderSort = "ascending" | "descending" | "none";
-export type YoColHeaderTone = "list" | "document";
 
 export const COL_HEADER_ALIGNS = ["start", "end", "center"] as const;
 export const COL_HEADER_SORTS = ["ascending", "descending", "none"] as const;
-export const COL_HEADER_TONES = ["list", "document"] as const;
 
 export const DEFAULT_COL_HEADER_ALIGN: YoColHeaderAlign = "start";
 export const DEFAULT_COL_HEADER_SORT: YoColHeaderSort = "none";
-export const DEFAULT_COL_HEADER_TONE: YoColHeaderTone = "list";
+export const DEFAULT_COL_HEADER_TONE: YoListRowTone = "list";
 
 export interface ColHeaderInput {
   align?: string;
@@ -29,7 +29,7 @@ export interface ColHeaderInput {
 export interface ColHeaderSpec {
   align: YoColHeaderAlign;
   sort: YoColHeaderSort;
-  tone: YoColHeaderTone;
+  tone: YoListRowTone;
   resizable: boolean;
   /** 右缘有列缝铬（拖条或 mark） */
   edge: boolean;
@@ -40,13 +40,26 @@ export function resolveColHeaderAlign(align?: string): YoColHeaderAlign {
   return DEFAULT_COL_HEADER_ALIGN;
 }
 
+export function colHeaderSortIsAscending(sort?: string): sort is "ascending" {
+  return sort === "ascending";
+}
+
+export function colHeaderSortIsDescending(sort?: string): sort is "descending" {
+  return sort === "descending";
+}
+
+/** 未排序。不画箭头。 */
+export function colHeaderSortIsNone(sort?: string): boolean {
+  return sort === "none";
+}
+
 export function resolveColHeaderSort(sort?: string): YoColHeaderSort {
-  if (sort === "ascending" || sort === "descending") return sort;
+  if (colHeaderSortIsAscending(sort) || colHeaderSortIsDescending(sort)) return sort;
   return DEFAULT_COL_HEADER_SORT;
 }
 
-export function resolveColHeaderTone(tone?: string): YoColHeaderTone {
-  if (tone === "document") return "document";
+export function resolveColHeaderTone(tone?: string): YoListRowTone {
+  if (listRowToneIsDocument(tone)) return "document";
   return DEFAULT_COL_HEADER_TONE;
 }
 

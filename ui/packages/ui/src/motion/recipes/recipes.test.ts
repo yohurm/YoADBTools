@@ -22,12 +22,23 @@ describe("L3 recipe CSS", () => {
     expect(css).not.toContain("min-height: min-content");
     expect(css).not.toContain("max-height: none");
     expect(css).not.toContain("grid-template-columns: 0fr auto");
+    expect(css).toContain('[data-part="clip"]');
+    expect(css).toContain('[data-part="pane"]');
+    expect(css).toContain('[data-part="toggle"]');
+    expect(css).toContain("--yohu-button-min-inline: 0");
+    expect(css).toContain("--yohu-button-min-block: 0");
+    expect(css).not.toContain("> *");
+    expect(css).not.toContain(":first-child");
+    expect(css).not.toContain(":last-child");
   });
 
   it("send-aim 转向上，时长 spatial-small", () => {
     const css = loadMotionLayerCss("recipes/send-aim.css");
     expect(css).toContain("yohu-recipe-send-aim");
     expect(css).toContain("rotate(-90deg)");
+    expect(css).toContain("--yohu-icon-transform: rotate(0deg)");
+    expect(css).not.toContain("[data-icon]");
+    expect(css).not.toContain(".yohu-icon");
     expect(css).toContain("--yohu-motion-spatial-small");
     expect(css).not.toMatch(/\b\d+ms\b/);
   });
@@ -48,15 +59,13 @@ describe("L3 recipe CSS", () => {
     expect(css).toContain("yohu-recipe-tree-chevron--open");
   });
 
-  it("scroller 滑块只过渡透明度、Hover 色与 GROW 宽", () => {
-    const css = loadMotionLayerCss("recipes/scroller.css");
-    expect(css).toContain(".yohu-scroller__thumb");
-    expect(css).toContain("opacity var(--yohu-motion-effects-enter)");
-    expect(css).toContain("opacity var(--yohu-motion-effects-exit)");
-    expect(css).toContain("background-color var(--yohu-motion-effects-fast)");
-    expect(css).toContain("width var(--yohu-motion-effects-fast)");
-    expect(css).not.toContain("height");
-    expect(css).not.toContain("transform");
+  it("gather 不把整沓淡出，也不按槽位延后", () => {
+    const css = loadMotionLayerCss("recipes/gather.css");
+    expect(css).toContain('data-recipe="gather"');
+    expect(css).toContain("transition: none");
+    expect(css).not.toContain("--yohu-drag-pile-slot");
+    expect(css).not.toContain("[data-phase=\"home\"]");
+    expect(css).not.toMatch(/\b\d+ms\b/);
   });
 
   it("reorder 铬在 L3，不绑虚拟列表选择器", () => {
@@ -81,12 +90,19 @@ describe("L3 recipe CSS", () => {
     expect(css).toContain("--yohu-motion-spatial-stretch");
     expect(css).toContain("--yohu-motion-effects-exit");
     expect(css).toContain("yohu-bounce-down");
-    expect(css).toContain(".yohu-list-item__mark-fill");
+    expect(css).toContain('[data-part="bar"]');
+    expect(css).toContain('[data-part="title"]');
+    expect(css).toContain('[data-part="sub"]');
+    expect(css).toContain("[data-bounce]");
+    expect(css).not.toContain(".yohu-list-item");
     expect(css).toContain("scaleY(0)");
     expect(css).toContain("scaleY(1)");
     expect(css).toContain("transform var(--yohu-motion-spatial-stretch)");
     expect(css).toContain("transform var(--yohu-motion-effects-exit)");
     expect(css).toContain("transition: color var(--yohu-motion-spatial-tick)");
+    expect(css).toContain("--yohu-interactive-wash-transform: scale(0.94)");
+    expect(css).toContain("--yohu-interactive-wash-transform: scale(1)");
+    expect(css).not.toContain("::before");
     expect(css).toContain("color: var(--yohu-state-selected-fg)");
     expect(css).toContain("font-weight: var(--yohu-font-weight-medium)");
     expect(css).not.toMatch(/\.yohu-recipe-selected\.yohu-interactive\s*\{[^}]*\bscale\(/);

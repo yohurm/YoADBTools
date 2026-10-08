@@ -12,5 +12,7 @@ pub use os_paths::{
 };
 pub use persist::{atomic_write, backup_corrupt};
 pub use process::{
-    kill_tree, ChildHandle, ProcessError, ProcessOutput, ProcessRunner, STDERR_BUDGET, STDOUT_BUDGET,
+    bad_exit_text, io_error_text, kill_tree, ChildHandle, ProcessError, ProcessOutput,
+    ProcessRunner, CAPTURE_TRUNCATED, EXEC_TIMEOUT, PUMP_PANIC, STDERR_BUDGET, STDOUT_BUDGET,
+    TASK_CANCELLED,
 };

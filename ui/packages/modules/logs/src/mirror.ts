@@ -18,9 +18,7 @@ export class RingMirror {
       this.buf.push(line);
       added++;
     }
-    if (this.buf.length > this.capacity) {
-      this.buf.splice(0, this.buf.length - this.capacity);
-    }
+    this.dropOverflow();
     return added;
   }
 
@@ -46,12 +44,25 @@ export class RingMirror {
     return this.lastSeq;
   }
 
+  /** 镜像尚未收入的下一 seq。空镜像为 0；clear 不回退。 */
+  nextSeq(): number {
+    return this.lastSeq + 1;
+  }
+
   setCapacity(capacity: number): void {
-    this.capacity = Math.max(1, capacity);
+    this.capacity = clampCapacity(capacity);
+    this.dropOverflow();
+  }
+
+  private dropOverflow(): void {
     if (this.buf.length > this.capacity) {
       this.buf.splice(0, this.buf.length - this.capacity);
     }
   }
+}
+
+function clampCapacity(capacity: number): number {
+  return Math.max(1, capacity);
 }
 
 export class MirrorBank {
@@ -73,7 +84,7 @@ export class MirrorBank {
   }
 
   setCapacity(capacity: number): void {
-    this.capacity = Math.max(1, capacity);
+    this.capacity = clampCapacity(capacity);
     for (const mirror of this.maps.values()) {
       mirror.setCapacity(this.capacity);
     }

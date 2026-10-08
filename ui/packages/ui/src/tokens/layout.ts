@@ -12,7 +12,7 @@ export const Layout = {
    */
   ShellNav: 200,
   /**
-   * 侧栏收起：图标轨。与标题栏三键 / 投屏操作栏同一档 48vp 热区，
+   * 侧栏收起：图标轨。与标题栏三键同一档 48vp 热区，
    * 不是把展开宽裁到 0。文件预览仍走 Preview↔0。
    */
   ShellNavIcons: 48,
@@ -22,7 +22,7 @@ export const Layout = {
    */
   Sidebar: 240,
   Preview: 240,
-  /** 投屏设备操作栏（鸿蒙标题栏热区 48vp）。 */
+  /** 投屏设备操作栏（图标轨，鸿蒙标题栏热区 48vp）。底色走面板 surface，不另铺。 */
   MirrorOps: 48,
   /** 投屏质量栏；比文件预览窄，只够一列下拉。 */
   MirrorFunc: 200,
@@ -103,8 +103,11 @@ export const Layout = {
   TooltipArrowInset: 20,
   /** 箭头尖到锚点的空隙 */
   TooltipGap: Spacing.Xs,
-  /** 电脑菜单默认最小宽 224vp */
-  MenuMin: 224,
+  /**
+   * 右键菜单内容帽（Fluent Menu 300px）。
+   * 菜单宽跟最长标签；超过帽则省略。落点估算与 CSS 同一帽。
+   */
+  MenuMax: 300,
   /** 侧栏内容距背板（设备/导航同一槽，选中片不再二次内缩） */
   RailInset: 8,
   /** HarmonyOS Toggle Switch 默认 {width:36vp, height:20vp} */

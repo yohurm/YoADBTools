@@ -160,14 +160,6 @@
   min-height: 0;
 }
 
-.yohu-text-field[data-multiline] .yohu-grow {
-  /* 行轴吃父级定宽。块轴只认锁行，禁止 stretch 写回 height，禁止 intrinsic basis。 */
-  flex: 1 1 0%;
-  align-self: flex-start;
-  width: 100%;
-  min-width: 0;
-}
-
 .yohu-text-field[data-multiline] .yohu-text-field__control {
   /* 铺满锁行。字贴底（与发送钮同一基线）；顶边裁切揭开上一行。量的是 body。 */
   position: absolute;
@@ -227,8 +219,7 @@
   height: 0;
 }
 
-.yohu-text-field[data-multiline] .yohu-text-field__affix,
-.yohu-text-field[data-multiline] .yohu-recipe-clear {
+.yohu-text-field[data-multiline] .yohu-text-field__affix {
   margin-block-start: calc((var(--yohu-text-field-line) - var(--yohu-layout-icon-inline)) / 2);
 }
 

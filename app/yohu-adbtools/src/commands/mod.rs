@@ -12,10 +12,11 @@ pub mod log;
 pub mod mirror;
 pub mod settings;
 pub mod system;
+pub mod task;
 pub mod terminal;
 pub mod update;
 
 pub use crate::ipc_map::{
-    ipc, ipc_adb, ipc_catalog, ipc_code, ipc_dnd, ipc_eval, ipc_file, ipc_group, ipc_library_store,
-    ipc_log, ipc_mirror, ipc_present, ipc_update,
+    ipc, ipc_adb, ipc_catalog, ipc_dnd, ipc_eval, ipc_file, ipc_group, ipc_library_store, ipc_log,
+    ipc_mirror, ipc_present, ipc_session, ipc_settings, ipc_update,
 };

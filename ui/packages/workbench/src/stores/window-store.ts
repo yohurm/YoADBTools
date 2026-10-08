@@ -19,6 +19,14 @@ export function createWindowStore() {
     setMaximized(await windowIsMaximized());
   }
 
+  function syncNow(): void {
+    void syncMaximized();
+  }
+
+  function shellChannel() {
+    return "shell" as const;
+  }
+
   async function minimize(): Promise<void> {
     await windowMinimize();
   }
@@ -36,10 +44,8 @@ export function createWindowStore() {
   function attach(): () => void {
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    void syncMaximized();
-    void listenWindowResize(() => {
-      void syncMaximized();
-    }).then((fn) => {
+    syncNow();
+    void listenWindowResize(syncNow).then((fn) => {
       if (disposed) {
         fn();
       } else {
@@ -52,7 +58,7 @@ export function createWindowStore() {
     };
   }
 
-  return { maximized, minimize, toggleMaximize, close, attach };
+  return { maximized, minimize, toggleMaximize, close, attach, shellChannel };
 }
 
 export type WindowStoreApi = ReturnType<typeof createWindowStore>;

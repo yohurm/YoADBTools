@@ -7,6 +7,7 @@ import { formatLogLine, LOG_COLOR_SCHEME_CATALOG, LOG_COLOR_SCHEME_DEFAULT, type
 
 import {
   ALL_LOG_DISPLAY_COLUMNS,
+  DEFAULT_CH_PX,
   DEFAULT_LOG_DISPLAY_COLUMNS,
   TAG_DEFAULT_MAX,
   TAG_DEFAULT_WIDTH_PX,
@@ -16,7 +17,9 @@ import {
   formatAppName,
   formatColumns,
   formatMessage,
+  formatMessages,
   formatOptionsKey,
+  logcatLevelLetter,
   formatParts,
   formatProcessThread,
   formatTag,
@@ -26,6 +29,8 @@ import {
   headerWidth,
   javaStringHash,
   LEVEL_FORMAT_WIDTH,
+  logChUnit,
+  logColPx,
   logDocTrackTemplate,
   logFieldLabel,
   LOGCAT_TAG_SWATCHES,
@@ -70,9 +75,26 @@ describe("官方 Format 分段", () => {
     expect(headerWidth(shown)).toBe(24 + 12 + 24 + 36 + 4);
   });
 
-  it("TagFormat padEnd(max+1)，空 Tag 是空格不是 <no-tag>", () => {
+  it("hideDuplicates 时连续相同 Tag/App 留空列（AS TagFormat / AppNameFormat）", () => {
+    const dup = { ...shown, hideDuplicateTag: true, hideDuplicateApp: true };
+    const a = line({ tag: "Same", pid: 9 });
+    const b = line({ tag: "Same", pid: 9, msg: "b" });
+    const { messages } = formatMessages([a, b], dup);
+    expect(formatParts(messages[0]!).find((p) => p.kind === "tag")?.text.trim()).toBe("Same");
+    expect(formatParts(messages[1]!).find((p) => p.kind === "tag")?.text.trim()).toBe("");
+    expect(formatParts(messages[1]!).find((p) => p.kind === "app")?.text.trim()).toBe("");
+  });
+
+  it("FATAL 级别列显示 A（AS LogLevel.ASSERT）", () => {
+    expect(logcatLevelLetter("F")).toBe("A");
+    const fatal = formatMessage(line({ level: "F" }), shown);
+    expect(fatal.text).toContain(" A ");
+    expect(fatal.text).not.toContain(" F ");
+  });
+
+  it("TagFormat padEnd(max+1)，空 Tag 是 <no-tag>（对照 AS TagFormat）", () => {
     expect(formatTag("Yohu", 23)).toBe("Yohu".padEnd(24));
-    expect(formatTag("", 23)).toBe(" ".padEnd(24));
+    expect(formatTag("", 23)).toBe("<no-tag>".padEnd(24));
     const long = "A".repeat(24);
     expect(formatTag(long, 23)).toBe(`${shortenTextWithEllipsis(long, 23, 10)} `);
   });
@@ -220,6 +242,49 @@ describe("着色 range", () => {
     expect(contentColor("darcula").id).toBe(LOG_COLOR_SCHEME_DEFAULT);
   });
 
+  it("级别色键走 api levelKey，Formatter 不再自折字母", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    expect(src).toContain("levelKey");
+    expect(src).not.toContain("function levelSwatch");
+    expect(src).not.toContain("parseLevelLetter");
+    expect(src).not.toContain('from "../filter"');
+    expect(src).not.toContain('from "./filter"');
+    const body = src
+      .replace('return kind === "msg"', "")
+      .replace('return kind === "level"', "")
+      .replace('return kind === "ts" || kind === "uid"', "")
+      .replace('return kind === "pid" || kind === "tid" || kind === "app"', "")
+      .replace('return level === "F"', "")
+      .replace('|| level === "A"', "");
+    expect(body).not.toContain('kind === "msg"');
+    expect(body).not.toContain('kind === "level"');
+    expect(body).not.toContain('kind === "ts"');
+    expect(body).not.toContain('kind === "uid"');
+    expect(body).not.toContain('kind === "pid"');
+    expect(body).not.toContain('kind === "tid"');
+    expect(body).not.toContain('kind === "app"');
+    expect(body).not.toContain('key === "msg"');
+    expect(body).not.toContain('key !== "msg"');
+    expect(body).not.toContain('key === "level"');
+    expect(body).not.toContain('key !== "level"');
+    const header = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../LogColumnHeader.tsx"), "utf8");
+    expect(header).toContain("logFieldIsMessage");
+    expect(header).not.toContain('"msg"');
+    expect(body).not.toContain('level === "F"');
+    expect(body).not.toContain('level === "A"');
+    const thread = src
+      .replace('return style === "both"', "")
+      .replace('return style === "pid"', "")
+      .replace('return style === "tid"', "")
+      .replace('return style === "off"', "");
+    expect(thread).not.toContain('style === "both"');
+    expect(thread).not.toContain('style === "pid"');
+    expect(thread).not.toContain('style === "tid"');
+    expect(thread).not.toContain('process === "both"');
+    expect(thread).not.toContain('process === "tid"');
+    expect(thread).not.toContain('process !== "off"');
+  });
+
   it("Yohu：已知级别都是 wash/line 色块，对照 LevelFormat BACKGROUND；尾空格不着色", () => {
     const debug = formatMessage(line({ level: "D" }), shown);
     expect(debug.bar).toBe("level");
@@ -274,6 +339,95 @@ describe("着色 range", () => {
   });
 });
 
+describe("列键和探针尺只写一处", () => {
+  it("进程列键、ch 回落和列像素不再各写一遍", () => {
+    expect(logChUnit(0)).toBe(DEFAULT_CH_PX);
+    expect(logChUnit(8)).toBe(8);
+    expect(logColPx(24, 8)).toBe(192);
+    const root = dirname(fileURLToPath(import.meta.url));
+    const format = readFileSync(resolve(root, "format.ts"), "utf8")
+      .replace('return processThreadIsTid(style) ? "tid" : "pid";', "")
+      .replace("return chPx > 0 ? chPx : DEFAULT_CH_PX;", "")
+      .replace("return Math.max(1, Math.round(chars * logChUnit(chPx)));", "");
+    expect(format).not.toContain('? "tid" : "pid"');
+    expect(format.split('col.key === "pid"').length - 1).toBe(1);
+    expect(format).not.toContain("chPx > 0");
+    expect(format).not.toContain("Math.max(1, Math.round");
+    const header = readFileSync(resolve(root, "../LogColumnHeader.tsx"), "utf8");
+    expect(header).toContain("logColPx");
+    expect(header).toContain("logChUnit");
+    expect(header).not.toContain("chPx > 0");
+    expect(header).not.toContain("Math.max(1, Math.round");
+    expect(header).not.toContain("DEFAULT_CH_PX");
+    const layout = readFileSync(resolve(root, "../layout.ts"), "utf8");
+    expect(layout).toContain("logChUnit");
+    expect(layout).not.toContain("DEFAULT_CH_PX");
+    expect(layout).not.toContain("width > 0");
+  });
+});
+
+describe("末尾补齐只写一处", () => {
+  it("pad_end_num_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "text.pad" + "End(width)";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("padField(");
+  });
+
+  it("pad_end_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = ".pad" + "End(";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("padField(");
+  });
+});
+
+describe("进程号列宽只写一处", () => {
+  it("process_col_chars_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = ", PROCESS_PID" + "_WIDTH)";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("processColChars(");
+  });
+});
+
+describe("时间用户应用列宽只写一处", () => {
+  it("meta_col_chars_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const ts = 'colCharsOf(options, "' + 'ts"';
+    const uid = 'colCharsOf(options, "' + 'uid"';
+    const app = 'colCharsOf(options, "' + 'app"';
+    const once = "colCharsOf(options, key, " + "fallback)";
+    expect(src.split(ts).length - 1).toBe(0);
+    expect(src.split(uid).length - 1).toBe(0);
+    expect(src.split(app).length - 1).toBe(0);
+    expect(src.split(once).length - 1).toBe(1);
+    expect(src).toContain("metaColChars(");
+  });
+});
+
+describe("可拖宽表头只写一处", () => {
+  it("resizable_header_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "resizable: " + "true";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("resizableHeader(");
+  });
+});
+
+describe("消息按列清单走一遍", () => {
+  it("message_walks_columns_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    expect(src.split("if (display." + "ts)").length - 1).toBe(1);
+    expect(src.split("if (display." + "uid)").length - 1).toBe(1);
+    expect(src.split("if (display." + "tag)").length - 1).toBe(1);
+    expect(src.split("if (display." + "app)").length - 1).toBe(1);
+    expect(src.split("if (display." + "level)").length - 1).toBe(1);
+    expect(src.split("if (!processThreadIsOff(" + "process))").length - 1).toBe(1);
+    expect(src).toContain("formatColumns(");
+  });
+});
+
 describe("measureChPx 不进 Formatter", () => {
   it("探针在 layout，format 不量 DOM，也不认识 Document / View", () => {
     const layout = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../layout.ts"), "utf-8");
@@ -290,5 +444,105 @@ describe("measureChPx 不进 Formatter", () => {
     expect(src).not.toContain("./selection");
     expect(src).not.toContain("../highlight");
     expect(src).not.toContain("../layout");
+  });
+});
+
+describe("累加器打包只写一处", () => {
+  it("pack_message_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const bar = "bar: " + "engine.bar";
+    const ink = "engine.barInk(" + "line)";
+    expect(src.split(bar).length - 1).toBe(1);
+    expect(src.split(ink).length - 1).toBe(1);
+    expect(src).toContain("packMessage(");
+  });
+});
+
+describe("标签和应用名显示宽度只写一处", () => {
+  it("span_width_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const tag = "Math.max(TAG_MIN_LENGTH, " + "maxLength) + 1";
+    const app = "Math.max(APP_MIN_LENGTH, " + "maxLength) + 1";
+    const once = "Math.max(min, " + "maxLength) + 1";
+    expect(src.split(tag).length - 1).toBe(0);
+    expect(src.split(app).length - 1).toBe(0);
+    expect(src.split(once).length - 1).toBe(1);
+    expect(src).toContain("spanWidth(");
+  });
+});
+
+describe("缩短之后再补一个空格只写一处", () => {
+  it("ellipsis_span_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = '`${shorten' + 'TextWithEllipsis(';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("ellipsisSpan(");
+  });
+});
+
+describe("没有级别键时回落正文色只写一处", () => {
+  it("level_ink_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "return plain" + "MessageInk(kind)";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("levelInk(");
+  });
+});
+
+describe("Yohu 级别色变量只写一处", () => {
+  it("yohu_level_var_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "--yohu-level-${" + "key})";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("yohuLevelVar(");
+  });
+});
+
+describe("Logcat 级别色变量只写一处", () => {
+  it("logcat_level_var_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    expect(src.split("--yohu-logcat-level-${" + "key})").length - 1).toBe(0);
+    expect(src.split("--yohu-logcat-level-${" + "key}-bg").length - 1).toBe(0);
+    expect(src.split("--yohu-logcat-level-${" + "key}").length - 1).toBe(1);
+    expect(src).toContain("logcatLevelVar(");
+  });
+});
+
+describe("可选布尔缺省关只写一处", () => {
+  it("flag_on_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "?" + "? false";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("flagOn(");
+  });
+});
+
+describe("布尔收成 0 或 1 只写一处", () => {
+  it("bit_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = "Number" + "(";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("return " + needle + "value)");
+  });
+});
+
+describe("批次游标只写一处", () => {
+  it("batch_cursor_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const format = readFileSync(resolve(dir, "format.ts"), "utf8");
+    const document = readFileSync(resolve(dir, "document.ts"), "utf8");
+    expect(format.split("previousTag: " + "line.tag").length - 1).toBe(1);
+    expect(document.split("previousTag: " + "last.tag").length - 1).toBe(0);
+    expect(format).toContain("batchCursor(");
+    expect(document).toContain("batchCursor(");
+  });
+});
+
+describe("空白字段只补一次", () => {
+  it("blank_field_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const needle = 'padField("' + '", width)';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("blankField(");
   });
 });

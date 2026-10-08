@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEVICE_UNAUTHORIZED_LABEL,
   formatDeviceRailTip,
   formatDeviceStatusHint,
   formatDeviceStatusMeta,
@@ -26,10 +27,11 @@ describe("formatDeviceStatusMeta / hint", () => {
       formatDeviceRailTip({
         name: "Moto X",
         serial: "A1",
-        unauthorized: true,
+        state: "unauthorized",
         hint: "Android 15 · 87% 充电",
       }),
     ).toBe("Moto X · A1 · 未授权 · Android 15 · 87% 充电");
+    expect(DEVICE_UNAUTHORIZED_LABEL).toBe("未授权");
   });
 
   it("hint 附加深浅色与息屏", () => {

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { resolveEmptyStateSpec } from "./empty-model";
 
@@ -37,5 +40,19 @@ describe("empty-model", () => {
   it("size 只认 sm，其余回落 md", () => {
     expect(resolveEmptyStateSpec({ title: "空", size: "sm" }).size).toBe("sm");
     expect(resolveEmptyStateSpec({ title: "空", size: "md" }).size).toBe("md");
+  });
+
+  it("小号只在模型里比较一次", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const model = readFileSync(resolve(dir, "empty-model.ts"), "utf8");
+    const policy = readFileSync(resolve(dir, "empty-policy.ts"), "utf8");
+    const view = readFileSync(resolve(dir, "EmptyState.tsx"), "utf8");
+    const body = model.replace('return size === "sm"', "").replace('export type EmptyStateSize = "md" | "sm";', "");
+    expect(body).not.toContain('=== "sm"');
+    expect(body).not.toContain('"md" | "sm"');
+    expect(policy).not.toContain('=== "sm"');
+    expect(policy).not.toContain('"md" | "sm"');
+    expect(view).not.toContain('"md" | "sm"');
+    expect(policy).toContain("emptySizeIsSm");
   });
 });

@@ -49,9 +49,9 @@ fn skip_resume(skip: &ResumeSkip, line: &LogLine) -> bool {
     if line.ts != skip.ts {
         return false;
     }
-    skip.identities
-        .iter()
-        .any(|(pid, tid, tag, msg)| *pid == line.pid && *tid == line.tid && tag == &line.tag && msg == &line.msg)
+    skip.identities.iter().any(|(pid, tid, tag, msg)| {
+        *pid == line.pid && *tid == line.tid && tag == &line.tag && msg == &line.msg
+    })
 }
 
 async fn emit(ring: &RingBuffer, batcher: &Batcher, mut line: LogLine) -> Result<(), ()> {
@@ -59,15 +59,44 @@ async fn emit(ring: &RingBuffer, batcher: &Batcher, mut line: LogLine) -> Result
     batcher.feed(line).await
 }
 
-fn classify(result: Result<i32, AdbError>, slot_cancelled: bool) -> FollowEnd {
+/// 续流重复行丢掉；墙钟往前走就清掉跳过集，然后入环。
+async fn admit_line(
+    skip: &mut Option<ResumeSkip>,
+    ring: &RingBuffer,
+    batcher: &Batcher,
+    line: LogLine,
+) -> Result<(), ()> {
+    if skip
+        .as_ref()
+        .is_some_and(|known| skip_resume(known, &line))
+    {
+        return Ok(());
+    }
+    if skip.as_ref().is_some_and(|known| line.ts != known.ts) {
+        *skip = None;
+    }
+    emit(ring, batcher, line).await
+}
+
+fn classify(result: &Result<i32, AdbError>, slot_cancelled: bool) -> FollowEnd {
     if slot_cancelled {
         return FollowEnd::Cancelled;
     }
     match result {
-        Ok(code) => FollowEnd::Exited { code },
-        Err(AdbError::Cancelled) => FollowEnd::Error,
-        Err(AdbError::DeviceOffline(_)) | Err(AdbError::NotOnline(_)) => FollowEnd::Offline,
-        Err(_) => FollowEnd::Error,
+        Ok(code) => FollowEnd::Exited { code: *code },
+        Err(AdbError::DeviceOffline(_) | AdbError::NotOnline(_)) => FollowEnd::Offline,
+        Err(
+            AdbError::Cancelled
+            | AdbError::ToolUnavailable
+            | AdbError::CandidatesFailed
+            | AdbError::Timeout
+            | AdbError::UnsupportedShell
+            | AdbError::BadExit { .. }
+            | AdbError::Io(_)
+            | AdbError::Truncated
+            | AdbError::PumpPanic
+            | AdbError::Shell(_),
+        ) => FollowEnd::Error,
     }
 }
 
@@ -94,26 +123,20 @@ pub(crate) async fn run_follow(
                         break;
                     };
                     for line in assembler.ingest(&raw) {
-                        if skip.as_ref().is_some_and(|s| skip_resume(s, &line)) {
-                            continue;
-                        }
-                        if skip.as_ref().is_some_and(|s| line.ts != s.ts) {
-                            skip = None;
-                        }
-                        if emit(&ring_pump, &batcher_pump, line).await.is_err() {
+                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
+                            .await
+                            .is_err()
+                        {
                             return;
                         }
                     }
                 }
                 _ = tokio::time::sleep(LAST_MESSAGE_DELAY), if assembler.has_pending() => {
                     if let Some(line) = assembler.take() {
-                        if skip.as_ref().is_some_and(|s| skip_resume(s, &line)) {
-                            continue;
-                        }
-                        if skip.as_ref().is_some_and(|s| line.ts != s.ts) {
-                            skip = None;
-                        }
-                        if emit(&ring_pump, &batcher_pump, line).await.is_err() {
+                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
+                            .await
+                            .is_err()
+                        {
                             return;
                         }
                     }
@@ -121,17 +144,19 @@ pub(crate) async fn run_follow(
             }
         }
         if let Some(line) = assembler.take() {
-            if skip.as_ref().is_some_and(|s| skip_resume(s, &line)) {
-                return;
-            }
-            let _ = emit(&ring_pump, &batcher_pump, line).await;
+            let _ = admit_line(&mut skip, &ring_pump, &batcher_pump, line).await;
         }
     }));
 
     let result = adb
-        .stream_lines(&serial, &follow_argv(since.as_deref()), cancel.clone(), line_tx.clone())
+        .stream_lines(
+            &serial,
+            &follow_argv(since.as_deref()),
+            cancel.clone(),
+            line_tx.clone(),
+        )
         .await;
-    let end = classify(result, cancel.is_cancelled());
+    let end = classify(&result, cancel.is_cancelled());
     match end {
         FollowEnd::Cancelled => {}
         FollowEnd::Offline => {
@@ -141,7 +166,9 @@ pub(crate) async fn run_follow(
             tracing::warn!(serial = %serial, code, resume, "采集跟流工人退出");
         }
         FollowEnd::Error => {
-            tracing::warn!(serial = %serial, resume, "采集跟流工人出错");
+            if let Err(e) = &result {
+                tracing::warn!(serial = %serial, error = %e, resume, "采集跟流工人出错");
+            }
         }
     }
 
@@ -212,14 +239,42 @@ mod tests {
 
     #[test]
     fn classify_pipe_cancel_without_slot_cancel_is_error() {
-        assert_eq!(classify(Err(AdbError::Cancelled), false), FollowEnd::Error);
-        assert_eq!(classify(Err(AdbError::Cancelled), true), FollowEnd::Cancelled);
+        assert_eq!(classify(&Err(AdbError::Cancelled), false), FollowEnd::Error);
         assert_eq!(
-            classify(Err(AdbError::DeviceOffline("offline".into())), false),
+            classify(&Err(AdbError::Cancelled), true),
+            FollowEnd::Cancelled
+        );
+        assert_eq!(
+            classify(&Err(AdbError::DeviceOffline("offline".into())), false),
             FollowEnd::Offline
         );
-        assert_eq!(classify(Ok(0), false), FollowEnd::Exited { code: 0 });
-        assert_eq!(classify(Ok(0), true), FollowEnd::Cancelled);
+        assert_eq!(classify(&Ok(0), false), FollowEnd::Exited { code: 0 });
+        assert_eq!(classify(&Ok(0), true), FollowEnd::Cancelled);
+    }
+
+    #[test]
+    fn only_offline_stops_the_slot() {
+        assert_eq!(
+            classify(&Err(AdbError::NotOnline("S1".into())), false),
+            FollowEnd::Offline
+        );
+        for err in [
+            AdbError::Timeout,
+            AdbError::Truncated,
+            AdbError::PumpPanic,
+            AdbError::UnsupportedShell,
+            AdbError::CandidatesFailed,
+            AdbError::ToolUnavailable,
+            AdbError::BadExit {
+                exit_code: 1,
+                stderr: "boom".into(),
+            },
+            AdbError::Io(std::io::Error::other("pipe")),
+            AdbError::Shell(yohu_adb::ShellFault::Ended),
+        ] {
+            let end = classify(&Err(err), false);
+            assert_eq!(end, FollowEnd::Error);
+        }
     }
 
     #[test]
@@ -246,5 +301,81 @@ mod tests {
         };
         assert!(skip_resume(&skip, &dup));
         assert!(!skip_resume(&skip, &newer));
+    }
+
+    fn without_fn(src: &str, name: &str) -> String {
+        let marker = format!("fn {name}");
+        let mut out = String::new();
+        let mut dropping = false;
+        let mut depth = 0i32;
+        let mut seen_brace = false;
+        for line in src.lines() {
+            if !dropping && line.contains(&marker) {
+                dropping = true;
+                depth = 0;
+                seen_brace = false;
+            }
+            if dropping {
+                depth += line.matches('{').count() as i32;
+                depth -= line.matches('}').count() as i32;
+                if line.contains('{') {
+                    seen_brace = true;
+                }
+                if seen_brace && depth <= 0 {
+                    dropping = false;
+                }
+                continue;
+            }
+            out.push_str(line);
+            out.push('\n');
+        }
+        out
+    }
+
+    #[test]
+    fn cut_log_slot_and_ring_stay_with_owner() {
+        let mut ring = include_str!("ring.rs").to_string();
+        for name in ["ring_capacity", "evict_overflow", "lines_from"] {
+            ring = without_fn(&ring, name);
+        }
+        assert!(!ring.contains(".max(1)"));
+        assert!(!ring.contains("pop_front()"));
+        assert!(!ring.contains("line.seq >= from_seq"));
+
+        let capture_src = include_str!("capture.rs");
+        assert!(!capture_src.contains(".max(1)"));
+        assert!(!capture_src.contains("slot.phase == Phase::Starting || slot.phase == Phase::Live"));
+        assert!(!capture_src.contains("slot.phase == Phase::Live || slot.phase == Phase::Starting"));
+        let mut capture = capture_src.to_string();
+        for name in ["phase_occupies", "join_workers", "publish_stopped"] {
+            capture = without_fn(&capture, name);
+        }
+        assert!(!capture.contains("CaptureState::Stopped"));
+        assert!(!capture.contains("join_or_abort("));
+
+        let assembler = include_str!("assembler.rs");
+        assert!(!assembler.contains("header.is_none() || self.body.is_empty()"));
+        let pending = without_fn(assembler, "has_pending");
+        assert!(!pending.contains("header.is_some() && !self.body.is_empty()"));
+    }
+
+    #[test]
+    fn phase_edge_once() {
+        let src = include_str!("capture.rs");
+        let (production, _) = src
+            .split_once("mod tests")
+            .expect("capture.rs 应有 mod tests");
+        assert_eq!(production.matches("phase == Phase::Starting").count(), 1);
+        assert_eq!(production.matches("phase == Phase::Stopping").count(), 1);
+    }
+
+    #[test]
+    fn capture_same_generation_once() {
+        let src = include_str!("capture.rs");
+        let (production, _) = src
+            .split_once("mod tests")
+            .expect("capture.rs 应有 mod tests");
+        assert_eq!(production.matches("slot.generation ==").count(), 0);
+        assert_eq!(production.matches("slot_generation == expected").count(), 1);
     }
 }

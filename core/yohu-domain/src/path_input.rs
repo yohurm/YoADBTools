@@ -1,6 +1,6 @@
 //! 用户输入 → 设备绝对 POSIX 路径（只做句法，不管安全根）。
 //! 不折叠 `.` / `..` / `//`；穿越只由 [`crate::path`] / [`crate::safety`] 判定。
-//! UI `path-parse.ts` 镜像本层 + [`testdata/path_input.json`]。
+//! UI `path-input.ts` 镜像本层 + [`testdata/path_input.json`]。
 
 use serde::{Deserialize, Serialize};
 
@@ -38,15 +38,16 @@ pub struct PathParseErr {
 
 pub type PathParseResult = Result<PathParseOk, PathParseErr>;
 
+fn reject_empty_path(applied: Vec<PathStrategy>) -> PathParseErr {
+    PathParseErr { reason: "路径为空", applied }
+}
+
 /// 句法解析。`current` 只在相对路径时拼接。
 pub fn parse_remote_path(raw: &str, current: &str) -> PathParseResult {
     let mut applied = Vec::new();
     let mut text = raw.trim().to_string();
     if text.is_empty() {
-        return Err(PathParseErr {
-            reason: "路径为空",
-            applied,
-        });
+        return Err(reject_empty_path(applied));
     }
     if text.contains('\0') {
         return Err(PathParseErr {
@@ -60,10 +61,7 @@ pub fn parse_remote_path(raw: &str, current: &str) -> PathParseResult {
         applied.push(PathStrategy::Unquote);
         text = unquoted;
         if text.is_empty() {
-            return Err(PathParseErr {
-                reason: "路径为空",
-                applied,
-            });
+            return Err(reject_empty_path(applied));
         }
     }
 
@@ -73,7 +71,7 @@ pub fn parse_remote_path(raw: &str, current: &str) -> PathParseResult {
         text = without_uri;
     }
 
-    let posix = text.replace('\\', "/");
+    let posix = crate::path::posix_slashes(&text);
     if posix != text {
         applied.push(PathStrategy::Separators);
         text = posix;
@@ -93,12 +91,15 @@ pub fn parse_remote_path(raw: &str, current: &str) -> PathParseResult {
         text = aliased;
     }
 
-    if !text.starts_with('/') {
+    if !crate::path::is_absolute(&text) {
         applied.push(PathStrategy::Relative);
         text = join_abs(current, &text);
     }
 
-    Ok(PathParseOk { path: text, applied })
+    Ok(PathParseOk {
+        path: text,
+        applied,
+    })
 }
 
 fn unquote(text: &str) -> String {
@@ -163,7 +164,7 @@ fn expand_one(text: &str, from: &str, to: &str) -> Option<String> {
     }
     let prefix = format!("{from}/");
     text.strip_prefix(&prefix)
-        .map(|tail| format!("{to}/{tail}"))
+        .map(|tail| crate::path::join_path(to, tail))
 }
 
 fn expand_aliases(text: &str) -> String {
@@ -181,13 +182,11 @@ fn expand_aliases(text: &str) -> String {
 }
 
 fn join_abs(base: &str, rel: &str) -> String {
-    let root = if base.starts_with('/') {
-        base.to_string()
+    if crate::path::is_absolute(base) {
+        crate::path::join_path(base, rel)
     } else {
-        format!("/{base}")
-    };
-    let root = root.trim_end_matches('/');
-    format!("{root}/{rel}")
+        crate::path::join_path(&format!("/{base}"), rel)
+    }
 }
 
 #[cfg(test)]
@@ -230,5 +229,21 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn production(src: &str) -> &str {
+        src.split("\n#[cfg(test)]").next().unwrap_or(src)
+    }
+
+    #[test]
+    fn slash_absolute_and_trailing_slash_are_single() {
+        let path = production(include_str!("path.rs"));
+        let input = production(include_str!("path_input.rs"));
+        assert_eq!(path.matches("replace('\\\\', \"/\")").count(), 1);
+        assert_eq!(path.matches("starts_with('/')").count(), 1);
+        assert_eq!(path.matches("trim_end_matches('/')").count(), 1);
+        assert!(!input.contains("replace('\\\\', \"/\")"));
+        assert!(!input.contains("starts_with('/')"));
+        assert!(!input.contains("trim_end_matches('/')"));
     }
 }

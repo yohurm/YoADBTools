@@ -4,7 +4,9 @@
  * 配方只点 spec，不含选择器。
  */
 
-import { normalizeTravelAxes, type TravelAxis } from "./travel-model";
+import { logicalAxesHaveBlock, logicalAxesHaveInline, type LogicalAxis } from "../../../placement/axis";
+import { normalizeTravelAxes } from "./travel-model";
+import { presenceAttr } from "../../../dom/flag";
 
 export type TravelAttr = "used";
 
@@ -20,16 +22,16 @@ export interface TravelHostAttrs {
   "data-axis-inline"?: "";
 }
 
-export function travelHostAttrs(axes?: readonly TravelAxis[]): TravelHostAttrs {
+export function travelHostAttrs(axes?: readonly LogicalAxis[]): TravelHostAttrs {
   const next = normalizeTravelAxes(axes);
   return {
     "data-travel": "used",
-    "data-axis-block": next.includes("block") ? "" : undefined,
-    "data-axis-inline": next.includes("inline") ? "" : undefined,
+    "data-axis-block": presenceAttr(logicalAxesHaveBlock(next)),
+    "data-axis-inline": presenceAttr(logicalAxesHaveInline(next)),
   };
 }
 
-export function travelAxisAttrs(axes?: readonly TravelAxis[]): Pick<TravelHostAttrs, "data-axis-block" | "data-axis-inline"> {
+export function travelAxisAttrs(axes?: readonly LogicalAxis[]): Pick<TravelHostAttrs, "data-axis-block" | "data-axis-inline"> {
   const next = travelHostAttrs(axes);
   return {
     "data-axis-block": next["data-axis-block"],

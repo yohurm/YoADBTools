@@ -19,6 +19,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
 
 import {
   dismissBootOverlay,
+  loadShellFacts,
   resetMainWindowRevealForTests,
   revealMainWindow,
   runBootPipeline,
@@ -142,6 +143,42 @@ describe("启动编排", () => {
     vi.unstubAllGlobals();
   });
 
+  it("揭窗前并行读设置、目录、任务和模块投影", async () => {
+    const order: string[] = [];
+    let releaseTasks: () => void = () => undefined;
+    const tasksGate = new Promise<void>((resolve) => {
+      releaseTasks = resolve;
+    });
+    const pending = loadShellFacts({
+      settings: async () => {
+        order.push("settings");
+      },
+      devices: async () => {
+        order.push("devices");
+      },
+      tasks: async () => {
+        order.push("tasks");
+        await tasksGate;
+      },
+      hydrates: [
+        async () => {
+          order.push("mirror");
+        },
+      ],
+    });
+    await Promise.resolve();
+    expect(order).toEqual(["settings", "devices", "tasks", "mirror"]);
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    releaseTasks();
+    await pending;
+    expect(settled).toBe(true);
+  });
+
   it("揭窗失败上抛，不 refresh", async () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
@@ -231,5 +268,13 @@ describe("启动编排", () => {
     expect(vite).not.toMatch(/\bport:\s*1420\b/);
     expect(tauri.build?.devUrl).toBeTruthy();
     expect(new URL(tauri.build!.devUrl!).port).toBe("1420");
+  });
+
+  it("error 与 contextmenu 只经 listen 登记和摘掉", () => {
+    const app = readFileSync(findRepoFile(["packages/workbench/src/App.tsx", "src/App.tsx"]), "utf8");
+    expect(app.split("add" + "EventListener").length - 1).toBe(1);
+    expect(app.split("remove" + "EventListener").length - 1).toBe(1);
+    expect(app).toContain('listen(window, "error", onError)');
+    expect(app).toContain('listen(document, "contextmenu", onContextMenu)');
   });
 });

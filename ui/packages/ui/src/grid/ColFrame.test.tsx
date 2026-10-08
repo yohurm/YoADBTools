@@ -59,15 +59,35 @@ describe("YoColFrame", () => {
     expect(frame.getAttribute("data-tone")).toBe("document");
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
     expect(css).toMatch(/\[data-tone="document"\]\s*\{[^}]*--yohu-font-mono/);
-    expect(css).toMatch(/\[data-tone="document"\]\s+\.yohu-col-row\s*\{[^}]*min-width:\s*max-content/);
+    expect(css).toMatch(/\[data-tone="document"\]\s*\{[^}]*--yohu-col-row-min:\s*max-content/);
+    expect(css).not.toContain(".yohu-col-row");
   });
 });
 
 describe("YoColFrame 侧轨", () => {
   it("清单溢出让出侧轨时表头跟 gutter 对齐，不写 scrollbar-gutter", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColFrame.css"), "utf-8");
-    expect(css).toContain(':has(.yohu-scroller[data-gutter="on"])');
-    expect(css).toContain("padding-inline-end: var(--yohu-space-lg)");
+    expect(css).toContain(':has([data-gutter="on"])');
+    expect(css).not.toContain(".yohu-scroller");
+    expect(css).not.toContain(".yohu-col-row");
+    expect(css).toContain("--yohu-col-gutter-pad: var(--yohu-space-lg)");
+    expect(css).toContain("--yohu-col-head-gutter: var(--yohu-col-gutter-pad)");
+    expect(css).toContain("--yohu-col-cell-pad: 0 var(--yohu-space-sm) 0 var(--yohu-space-md)");
+    const gutterOwner = css.replace("--yohu-col-gutter-pad: var(--yohu-space-lg)", "");
+    expect(gutterOwner).not.toContain("var(--yohu-space-lg)");
+    expect(css).not.toContain(".yohu-col-head");
+    expect(css).not.toContain("padding-inline-end: var(--yohu-col-head-gutter");
+    const head = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColHead.css"), "utf-8");
+    expect(head).not.toContain("var(--yohu-space-lg)");
+    expect(head).toContain("padding-inline-end: var(--yohu-col-head-gutter, 0)");
+    expect(head).toContain("--yohu-col-gutter-pad: 0");
+    expect(css).not.toContain("> *");
     expect(css).not.toMatch(/scrollbar-gutter\s*:/);
+  });
+
+  it("单元格只吃列架发布的列垫，不读表头变量", () => {
+    const cell = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "ColCell.css"), "utf-8");
+    expect(cell).toContain("padding: var(--yohu-col-cell-pad)");
+    expect(cell).not.toContain("yohu-col-header");
   });
 });

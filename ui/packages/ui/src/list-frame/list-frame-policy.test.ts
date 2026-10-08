@@ -5,6 +5,7 @@ import { listFrameHostAttrs, listFrameStyle } from "./list-frame-policy";
 describe("list-frame-policy", () => {
   it("缺省 variant=hot", () => {
     expect(listFrameHostAttrs()).toEqual({ "data-variant": "hot" });
+    expect(listFrameHostAttrs(undefined)).toEqual({ "data-variant": "hot" });
     expect(listFrameHostAttrs("focus")).toEqual({ "data-variant": "focus" });
   });
 

@@ -82,4 +82,19 @@ mod tests {
         assert!(dir_with_adb(root.join("nested").as_path()).is_none());
         let _ = std::fs::remove_dir_all(&root);
     }
+
+    #[test]
+    fn user_adb_path_is_decided_once() {
+        let old = ".is_empty()).then(|| PathBuf::from";
+        let boot = include_str!("lib.rs");
+        let apply = include_str!("settings_apply.rs");
+        assert!(!boot.contains(old));
+        assert!(!apply.contains(old));
+        assert!(apply.contains("fn user_adb_path"));
+        assert_eq!(crate::settings_apply::user_adb_path(""), None);
+        assert_eq!(
+            crate::settings_apply::user_adb_path(r"C:\adb.exe").as_deref(),
+            Some(std::path::Path::new(r"C:\adb.exe"))
+        );
+    }
 }

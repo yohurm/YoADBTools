@@ -3,6 +3,10 @@
  * 整组/单项禁用、提交、键盘与 roving 是同一写入口；宿主 data-* 从模型快照组装。
  * 不写色值、不画铬、不测选择块几何。
  */
+import { presenceAttr, trueAttr } from "../dom/flag";
+import { controlIsDisabled } from "./control-busy";
+import type { ControlIconSize } from "./control-icon";
+import { itemIsEnabled } from "../keymap/list-index";
 
 import {
   isHybridItems,
@@ -20,7 +24,6 @@ import {
   toggleSelectedValues,
   type SegmentedFillOwner,
   type SegmentedGraphic,
-  type SegmentedIconSize,
   type SegmentedInput,
   type SegmentedJoin,
   type SegmentedPaintKind,
@@ -29,6 +32,8 @@ import {
   type YoSegmentedItemModel,
   type YoSegmentedType,
 } from "./segmented-model";
+
+export { segmentedGraphicIsIcon, segmentedGraphicIsImage } from "./segmented-model";
 
 export interface SegmentedInteractiveInput {
   disabled?: boolean;
@@ -39,7 +44,7 @@ export interface SegmentedInteractive {
 }
 
 export function resolveSegmentedInteractive(input: SegmentedInteractiveInput): SegmentedInteractive {
-  return { disabled: Boolean(input.disabled) };
+  return { disabled: controlIsDisabled(input.disabled) };
 }
 
 export interface SegmentedCommit {
@@ -86,6 +91,38 @@ export type SegmentedAction =
       focusValue: string;
     };
 
+/** 只移焦，不改取值。 */
+export function segmentedActionIsRoving(
+  action: SegmentedAction,
+): action is Extract<SegmentedAction, { kind: "roving" }> {
+  return action.kind === "roving";
+}
+
+/** 单选提交。 */
+export function segmentedActionIsCommitSingle(
+  action: SegmentedAction,
+): action is Extract<SegmentedAction, { kind: "commit-single" }> {
+  return action.kind === "commit-single";
+}
+
+/** 多选切换集合。 */
+export function segmentedActionIsCommitMulti(
+  action: SegmentedAction,
+): action is Extract<SegmentedAction, { kind: "commit-multi" }> {
+  return action.kind === "commit-multi";
+}
+
+function segmentedCommitItem(
+  items: readonly YoSegmentedItemModel[],
+  index: number,
+  groupDisabled?: boolean,
+): YoSegmentedItemModel | undefined {
+  if (groupDisabled) return undefined;
+  const item = items[index];
+  if (!itemIsEnabled(item)) return undefined;
+  return item;
+}
+
 /** 整组或单项禁用则拒绝提交；再点当前项 changed=false。 */
 export function resolveSegmentedCommit(
   items: readonly YoSegmentedItemModel[],
@@ -93,9 +130,8 @@ export function resolveSegmentedCommit(
   index: number,
   groupDisabled?: boolean,
 ): SegmentedCommit | undefined {
-  if (groupDisabled) return undefined;
-  const item = items[index];
-  if (!item || item.disabled) return undefined;
+  const item = segmentedCommitItem(items, index, groupDisabled);
+  if (!item) return undefined;
   return {
     index,
     value: item.value,
@@ -110,9 +146,8 @@ export function resolveSegmentedMultiCommit(
   index: number,
   groupDisabled?: boolean,
 ): SegmentedMultiCommit | undefined {
-  if (groupDisabled) return undefined;
-  const item = items[index];
-  if (!item || item.disabled) return undefined;
+  const item = segmentedCommitItem(items, index, groupDisabled);
+  if (!item) return undefined;
   const current = resolveSelectedValues(items, values);
   const next = toggleSelectedValues(items, current, item.value);
   return {
@@ -140,6 +175,18 @@ export function resolveSegmentedRoving(
   return resolveRovingValue(items, selected, hint);
 }
 
+function singleValue(value: string | undefined): string {
+  return value ?? "";
+}
+
+function itemValue(items: readonly YoSegmentedItemModel[], index: number): string | undefined {
+  return items[index]?.value;
+}
+
+function segmentedHasValue(value: string | undefined): value is string {
+  return Boolean(value);
+}
+
 /** 指针提交：单选改值，多选切换集合。不移焦。 */
 export function resolveSegmentedPointerAction(
   input: SegmentedActionInput,
@@ -148,8 +195,8 @@ export function resolveSegmentedPointerAction(
   if (input.multiple) {
     const next = resolveSegmentedMultiCommit(input.items, input.values ?? [], index, input.disabled);
     if (!next) return undefined;
-    const value = input.items[next.index]?.value;
-    if (!value) return undefined;
+    const value = itemValue(input.items, next.index);
+    if (!segmentedHasValue(value)) return undefined;
     return {
       kind: "commit-multi",
       index: next.index,
@@ -159,7 +206,7 @@ export function resolveSegmentedPointerAction(
       focusValue: value,
     };
   }
-  const next = resolveSegmentedCommit(input.items, input.value ?? "", index, input.disabled);
+  const next = resolveSegmentedCommit(input.items, singleValue(input.value), index, input.disabled);
   if (!next) return undefined;
   return {
     kind: "commit-single",
@@ -176,15 +223,15 @@ export function resolveSegmentedKeyAction(
   input: SegmentedActionInput,
   key: string,
 ): SegmentedAction | undefined {
-  if (input.disabled) return undefined;
+  if (controlIsDisabled(input.disabled)) return undefined;
   const index = resolveKeyIndex(input.items, input.roving ?? "", key);
   if (index === undefined) return undefined;
-  const value = input.items[index]?.value;
-  if (!value) return undefined;
+  const value = itemValue(input.items, index);
+  if (!segmentedHasValue(value)) return undefined;
   if (input.multiple) {
     return { kind: "roving", index, focusValue: value };
   }
-  const next = resolveSegmentedCommit(input.items, input.value ?? "", index, input.disabled);
+  const next = resolveSegmentedCommit(input.items, singleValue(input.value), index, input.disabled);
   if (!next) return undefined;
   return {
     kind: "commit-single",
@@ -208,7 +255,7 @@ export interface SegmentedHostAttrs {
   "data-hybrid": "" | undefined;
   "data-multiple": "" | undefined;
   "data-block": "" | undefined;
-  "data-icon-size": SegmentedIconSize;
+  "data-icon-size": ControlIconSize;
   "aria-disabled": true | undefined;
   "aria-multiselectable": true | undefined;
 }
@@ -223,12 +270,12 @@ export function segmentedHostAttrs(input: SegmentedHostInput): SegmentedHostAttr
     "data-size": spec.size,
     "data-paint": paint,
     "data-fill-owner": segmentedFillOwner(paint),
-    "data-hybrid": hybrid ? "" : undefined,
-    "data-multiple": spec.multiple ? "" : undefined,
-    "data-block": spec.block ? "" : undefined,
+    "data-hybrid": presenceAttr(hybrid),
+    "data-multiple": presenceAttr(spec.multiple),
+    "data-block": presenceAttr(spec.block),
     "data-icon-size": segmentedIconSize(spec, hybrid),
-    "aria-disabled": interactive.disabled ? true : undefined,
-    "aria-multiselectable": spec.multiple ? true : undefined,
+    "aria-disabled": trueAttr(interactive.disabled),
+    "aria-multiselectable": trueAttr(spec.multiple),
   };
 }
 
@@ -274,7 +321,7 @@ export function segmentedItemAttrs(
         : "none";
   return {
     selected,
-    disabled: Boolean(options?.groupDisabled) || Boolean(item.disabled),
+    disabled: controlIsDisabled(options?.groupDisabled) || !itemIsEnabled(item),
     tabIndex: item.value === roving ? 0 : -1,
     content: segmentedItemContent(item),
     graphic: resolveSegmentedGraphic(item, selected),

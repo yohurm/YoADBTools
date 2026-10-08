@@ -1,6 +1,11 @@
 //! 设置键校验与应用（贴 protocol 模型；落盘与副作用仍在壳）。
 
-use yohu_protocol::{AppSettings, MirrorProtocol, SettingKey, TerminalTimeFormat};
+use std::collections::HashSet;
+
+use yohu_protocol::{
+    AppSettings, LibraryExpand, MirrorProtocol, SettingKey, TerminalTimeFormat,
+    LIBRARY_EXPAND_MAX_IDS, LIBRARY_EXPAND_MAX_ID_CHARS,
+};
 
 use crate::mirror::apply_protocol;
 
@@ -30,6 +35,10 @@ pub enum SettingError {
     ExpectLogColorScheme(&'static str),
     #[error("{0} 必须是 clip 或 wrap")]
     ExpectLogLineLayout(&'static str),
+    #[error(
+        "{0} 必须是 collapsed、expanded 或 groups，且 ids 为至多 256 个命令组 ID（每个 1–128 字）"
+    )]
+    ExpectLibraryExpand(&'static str),
 }
 
 fn must_str(key: SettingKey, value: &serde_json::Value) -> Result<String, SettingError> {
@@ -49,6 +58,14 @@ fn must_bool(key: SettingKey, value: &serde_json::Value) -> Result<bool, Setting
     value
         .as_bool()
         .ok_or(SettingError::ExpectBool(key.as_str()))
+}
+
+fn require_positive(key: SettingKey, n: u64) -> Result<u64, SettingError> {
+    if n == 0 {
+        Err(SettingError::MustPositive(key.as_str()))
+    } else {
+        Ok(n)
+    }
 }
 
 fn must_clock_format(
@@ -75,10 +92,7 @@ pub fn apply_setting(
             settings.devices_auto_refresh = must_bool(key, value)?;
         }
         SettingKey::BufferCapacity => {
-            let n = must_u64(key, value)?;
-            if n == 0 {
-                return Err(SettingError::MustPositive(key.as_str()));
-            }
+            let n = require_positive(key, must_u64(key, value)?)?;
             settings.buffer_capacity = n as usize;
         }
         SettingKey::ClearDeviceOnStart => {
@@ -118,10 +132,7 @@ pub fn apply_setting(
             settings.mirror_max_size = u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
         SettingKey::MirrorVideoBitRate => {
-            let n = must_u64(key, value)?;
-            if n == 0 {
-                return Err(SettingError::MustPositive(key.as_str()));
-            }
+            let n = require_positive(key, must_u64(key, value)?)?;
             settings.mirror_video_bit_rate =
                 u32::try_from(n).map_err(|_| SettingError::TooLarge)?;
         }
@@ -146,8 +157,44 @@ pub fn apply_setting(
         SettingKey::TerminalTimeFormat => {
             settings.terminal_time_format = must_clock_format(key, value)?;
         }
+        SettingKey::TerminalLibraryExpand => {
+            settings.terminal_library_expand = must_library_expand(key, value)?;
+        }
     }
     Ok(())
+}
+
+fn must_library_expand(
+    key: SettingKey,
+    value: &serde_json::Value,
+) -> Result<LibraryExpand, SettingError> {
+    let raw: LibraryExpand = serde_json::from_value(value.clone())
+        .map_err(|_| SettingError::ExpectLibraryExpand(key.as_str()))?;
+    normalize_library_expand(key, raw)
+}
+
+fn normalize_library_expand(
+    key: SettingKey,
+    raw: LibraryExpand,
+) -> Result<LibraryExpand, SettingError> {
+    if raw.ids.len() > LIBRARY_EXPAND_MAX_IDS {
+        return Err(SettingError::ExpectLibraryExpand(key.as_str()));
+    }
+    let mut seen = HashSet::new();
+    let mut ids = Vec::with_capacity(raw.ids.len());
+    for id in raw.ids {
+        let id = id.trim().to_string();
+        if id.is_empty() || id.chars().count() > LIBRARY_EXPAND_MAX_ID_CHARS {
+            return Err(SettingError::ExpectLibraryExpand(key.as_str()));
+        }
+        if seen.insert(id.clone()) {
+            ids.push(id);
+        }
+    }
+    Ok(LibraryExpand {
+        mode: raw.mode,
+        ids,
+    })
 }
 
 #[cfg(test)]
@@ -155,8 +202,9 @@ mod tests {
     use super::*;
     use serde_json::json;
     use yohu_protocol::{
-        default_wifi_mirror_max_fps, default_wifi_mirror_max_size, default_wifi_mirror_video_bit_rate,
-        LogColorScheme, LogLineLayout,
+        default_wifi_mirror_max_fps, default_wifi_mirror_max_size,
+        default_wifi_mirror_video_bit_rate, LibraryExpandMode, LogColorScheme, LogLineLayout,
+        LIBRARY_EXPAND_MAX_IDS, LIBRARY_EXPAND_MAX_ID_CHARS,
     };
 
     #[test]
@@ -181,7 +229,10 @@ mod tests {
         let mut s = AppSettings::default();
         apply_setting(&mut s, SettingKey::MirrorProtocol, &json!("wifi")).unwrap();
         assert_eq!(s.mirror_max_size, default_wifi_mirror_max_size());
-        assert_eq!(s.mirror_video_bit_rate, default_wifi_mirror_video_bit_rate());
+        assert_eq!(
+            s.mirror_video_bit_rate,
+            default_wifi_mirror_video_bit_rate()
+        );
         assert_eq!(s.mirror_max_fps, default_wifi_mirror_max_fps());
         assert_eq!(s.mirror_protocol, yohu_protocol::MirrorProtocol::Wifi);
         apply_setting(&mut s, SettingKey::MirrorMaxFps, &json!(15)).unwrap();
@@ -244,6 +295,61 @@ mod tests {
         assert_eq!(s.log_color_scheme, LogColorScheme::Logcat);
         let err = apply_setting(&mut s, SettingKey::LogColorScheme, &json!("darcula")).unwrap_err();
         assert!(matches!(err, SettingError::ExpectLogColorScheme(_)));
+    }
+
+    #[test]
+    fn terminal_library_expand_defaults_collapsed_and_normalizes_ids() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.terminal_library_expand.mode, LibraryExpandMode::Collapsed);
+        assert!(s.terminal_library_expand.ids.is_empty());
+        apply_setting(
+            &mut s,
+            SettingKey::TerminalLibraryExpand,
+            &json!({ "mode": "groups", "ids": [" g-device ", "g-device", "g-power"] }),
+        )
+        .unwrap();
+        assert_eq!(s.terminal_library_expand.mode, LibraryExpandMode::Groups);
+        assert_eq!(
+            s.terminal_library_expand.ids,
+            vec!["g-device".to_string(), "g-power".to_string()]
+        );
+        apply_setting(
+            &mut s,
+            SettingKey::TerminalLibraryExpand,
+            &json!({ "mode": "expanded", "ids": ["g-device"] }),
+        )
+        .unwrap();
+        assert_eq!(s.terminal_library_expand.mode, LibraryExpandMode::Expanded);
+        assert_eq!(s.terminal_library_expand.ids, vec!["g-device".to_string()]);
+        apply_setting(
+            &mut s,
+            SettingKey::TerminalLibraryExpand,
+            &json!({ "mode": "collapsed" }),
+        )
+        .unwrap();
+        assert_eq!(s.terminal_library_expand.mode, LibraryExpandMode::Collapsed);
+        assert!(s.terminal_library_expand.ids.is_empty());
+        let bad = apply_setting(
+            &mut s,
+            SettingKey::TerminalLibraryExpand,
+            &json!({ "mode": "all", "ids": [] }),
+        )
+        .unwrap_err();
+        assert!(matches!(bad, SettingError::ExpectLibraryExpand(_)));
+        let blank = apply_setting(
+            &mut s,
+            SettingKey::TerminalLibraryExpand,
+            &json!({ "mode": "groups", "ids": ["  "] }),
+        )
+        .unwrap_err();
+        assert!(matches!(blank, SettingError::ExpectLibraryExpand(_)));
+        assert!(blank.to_string().contains("collapsed"));
+        assert!(blank
+            .to_string()
+            .contains(&LIBRARY_EXPAND_MAX_IDS.to_string()));
+        assert!(blank
+            .to_string()
+            .contains(&LIBRARY_EXPAND_MAX_ID_CHARS.to_string()));
     }
 
     #[test]

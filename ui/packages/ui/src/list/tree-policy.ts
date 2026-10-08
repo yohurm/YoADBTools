@@ -57,6 +57,20 @@ export type TreeKeyAction =
   | { type: "toggle"; key: string }
   | { type: "select"; key: string };
 
+/** 只移动焦点。意图上的 focus / parent 仍由 switch 收成动作。 */
+export function treeActionIsFocus(
+  action: TreeKeyAction,
+): action is Extract<TreeKeyAction, { type: "focus" }> {
+  return action.type === "focus";
+}
+
+/** 开合当前目录。选中是其余分支。 */
+export function treeActionIsToggle(
+  action: TreeKeyAction,
+): action is Extract<TreeKeyAction, { type: "toggle" }> {
+  return action.type === "toggle";
+}
+
 export function applyTreeKeyIntent<T extends TreeWalkNode>(
   intent: TreeKeyIntent,
   rows: readonly { node: T; depth: number }[],

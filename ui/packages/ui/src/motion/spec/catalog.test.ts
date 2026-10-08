@@ -28,7 +28,7 @@ const REQUIRED_RECIPES = [
   "theme-wipe",
   "tree-chevron",
   "reorder",
-  "scroller",
+  "gather",
 ] as const;
 
 function catalogSpecs(spec: MotionCatalogEntry["spec"]): MotionSpecName[] {
@@ -39,6 +39,9 @@ function catalogSpecs(spec: MotionCatalogEntry["spec"]): MotionSpecName[] {
 function recipeSelectors(name: string): readonly string[] {
   if (name === "theme-wipe") {
     return ["::view-transition", "data-theme-transition"];
+  }
+  if (name === "reorder") {
+    return ["data-reordering"];
   }
   return [`data-recipe="${name}"`, `.yohu-recipe-${name}`, `.yohu-${name}`];
 }

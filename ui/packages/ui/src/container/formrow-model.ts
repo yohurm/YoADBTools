@@ -12,25 +12,45 @@ export const DEFAULT_FORM_ROW_PAD: YoFormRowPad = "md";
 export interface FormRowSlotInput {
   description?: unknown;
   note?: unknown;
+  sub?: unknown;
+}
+
+export function formRowLayoutIsStacked(layout?: YoFormRowLayout): boolean {
+  return layout === "stacked";
 }
 
 export function resolveFormRowLayout(layout?: YoFormRowLayout): YoFormRowLayout {
-  return layout === "stacked" ? "stacked" : DEFAULT_FORM_ROW_LAYOUT;
+  return formRowLayoutIsStacked(layout) ? "stacked" : DEFAULT_FORM_ROW_LAYOUT;
+}
+
+export function formRowPadIsFlush(pad?: YoFormRowPad): boolean {
+  return pad === "flush";
 }
 
 export function resolveFormRowPad(pad?: YoFormRowPad): YoFormRowPad {
-  return pad === "flush" ? "flush" : DEFAULT_FORM_ROW_PAD;
+  return formRowPadIsFlush(pad) ? "flush" : DEFAULT_FORM_ROW_PAD;
 }
 
 export interface FormRowSlots {
   description: boolean;
   note: boolean;
+  sub: boolean;
+}
+
+/** 没有子项就不开。没写 subOpen 时，有子项默认开。 */
+export function formRowSubIsOpen(sub: unknown, open?: boolean): boolean {
+  if (!hasFormRowSlot(sub)) return false;
+  return open !== false;
+}
+
+export function trimmedTextPresent(value: string): boolean {
+  return value.trim().length > 0;
 }
 
 /** 空串 / 空白 / null / false 不算占槽。 */
 export function hasFormRowSlot(value: unknown): boolean {
   if (value === undefined || value === null || value === false) return false;
-  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "string") return trimmedTextPresent(value);
   return true;
 }
 
@@ -38,5 +58,6 @@ export function resolveFormRowSlots(input: FormRowSlotInput): FormRowSlots {
   return {
     description: hasFormRowSlot(input.description),
     note: hasFormRowSlot(input.note),
+    sub: hasFormRowSlot(input.sub),
   };
 }

@@ -1,32 +1,17 @@
 //! 单字段对单语的第一次命中。下标是 Unicode 标量。
 
-use crate::chars::{find_chars, lowered_chars};
+use crate::chars::{find_chars, fold_search};
 use crate::pinyin::find_pinyin_span;
-use crate::token::normalize_search_query;
 use crate::types::SearchHitKind;
 
-fn hit_kind(hay: &[char], needle: &[char], index: usize) -> SearchHitKind {
-    if hay == needle {
-        return SearchHitKind::Exact;
-    }
-    if index == 0 || hay[index - 1].is_whitespace() {
-        return SearchHitKind::Prefix;
-    }
-    SearchHitKind::Contains
-}
-
 pub fn search_field_hit(text: &str, token: &str) -> Option<(usize, usize, SearchHitKind)> {
-    let needle = normalize_search_query(token);
-    if needle.is_empty() {
-        return None;
+    let folded = fold_search(text, token)?;
+    if let Some(start) = find_chars(&folded.hay, &folded.needle, 0) {
+        let end = start + folded.needle.len();
+        return Some((start, end, span_kind(&folded.hay, start, end)));
     }
-    let hay = lowered_chars(text);
-    let n: Vec<char> = needle.chars().collect();
-    if let Some(start) = find_chars(&hay, &n, 0) {
-        return Some((start, start + n.len(), hit_kind(&hay, &n, start)));
-    }
-    let (start, end) = find_pinyin_span(&hay, &needle, 0)?;
-    Some((start, end, span_kind(&hay, start, end)))
+    let (start, end) = find_pinyin_span(&folded.hay, &folded.normalized, 0)?;
+    Some((start, end, span_kind(&folded.hay, start, end)))
 }
 
 fn span_kind(hay: &[char], start: usize, end: usize) -> SearchHitKind {

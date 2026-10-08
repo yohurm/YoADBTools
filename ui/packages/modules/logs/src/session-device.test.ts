@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { DeviceInfo, DeviceStatus } from "@yohu/api";
 
 import {
-  deviceConnectionLabel,
   devicePickerDescription,
   devicePickerFields,
   devicePickerLabel,
@@ -38,16 +40,6 @@ describe("devicePickerLabel", () => {
   });
 });
 
-describe("deviceConnectionLabel", () => {
-  it("usb / tcp 收成 USB / 无线", () => {
-    expect(deviceConnectionLabel("usb")).toBe("USB");
-    expect(deviceConnectionLabel("usb:1-2")).toBe("USB");
-    expect(deviceConnectionLabel("tcp:192.168.1.8:5555")).toBe("无线");
-    expect(deviceConnectionLabel("wifi")).toBe("无线");
-    expect(deviceConnectionLabel("")).toBe("");
-  });
-});
-
 describe("devicePickerFields", () => {
   it("主文案型号，次文案短号与连接", () => {
     expect(devicePickerFields(device("ABCDEFGH", "edge"))).toEqual({
@@ -62,6 +54,16 @@ describe("devicePickerFields", () => {
       label: "S1",
       description: "USB",
     });
+  });
+
+  it("型号文本与 serial 相同仍算有型号", () => {
+    expect(devicePickerLabel(device("S1", "S1"))).toBe("S1 · S1");
+    expect(devicePickerDescription(device("S1", "S1"))).toBe("S1 · USB");
+    const owner = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "session-device.ts"), "utf8");
+    expect(owner).toContain("deviceHasModel");
+    expect(owner).not.toContain("=== device.serial");
+    expect(owner).not.toContain('startsWith("usb:")');
+    expect(owner).not.toContain('=== "wifi"');
   });
 
   it("tcp 连接标无线", () => {
@@ -95,5 +97,23 @@ describe("formatSessionDevice", () => {
 
   it("目录中找不到设备时仍用 serial，版本可缺", () => {
     expect(formatSessionDevice("gone", [], {})).toBe("gone");
+  });
+});
+
+describe("设备短号只取一次", () => {
+  it("device_short_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "session-device.ts"), "utf8");
+    const needle = "shortSerial(device." + "serial)";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("deviceShort(");
+  });
+});
+
+describe("间隔点只拼一次", () => {
+  it("join_dot_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "session-device.ts"), "utf8");
+    const needle = '.join("' + ' · ")';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("joinDot(");
   });
 });

@@ -2,10 +2,11 @@
  * YoSegmentedButton —— 分段按钮（L4 视图）。
  * 对齐 HarmonyOS 设计指南三种：页签单选 / 胶囊单选 / 胶囊多选。
  * 类型 / 涂装 / 提交由 segmented-model + segmented-policy 决定；本文件只绑属性与内容区。
- * host 即轨：YoCorner paint 铺在宿主上；单选 YoIndicator 与项同一父级；多选每项自绘选中底。
+ * host 即轨：单选自己声明指示条宿主；滑块与项同一父级。多选不声明宿主，项自绘选中底。
  *
  * 页签栏仍走 YoTabs；本组件不作一级导航，不承载删除/添加。
  */
+import { presenceAttr, presenceIsOn } from "../dom/flag";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 
@@ -18,11 +19,17 @@ import {
   resolveSegmentedPointerAction,
   resolveSegmentedRoving,
   resolveSegmentedSelection,
+  segmentedActionIsCommitMulti,
+  segmentedActionIsCommitSingle,
+  segmentedActionIsRoving,
+  segmentedGraphicIsIcon,
+  segmentedGraphicIsImage,
   segmentedHostAttrs,
   segmentedItemAttrs,
   type SegmentedAction,
   type SegmentedActionInput,
 } from "./segmented-policy";
+import { controlIconPx } from "./control-icon";
 import "./SegmentedButton.css";
 
 export type { YoSegmentedButtonSize, YoSegmentedType };
@@ -90,13 +97,16 @@ function itemPaintStyle(ink: string | undefined, fill: string | undefined): JSX.
   return style;
 }
 
-function SegmentedGraphicView(props: { graphic: SegmentedGraphic | undefined }): JSX.Element {
+function SegmentedGraphicView(props: {
+  graphic: SegmentedGraphic | undefined;
+  glyph: number;
+}): JSX.Element {
   const graphic = props.graphic;
   if (!graphic) return null;
-  if (graphic.kind === "icon" && isIconName(graphic.name)) {
-    return <Icon name={graphic.name} />;
+  if (segmentedGraphicIsIcon(graphic) && isIconName(graphic.name)) {
+    return <Icon name={graphic.name} size={props.glyph} />;
   }
-  if (graphic.kind === "image") {
+  if (segmentedGraphicIsImage(graphic)) {
     return <img class="yohu-segmented__image" src={graphic.src} alt="" />;
   }
   return null;
@@ -105,6 +115,22 @@ function SegmentedGraphicView(props: { graphic: SegmentedGraphic | undefined }):
 /** 渲染分段按钮。内容区 = 图标/图片 + 标签；单选选择块在轨内，多选画在项上。 */
 export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
   const itemRefs: Array<HTMLButtonElement | undefined> = [];
+
+  function segmentedItems(): YoSegmentedItem[] {
+    return props.items;
+  }
+
+  function segmentedDisabled(): boolean | undefined {
+    return props.disabled;
+  }
+
+  function segmentedValue(): string | undefined {
+    return props.value;
+  }
+
+  function focusSegmentedItem(index: number): void {
+    queueMicrotask(() => itemRefs[index]?.focus());
+  }
   const [focusValue, setFocusValue] = createSignal<string | undefined>();
 
   const host = createMemo(() =>
@@ -113,47 +139,49 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
       size: props.size,
       multiple: props.multiple,
       block: props.block,
-      disabled: props.disabled,
-      items: props.items,
+      disabled: segmentedDisabled(),
+      items: segmentedItems(),
     }),
   );
 
-  const multiple = () => host()["data-multiple"] === "";
+  const multiple = () => presenceIsOn(host()["data-multiple"]);
   const selectedValues = createMemo(() =>
-    resolveSegmentedSelection(props.items, multiple(), props.value, props.values),
+    resolveSegmentedSelection(segmentedItems(), multiple(), segmentedValue(), props.values),
   );
   const rovingValue = createMemo(() =>
-    resolveSegmentedRoving(props.items, selectedValues(), {
+    resolveSegmentedRoving(segmentedItems(), selectedValues(), {
       focus: focusValue(),
-      value: props.value,
+      value: segmentedValue(),
       multiple: multiple(),
     }),
   );
 
   const actionInput = (): SegmentedActionInput => ({
-    items: props.items,
+    items: segmentedItems(),
     multiple: multiple(),
-    value: props.value,
+    value: segmentedValue(),
     values: selectedValues(),
-    disabled: props.disabled,
+    disabled: segmentedDisabled(),
     roving: rovingValue(),
   });
 
   const applyAction = (action: SegmentedAction): void => {
     setFocusValue(action.focusValue);
-    if (action.kind === "roving") {
-      queueMicrotask(() => itemRefs[action.index]?.focus());
+    if (segmentedActionIsRoving(action)) {
+      focusSegmentedItem(action.index);
       return;
     }
     props.onItemClick?.(action.index);
-    if (action.kind === "commit-single" && action.changed) props.onChange?.(action.value);
-    if (action.kind === "commit-multi" && action.changed) props.onChangeValues?.(action.values);
-    if (action.focus) queueMicrotask(() => itemRefs[action.index]?.focus());
+    if (segmentedActionIsCommitSingle(action) && action.changed) props.onChange?.(action.value);
+    if (segmentedActionIsCommitMulti(action) && action.changed) props.onChangeValues?.(action.values);
+    if (action.focus) focusSegmentedItem(action.index);
   };
 
   return (
     <div
       class="yohu-segmented"
+      classList={{ "yohu-indicator-host": !multiple() }}
+      data-indicator-variant={!multiple() ? "thumb" : undefined}
       data-type={host()["data-type"]}
       data-size={host()["data-size"]}
       data-paint={host()["data-paint"]}
@@ -175,16 +203,16 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
     >
       <YoCorner role="control" stroke={false} mode="paint" />
       <Show when={!multiple()}>
-        <YoIndicator follow={props.value} variant="thumb" selector=".yohu-segmented__item[data-selected]" />
+        <YoIndicator follow={segmentedValue()} variant="thumb" selector=".yohu-segmented__item[data-selected]" />
       </Show>
-      <For each={props.items}>
+      <For each={segmentedItems()}>
         {(item, index) => {
           const attrs = () =>
             segmentedItemAttrs(item, selectedValues(), {
-              groupDisabled: props.disabled,
+              groupDisabled: segmentedDisabled(),
               multiple: multiple(),
               roving: rovingValue(),
-              items: props.items,
+              items: segmentedItems(),
               index: index(),
             });
           return (
@@ -194,7 +222,7 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
               }}
               type="button"
               class="yohu-segmented__item yohu-focus-ring--inset"
-              data-selected={attrs().selected ? "" : undefined}
+              data-selected={presenceAttr(attrs().selected)}
               data-content={attrs().content}
               data-join={attrs().join}
               style={itemPaintStyle(attrs().ink, attrs().fill)}
@@ -210,7 +238,10 @@ export function YoSegmentedButton(props: YoSegmentedButtonProps): JSX.Element {
                 if (next) applyAction(next);
               }}
             >
-              <SegmentedGraphicView graphic={attrs().graphic} />
+              <SegmentedGraphicView
+                graphic={attrs().graphic}
+                glyph={controlIconPx(host()["data-icon-size"])}
+              />
               {item.label ? <span class="yohu-segmented__label">{item.label}</span> : null}
             </button>
           );

@@ -18,6 +18,8 @@
  * 见 harmonyos-design-notes.md §1.4 / §1.6。
  */
 
+import type { ThemeName } from "./theme-name";
+
 /** HarmonyOS ARGB `#AARRGGBB` → CSS `#RRGGBB` / `#RRGGBBAA`。 */
 function fromArgb(argb: string): string {
   const hex = argb.replace(/^#/, "").toUpperCase();
@@ -237,7 +239,7 @@ export const DarkColors: Record<SemanticColorName, string> = {
  * 排出 `--yohu-level-*`。Yohu 级别块底用 `--yohu-level-*` + 字母 `--yohu-fg-on`；Tag/消息仍写 `--yohu-log-ink`。禁止 `--yohu-level-f-bg`。
  * 官方 Logcat V2 板在 logcat.ts，禁止本文件再列 AS hex。
  */
-function logLevelBoard(mode: "light" | "dark") {
+function logLevelBoard(mode: ThemeName) {
   return {
     v: Harmony.fontSecondary[mode],
     d: Harmony.brand[mode],
@@ -266,7 +268,7 @@ export type LogLevelKey = keyof typeof LogLevelLight;
  * - xml / pdf：结构/文档=一级警示红；括号/行条走 on-primary
  * - json：数据=警示橙；花括号走各级主题正文色
  */
-function fileIconBoard(mode: "light" | "dark") {
+function fileIconBoard(mode: ThemeName) {
   return {
     folder: { body: Harmony.brand[mode], mark: Harmony.iconSubEmphasize[mode] },
     file: { body: Harmony.fontTertiary[mode], mark: Harmony.backgroundFourth[mode] },

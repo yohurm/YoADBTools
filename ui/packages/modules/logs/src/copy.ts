@@ -3,7 +3,7 @@
  * 选区范围由 editor/selection 读出；本文件只序列化与写剪贴板。
  */
 
-import { docSelCopyText, logSelectionInList, readDocSel, textOffsetInDoc } from "./editor/selection";
+import { docSelCopyText, finiteOrNull, logSelectionInList, readDocSel, rowOf, textOffsetInDoc } from "./editor/selection";
 
 export type LogCopyScope = { kind: "none" } | { kind: "all" };
 export type CopyMessage = { seq: number; text: string };
@@ -11,16 +11,22 @@ export type CopyMessage = { seq: number; text: string };
 export const LOG_COPY_NONE: LogCopyScope = { kind: "none" };
 export const LOG_COPY_ALL: LogCopyScope = { kind: "all" };
 
+/** 全选复制。范围只有全选与无，手势、载荷和序列化都认这一把。 */
+export function copyScopeIsAll(scope: LogCopyScope): boolean {
+  return scope.kind === "all";
+}
+
 export { logSelectionInList, textOffsetInDoc };
 
 export function seqFromTarget(target: EventTarget | null): number | null {
-  const el = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
-  const raw = el?.closest<HTMLElement>("[data-seq]")?.dataset.seq;
+  if (!(target instanceof Node)) {
+    return null;
+  }
+  const raw = rowOf(target)?.dataset.seq;
   if (!raw) {
     return null;
   }
-  const seq = Number(raw);
-  return Number.isFinite(seq) ? seq : null;
+  return finiteOrNull(Number(raw));
 }
 
 export function copyHasPayload(opts: {
@@ -29,7 +35,7 @@ export function copyHasPayload(opts: {
   selection: Selection | null;
   fallbackText?: string;
 }): boolean {
-  if (opts.pick.kind === "all") {
+  if (copyScopeIsAll(opts.pick)) {
     return true;
   }
   if (logSelectionInList(opts.listRoot, opts.selection)) {
@@ -57,7 +63,7 @@ export function serializeLogCopy(opts: {
   selection: Selection | null;
   fallbackText?: string;
 }): string {
-  if (opts.pick.kind === "all") {
+  if (copyScopeIsAll(opts.pick)) {
     return opts.messages.map((item) => item.text).join("\n");
   }
   const fromSelection = documentCopyText(opts.listRoot, opts.selection, opts.messages);

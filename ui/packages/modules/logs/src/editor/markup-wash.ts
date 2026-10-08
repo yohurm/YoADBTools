@@ -23,24 +23,33 @@ const EMPTY_PAINT: WashPaint = {
   position: "0 0",
 };
 
+/** 闭开 [from, to) 有格子。空段不画背景，也不登记高亮。 */
+export function washSpanOpen(from: number, to: number): boolean {
+  return from < to;
+}
+
 /** 闭开 [from, to) 映射到等宽字符格。字母在正中格。 */
 export function washGrid(from: number, to: number): { from: number; span: number } | null {
-  if (to <= from) {
+  if (!washSpanOpen(from, to)) {
     return null;
   }
   return { from, span: to - from };
 }
 
+function cssList(parts: readonly string[]): string {
+  return parts.join(", ");
+}
+
 /** BACKGROUND 画在文本节点自己的 1ch 格上，对照编辑器 charWidth。 */
 export function washPaint(cells: readonly WashCell[]): WashPaint {
-  const real = cells.filter((cell) => cell.to > cell.from && cell.fill);
+  const real = cells.filter((cell) => washSpanOpen(cell.from, cell.to) && cell.fill);
   if (real.length === 0) {
     return EMPTY_PAINT;
   }
   return {
-    image: real.map((cell) => `linear-gradient(${cell.fill}, ${cell.fill})`).join(", "),
-    size: real.map((cell) => `calc(${cell.to - cell.from} * 1ch) 100%`).join(", "),
-    position: real.map((cell) => `calc(${cell.from} * 1ch) 0`).join(", "),
+    image: cssList(real.map((cell) => `linear-gradient(${cell.fill}, ${cell.fill})`)),
+    size: cssList(real.map((cell) => `calc(${cell.to - cell.from} * 1ch) 100%`)),
+    position: cssList(real.map((cell) => `calc(${cell.from} * 1ch) 0`)),
   };
 }
 

@@ -4,46 +4,64 @@
 
 import { Show } from "solid-js";
 
-import { Icon, YoBadge, YoButton, YoChip, YoIconButton, YoListPresence, YoTextField } from "@yohu/ui";
+import {
+  closedAttr,
+  enterKey,
+  flagAttr,
+  Icon,
+  YoBadge,
+  YoButton,
+  YoChip,
+  YoIconButton,
+  YoListPresence,
+  YoTextField,
+  type IconName,
+} from "@yohu/ui";
 
-import { commandBlockGapLabel } from "./block-gap";
+import { commandBlockSummary } from "./block-gap";
 
-import { formatAdbLine } from "./command-line";
+import { entryIsBlock } from "@yohu/api";
+import { commandCopyText, queuedIsLine } from "./command-line";
 import { terminalStore, type QueuedSend } from "./store";
 
-function queuedLeading(item: QueuedSend): "terminal" | "block" {
-  if (item.kind === "block") return "block";
+function queuedLeading(item: QueuedSend): IconName {
+  if (entryIsBlock(item)) return "block";
   return "terminal";
 }
 
 function queuedText(item: QueuedSend): string {
-  if (item.kind === "line") return `${item.title} · ${formatAdbLine("-", item.line)}`;
-  return `${item.title} · ${item.block.steps.length} 条 · 间隔 ${commandBlockGapLabel(item.block.gap_ms)}`;
+  if (queuedIsLine(item)) return `${item.title} · ${commandCopyText(item.line)}`;
+  return `${item.title} · ${commandBlockSummary(item.block.steps.length, item.block.gap_ms)}`;
 }
 
 export function Composer(props: { serials: string[] }) {
-  const running = (): boolean => terminalStore.session.busy;
+  const running = (): boolean => terminalStore.busy();
   const open = (): boolean => terminalStore.session.composerOpen;
   const canSend = (): boolean => terminalStore.canSend();
 
+  function sendComposer(): void {
+    void terminalStore.sendAll(props.serials);
+  }
+
   const onComposerKey = (event: KeyboardEvent): void => {
-    if (event.key !== "Enter") return;
+    if (!enterKey(event.key)) return;
     if (event.shiftKey) return;
     event.preventDefault();
-    void terminalStore.sendAll(props.serials);
+    sendComposer();
   };
 
   return (
     <div
       class="yohu-terminal__dock yohu-recipe-inline-end"
-      data-open={open() ? "true" : "false"}
+      data-open={flagAttr(open())}
     >
       <div
         class="yohu-terminal__composer-clip"
-        aria-hidden={!open() || undefined}
-        inert={!open() ? true : undefined}
+        data-part="clip"
+        aria-hidden={closedAttr(open())}
+        inert={closedAttr(open())}
       >
-        <div class="yohu-terminal__composer-pane">
+        <div class="yohu-terminal__composer-pane" data-part="pane">
           <div class="yohu-terminal__queue" role="list">
             <YoListPresence each={terminalStore.session.queue} key={(item) => item.id}>
               {(item) => (
@@ -80,14 +98,14 @@ export function Composer(props: { serials: string[] }) {
             </div>
             <span
               class="yohu-terminal__send yohu-recipe-send-aim"
-              data-armed={canSend() ? "true" : "false"}
+              data-armed={flagAttr(canSend())}
             >
               <YoIconButton
                 icon="send"
                 title="发送"
                 loading={running()}
                 disabled={!canSend() || running()}
-                onClick={() => void terminalStore.sendAll(props.serials)}
+                onClick={sendComposer}
               />
             </span>
           </div>
@@ -95,8 +113,9 @@ export function Composer(props: { serials: string[] }) {
       </div>
       <div
         class="yohu-terminal__toggle-clip"
-        aria-hidden={open() || undefined}
-        inert={open() ? true : undefined}
+        data-part="toggle"
+        aria-hidden={closedAttr(!open())}
+        inert={closedAttr(!open())}
       >
         <YoButton
           buttonStyle="normal"

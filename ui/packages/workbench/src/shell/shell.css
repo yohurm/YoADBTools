@@ -30,28 +30,13 @@
   overflow: hidden;
 }
 
+/* 壳只排这条边。列宽跟 YoRail 的 data-rail，不在布局 class 上写宽。 */
 .yohu-layout__rail {
   flex-grow: 0;
   flex-shrink: 0;
   box-sizing: border-box;
-  min-width: 0;
-  overflow: hidden;
   background: transparent;
   border-right: var(--yohu-stroke-hairline) solid var(--yohu-border);
-}
-
-/* 两态都写死，禁止回退到同一条基础宽——展开会变成同宽→同宽，插不回去。
- * 宽跟轨自己的 data-rail（宽度拍），不是页栅上的用户意图。 */
-.yohu-layout__rail[data-rail="expanded"] {
-  flex-basis: var(--yohu-layout-shell-nav);
-  width: var(--yohu-layout-shell-nav);
-  max-width: var(--yohu-layout-shell-nav);
-}
-
-.yohu-layout__rail[data-rail="icons"] {
-  flex-basis: var(--yohu-layout-shell-nav-icons);
-  width: var(--yohu-layout-shell-nav-icons);
-  max-width: var(--yohu-layout-shell-nav-icons);
 }
 
 /* 内层跟轨宽。文案 nowrap + 关流 0fr，不锁展开宽硬裁。 */
@@ -77,12 +62,6 @@
   box-sizing: border-box;
 }
 
-.yohu-layout__content > * {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-}
-
 /* ===== 设备栏（卡片式，§3） ===== */
 
 .yohu-device-rail {
@@ -96,19 +75,9 @@
   overflow: hidden;
 }
 
-/* 无设备：栏与折叠都 hug，不把 42% 帽当成目标高度。有列表才走 fill。 */
+/* 无设备：栏 hug，不把 42% 帽当成目标高度。折叠根的 grow/hug 由 YoCollapse flex 自己写。 */
 .yohu-device-rail[data-empty] {
   flex: 0 0 auto;
-}
-
-.yohu-device-rail[data-empty] .yohu-collapse {
-  flex: 0 0 auto;
-}
-
-/* 折叠根是壳的孩子：排自己的 flex。内层填满走 YoCollapse recipe=fill，禁止再点 __inner。 */
-.yohu-device-rail .yohu-collapse {
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 .yohu-device-rail__header {
@@ -117,10 +86,6 @@
   gap: var(--yohu-space-xs);
   /* 关流槽仍在 flex 树（0fr，禁止 display:none）；gap 不随 0 宽项塌缩。 */
   transition: gap var(--yohu-motion-spatial-rail);
-}
-
-.yohu-device-rail__heading {
-  min-width: 0;
 }
 
 .yohu-device-rail[data-stream="open"] .yohu-device-rail__heading {
@@ -132,10 +97,11 @@
   gap: 0;
 }
 
-/* fill 只有一个直接子级：列表吃剩余高度，空态卡片 hug，避免两者各 flex:1。 */
+/* 名单盒自己吃折叠 fill 的剩余高。列表再吃盒内剩余；空态卡片不写 flex。 */
 .yohu-device-rail__body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }

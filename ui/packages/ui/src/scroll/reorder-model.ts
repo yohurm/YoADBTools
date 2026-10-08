@@ -3,6 +3,7 @@
  * 定高走 itemHeight；变高走行盒（内容坐标）。禁止常驻手柄。
  */
 
+import { clampSpan } from "../placement/clamp";
 import { Spacing } from "../tokens/spacing";
 
 /** 按下后位移达到此距离才进入拖动，避免误把点选当成换位。 */
@@ -13,6 +14,27 @@ export interface ReorderSession {
   /** 插入缝 0..count；home 为 from 或 from+1。 */
   insert: number;
   key: string | number;
+}
+
+/** 行槽内容。placeholder = 源行空占位，不挂文本；item = 邻行与浮层。 */
+export type ReorderSlot = "item" | "placeholder";
+
+/** 源行是占位。文本不留在槽里，只由浮层画。 */
+export function resolveReorderSlot(isSource: boolean): ReorderSlot {
+  return isSource ? "placeholder" : "item";
+}
+
+/** 源行空占位。属性、定高列表和变高列表都认这一把。 */
+export function reorderSlotIsPlaceholder(isSource: boolean): boolean {
+  return resolveReorderSlot(isSource) === "placeholder";
+}
+
+/** 会话键与行键同一把才是源行。两边都缺也相等。 */
+export function reorderKeyIsSource(
+  sessionKey: string | number | null | undefined,
+  rowKey: string | number | null | undefined,
+): boolean {
+  return sessionKey === rowKey;
 }
 
 /**
@@ -82,7 +104,7 @@ export function reorderBarOffset(insert: number, itemHeight: number): number {
 /** 浮层相对视口顶（与 viewTop 对齐的非滚平面）：跟着指针，扣住按下时的抓取偏移。 */
 export function overlayOffset(pointerY: number, listTop: number, grabOffset: number, itemHeight: number, viewportHeight: number): number {
   const raw = pointerY - listTop - grabOffset;
-  return Math.max(0, Math.min(Math.max(0, viewportHeight - itemHeight), raw));
+  return clampSpan(raw, itemHeight, viewportHeight);
 }
 
 export function rowTopInViewport(

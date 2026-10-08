@@ -1,5 +1,7 @@
 //! `adb shell readlink -f` 输出解析。
 
+use super::remote_stderr::{self, RemoteStderr};
+
 /// `readlink -f` 的结构化结果。运输错误（超时/取消/掉线）不在此枚举。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReadlinkF {
@@ -35,8 +37,7 @@ fn parse_canonical(stdout: &str) -> Option<String> {
 }
 
 fn stderr_missing(stderr: &str) -> bool {
-    let text = stderr.to_ascii_lowercase();
-    text.contains("no such file") || text.contains("does not exist")
+    remote_stderr::classify(stderr) == Some(RemoteStderr::NotFound)
 }
 
 #[cfg(test)]

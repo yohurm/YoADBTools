@@ -46,31 +46,20 @@ impl FileMutator {
             cancel.clone(),
         )
         .await?;
-        let out = self
-            .adb
-            .run(
-                serial,
-                &[
-                    "shell".into(),
-                    "rm".into(),
-                    "-rf".into(),
-                    shell_quote(normalized.as_str()),
-                ],
-                Some(DELETE_TIMEOUT_MS),
-                cancel,
-            )
-            .await
-            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
-        if out.exit_code != 0 {
-            return Err(file_error_from_adb(
-                normalized.as_str(),
-                yohu_adb::AdbError::BadExit {
-                    exit_code: out.exit_code,
-                    stderr: out.stderr,
-                },
-            ));
-        }
-        Ok(())
+        finish_shell(
+            &self.adb,
+            serial,
+            &[
+                "shell".into(),
+                "rm".into(),
+                "-rf".into(),
+                shell_quote(normalized.as_str()),
+            ],
+            DELETE_TIMEOUT_MS,
+            normalized.as_str(),
+            cancel,
+        )
+        .await
     }
 
     /// 新建目录（`mkdir -p`）。
@@ -90,31 +79,20 @@ impl FileMutator {
             cancel.clone(),
         )
         .await?;
-        let out = self
-            .adb
-            .run(
-                serial,
-                &[
-                    "shell".into(),
-                    "mkdir".into(),
-                    "-p".into(),
-                    shell_quote(normalized.as_str()),
-                ],
-                Some(MUTATE_TIMEOUT_MS),
-                cancel,
-            )
-            .await
-            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
-        if out.exit_code != 0 {
-            return Err(file_error_from_adb(
-                normalized.as_str(),
-                yohu_adb::AdbError::BadExit {
-                    exit_code: out.exit_code,
-                    stderr: out.stderr,
-                },
-            ));
-        }
-        Ok(())
+        finish_shell(
+            &self.adb,
+            serial,
+            &[
+                "shell".into(),
+                "mkdir".into(),
+                "-p".into(),
+                shell_quote(normalized.as_str()),
+            ],
+            MUTATE_TIMEOUT_MS,
+            normalized.as_str(),
+            cancel,
+        )
+        .await
     }
 
     /// 新建空文件（`touch`；已存在则只更新时间）。
@@ -134,29 +112,43 @@ impl FileMutator {
             cancel.clone(),
         )
         .await?;
-        let out = self
-            .adb
-            .run(
-                serial,
-                &[
-                    "shell".into(),
-                    "touch".into(),
-                    shell_quote(normalized.as_str()),
-                ],
-                Some(MUTATE_TIMEOUT_MS),
-                cancel,
-            )
-            .await
-            .map_err(|e| file_error_from_adb(normalized.as_str(), e))?;
-        if out.exit_code != 0 {
-            return Err(file_error_from_adb(
-                normalized.as_str(),
-                yohu_adb::AdbError::BadExit {
-                    exit_code: out.exit_code,
-                    stderr: out.stderr,
-                },
-            ));
-        }
-        Ok(())
+        finish_shell(
+            &self.adb,
+            serial,
+            &[
+                "shell".into(),
+                "touch".into(),
+                shell_quote(normalized.as_str()),
+            ],
+            MUTATE_TIMEOUT_MS,
+            normalized.as_str(),
+            cancel,
+        )
+        .await
     }
+}
+
+/// 短 shell 的运输失败与非零退出都收成 `FileError`。传输流的退出码不走这里。
+async fn finish_shell(
+    adb: &AdbClient,
+    serial: &str,
+    argv: &[String],
+    timeout_ms: u64,
+    path: &str,
+    cancel: CancellationToken,
+) -> Result<(), FileError> {
+    let out = adb
+        .run(serial, argv, Some(timeout_ms), cancel)
+        .await
+        .map_err(|e| file_error_from_adb(path, e))?;
+    if out.exit_code != 0 {
+        return Err(file_error_from_adb(
+            path,
+            yohu_adb::AdbError::BadExit {
+                exit_code: out.exit_code,
+                stderr: out.stderr,
+            },
+        ));
+    }
+    Ok(())
 }

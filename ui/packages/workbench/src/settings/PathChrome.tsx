@@ -6,6 +6,8 @@ import type { JSX } from "solid-js";
 
 import { YoButton, YoTextField } from "@yohu/ui";
 
+import { settingsStore } from "../stores";
+
 export function PathChrome(props: {
   label: string;
   path: string;
@@ -17,8 +19,8 @@ export function PathChrome(props: {
     <>
       <YoTextField width="control" readOnly value={props.path} ariaLabel={props.label} />
       <YoButton
-        buttonStyle="normal"
-        tone="neutral"
+        buttonStyle={settingsStore.normalStyle()}
+        tone={settingsStore.neutralTone()}
         disabled={props.disabled}
         onClick={() => props.onAction()}
       >

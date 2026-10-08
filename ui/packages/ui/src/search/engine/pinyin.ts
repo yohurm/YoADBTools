@@ -40,17 +40,25 @@ function dict(): PinyinDict {
   return cached;
 }
 
+function isAsciiLetter(ch: string): boolean {
+  return ch.length === 1 && ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z"));
+}
+
+function isPinyinSeparator(ch: string): boolean {
+  return ch === "'";
+}
+
 export function isPinyinQuery(token: string): boolean {
   let letter = false;
   for (const ch of token) {
-    if ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z")) letter = true;
-    else if (ch !== "'") return false;
+    if (isAsciiLetter(ch)) letter = true;
+    else if (!isPinyinSeparator(ch)) return false;
   }
   return letter;
 }
 
 function needleChars(token: string): string[] {
-  return [...token].filter((ch) => ch !== "'");
+  return [...token].filter((ch) => !isPinyinSeparator(ch));
 }
 
 function prefixLen(syl: string, needle: readonly string[], ni: number): number {
@@ -89,10 +97,6 @@ function consume(
     return null;
   }
   return consume(hay, hi + 1, needle, ni, table);
-}
-
-function isAsciiLetter(ch: string): boolean {
-  return ch.length === 1 && ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z"));
 }
 
 function findFrom(

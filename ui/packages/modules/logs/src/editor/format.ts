@@ -15,13 +15,14 @@ import {
   LOG_COLOR_SCHEME_DEFAULT,
   LOG_DISPLAY_COLUMN_CATALOG,
   LOG_MESSAGE_COLUMN,
-  parseLevelLetter,
-  type LevelLetter,
+  levelKey,
   type LogColorScheme,
   type LogDisplayColumns,
   type LogLine,
   type TerminalTimeFormat,
 } from "@yohu/api";
+
+import { tokenToneIsPlain, type TokenTone } from "./token-tone";
 
 export const DEFAULT_CH_PX = 8;
 
@@ -48,7 +49,6 @@ export const UID_FORMAT_WIDTH = UID_BODY_CHARS + 1;
 
 export type LogMetaColKey = keyof LogDisplayColumns;
 export type LogColKey = LogMetaColKey | "msg";
-export type LogFieldKind = LogColKey;
 export type ProcessThreadStyle = "off" | "pid" | "tid" | "both";
 export type AppNameMap = Readonly<Record<number, string>>;
 
@@ -82,17 +82,41 @@ export function processThreadStyle(display: LogDisplayColumns): ProcessThreadSty
   return "off";
 }
 
+/** PID 与 TID 一起显示。列宽、表头拆分和正文拼接都认这一把。 */
+export function processThreadIsBoth(style: ProcessThreadStyle): boolean {
+  return style === "both";
+}
+
+/** 只显示 PID。 */
+export function processThreadIsPid(style: ProcessThreadStyle): boolean {
+  return style === "pid";
+}
+
+/** 只显示 TID。列键也认这一把。 */
+export function processThreadIsTid(style: ProcessThreadStyle): boolean {
+  return style === "tid";
+}
+
+/** 进程列在文档里的键。BOTH 与只开 PID 都是 pid；只开 TID 才是 tid。表头拆分认这一把。 */
+function processColumnKey(style: ProcessThreadStyle): "pid" | "tid" {
+  return processThreadIsTid(style) ? "tid" : "pid";
+}
+
+/** 进程列关掉。 */
+export function processThreadIsOff(style: ProcessThreadStyle): boolean {
+  return style === "off";
+}
+
 export function processThreadWidth(style: ProcessThreadStyle): number {
-  if (style === "both") {
+  if (processThreadIsBoth(style)) {
     return PROCESS_BOTH_WIDTH;
   }
-  if (style === "pid" || style === "tid") {
+  if (processThreadIsPid(style) || processThreadIsTid(style)) {
     return PROCESS_PID_WIDTH;
   }
   return 0;
 }
 
-export type TokenTone = "plain" | "ink" | "wash";
 export type TokenBox = "glyph" | "line";
 export type TokenStyle = {
   "--yohu-log-ink"?: string;
@@ -109,7 +133,7 @@ export type ContentBar = "level" | "none";
 export type FormatRange = {
   start: number;
   end: number;
-  kind: LogFieldKind;
+  kind: LogColKey;
   tone?: TokenTone;
   box?: TokenBox;
   style?: TokenStyle;
@@ -125,7 +149,21 @@ export type FormatOptions = {
   appNames?: AppNameMap;
   /** 列宽覆盖（ch）。缺省走官方 Format.width()；拖宽只加不减官方下限。 */
   colChars?: Partial<Record<LogMetaColKey, number>>;
+  /** 对照 AS `TagFormat.hideDuplicates`（STANDARD 默认 false） */
+  hideDuplicateTag?: boolean;
+  /** 对照 AS `AppNameFormat.hideDuplicates`（STANDARD 默认 false） */
+  hideDuplicateApp?: boolean;
 };
+
+/** 对照 AS `MessageFormatter` 批内 `previousTag` / `previousPid`。 */
+export type FormatBatchState = {
+  previousTag?: string;
+  previousPid?: number;
+};
+
+export function batchCursor(line: { tag: string; pid: number }): FormatBatchState {
+  return { previousTag: line.tag, previousPid: line.pid };
+}
 
 export type FormattedMessage = {
   text: string;
@@ -144,7 +182,7 @@ type ColorEngine = {
   id: LogColorScheme;
   bar: ContentBar;
   barInk(line: { level: string }): string | undefined;
-  token(kind: LogFieldKind, line: { level: string; tag: string }): TokenPaint;
+  token(kind: LogColKey, line: { level: string; tag: string }): TokenPaint;
 };
 
 function ink(token: string): TokenPaint {
@@ -163,35 +201,66 @@ function unstyled(): TokenPaint {
   return { tone: "plain", box: "glyph" };
 }
 
-type LevelSwatch = Lowercase<LevelLetter>;
+/** 消息列。配色、表头宽度和标题栏都认这一把。 */
+export function logFieldIsMessage(kind: LogColKey): kind is "msg" {
+  return kind === "msg";
+}
 
-function levelSwatch(level: string): LevelSwatch | null {
-  const letter = parseLevelLetter(level);
-  return letter ? (letter.toLowerCase() as LevelSwatch) : null;
+/** 级别列。配色和表头可拖性都认这一把。 */
+export function logFieldIsLevel(kind: LogColKey): kind is "level" {
+  return kind === "level";
+}
+
+/** 时间与 uid。两套配色都认这一组。 */
+function logFieldIsClock(kind: LogColKey): boolean {
+  return kind === "ts" || kind === "uid";
+}
+
+/** 进程、线程与应用名。两套配色都认这一组。 */
+function logFieldIsProcess(kind: LogColKey): boolean {
+  return kind === "pid" || kind === "tid" || kind === "app";
+}
+
+/** 没有级别色时：消息用正文色，其余列不涂。两套配色都认这一把。 */
+function plainMessageInk(kind: LogColKey): TokenPaint {
+  return logFieldIsMessage(kind) ? ink("var(--yohu-fg)") : unstyled();
+}
+
+function levelInk(
+  kind: LogColKey,
+  key: ReturnType<typeof levelKey>,
+  paint: (key: NonNullable<ReturnType<typeof levelKey>>) => TokenPaint,
+): TokenPaint {
+  if (!key) {
+    return plainMessageInk(kind);
+  }
+  return paint(key);
+}
+
+export function yohuLevelVar(key: NonNullable<ReturnType<typeof levelKey>>): string {
+  return `var(--yohu-level-${key})`;
 }
 
 const yohuEngine: ColorEngine = {
   id: "yohu",
   bar: "level",
   barInk(line) {
-    const key = levelSwatch(line.level);
-    return key ? `var(--yohu-level-${key})` : undefined;
+    const key = levelKey(line.level);
+    return key ? yohuLevelVar(key) : undefined;
   },
   token(kind, line) {
-    if (kind === "ts" || kind === "uid") {
+    if (logFieldIsClock(kind)) {
       return ink("var(--yohu-fg-3)");
     }
-    if (kind === "pid" || kind === "tid" || kind === "app") {
+    if (logFieldIsProcess(kind)) {
       return ink("var(--yohu-fg-2)");
     }
-    const key = levelSwatch(line.level);
-    if (!key) {
-      return kind === "msg" ? ink("var(--yohu-fg)") : unstyled();
-    }
-    if (kind === "level") {
-      return wash("var(--yohu-fg-on)", `var(--yohu-level-${key})`);
-    }
-    return ink(`var(--yohu-level-${key})`);
+    return levelInk(kind, levelKey(line.level), (key) => {
+      if (logFieldIsLevel(kind)) {
+        return wash("var(--yohu-fg-on)", yohuLevelVar(key));
+      }
+      return ink(yohuLevelVar(key));
+    });
   },
 };
 
@@ -209,6 +278,25 @@ export function tagSwatchIndex(tag: string): number {
   return Math.abs(javaStringHash(tag)) % LOGCAT_TAG_SWATCHES;
 }
 
+/** 设备 FATAL 字母。清单显示成 A，配色仍按 F。 */
+function levelIsDeviceFatal(level: string): boolean {
+  return level === "F";
+}
+
+/** 官方 ASSERT：设备 F，或清单里已经写成 A。配色都按 F。 */
+function levelIsAssert(level: string): boolean {
+  return levelIsDeviceFatal(level) || level === "A";
+}
+
+function logcatLevelSwatch(level: string) {
+  const paint = levelIsAssert(level) ? "F" : level;
+  return levelKey(paint);
+}
+
+function logcatLevelVar(key: NonNullable<ReturnType<typeof levelKey>>, suffix = ""): string {
+  return `var(--yohu-logcat-level-${key}${suffix})`;
+}
+
 const logcatEngine: ColorEngine = {
   id: "logcat",
   bar: "none",
@@ -216,23 +304,21 @@ const logcatEngine: ColorEngine = {
     return undefined;
   },
   token(kind, line) {
-    if (kind === "ts" || kind === "uid" || kind === "pid" || kind === "tid" || kind === "app") {
+    if (logFieldIsClock(kind) || logFieldIsProcess(kind)) {
       return unstyled();
     }
     if (kind === "tag") {
       return ink(`var(--yohu-logcat-tag-${tagSwatchIndex(line.tag)})`);
     }
-    const key = levelSwatch(line.level);
-    if (!key) {
-      return kind === "msg" ? ink("var(--yohu-fg)") : unstyled();
-    }
-    if (kind === "level") {
-      return wash(`var(--yohu-logcat-level-${key})`, `var(--yohu-logcat-level-${key}-bg)`);
-    }
-    if (kind === "msg") {
-      return ink(`var(--yohu-logcat-msg-${key})`);
-    }
-    return unstyled();
+    return levelInk(kind, logcatLevelSwatch(line.level), (key) => {
+      if (logFieldIsLevel(kind)) {
+        return wash(logcatLevelVar(key), logcatLevelVar(key, "-bg"));
+      }
+      if (logFieldIsMessage(kind)) {
+        return ink(`var(--yohu-logcat-msg-${key})`);
+      }
+      return unstyled();
+    });
   },
 };
 
@@ -255,21 +341,31 @@ export function defaultFormatOptions(display: LogDisplayColumns, scheme?: string
   };
 }
 
+function flagOn(value: boolean | undefined): boolean {
+  return value ?? false;
+}
+
+function bit(value: boolean): number {
+  return Number(value);
+}
+
 export function formatOptionsKey(options: FormatOptions): string {
   const d = options.display;
   return [
     options.timeFormat,
     options.scheme ?? "",
     options.softWrap ? "1" : "0",
-    Number(d.ts),
-    Number(d.uid),
-    Number(d.pid),
-    Number(d.tid),
-    Number(d.tag),
-    Number(d.app),
-    Number(d.level),
+    bit(d.ts),
+    bit(d.uid),
+    bit(d.pid),
+    bit(d.tid),
+    bit(d.tag),
+    bit(d.app),
+    bit(d.level),
     options.tagWidthPx,
     JSON.stringify(options.colChars ?? {}),
+    bit(flagOn(options.hideDuplicateTag)),
+    bit(flagOn(options.hideDuplicateApp)),
   ].join("|");
 }
 
@@ -316,6 +412,18 @@ export function colCharsOf(options: FormatOptions, key: LogMetaColKey, fallback:
   return Math.max(minColChars(key, options), override);
 }
 
+function processColChars(options: FormatOptions, key: "pid" | "tid"): number {
+  return colCharsOf(options, key, PROCESS_PID_WIDTH);
+}
+
+function metaColChars(options: FormatOptions, key: "ts" | "uid" | "app"): number {
+  const fallback =
+    key === "ts" ? timestampWidth(options.timeFormat)
+    : key === "uid" ? UID_FORMAT_WIDTH
+    : APP_FORMAT_WIDTH;
+  return colCharsOf(options, key, fallback);
+}
+
 function padField(text: string, width: number): string {
   return text.length >= width ? text : text.padEnd(width);
 }
@@ -334,47 +442,50 @@ export type LogHeaderColumn = {
   resizable: boolean;
 };
 
+function resizableHeader(key: "pid" | "tid", width: number): LogHeaderColumn {
+  return { key, label: logFieldLabel(key), width, resizable: true };
+}
+
 /** 标题栏列：与文档 Format 同尺；PID+TID 开时拆成两段，对应内容 `pid-tid`。 */
 export function headerColumns(options: FormatOptions): LogHeaderColumn[] {
   const process = processThreadStyle(options.display);
   const cols: LogHeaderColumn[] = [];
   for (const col of formatColumns(options)) {
-    if (col.key === "pid" && process === "both") {
-      const pidWidth = colCharsOf(options, "pid", PROCESS_PID_WIDTH);
-      const tidWidth = colCharsOf(options, "tid", PROCESS_PID_WIDTH);
-      cols.push({
-        key: "pid",
-        label: logFieldLabel("pid"),
-        width: pidWidth,
-        resizable: true,
-      });
-      cols.push({
-        key: "tid",
-        label: logFieldLabel("tid"),
-        width: tidWidth,
-        resizable: true,
-      });
+    if (processThreadIsBoth(process) && col.key === processColumnKey(process)) {
+      const pidWidth = processColChars(options, "pid");
+      const tidWidth = processColChars(options, "tid");
+      cols.push(resizableHeader("pid", pidWidth));
+      cols.push(resizableHeader("tid", tidWidth));
       continue;
     }
     cols.push({
       key: col.key,
       label: logFieldLabel(col.key),
       width: col.width,
-      resizable: col.key !== "msg" && col.key !== "level",
+      resizable: !logFieldIsMessage(col.key) && !logFieldIsLevel(col.key),
     });
   }
   return cols;
 }
 
+/** 非正探针回落默认尺。测量失败和列像素都认这一把。 */
+export function logChUnit(chPx: number): number {
+  return chPx > 0 ? chPx : DEFAULT_CH_PX;
+}
+
+/** 列宽 ch → px，至少 1。轨道和拖条都认这一把。 */
+export function logColPx(chars: number, chPx: number): number {
+  return Math.max(1, Math.round(chars * logChUnit(chPx)));
+}
+
 /** 表头轨道。px 跟 measureChPx 同一把尺；wrap 时消息吃剩余；clip 时跟文档自然宽横滑。 */
 export function logDocTrackTemplate(options: FormatOptions, chPx = DEFAULT_CH_PX): string {
-  const unit = chPx > 0 ? chPx : DEFAULT_CH_PX;
   return headerColumns(options)
     .map((col) => {
       if (col.width == null) {
         return options.softWrap ? "minmax(0, 1fr)" : "max-content";
       }
-      return `${Math.max(1, Math.round(col.width * unit))}px`;
+      return `${logColPx(col.width, chPx)}px`;
     })
     .join(" ");
 }
@@ -384,27 +495,24 @@ export function formatColumns(options: FormatOptions): FormatColumn[] {
   const display = options.display;
   const cols: FormatColumn[] = [];
   if (display.ts) {
-    cols.push({ key: "ts", width: colCharsOf(options, "ts", timestampWidth(options.timeFormat)) });
+    cols.push({ key: "ts", width: metaColChars(options, "ts") });
   }
   if (display.uid) {
-    cols.push({ key: "uid", width: colCharsOf(options, "uid", UID_FORMAT_WIDTH) });
+    cols.push({ key: "uid", width: metaColChars(options, "uid") });
   }
   const process = processThreadStyle(display);
-  if (process !== "off") {
-    const width =
-      process === "both"
-        ? colCharsOf(options, "pid", PROCESS_PID_WIDTH) + colCharsOf(options, "tid", PROCESS_PID_WIDTH)
-        : colCharsOf(options, process === "tid" ? "tid" : "pid", PROCESS_PID_WIDTH);
-    cols.push({
-      key: process === "tid" ? "tid" : "pid",
-      width,
-    });
+  if (!processThreadIsOff(process)) {
+    const key = processColumnKey(process);
+    const width = processThreadIsBoth(process)
+      ? processColChars(options, "pid") + processColChars(options, "tid")
+      : processColChars(options, key);
+    cols.push({ key, width });
   }
   if (display.tag) {
     cols.push({ key: "tag", width: tagFormatWidth(options) });
   }
   if (display.app) {
-    cols.push({ key: "app", width: colCharsOf(options, "app", APP_FORMAT_WIDTH) });
+    cols.push({ key: "app", width: metaColChars(options, "app") });
   }
   if (display.level) {
     cols.push({ key: "level", width: LEVEL_FORMAT_WIDTH });
@@ -417,7 +525,7 @@ export function formatColumns(options: FormatOptions): FormatColumn[] {
 export function headerWidth(options: FormatOptions): number {
   let n = 0;
   for (const col of formatColumns(options)) {
-    if (col.key === "msg") {
+    if (logFieldIsMessage(col.key)) {
       continue;
     }
     n += col.width ?? 0;
@@ -430,9 +538,12 @@ function padStartNum(value: number, width: number): string {
   return text.length >= width ? text : text.padStart(width);
 }
 
+function blankField(width: number): string {
+  return padField("", width);
+}
+
 function padEndNum(value: number, width: number): string {
-  const text = String(value);
-  return text.length >= width ? text : text.padEnd(width);
+  return padField(String(value), width);
 }
 
 /** IntelliJ StringUtil.shortenTextWithEllipsis(text, maxLength, suffixLength, "...") */
@@ -444,12 +555,16 @@ export function shortenTextWithEllipsis(text: string, maxLength: number, suffixL
   return `${text.slice(0, prefix)}${TAG_ELLIPSIS}${text.slice(text.length - suffixLength)}`;
 }
 
+function ellipsisSpan(text: string, maxLength: number, suffixLength: number): string {
+  return `${shortenTextWithEllipsis(text, maxLength, suffixLength)} `;
+}
+
 export function formatTimestamp(ts: string, timeFormat: TerminalTimeFormat): string {
   return `${formatLogTs(ts, timeFormat)} `;
 }
 
 export function formatUid(uid: string | undefined): string {
-  return `${uid ?? ""}`.padEnd(UID_BODY_CHARS) + " ";
+  return padField(`${uid ?? ""}`, UID_BODY_CHARS) + " ";
 }
 
 export function formatProcessThread(
@@ -458,27 +573,47 @@ export function formatProcessThread(
   pidChars = PROCESS_PID_WIDTH,
   tidChars = PROCESS_PID_WIDTH,
 ): string {
-  if (style === "both") {
+  if (processThreadIsBoth(style)) {
     return `${padField(`${padStartNum(line.pid, 5)}-`, pidChars)}${padField(`${padEndNum(line.tid, 5)} `, tidChars)}`;
   }
-  if (style === "pid") {
+  if (processThreadIsPid(style)) {
     return padField(`${padEndNum(line.pid, 5)} `, pidChars);
   }
-  if (style === "tid") {
+  if (processThreadIsTid(style)) {
     return padField(`${padEndNum(line.tid, 5)} `, tidChars);
   }
   return "";
 }
 
-export function formatTag(tag: string, maxLength: number): string {
-  const width = Math.max(TAG_MIN_LENGTH, maxLength) + 1;
+/** AS `LevelFormat`：设备 FATAL（`F`）在清单里显示为 ASSERT 字母 `A`。 */
+export function logcatLevelLetter(level: string): string {
+  if (levelIsDeviceFatal(level)) {
+    return "A";
+  }
+  return level;
+}
+
+function spanWidth(min: number, maxLength: number): number {
+  return Math.max(min, maxLength) + 1;
+}
+
+export function formatTag(
+  tag: string,
+  maxLength: number,
+  previousTag?: string,
+  hideDuplicates = false,
+): string {
+  const width = spanWidth(TAG_MIN_LENGTH, maxLength);
+  if (hideDuplicates && tag === previousTag) {
+    return blankField(width);
+  }
   if (!tag) {
-    return " ".padEnd(width);
+    return padField("<no-tag>", width);
   }
   if (tag.length > maxLength) {
-    return `${shortenTextWithEllipsis(tag, maxLength, Math.floor((maxLength - TAG_ELLIPSIS.length) / 2))} `;
+    return ellipsisSpan(tag, maxLength, Math.floor((maxLength - TAG_ELLIPSIS.length) / 2));
   }
-  return tag.padEnd(width);
+  return padField(tag, width);
 }
 
 export function appNameOf(line: LogLine, names?: AppNameMap): string {
@@ -495,12 +630,21 @@ export function appNameOf(line: LogLine, names?: AppNameMap): string {
   return `pid-${line.pid}`;
 }
 
-export function formatAppName(name: string, maxLength = APP_DEFAULT_MAX): string {
-  const width = Math.max(APP_MIN_LENGTH, maxLength) + 1;
-  if (name.length > maxLength) {
-    return `${shortenTextWithEllipsis(name, maxLength, maxLength - APP_PREFIX_KEEP)} `;
+export function formatAppName(
+  name: string,
+  maxLength = APP_DEFAULT_MAX,
+  pid?: number,
+  previousPid?: number,
+  hideDuplicates = false,
+): string {
+  const width = spanWidth(APP_MIN_LENGTH, maxLength);
+  if (hideDuplicates && pid != null && pid === previousPid) {
+    return blankField(width);
   }
-  return name.padEnd(width);
+  if (name.length > maxLength) {
+    return ellipsisSpan(name, maxLength, maxLength - APP_PREFIX_KEEP);
+  }
+  return padField(name, width);
 }
 
 type Accumulator = {
@@ -508,7 +652,7 @@ type Accumulator = {
   ranges: FormatRange[];
 };
 
-function accumulate(buf: Accumulator, text: string, kind: LogFieldKind, paint?: TokenPaint): void {
+function accumulate(buf: Accumulator, text: string, kind: LogColKey, paint?: TokenPaint): void {
   if (!text) {
     return;
   }
@@ -516,7 +660,7 @@ function accumulate(buf: Accumulator, text: string, kind: LogFieldKind, paint?: 
   buf.text += text;
   const end = buf.text.length;
   const range: FormatRange = { start, end, kind };
-  if (paint && paint.tone !== "plain") {
+  if (paint && !tokenToneIsPlain(paint.tone)) {
     range.tone = paint.tone;
     range.box = paint.box;
     range.style = paint.style;
@@ -524,71 +668,11 @@ function accumulate(buf: Accumulator, text: string, kind: LogFieldKind, paint?: 
   buf.ranges.push(range);
 }
 
-function paintOf(engine: ColorEngine, kind: LogFieldKind, line: LogLine): TokenPaint {
+function paintOf(engine: ColorEngine, kind: LogColKey, line: LogLine): TokenPaint {
   return engine.token(kind, line);
 }
 
-export function formatMessage(line: LogLine, options: FormatOptions): FormattedMessage {
-  const engine = contentColor(options.scheme);
-  if (line.level === "?") {
-    const buf: Accumulator = { text: "", ranges: [] };
-    accumulate(buf, line.msg, "msg", paintOf(engine, "msg", line));
-    return {
-      text: buf.text,
-      ranges: buf.ranges,
-      headerChars: 0,
-      bar: engine.bar,
-      barInk: engine.barInk(line),
-    };
-  }
-  const buf: Accumulator = { text: "", ranges: [] };
-  const display = options.display;
-  if (display.ts) {
-    accumulate(
-      buf,
-      padField(formatTimestamp(line.ts, options.timeFormat), colCharsOf(options, "ts", timestampWidth(options.timeFormat))),
-      "ts",
-      paintOf(engine, "ts", line),
-    );
-  }
-  if (display.uid) {
-    accumulate(
-      buf,
-      padField(formatUid(line.uid), colCharsOf(options, "uid", UID_FORMAT_WIDTH)),
-      "uid",
-      paintOf(engine, "uid", line),
-    );
-  }
-  const process = processThreadStyle(display);
-  if (process !== "off") {
-    const kind: LogFieldKind = process === "tid" ? "tid" : "pid";
-    const pidChars = colCharsOf(options, "pid", PROCESS_PID_WIDTH);
-    const tidChars = colCharsOf(options, "tid", PROCESS_PID_WIDTH);
-    accumulate(
-      buf,
-      formatProcessThread(line, process, pidChars, tidChars),
-      kind,
-      paintOf(engine, kind, line),
-    );
-  }
-  if (display.tag) {
-    accumulate(buf, formatTag(line.tag, tagFormatWidth(options) - 1), "tag", paintOf(engine, "tag", line));
-  }
-  if (display.app) {
-    accumulate(
-      buf,
-      formatAppName(appNameOf(line, options.appNames), colCharsOf(options, "app", APP_FORMAT_WIDTH) - 1),
-      "app",
-      paintOf(engine, "app", line),
-    );
-  }
-  if (display.level) {
-    accumulate(buf, ` ${line.level} `, "level", paintOf(engine, "level", line));
-    accumulate(buf, " ", "level");
-  }
-  const headerChars = buf.text.length;
-  const newline = options.softWrap ? "\n" : `\n${" ".repeat(headerChars)}`;
-  accumulate(buf, line.msg.replaceAll("\n", newline), "msg", paintOf(engine, "msg", line));
+function packMessage(buf: Accumulator, headerChars: number, engine: ColorEngine, line: LogLine): FormattedMessage {
   return {
     text: buf.text,
     ranges: buf.ranges,
@@ -598,8 +682,109 @@ export function formatMessage(line: LogLine, options: FormatOptions): FormattedM
   };
 }
 
-export function formatParts(formatted: FormattedMessage): { kind: LogFieldKind; text: string }[] {
-  const parts: { kind: LogFieldKind; text: string }[] = [];
+export function formatMessage(
+  line: LogLine,
+  options: FormatOptions,
+  batch: FormatBatchState = {},
+): FormattedMessage {
+  const engine = contentColor(options.scheme);
+  if (line.level === "?") {
+    const buf: Accumulator = { text: "", ranges: [] };
+    accumulate(buf, line.msg, "msg", paintOf(engine, "msg", line));
+    return packMessage(buf, 0, engine, line);
+  }
+  const buf: Accumulator = { text: "", ranges: [] };
+  for (const col of formatColumns(options)) {
+    if (logFieldIsMessage(col.key)) {
+      const headerChars = buf.text.length;
+      const newline = options.softWrap ? "\n" : `\n${" ".repeat(headerChars)}`;
+      accumulate(buf, line.msg.replaceAll("\n", newline), col.key, paintOf(engine, col.key, line));
+      return packMessage(buf, headerChars, engine, line);
+    }
+    if (col.key === "ts") {
+      accumulate(
+        buf,
+        padField(formatTimestamp(line.ts, options.timeFormat), metaColChars(options, "ts")),
+        col.key,
+        paintOf(engine, col.key, line),
+      );
+      continue;
+    }
+    if (col.key === "uid") {
+      accumulate(
+        buf,
+        padField(formatUid(line.uid), metaColChars(options, "uid")),
+        col.key,
+        paintOf(engine, col.key, line),
+      );
+      continue;
+    }
+    if (col.key === "pid" || col.key === "tid") {
+      const process = processThreadStyle(options.display);
+      const pidChars = processColChars(options, "pid");
+      const tidChars = processColChars(options, "tid");
+      accumulate(
+        buf,
+        formatProcessThread(line, process, pidChars, tidChars),
+        col.key,
+        paintOf(engine, col.key, line),
+      );
+      continue;
+    }
+    if (col.key === "tag") {
+      accumulate(
+        buf,
+        formatTag(
+          line.tag,
+          tagFormatWidth(options) - 1,
+          batch.previousTag,
+          flagOn(options.hideDuplicateTag),
+        ),
+        col.key,
+        paintOf(engine, col.key, line),
+      );
+      continue;
+    }
+    if (col.key === "app") {
+      accumulate(
+        buf,
+        formatAppName(
+          appNameOf(line, options.appNames),
+          metaColChars(options, "app") - 1,
+          line.pid,
+          batch.previousPid,
+          flagOn(options.hideDuplicateApp),
+        ),
+        col.key,
+        paintOf(engine, col.key, line),
+      );
+      continue;
+    }
+    if (logFieldIsLevel(col.key)) {
+      const letter = logcatLevelLetter(line.level);
+      accumulate(buf, ` ${letter} `, col.key, paintOf(engine, col.key, line));
+      accumulate(buf, " ", col.key);
+    }
+  }
+  return packMessage(buf, buf.text.length, engine, line);
+}
+
+export function formatMessages(
+  lines: readonly LogLine[],
+  options: FormatOptions,
+  seed: FormatBatchState = {},
+): { messages: FormattedMessage[]; state: FormatBatchState } {
+  let state = seed;
+  const messages: FormattedMessage[] = [];
+  for (const line of lines) {
+    messages.push(formatMessage(line, options, state));
+    state = batchCursor(line);
+  }
+  return { messages, state };
+}
+
+export function formatParts(formatted: FormattedMessage): { kind: LogColKey; text: string }[] {
+  const parts: { kind: LogColKey; text: string }[] = [];
   for (const range of formatted.ranges) {
     const text = formatted.text.slice(range.start, range.end);
     const last = parts.at(-1);

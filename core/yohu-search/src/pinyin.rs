@@ -50,12 +50,20 @@ fn dict() -> &'static PinyinDict {
     DICT.get_or_init(|| parse_dict(include_str!("../data/pinyin.tsv")))
 }
 
+fn is_pinyin_letter(ch: char) -> bool {
+    ch.is_ascii_alphabetic()
+}
+
+fn is_pinyin_separator(ch: char) -> bool {
+    ch == '\''
+}
+
 pub fn is_pinyin_query(token: &str) -> bool {
     let mut letter = false;
     for ch in token.chars() {
-        if ch.is_ascii_alphabetic() {
+        if is_pinyin_letter(ch) {
             letter = true;
-        } else if ch != '\'' {
+        } else if !is_pinyin_separator(ch) {
             return false;
         }
     }
@@ -63,7 +71,7 @@ pub fn is_pinyin_query(token: &str) -> bool {
 }
 
 fn needle_chars(token: &str) -> Vec<char> {
-    token.chars().filter(|&ch| ch != '\'').collect()
+    token.chars().filter(|&ch| !is_pinyin_separator(ch)).collect()
 }
 
 fn prefix_len(syl: &str, needle: &[char], ni: usize) -> usize {
@@ -86,7 +94,7 @@ fn consume(hay: &[char], hi: usize, needle: &[char], ni: usize, dict: &PinyinDic
         return None;
     }
     let ch = hay[hi];
-    if ch.is_ascii_alphabetic() {
+    if is_pinyin_letter(ch) {
         return if ch == needle[ni] {
             consume(hay, hi + 1, needle, ni + 1, dict)
         } else {
@@ -115,7 +123,7 @@ fn find_from(hay: &[char], needle: &[char], from: usize, dict: &PinyinDict) -> O
     let mut start = from;
     while start < hay.len() {
         let ch = hay[start];
-        if !ch.is_ascii_alphabetic() && !dict.by_char.contains_key(&ch) {
+        if !is_pinyin_letter(ch) && !dict.by_char.contains_key(&ch) {
             start += 1;
             continue;
         }

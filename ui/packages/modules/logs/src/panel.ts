@@ -6,16 +6,24 @@
  * 清空把 fromSeq 推过已见与镜像末 seq，旧行不能再投影回来。
  */
 
-import type { LogLine } from "@yohu/api";
+import { matchesWireFilter, type LogLine } from "@yohu/api";
 
-import { matchesLine, type SessionFilter } from "./filter";
+import { sessionWire, type SessionFilter } from "./filter";
 import { collapseStack, type ViewRow } from "./stack";
 
 export const EMPTY_VIEW_ROWS: ViewRow[] = [];
 
-/** 订阅起点之前的游标；fromSeq 为负表示从未开始。 */
+/** 从未开始采集。会话写入这个游标；面板用 `captureStarted` 识别它。 */
+export const SESSION_NEVER_STARTED = -1;
+
+/** 游标已经离开「从未开始」。导出、续采、入镜共用。 */
+export function captureStarted(fromSeq: number): boolean {
+  return fromSeq > SESSION_NEVER_STARTED;
+}
+
+/** 订阅起点之前的游标。从未开始时停在哨兵上。 */
 export function seqBefore(fromSeq: number): number {
-  return fromSeq < 0 ? -1 : fromSeq - 1;
+  return captureStarted(fromSeq) ? fromSeq - 1 : SESSION_NEVER_STARTED;
 }
 
 export function lastSeqOf(rows: readonly ViewRow[], fromSeq: number): number {
@@ -32,6 +40,11 @@ export function canFreezeFollow(visible: readonly ViewRow[]): boolean {
   return visible.length > 0;
 }
 
+/** 空面板没有已画行，跟滚必须抬起。入镜和会话标志都认这一把。 */
+export function panelFollows(following: boolean, visible: readonly ViewRow[]): boolean {
+  return following || !canFreezeFollow(visible);
+}
+
 /** 入镜 / 回放共用：seq 在窗口起点之后、且晚于已画末行。 */
 export function isFreshLine(seq: number, after: number, fromSeq: number): boolean {
   return seq > after && seq >= fromSeq;
@@ -43,7 +56,7 @@ export function viewCeiling(following: boolean, frozenThroughSeq: number | null)
 
 /** 镜像里是否还有本窗口游标范围内的行。空镜像不得当权威源去冲面板。 */
 export function mirrorCoversRange(size: number, lastSeq: number, fromSeq: number): boolean {
-  return fromSeq >= 0 && size > 0 && lastSeq >= fromSeq;
+  return captureStarted(fromSeq) && size > 0 && lastSeq >= fromSeq;
 }
 
 /** 清空可见区：游标推到已见与镜像之后，旧 seq 全部失效。 */
@@ -52,7 +65,7 @@ export function nextDiscardFromSeq(
   lastVisibleSeq: number | undefined,
   mirrorLast: number,
 ): number {
-  if (fromSeq < 0) return fromSeq;
+  if (!captureStarted(fromSeq)) return fromSeq;
   const visible = lastVisibleSeq ?? seqBefore(fromSeq);
   return Math.max(fromSeq, visible + 1, mirrorLast + 1);
 }
@@ -68,7 +81,8 @@ export function signalCountOf(rows: readonly ViewRow[]): number {
 }
 
 export function keepMatching(rows: readonly ViewRow[], filter: SessionFilter): LogLine[] {
-  return rows.filter((row) => matchesLine(row.line, filter)).map((row) => row.line);
+  const wire = sessionWire(filter);
+  return rows.filter((row) => matchesWireFilter(row.line, wire)).map((row) => row.line);
 }
 
 /**
@@ -91,14 +105,19 @@ export function splitHitsForFreeze(
 
 const EMPTY_FOR_PANEL: LogLine[] = [];
 
+function noLines(lines: readonly LogLine[]): boolean {
+  return lines.length === 0;
+}
+
 export function selectHits(
   lines: readonly LogLine[],
   fromSeq: number,
   ceiling: number | null,
   filter: SessionFilter,
 ): { forPanel: LogLine[]; pending: number } {
-  if (fromSeq < 0) return { forPanel: EMPTY_FOR_PANEL, pending: 0 };
-  const hits = lines.filter((line) => line.seq >= fromSeq && matchesLine(line, filter));
+  if (!captureStarted(fromSeq)) return { forPanel: EMPTY_FOR_PANEL, pending: 0 };
+  const wire = sessionWire(filter);
+  const hits = lines.filter((line) => line.seq >= fromSeq && matchesWireFilter(line, wire));
   return splitHitsForFreeze(hits, ceiling);
 }
 
@@ -107,7 +126,7 @@ export function appendLines(
   lines: readonly LogLine[],
   cap: number,
 ): ViewRow[] {
-  if (lines.length === 0) return trimRows(current, cap);
+  if (noLines(lines)) return trimRows(current, cap);
   return trimRows([...current, ...collapseStack(lines)], cap);
 }
 
@@ -115,7 +134,7 @@ export function panelFromLines(
   lines: readonly LogLine[],
   cap: number,
 ): { visible: ViewRow[]; signalCount: number } {
-  if (lines.length === 0) return { visible: EMPTY_VIEW_ROWS, signalCount: 0 };
+  if (noLines(lines)) return { visible: EMPTY_VIEW_ROWS, signalCount: 0 };
   const visible = trimRows(collapseStack(lines), cap);
   return { visible, signalCount: signalCountOf(visible) };
 }
@@ -165,11 +184,12 @@ export function applyAppend(opts: {
   cap: number;
   pendingCount: number;
 }): ViewApply | null {
-  if (opts.paused || opts.fromSeq < 0) return null;
-  const following = opts.following || !canFreezeFollow(opts.visible);
+  if (opts.paused || !captureStarted(opts.fromSeq)) return null;
+  const following = panelFollows(opts.following, opts.visible);
   const after = lastSeqOf(opts.visible, opts.fromSeq);
+  const wire = sessionWire(opts.filter);
   const fresh = opts.lines.filter(
-    (line) => isFreshLine(line.seq, after, opts.fromSeq) && matchesLine(line, opts.filter),
+    (line) => isFreshLine(line.seq, after, opts.fromSeq) && matchesWireFilter(line, wire),
   );
   if (fresh.length === 0) {
     if (!following) return null;

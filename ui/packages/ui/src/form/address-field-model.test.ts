@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +8,8 @@ import {
   addressDismissOutside,
   addressOpenCaret,
   addressScrollPin,
+  addressScrollPinIsEnd,
+  addressScrollPinIsStart,
   isAddressVacantClick,
 } from "./address-field-model";
 
@@ -65,6 +70,21 @@ describe("address-field-model", () => {
     expect(addressScrollPin({ start: 12, end: 12 }, 12)).toBe("end");
     expect(addressScrollPin({ start: 3, end: 3 }, 12)).toBe("keep");
     expect(addressScrollPin({ start: 2, end: 5 }, 12)).toBe("keep");
+    expect(addressScrollPinIsStart("start")).toBe(true);
+    expect(addressScrollPinIsStart("end")).toBe(false);
+    expect(addressScrollPinIsStart("keep")).toBe(false);
+    expect(addressScrollPinIsEnd("end")).toBe(true);
+    expect(addressScrollPinIsEnd("keep")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["address-field-model.ts", "AddressField.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "address-field-model.ts") {
+        body = body.replace('return pin === "start"', "").replace('return pin === "end"', "");
+      }
+      expect(body, name).not.toContain('pin === "start"');
+      expect(body, name).not.toContain('pin === "end"');
+      expect(body, name).not.toContain('pin === "keep"');
+    }
   });
 
   it("取消只看输入铬，槽剩余不是路径栏", () => {

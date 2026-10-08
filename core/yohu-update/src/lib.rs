@@ -1,6 +1,8 @@
 //! yohu-update — 应用更新检查 / 下载 / 覆盖安装。
 //!
 //! 固定 GitHub Releases（`yohurm/Windows-YoADBTools`）。
+//! 检查默认静态 manifest / Atom（ADR-v6-035），REST 最后兜底。
+//! 说明纯文本经 `yohu-textparsing`（ADR-v6-036）：Atom HTML / REST Markdown。
 //! 检查与下载同一条编排：各自 `load_github_source`，失败上抛；
 //! Authorization 只打 GitHub 主机；UA 只在 `user_agent` 拼一次。
 //! Windows：家园缓存 NSIS 后 `/S /UPDATE /NS` 覆盖；macOS：打开 DMG。
@@ -12,13 +14,12 @@ mod cache;
 mod check;
 mod contract;
 mod credentials;
-mod download;
 mod error;
+mod fetch;
 mod github;
 mod platform;
 mod release;
 mod url_policy;
-mod verify;
 
 pub use apply::{installed_exe_path, spawn_overlay_install};
 pub use artifact::InstallerKind;
@@ -60,7 +61,7 @@ pub async fn download_configured(
     cancel: CancellationToken,
     on_progress: impl FnMut(UpdateProgress),
 ) -> Result<UpdateDownloadResult, UpdateError> {
-    download_configured_from(load_github_source(config_dir), request, cancel, on_progress).await
+    fetch::download_installer(config_dir, request, cancel, on_progress).await
 }
 
 /// 用已解析的 GitHub 坐标下载安装包。
@@ -77,24 +78,9 @@ async fn download_configured_from(
     source: Result<GitHubReleaseSource, UpdateError>,
     request: UpdateDownloadRequest,
     cancel: CancellationToken,
-    mut on_progress: impl FnMut(UpdateProgress),
+    on_progress: impl FnMut(UpdateProgress),
 ) -> Result<UpdateDownloadResult, UpdateError> {
-    let source = source?;
-    let version = request.version.clone();
-    let url = assert_http_url(&request.url)?;
-    crate::download::stream_installer(
-        url,
-        &request.sha256,
-        request.size_bytes,
-        &source.token,
-        &user_agent(env!("CARGO_PKG_VERSION")),
-        cancel,
-        move |mut progress| {
-            progress.version = version.clone();
-            on_progress(progress);
-        },
-    )
-    .await
+    fetch::download_installer_from(source, request, cancel, on_progress).await
 }
 
 #[cfg(test)]

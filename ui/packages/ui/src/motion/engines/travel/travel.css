@@ -20,15 +20,8 @@
   height: 0;
   min-height: 0;
   flex: 0 0 auto;
-  overflow: visible;
-}
-
-/*
- * 落定后：出流 abspos 不得撑祖先 scrollHeight（CSS Overflow / CSSOM View）。
- * 行程中 Travel 已 clip，保持 visible，避免 height:0 + clip 把内容闪没。
- */
-.yohu-travel:not([data-travel]) .yohu-reveal[data-layout="out"] {
-  overflow: clip;
+  /* 出流默认可见。落定行程发布 clip，避免 abspos 撑 scrollHeight。 */
+  overflow: var(--yohu-reveal-out-overflow, visible);
 }
 
 .yohu-reveal[data-layout="in"] {
@@ -43,9 +36,18 @@
 .yohu-travel {
   display: flex;
   flex-direction: column;
+  width: var(--yohu-travel-inline, auto);
+  height: var(--yohu-travel-block, auto);
+  flex: var(--yohu-travel-flex, 0 1 auto);
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
+  /* 落定 clip 出流。行程中改回 visible，避免 height:0 + clip 把内容闪没。 */
+  --yohu-reveal-out-overflow: clip;
+}
+
+.yohu-travel[data-travel] {
+  --yohu-reveal-out-overflow: visible;
 }
 
 /*

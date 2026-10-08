@@ -2,7 +2,6 @@
 //! 过滤走 domain `log_filter_matches`；环本身不过滤。
 
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use yohu_domain::{format_log_line, log_filter_matches};
@@ -57,7 +56,7 @@ fn resolve_dest(
         _ => {
             let dir = default_dir
                 .filter(|d| !d.as_os_str().is_empty())
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "未指定导出目录"))?;
+                .ok_or(LogError::ExportDir)?;
             fs::create_dir_all(dir)?;
             let safe: String = serial
                 .chars()
@@ -138,6 +137,27 @@ mod tests {
         assert!(text.contains("also"));
         assert!(!text.contains("drop"));
         let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[test]
+    fn missing_export_dir_is_not_an_io_error() {
+        let scratch = std::env::temp_dir().join(format!(
+            "yohu-export-nodir-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let (tx, _rx) = mpsc::channel::<AppEvent>(8);
+        let adb = Arc::new(AdbClient::new(
+            ToolResolver::new(None, scratch.join("res"), scratch.join("data")),
+            1,
+        ));
+        let svc = CaptureService::new(adb, tx, 100, CancellationToken::new());
+        let err = svc
+            .export("S1", 0, &LogFilter::default(), None, None)
+            .unwrap_err();
+        assert!(matches!(err, LogError::ExportDir));
+        assert_eq!(err.to_string(), "未指定导出目录");
+        assert!(!err.to_string().contains("导出失败"));
     }
 
     #[test]

@@ -5,6 +5,9 @@
  */
 
 import { windowShow, YoLog } from "@yohu/api";
+import { documentIsHidden } from "@yohu/ui";
+
+import { settingsStore, windowStore } from "./stores";
 
 let revealOnce: Promise<void> | null = null;
 
@@ -19,7 +22,7 @@ function nextFrame(): Promise<void> {
  * 隐藏文档没有合成帧，`requestAnimationFrame` 可能永不回调；此时直接返回。
  */
 export async function waitForNextPaint(): Promise<void> {
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+  if (documentIsHidden()) {
     return;
   }
   await nextFrame();
@@ -45,6 +48,21 @@ export async function dismissBootOverlay(): Promise<void> {
   el.remove();
 }
 
+/** 揭窗前并行读应用级事实。设备重扫不在这里。 */
+export async function loadShellFacts(parts: {
+  settings: () => Promise<unknown>;
+  devices: () => Promise<unknown>;
+  tasks: () => Promise<unknown>;
+  hydrates: readonly (() => Promise<void>)[];
+}): Promise<void> {
+  await Promise.all([
+    parts.settings(),
+    parts.devices(),
+    parts.tasks(),
+    ...parts.hydrates.map((hydrate) => hydrate()),
+  ]);
+}
+
 export async function runBootPipeline(opts: {
   load: () => Promise<void>;
   refresh: () => void;
@@ -52,11 +70,11 @@ export async function runBootPipeline(opts: {
   await opts.load();
   await waitForNextPaint();
   await dismissBootOverlay();
-  YoLog.info("shell", "工作台已就绪，揭主窗口");
+  YoLog.info(windowStore.shellChannel(), "工作台已就绪，揭主窗口");
   try {
     await revealMainWindow();
   } catch (e) {
-    YoLog.error("shell", `揭窗失败 ${String(e)}`);
+    YoLog.error(windowStore.shellChannel(), `揭窗失败 ${settingsStore.errorDetail(e)}`);
     throw e;
   }
   opts.refresh();

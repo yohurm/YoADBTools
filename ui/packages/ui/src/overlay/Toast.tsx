@@ -7,6 +7,7 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { presenceIsOn } from "../dom/flag";
 import { DismissMark } from "../display/dismiss-mark";
 import { progressFillWidth, progressHostAttrs } from "../display/progress-policy";
 import { Icon, isIconName } from "../icons";
@@ -64,11 +65,19 @@ export function createToaster(): ToasterHost {
     setToasts(next.items);
   };
 
+  function dropTimer(id: number): void {
+    timers.delete(id);
+  }
+
+  function dismissItem(id: number): void {
+    commit(beginDismissToast(queue, id));
+  }
+
   const clearTimer = (id: number): void => {
     const timer = timers.get(id);
     if (timer !== undefined) {
       clearTimeout(timer);
-      timers.delete(id);
+      dropTimer(id);
     }
   };
 
@@ -77,8 +86,8 @@ export function createToaster(): ToasterHost {
     const item = toastById(queue, id);
     if (!item || !item.open || item.sticky) return;
     const timer = setTimeout(() => {
-      timers.delete(id);
-      commit(beginDismissToast(queue, id));
+      dropTimer(id);
+      dismissItem(id);
     }, toastHoldMs());
     timers.set(id, timer);
   };
@@ -101,7 +110,7 @@ export function createToaster(): ToasterHost {
 
   const dismiss = (id: number): void => {
     clearTimer(id);
-    commit(beginDismissToast(queue, id));
+    dismissItem(id);
   };
 
   const forget = (id: number): void => {
@@ -172,21 +181,21 @@ export function YoToast(props: YoToastProps): JSX.Element {
       data-sticky={host()["data-sticky"]}
       role={host().role}
     >
-      <YoCorner mode="paint" role="control" class="yohu-toast__chrome" />
-      <Show when={props.toast.leading}>
+      <YoCorner mode="paint" role="card" stroke class="yohu-toast__chrome" />
+      <Show when={presenceIsOn(host()["data-leading"])}>
         <span class="yohu-toast__leading" aria-hidden="true">
           <ToastLeading name={props.toast.leading} />
         </span>
       </Show>
       <div class="yohu-toast__body">
         <div class="yohu-toast__title">{props.toast.text}</div>
-        <Show when={props.toast.detail}>
+        <Show when={presenceIsOn(host()["data-detail"])}>
           <div class="yohu-toast__detail">{props.toast.detail}</div>
         </Show>
-        <Show when={props.toast.progress}>
+        <Show when={presenceIsOn(host()["data-progress"])}>
           <ToastProgress toast={props.toast} />
         </Show>
-        <Show when={props.toast.meta}>
+        <Show when={presenceIsOn(host()["data-meta"])}>
           <div class="yohu-toast__meta">{props.toast.meta}</div>
         </Show>
       </div>

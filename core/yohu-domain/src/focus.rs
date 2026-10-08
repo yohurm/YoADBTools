@@ -4,7 +4,9 @@
 //! 执行目标由 [`SelectionMode::resolve_targets`] 解析（禁止默认广播全部在线设备），
 //! 命令边界再用 [`assert_device_online`] 校验——与路径 [`crate::SafetyRoot`] 同级，不信任 UI。
 
-use yohu_protocol::{DeviceInfo, DeviceState};
+use yohu_protocol::DeviceInfo;
+
+use crate::catalog::{device_is_online, device_is_unauthorized};
 
 /// 模块对设备的选择模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +58,14 @@ impl SelectionMode {
     }
 }
 
+/// 未在线用户句。载荷是 serial。会话边界、执行端口和运输层共用。
+pub fn device_not_online_text(serial: &str) -> String {
+    format!("设备未在线: {serial}")
+}
+
+/// 空面板标题。文件、日志和投屏舞台共用。命令边界「未选择在线设备」不是这一句。
+pub const DEVICE_UNSELECTED: &str = "未选择设备";
+
 /// 命令边界：目标设备必须出现在最近一次扫描且状态为在线。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DeviceSessionError {
@@ -65,7 +75,7 @@ pub enum DeviceSessionError {
     Unknown(String),
     #[error("设备未授权: {0}")]
     Unauthorized(String),
-    #[error("设备未在线: {0}")]
+    #[error("{}", device_not_online_text(.0))]
     Offline(String),
 }
 
@@ -75,8 +85,8 @@ pub fn assert_device_online(
     devices: &[DeviceInfo],
 ) -> Result<(), DeviceSessionError> {
     match devices.iter().find(|d| d.serial == serial) {
-        Some(d) if d.state == DeviceState::Online => Ok(()),
-        Some(d) if d.state == DeviceState::Unauthorized => {
+        Some(d) if device_is_online(d.state) => Ok(()),
+        Some(d) if device_is_unauthorized(d.state) => {
             Err(DeviceSessionError::Unauthorized(serial.to_string()))
         }
         Some(_) => Err(DeviceSessionError::Offline(serial.to_string())),
@@ -109,6 +119,22 @@ pub fn reconcile_focus(focus: Option<&str>, online: &[String]) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yohu_protocol::DeviceState;
+
+    #[test]
+    fn not_online_text_is_the_display() {
+        assert_eq!(device_not_online_text("S1"), "设备未在线: S1");
+        assert_eq!(
+            DeviceSessionError::Offline("S1".into()).to_string(),
+            device_not_online_text("S1")
+        );
+    }
+
+    #[test]
+    fn unselected_title_is_not_the_empty_session() {
+        assert_eq!(DEVICE_UNSELECTED, "未选择设备");
+        assert_ne!(DEVICE_UNSELECTED, DeviceSessionError::Empty.to_string());
+    }
 
     #[test]
     fn reconcile_focus_keeps_online_focus() {

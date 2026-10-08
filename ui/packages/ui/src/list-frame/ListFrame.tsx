@@ -18,7 +18,7 @@ export interface YoListFrameProps {
 }
 
 export function YoListFrame(props: YoListFrameProps): JSX.Element {
-  const attrs = () => listFrameHostAttrs(props.variant ?? "hot");
+  const attrs = () => listFrameHostAttrs(props.variant);
   const box = (): ListFrameBox | null => props.box();
   return (
     <Show when={box() != null}>

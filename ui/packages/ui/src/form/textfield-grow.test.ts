@@ -26,4 +26,10 @@ describe("textfield-grow", () => {
     expect(onIntent).toHaveBeenCalledTimes(3);
     dispose();
   });
+
+  it("成对登记与摘掉只写一处", () => {
+    expect(src.split("field.add" + "EventListener").length - 1).toBe(1);
+    expect(src.split("field.remove" + "EventListener").length - 1).toBe(1);
+    expect(src).toContain("listen(");
+  });
 });

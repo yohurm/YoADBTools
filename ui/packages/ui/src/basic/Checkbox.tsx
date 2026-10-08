@@ -6,8 +6,10 @@
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
+import { Icon, type IconName } from "../icons";
 import { Radius } from "../tokens/radius";
-import { canCommitCheckboxChange, checkboxHostAttrs } from "./checkbox-policy";
+import { flagIsOn } from "../dom/flag";
+import { canCommitCheckboxChange, checkboxHostAttrs, type CheckboxTone } from "./checkbox-policy";
 import "./Checkbox.css";
 
 export interface YoCheckboxProps {
@@ -17,16 +19,30 @@ export interface YoCheckboxProps {
   onChange?: (checked: boolean) => void;
   /** 标签文本 */
   label?: string;
+  /** 盒与标签之间的种类图标 */
+  icon?: IconName;
+  /** body=条目；section=分组标题，墨水对齐列表型 SubHeader */
+  tone?: CheckboxTone;
   /** 禁用 */
   disabled?: boolean;
+  /** 铺满所在行。缺省 hug，调用方不得再点 .yohu-checkbox 写 flex。 */
+  block?: boolean;
 }
 
-/** 渲染复选框。内容区 = 勾选符 + 标签，圆角盒内裁剪。 */
+/** 渲染复选框。圆角盒内裁勾；可选种类图标在盒与标签之间。 */
 export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
   const host = createMemo(() => checkboxHostAttrs(props));
 
+  function checkboxPaint(): ReturnType<typeof checkboxHostAttrs>["data-paint"] {
+    return host()["data-paint"];
+  }
+
+  function checkboxDisabled(): boolean {
+    return host().disabled;
+  }
+
   const handleChange = (event: Event): void => {
-    if (!canCommitCheckboxChange(host().disabled)) return;
+    if (!canCommitCheckboxChange(checkboxDisabled())) return;
     const target = event.currentTarget as HTMLInputElement;
     props.onChange?.(target.checked);
   };
@@ -35,19 +51,21 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
     <label
       class="yohu-checkbox"
       data-checked={host()["data-checked"]}
-      data-paint={host()["data-paint"]}
+      data-paint={checkboxPaint()}
       data-disabled={host()["data-disabled"]}
+      data-block={host()["data-block"]}
+      data-tone={host()["data-tone"]}
     >
-      <span class="yohu-checkbox__box yohu-focus-host" data-paint={host()["data-paint"]}>
+      <span class="yohu-checkbox__box yohu-focus-host" data-paint={checkboxPaint()}>
         <YoCorner role="control" radius={Radius.Xs} class="yohu-checkbox__chrome" align="center" justify="center">
           <input
             type="checkbox"
             class="yohu-checkbox__input"
-            checked={host()["data-checked"] === "true"}
-            disabled={host().disabled}
+            checked={flagIsOn(host()["data-checked"])}
+            disabled={checkboxDisabled()}
             onChange={handleChange}
           />
-          {/* 勾选符常挂：成形/收回走 dashoffset 过渡（spatialTick），可逆可打断，不用 Show 直切。 */}
+          {/* 勾选符常挂。路径从短臂起笔（4,12 → 9,17 → 20,6），dashoffset 1→0 沿笔顺画勾。 */}
           <svg
             class="yohu-checkbox__check"
             viewBox="0 0 24 24"
@@ -58,10 +76,17 @@ export function YoCheckbox(props: YoCheckboxProps): JSX.Element {
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <polyline points="20 6 9 17 4 12" pathLength={1} />
+            <polyline points="4 12 9 17 20 6" pathLength={1} />
           </svg>
         </YoCorner>
       </span>
+      <Show when={props.icon}>
+        {(name) => (
+          <span class="yohu-checkbox__mark">
+            <Icon name={name()} />
+          </span>
+        )}
+      </Show>
       <Show when={props.label}>
         <span class="yohu-checkbox__label">{props.label}</span>
       </Show>

@@ -1,0 +1,27 @@
+/* 正圆关闭。Chip / Toast 共用这一颗钮，宿主不点本 class。 */
+
+.yohu-recipe-dismiss {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--yohu-layout-icon-sm);
+  height: var(--yohu-layout-icon-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--yohu-radius-full);
+  background-color: var(--yohu-fg-2);
+  color: var(--yohu-surface);
+  cursor: pointer;
+}
+
+/* 钮自己带焦点环。环的默认圆角是 sm，正圆要压过它。 */
+.yohu-recipe-dismiss.yohu-focus-ring {
+  border-radius: var(--yohu-radius-full);
+}
+
+.yohu-recipe-dismiss:hover {
+  background-color: var(--yohu-fg);
+}

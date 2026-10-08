@@ -4,8 +4,9 @@ use yohu_protocol::RemoteUpdate;
 
 use crate::artifact::InstallerKind;
 use crate::error::UpdateError;
-use crate::platform::PlatformInfo;
-use crate::url_policy;
+use crate::github::urls::GitHubUrls;
+use crate::platform::{cpu_arch, CpuArch, PlatformInfo};
+use yohu_textparsing::{to_plain, TextFormat};
 
 const SCORE_BASE: i32 = 12;
 const SCORE_NSIS_SETUP: i32 = 6;
@@ -47,6 +48,24 @@ pub fn strip_tag_prefix(tag: &str) -> &str {
     tag.trim().trim_start_matches(['v', 'V']).trim()
 }
 
+/// 去掉前缀后的版本号。空串不是版本。
+pub fn release_version(tag: &str) -> Option<String> {
+    let version = strip_tag_prefix(tag);
+    if version.is_empty() {
+        None
+    } else {
+        Some(version.to_string())
+    }
+}
+
+pub(crate) fn ensure_published(draft: bool) -> Result<(), UpdateError> {
+    if draft {
+        Err(UpdateError::DraftRelease)
+    } else {
+        Ok(())
+    }
+}
+
 fn version_parts(value: &str) -> Vec<u64> {
     strip_tag_prefix(value)
         .split(|c: char| !c.is_ascii_digit())
@@ -62,7 +81,7 @@ pub fn pick_asset<'a>(
 ) -> Option<&'a ReleaseAsset> {
     assets
         .iter()
-        .filter(|a| url_policy::is_http_url(a.browser_download_url.trim()))
+        .filter(|a| yohu_download::is_http_url(a.browser_download_url.trim()))
         .filter_map(|a| {
             let score = asset_score(&a.name, platform)?;
             Some((score, a))
@@ -79,9 +98,9 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
         return None;
     }
     let n = name.to_ascii_lowercase();
-    let arch = platform.arch.to_ascii_lowercase();
-    let is_x64 = arch == "x86_64" || arch == "amd64";
-    let is_arm64 = arch == "aarch64" || arch == "arm64";
+    let cpu = cpu_arch(&platform.arch);
+    let is_x64 = cpu == Some(CpuArch::X64);
+    let is_arm64 = cpu == Some(CpuArch::Arm64);
 
     if is_x64
         && contains_any(&n, &["arm64", "aarch64", "armv7"])
@@ -139,6 +158,46 @@ fn sha256_from_digest(digest: &str) -> String {
     }
 }
 
+/// CI 约定安装包文件名（无 manifest / 无 REST assets 时的直链）。
+pub fn conventional_installer_name(platform: &PlatformInfo, version: &str) -> Option<String> {
+    let kind = InstallerKind::for_os(&platform.os)?;
+    match (kind, cpu_arch(&platform.arch)?) {
+        (InstallerKind::Nsis, CpuArch::X64) => {
+            Some(format!("YohuAdbTools_{version}_x64-setup.exe"))
+        }
+        (InstallerKind::Dmg, CpuArch::Arm64) => {
+            Some(format!("YohuAdbTools_{version}_aarch64.dmg"))
+        }
+        (InstallerKind::Dmg, CpuArch::X64) => Some(format!("YohuAdbTools_{version}_x64.dmg")),
+        (InstallerKind::Nsis, CpuArch::Arm64) => None,
+    }
+}
+
+/// Atom / Web Latest 得到 tag 后，用约定文件名组装 `RemoteUpdate`（无 size/sha256）。
+pub fn remote_from_tag_and_notes(
+    tag: &str,
+    notes: &str,
+    page_url: &str,
+    owner: &str,
+    repo: &str,
+    platform: &PlatformInfo,
+) -> Result<RemoteUpdate, UpdateError> {
+    let version = release_version(tag).ok_or(UpdateError::MissingTag)?;
+    let installer_name =
+        conventional_installer_name(platform, &version).ok_or(UpdateError::NoInstallerOrPage)?;
+    let installer_url = GitHubUrls::new(owner, repo).release_asset(tag, &installer_name);
+    Ok(RemoteUpdate {
+        has_new_version: is_newer(&version, &platform.version),
+        version,
+        description: to_plain(notes, TextFormat::Markdown),
+        installer_url: Some(installer_url),
+        installer_name,
+        page_url: page_url.trim().to_string(),
+        sha256: String::new(),
+        size_bytes: 0,
+    })
+}
+
 /// 把一份 Release 元数据编成 `RemoteUpdate`。
 pub fn remote_from_release(
     tag_name: &str,
@@ -147,25 +206,25 @@ pub fn remote_from_release(
     assets: &[ReleaseAsset],
     platform: &PlatformInfo,
 ) -> Result<RemoteUpdate, UpdateError> {
-    let version = strip_tag_prefix(tag_name).to_string();
-    if version.is_empty() {
-        return Err(UpdateError::MissingTag);
-    }
+    let version = release_version(tag_name).ok_or(UpdateError::MissingTag)?;
     let page_url = page_url.trim().to_string();
-    let (installer_url, size_bytes, sha256) = if let Some(asset) = pick_asset(assets, platform) {
-        (
-            Some(asset.browser_download_url.trim().to_string()),
-            asset.size,
-            sha256_from_digest(&asset.digest),
-        )
-    } else {
-        (None, 0, String::new())
-    };
+    let (installer_url, installer_name, size_bytes, sha256) =
+        if let Some(asset) = pick_asset(assets, platform) {
+            (
+                Some(asset.browser_download_url.trim().to_string()),
+                asset.name.trim().to_string(),
+                asset.size,
+                sha256_from_digest(&asset.digest),
+            )
+        } else {
+            (None, String::new(), 0, String::new())
+        };
     Ok(RemoteUpdate {
         has_new_version: is_newer(&version, &platform.version),
         version,
-        description: body.trim().to_string(),
+        description: to_plain(body, TextFormat::Markdown),
         installer_url,
+        installer_name,
         page_url,
         sha256,
         size_bytes,
@@ -273,6 +332,27 @@ mod tests {
         ];
         let picked = pick_asset(&assets, &mac_arm()).unwrap();
         assert!(picked.name.contains("aarch64.dmg"));
+    }
+
+    #[test]
+    fn amd64_alias_picks_windows_setup() {
+        let mut platform = win64();
+        platform.arch = "amd64".into();
+        let assets = vec![asset(
+            "YohuAdbTools_1.2.0_x64-setup.exe",
+            "https://example.com/a.exe",
+            1,
+        )];
+        assert!(pick_asset(&assets, &platform).is_some());
+    }
+
+    #[test]
+    fn release_version_rejects_empty_after_prefix() {
+        assert_eq!(release_version("v1.2.0").as_deref(), Some("1.2.0"));
+        assert_eq!(release_version("v"), None);
+        assert_eq!(release_version("  "), None);
+        assert!(ensure_published(true).is_err());
+        assert!(ensure_published(false).is_ok());
     }
 
     #[test]

@@ -8,20 +8,19 @@
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { CornerPillRadius, YoCorner } from "../corner";
+import { presenceIsOn } from "../dom/flag";
 import { Icon, isIconName, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
-import type { YoChipTone } from "./chip-model";
+import type { YoBadgeTone } from "./badge-model";
 import { chipHostAttrs } from "./chip-policy";
 import { DismissMark } from "./dismiss-mark";
 import "./Chip.css";
-
-export type { YoChipTone };
 
 export type YoChipLeading = IconName | JSX.Element;
 
 export interface YoChipProps {
   text: string;
-  tone?: YoChipTone;
+  tone?: YoBadgeTone;
   /** 流内前导槽（图标名或节点）。 */
   leading?: YoChipLeading;
   /** 铺满父格（对话框名单网格）。默认 hug。 */
@@ -64,13 +63,13 @@ export function YoChip(props: YoChipProps): JSX.Element {
         radius={CornerPillRadius}
         class="yohu-chip__chrome"
       />
-      <Show when={host()["data-leading"]}>
+      <Show when={presenceIsOn(host()["data-leading"])}>
         <span class="yohu-chip__leading">
           <ChipLeading value={props.leading} />
         </span>
       </Show>
       <span class="yohu-chip__label">{props.text}</span>
-      <Show when={host()["data-dismiss"]}>
+      <Show when={presenceIsOn(host()["data-dismiss"])}>
         <DismissMark label={`移除 ${props.text}`} onDismiss={props.onDismiss} />
       </Show>
     </div>

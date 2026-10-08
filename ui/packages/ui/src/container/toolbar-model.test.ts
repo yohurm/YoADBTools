@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +8,8 @@ import {
   DEFAULT_TOOLBAR_OVERFLOW,
   DEFAULT_TOOLBAR_PAD,
   resolveToolbarSpec,
+  toolbarChromeIsPlain,
+  toolbarPadIsXs,
 } from "./toolbar-model";
 
 describe("toolbar-model", () => {
@@ -32,5 +37,21 @@ describe("toolbar-model", () => {
     expect(resolveToolbarSpec().overflow).toBe("hidden");
     expect(resolveToolbarSpec({ pad: "xs" }).chrome).toBe("plain");
     expect(resolveToolbarSpec({ pad: "xs" }).overflow).toBe(DEFAULT_TOOLBAR_OVERFLOW);
+  });
+
+  it("贴栏和素底只各比一次", () => {
+    expect(toolbarPadIsXs("xs")).toBe(true);
+    expect(toolbarPadIsXs("band")).toBe(false);
+    expect(toolbarChromeIsPlain("plain")).toBe(true);
+    expect(toolbarChromeIsPlain("band")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["toolbar-model.ts", "toolbar-policy.ts", "Toolbar.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "toolbar-model.ts") {
+        body = body.replace('return pad === "xs"', "").replace('return chrome === "plain"', "");
+      }
+      expect(body, name).not.toContain('=== "xs"');
+      expect(body, name).not.toContain('=== "plain"');
+    }
   });
 });

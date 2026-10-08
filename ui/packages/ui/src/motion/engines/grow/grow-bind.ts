@@ -23,19 +23,34 @@ export interface GrowController {
   dispose(): void;
 }
 
+function growNodeHeight(node: Element | null): number | undefined {
+  return node instanceof HTMLElement ? node.offsetHeight : undefined;
+}
+
 /** 内容用后高。不解宿主。优先量标记盒，避免铬铺满锁行后把 to 写成 from。 */
 export function measureGrowUsed(el: HTMLElement): number {
   const slot = el.firstElementChild;
   if (!(slot instanceof HTMLElement)) return 0;
-  const marked = slot.querySelector(`[${GROW_USED_ATTR}]`);
-  if (marked instanceof HTMLElement) return marked.offsetHeight;
-  const child = slot.firstElementChild;
-  return child instanceof HTMLElement ? child.offsetHeight : 0;
+  const marked = growNodeHeight(slot.querySelector(`[${GROW_USED_ATTR}]`));
+  if (marked !== undefined) return marked;
+  return growNodeHeight(slot.firstElementChild) ?? 0;
 }
 
 /** 锁盒当前高。插值中是途中值，不是行程起点。 */
 export function readGrowLock(el: HTMLElement): number {
   return el.offsetHeight;
+}
+
+function growCssPx(value: number): string {
+  return `${value}px`;
+}
+
+function growKept(primary: number, fallback: number): number {
+  return primary > 0 ? primary : fallback;
+}
+
+function growNextId(current: number): number {
+  return current + 1;
 }
 
 export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
@@ -53,7 +68,7 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
   };
 
   const writeHeight = (px: number): void => {
-    el.style.height = `${px}px`;
+    el.style.height = growCssPx(px);
   };
 
   const markUsed = (used: boolean): void => {
@@ -84,6 +99,11 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
     prev = used;
   };
 
+  function growSettle(used: number): void {
+    tripTo = 0;
+    lock(used);
+  }
+
   const clearSafety = (): void => {
     if (safety === 0) return;
     window.clearTimeout(safety);
@@ -93,9 +113,7 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
   const finish = (id: number): void => {
     if (id !== tripId) return;
     clearSafety();
-    const next = tripTo > 0 ? tripTo : prev;
-    tripTo = 0;
-    lock(next);
+    growSettle(growKept(tripTo, prev));
   };
 
   const snapshot = (): void => {
@@ -108,19 +126,17 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
       return;
     }
     if (shouldSkipMotion()) {
-      tripTo = 0;
-      lock(measureGrowUsed(el));
+      growSettle(measureGrowUsed(el));
       return;
     }
     const from = readGrowLock(el) || prev;
     const to = measureGrowUsed(el);
     const next = resolveGrow(from, to);
     if (!next) {
-      tripTo = 0;
-      lock(to > 0 ? to : from);
+      growSettle(growKept(to, from));
       return;
     }
-    tripId += 1;
+    tripId = growNextId(tripId);
     const id = tripId;
     tripTo = next.to;
     ready();
@@ -128,7 +144,7 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
     el.getAnimations().forEach((running) => running.cancel());
     const spec = host.spec?.() ?? GROW_SPEC;
     const easing = MotionEasing[MotionSpec[spec].easing];
-    anim = el.animate([{ height: `${next.from}px` }, { height: `${next.to}px` }], {
+    anim = el.animate([{ height: growCssPx(next.from) }, { height: growCssPx(next.to) }], {
       duration: motionSpecMs(spec),
       easing,
       fill: "forwards",
@@ -148,7 +164,7 @@ export function bindGrow(el: HTMLElement, host: GrowHost): GrowController {
     snapshot,
     command,
     dispose: () => {
-      tripId += 1;
+      tripId = growNextId(tripId);
       clearSafety();
       stopAnim();
     },

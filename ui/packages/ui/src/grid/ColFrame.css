@@ -19,16 +19,10 @@
   font-family: var(--yohu-font-mono);
   font-size: var(--yohu-font-caption);
   font-variant-numeric: tabular-nums;
+  --yohu-col-row-min: max-content;
 }
 
-.yohu-col-frame[data-tone="document"] .yohu-col-row {
-  min-width: max-content;
-}
-
-.yohu-col-frame > .yohu-col-row {
-  overflow: hidden;
-}
-
-.yohu-col-frame:has(.yohu-scroller[data-gutter="on"]) > .yohu-col-row {
-  padding-inline-end: var(--yohu-space-lg);
+.yohu-col-frame:has([data-gutter="on"]) {
+  --yohu-col-gutter-pad: var(--yohu-space-lg);
+  --yohu-col-head-gutter: var(--yohu-col-gutter-pad);
 }

@@ -7,19 +7,20 @@
 
 /* —— 配方：浮层 —— */
 
-.yohu-presence[data-recipe="dialog"][data-state="open"] .yohu-dialog__backdrop {
+/* 出场零件由表面自己标 data-enter。配方只认标记，不点对话框 / 菜单的 class。 */
+.yohu-presence[data-recipe="dialog"][data-state="open"] [data-enter="fade"] {
   animation: yohu-fade-in var(--yohu-motion-effects-enter) both;
 }
 
-.yohu-presence[data-recipe="dialog"][data-state="closed"] .yohu-dialog__backdrop {
+.yohu-presence[data-recipe="dialog"][data-state="closed"] [data-enter="fade"] {
   animation: yohu-fade-out var(--yohu-motion-effects-exit) both;
 }
 
-.yohu-presence[data-recipe="dialog"][data-state="open"] .yohu-dialog__panel {
+.yohu-presence[data-recipe="dialog"][data-state="open"] [data-enter="scale"] {
   animation: yohu-scale-in var(--yohu-motion-spatial-enter) both;
 }
 
-.yohu-presence[data-recipe="dialog"][data-state="closed"] .yohu-dialog__panel {
+.yohu-presence[data-recipe="dialog"][data-state="closed"] [data-enter="scale"] {
   animation: yohu-scale-out var(--yohu-motion-spatial-exit) both;
 }
 
@@ -48,7 +49,7 @@
   min-height: 0;
 }
 
-.yohu-presence[data-recipe="toast"] .yohu-presence__clip > * {
+.yohu-presence[data-recipe="toast"] .yohu-presence__face {
   min-height: min-content;
   opacity: 0;
   transform: translateY(100%) scale(0.94);
@@ -58,7 +59,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-presence[data-recipe="toast"][data-state="open"] .yohu-presence__clip > * {
+.yohu-presence[data-recipe="toast"][data-state="open"] .yohu-presence__face {
   opacity: 1;
   transform: translateY(0) scale(1);
   transition:
@@ -66,22 +67,37 @@
     transform var(--yohu-motion-spatial-rail);
 }
 
-.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-select__menu,
-.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-context-menu {
+.yohu-presence[data-recipe="popover"][data-state="open"] [data-enter="rise"] {
   animation: yohu-rise-in var(--yohu-motion-spatial-local) both;
 }
 
-.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-select__menu,
-.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-context-menu {
+.yohu-presence[data-recipe="popover"][data-state="closed"] [data-enter="rise"] {
   animation: yohu-rise-out var(--yohu-motion-effects-exit) both;
 }
 
-.yohu-presence[data-recipe="popover"][data-state="open"] .yohu-select__menu[data-placement="top"] {
+.yohu-presence[data-recipe="popover"][data-state="open"] [data-enter="rise"][data-placement="top"] {
   animation-name: yohu-drop-in;
 }
 
-.yohu-presence[data-recipe="popover"][data-state="closed"] .yohu-select__menu[data-placement="top"] {
+.yohu-presence[data-recipe="popover"][data-state="closed"] [data-enter="rise"][data-placement="top"] {
   animation-name: yohu-drop-out;
+}
+
+/* 提示条：落点之后才进场，避免藏着时把 tip-in 播完。 */
+.yohu-presence[data-recipe="popover"][data-state="open"] [data-placed] [data-enter="tip"] {
+  animation: yohu-tip-in var(--yohu-motion-effects-enter) both;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="closed"] [data-enter="tip"] {
+  animation: yohu-tip-out var(--yohu-motion-effects-exit) both;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="open"] [data-placed] [data-enter="tip"][data-placement="top"] {
+  animation-name: yohu-tip-drop-in;
+}
+
+.yohu-presence[data-recipe="popover"][data-state="closed"] [data-enter="tip"][data-placement="top"] {
+  animation-name: yohu-tip-drop-out;
 }
 
 .yohu-presence[data-recipe="fade"] {
@@ -90,12 +106,6 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-}
-
-.yohu-presence[data-recipe="fade"] > * {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
 }
 
 .yohu-presence[data-recipe="fade"][data-state="open"] {
@@ -147,7 +157,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-presence[data-recipe="list"] .yohu-presence__clip > * {
+.yohu-presence[data-recipe="list"] .yohu-presence__face {
   min-height: min-content;
 }
 
@@ -189,7 +199,7 @@
     transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-presence[data-recipe="chip"] .yohu-presence__clip > * {
+.yohu-presence[data-recipe="chip"] .yohu-presence__face {
   min-width: min-content;
 }
 

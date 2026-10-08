@@ -18,6 +18,10 @@ function asHost(ctl: ContextMenuController): ContextMenuHostController {
   return ctl as ContextMenuHostController;
 }
 
+function coordOrZero(value: number | undefined): number {
+  return value ?? 0;
+}
+
 export function YoContextMenuHost(props: YoContextMenuHostProps): JSX.Element {
   const ctl = (): ContextMenuHostController => asHost(props.controller ?? contextMenu);
   const session = () => ctl().session();
@@ -26,8 +30,8 @@ export function YoContextMenuHost(props: YoContextMenuHostProps): JSX.Element {
     <Portal mount={document.body}>
       <YoContextMenu
         open={session() !== null}
-        x={session()?.x ?? 0}
-        y={session()?.y ?? 0}
+        x={coordOrZero(session()?.x)}
+        y={coordOrZero(session()?.y)}
         items={[...(session()?.items ?? [])]}
         onClose={() => ctl().close()}
         onSelect={(id) => session()?.select(id)}

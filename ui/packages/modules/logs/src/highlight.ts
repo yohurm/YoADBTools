@@ -13,8 +13,13 @@ export type KeywordWindow = {
   kind: string;
 };
 
+/** 没有关键字。全文和窗口内都不标。 */
+export function keywordBlank(keyword: string): boolean {
+  return keyword.length === 0;
+}
+
 export function keywordRanges(text: string, keyword: string): KeywordRange[] {
-  if (!keyword) {
+  if (keywordBlank(keyword)) {
     return [];
   }
   const out: KeywordRange[] = [];
@@ -35,7 +40,7 @@ export function keywordRangesInWindows(
   keyword: string,
   kind = "msg",
 ): KeywordRange[] {
-  if (!keyword) {
+  if (keywordBlank(keyword)) {
     return [];
   }
   const out: KeywordRange[] = [];

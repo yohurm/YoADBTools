@@ -17,7 +17,8 @@ describe("YoIconButton", () => {
     expect(btn.getAttribute("data-size")).toBe("md");
     expect(btn.getAttribute("data-paint")).toBeNull();
     expect(btn.className).not.toContain("yohu-button");
-    expect(container.querySelector("svg")).toBeTruthy();
+    expect(container.querySelector("[data-icon]")?.getAttribute("width")).toBe("20");
+    expect(css).not.toMatch(/\.yohu-icon(?![-_])/);
     const slot = btn.querySelector(".yohu-corner__content");
     expect(slot?.getAttribute("data-direction")).toBe("row");
     expect(slot?.getAttribute("data-align")).toBe("center");
@@ -38,6 +39,9 @@ describe("YoIconButton", () => {
   it("size=sm 写入 data-size，不接受魔法 px", () => {
     render(() => <YoIconButton icon="settings" size="sm" title="设置" />);
     expect(screen.getByRole("button", { name: "设置" }).getAttribute("data-size")).toBe("sm");
+    expect(screen.getByRole("button", { name: "设置" }).querySelector("[data-icon]")?.getAttribute("width")).toBe(
+      "16",
+    );
   });
 
   it("点击触发 onClick", () => {
@@ -67,6 +71,7 @@ describe("YoIconButton", () => {
     expect(btn.getAttribute("data-busy")).toBe("");
     expect((btn as HTMLButtonElement).disabled).toBe(true);
     expect(container.querySelector(".yohu-icon-button[data-busy]")).toBeTruthy();
+    expect(container.querySelector("[data-icon]")?.hasAttribute("data-spin")).toBe(true);
   });
 
   it("pressed 时带 aria-pressed 与 data-pressed", () => {
@@ -91,5 +96,47 @@ describe("YoIconButton", () => {
     ));
     expect(container.querySelector("[data-slot=glyph]")?.textContent).toBe("槽");
     expect(container.querySelector(".yohu-icon")).toBeNull();
+  });
+});
+
+function iconButtonSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "IconButton.tsx"), "utf8");
+}
+
+describe("图标钮尺寸", () => {
+  it("宿主和像素都读同一档尺寸", () => {
+    const src = iconButtonSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('host()["' + 'data-size"]')).toBe(1);
+    expect(times("function iconButtonSize")).toBe(1);
+    expect(times("export function iconButtonSize")).toBe(0);
+    expect(times("iconButtonSize()")).toBe(3);
+    expect(times("data-size={iconButtonSize()}")).toBe(1);
+    expect(times("controlIconPx(iconButtonSize())")).toBe(1);
+  });
+});
+
+describe("图标钮禁用", () => {
+  it("按钮和气泡都问同一把禁用", () => {
+    const src = iconButtonSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("host()." + "disabled")).toBe(1);
+    expect(times("function iconButtonDisabled")).toBe(1);
+    expect(times("export function iconButtonDisabled")).toBe(0);
+    expect(times("iconButtonDisabled()")).toBe(3);
+    expect(times("disabled={iconButtonDisabled()}")).toBe(2);
+  });
+});
+
+describe("图标钮标题", () => {
+  it("名字、气泡和是否包气泡都读同一标题", () => {
+    const src = iconButtonSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("props." + "title")).toBe(1);
+    expect(times("function iconButtonTitle")).toBe(1);
+    expect(times("export function iconButtonTitle")).toBe(0);
+    expect(times("iconButtonTitle()")).toBe(4);
+    expect(times("aria-label={iconButtonTitle()}")).toBe(1);
+    expect(times("content={iconButtonTitle() ?? " + '""}')).toBe(1);
   });
 });

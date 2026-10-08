@@ -1,9 +1,10 @@
 /**
  * YoColCell —— 清单体单元格。
- * 列垫与表头同一条 `--yohu-col-cell-pad`（由 YoColFrame 写入）。
+ * 列垫只吃列架写入的 `--yohu-col-cell-pad`。
  */
 import { splitProps, type JSX } from "solid-js";
 import "./ColCell.css";
+import { presenceAttr } from "../dom/flag";
 
 export type YoColCellProps = JSX.HTMLAttributes<HTMLSpanElement> & {
   /** 解析失败等通栏：占满整条轨道，不改 template */
@@ -17,7 +18,7 @@ export function YoColCell(props: YoColCellProps): JSX.Element {
       {...rest}
       class={`yohu-col-cell${local.class ? ` ${local.class}` : ""}`}
       classList={local.classList}
-      data-span={local.span ? "" : undefined}
+      data-span={presenceAttr(local.span)}
     />
   );
 }

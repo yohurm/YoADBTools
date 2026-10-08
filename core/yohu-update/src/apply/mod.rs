@@ -57,7 +57,7 @@ pub fn spawn_overlay_install(
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .spawn()
-                    .map_err(|e| UpdateError::Io(e.to_string()))?;
+                    .map_err(|_| UpdateError::LaunchFailed)?;
                 Ok(false)
             }
             #[cfg(not(target_os = "macos"))]
@@ -116,7 +116,7 @@ fn spawn_windows(plan: &ApplyPlan) -> Result<(), UpdateError> {
     .stdout(Stdio::null())
     .stderr(Stdio::null())
     .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB);
-    cmd.spawn().map_err(|e| UpdateError::Io(e.to_string()))?;
+    cmd.spawn().map_err(|_| UpdateError::LaunchFailed)?;
     Ok(())
 }
 

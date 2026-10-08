@@ -19,4 +19,9 @@ describe("progress-policy", () => {
     expect(attrs["data-mode"]).toBe("indeterminate");
     expect(progressFillWidth({ indeterminate: true })).toBeUndefined();
   });
+
+  it("sm 才写 data-size，缺省不写", () => {
+    expect(progressHostAttrs({ value: 10 })["data-size"]).toBeUndefined();
+    expect(progressHostAttrs({ value: 10, size: "sm" })["data-size"]).toBe("sm");
+  });
 });

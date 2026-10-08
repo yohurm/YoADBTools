@@ -6,7 +6,7 @@
 import { Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
-import { dialogSaveFile, errorText, ipcErrorCode, ModuleTitle, systemOpenPath } from "@yohu/api";
+import { writeClipboard, clipboardFailureText, boundSerial, DEVICE_UNSELECTED, dialogFailureText, dialogPickAccepted, dialogSaveFile, errorText, isCancelledError, logLineWraps, ModuleTitle, systemOpenPath, tagFilterActive } from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -48,34 +48,54 @@ import {
   type LogDocument,
   type LogMetaColKey,
 } from "./editor";
-import { tagFilterActive } from "./filter";
 import { suggestedExportPath } from "./host-path";
-import { LOGS_KEY_BINDINGS, LOGS_LIST_SELECTOR, type LogsKeyAction } from "./keys";
+import {
+  LOGS_KEY_BINDINGS,
+  LOGS_LIST_SELECTOR,
+  logsKeyIsClear,
+  logsKeyIsCloseTab,
+  logsKeyIsCopy,
+  logsKeyIsFind,
+  logsKeyIsNewTab,
+  logsKeyIsNextTab,
+  logsKeyIsPause,
+  logsKeyIsSelectAll,
+  type LogsKeyAction,
+} from "./keys";
 import { dataRowHeight, measureChPx } from "./layout";
 import { LogColumnHeader } from "./LogColumnHeader";
 import { LogFilterBar } from "./LogFilterBar";
-import { logsChromeActions, type LogsChromeAction } from "./logs-chrome-actions";
+import {
+  logsChromeActions,
+  logsChromeIsCapture,
+  logsChromeIsClear,
+  logsChromeIsClearDevice,
+  logsChromeIsExport,
+  logsChromeIsPause,
+  type LogsChromeAction,
+} from "./logs-chrome-actions";
 import { logsRowMenu, logsTabMenu } from "./menu";
 import { NewSessionDialog } from "./NewSessionDialog";
 import {
+  sessionCaptureButton,
+  sessionCaptureButtonTone,
   sessionCaptureLabel,
+  sessionCaptureOccupies,
+  sessionCaptureIsLive,
   sessionCapturePhase,
-  sessionEmptyWait,
-  sessionIsLive,
+  sessionEmptyView,
+  sessionEmptyIsWait,
+  sessionStatusTone,
   sessionTabDot,
 } from "./session-chrome";
 import { formatSessionDevice, shortSerial } from "./session-device";
 import type { ViewRow } from "./stack";
 import { deviceSlice, logStore } from "./store";
-import type { LogSessionState } from "./workspace";
+import { EXPORT_NEEDS_CAPTURE, sessionHasCapture, type LogSessionState } from "./workspace";
 import "./logs.css";
 
-function errorMessage(e: unknown): string {
-  return errorText(e);
-}
-
-function isCancelled(e: unknown): boolean {
-  return ipcErrorCode(e) === "cancelled";
+function overflowLagBadge() {
+  return <YoBadge text="缓冲滞后（已回补）" tone="warning" />;
 }
 
 function displayColumnsOf(settings: DeviceSession["settings"]): LogDisplayColumns {
@@ -93,35 +113,30 @@ function tabTitle(session: LogSessionState): string {
 function SessionEmpty(props: { session: LogSessionState; canStart: boolean; onStart: () => void }) {
   const filterActive = (): boolean =>
     props.session.levels.length > 0 || tagFilterActive(props.session.tagContains) || props.session.keyword.length > 0;
-  const phase = (): ReturnType<typeof sessionCapturePhase> => sessionCapturePhase(props.session);
-  const idle = (): boolean => phase() === "stopped" && !filterActive();
+  const empty = (): ReturnType<typeof sessionEmptyView> =>
+    sessionEmptyView(sessionCapturePhase(props.session), filterActive());
   return (
     <div class="yohu-logs__empty">
       <Show
-        when={!idle()}
+        when={sessionEmptyIsWait(empty())}
         fallback={
           <YoEmptyState
             icon="log"
-            title="未采集"
-            description="点击「开始采集」拉取设备日志"
+            title={empty().title}
+            description={empty().description}
             action={
-              <YoButton disabled={!props.canStart} onClick={() => props.onStart()}>
-                开始采集
-              </YoButton>
+              <Show when={empty().action}>
+                {(label) => (
+                  <YoButton disabled={!props.canStart} onClick={() => props.onStart()}>
+                    {label()}
+                  </YoButton>
+                )}
+              </Show>
             }
           />
         }
       >
-        <Show
-          when={filterActive() && phase() !== "starting"}
-          fallback={
-            <Show when={sessionEmptyWait(phase())} keyed>
-              {(wait) => <YoLoading title={wait.title} description={wait.description} />}
-            </Show>
-          }
-        >
-          <YoEmptyState icon="log" title="无匹配日志" description="调整过滤条件（级别/Tag/关键字）后重试" />
-        </Show>
+        <YoLoading title={empty().title} description={empty().description} />
       </Show>
     </div>
   );
@@ -146,7 +161,7 @@ export function LogAnalyzerView(props: DeviceSession) {
   let activeDoc: LogDocument | undefined;
 
   createEffect(() => {
-    const serial = props.selectedSerials[0] ?? null;
+    const serial = boundSerial(props.selectedSerials);
     void logStore.bindSerial(serial);
     untrack(() => logStore.ensureSession());
   });
@@ -162,9 +177,13 @@ export function LogAnalyzerView(props: DeviceSession) {
     closeContextMenu();
   });
 
+  function sessionById(id: number | null) {
+    return logStore.state.sessions.find((s) => s.id === id);
+  }
+
   const active = createMemo(() => {
     const id = logStore.state.activeSessionId;
-    return logStore.state.sessions.find((s) => s.id === id) ?? null;
+    return sessionById(id) ?? null;
   });
 
   const tabs = createMemo(() =>
@@ -175,30 +194,38 @@ export function LogAnalyzerView(props: DeviceSession) {
     })),
   );
 
-  const windowLive = (): boolean => {
-    const session = active();
-    return Boolean(session && sessionIsLive(session));
-  };
+  const capturePhase = (): ReturnType<typeof sessionCapturePhase> =>
+    sessionCapturePhase(active() ?? { capturing: false, starting: false });
 
   const overflowed = createMemo(() => deviceSlice(logStore.state, active()?.serial).overflowed);
 
-  const windowSerial = (): string | null => active()?.serial ?? props.selectedSerials[0] ?? null;
+  const windowSerial = (): string | null => active()?.serial ?? boundSerial(props.selectedSerials);
+
+  const windowHasSerial = (): boolean => windowSerial() !== null;
+
+  const showErrorText = (e: unknown): void => {
+    toaster.show(errorText(e), "error");
+  };
+
+  const showFailure = (failure: string): void => {
+    toaster.show(failure, "error");
+  };
 
   const beginCapture = (): void => {
-    if (windowSerial() === null) {
+    if (!windowHasSerial()) {
       toaster.show("请先选择设备", "info");
       return;
     }
     void logStore.startCapture().catch((e) => {
-      if (isCancelled(e)) return;
-      toaster.show(errorMessage(e), "error");
+      if (isCancelledError(e)) return;
+      showErrorText(e);
     });
   };
 
   const displayColumns = (): LogDisplayColumns => displayColumnsOf(props.settings);
 
   const formatOpts = createMemo((): FormatOptions => {
-    const serial = active()?.serial ?? windowSerial();
+    const serial = windowSerial();
     const names: Record<number, string> = {};
     for (const entry of deviceSlice(logStore.state, serial).processEntries) {
       names[entry.pid] = entry.name;
@@ -208,7 +235,7 @@ export function LogAnalyzerView(props: DeviceSession) {
       tagWidthPx: TAG_DEFAULT_WIDTH_PX,
       timeFormat: props.settings.log_time_format,
       scheme: props.settings.log_color_scheme,
-      softWrap: props.settings.log_line_layout === "wrap",
+      softWrap: logLineWraps(props.settings.log_line_layout),
       appNames: names,
       colChars: colChars(),
     };
@@ -223,13 +250,13 @@ export function LogAnalyzerView(props: DeviceSession) {
   });
 
   createEffect(() => {
-    if (props.settings.log_line_layout === "wrap") {
+    if (logLineWraps(props.settings.log_line_layout)) {
       setHeadShift(0);
     }
   });
 
   createEffect(() => {
-    if (props.settings.log_line_layout !== "wrap") {
+    if (!logLineWraps(props.settings.log_line_layout)) {
       setRowChars(0);
       return;
     }
@@ -250,8 +277,8 @@ export function LogAnalyzerView(props: DeviceSession) {
   const togglePause = (): void => {
     const id = logStore.state.activeSessionId;
     if (id === null) return;
-    const session = logStore.state.sessions.find((s) => s.id === id);
-    if (session?.capturing) logStore.setPaused(id, !session.paused);
+    const session = sessionById(id);
+    if (session && sessionCaptureIsLive(session)) logStore.setPaused(id, !session.paused);
   };
 
   const copyMessages = () =>
@@ -277,34 +304,46 @@ export function LogAnalyzerView(props: DeviceSession) {
   const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): boolean => {
     const text = copyText(scope, fallbackLine);
     if (!text) return false;
-    void navigator.clipboard.writeText(text).catch((e) => toaster.show(`复制失败: ${errorMessage(e)}`, "error"));
+    void writeClipboard(text).then((result) => {
+      const failure = clipboardFailureText(result);
+      if (failure) showFailure(failure);
+    });
     return true;
+  };
+
+  const openNewSession = (): void => {
+    setNewOpen(true);
+  };
+
+  const clearActiveVisible = (): void => {
+    const id = logStore.state.activeSessionId;
+    if (id !== null) void logStore.clearVisible(id);
   };
 
   const onKeyAction = (action: LogsKeyAction): boolean | void => {
     const id = logStore.state.activeSessionId;
-    if (action === "pause") {
+    if (logsKeyIsPause(action)) {
       togglePause();
       return;
     }
-    if (action === "clear") {
-      if (id !== null) void logStore.clearVisible(id);
+    if (logsKeyIsClear(action)) {
+      clearActiveVisible();
       return;
     }
-    if (action === "find") {
+    if (logsKeyIsFind(action)) {
       keywordRef?.focus();
       keywordRef?.select();
       return;
     }
-    if (action === "new-tab") {
-      setNewOpen(true);
+    if (logsKeyIsNewTab(action)) {
+      openNewSession();
       return;
     }
-    if (action === "close-tab") {
+    if (logsKeyIsCloseTab(action)) {
       if (id !== null) logStore.closeSession(id);
       return;
     }
-    if (action === "next-tab") {
+    if (logsKeyIsNextTab(action)) {
       const ids = logStore.state.sessions.map((s) => s.id);
       if (id !== null) {
         const next = ids[(ids.indexOf(id) + 1) % ids.length];
@@ -312,14 +351,14 @@ export function LogAnalyzerView(props: DeviceSession) {
       }
       return;
     }
-    if (action === "select-all") {
+    if (logsKeyIsSelectAll(action)) {
       setPick(LOG_COPY_ALL);
       const root = listEl();
-      const host = root?.querySelector(".yohu-virtual-list__inner") ?? root;
+      const host = root?.querySelector(".yohu-logs__view") ?? root;
       if (host) window.getSelection()?.selectAllChildren(host);
       return;
     }
-    if (action === "copy") return copySelected();
+    if (logsKeyIsCopy(action)) return copySelected();
   };
 
   onMount(() => {
@@ -342,27 +381,29 @@ export function LogAnalyzerView(props: DeviceSession) {
     });
   });
 
+  const showExportNeedsCapture = (): void => {
+    toaster.show(EXPORT_NEEDS_CAPTURE, "info");
+  };
+
   const doExport = async (): Promise<void> => {
     const session = active();
-    if (!session?.serial || session.fromSeq < 0) {
-      toaster.show("请先选择设备并采集日志", "info");
+    if (!sessionHasCapture(session)) {
+      showExportNeedsCapture();
       return;
     }
-    try {
-      if (props.settings.export_ask_every_time) {
-        const picked = await dialogSaveFile({
-          title: "导出日志",
-          defaultPath: suggestedExportPath(props.settings.export_default_path),
-          filters: [{ name: "文本", extensions: ["txt"] }],
-        });
-        if (typeof picked !== "string") return;
-        await runExport(picked);
-        return;
-      }
-      await runExport();
-    } catch (e) {
-      toaster.show(`导出失败: ${errorMessage(e)}`, "error");
+    if (props.settings.export_ask_every_time) {
+      const picked = await dialogSaveFile({
+        title: "导出日志",
+        defaultPath: suggestedExportPath(props.settings.export_default_path),
+        filters: [{ name: "文本", extensions: ["txt"] }],
+      });
+      const failure = dialogFailureText(picked);
+      if (failure) showFailure(failure);
+      if (!dialogPickAccepted(picked)) return;
+      await runExport(picked.path);
+      return;
     }
+    await runExport();
   };
 
   const runExport = async (dest?: string): Promise<void> => {
@@ -373,82 +414,76 @@ export function LogAnalyzerView(props: DeviceSession) {
         void systemOpenPath(path);
         return;
       }
-      toaster.show("请先选择设备并采集日志", "info");
+      showExportNeedsCapture();
     } catch (e) {
-      toaster.show(`导出失败: ${errorMessage(e)}`, "error");
+      showErrorText(e);
     }
   };
 
-  const chromeActions = createMemo(() =>
-    logsChromeActions({
-      capturing: Boolean(active()?.capturing),
+  const chromeActions = createMemo(() => {
+    const session = active();
+    return logsChromeActions({
+      capturing: session ? sessionCaptureIsLive(session) : false,
       overflowed: overflowed(),
-    }),
-  );
+    });
+  });
 
   const chromeAction = (id: LogsChromeAction) => {
-    if (id === "capture") {
+    if (logsChromeIsCapture(id)) {
       return (
         <YoButton
-          tone={windowLive() ? "danger" : "accent"}
-          disabled={!windowLive() && windowSerial() === null}
+          tone={sessionCaptureButtonTone(capturePhase())}
+          disabled={!sessionCaptureOccupies(capturePhase()) && !windowHasSerial()}
           onClick={() => {
-            if (windowLive()) {
-              void logStore.stopCapture().catch((e) => toaster.show(errorMessage(e), "error"));
+            if (sessionCaptureOccupies(capturePhase())) {
+              void logStore.stopCapture().catch(showErrorText);
               return;
             }
             beginCapture();
           }}
         >
-          {windowLive()
-            ? sessionCapturePhase(active()!) === "starting"
-              ? "取消启动"
-              : "停止"
-            : "开始"}
+          {sessionCaptureButton(capturePhase())}
         </YoButton>
       );
     }
-    if (id === "pause") {
+    if (logsChromeIsPause(id)) {
       return (
         <YoButton buttonStyle="normal" tone="neutral" onClick={togglePause}>
           {active()?.paused ? "继续" : "暂停"}
         </YoButton>
       );
     }
-    if (id === "clear") {
+    if (logsChromeIsClear(id)) {
       return (
         <YoButton
           buttonStyle="normal"
           tone="neutral"
-          onClick={() => {
-            const sessionId = logStore.state.activeSessionId;
-            if (sessionId !== null) void logStore.clearVisible(sessionId);
-          }}
+          onClick={() => clearActiveVisible()}
         >
           清空
         </YoButton>
       );
     }
-    if (id === "clear-device") {
+    if (logsChromeIsClearDevice(id)) {
       return (
         <YoButton
           buttonStyle="normal"
           tone="neutral"
           onClick={() => void logStore.clearDevice()}
-          disabled={windowSerial() === null}
+          disabled={!windowHasSerial()}
         >
           清设备缓冲
         </YoButton>
       );
     }
-    if (id === "export") {
+    if (logsChromeIsExport(id)) {
       return (
         <YoButton buttonStyle="normal" tone="neutral" onClick={() => void doExport()}>
           导出
         </YoButton>
       );
     }
-    return <YoBadge text="缓冲滞后（已回补）" tone="warning" />;
+    return overflowLagBadge();
   };
 
   return (
@@ -463,7 +498,7 @@ export function LogAnalyzerView(props: DeviceSession) {
         when={logStore.state.sessions.length > 0}
         fallback={
           <YoPanel variant="pane" overflow="hidden">
-            <YoEmptyState icon="log" title="未选择设备" description="请在左侧设备栏选择在线设备，或新建日志窗口" />
+            <YoEmptyState icon="log" title={DEVICE_UNSELECTED} description="请在左侧设备栏选择在线设备，或新建日志窗口" />
           </YoPanel>
         }
       >
@@ -473,7 +508,7 @@ export function LogAnalyzerView(props: DeviceSession) {
             activeId={logStore.state.activeSessionId !== null ? String(logStore.state.activeSessionId) : null}
             onActivate={(id) => logStore.setActive(Number(id))}
             onClose={(id) => logStore.closeSession(Number(id))}
-            onNew={() => setNewOpen(true)}
+            onNew={() => openNewSession()}
             onContextMenu={(id, event) => {
               event.preventDefault();
               const target = Number(id);
@@ -482,7 +517,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                 y: event.clientY,
                 ctx: {
                   rename: () => {
-                    const session = logStore.state.sessions.find((s) => s.id === target);
+                    const session = sessionById(target);
                     setRenameTarget(target);
                     setRenameText(session?.title ?? "");
                     setRenameOpen(true);
@@ -500,7 +535,10 @@ export function LogAnalyzerView(props: DeviceSession) {
         </div>
 
         <Show when={active()} keyed>
-          {(session) => (
+          {(session) => {
+            const live = () => sessionById(session.id);
+            const sessionPhase = sessionCapturePhase(session);
+            return (
             <YoPanel variant="pane" overflow="hidden">
               <LogFilterBar
                 session={session}
@@ -511,7 +549,6 @@ export function LogAnalyzerView(props: DeviceSession) {
 
               <div class="yohu-logs__list">
                 <YoColFrame
-                  class="yohu-logs__table"
                   cellPad="none"
                   tone="document"
                   template={logDocTrackTemplate(formatOpts(), chPx())}
@@ -535,7 +572,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                   >
                   <EditorView
                     rows={() =>
-                      logStore.state.sessions.find((item) => item.id === session.id)?.visible ?? EMPTY_ROWS
+                      live()?.visible ?? EMPTY_ROWS
                     }
                     options={formatOpts}
                     layout={() => props.settings.log_line_layout}
@@ -544,23 +581,20 @@ export function LogAnalyzerView(props: DeviceSession) {
                     itemHeight={dataRowHeight()}
                     onInlineScroll={setHeadShift}
                     keyword={() =>
-                      logStore.state.sessions.find((item) => item.id === session.id)?.keyword ?? ""
+                      live()?.keyword ?? ""
                     }
                     following={() =>
-                      Boolean(logStore.state.sessions.find((item) => item.id === session.id)?.following)
+                      Boolean(live()?.following)
                     }
                     paused={() =>
-                      Boolean(logStore.state.sessions.find((item) => item.id === session.id)?.paused)
+                      Boolean(live()?.paused)
                     }
                     documentRef={(doc) => {
                       activeDoc = doc;
                     }}
                     onAtBottomChange={(atBottom) => {
-                      const rows =
-                        logStore.state.sessions.find((item) => item.id === session.id)?.visible ??
-                        EMPTY_ROWS;
                       if (atBottom) logStore.resumeFollow(session.id);
-                      else if (rows.length > 0) logStore.detachFollow(session.id);
+                      else logStore.detachFollow(session.id);
                     }}
                     onRowContextMenu={(row, event) => {
                       setContextLine(row.line);
@@ -583,12 +617,12 @@ export function LogAnalyzerView(props: DeviceSession) {
                   />
                   <Show
                     when={
-                      (logStore.state.sessions.find((s) => s.id === session.id)?.visible.length ?? 0) === 0
+                      (live()?.visible.length ?? 0) === 0
                     }
                   >
                     <SessionEmpty
                       session={session}
-                      canStart={windowSerial() !== null}
+                      canStart={windowHasSerial()}
                       onStart={beginCapture}
                     />
                   </Show>
@@ -606,9 +640,9 @@ export function LogAnalyzerView(props: DeviceSession) {
               <div class="yohu-logs__status">
                 <span class="yohu-logs__status-capture">
                   <YoStatusDot
-                    tone={sessionCapturePhase(session) === "live" ? "success" : "offline"}
+                    tone={sessionStatusTone(sessionPhase)}
                   />
-                  {sessionCaptureLabel(sessionCapturePhase(session))}
+                  {sessionCaptureLabel(sessionPhase)}
                 </span>
                 <span>
                   {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}
@@ -619,11 +653,12 @@ export function LogAnalyzerView(props: DeviceSession) {
                   tone={session.signalCount > 0 ? "danger" : "neutral"}
                 />
                 <Show when={overflowed()}>
-                  <YoBadge text="缓冲滞后（已回补）" tone="warning" />
+                  {overflowLagBadge()}
                 </Show>
               </div>
             </YoPanel>
-          )}
+            );
+          }}
         </Show>
       </Show>
 

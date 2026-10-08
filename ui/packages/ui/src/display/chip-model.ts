@@ -4,44 +4,33 @@
  * 有 onDismiss 才带关闭圆钮。不设 hover 藏钮。不碰 DOM。
  */
 
+import { controlIsBlock } from "../basic/control-busy";
+import { hasTextFieldSlot } from "../form/textfield-model";
 import type { YoBadgeTone } from "./badge-model";
 
-export type YoChipTone = YoBadgeTone;
-
-export const DEFAULT_CHIP_TONE: YoChipTone = "accent";
+export const DEFAULT_CHIP_TONE: YoBadgeTone = "accent";
 
 export interface ChipInput {
   text: string;
-  tone?: YoChipTone;
+  tone?: YoBadgeTone;
   leading?: unknown;
   block?: boolean;
 }
 
 export interface ChipSpec {
   text: string;
-  tone: YoChipTone;
+  tone: YoBadgeTone;
   leading: boolean;
   dismiss: boolean;
   block: boolean;
-}
-
-/** 空串 / null / false 不算占槽。 */
-export function hasChipLeading(value: unknown): boolean {
-  if (value === undefined || value === null || value === false) return false;
-  if (typeof value === "string") return value.length > 0;
-  return true;
-}
-
-export function resolveChipBlock(block?: boolean): boolean {
-  return Boolean(block);
 }
 
 export function resolveChipSpec(input: ChipInput & { dismissible?: boolean }): ChipSpec {
   return {
     text: input.text,
     tone: input.tone ?? DEFAULT_CHIP_TONE,
-    leading: hasChipLeading(input.leading),
+    leading: hasTextFieldSlot(input.leading),
     dismiss: Boolean(input.dismissible),
-    block: resolveChipBlock(input.block),
+    block: controlIsBlock(input.block),
   };
 }

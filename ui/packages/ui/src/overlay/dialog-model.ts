@@ -14,6 +14,8 @@
  * 关窗只锁最后打开盒（inline + data-locked），禁止第三种 kind 去改内容区 flex。
  */
 
+import { cornerExtentIsEmpty } from "../corner/corner-model";
+
 export type YoDialogBodyLayout = "stack" | "row";
 export type YoDialogBodyOverflow = "auto" | "hidden";
 export type YoDialogBodyPad = "lg" | "none";
@@ -23,6 +25,8 @@ export type YoDialogInitial = "auto" | "footer";
 export type DialogBoxKind = "fit" | "fill";
 /** plain = 子树即滚槽；split = lead / main / tail，只有 main 滚。 */
 export type DialogBodyRegion = "plain" | "split";
+/** start = 尾槽 hug；stretch = 尾槽铺满主轴（进度条钉底）。 */
+export type DialogTailAlign = "start" | "stretch";
 /**
  * 操作区对照 HarmonyOS DialogButtonDirection.AUTO：
  * ≤1 居中 hug；2 左右铺满；≥3 从下至上（左→下，右→上）。
@@ -36,8 +40,12 @@ export const DEFAULT_DIALOG_INITIAL: YoDialogInitial = "auto";
 export const DEFAULT_DIALOG_BODY_REGION: DialogBodyRegion = "plain";
 
 /** 未写或未知值归一成 auto。禁止第二套首焦别名。 */
+export function dialogInitialIsFooter(value?: string): boolean {
+  return value === "footer";
+}
+
 export function resolveDialogInitial(value?: string): YoDialogInitial {
-  return value === "footer" ? "footer" : DEFAULT_DIALOG_INITIAL;
+  return dialogInitialIsFooter(value) ? "footer" : DEFAULT_DIALOG_INITIAL;
 }
 
 /** 只数操作钮。页脚里的错误字不进 AUTO。 */
@@ -60,6 +68,25 @@ export interface DialogBodySpec {
   overflow: YoDialogBodyOverflow;
   pad: YoDialogBodyPad;
   region: DialogBodyRegion;
+}
+
+/** 缺省 hug。只有显式 stretch 才铺满。策略和解析都认这一把。 */
+export function dialogTailAlignIsStretch(align?: DialogTailAlign): boolean {
+  return align === "stretch";
+}
+
+export function resolveDialogTailAlign(align?: DialogTailAlign): DialogTailAlign {
+  return dialogTailAlignIsStretch(align) ? "stretch" : "start";
+}
+
+/** plain 是整段子树。split 才拆 lead / main / tail。 */
+export function dialogRegionIsSplit(region: DialogBodyRegion): boolean {
+  return region === "split";
+}
+
+/** 铅槽和尾槽有没有节点。null 与缺省没有；false 仍算有。 */
+export function dialogNodeOn(value: unknown): boolean {
+  return value != null;
 }
 
 /** 有 lead 或 tail 才 split。Collapse 只许进 main。 */
@@ -94,16 +121,21 @@ export interface DialogBoxPaint {
   style: { width?: string; height?: string };
 }
 
-function dialogSizeStyle(width?: number, height?: number): DialogBoxPaint["style"] {
-  return {
-    ...(width !== undefined ? { width: `${width}px` } : {}),
-    ...(height !== undefined ? { height: `${height}px` } : {}),
-  };
-}
-
 /** 无显式高 = hug。hug 才外包 YoTravel（开窗插值、关窗冻锁）。fill 定高不套 Travel。 */
 export function dialogHugsContent(height?: number): boolean {
   return height === undefined;
+}
+
+/** 有显式宽。写宽度样式和 sized 都认这一把。 */
+export function dialogWidthIsSet(width?: number): boolean {
+  return width !== undefined;
+}
+
+function dialogSizeStyle(width?: number, height?: number): DialogBoxPaint["style"] {
+  return {
+    ...(dialogWidthIsSet(width) ? { width: `${width}px` } : {}),
+    ...(!dialogHugsContent(height) ? { height: `${height}px` } : {}),
+  };
 }
 
 /**
@@ -111,8 +143,8 @@ export function dialogHugsContent(height?: number): boolean {
  * fill 内容区始终吃剩余高；fit 内容区始终 hug。禁止用第三种 kind 改 flex。
  */
 export function resolveDialogBox(input: DialogBoxInput): DialogBoxPaint {
-  const sized = input.width !== undefined;
-  const kind: DialogBoxKind = input.height !== undefined ? "fill" : "fit";
+  const sized = dialogWidthIsSet(input.width);
+  const kind: DialogBoxKind = dialogHugsContent(input.height) ? "fit" : "fill";
   const locked = !input.open;
   const style = locked
     ? (input.lastOpen ?? dialogSizeStyle(input.width, input.height))
@@ -122,6 +154,6 @@ export function resolveDialogBox(input: DialogBoxInput): DialogBoxPaint {
 
 /** 正宽高才锁；0 盒（未布局 / jsdom）不写 inline，避免出场折成一条线。 */
 export function resolveDialogExitLock(width: number, height: number): DialogBoxLock | undefined {
-  if (width <= 0 || height <= 0) return undefined;
+  if (cornerExtentIsEmpty(width, height)) return undefined;
   return { width: `${width}px`, height: `${height}px` };
 }

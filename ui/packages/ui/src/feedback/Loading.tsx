@@ -6,7 +6,7 @@
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { YoSpinner } from "../spinner/Spinner";
-import { loadingHostAttrs } from "./loading-policy";
+import { loadingDescription, loadingHostAttrs } from "./loading-policy";
 import "./Loading.css";
 
 export interface YoLoadingProps {
@@ -23,6 +23,7 @@ export interface YoLoadingProps {
 /** 渲染一个居中的加载占位。内容区 = 环 + 文案。 */
 export function YoLoading(props: YoLoadingProps): JSX.Element {
   const host = createMemo(() => loadingHostAttrs(props));
+  const description = () => loadingDescription(props);
   return (
     <div
       class="yohu-loading"
@@ -34,8 +35,8 @@ export function YoLoading(props: YoLoadingProps): JSX.Element {
     >
       <YoSpinner size="lg" track class="yohu-loading__spinner" />
       <div class="yohu-loading__title">{props.title}</div>
-      <Show when={props.description}>
-        {(description) => <div class="yohu-loading__description">{description()}</div>}
+      <Show when={description()}>
+        {(text) => <div class="yohu-loading__description">{text()}</div>}
       </Show>
     </div>
   );

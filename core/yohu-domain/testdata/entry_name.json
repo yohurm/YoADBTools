@@ -3,9 +3,10 @@
   { "name": "DCIM", "valid": true },
   { "name": "v1.0.apk", "valid": true },
   { "name": "  spacename  ", "valid": true },
-  { "name": "", "valid": false },
-  { "name": ".", "valid": false },
-  { "name": "..", "valid": false },
-  { "name": "a/b", "valid": false },
-  { "name": "a\\b", "valid": false }
+  { "name": "", "valid": false, "detail": "名称为空" },
+  { "name": ".", "valid": false, "detail": "." },
+  { "name": "..", "valid": false, "detail": ".." },
+  { "name": "a/b", "valid": false, "detail": "含路径分隔符" },
+  { "name": "a\\b", "valid": false, "detail": "含路径分隔符" },
+  { "name": "a\u0000b", "valid": false, "detail": "含路径分隔符" }
 ]

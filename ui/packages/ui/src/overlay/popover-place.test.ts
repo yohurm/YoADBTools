@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { applyPopoverBox, overlayLayerStyle, placePopover, popoverLayerStyle } from "./popover-place";
+import { applyPopoverBox, overlayLayerStyle, placementIsBottom, placePopover, popoverLayerStyle } from "./popover-place";
 
 const VIEW = { width: 800, height: 600 };
 const GAP = 8;
@@ -107,6 +110,7 @@ describe("placePopover", () => {
     el.style.width = "100px";
     applyPopoverBox(el, box);
     expect(el.style.width).toBe("");
+    expect(el.dataset.placed).toBe("");
     expect(el.hasAttribute("data-overflow-y")).toBe(false);
     expect(el.style.zIndex).toBe("var(--yohu-z-overlay)");
   });
@@ -141,5 +145,52 @@ describe("placePopover", () => {
   it("叠层配方走 overlay token，不写 9999", () => {
     expect(overlayLayerStyle("dialog").zIndex).toBe("var(--yohu-z-dialog)");
     expect(overlayLayerStyle("popover").zIndex).toBe("var(--yohu-z-overlay)");
+  });
+
+  it("向下只在 placementIsBottom 里比较", () => {
+    expect(placementIsBottom("bottom")).toBe(true);
+    expect(placementIsBottom("top")).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.") || name === "popover-place.ts") continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      expect(text, name).not.toContain('=== "bottom"');
+      expect(text, name).not.toContain('=== "top"');
+    }
+  });
+});
+
+describe("菜单剩余空间", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("上下剩余空间必填不小于 0", () => {
+    const body = readFileSync(join(root, "popover-place.ts"), "utf8");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "viewport.height - trigger.bottom - gap)")).toBe(0);
+    expect(times("Math.max(0, " + "trigger.top - gap)")).toBe(0);
+    expect(body).toContain("popoverExtent(viewport.height - trigger.bottom - gap)");
+    expect(body).toContain("popoverExtent(trigger.top - gap)");
+    expect(times("function popoverExtent")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(1);
+    expect(body).toContain("popoverExtent(input.menuHeight)");
+    expect(body).toContain("Math.max(0, " + "viewport.height - trigger.top + gap)");
+  });
+});
+
+describe("菜单度量", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("选项数与菜单内容高必填不小于 0", () => {
+    const body = readFileSync(join(root, "popover-place.ts"), "utf8");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "optionCount)")).toBe(0);
+    expect(times("Math.max(0, " + "input.menuHeight)")).toBe(0);
+    expect(body).toContain("popoverExtent(optionCount)");
+    expect(body).toContain("popoverExtent(input.menuHeight)");
+    expect(times("function popoverExtent")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(1);
+    expect(body).toContain("Math.max(0, " + "viewport.height - trigger.top + gap)");
+    expect(body).toContain("Math.max(0, " + "input.minWidth");
+    expect(body).toContain("popoverExtent(trigger.top - gap)");
   });
 });

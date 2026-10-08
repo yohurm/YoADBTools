@@ -5,10 +5,11 @@
  * AppEvent 内部 tag `kind`（camelCase））。由 fixture 契约测试守护（types.test.ts）。
  */
 
+import type { LibraryExpand } from "./library-expand";
 import type { LogColorScheme } from "./log-color-scheme";
 import type { LogLineLayout } from "./log-line-layout";
 
-export type { LogColorScheme, LogLineLayout };
+export type { LibraryExpand, LogColorScheme, LogLineLayout };
 
 // ===== device =====
 
@@ -136,6 +137,7 @@ export interface AppSettings {
   terminal_prepend_adb: boolean;
   files_drop_into_folder: boolean;
   terminal_time_format: TerminalTimeFormat;
+  terminal_library_expand: LibraryExpand;
 }
 
 /** 日志清单元数据列开关；消息列始终显示。默认对齐官方 STANDARD。 */
@@ -170,7 +172,8 @@ export type SettingKey =
   | "mirror_force_forward"
   | "terminal_prepend_adb"
   | "files_drop_into_folder"
-  | "terminal_time_format";
+  | "terminal_time_format"
+  | "terminal_library_expand";
 
 /** `settings.set` 单键值类型：按键映射到 `AppSettings` 对应字段类型。
  * `SettingKey` 成员与 `AppSettings` 字段一一同名，故索引映射即精确值类型。
@@ -222,6 +225,9 @@ export type TransferState = "running" | "done" | "failed" | "cancelled";
 /** 传输失败分类。只带 kind + 路径/serial；禁止用户句子。 */
 export type TransferFault =
   | { kind: "path"; path: string }
+  | { kind: "not_absolute"; path: string }
+  | { kind: "traversal"; path: string }
+  | { kind: "invalid_name"; detail: string }
   | { kind: "outside_root"; path: string }
   | { kind: "remote_not_found"; path: string }
   | { kind: "not_a_directory"; path: string }
@@ -229,11 +235,19 @@ export type TransferFault =
   | { kind: "read_only"; path: string }
   | { kind: "already_exists"; path: string }
   | { kind: "remote_failed"; path: string }
+  | { kind: "readlink_unparseable"; path: string }
   | { kind: "local_not_found"; path: string }
   | { kind: "local"; path: string }
   | { kind: "device_offline"; serial: string }
   | { kind: "timeout" }
   | { kind: "io" }
+  | { kind: "truncated" }
+  | { kind: "pump_panic" }
+  | { kind: "shell_no_stdin" }
+  | { kind: "shell_no_stdout" }
+  | { kind: "shell_handshake" }
+  | { kind: "shell_ended" }
+  | { kind: "shell_exec" }
   | { kind: "tool_unavailable" }
   | { kind: "progress_join" };
 
@@ -381,9 +395,11 @@ export interface CommandBlockDto {
   steps: CommandStepDto[];
 }
 
+export type LibraryEntryKind = "command" | "block";
+
 export type LibraryEntryDto =
-  | ({ kind: "command" } & CommandDto)
-  | ({ kind: "block" } & CommandBlockDto);
+  | ({ kind: Extract<LibraryEntryKind, "command"> } & CommandDto)
+  | ({ kind: Extract<LibraryEntryKind, "block"> } & CommandBlockDto);
 
 export interface CommandGroupDto {
   id: string;
@@ -403,12 +419,35 @@ export interface CommandLibraryDto {
   groups: CommandGroupDto[];
 }
 
+/** 导入预览：相对当前库。 */
+export type ImportPresence = "new" | "existing";
+
+export interface ImportEntryPreviewDto {
+  id: string;
+  name: string;
+  kind: LibraryEntryKind;
+  presence: ImportPresence;
+}
+
+export interface ImportGroupPreviewDto {
+  id: string;
+  name: string;
+  presence: ImportPresence;
+  entries: ImportEntryPreviewDto[];
+}
+
+/** `commandlib.preview` 响应。不含 template。 */
+export interface ImportPreviewDto {
+  groups: ImportGroupPreviewDto[];
+}
+
 /** `update.check` 响应。 */
 export interface RemoteUpdate {
   has_new_version: boolean;
   version: string;
   description: string;
   installer_url: string | null;
+  installer_name: string;
   page_url: string;
   sha256: string;
   size_bytes: number;
@@ -422,14 +461,11 @@ export interface UpdateDownloadRequest {
   version: string;
 }
 
-/** `update.download` 响应。 */
-export interface UpdateDownloadResult {
-  path: string;
-  size_bytes: number;
-}
+/** `update.download` 响应（invoke 立即返回；路径经 progress.ready）。 */
+export type UpdateDownloadAccepted = Record<string, never>;
 
 /** `update/progress` 阶段。 */
-export type UpdateStage = "downloading" | "verifying" | "ready" | "applying";
+export type UpdateStage = "downloading" | "verifying" | "ready" | "applying" | "failed";
 
 /** `update/progress` 负载。 */
 export interface UpdateProgress {
@@ -437,6 +473,10 @@ export interface UpdateProgress {
   stage: UpdateStage;
   received_bytes: number;
   total_bytes: number;
+  /** ready 时已校验安装包路径 */
+  installer_path?: string;
+  /** failed 时为 ipc_update 的结果 */
+  error?: IpcError;
 }
 
 /** `update.info` 响应（不含密钥）。 */
@@ -448,6 +488,21 @@ export interface UpdateChannelInfo {
 // ===== mirror =====
 
 export type MirrorSessionState = "starting" | "live" | "stopped" | "failed";
+
+export interface MirrorSessionSnapshot {
+  serial: string;
+  generation: number;
+  phase: MirrorSessionState;
+  width: number;
+  height: number;
+  codec: string;
+  control: boolean;
+  has_frame: boolean;
+  painted_fps: number;
+  paused: boolean;
+  fullscreen: boolean;
+  error?: string | null;
+}
 
 export interface MirrorStart {
   serial: string;
@@ -532,10 +587,12 @@ export interface TaskInfo {
 export interface GroupProgress {
   run_id: number;
   serial: string;
-  name?: string;
+  /** 命令名。空串表示没有名字。 */
+  name: string;
   template: string;
   ok: boolean;
-  message?: string;
+  /** 原始输出。空串表示没有正文。 */
+  message: string;
   /** 单命令用时（毫秒） */
   duration_ms: number;
 }

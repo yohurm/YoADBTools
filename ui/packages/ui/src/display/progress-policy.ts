@@ -4,7 +4,15 @@
  * 不写色值、不画铬。
  */
 
-import { resolveProgressSpec, type ProgressInput, type ProgressMode } from "./progress-model";
+import {
+  progressIsIndeterminate,
+  progressSizeIsSm,
+  resolveProgressSize,
+  resolveProgressSpec,
+  type ProgressInput,
+  type ProgressMode,
+  type ProgressSize,
+} from "./progress-model";
 
 export interface ProgressHostAttrs {
   role: "progressbar";
@@ -12,22 +20,25 @@ export interface ProgressHostAttrs {
   "aria-valuemax": 100;
   "aria-valuenow": number | undefined;
   "data-mode": ProgressMode;
+  "data-size"?: ProgressSize;
 }
 
 export function progressHostAttrs(input: ProgressInput): ProgressHostAttrs {
   const spec = resolveProgressSpec(input);
+  const size = resolveProgressSize(input.size);
   return {
     role: "progressbar",
     "aria-valuemin": 0,
     "aria-valuemax": 100,
-    "aria-valuenow": spec.mode === "indeterminate" ? undefined : spec.value,
+    "aria-valuenow": progressIsIndeterminate(spec.mode) ? undefined : spec.value,
     "data-mode": spec.mode,
+    ...(progressSizeIsSm(size) ? { "data-size": "sm" as const } : {}),
   };
 }
 
 /** 确定态才写宽度；不定态交给 CSS 扫动。 */
 export function progressFillWidth(input: ProgressInput): string | undefined {
   const spec = resolveProgressSpec(input);
-  if (spec.mode === "indeterminate") return undefined;
+  if (progressIsIndeterminate(spec.mode)) return undefined;
   return `${spec.value}%`;
 }

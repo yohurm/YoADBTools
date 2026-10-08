@@ -21,6 +21,7 @@ describe("checkbox-policy", () => {
       "data-checked": "false",
       "data-paint": "idle",
       "data-disabled": undefined,
+      "data-tone": "body",
       disabled: false,
     });
   });
@@ -31,10 +32,15 @@ describe("checkbox-policy", () => {
     expect(attrs["data-paint"]).toBe("checked");
   });
 
+  it("block 才写 data-block", () => {
+    expect(checkboxHostAttrs({})["data-block"]).toBeUndefined();
+    expect(checkboxHostAttrs({ block: true })["data-block"]).toBe("");
+  });
+
   it("disabled 写入 data-disabled，涂装仍跟勾选", () => {
     const attrs = checkboxHostAttrs({ checked: true, disabled: true });
     expect(attrs.disabled).toBe(true);
-    expect(attrs["data-disabled"]).toBe(true);
+    expect(attrs["data-disabled"]).toBe("");
     expect(attrs["data-paint"]).toBe("checked");
   });
 });

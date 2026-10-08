@@ -6,7 +6,7 @@
  * 无 API 或减少动态效果时直切。
  */
 import { MotionEasing, motionSpecMs } from "../../../tokens/motion";
-import { getTheme, type ThemeName } from "../../../tokens";
+import { getTheme, themeIsDark, type ThemeName } from "../../../tokens";
 import { shouldSkipMotion } from "../../reduced";
 
 export interface ThemeTransitionOrigin {
@@ -21,6 +21,7 @@ type ViewTransitionLike = {
   ready: Promise<void>;
   finished: Promise<void>;
   waitUntil?: (promise: Promise<unknown>) => void;
+  skipTransition?: () => void;
 };
 
 function startViewTransition(update: () => void): ViewTransitionLike | undefined {
@@ -44,19 +45,43 @@ function waitFrames(count: number): Promise<void> {
   });
 }
 
+function themeAxisCenter(origin: number, size: number): number {
+  return origin + size / 2;
+}
+
 /** 以元素中心为揭示原点（键盘激活时比 click 坐标稳）。 */
 export function themeTransitionOriginFromElement(el: Element): ThemeTransitionOrigin {
   const box = el.getBoundingClientRect();
-  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  return { x: themeAxisCenter(box.left, box.width), y: themeAxisCenter(box.top, box.height) };
+}
+
+function themeFarEdge(point: number, span: number): number {
+  return Math.max(point, span - point);
 }
 
 /** 覆盖视口所需的圆半径（最远角斜边 × 覆盖余量）。 */
 export function themeWipeRadius(x: number, y: number, width: number, height: number): number {
-  return Math.hypot(Math.max(x, width - x), Math.max(y, height - y)) * THEME_WIPE_COVERAGE;
+  return Math.hypot(themeFarEdge(x, width), themeFarEdge(y, height)) * THEME_WIPE_COVERAGE;
 }
 
 export function nextResolvedTheme(current: ThemeName = getTheme()): ThemeName {
-  return current === "dark" ? "light" : "dark";
+  return themeIsDark(current) ? "light" : "dark";
+}
+
+function themeWipeAt(x: number, y: number): string {
+  return `${x}px ${y}px`;
+}
+
+function themeWipeHold(frame: string): [string, string] {
+  return [frame, frame];
+}
+
+function themeViewLayer(which: "old" | "new"): string {
+  return which === "old" ? "::view-transition-old(root)" : "::view-transition-new(root)";
+}
+
+function themeCircle(radius: number, at: string): string {
+  return `circle(${radius}px at ${at})`;
 }
 
 export function themeWipeFrames(
@@ -64,25 +89,34 @@ export function themeWipeFrames(
   radius: number,
   fromDark: boolean,
 ): { moving: string[]; hold: string[]; movingPseudo: string; holdPseudo: string } {
-  const collapsed = `circle(0px at ${origin.x}px ${origin.y}px)`;
-  const expanded = `circle(${radius}px at ${origin.x}px ${origin.y}px)`;
+  const collapsed = themeCircle(0, themeWipeAt(origin.x, origin.y));
+  const expanded = themeCircle(radius, themeWipeAt(origin.x, origin.y));
   if (fromDark) {
     return {
       moving: [expanded, collapsed],
-      hold: [expanded, expanded],
-      movingPseudo: "::view-transition-old(root)",
-      holdPseudo: "::view-transition-new(root)",
+      hold: themeWipeHold(expanded),
+      movingPseudo: themeViewLayer("old"),
+      holdPseudo: themeViewLayer("new"),
     };
   }
   return {
     moving: [collapsed, expanded],
-    hold: [expanded, expanded],
-    movingPseudo: "::view-transition-new(root)",
-    holdPseudo: "::view-transition-old(root)",
+    hold: themeWipeHold(expanded),
+    movingPseudo: themeViewLayer("new"),
+    holdPseudo: themeViewLayer("old"),
   };
 }
 
-function playWipe(root: HTMLElement, origin: ThemeTransitionOrigin, fromDark: boolean): Animation {
+function themeWipeClip(
+  root: HTMLElement,
+  frames: string[],
+  pseudo: string,
+  timing: { duration: number; easing: string; fill: "forwards" },
+): Animation {
+  return root.animate({ clipPath: frames }, { ...timing, pseudoElement: pseudo });
+}
+
+function playWipe(root: HTMLElement, origin: ThemeTransitionOrigin, fromDark: boolean): Animation[] {
   const radius = themeWipeRadius(origin.x, origin.y, window.innerWidth, window.innerHeight);
   const frames = themeWipeFrames(origin, radius, fromDark);
   const common = {
@@ -90,9 +124,30 @@ function playWipe(root: HTMLElement, origin: ThemeTransitionOrigin, fromDark: bo
     easing: MotionEasing.standard,
     fill: "forwards" as const,
   };
-  const moving = root.animate({ clipPath: frames.moving }, { ...common, pseudoElement: frames.movingPseudo });
-  root.animate({ clipPath: frames.hold }, { ...common, pseudoElement: frames.holdPseudo });
-  return moving;
+  return [
+    themeWipeClip(root, frames.moving, frames.movingPseudo, common),
+    themeWipeClip(root, frames.hold, frames.holdPseudo, common),
+  ];
+}
+
+/** fill 只许在揭示进行时钉住末帧。伪元素卸掉之前必须松开，否则快照层留在文档上。 */
+function releaseThemeWipe(anims: readonly Animation[]): void {
+  for (const anim of anims) anim.cancel();
+}
+
+/** 新主题已经写进文档。结束 View Transition，卸掉 ::view-transition 叠层。 */
+function endThemeTransition(transition: ViewTransitionLike): void {
+  const skip = transition.skipTransition;
+  if (typeof skip !== "function") return;
+  try {
+    skip.call(transition);
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error;
+  }
+}
+
+function themeSettled(done: Promise<unknown>): Promise<void> {
+  return done.catch(() => undefined);
 }
 
 /**
@@ -103,7 +158,7 @@ export async function runThemeViewTransition(
   apply: () => void,
   origin: ThemeTransitionOrigin,
 ): Promise<void> {
-  const fromDark = getTheme() === "dark";
+  const fromDark = themeIsDark(getTheme());
   if (shouldSkipMotion() || typeof document.startViewTransition !== "function") {
     apply();
     return;
@@ -111,6 +166,7 @@ export async function runThemeViewTransition(
 
   const root = document.documentElement;
   root.setAttribute("data-theme-transition", fromDark ? "to-light" : "to-dark");
+  let wipe: Animation[] = [];
   try {
     const transition = startViewTransition(apply);
     if (!transition) {
@@ -119,13 +175,19 @@ export async function runThemeViewTransition(
     }
     await transition.ready;
     await waitFrames(1);
-    const wipe = playWipe(root, origin, fromDark);
-    const wipeDone = wipe.finished.catch(() => undefined);
-    transition.waitUntil?.(wipeDone);
-    await wipeDone;
-    await waitFrames(1);
-    await transition.finished.catch(() => undefined);
+    wipe = playWipe(root, origin, fromDark);
+    const moving = wipe[0];
+    if (moving) {
+      const wipeDone = themeSettled(moving.finished);
+      transition.waitUntil?.(wipeDone);
+      await wipeDone;
+      releaseThemeWipe(wipe);
+      wipe = [];
+    }
+    endThemeTransition(transition);
+    await themeSettled(transition.finished);
   } finally {
+    releaseThemeWipe(wipe);
     root.removeAttribute("data-theme-transition");
   }
 }

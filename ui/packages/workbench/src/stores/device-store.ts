@@ -13,6 +13,10 @@ import {
   deviceStatus,
   errorText,
   lookupSelectedDevices,
+  deviceIsOnline,
+  reconcileFocus,
+  resolveTargetSerials,
+  selectionModeIsMulti,
   onDeviceOffline,
   onDeviceStatus,
   onDevicesChanged,
@@ -22,7 +26,6 @@ import {
 import type { DeviceInfo, DeviceStatus } from "@yohu/api";
 
 import type { SelectionMode } from "../registry";
-import { reconcileFocus, resolveTargetSerials } from "./selection";
 
 export interface DeviceStore {
   devices: DeviceInfo[];
@@ -45,6 +48,24 @@ export interface SelectDeviceOpts {
   additive?: boolean;
 }
 
+function listedCount(devices: readonly DeviceInfo[]): number {
+  return devices.length;
+}
+
+function listedSerials(devices: readonly DeviceInfo[]): string[] {
+  return devices.map((d) => d.serial);
+}
+
+/** 目录快照里一台都没有。在线台数、选中页眉另计。 */
+export function deviceCatalogIsEmpty(devices: readonly DeviceInfo[]): boolean {
+  return listedCount(devices) === 0;
+}
+
+/** 最近一次扫描留下了错误明细。 */
+export function deviceScanHasError(lastError: string): boolean {
+  return lastError.length > 0;
+}
+
 export function createDeviceStore() {
   const [state, setState] = createStore<DeviceStore>({
     devices: [],
@@ -56,91 +77,134 @@ export function createDeviceStore() {
     lastError: "",
   });
 
+  function catalog(): DeviceInfo[] {
+    return state.devices;
+  }
+
+  function focus(): string | null {
+    return state.focusSerial;
+  }
+
+  function selectionMap(): Record<string, string[]> {
+    return state.selectedByModule;
+  }
+
+  function caughtText(e: unknown): string {
+    return errorText(e);
+  }
+
+  function deviceChannel() {
+    return "device" as const;
+  }
+
+  function nowMs(): number {
+    return performance.now();
+  }
+
+  function onlineCount(online: readonly string[]): number {
+    return online.length;
+  }
+
+  function statusSerial(status: DeviceStatus): string {
+    return status.serial;
+  }
+
+  function additivePick(opts?: SelectDeviceOpts): boolean | undefined {
+    return opts?.additive;
+  }
+
+  const moduleSelection = (id: string): string[] => selectionMap()[id] ?? [];
+
   function onlineSerials(devices: readonly DeviceInfo[]): string[] {
-    return devices.filter((d) => d.state === "online").map((d) => d.serial);
+    return devices.filter((d) => deviceIsOnline(d.state)).map((d) => d.serial);
   }
 
   function applyStatus(status: DeviceStatus): void {
-    setState("statuses", status.serial, status);
+    setState("statuses", statusSerial(status), status);
+  }
+
+  function clearStatus(serial: string): void {
+    setState("statuses", serial, undefined!);
   }
 
   function pruneStatuses(online: Set<string>): void {
     for (const serial of Object.keys(state.statuses)) {
-      if (!online.has(serial)) {
-        setState("statuses", serial, undefined!);
-      }
+      if (!online.has(serial)) clearStatus(serial);
     }
   }
 
   function applyDevices(devices: DeviceInfo[]): void {
+    setState("lastError", "");
     setState("devices", devices);
     const online = onlineSerials(devices);
-    setState("statusText", online.length > 0 ? `在线 ${online.length} 台` : "无在线设备");
-    pruneSelections(new Set(devices.map((d) => d.serial)));
+    setState("statusText", onlineCount(online) > 0 ? `在线 ${onlineCount(online)} 台` : "无在线设备");
+    pruneSelections(new Set(listedSerials(devices)));
     pruneStatuses(new Set(online));
-    setState("focusSerial", reconcileFocus(state.focusSerial, online));
+    setFocus(reconcileFocus(focus(), online));
   }
 
   /** `device/status` 可丢；对账走缓存快照（ADR-v6-025），不打 dumpsys。 */
   async function pullStatuses(): Promise<void> {
     try {
       const statuses = await deviceStatus();
-      const online = new Set(onlineSerials(state.devices));
+      const online = new Set(onlineSerials(catalog()));
       for (const status of statuses) {
-        if (online.has(status.serial)) applyStatus(status);
+        if (online.has(statusSerial(status))) applyStatus(status);
       }
     } catch (e) {
-      YoLog.warn("device", `读取运行时状态失败 ${errorText(e)}`);
+      YoLog.warn(deviceChannel(), `读取运行时状态失败 ${caughtText(e)}`);
     }
+  }
+
+  async function awaitStatuses(): Promise<void> {
+    await pullStatuses();
   }
 
   /** 读 core 目录快照，不跑 adb。启动扫描走 `refresh()`。 */
   async function load(): Promise<void> {
     try {
       const devices = await deviceList();
-      setState("lastError", "");
       applyDevices(devices);
-      if (devices.length > 0) {
-        YoLog.info("device", `读目录 ${devices.length} 台`, devices.map((d) => d.serial));
+      if (!deviceCatalogIsEmpty(devices)) {
+        YoLog.info(deviceChannel(), `读目录 ${listedCount(devices)} 台`, listedSerials(devices));
       }
     } catch (e) {
-      const detail = errorText(e);
+      const detail = caughtText(e);
       setState("lastError", detail);
-      YoLog.error("device", `读取目录失败 ${detail}`);
+      YoLog.error(deviceChannel(), `读取目录失败 ${detail}`);
       console.error("device.list 失败", e);
     }
-    await pullStatuses();
+    await awaitStatuses();
   }
 
   async function refresh(): Promise<void> {
     setState("refreshing", true);
-    if (state.devices.length === 0) {
+    if (deviceCatalogIsEmpty(catalog())) {
       setState("statusText", "扫描中…");
     }
-    const t0 = performance.now();
+    const t0 = nowMs();
     try {
       const devices = await deviceRefresh();
-      setState("lastError", "");
       applyDevices(devices);
-      await pullStatuses();
+      await awaitStatuses();
       YoLog.info(
-        "device",
-        `扫描完成 ${devices.length} 台 ${Math.round(performance.now() - t0)}ms`,
-        devices.map((d) => d.serial),
+        deviceChannel(),
+        `扫描完成 ${listedCount(devices)} 台 ${Math.round(nowMs() - t0)}ms`,
+        listedSerials(devices),
       );
     } catch (e) {
-      const detail = errorText(e);
+      const detail = caughtText(e);
       let adbHint = "";
       try {
         const info = await systemInfo();
         const used = info.adb_path;
         adbHint = used ? `；adb: ${used}` : "；adb 未解析";
       } catch (hintErr) {
-        YoLog.warn("device", `读取 adb 路径失败 ${errorText(hintErr)}`);
+        YoLog.warn(deviceChannel(), `读取 adb 路径失败 ${errorText(hintErr)}`);
       }
       setState("lastError", `${detail}${adbHint}`);
       setState("statusText", "设备扫描失败");
-      YoLog.error("device", `扫描失败 ${detail}${adbHint}`);
+      YoLog.error(deviceChannel(), `扫描失败 ${detail}${adbHint}`);
       console.error("device.refresh 失败", e);
     } finally {
       setState("refreshing", false);
@@ -148,9 +212,9 @@ export function createDeviceStore() {
   }
 
   function pruneSelections(known: Set<string>): void {
-    const prevIds = Object.keys(state.selectedByModule);
+    const prevIds = Object.keys(selectionMap());
     for (const id of prevIds) {
-      const kept = (state.selectedByModule[id] ?? []).filter((s) => known.has(s));
+      const kept = moduleSelection(id).filter((s) => known.has(s));
       setState("selectedByModule", id, kept.length > 0 ? kept : undefined!);
     }
   }
@@ -161,18 +225,18 @@ export function createDeviceStore() {
 
   /** 设备栏选择：始终更新全局焦点；MultiOptional 才写入模块勾选。 */
   function selectDevice(serial: string, opts?: SelectDeviceOpts): void {
-    const previousFocus = state.focusSerial;
+    const previousFocus = focus();
     setFocus(serial);
     const moduleId = opts?.moduleId;
     const mode = opts?.mode;
-    if (!moduleId || mode !== "multiOptional") return;
+    if (!moduleId || !selectionModeIsMulti(mode)) return;
 
-    const implicit = state.selectedByModule[moduleId] ?? [];
+    const implicit = moduleSelection(moduleId);
     const current =
-      opts?.additive && implicit.length === 0 && previousFocus && previousFocus !== serial
+      additivePick(opts) && implicit.length === 0 && previousFocus && previousFocus !== serial
         ? [previousFocus]
         : implicit;
-    const next = opts?.additive
+    const next = additivePick(opts)
       ? current.includes(serial)
         ? current.filter((s) => s !== serial)
         : [...current, serial]
@@ -183,31 +247,48 @@ export function createDeviceStore() {
   function selectedSerials(moduleId: string, mode: SelectionMode): string[] {
     return resolveTargetSerials(
       mode,
-      state.focusSerial,
-      state.selectedByModule[moduleId] ?? [],
-      onlineSerials(state.devices),
+      focus(),
+      moduleSelection(moduleId),
+      onlineSerials(catalog()),
     );
   }
 
   function selectedDevices(moduleId: string, mode: SelectionMode): DeviceInfo[] {
-    return lookupSelectedDevices(selectedSerials(moduleId, mode), state.devices);
+    return lookupSelectedDevices(selectedSerials(moduleId, mode), catalog());
+  }
+
+  function refreshNow(): void {
+    void refresh();
   }
 
   function bindIpc(): void {
     void onDevicesChanged((e) => {
-      setState("lastError", "");
       applyDevices(e.devices);
       void pullStatuses();
     });
     void onDeviceOffline((e) => {
-      setState("statuses", e.serial, undefined!);
+      clearStatus(e.serial);
     });
     void onDeviceStatus((e) => {
       applyStatus(e.status);
     });
   }
 
-  return { state, load, refresh, setFocus, selectDevice, selectedSerials, selectedDevices, bindIpc };
+  return {
+    state,
+    load,
+    refresh,
+    refreshNow,
+    setFocus,
+    selectDevice,
+    selectedSerials,
+    selectedDevices,
+    bindIpc,
+    catalog,
+    focus,
+    caughtText,
+    listedCount,
+  };
 }
 
 export type DeviceStoreApi = ReturnType<typeof createDeviceStore>;

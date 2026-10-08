@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { createKindTitle } from "./create-kind";
 import { filesListMenu } from "./menu";
 
 describe("filesListMenu", () => {
@@ -15,7 +16,8 @@ describe("filesListMenu", () => {
       remove: () => undefined,
     });
     expect(items.map((item) => item.id)).toEqual(["new-file", "new-dir", "download", "copy", "delete"]);
-    expect(items.find((item) => item.id === "copy")?.disabled).toBe(true);
+    expect(items.find((item) => item.id === "new-file")?.label).toBe(createKindTitle("file"));
+    expect(items.find((item) => item.id === "new-dir")?.label).toBe(createKindTitle("dir"));
     expect(items.find((item) => item.id === "delete")?.danger).toBe(true);
   });
 

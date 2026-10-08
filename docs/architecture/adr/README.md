@@ -37,3 +37,10 @@
 | [031](ADR-v6-031.md) | 路径家园 | 安装根 ≠ 产品家园；config / data / cache / logs |
 | [032](ADR-v6-032.md) | 投屏呈现分层 | Fit / Convert / Scale / Compose / Present；`gpu.rs` 只装配；禁 libplacebo/FFmpeg |
 | [033](ADR-v6-033.md) | 文件浏览会话 | FileListing 同构：工具窗 attach/detach；`DeviceShell` 是 008 补偿；失败回退短命令 |
+| [034](ADR-v6-034.md) | HTTP 下载原语 | `yohu-download`；update 只编排 |
+| [035](ADR-v6-035.md) | GitHub Provider | manifest → Atom → Web Latest → REST；免配额优先 |
+| [036](ADR-v6-036.md) | 文本解析引擎 | `yohu-textparsing`：Html / Markdown / Xml / Plain；update 只调 API |
+| [037](ADR-v6-037.md) | 命令库拖入导入 | 预览/合并在 domain；虚线只复用 YoPanel；确认框在终端 |
+| [038](ADR-v6-038.md) | 盒子归组件 | 产品数据链路不改层；禁止用 prop 换掉调用方选择器 |
+| [039](ADR-v6-039.md) | 命令库默认展开 | 一键 `terminal_library_expand`；默认全部折叠；指定组认 id；停留开合不写回 |
+| [040](ADR-v6-040.md) | 流程标准步骤 | 每条流程单独登记；hydrate 读设置/目录/任务/投屏投影；禁止预写阶段与 `mirror.sync` |

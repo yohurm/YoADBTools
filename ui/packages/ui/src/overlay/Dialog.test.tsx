@@ -52,6 +52,10 @@ describe("YoDialog", () => {
     expect(dialog.hasAttribute("aria-label")).toBe(false);
     expect(document.getElementById(labelId!)?.textContent).toBe("确认删除");
     expect(screen.getByText("确定要删除吗？")).toBeTruthy();
+    expect(dialogRoot().querySelector(".yohu-dialog__backdrop")?.getAttribute("data-enter")).toBe(
+      "fade",
+    );
+    expect(dialog.getAttribute("data-enter")).toBe("scale");
   });
 
   it("Esc 键触发 onClose", () => {
@@ -211,15 +215,13 @@ describe("YoDialog", () => {
         /\.yohu-dialog__body\[data-overflow="auto"\]:not\(\[data-region="split"\]\)\s*\{[^}]*\}/,
       )?.[0] ?? "";
     expect(autoRule).toContain("overflow: hidden");
+    expect(autoRule).toContain("--yohu-scroll-flex: 0 1 auto");
     expect(autoRule).not.toContain("overflow-y: auto");
     expect(autoRule).not.toMatch(/(?<!-)overflow:\s*auto/);
-    expect(dialogCss).toContain(
-      '.yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) > .yohu-scroller',
+    expect(dialogCss).not.toContain(
+      '.yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) > *',
     );
-    expect(dialogCss).toMatch(
-      /data-overflow="auto"\]:not\(\[data-region="split"\]\)\s*>\s*\.yohu-scroller\s*\{[^}]*flex:\s*0 1 auto/,
-    );
-    expect(dialogCss).not.toContain(".yohu-scroller__view");
+    expect(dialogCss).not.toContain(".yohu-scroller");
   });
 
   it("bodyOverflow=hidden 保持 stack 与 lg 垫", () => {
@@ -300,7 +302,10 @@ describe("YoDialog", () => {
     expect(dialogCss).toContain("flex-direction: column-reverse");
     expect(dialogCss).not.toContain(":has(> .yohu-button");
     expect(dialogCss).not.toContain(".yohu-button");
-    expect(dialogCss).toContain('[data-layout="row"] > button');
+    expect(dialogCss).not.toContain("> button");
+    expect(dialogCss).toContain("--yohu-button-flex: 1 1 0");
+    expect(dialogCss).toContain("--yohu-button-inline: 100%");
+    expect(dialogCss).toContain("--yohu-button-inline: auto");
     expect(dialogCss).toContain("[data-sized] .yohu-dialog__footer");
     expect(dialogCss).toContain(".yohu-dialog__body[data-region=\"split\"]");
     expect(dialogCss).toMatch(
@@ -359,14 +364,18 @@ describe("YoDialog", () => {
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__chrome");
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__body");
     expect(dialogCss).toContain(".yohu-dialog__panel[data-clip] .yohu-dialog__scroller");
-    expect(dialogCss).toContain("> .yohu-scroller");
-    expect(dialogCss).not.toContain(".yohu-scroller__view");
+    expect(dialogCss).toContain("--yohu-scroll-max-block: 100%");
+    expect(dialogCss).not.toContain(".yohu-dialog__scroller > *");
+    expect(dialogCss).not.toContain(".yohu-scroller");
     expect(dialogCss).not.toContain(".yohu-corner__content");
-    expect(dialogCss).not.toContain(":has(.yohu-travel");
+    expect(dialogCss).toContain("--yohu-travel-inline: 100%");
+    expect(dialogCss).toContain("--yohu-travel-flex: 1 1 0");
+    expect(dialogCss).not.toContain(".yohu-dialog__panel > *");
+    expect(dialogCss).not.toContain(".yohu-travel");
     expect(dialogCss).not.toContain('[data-travel="used"]');
     expect(dialogCss).not.toContain('[data-travel="hold"]');
     expect(dialogCss).toContain("yohu-dialog__scroller");
-    expect(dialogCss).toContain("yohu-scroller");
+    expect(dialogCss).not.toContain("yohu-scroller");
     expect(dialogCss).not.toContain("yohu-dialog__scroll-thumb");
     expect(dialogCss).not.toContain(".yohu-dialog__scroll {");
     expect(dialogCss).not.toContain("pointer-events: none");

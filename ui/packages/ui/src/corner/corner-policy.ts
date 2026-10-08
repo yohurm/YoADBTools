@@ -3,9 +3,24 @@
  * 角色半径与描边宽从模型/token 取；本文件只装配宿主与内容槽契约。
  */
 import { Stroke } from "../tokens/layout";
-import { cornerRadiusForRole, type CornerRole } from "./corner-model";
+import { resolveCornerRadius, resolveCornerRole, type CornerRole } from "./corner-model";
 
 export type YoCornerMode = "host" | "paint";
+
+/** 自持盒。默认描边、裁内容、露出内容槽。 */
+export function cornerModeIsHost(mode?: string): boolean {
+  return mode === "host";
+}
+
+/** 铺在已有宿主上。自身不进无障碍树。 */
+export function cornerModeIsPaint(mode?: string): boolean {
+  return mode === "paint";
+}
+
+/** paint 量父盒；host 量自己。 */
+export function cornerMeasureTarget(el: HTMLElement, mode?: string): HTMLElement | null {
+  return cornerModeIsPaint(mode) ? el.parentElement : el;
+}
 export type YoCornerFlex = "fill" | "hug";
 export type YoCornerOverflow = "visible" | "hidden" | "auto";
 export type YoCornerPad = "none" | "xs" | "sm" | "inline-sm" | "block-xs";
@@ -48,7 +63,6 @@ export interface CornerContentSpec {
   gap: YoCornerGap;
 }
 
-const DEFAULT_CORNER_ROLE: CornerRole = "card";
 const DEFAULT_CORNER_MODE: YoCornerMode = "host";
 const DEFAULT_CORNER_DIRECTION: YoCornerDirection = "column";
 const DEFAULT_CORNER_ALIGN: YoCornerAlign = "stretch";
@@ -70,14 +84,14 @@ function pick<T extends string>(value: T | undefined, allowed: Set<T>, fallback:
 
 /** host 默认画描边并裁内容；paint 只铺在已有宿主上，默认不描边。 */
 export function resolveCornerHostSpec(input: CornerHostInput): CornerHostSpec {
-  const role = input.role ?? DEFAULT_CORNER_ROLE;
+  const role = resolveCornerRole(input.role);
   const mode = input.mode ?? DEFAULT_CORNER_MODE;
-  const strokeOn = input.stroke ?? mode === "host";
+  const strokeOn = input.stroke ?? cornerModeIsHost(mode);
   return {
     role,
-    radius: input.radius ?? cornerRadiusForRole(role),
+    radius: resolveCornerRadius(role, input.radius),
     stroke: strokeOn ? Stroke.Hairline : 0,
-    clip: input.clip ?? mode === "host",
+    clip: input.clip ?? cornerModeIsHost(mode),
     mode,
   };
 }

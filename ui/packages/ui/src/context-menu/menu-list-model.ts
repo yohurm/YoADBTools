@@ -3,17 +3,21 @@
  * 可选项下标、步进与 typeahead 匹配是不变式；不碰 DOM / 不解释按键。
  */
 
+import { itemIsEnabled, listEdgeIndex, stepWrappedIndex, type ListEdge } from "../keymap/list-index";
+
 export interface MenuListItem {
   label: string;
   disabled?: boolean;
+  children?: readonly unknown[];
 }
 
-export function enabledMenuIndexes(items: readonly MenuListItem[]): number[] {
-  const indexes: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    if (!items[i]?.disabled) indexes.push(i);
-  }
-  return indexes;
+/** 可展开的二级菜单项：未禁用，且至少有一条子项。 */
+export function menuItemIsBranch(item: { disabled?: boolean; children?: readonly unknown[] } | undefined): boolean {
+  return itemIsEnabled(item) && (item?.children?.length ?? 0) > 0;
+}
+
+function enabledAt(enabled: readonly number[], index: number): number | null {
+  return enabled[index] ?? null;
 }
 
 export function stepEnabledIndex(
@@ -24,12 +28,14 @@ export function stepEnabledIndex(
   if (enabled.length === 0) return null;
   const pos = enabled.indexOf(current);
   const from = pos >= 0 ? pos : delta > 0 ? -1 : 0;
-  return enabled[(from + delta + enabled.length) % enabled.length] ?? null;
+  const index = stepWrappedIndex(enabled.length, from, delta);
+  return enabledAt(enabled, index);
 }
 
-export function edgeEnabledIndex(enabled: readonly number[], edge: "start" | "end"): number | null {
-  if (enabled.length === 0) return null;
-  return edge === "start" ? enabled[0]! : enabled[enabled.length - 1]!;
+export function edgeEnabledIndex(enabled: readonly number[], edge: ListEdge): number | null {
+  const index = listEdgeIndex(enabled.length, edge);
+  if (index < 0) return null;
+  return enabledAt(enabled, index);
 }
 
 /**
@@ -47,9 +53,9 @@ export function typeaheadMatchIndex(
   const needle = repeated ? lower[0]! : lower;
   const start = repeated ? fromIndex + 1 : fromIndex;
   for (let step = 0; step < items.length; step++) {
-    const index = (start + step + items.length) % items.length;
+    const index = stepWrappedIndex(items.length, start, step);
     const item = items[index];
-    if (!item || item.disabled) continue;
+    if (!itemIsEnabled(item)) continue;
     if (item.label.toLocaleLowerCase().startsWith(needle)) return index;
   }
   return null;

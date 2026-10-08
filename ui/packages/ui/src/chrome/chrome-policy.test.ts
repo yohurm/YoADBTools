@@ -15,7 +15,7 @@ describe("chrome-policy", () => {
   });
 
   it("功能栏与次行分别开槽，leading 走同一快照", () => {
-    const input = { hasBar: true, hasExtra: true, hasLeading: true };
+    const input = { actions: [{ key: "run" }], hasExtra: true, hasLeading: true };
     expect(chromeHostAttrs(input)).not.toHaveProperty("data-layout");
     expect(resolveChromeSlots(input)).toEqual({
       showLeading: true,

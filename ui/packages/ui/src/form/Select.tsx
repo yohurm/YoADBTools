@@ -5,6 +5,7 @@
  * 选项可带 description（次文案）。block 触发钮才画出，菜单项始终画。
  * 默认 hug 文案簇（字 + 箭头）；禁止给 hug 写 min-width（短文案会被拉开）。
  * block 才让文案吃剩余、次文案与箭头贴尾。宿主是 button；YoCorner 只 paint。
+ * 触发钮圆角 32，带描边和轻阴影。下拉菜单是特殊铬，圆角 16。
  * 文案与箭头在钮上，禁止 clip-path 裁箭头。
  *
  * 交互：
@@ -14,6 +15,7 @@
  * - 触发钮 `aria-haspopup=listbox aria-expanded`；菜单 `role=listbox`；选项 `role=option`
  * - 菜单 Portal 到 body；宽 hug 内容（min=触发钮）；高 hug 内容，仅超出视口才纵向滚动
  */
+import { presenceAttr, presenceIsOn } from "../dom/flag";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -21,18 +23,24 @@ import { YoCorner } from "../corner";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
+import { Radius } from "../tokens/radius";
 import {
   findOption,
   optionDescription,
   optionDomId,
+  optionIsSelected,
   type SelectMenuLayout,
   type YoSelectOption,
 } from "./select-model";
-import { layoutSelectMenu, readSelectTrigger } from "./select-place";
+import { dismissKey } from "../keymap/list-index";
+import { layoutSelectMenu } from "./select-place";
+import { readAnchorBox } from "../placement/anchor";
 import {
   applySelectEscape,
   applySelectKey,
   idleSelectSession,
+  selectEffectIsCommit,
+  selectEffectIsNone,
   selectHostAttrs,
   toggleSelect,
   type SelectSession,
@@ -95,7 +103,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     const menu = menuRef;
     if (!trigger || !layer || !menu) return;
     const laid = layoutSelectMenu(
-      readSelectTrigger(trigger),
+      readAnchorBox(trigger),
       { optionCount: props.options.length, scrollHeight: menu.scrollHeight },
     );
     setPlacement(laid.placement);
@@ -103,24 +111,72 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     setMenuStyle(selectLayerStyle(laid.style));
   };
 
+  function selectIdle(): void {
+    setSession(idleSelectSession());
+  }
+
+  function selectFocusTrigger(): void {
+    triggerRef?.focus();
+  }
+
+  function selectPlacement(): SelectMenuLayout["placement"] {
+    return placement();
+  }
+
+  function placeIfMounted(el: HTMLElement | undefined): void {
+    if (el) syncMenuPlace();
+  }
+
+  function selectDescription(text: () => string): JSX.Element {
+    return <span class="yohu-select__description">{text()}</span>;
+  }
+
   const commitValue = (value: string): void => {
     props.onChange?.(value);
-    setSession(idleSelectSession());
-    triggerRef?.focus();
+    selectIdle();
+    selectFocusTrigger();
   };
 
   const openMenu = (): void => {
     setSession((cur) => toggleSelect(cur.open, props.options, props.value, props.disabled));
   };
 
+  function listen(
+    target: EventTarget | null | undefined,
+    type: string,
+    handler: () => void,
+    capture?: boolean,
+  ): () => void;
+  function listen(
+    target: EventTarget | null | undefined,
+    type: string,
+    handler: (event: MouseEvent) => void,
+    capture?: boolean,
+  ): () => void;
+  function listen(
+    target: EventTarget | null | undefined,
+    type: string,
+    handler: (event: KeyboardEvent) => void,
+    capture?: boolean,
+  ): () => void;
+  function listen(
+    target: EventTarget | null | undefined,
+    type: string,
+    handler: () => void,
+    capture?: boolean,
+  ): () => void {
+    target?.addEventListener(type, handler, capture);
+    return () => target?.removeEventListener(type, handler, capture);
+  }
+
   onMount(() => {
     const handleDocPointerDown = (event: MouseEvent): void => {
       const target = event.target as Node;
       if (rootRef?.contains(target) || layerRef?.contains(target)) return;
-      setSession(idleSelectSession());
+      selectIdle();
     };
     const handleDocKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return;
+      if (!dismissKey(event.key)) return;
       const next = applySelectEscape(open(), props.disabled);
       if (!next) return;
       // 逐层退出契约：菜单打开时本层为“最内浮层”，Esc 只消费本层的 Esc 并向下收口。
@@ -129,13 +185,13 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
       event.preventDefault();
       event.stopImmediatePropagation();
       setSession(next);
-      triggerRef?.focus();
+      selectFocusTrigger();
     };
-    document.addEventListener("mousedown", handleDocPointerDown);
-    document.addEventListener("keydown", handleDocKeyDown, true);
+    const stopDocPointerDown = listen(document, "mousedown", handleDocPointerDown);
+    const stopDocKeyDown = listen(document, "keydown", handleDocKeyDown, true);
     onCleanup(() => {
-      document.removeEventListener("mousedown", handleDocPointerDown);
-      document.removeEventListener("keydown", handleDocKeyDown, true);
+      stopDocPointerDown();
+      stopDocKeyDown();
     });
   });
 
@@ -146,16 +202,16 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     }
     const frame = requestAnimationFrame(() => syncMenuPlace());
     const onRelayout = (): void => syncMenuPlace();
-    window.addEventListener("resize", onRelayout);
-    window.addEventListener("scroll", onRelayout, true);
-    window.visualViewport?.addEventListener("resize", onRelayout);
-    window.visualViewport?.addEventListener("scroll", onRelayout);
+    const stopWindowResize = listen(window, "resize", onRelayout);
+    const stopWindowScroll = listen(window, "scroll", onRelayout, true);
+    const stopViewportResize = listen(window.visualViewport, "resize", onRelayout);
+    const stopViewportScroll = listen(window.visualViewport, "scroll", onRelayout);
     onCleanup(() => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("resize", onRelayout);
-      window.removeEventListener("scroll", onRelayout, true);
-      window.visualViewport?.removeEventListener("resize", onRelayout);
-      window.visualViewport?.removeEventListener("scroll", onRelayout);
+      stopWindowResize();
+      stopWindowScroll();
+      stopViewportResize();
+      stopViewportScroll();
     });
   });
 
@@ -163,9 +219,9 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
 
   const onTriggerKeyDown = (event: KeyboardEvent): void => {
     const effect = applySelectKey(event.key, session(), props.options, props.value, props.disabled);
-    if (effect.type === "none") return;
+    if (selectEffectIsNone(effect)) return;
     event.preventDefault();
-    if (effect.type === "commit") {
+    if (selectEffectIsCommit(effect)) {
       commitValue(effect.value);
       return;
     }
@@ -190,15 +246,15 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         onClick={openMenu}
         onKeyDown={onTriggerKeyDown}
       >
-        <YoCorner mode="paint" role="control" class="yohu-select__chrome" />
+        <YoCorner mode="paint" role="control" radius={Radius.Xl} stroke class="yohu-select__chrome" />
         <span
           class="yohu-select__value"
           data-placeholder={selected() ? undefined : ""}
         >
           {selected()?.label ?? props.placeholder ?? ""}
         </span>
-        <Show when={props.block && selectedMeta()}>
-          {(meta) => <span class="yohu-select__description">{meta()}</span>}
+        <Show when={presenceIsOn(host()["data-block"]) && selectedMeta()}>
+          {(meta) => selectDescription(meta)}
         </Show>
         <span class="yohu-select__chevron" aria-hidden="true">
           <Icon name="chevron-down" size={Layout.IconInline} />
@@ -209,49 +265,53 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
           <div
             ref={(el) => {
               layerRef = el;
-              if (el) syncMenuPlace();
+              placeIfMounted(el);
             }}
             class="yohu-select__layer"
-            data-placement={placement()}
-            data-overflow-y={overflowY() ? "" : undefined}
-            data-placed={menuStyle().position ? "true" : undefined}
+            data-placement={selectPlacement()}
+            data-overflow-y={presenceAttr(overflowY())}
+            data-placed={presenceAttr(menuStyle().position)}
             style={menuStyle()}
           >
             <div
               ref={(el) => {
                 menuRef = el;
-                if (el) syncMenuPlace();
+                placeIfMounted(el);
               }}
               class="yohu-select__menu"
-              data-placement={placement()}
+              data-enter="rise"
+              data-placement={selectPlacement()}
               role="listbox"
             >
               <YoCorner
-                role="control"
+                role="card"
                 class="yohu-select__menu-chrome"
                 overflow={overflowY() ? "auto" : "hidden"}
                 pad="block-xs"
               >
                 <For each={props.options}>
-                  {(option, index) => (
+                  {(option, index) => {
+                    const picked = () => optionIsSelected(option, props.value);
+                    return (
                     <div
                       id={optionDomId(option.value)}
                       class="yohu-select__option yohu-interactive yohu-recipe-selected"
                       classList={{
-                        "yohu-interactive--selected": option.value === props.value,
+                        "yohu-interactive--selected": picked(),
                         "yohu-interactive--active": index() === activeIndex(),
                       }}
                       role="option"
-                      aria-selected={option.value === props.value}
+                      aria-selected={picked()}
                       onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: index() }))}
                       onClick={() => commitValue(option.value)}
                     >
                       <span class="yohu-select__option-label">{option.label}</span>
                       <Show when={optionDescription(option)}>
-                        {(meta) => <span class="yohu-select__description">{meta()}</span>}
+                        {(meta) => selectDescription(meta)}
                       </Show>
                     </div>
-                  )}
+                    );
+                  }}
                 </For>
               </YoCorner>
             </div>

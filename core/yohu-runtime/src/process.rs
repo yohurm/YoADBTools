@@ -39,19 +39,40 @@ pub struct ProcessOutput {
     pub stderr: String,
 }
 
+/// 短命令输出超过 [`STDOUT_BUDGET`] / [`STDERR_BUDGET`] 时的句子。
+pub const CAPTURE_TRUNCATED: &str = "输出超过捕获预算";
+/// 输出泵任务 panic 被 `JoinError` 接住时的句子。不是 IO。
+pub const PUMP_PANIC: &str = "输出泵任务异常结束";
+/// 子进程等待超时。
+pub const EXEC_TIMEOUT: &str = "执行超时";
+/// 子进程被取消。执行端口的「已取消」是另一句。
+pub const TASK_CANCELLED: &str = "任务已取消";
+
+/// 非零退出。stderr 是载荷。
+pub fn bad_exit_text(exit_code: i32, stderr: &str) -> String {
+    format!("执行失败(退出码 {exit_code}): {stderr}")
+}
+
+/// 宿主 IO。`detail` 是 `std::io::Error` 的显示，不是产品路径。
+pub fn io_error_text(detail: &str) -> String {
+    format!("IO 错误: {detail}")
+}
+
 /// 宿主进程错误（不是 `AdbError`）。
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessError {
-    #[error("执行超时")]
+    #[error("{}", EXEC_TIMEOUT)]
     Timeout,
-    #[error("任务已取消")]
+    #[error("{}", TASK_CANCELLED)]
     Cancelled,
-    #[error("IO 错误: {0}")]
+    #[error("{}", io_error_text(&.0.to_string()))]
     Io(#[from] std::io::Error),
-    #[error("执行失败(退出码 {exit_code}): {stderr}")]
+    #[error("{}", bad_exit_text(*exit_code, stderr))]
     BadExit { exit_code: i32, stderr: String },
-    #[error("输出超过捕获预算")]
+    #[error("{}", CAPTURE_TRUNCATED)]
     Truncated,
+    #[error("{}", PUMP_PANIC)]
+    PumpPanic,
 }
 
 /// 终止整个进程树，并兜底 `start_kill` 主进程。
@@ -431,7 +452,11 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::null())?))
+        Ok(ChildHandle::wrap(self.spawn(
+            program,
+            args,
+            Stdio::null(),
+        )?))
     }
 
     /// 长驻且 stdin 可写（浏览 raw shell）。logcat / 投屏仍走 [`Self::spawn_child`]。
@@ -440,7 +465,11 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(program, args, Stdio::piped())?))
+        Ok(ChildHandle::wrap(self.spawn(
+            program,
+            args,
+            Stdio::piped(),
+        )?))
     }
 
     fn spawn(&self, program: &Path, args: &[String], stdin: Stdio) -> Result<Child, ProcessError> {
@@ -479,7 +508,8 @@ fn flatten_join(
 ) -> Result<(), ProcessError> {
     match result {
         Ok(inner) => inner,
-        Err(e) => Err(ProcessError::Io(std::io::Error::other(e.to_string()))),
+        Err(e) if e.is_panic() => Err(ProcessError::PumpPanic),
+        Err(_) => Err(ProcessError::Cancelled),
     }
 }
 
@@ -572,6 +602,25 @@ mod tests {
     use std::io::Cursor;
 
     #[tokio::test]
+    async fn pump_panic_is_not_io() {
+        let handle = tokio::spawn(async { panic!("pump") });
+        let err = flatten_join(handle.await).expect_err("panic");
+        assert!(matches!(err, ProcessError::PumpPanic));
+        assert_eq!(err.to_string(), PUMP_PANIC);
+    }
+
+    #[tokio::test]
+    async fn aborted_pump_is_cancelled() {
+        let handle = tokio::spawn(async {
+            std::future::pending::<()>().await;
+            Ok(())
+        });
+        handle.abort();
+        let err = flatten_join(handle.await).expect_err("abort");
+        assert!(matches!(err, ProcessError::Cancelled));
+    }
+
+    #[tokio::test]
     async fn read_lines_bounded_invalid_utf8_is_io() {
         let (tx, _rx) = mpsc::channel::<String>(8);
         let bytes = b"ok\n\xFF\xFE bad\n";
@@ -588,8 +637,14 @@ mod tests {
             read_line_lossy(&mut reader).await.unwrap().as_deref(),
             Some("ok")
         );
-        let bad = read_line_lossy(&mut reader).await.unwrap().expect("坏字节行");
-        assert!(bad.contains('\u{FFFD}'), "非法 UTF-8 必须替换后继续: {bad:?}");
+        let bad = read_line_lossy(&mut reader)
+            .await
+            .unwrap()
+            .expect("坏字节行");
+        assert!(
+            bad.contains('\u{FFFD}'),
+            "非法 UTF-8 必须替换后继续: {bad:?}"
+        );
         assert_eq!(
             read_line_lossy(&mut reader).await.unwrap().as_deref(),
             Some("end")
@@ -752,7 +807,10 @@ mod tests {
     fn ping_stdin_echo() -> (&'static Path, Vec<String>) {
         (
             Path::new("sh"),
-            vec!["-c".into(), "read line; printf 'pong:%s\\n' \"$line\"".into()],
+            vec![
+                "-c".into(),
+                "read line; printf 'pong:%s\\n' \"$line\"".into(),
+            ],
         )
     }
 
@@ -761,7 +819,9 @@ mod tests {
         use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
         let runner = ProcessRunner;
         let (program, args) = ping_stdin_echo();
-        let mut child = runner.spawn_child_piped(program, &args).expect("spawn piped");
+        let mut child = runner
+            .spawn_child_piped(program, &args)
+            .expect("spawn piped");
         let mut stdin = child.stdin.take().expect("stdin");
         let mut stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
         stdin.write_all(b"hi\n").await.expect("write");

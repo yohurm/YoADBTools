@@ -29,8 +29,9 @@ impl AdbClient {
     /// 自愈式设备扫描：按候选顺序尝试不同 adb（用户设置 → DataRoot 解压副本）。
     ///
     /// 每个候选先 `start-server` 再 `devices -l`，同一二进制，禁止两份 sidecar 抢 5037。
-    /// 任一候选「进程可启动且退出码 0」即采信其结果；失败的候选仅记录并尝试下一个。
-    /// 全部失败时返回带明细的错误。返回 (设备列表, 实际使用的 adb 路径)。
+    /// 任一候选「进程可启动且退出码 0」即采信其结果；失败的候选记入日志并尝试下一个。
+    /// 全部失败时返回 [`AdbError::CandidatesFailed`]，不把各候选的报错拼进用户句。
+    /// 返回 (设备列表, 实际使用的 adb 路径)。
     pub async fn devices_resilient(
         &self,
         cancel: CancellationToken,
@@ -38,9 +39,9 @@ impl AdbClient {
         let tool = self.tool();
         let candidates = tool.candidates();
         if candidates.is_empty() {
-            return Err(AdbError::ToolUnavailable(tool.unavailable_hint()));
+            tracing::error!("{}", tool.unavailable_hint());
+            return Err(AdbError::ToolUnavailable);
         }
-        let mut failures: Vec<String> = Vec::new();
         tracing::info!(
             candidates = candidates.len(),
             first = %candidates[0].display(),
@@ -73,25 +74,20 @@ impl AdbClient {
                     return Ok((devices_parse::parse_devices_list(&out.stdout), adb.clone()));
                 }
                 Ok(out) => {
-                    failures.push(format!("{} (退出码 {})", out.stderr.trim(), out.exit_code));
                     tracing::warn!(
                         adb = %adb.display(),
                         ms,
-                        "adb 候选失败 {}",
-                        failures.last().unwrap_or(&String::new())
+                        exit = out.exit_code,
+                        stderr = %out.stderr.trim(),
+                        "adb 候选失败"
                     );
                 }
                 Err(e) => {
-                    failures.push(e.to_string());
                     tracing::warn!(adb = %adb.display(), ms, "adb 候选不可用 {e}");
                 }
             }
         }
-        Err(AdbError::ToolUnavailable(format!(
-            "全部 adb 候选扫描失败（{} 个）: {}",
-            candidates.len(),
-            failures.join("；")
-        )))
+        Err(AdbError::CandidatesFailed)
     }
 }
 

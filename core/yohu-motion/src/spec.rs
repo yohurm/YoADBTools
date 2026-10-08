@@ -33,6 +33,11 @@ pub enum MotionSpec {
 }
 
 impl MotionSpec {
+    /// 规格时长是 0 时没有曲线。采样和打断都问这一次。
+    pub fn duration_is_zero(self) -> bool {
+        self.duration_ms() == 0
+    }
+
     /// `--yohu-dur-*` 毫秒。弹簧规格仍给感知档，物理 settle 只在 CSS `linear()`。
     pub const fn duration_ms(self) -> u64 {
         match self {
@@ -143,5 +148,18 @@ mod tests {
         assert!(MotionSpec::SpatialEnter.ease()(mid) > MotionSpec::SpatialPanel.ease()(mid));
         assert!(MotionSpec::SpatialExit.ease()(mid) < MotionSpec::SpatialPanel.ease()(mid));
         assert!(MotionSpec::SpatialLocal.ease()(mid) > MotionSpec::SpatialPanel.ease()(mid));
+    }
+
+    fn production(src: &str) -> &str {
+        src.split("\n#[cfg(test)]").next().unwrap_or(src)
+    }
+
+    #[test]
+    fn unit_interval_is_single() {
+        let curve = production(include_str!("curve.rs"));
+        let dcomp = production(include_str!("dcomp.rs"));
+        assert_eq!(curve.matches(".clamp(0.0, 1.0)").count(), 1);
+        assert!(!dcomp.contains(".clamp(0.0, 1.0)"));
+        assert!(!dcomp.contains("== 0"));
     }
 }

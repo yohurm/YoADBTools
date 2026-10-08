@@ -4,7 +4,7 @@
 
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowRect, IsWindowVisible, SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE,
+    IsWindowVisible, SetWindowPos, ShowWindow, HWND_TOP, SWP_NOACTIVATE,
     SWP_NOZORDER, SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
 };
 
@@ -12,8 +12,8 @@ use crate::tokens::{WINDOW_DEFAULT_H, WINDOW_DEFAULT_W};
 use crate::window_boot::elapsed_ms;
 
 use super::geometry::{
-    center_in_work_area, clamp_rect_min, classify_handover, last_geometry, rect_height, rect_width,
-    xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
+    center_in_work_area, clamp_rect_min, classify_handover, hwnd_rect, last_geometry, rect_height,
+    rect_width, xywh, HandoverKind, LOGICAL_H, LOGICAL_W, WINDOW_MIN_H, WINDOW_MIN_W,
 };
 use super::recipe;
 use super::surface::BootSurface;
@@ -36,7 +36,7 @@ pub fn to_main(main: HWND) {
             .map(|g| g.rect())
             .unwrap_or_else(|| xywh(0, 0, LOGICAL_W, LOGICAL_H))
     });
-    let main_rect = window_rect(main).unwrap_or(splash_rect);
+    let main_rect = hwnd_rect(main).unwrap_or(splash_rect);
     let Some(placement) = last_geometry() else {
         show_main_at_target(main, target_on_splash_work(main_rect));
         finish();
@@ -116,7 +116,7 @@ fn target_on_splash_work(main_size_src: RECT) -> RECT {
 }
 
 fn fallback_target(main: HWND) -> RECT {
-    window_rect(main)
+    hwnd_rect(main)
         .map(target_on_splash_work)
         .unwrap_or_else(|| xywh(0, 0, WINDOW_DEFAULT_W as i32, WINDOW_DEFAULT_H as i32))
 }
@@ -153,14 +153,6 @@ fn show_main_at_target(main: HWND, target: RECT) {
             rect_height(target).max(1),
             flags,
         );
-    }
-}
-
-fn window_rect(hwnd: HWND) -> Option<RECT> {
-    unsafe {
-        let mut r = RECT::default();
-        GetWindowRect(hwnd, &mut r).ok()?;
-        Some(r)
     }
 }
 

@@ -5,25 +5,20 @@
  * 密集提示共享一个 popup，不是每处一棵 Portal。
  * 延迟只收 MotionSpec 名；定时器代际在 destroy 后丢弃。
  */
+import { presenceAttr } from "../dom/flag";
+import { controlIsBlock } from "../basic/control-busy";
 
 import type { Accessor } from "solid-js";
 import { createSignal } from "solid-js";
 
+import type { AnchorBox } from "../placement/anchor";
 import { motionSpecMs, type MotionSpecName } from "../tokens/motion";
 import { DEFAULT_TOOLTIP_DELAY, DEFAULT_TOOLTIP_HIDE_DELAY, tooltipIsEmpty } from "./tooltip-model";
-
-export interface TooltipTriggerBox {
-  top: number;
-  left: number;
-  bottom: number;
-  width: number;
-  height: number;
-}
 
 export interface TooltipSession {
   id: string;
   content: string;
-  trigger: TooltipTriggerBox;
+  trigger: AnchorBox;
 }
 
 export interface TooltipUnique {
@@ -49,8 +44,8 @@ export function tooltipAnchorAttrs(input: {
   stretch?: boolean;
 }): TooltipAnchorAttrs {
   return {
-    "data-block": input.block ? "" : undefined,
-    "data-stretch": input.stretch ? "" : undefined,
+    "data-block": presenceAttr(controlIsBlock(input.block)),
+    "data-stretch": presenceAttr(input.stretch),
   };
 }
 
@@ -104,11 +99,15 @@ export function bindTooltipInputModality(doc: Document = document): () => void {
     if (event.key === "Shift" || event.key === "Control" || event.key === "Alt" || event.key === "Meta") return;
     inputModality = "keyboard";
   };
-  doc.addEventListener("pointerdown", onPointer, true);
-  doc.addEventListener("keydown", onKey, true);
+  function listen(type: string, handler: EventListener): () => void {
+    doc.addEventListener(type, handler, true);
+    return () => doc.removeEventListener(type, handler, true);
+  }
+  const stopPointer = listen("pointerdown", onPointer);
+  const stopKey = listen("keydown", onKey);
   return () => {
-    doc.removeEventListener("pointerdown", onPointer, true);
-    doc.removeEventListener("keydown", onKey, true);
+    stopPointer();
+    stopKey();
   };
 }
 

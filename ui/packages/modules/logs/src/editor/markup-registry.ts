@@ -4,6 +4,7 @@
  */
 
 import type { NamedMarkupRun } from "./markup-policy";
+import { washSpanOpen } from "./markup-wash";
 
 type HighlightLike = {
   add(range: AbstractRange): void;
@@ -67,7 +68,7 @@ export function bindMarkupRuns(textNode: Text, runs: readonly NamedMarkupRun[]):
   for (const run of runs) {
     const from = Math.max(0, Math.min(run.from, len));
     const to = Math.max(from, Math.min(run.to, len));
-    if (to <= from) {
+    if (!washSpanOpen(from, to)) {
       continue;
     }
     const owned = bucket(run.name);

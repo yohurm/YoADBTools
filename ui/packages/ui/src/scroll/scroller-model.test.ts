@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { Layout } from "../tokens/layout";
 import { motionDurationMs } from "../tokens/motion";
@@ -23,6 +26,7 @@ import {
   resolveScrollerInteractive,
   resolveScrollerOverflow,
   resolveScrollerPhase,
+  resolveScrollerReducedPhase,
   resolveScrollerScrollEnd,
   resolveScrollerScrollTop,
   resolveScrollerThumb,
@@ -31,10 +35,21 @@ import {
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
   resolveScrollerAxis,
+  scrollerAxisIsBoth,
+  scrollerPhaseAcceptsPointer,
+  scrollerPhaseIsNone,
+  scrollerPhaseIsOut,
+  scrollerBarIsAuto,
+  scrollerBarIsOff,
+  scrollerBarIsOn,
+  scrollerPhaseIsShown,
   resolveScrollerViewSize,
+  resolveScrollerValueNow,
   resolveScrollerViewFromGutter,
   resolveScrollerContentBox,
   resolveScrollerDrive,
+  scrollerDriveIsFlow,
+  scrollerOverflowIsHidden,
   scrollerPlaneTransform,
   resolveScrollerClampedTop,
   resolveScrollerPageTop,
@@ -174,5 +189,195 @@ describe("scroller-model", () => {
     expect(resolveScrollerPageTowardPointer({ pointerY: 30, trackTop: 0, thumbTop: 80, thumbHeight: 48 })).toBe(false);
     expect(resolveScrollerPageTowardPointer({ pointerY: 200, trackTop: 0, thumbTop: 80, thumbHeight: 48 })).toBe(true);
     expect(resolveScrollerThumbCoversPointer({ pointerY: 100, trackTop: 0, thumbTop: 80, thumbHeight: 48 })).toBe(true);
+  });
+
+  it("aria 百分比走进度比例", () => {
+    expect(resolveScrollerValueNow(0, 0)).toBe(0);
+    expect(resolveScrollerValueNow(1, 3)).toBe(33);
+    expect(resolveScrollerValueNow(150, 100)).toBe(100);
+  });
+
+  it("双轴只在 scrollerAxisIsBoth 里比较", () => {
+    expect(scrollerAxisIsBoth("both")).toBe(true);
+    expect(scrollerAxisIsBoth("block")).toBe(false);
+    expect(scrollerAxisIsBoth()).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.") || name === "scroller-model.ts") continue;
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('=== "both"');
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('!== "both"');
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('axis() === "block"');
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('"block" | "both"');
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('"auto" | "hidden"');
+    }
+  });
+
+  it("滚动相位只在模型里比较", () => {
+    expect(scrollerPhaseIsNone("none")).toBe(true);
+    expect(scrollerPhaseIsNone("on")).toBe(false);
+    expect(scrollerPhaseIsOut("out")).toBe(true);
+    expect(scrollerPhaseIsShown("in")).toBe(true);
+    expect(scrollerPhaseIsShown("on")).toBe(true);
+    expect(scrollerPhaseIsShown("out")).toBe(false);
+    expect(scrollerPhaseAcceptsPointer("on")).toBe(true);
+    expect(scrollerPhaseAcceptsPointer("none")).toBe(false);
+    expect(scrollerPhaseAcceptsPointer("out")).toBe(false);
+    expect(resolveScrollerReducedPhase("in")).toEqual({ phase: "on", prev: "on" });
+    expect(resolveScrollerReducedPhase("on")).toEqual({ phase: "on", prev: "on" });
+    expect(resolveScrollerReducedPhase("out")).toEqual({ phase: "none", prev: undefined });
+    expect(resolveScrollerReducedPhase("none")).toEqual({ phase: "none", prev: undefined });
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body =
+        name === "scroller-model.ts"
+          ? text
+              .replace('return phase === "none"', "")
+              .replace('return phase === "out"', "")
+              .replace('return phase === "in" || phase === "on"', "")
+          : text;
+      const phaseBody = body.replaceAll('=== "inline"', "");
+      expect(phaseBody, name).not.toContain('=== "none"');
+      expect(phaseBody, name).not.toContain('=== "out"');
+      expect(phaseBody, name).not.toContain('!== "out"');
+      expect(phaseBody, name).not.toContain('=== "in"');
+    }
+  });
+
+  it("条状态只在模型里比较", () => {
+    expect(scrollerBarIsAuto("auto")).toBe(true);
+    expect(scrollerBarIsAuto("on")).toBe(false);
+    expect(scrollerBarIsOn("on")).toBe(true);
+    expect(scrollerBarIsOff("off")).toBe(true);
+    expect(scrollerBarIsOff("auto")).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body =
+        name === "scroller-model.ts"
+          ? text
+              .replace('return state === "auto"', "")
+              .replace('return state === "on"', "")
+              .replace('return state === "off"', "")
+          : text;
+      expect(body, name).not.toContain('=== "auto"');
+      expect(body, name).not.toContain('!== "auto"');
+      expect(body, name).not.toContain('=== "off"');
+      expect(body, name).not.toContain('!== "off"');
+      expect(body, name).not.toContain('bar === "on"');
+    }
+  });
+
+  it("驱动只在模型里比较 flow", () => {
+    expect(scrollerDriveIsFlow("flow")).toBe(true);
+    expect(scrollerDriveIsFlow("offset")).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body = name === "scroller-model.ts" ? text.replace('return drive === "flow"', "") : text;
+      expect(body, name).not.toContain('drive() === "flow"');
+      expect(body, name).not.toContain('drive() !== "flow"');
+      expect(body, name).not.toContain('drive === "flow"');
+    }
+  });
+
+  it("裁切只在模型里比较 hidden", () => {
+    expect(scrollerOverflowIsHidden("hidden")).toBe(true);
+    expect(scrollerOverflowIsHidden("auto")).toBe(false);
+    expect(scrollerOverflowIsHidden()).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body = name === "scroller-model.ts" ? text.replace('return overflow === "hidden"', "") : text;
+      expect(body, name).not.toContain('overflow() === "hidden"');
+      expect(body, name).not.toContain('overflow === "hidden"');
+    }
+  });
+});
+
+describe("滑块行程", () => {
+  it("视口减去滑块长度后不小于 0", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "scroller-model.ts"), "utf8");
+    const heightNeedle = "Math.max(0, " + "view - height)";
+    const thumbNeedle = "Math.max(0, " + "input.view - input.thumbHeight)";
+    const endNeedle = "Math.max(0, " + "all - view)";
+    expect(source.split(heightNeedle).length - 1).toBe(0);
+    expect(source.split(thumbNeedle).length - 1).toBe(0);
+    expect(source).toContain("scrollerThumbRoom(view, height)");
+    expect(source).toContain("scrollerThumbRoom(input.view, input.thumbHeight)");
+    expect(source.split("return Math.max(0, view - thumb)").length - 1).toBe(1);
+    expect(source).toContain(endNeedle);
+  });
+});
+
+describe("绑定位移行程", () => {
+  it("四处 room 调用模型行程", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const binder = readFileSync(join(dir, "scroller-binder.ts"), "utf8");
+    const model = readFileSync(join(dir, "scroller-model.ts"), "utf8");
+    const blockRoom = "Math.max(0, " + "metrics.viewBlock - current.height)";
+    const inlineRoom = "Math.max(0, " + "metrics.viewInline - current.height)";
+    const endNeedle = "Math.max(0, " + "all - view)";
+    expect(binder.split(blockRoom).length - 1).toBe(0);
+    expect(binder.split(inlineRoom).length - 1).toBe(0);
+    expect(binder.split("scrollerThumbRoom(metrics.viewBlock, current.height)").length - 1).toBe(2);
+    expect(binder.split("scrollerThumbRoom(metrics.viewInline, current.height)").length - 1).toBe(2);
+    expect(model.split("export function scrollerThumbRoom").length - 1).toBe(1);
+    expect(model.split("return Math.max(0, view - thumb)").length - 1).toBe(1);
+    expect(model).toContain(endNeedle);
+  });
+});
+
+describe("滚动垫", () => {
+  it("起始垫和结束垫不小于 0", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "scroller-model.ts"), "utf8");
+    const startNeedle = "Math.max(0, " + "paddingStart)";
+    const endNeedle = "Math.max(0, " + "paddingEnd)";
+    expect(source.split(startNeedle).length - 1).toBe(0);
+    expect(source.split(endNeedle).length - 1).toBe(0);
+    expect(source).toContain("scrollerPad(paddingStart)");
+    expect(source).toContain("scrollerPad(paddingEnd)");
+    expect(source.split("function scrollerPad").length - 1).toBe(1);
+    expect(source.split("return Math.max(0, value)").length - 1).toBe(3);
+    expect(source).toContain("Math.max(0, client - scrollerPad");
+    expect(source.split("return Math.max(0, view - thumb)").length - 1).toBe(1);
+  });
+});
+
+describe("滚动偏移", () => {
+  it("滑块几何和夹紧滚动偏移不小于 0", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "scroller-model.ts"), "utf8");
+    const oldTop = "Math.max(0, " + "input.top)";
+    const thumbRatio = "Math.max(0, " + "input.thumbTop / room)";
+    expect(source.split(oldTop).length - 1).toBe(0);
+    expect(source.split("scrollerOffset(input.top)").length - 1).toBe(2);
+    expect(source.split("function scrollerOffset").length - 1).toBe(1);
+    expect(source.split("function scrollerPad").length - 1).toBe(1);
+    expect(source.split("return Math.max(0, value)").length - 1).toBe(3);
+    expect(source.split("return Math.max(0, view - thumb)").length - 1).toBe(1);
+    expect(source).toContain("return Math.max(0, all - view)");
+    expect(source).toContain(thumbRatio);
+  });
+});
+
+describe("内容盒边长", () => {
+  it("有声明尺时块边和横轴回退不小于 0", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "scroller-model.ts"), "utf8");
+    const blockNeedle = "Math.max(0, " + "declared.block)";
+    const inlineNeedle = "Math.max(0, " + "viewInline)";
+    expect(source.split(blockNeedle).length - 1).toBe(0);
+    expect(source.split(inlineNeedle).length - 1).toBe(0);
+    expect(source).toContain("scrollerExtent(declared.block)");
+    expect(source).toContain("scrollerExtent(viewInline)");
+    expect(source).toContain("declared.inline != null && declared.inline > 0");
+    expect(source.split("function scrollerExtent").length - 1).toBe(1);
+    expect(source.split("function scrollerPad").length - 1).toBe(1);
+    expect(source.split("return Math.max(0, value)").length - 1).toBe(3);
+    expect(source).toContain("Math.max(0, client - scrollerPad");
+    expect(source).toContain("return Math.max(0, all - view)");
   });
 });

@@ -1,0 +1,18 @@
+[package]
+name = "yohu-download"
+description = "Yohu ADB Tools v6 — HTTP(S) 大文件落盘原语（零产品类型）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "fs", "io-util", "net"] }
+tokio-util = "0.7"
+futures-util = "0.3"
+sha2 = "0.10"
+tracing.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

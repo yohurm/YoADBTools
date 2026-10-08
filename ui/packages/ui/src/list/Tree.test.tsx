@@ -60,6 +60,21 @@ describe("YoTree", () => {
     expect(screen.getByText("子2")).toBeTruthy();
   });
 
+  it("受控且有 onToggle 时把开合交回，自己不改展开", () => {
+    const onToggle = vi.fn();
+    render(() => <YoTree data={DATA} expandedKeys={[]} onToggle={onToggle} />);
+    fireEvent.click(screen.getByText("根1"));
+    expect(onToggle).toHaveBeenCalledWith("root1");
+    expect(document.querySelector('[data-tree-key="c1"]')?.closest(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    const tree = screen.getByRole("tree");
+    tree.focus();
+    fireEvent.keyDown(tree, { key: "ArrowRight" });
+    expect(onToggle).toHaveBeenCalledWith("root1");
+    expect(onToggle).toHaveBeenCalledTimes(2);
+  });
+
   it("键盘 → 展开，← 收起", () => {
     render(() => <YoTree data={DATA} />);
     const tree = screen.getByRole("tree");
@@ -105,6 +120,11 @@ describe("YoTree", () => {
     expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeNull();
   });
 
+  it("树不自铺表面，底色只跟所在面板", () => {
+    expect(treeCss).toMatch(/\.yohu-tree\s*\{[^}]*background-color:\s*transparent/);
+    expect(treeCss).not.toMatch(/\.yohu-tree\s*\{[^}]*var\(--yohu-surface\)/);
+  });
+
   it("行高走 header 尺，不套数据行，不被 collapse 盖成 min-content", () => {
     expect(treeCss).toContain("min-height: var(--yohu-tree-row-height, var(--yohu-row-height-header))");
     expect(treeCss).not.toMatch(/min-height:\s*var\(--yohu-row-height\)/);
@@ -126,5 +146,20 @@ describe("YoTree", () => {
     fireEvent.keyDown(tree, { key: "ArrowDown" }); // 焦点到子1
     fireEvent.keyDown(tree, { key: "ArrowLeft" }); // 未展开 → 父 root1
     expect(document.activeElement?.getAttribute("data-tree-key")).toBe("root1");
+  });
+});
+
+describe("树记下焦点", () => {
+  it("键盘与点击经 treeRememberFocus 记下焦点键", () => {
+    const source = readFileSync(resolve(here, "Tree.tsx"), "utf-8");
+    expect(source.split("setFocusedKey(" + "key)").length - 1).toBe(1);
+    expect(source.split("setFocusedKey(" + "node.key)").length - 1).toBe(0);
+    expect(source.split("function treeRememberFocus").length - 1).toBe(1);
+    expect(source.split("export function treeRememberFocus").length - 1).toBe(0);
+    expect(source.split("treeRememberFocus(key)").length - 1).toBe(1);
+    expect(source.split("treeRememberFocus(node.key)").length - 1).toBe(2);
+    expect(source.split("el?.focus()").length - 1).toBe(1);
+    expect(source.split("event.stopPropagation()").length - 1).toBe(1);
+    expect(source).toContain("const focusKey");
   });
 });

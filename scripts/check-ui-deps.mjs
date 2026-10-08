@@ -96,5 +96,19 @@ function scanNoPierce(dir) {
 scanNoPierce(MODULES_DIR);
 scanNoPierce(join(ROOT, "ui/packages/workbench/src"));
 
+function scanNoPierceScript(dir) {
+  if (!statSync(dir).isDirectory()) return;
+  for (const file of walk(dir, [])) {
+    if (!/\.(ts|tsx)$/.test(file) || /\.test\.(ts|tsx)$/.test(file)) continue;
+    const text = readFileSync(file, "utf8");
+    if (PIERCE.test(text)) {
+      console.error(`${relative(ROOT, file)} 禁止在脚本里点 Yo 内部槽（.yohu-*__*）`);
+      failed = true;
+    }
+  }
+}
+scanNoPierceScript(MODULES_DIR);
+scanNoPierceScript(join(ROOT, "ui/packages/workbench/src"));
+
 if (failed) process.exit(1);
 console.log("check-ui-deps: ok");

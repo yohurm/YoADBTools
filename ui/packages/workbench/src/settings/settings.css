@@ -15,6 +15,11 @@
   gap: var(--yohu-space-md);
 }
 
+.yohu-settings__hint {
+  font-size: var(--yohu-font-caption);
+  color: var(--yohu-fg-3);
+}
+
 .yohu-settings__about {
   display: flex;
   align-items: center;
@@ -79,9 +84,18 @@
   margin-top: var(--yohu-space-md);
 }
 
+.yohu-settings__update-progress--pinned {
+  width: 100%;
+  margin-top: 0;
+  padding-top: var(--yohu-space-md);
+  border-top: 1px solid var(--yohu-border);
+  box-sizing: border-box;
+}
+
 .yohu-settings__update-progress-text {
   margin: var(--yohu-space-sm) 0 0;
   font-size: var(--yohu-font-caption);
   color: var(--yohu-fg-3);
   font-variant-numeric: tabular-nums;
 }
+

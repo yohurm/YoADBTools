@@ -1,13 +1,22 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
   dialogHugsContent,
+  dialogInitialIsFooter,
+  dialogWidthIsSet,
+  dialogNodeOn,
+  dialogRegionIsSplit,
+  dialogTailAlignIsStretch,
   resolveDialogActionsLayout,
   resolveDialogBodyRegion,
   resolveDialogBodySpec,
   resolveDialogBox,
   resolveDialogExitLock,
   resolveDialogInitial,
+  resolveDialogTailAlign,
 } from "./dialog-model";
 
 describe("dialog-model", () => {
@@ -131,10 +140,79 @@ describe("dialog-model", () => {
     expect(resolveDialogActionsLayout(4)).toBe("stack");
   });
 
+  it("尾槽铺满和分区只在模型里比较", () => {
+    expect(dialogTailAlignIsStretch("stretch")).toBe(true);
+    expect(dialogTailAlignIsStretch("start")).toBe(false);
+    expect(dialogTailAlignIsStretch()).toBe(false);
+    expect(resolveDialogTailAlign("stretch")).toBe("stretch");
+    expect(resolveDialogTailAlign()).toBe("start");
+    expect(dialogRegionIsSplit("split")).toBe(true);
+    expect(dialogRegionIsSplit("plain")).toBe(false);
+    expect(dialogInitialIsFooter("footer")).toBe(true);
+    expect(dialogInitialIsFooter("auto")).toBe(false);
+    expect(dialogInitialIsFooter("first")).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body =
+        name === "dialog-model.ts"
+          ? text
+              .replace('return align === "stretch"', "")
+              .replace('return region === "split"', "")
+              .replace('return value === "footer"', "")
+              .replace("return height === undefined", "")
+          : text;
+      expect(body, name).not.toContain('=== "stretch"');
+      expect(body, name).not.toContain('=== "split"');
+      expect(body, name).not.toContain('=== "footer"');
+      expect(body, name).not.toContain("height === undefined");
+      expect(body, name).not.toContain("height !== undefined");
+    }
+  });
+
+  it("铅槽和尾槽的有无只在 dialogNodeOn", () => {
+    expect(dialogNodeOn(undefined)).toBe(false);
+    expect(dialogNodeOn(null)).toBe(false);
+    expect(dialogNodeOn(false)).toBe(true);
+    expect(dialogNodeOn("x")).toBe(true);
+    const view = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "Dialog.tsx"), "utf8");
+    expect(view).not.toContain("!= null");
+  });
+
   it("零盒不锁，正盒锁成 px", () => {
     expect(resolveDialogExitLock(0, 320)).toBeUndefined();
     expect(resolveDialogExitLock(400, 0)).toBeUndefined();
     expect(resolveDialogExitLock(400, 320)).toEqual({ width: "400px", height: "320px" });
+  });
+
+  it("显式宽只在 dialogWidthIsSet 里比较", () => {
+    expect(dialogWidthIsSet()).toBe(false);
+    expect(dialogWidthIsSet(undefined)).toBe(false);
+    expect(dialogWidthIsSet(0)).toBe(true);
+    expect(dialogWidthIsSet(960)).toBe(true);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name)) continue;
+      let body = readFileSync(join(dir, name), "utf8");
+      if (name.includes(".test.")) body = body.replaceAll("width !== undefined", "");
+      if (name === "dialog-model.ts") body = body.replace("return width !== undefined", "");
+      expect(body, name).not.toContain("width !== undefined");
+    }
+  });
+
+  it("空盒只在 cornerExtentIsEmpty 里比较", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const owner = readFileSync(join(dir, "../corner/corner-model.ts"), "utf8").replace(
+      "return width <= 0 || height <= 0",
+      "",
+    );
+    expect(owner).not.toContain("width <= 0 || height <= 0");
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const body = readFileSync(join(dir, name), "utf8");
+      expect(body, name).not.toContain("width <= 0 || height <= 0");
+    }
   });
 
 });

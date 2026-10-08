@@ -1,6 +1,6 @@
 /**
  * 模块导航 store：活动模块身份；投屏 HWND 开关跟身份走。
- * View 只交 navigate / setMirrorPresent。
+ * View 只交 navigate / setMirrorPresent。`dark` 是当时已解析主题，回放时覆盖缓存铬色。
  */
 
 import { createSignal } from "solid-js";
@@ -18,8 +18,8 @@ export function createNavStore() {
     closeContextMenu();
   }
 
-  async function setMirrorPresent(moduleId: string | undefined): Promise<void> {
-    await mirrorPresentSetActive(mirrorPresentShouldBeActive(moduleId));
+  async function setMirrorPresent(moduleId: string | undefined, dark: boolean): Promise<void> {
+    await mirrorPresentSetActive(mirrorPresentShouldBeActive(moduleId), dark);
   }
 
   return { activeModuleId, navigate, setMirrorPresent };

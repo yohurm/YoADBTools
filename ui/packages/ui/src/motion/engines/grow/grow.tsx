@@ -26,6 +26,10 @@ export interface YoGrowProps {
   children: JSX.Element;
 }
 
+function growSpec(spec: MotionSpecName | undefined): MotionSpecName {
+  return spec ?? GROW_SPEC;
+}
+
 export function YoGrow(props: YoGrowProps): JSX.Element {
   const [traveling, setTraveling] = createSignal(false);
   let ctl: GrowController | undefined;
@@ -36,8 +40,12 @@ export function YoGrow(props: YoGrowProps): JSX.Element {
     traveling,
   };
 
-  onCleanup(() => {
+  function growDispose(): void {
     ctl?.dispose();
+  }
+
+  onCleanup(() => {
+    growDispose();
     ctl = undefined;
   });
 
@@ -46,16 +54,16 @@ export function YoGrow(props: YoGrowProps): JSX.Element {
       <div
         class="yohu-grow"
         ref={(el) => {
-          ctl?.dispose();
+          growDispose();
           ctl = bindGrow(el, {
             enabled: () => props.enabled !== false,
-            spec: () => props.spec ?? GROW_SPEC,
+            spec: () => growSpec(props.spec),
             onTraveling: setTraveling,
           });
           ctl.snapshot();
           ctl.command();
         }}
-        data-spec={props.spec ?? GROW_SPEC}
+        data-spec={growSpec(props.spec)}
       >
         <div class="yohu-grow__slot">{props.children}</div>
       </div>

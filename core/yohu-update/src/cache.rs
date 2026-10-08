@@ -11,7 +11,7 @@ use crate::error::UpdateError;
 /// 产品家园 `cache/update/`：不进 NSIS INSTDIR，覆盖安装时不会自删。
 pub fn update_cache_dir() -> Result<PathBuf, UpdateError> {
     Ok(app_data_root(DATA_DIR_NAME)
-        .map_err(|e| UpdateError::Io(e.to_string()))?
+        .map_err(|_| UpdateError::HostRoot)?
         .join(dir::CACHE)
         .join(dir::UPDATE))
 }
@@ -19,7 +19,7 @@ pub fn update_cache_dir() -> Result<PathBuf, UpdateError> {
 /// 从下载 URL 取出合法的安装包文件名。
 pub fn installer_file_name(url: &str) -> Result<String, UpdateError> {
     let trimmed = url.trim();
-    let without_query = trimmed.split(['?', '#']).next().unwrap_or(trimmed);
+    let without_query = crate::url_policy::before_query(trimmed);
     let raw = without_query.rsplit('/').next().unwrap_or("").trim();
     if raw.is_empty() {
         return Err(UpdateError::InvalidInstaller);

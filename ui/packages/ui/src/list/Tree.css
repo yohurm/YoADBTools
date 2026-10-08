@@ -1,8 +1,9 @@
+/* 不自铺表面。底色只跟所在面板（投放时整栏 accent-soft），内容不再抠出一块白。 */
 .yohu-tree {
   position: relative;
   font-family: var(--yohu-font-sans);
   color: var(--yohu-fg);
-  background-color: var(--yohu-surface);
+  background-color: transparent;
   box-sizing: border-box;
 }
 

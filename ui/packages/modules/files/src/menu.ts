@@ -4,6 +4,8 @@
 
 import { defineContextMenu } from "@yohu/ui";
 
+import { createKindTitle } from "./create-kind";
+
 export type FilesListMenuAction = "new-file" | "new-dir" | "download" | "copy" | "delete";
 
 export interface FilesListMenuCtx {
@@ -20,8 +22,8 @@ export interface FilesListMenuCtx {
 export const filesListMenu = defineContextMenu<FilesListMenuCtx, FilesListMenuAction>({
   id: "files.list",
   items: (ctx) => [
-    { id: "new-file", label: "新建文件" },
-    { id: "new-dir", label: "新建目录" },
+    { id: "new-file", label: createKindTitle("file") },
+    { id: "new-dir", label: createKindTitle("dir") },
     { id: "download", label: "下载", disabled: !ctx.canDownload },
     { id: "copy", label: "复制路径", disabled: !ctx.canCopy },
     { id: "delete", label: "删除", danger: true, disabled: !ctx.canDelete },

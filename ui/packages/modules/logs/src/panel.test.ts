@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
@@ -11,8 +14,10 @@ import {
   lastSeqOf,
   mirrorCoversRange,
   nextDiscardFromSeq,
+  panelFollows,
   panelFromLines,
   projectWindow,
+  captureStarted,
   selectHits,
   seqBefore,
   signalCountOf,
@@ -22,6 +27,7 @@ import {
 } from "./panel";
 import type { SessionFilter } from "./filter";
 import { collapseStack } from "./stack";
+import { EXPORT_NEEDS_CAPTURE, sessionHasCapture } from "./workspace";
 
 const line = (seq: number, over: Partial<LogLine> = {}): LogLine => ({
   seq,
@@ -53,6 +59,9 @@ describe("panel 游标", () => {
     expect(isFreshLine(0, 0, 0)).toBe(false);
     expect(canFreezeFollow([])).toBe(false);
     expect(canFreezeFollow(collapseStack([line(0)]))).toBe(true);
+    expect(panelFollows(false, [])).toBe(true);
+    expect(panelFollows(true, [])).toBe(true);
+    expect(panelFollows(false, collapseStack([line(0)]))).toBe(false);
     expect(isFreshLine(1, 0, 2)).toBe(false);
   });
 
@@ -310,5 +319,60 @@ describe("panel 派生", () => {
     expect(visible.map((r) => r.line.seq)).toEqual([1, 2]);
     expect(signalCount).toBe(0);
     expect(signalCountOf(visible)).toBe(0);
+  });
+});
+
+describe("跟滚抬起只写一处", () => {
+  it("会话和视图不再自己或上空面板", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const panel = readFileSync(resolve(here, "panel.ts"), "utf8").replace(
+      "return following || !canFreezeFollow(visible);",
+      "",
+    );
+    expect(panel).not.toContain("|| !canFreezeFollow");
+    expect(readFileSync(resolve(here, "workspace.ts"), "utf8")).not.toContain("|| !canFreezeFollow");
+    const view = readFileSync(resolve(here, "LogAnalyzerView.tsx"), "utf8");
+    expect(view).not.toContain("rows.length > 0");
+  });
+});
+
+describe("sessionHasCapture", () => {
+  it("没设备或从未开始都不能导出", () => {
+    expect(captureStarted(-1)).toBe(false);
+    expect(captureStarted(0)).toBe(true);
+    expect(sessionHasCapture(null)).toBe(false);
+    expect(sessionHasCapture({ serial: null, fromSeq: 0 })).toBe(false);
+    expect(sessionHasCapture({ serial: "S1", fromSeq: -1 })).toBe(false);
+    expect(sessionHasCapture({ serial: "S1", fromSeq: 0 })).toBe(true);
+    expect(EXPORT_NEEDS_CAPTURE).toBe("请先选择设备并采集日志");
+  });
+});
+
+describe("没有新行只判一次", () => {
+  it("no_lines_once", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "panel.ts"), "utf8");
+    const needle = "lines.length " + "=== 0";
+    expect(body.split(needle).length - 1).toBe(1);
+    expect(body).toContain("noLines(");
+  });
+});
+
+describe("镜像超出容量只裁一次", () => {
+  it("drop_overflow_once", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "mirror.ts"), "utf8");
+    const longer = "this.buf.length > " + "this.capacity";
+    const splice = "this.buf.splice(0, this.buf.length - " + "this.capacity)";
+    expect(body.split(longer).length - 1).toBe(1);
+    expect(body.split(splice).length - 1).toBe(1);
+    expect(body).toContain("dropOverflow(");
+  });
+});
+
+describe("容量至少为一只写一次", () => {
+  it("clamp_capacity_once", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "mirror.ts"), "utf8");
+    const needle = "Math.max(1, " + "capacity)";
+    expect(body.split(needle).length - 1).toBe(1);
+    expect(body).toContain("clampCapacity(");
   });
 });

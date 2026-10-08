@@ -8,6 +8,8 @@ export interface YoMenuItem<Action extends string = string> {
   label: string;
   danger?: boolean;
   disabled?: boolean;
+  /** 二级菜单。有子项时本项不提交，悬停或向右展开。 */
+  children?: readonly YoMenuItem<Action>[];
 }
 
 export interface ContextMenuScene<Ctx, Action extends string = string> {

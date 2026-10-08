@@ -2,11 +2,38 @@
  * 文件页快捷键策略：绑定表 + 远程路径复制格式。
  */
 
+import { joinPath } from "@yohu/api";
 import { whenList, whenPanel, type KeyBinding } from "@yohu/ui";
 
-import { joinPath } from "./model";
-
 export type FilesKeyAction = "select-all" | "copy" | "delete" | "refresh" | "go-up" | "open" | "edit-path";
+
+export function filesKeyIsSelectAll(action: FilesKeyAction): boolean {
+  return action === "select-all";
+}
+
+export function filesKeyIsCopy(action: FilesKeyAction): boolean {
+  return action === "copy";
+}
+
+export function filesKeyIsDelete(action: FilesKeyAction): boolean {
+  return action === "delete";
+}
+
+export function filesKeyIsRefresh(action: FilesKeyAction): boolean {
+  return action === "refresh";
+}
+
+export function filesKeyIsGoUp(action: FilesKeyAction): boolean {
+  return action === "go-up";
+}
+
+export function filesKeyIsEditPath(action: FilesKeyAction): boolean {
+  return action === "edit-path";
+}
+
+export function filesKeyIsOpen(action: FilesKeyAction): boolean {
+  return action === "open";
+}
 
 export const FILES_LIST_SELECTOR = ".yohu-files__table-list";
 

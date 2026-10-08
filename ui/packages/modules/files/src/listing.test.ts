@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DEFAULT_BROWSE_ROOT, type BrowseAttach, type RemoteEntry } from "@yohu/api";
@@ -27,7 +27,13 @@ vi.mock("@yohu/api", async (importOriginal) => {
   };
 });
 
-import { createListingStore, listingEntryFromWire } from "./listing";
+import {
+  browseGenerationAbsent,
+  createListingStore,
+  listingCommitNow,
+  listingCommitStays,
+  listingEntryFromWire,
+} from "./listing";
 
 function fileEntry(name: string): RemoteEntry {
   return { name, kind: "file", size: 1, permission: "-rw-r--r--" };
@@ -57,7 +63,7 @@ describe("listing 边界", () => {
     const start = src.indexOf("async function enterDirectory");
     const next = src.indexOf("async function goUp");
     const body = src.slice(start, next);
-    expect(body).not.toContain("try");
+    expect(body).not.toContain("try {");
     expect(body).not.toContain("catch");
     expect(src.match(/resolveRemotePath\(/g)?.length).toBe(1);
   });
@@ -235,7 +241,7 @@ describe("goTo / detach fault", () => {
     expect(store.session.path).toBe("/sdcard");
     await expect(store.goTo("/data/local/tmp")).resolves.toBe(false);
     expect(store.session.path).toBe("/sdcard");
-    expect(store.session.error).toBe("路径不在安全根内");
+    expect(store.session.error).toBe("路径不在安全根内: /data/local/tmp");
     expect(mocks.filesList).not.toHaveBeenCalled();
   });
 
@@ -270,28 +276,41 @@ describe("goTo / detach fault", () => {
   });
 });
 
-describe("删除乐观摘名", () => {
-  it("removeMany 先摘名，IPC 返回前列表已无该项", async () => {
+describe("删除后以 list 为准", () => {
+  it("removeMany 在 list 返回前不摘行，回来才换这份清单", async () => {
     mocks.filesList.mockResolvedValue([fileEntry("a.txt"), fileEntry("b.txt")]);
     const store = createListingStore();
     store.bindSerial("S1");
     await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]));
 
-    let release!: () => void;
+    let releaseDelete!: () => void;
     mocks.filesDelete.mockImplementation(
       () =>
         new Promise((resolveDelete) => {
-          release = resolveDelete;
+          releaseDelete = resolveDelete;
         }),
     );
-    mocks.filesList.mockResolvedValue([fileEntry("b.txt")]);
+    let releaseList!: (list: RemoteEntry[]) => void;
+    mocks.filesList.mockImplementationOnce(
+      () =>
+        new Promise((resolveList) => {
+          releaseList = resolveList;
+        }),
+    );
 
     const pending = store.removeMany(["a.txt"]);
-    await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]));
-    release();
+    await vi.waitFor(() =>
+      expect(mocks.filesDelete).toHaveBeenCalledWith({ serial: "S1", path: "/sdcard/a.txt" }),
+    );
+    expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]);
+    expect(mocks.filesSessionAttach).toHaveBeenCalledTimes(1);
+    releaseDelete();
+    await vi.waitFor(() => expect(mocks.filesList.mock.calls.length).toBeGreaterThan(1));
+    expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]);
+    expect(mocks.filesSessionAttach).toHaveBeenCalledTimes(1);
+    releaseList([fileEntry("b.txt")]);
     await pending;
-    expect(mocks.filesDelete).toHaveBeenCalledWith({ serial: "S1", path: "/sdcard/a.txt" });
-    await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]));
+    expect(store.entries.map((e) => e.name)).toEqual(["b.txt"]);
   });
 
   it("removeMany 失败仍 list，并把错误写回 session", async () => {
@@ -304,6 +323,14 @@ describe("删除乐观摘名", () => {
     await store.removeMany(["a.txt"]);
     expect(store.session.error).toBe("a.txt: 设备忙");
     expect(mocks.filesList.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("mkdir 非法名写入领域句，不当成 IPC 错误", async () => {
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.session.path).toBe("/sdcard"));
+    await store.mkdir("..");
+    expect(store.session.error).toBe("条目名非法: ..");
   });
 });
 
@@ -363,5 +390,87 @@ describe("目录快照会话", () => {
     release([dirEntry("DCIM")]);
     await pending;
     expect(store.entries.map((e) => e.name)).toEqual(["DCIM"]);
+  });
+
+  it("普通文件和清单里没有的名字不进入，链接当目录进入", async () => {
+    mocks.filesList.mockImplementation(async (_serial, path) => {
+      if (path === "/sdcard") {
+        return [
+          fileEntry("a.txt"),
+          { name: "link", kind: "symlink", size: 0, permission: "lrwxrwxrwx" },
+        ];
+      }
+      return [fileEntry("inner.txt")];
+    });
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.entries).toHaveLength(2));
+    const listed = mocks.filesList.mock.calls.length;
+    await store.enterDirectory("a.txt");
+    await store.enterDirectory("missing");
+    expect(store.session.path).toBe("/sdcard");
+    expect(mocks.filesList.mock.calls.length).toBe(listed);
+    await store.enterDirectory("link");
+    expect(store.session.path).toBe("/sdcard/link");
+  });
+});
+
+describe("浏览世代是否挂上", () => {
+  it("0 表示还没有世代", () => {
+    expect(browseGenerationAbsent(0)).toBe(true);
+    expect(browseGenerationAbsent(1)).toBe(false);
+  });
+});
+
+describe("手势选择", () => {
+  it("未选中则换成该行，已在组内则保持整组", () => {
+    const store = createListingStore();
+    store.selectGestureTarget("a");
+    expect([...store.selection.names]).toEqual(["a"]);
+    store.select("b", "toggle");
+    store.selectGestureTarget("a");
+    expect([...store.selection.names]).toEqual(["a", "b"]);
+    store.selectGestureTarget("c");
+    expect([...store.selection.names]).toEqual(["c"]);
+  });
+});
+
+describe("删除名裁空白", () => {
+  it("裁掉空白后还有没有字只走 trimmedTextPresent", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "listing.ts"), "utf8");
+    expect(src).not.toContain(".filter(Boolean)");
+    expect(src).toContain("trimmedTextPresent");
+  });
+});
+
+describe("浏览提交方式只判一次", () => {
+  it("留在当前路径，或一开始就改地址", () => {
+    expect(listingCommitStays("stay")).toBe(true);
+    expect(listingCommitStays("now")).toBe(false);
+    expect(listingCommitStays("on-ok")).toBe(false);
+    expect(listingCommitNow("now")).toBe(true);
+    expect(listingCommitNow("stay")).toBe(false);
+    expect(listingCommitNow("on-ok")).toBe(false);
+  });
+
+  it("生产路径不再自己比较 stay / now", () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(root)) {
+      if (!/\.(ts|tsx)$/.test(name) || name.includes(".test.")) continue;
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "listing.ts") {
+        body = body.replace('return commit === "stay"', "").replace('return commit === "now"', "");
+      }
+      expect(body, name).not.toContain('commit === "stay"');
+      expect(body, name).not.toContain('commit === "now"');
+    }
+  });
+});
+
+describe("新建条目路径只解析一次", () => {
+  it("new_entry_path_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "listing.ts"), "utf8");
+    const needle = "childPath(session.path, name.trim())";
+    expect(src.split(needle).length - 1).toBe(1);
   });
 });

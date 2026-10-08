@@ -12,6 +12,19 @@
     max-width var(--yohu-motion-spatial-rail);
 }
 
+/* 两态都写死。基础规则不写宽，否则展开会变成同宽→同宽。 */
+.yohu-recipe-rail[data-rail="expanded"] {
+  flex-basis: var(--yohu-layout-shell-nav);
+  width: var(--yohu-layout-shell-nav);
+  max-width: var(--yohu-layout-shell-nav);
+}
+
+.yohu-recipe-rail[data-rail="icons"] {
+  flex-basis: var(--yohu-layout-shell-nav-icons);
+  width: var(--yohu-layout-shell-nav-icons);
+  max-width: var(--yohu-layout-shell-nav-icons);
+}
+
 .yohu-rail-slot {
   display: grid;
   min-width: 0;

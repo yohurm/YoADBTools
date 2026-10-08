@@ -85,4 +85,12 @@ describe("log-bind（与 domain testdata/log_bind.json 同一套向量）", () =
     if (c.expect_tag) expect(got.tag_contains).toBe(c.expect_tag);
     if (c.expect_message) expect(got.message_contains).toBe(c.expect_message);
   });
+
+  it("包名与子进程后缀各只比一次", () => {
+    const owner = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "log-bind.ts"), "utf8")
+      .replace("return name === pkg", "")
+      .replace("return name.startsWith(`${pkg}:`)", "");
+    expect(owner).not.toContain("name === pkg");
+    expect(owner).not.toContain("startsWith(`${pkg}:`)");
+  });
 });

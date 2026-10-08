@@ -31,17 +31,16 @@ export type {
 } from "./engine";
 
 export { YoSearch } from "./Search";
-export type { YoSearchCancel, YoSearchControl, YoSearchProps, YoSearchSlot, YoSearchStatus } from "./Search";
+export type { YoSearchCancel, YoSearchControl, YoSearchProps, YoSearchSlot } from "./Search";
 export {
   resolveSearchActive,
   resolveSearchCancel,
   resolveSearchOpen,
   resolveSearchSlot,
-  resolveSearchStatus,
   resolveSearchWidth,
   searchEntryPressed,
+  searchHasQuery,
   searchHostAttrs,
-  searchPaintKind,
   searchShowClear,
   searchShowsBar,
   searchShowsEntry,
@@ -49,6 +48,5 @@ export {
 export type {
   SearchHostAttrs,
   SearchHostInput,
-  SearchPaintKind,
   SearchWidthKind,
 } from "./search-policy";

@@ -1,22 +1,18 @@
 //! 启动小窗 HWND：注册类、创建、显示 clip、消息泵、销毁。
 //! 像素来自 `PaintData` 的矩形 frame。`SetWindowRgn` 只裁用户看见的外形，不进入交接表面。
 
-use std::ffi::c_void;
 use std::sync::Mutex;
 
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Dwm::{
-    DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
-};
 use windows::Win32::Graphics::Gdi::{
     CreateRoundRectRgn, DeleteObject, GetDC, InvalidateRect, ReleaseDC, SetWindowRgn, UpdateWindow,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, GetWindowRect, LoadCursorW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, LoadCursorW,
     PostMessageW, RegisterClassExW, SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW,
     CS_VREDRAW, GWLP_USERDATA, HWND_TOPMOST, IDC_ARROW, SWP_NOZORDER, SW_HIDE, SW_SHOWNORMAL,
     WM_CLOSE, WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WNDCLASSEXW, WS_EX_COMPOSITED, WS_EX_TOOLWINDOW,
@@ -25,8 +21,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use yohu_protocol::DISPLAY_NAME;
 
 use super::geometry::{
-    primary_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL, FONT_LOGICAL,
-    ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
+    hwnd_rect, primary_monitor, scale_px, store_geometry, SplashPlacement, BRAND_GAP_LOGICAL,
+    FONT_LOGICAL, ICON_LOGICAL, LOGICAL_H, LOGICAL_W, USER_DEFAULT_SCREEN_DPI,
 };
 use super::icon::{create_bitmap, load_icon, scale_bitmap};
 use super::paint::{present, PaintData, PaintSpec};
@@ -72,12 +68,7 @@ pub fn splash_hwnd() -> Option<HWND> {
 }
 
 pub fn splash_window_rect() -> Option<RECT> {
-    let hwnd = splash_hwnd()?;
-    unsafe {
-        let mut r = RECT::default();
-        GetWindowRect(hwnd, &mut r).ok()?;
-        Some(r)
-    }
+    hwnd_rect(splash_hwnd()?)
 }
 
 pub fn frame_snapshot() -> Option<BootFrame> {
@@ -170,13 +161,7 @@ fn show_inner(dark: bool) -> Result<(), String> {
             placement.gdi_ellipse(),
         );
         let _ = SetWindowRgn(hwnd, Some(rgn), true);
-        let pref = DWMWCP_DONOTROUND;
-        let _ = DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &pref as *const _ as *const c_void,
-            std::mem::size_of_val(&pref) as u32,
-        );
+        super::overlay_window::dwm_do_not_round(hwnd);
 
         let full = create_bitmap(screen_dc, &icon)?;
         let icon_px = scale_px(ICON_LOGICAL, dpi);

@@ -84,6 +84,9 @@ describe("YoReorderList", () => {
     firePointer(window, "pointermove", 20);
     expect(host.hasAttribute("data-reordering")).toBe(true);
     expect(rows[0]!.getAttribute("data-reorder")).toBe("source");
+    expect(rows[0]!.getAttribute("data-slot")).toBe("placeholder");
+    expect(rows[0]!.textContent).toBe("");
+    expect(container.querySelector(".yohu-recipe-reorder-overlay")?.textContent).toBe("a");
     expect(container.querySelector(".yohu-recipe-reorder-overlay")?.hasAttribute("data-open")).toBe(true);
     firePointer(window, "pointermove", 140);
     expect(bar?.hasAttribute("data-open")).toBe(true);
@@ -232,6 +235,22 @@ describe("YoReorderList", () => {
     expect(src).toContain(":not([data-exiting])");
     expect(src).not.toContain("YoListPresence");
     expect(src).not.toContain("reconcileListPresenceSlots");
+  });
+
+  it("换位条等一帧只在 ReorderBar 安排", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const frameNeedle = "requestAnimationFrame(() => setBarReady(true))";
+    const readyNeedle = "setBarReady(true)";
+    for (const name of ["ReorderList.tsx", "VirtualList.tsx", "ReorderList.test.tsx"]) {
+      let body = readFileSync(resolve(here, name), "utf8");
+      if (name.includes(".test.")) {
+        body = body.replaceAll(frameNeedle, "").replaceAll(readyNeedle, "");
+      } else {
+        expect(body, name).toContain("scheduleReorderBarReady(setBarReady, onCleanup)");
+      }
+      expect(body, name).not.toContain(frameNeedle);
+      expect(body, name).not.toContain(readyNeedle);
+    }
   });
 
   it("增删走行内 Presence list，浮层不套第二份", () => {

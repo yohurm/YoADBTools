@@ -92,3 +92,27 @@ describe("YoColResizer", () => {
     expect(colResizerCss).toMatch(/\[data-mark\]\s*\{[^}]*pointer-events:\s*none/);
   });
 });
+
+describe("列缝读拖动宿主", () => {
+  it("两处从指针事件读拖动宿主", () => {
+    const candidates = [
+      resolve(process.cwd(), "src/grid/ColResizer.tsx"),
+      resolve(process.cwd(), "packages/ui/src/grid/ColResizer.tsx"),
+    ];
+    let src = "";
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        src = readFileSync(candidate, "utf-8");
+        break;
+      }
+    }
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("event.currentTarget as " + "HTMLElement")).toBe(1);
+    expect(times("function resizeHost")).toBe(1);
+    expect(times("export function resizeHost")).toBe(0);
+    expect(times("resizeHost(event)")).toBe(2);
+    expect(times("setPointerCapture")).toBe(2);
+    expect(times("releasePointerCapture")).toBe(1);
+    expect(src).toContain("function lockPageResize");
+  });
+});

@@ -27,14 +27,14 @@ describe("YoEmptyState", () => {
   it("可选插画", () => {
     const { container } = render(() => <YoEmptyState icon="log" title="空" />);
     expect(container.querySelector("svg")).toBeTruthy();
-    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-icon")).toBe("true");
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-icon")).toBe("");
     expect(container.querySelector(".yohu-empty-state__illustration")).toBeTruthy();
   });
 
   it("可选 action 槽，不是 Dialog", () => {
     const { container } = render(() => <YoEmptyState title="空" action={<button type="button">开始采集</button>} />);
     expect(screen.getByRole("button", { name: "开始采集" })).toBeTruthy();
-    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-action")).toBe("true");
+    expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-has-action")).toBe("");
     expect(container.querySelector("[role=dialog]")).toBeNull();
     expect(container.querySelector(".yohu-dialog")).toBeNull();
   });
@@ -47,7 +47,7 @@ describe("YoEmptyState", () => {
 
   it("fill 写 data-fill；默认不写", () => {
     const filled = render(() => <YoEmptyState title="空" fill />);
-    expect(filled.container.querySelector(".yohu-empty-state")?.getAttribute("data-fill")).toBe("true");
+    expect(filled.container.querySelector(".yohu-empty-state")?.getAttribute("data-fill")).toBe("");
     filled.unmount();
     const { container } = render(() => <YoEmptyState title="空" />);
     expect(container.querySelector(".yohu-empty-state")?.getAttribute("data-fill")).toBeNull();

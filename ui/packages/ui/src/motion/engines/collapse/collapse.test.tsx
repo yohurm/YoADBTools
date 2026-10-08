@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
@@ -40,5 +43,14 @@ describe("YoCollapse", () => {
     expect(root?.getAttribute("data-recipe")).toBe("fill");
     expect(root?.getAttribute("data-open")).toBe("false");
     expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("画出的开闭问出生函数，内容身高两帧后再开", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "collapse.tsx"), "utf8");
+    expect(src).toContain("collapsePaintOpen");
+    expect(src).toContain("collapseDelaysPaint");
+    expect(src).toContain("open: painted()");
+    expect(src).toContain("return window.requestAnimationFrame(run)");
+    expect(src).toContain("aria-hidden={closedAttr(props.open)}");
   });
 });

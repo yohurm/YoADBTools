@@ -4,7 +4,10 @@
  * 禁止扫 DOM 行盒，禁止 elementFromPoint。scale 由调用方传入。
  */
 
-import type { NativeDragDropEvent } from "@yohu/api";
+import { dragEventIsHover, dragPathsAreEmpty, type NativeDragDropEvent } from "@yohu/api";
+import { cssPointFromPhysical, pointInRect, rectOf, type PointerRect } from "@yohu/ui";
+
+import { entryOpensAsDir } from "./model";
 
 export type DropSession = { hot: false } | { hot: true; dirName: string | null };
 
@@ -15,13 +18,6 @@ export interface DropCommit {
   dirName: string | null;
 }
 
-export interface DropRect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
 export interface ListHitEntry {
   name: string;
   kind: string;
@@ -29,31 +25,9 @@ export interface ListHitEntry {
 
 /** 虚拟清单命中空间：一次滚轴盒，不用扫每行。 */
 export interface ListHitSpace {
-  rect: DropRect;
+  rect: PointerRect;
   scrollTop: number;
   itemHeight: number;
-}
-
-export function cssPointFromPhysical(x: number, y: number, scale: number): { x: number; y: number } {
-  const factor = scale > 0 ? scale : 1;
-  return { x: x / factor, y: y / factor };
-}
-
-/** Windows / POSIX 本机路径取末段；目录尾部分隔符去掉。 */
-export function localBaseName(path: string): string {
-  const trimmed = path.replace(/[\\/]+$/, "");
-  if (!trimmed) return "";
-  const parts = trimmed.split(/[\\/]/);
-  return parts[parts.length - 1] ?? "";
-}
-
-export function rectOf(el: Element): DropRect {
-  const box = el.getBoundingClientRect();
-  return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
-}
-
-export function pointInRect(rect: DropRect, x: number, y: number): boolean {
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 export function readListHitSpace(list: Element, itemHeight: number, scrollTop: number): ListHitSpace {
@@ -76,16 +50,21 @@ export function destDirFromEntries(
   }
   const index = Math.floor((y - space.rect.top + space.scrollTop) / space.itemHeight);
   const entry = entries[index];
-  if (entry == null || (entry.kind !== "dir" && entry.kind !== "symlink")) return null;
+  if (entry == null || !entryOpensAsDir(entry.kind)) return null;
   return entry.name;
 }
 
-/** 热态只看设备与模态。不读点。 */
+/** 有设备且没有模态挡住。悬停变热和松手提交都问这里。 */
+function dropGateOpen(ctx: { hasDevice: boolean; blocked: boolean }): boolean {
+  return ctx.hasDevice && !ctx.blocked;
+}
+
+/** 热态只看悬停和投放门。不读点。 */
 export function dropSessionForEvent(
   event: NativeDragDropEvent,
   ctx: { hasDevice: boolean; blocked: boolean },
 ): DropSession {
-  if (event.type === "leave" || event.type === "drop" || !ctx.hasDevice || ctx.blocked) {
+  if (!dragEventIsHover(event) || !dropGateOpen(ctx)) {
     return DROP_IDLE;
   }
   return { hot: true, dirName: null };
@@ -117,7 +96,7 @@ export function dropCommit(
     entries: readonly ListHitEntry[];
   },
 ): DropCommit | undefined {
-  if (!ctx.hasDevice || ctx.blocked || event.paths.length === 0) return undefined;
+  if (!dropGateOpen(ctx) || dragPathsAreEmpty(event.paths)) return undefined;
   if (!ctx.intoFolder || !ctx.space) {
     return { paths: event.paths, dirName: null };
   }

@@ -1,7 +1,7 @@
 /**
  * YoTree —— 泛型树（L4 视图）。
  * HarmonyOS 对照：Tree；命令库等层级导航。
- * 受控 API：data / onSelect / expandedKeys / defaultExpandedKeys。
+ * 受控 API：data / onSelect / expandedKeys / defaultExpandedKeys / onToggle。
  *
  * 键盘：
  * - ↑/↓ 在可见节点间移动焦点；→ 展开（有子节点时，否则移到下一节点）；← 收起（已展开时，否则移到父节点）
@@ -9,6 +9,7 @@
  *
  * ARIA：`role=tree/treeitem` + `aria-expanded` + roving tabindex（仅焦点节点 tabindex=0）。
  * 受控展开（expandedKeys）或默认展开（defaultExpandedKeys）。
+ * 受控且提供 onToggle 时，开合把 key 交回调用方；没有回调则受控树不改展开。
  * 子树用 YoCollapse，关闭后仍挂载（aria-hidden），高度走 MotionSpec。
  * 选中只挂 yohu-interactive--selected + 配方 selected（项内弹出，禁止滑块换行）。
  */
@@ -17,12 +18,14 @@ import type { JSX } from "solid-js";
 import { Icon, type IconName } from "../icons";
 import { Layout } from "../tokens/layout";
 import { YoCollapse } from "../motion/engines/collapse";
-import { flattenVisible, treeActivateIntent, treeHasChildren, treeKeySelector } from "./tree-model";
+import { flattenVisible, treeActivateIsToggle, treeHasChildren, treeKeySelector } from "./tree-model";
 import {
   isTreeControlled,
   isTreeExpanded,
   resolveTreeKeyAction,
   toggleExpandedSet,
+  treeActionIsFocus,
+  treeActionIsToggle,
   treeRowAttrs,
 } from "./tree-policy";
 import "./Tree.css";
@@ -51,6 +54,8 @@ export interface YoTreeProps<T = unknown> {
   expandedKeys?: string[] | Set<string>;
   /** 默认展开 key（非受控模式） */
   defaultExpandedKeys?: string[];
+  /** 受控开合。提供后目录行 / 箭头 / 键盘把 key 交回，树不改本地展开。 */
+  onToggle?: (key: string) => void;
   /** 选中回调 */
   onSelect?: (key: string, node: TreeNode<T>) => void;
   /** 行高（px）；缺省走 --yohu-row-height-header，禁止套数据行 --yohu-row-height */
@@ -71,7 +76,10 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
   const isExpanded = (key: string): boolean => isTreeExpanded(key, props.expandedKeys, expanded());
 
   const toggle = (key: string): void => {
-    if (isTreeControlled(props.expandedKeys)) return;
+    if (isTreeControlled(props.expandedKeys)) {
+      props.onToggle?.(key);
+      return;
+    }
     setExpanded((prev) => toggleExpandedSet(prev, key));
   };
 
@@ -82,8 +90,12 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
 
   const rows = createMemo(() => flattenVisible(props.data, isExpanded));
 
-  const focusKey = (key: string): void => {
+  function treeRememberFocus(key: string): void {
     setFocusedKey(key);
+  }
+
+  const focusKey = (key: string): void => {
+    treeRememberFocus(key);
     const el = root?.querySelector<HTMLElement>(treeKeySelector(key));
     el?.focus();
   };
@@ -92,13 +104,13 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
     const action = resolveTreeKeyAction(event.key, rows(), focusedKey(), selected(), isExpanded);
     if (!action) return;
     event.preventDefault();
-    if (action.type === "focus") {
+    if (treeActionIsFocus(action)) {
       focusKey(action.key);
       return;
     }
     const current = rows().find((row) => row.node.key === action.key)?.node;
     if (!current) return;
-    if (action.type === "toggle") {
+    if (treeActionIsToggle(action)) {
       toggle(current.key);
       return;
     }
@@ -135,8 +147,8 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                 "padding-left": `calc(${depth} * var(--yohu-space-lg))`,
               }}
               onClick={() => {
-                setFocusedKey(node.key);
-                if (treeActivateIntent(hasChildren) === "toggle") {
+                treeRememberFocus(node.key);
+                if (treeActivateIsToggle(hasChildren)) {
                   toggle(node.key);
                   return;
                 }
@@ -151,7 +163,7 @@ export function YoTree<T = unknown>(props: YoTreeProps<T>): JSX.Element {
                   tabindex={-1}
                   onClick={(event) => {
                     event.stopPropagation();
-                    setFocusedKey(node.key);
+                    treeRememberFocus(node.key);
                     toggle(node.key);
                   }}
                 >

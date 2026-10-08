@@ -50,7 +50,7 @@ describe("YoChip", () => {
       <YoChip text="app.apk" leading="folder" onDismiss={() => undefined} />
     ));
     const host = container.querySelector(".yohu-chip");
-    expect(host?.getAttribute("data-leading")).toBe("true");
+    expect(host?.getAttribute("data-leading")).toBe("");
     expect(host?.querySelector(".yohu-chip__leading [data-icon='folder']")).toBeTruthy();
   });
 
@@ -73,10 +73,8 @@ describe("YoChip", () => {
     expect(chipRule).toContain("flex: 0 1 auto");
     expect(chipRule).toContain("min-width: 0");
     expect(chipRule).not.toContain("border-radius:");
-    const removeBlock = css.slice(css.indexOf(".yohu-chip .yohu-recipe-dismiss {"));
-    const removeRule = removeBlock.slice(0, removeBlock.indexOf("}") + 1);
-    expect(removeRule).not.toContain("align-self");
-    expect(removeRule).not.toContain("position: absolute");
+    expect(css).not.toContain(".yohu-recipe-dismiss");
+    expect(css).not.toContain("position: absolute");
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
   });
 });

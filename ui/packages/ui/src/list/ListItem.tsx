@@ -3,11 +3,19 @@
  * HarmonyOS 对照：ListItem。选中走配方 selected（软底绽开、强调条展开/收回、字色非线性、导航图标 DOWN）。
  * 模块不再自挂 button 皮。
  */
+import { presenceAttr, presenceIsOn } from "../dom/flag";
 import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import type { JSX } from "solid-js";
 import { useRail, railStreamAttr } from "../motion/engines/rail";
 import { listItemHostAttrs } from "./list-item-policy";
-import type { YoListItemRing, YoListItemRole, YoListItemSize } from "./list-item-model";
+import {
+  listItemRingIsInset,
+  listItemRoleIsButton,
+  listItemSizeIsNav,
+  type YoListItemRing,
+  type YoListItemRole,
+  type YoListItemSize,
+} from "./list-item-model";
 import { ListItemMark } from "./Mark";
 import "./ListItem.css";
 
@@ -49,25 +57,67 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
     }),
   );
 
+  function selectedNow(): boolean {
+    return presenceIsOn(host()["data-selected"]);
+  }
+
+  function selectedClass() {
+    return { "yohu-interactive--selected": selectedNow() };
+  }
+
+  function itemSize(): YoListItemSize {
+    return host()["data-size"];
+  }
+
+  function itemLabel(): string | undefined {
+    return props.label;
+  }
+
+  function itemTabIndex(): number | undefined {
+    return props.tabIndex;
+  }
+
+  function forwardItemClick(event: MouseEvent): void {
+    props.onClick?.(event);
+  }
+
+  function forwardItemKey(event: KeyboardEvent): void {
+    props.onKeyDown?.(event);
+  }
+
+  function itemRailPart() {
+    return "rail";
+  }
+
+  function itemSubPart() {
+    return "sub";
+  }
+
   const className = (): string => {
-    const ring = host()["data-ring"] === "inset" ? "yohu-focus-ring--inset" : "yohu-focus-ring";
+    const ring = listItemRingIsInset(host()["data-ring"]) ? "yohu-focus-ring--inset" : "yohu-focus-ring";
     const extra = props.class ? ` ${props.class}` : "";
     return `yohu-list-item yohu-interactive yohu-recipe-selected ${ring}${extra}`;
   };
 
   const [iconBounce, setIconBounce] = createSignal(false);
   let bounceBound = false;
+  function clearIconBounce(): void {
+    setIconBounce(false);
+  }
+  function markBounceBound(): void {
+    bounceBound = true;
+  }
   createEffect(
     on(
-      () => Boolean(props.selected),
+      () => selectedNow(),
       (selected) => {
-        if (props.size !== "nav") {
-          setIconBounce(false);
-          bounceBound = true;
+        if (!listItemSizeIsNav(itemSize())) {
+          clearIconBounce();
+          markBounceBound();
           return;
         }
         if (!bounceBound) {
-          bounceBound = true;
+          markBounceBound();
           return;
         }
         setIconBounce(selected);
@@ -82,10 +132,10 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
         {(leading) => (
           <span
             class="yohu-list-item__leading"
-            data-bounce={iconBounce() ? "" : undefined}
+            data-bounce={presenceAttr(iconBounce())}
             onAnimationEnd={(event) => {
               if (event.animationName === "yohu-bounce-down") {
-                setIconBounce(false);
+                clearIconBounce();
               }
             }}
           >
@@ -93,17 +143,27 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
           </span>
         )}
       </Show>
-      <span class="yohu-list-item__info">
-        <span class="yohu-list-item__title">{props.title}</span>
+      <span class="yohu-list-item__info" data-part={itemRailPart()}>
+        <span class="yohu-list-item__title" data-part="title">
+          {props.title}
+        </span>
         <Show when={props.description || props.meta}>
-          <span class="yohu-list-item__extra">
+          <span class="yohu-list-item__extra" data-part={itemRailPart()}>
             <span class="yohu-list-item__extra-inner">
               <span class="yohu-list-item__extra-content">
                 <Show when={props.description}>
-                  {(description) => <span class="yohu-list-item__description">{description()}</span>}
+                  {(description) => (
+                    <span class="yohu-list-item__description" data-part={itemSubPart()}>
+                      {description()}
+                    </span>
+                  )}
                 </Show>
                 <Show when={props.meta}>
-                  {(meta) => <span class="yohu-list-item__meta">{meta()}</span>}
+                  {(meta) => (
+                    <span class="yohu-list-item__meta" data-part={itemSubPart()}>
+                      {meta()}
+                    </span>
+                  )}
                 </Show>
               </span>
             </span>
@@ -112,7 +172,7 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
       </span>
       <Show when={props.trailing}>
         {(trailing) => (
-          <span class="yohu-list-item__end">
+          <span class="yohu-list-item__end" data-part={itemRailPart()}>
             <span class="yohu-list-item__end-inner">
               <span class="yohu-list-item__trailing">{trailing()}</span>
             </span>
@@ -124,19 +184,19 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
 
   return (
     <Show
-      when={host().role === "button"}
+      when={listItemRoleIsButton(host().role)}
       fallback={
         <div
           class={className()}
-          classList={{ "yohu-interactive--selected": Boolean(host()["data-selected"]) }}
-          data-size={host()["data-size"]}
+          classList={selectedClass()}
+          data-size={itemSize()}
           data-stream={stream()}
           role="option"
           aria-selected={host()["aria-selected"]}
-          aria-label={props.label}
-          tabIndex={props.tabIndex}
-          onClick={props.onClick}
-          onKeyDown={props.onKeyDown}
+          aria-label={itemLabel()}
+          tabIndex={itemTabIndex()}
+          onClick={forwardItemClick}
+          onKeyDown={forwardItemKey}
         >
           {body()}
         </div>
@@ -145,14 +205,14 @@ export function YoListItem(props: YoListItemProps): JSX.Element {
       <button
         type="button"
         class={className()}
-        classList={{ "yohu-interactive--selected": Boolean(host()["data-selected"]) }}
-        data-size={host()["data-size"]}
+        classList={selectedClass()}
+        data-size={itemSize()}
         data-stream={stream()}
         aria-current={host()["aria-current"]}
-        aria-label={props.label}
-        tabIndex={props.tabIndex}
-        onClick={props.onClick}
-        onKeyDown={props.onKeyDown}
+        aria-label={itemLabel()}
+        tabIndex={itemTabIndex()}
+        onClick={forwardItemClick}
+        onKeyDown={forwardItemKey}
       >
         {body()}
       </button>

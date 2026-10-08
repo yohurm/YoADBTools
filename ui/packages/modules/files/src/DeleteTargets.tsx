@@ -7,10 +7,11 @@
 
 import { For, Show } from "solid-js";
 
-import { Layout, YoButton, YoChip, YoFileIcon, YoReveal, type YoFileIconProps } from "@yohu/ui";
+import { Layout, YoButton, YoChip, YoFileIcon, YoReveal } from "@yohu/ui";
 
 import { DELETE_PREVIEW_LIMIT, canToggleDelete } from "./delete-targets";
 import { listingStore } from "./listing";
+import { entryOpensAsDir } from "./model";
 
 export interface DeleteTargetsProps {
   names: string[];
@@ -19,8 +20,9 @@ export interface DeleteTargetsProps {
   onRemove: (name: string) => void;
 }
 
-function entryKind(name: string): YoFileIconProps["kind"] {
-  return listingStore.entries.find((entry) => entry.name === name)?.kind ?? "file";
+function entryFolder(name: string): boolean {
+  const kind = listingStore.entries.find((entry) => entry.name === name)?.kind;
+  return kind != null && entryOpensAsDir(kind);
 }
 
 function DeleteChip(props: { name: string; onRemove: (name: string) => void }) {
@@ -30,7 +32,7 @@ function DeleteChip(props: { name: string; onRemove: (name: string) => void }) {
         tone="neutral"
         block
         text={props.name}
-        leading={<YoFileIcon name={props.name} kind={entryKind(props.name)} size={Layout.IconSm} />}
+        leading={<YoFileIcon name={props.name} folder={entryFolder(props.name)} size={Layout.IconSm} />}
         onDismiss={() => props.onRemove(props.name)}
       />
     </li>
@@ -52,16 +54,17 @@ export function DeleteTargetList(props: {
 }) {
   const head = () => props.names.slice(0, DELETE_PREVIEW_LIMIT);
   const rest = () => props.names.slice(DELETE_PREVIEW_LIMIT);
+  const deleteChip = (name: string) => <DeleteChip name={name} onRemove={props.onRemove} />;
 
   return (
     <div class="yohu-files__delete-list">
       <ul class="yohu-files__delete-grid">
-        <For each={head()}>{(name) => <DeleteChip name={name} onRemove={props.onRemove} />}</For>
+        <For each={head()}>{deleteChip}</For>
       </ul>
       <Show when={rest().length > 0}>
         <YoReveal open={props.expanded}>
           <ul class="yohu-files__delete-grid yohu-files__delete-rest">
-            <For each={rest()}>{(name) => <DeleteChip name={name} onRemove={props.onRemove} />}</For>
+            <For each={rest()}>{deleteChip}</For>
           </ul>
         </YoReveal>
       </Show>

@@ -41,6 +41,10 @@ pub struct ToolResolver {
     data_tools_dir: PathBuf,
 }
 
+fn lock_tool<T>(result: Result<T, std::sync::PoisonError<T>>) -> T {
+    result.expect("tool lock poisoned")
+}
+
 impl ToolResolver {
     pub fn new(user_path: Option<PathBuf>, resource_dir: PathBuf, data_tools_dir: PathBuf) -> Self {
         Self {
@@ -53,21 +57,24 @@ impl ToolResolver {
 
     /// 记住本次扫描实际用的 adb。
     pub fn set_preferred(&self, path: PathBuf) {
-        *self.preferred.write().expect("tool lock poisoned") = Some(path);
+        *lock_tool(self.preferred.write()) = Some(path);
     }
 
     /// 更新用户自定义路径（设置 `adb.path` 立即生效）。新路径必须重新探测，不能沿用旧副本。
     pub fn set_user_path(&self, path: Option<PathBuf>) {
-        *self.user_path.write().expect("tool lock poisoned") = path;
-        *self.preferred.write().expect("tool lock poisoned") = None;
+        *lock_tool(self.user_path.write()) = path;
+        *lock_tool(self.preferred.write()) = None;
     }
 
     /// 解析可用 adb（首个候选）。
     pub fn resolve(&self) -> Result<PathBuf, AdbError> {
-        self.candidates()
-            .into_iter()
-            .next()
-            .ok_or_else(|| AdbError::ToolUnavailable(self.unavailable_hint()))
+        match self.candidates().into_iter().next() {
+            Some(path) => Ok(path),
+            None => {
+                tracing::error!("{}", self.unavailable_hint());
+                Err(AdbError::ToolUnavailable)
+            }
+        }
     }
 
     /// 候选 adb 路径（去重，仅存在的文件）。
@@ -79,10 +86,10 @@ impl ToolResolver {
                 out.push(p);
             }
         };
-        if let Some(p) = self.preferred.read().expect("tool lock poisoned").clone() {
+        if let Some(p) = lock_tool(self.preferred.read()).clone() {
             push(p);
         }
-        if let Some(p) = self.user_path.read().expect("tool lock poisoned").clone() {
+        if let Some(p) = lock_tool(self.user_path.read()).clone() {
             if p.is_file() {
                 push(p);
             } else {
@@ -165,6 +172,27 @@ fn sidecar_stamp(resource_dir: &std::path::Path) -> String {
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn missing_adb_sentence_has_no_path() {
+        let root = std::env::temp_dir().join(format!(
+            "yohu-tool-missing-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let resource = root.join("res");
+        let data = root.join("data");
+        let tool = ToolResolver::new(None, resource.clone(), data);
+        let err = tool.resolve().expect_err("no adb");
+        assert!(matches!(err, AdbError::ToolUnavailable));
+        assert_eq!(err.to_string(), yohu_domain::TOOL_UNAVAILABLE);
+        assert!(tool
+            .unavailable_hint()
+            .contains(&resource.display().to_string()));
+        assert!(!err.to_string().contains(&root.display().to_string()));
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn extract_copies_adb_trio_into_data_dir() {

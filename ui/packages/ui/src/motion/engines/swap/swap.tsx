@@ -17,8 +17,10 @@ import {
   releaseSwapSession,
   resolveSwapKeyAdvance,
   resolveSwapToWidth,
+  swapAdvanceIsSame,
   swapClipWidth,
   swapHostAttrs,
+  type SwapSessionPaint,
 } from "./swap-policy";
 
 export type { SwapAnchor };
@@ -34,6 +36,27 @@ export interface YoSwapProps {
    * 默认 end。
    */
   anchor?: SwapAnchor;
+}
+
+function swapApplyPaint(
+  setResizing: (value: boolean) => void,
+  setClipW: (value: number | undefined) => void,
+  paint: SwapSessionPaint,
+): void {
+  setResizing(paint.resizing);
+  setClipW(paint.clipW);
+}
+
+function swapWidth(el: HTMLElement): number {
+  return el.offsetWidth;
+}
+
+function swapShowIncoming(setView: (next: () => JSX.Element) => void, incoming: JSX.Element): void {
+  setView(() => incoming);
+}
+
+function swapClearTimer(timer: number): void {
+  window.clearTimeout(timer);
 }
 
 /**
@@ -54,18 +77,22 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
   let gen = 0;
   let measureAfterSwap = false;
 
+  function swapStopMeasure(): void {
+    measureAfterSwap = false;
+  }
+
   const idle = (): void => {
     const paint = releaseSwapSession();
     setResizing(paint.resizing);
     setClipW(undefined);
-    measureAfterSwap = false;
+    swapStopMeasure();
   };
 
   createRenderEffect(() => {
     const nextKey = props.keys;
     const incoming = resolved();
     const advance = resolveSwapKeyAdvance(currentKey, nextKey);
-    if (advance.kind === "same") {
+    if (swapAdvanceIsSame(advance)) {
       idle();
       return;
     }
@@ -82,29 +109,27 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
         incomingText,
       })
     ) {
-      setView(() => incoming);
+      swapShowIncoming(setView, incoming);
       idle();
       return;
     }
 
-    const fromW = clipEl.offsetWidth;
-    setView(() => incoming);
+    const fromW = swapWidth(clipEl);
+    swapShowIncoming(setView, incoming);
     const hold = holdSwapSession(fromW);
-    setResizing(hold.resizing);
-    setClipW(hold.clipW);
+    swapApplyPaint(setResizing, setClipW, hold);
     measureAfterSwap = true;
   });
 
   createRenderEffect(() => {
     view();
     if (!measureAfterSwap || !inner || !clip) return;
-    measureAfterSwap = false;
+    swapStopMeasure();
     const thisGen = ++gen;
-    const fromW = clip.offsetWidth;
-    const toW = inner.offsetWidth;
+    const fromW = swapWidth(clip);
+    const toW = swapWidth(inner);
     const next = resolveSwapToWidth(fromW, toW);
-    setResizing(next.resizing);
-    setClipW(next.clipW);
+    swapApplyPaint(setResizing, setClipW, next);
     if (next.clipW === undefined) return;
 
     const clipEl = clip;
@@ -115,12 +140,12 @@ export function YoSwap(props: YoSwapProps): JSX.Element {
     const timer = window.setTimeout(finish, motionDurationMs(SWAP_DURATION) + PRESENCE_EXIT_SAFETY_MS);
     const onEnd = (event: TransitionEvent): void => {
       if (!isSwapWidthTransitionEnd(event.propertyName, event.target, clipEl)) return;
-      window.clearTimeout(timer);
+      swapClearTimer(timer);
       finish();
     };
     clipEl.addEventListener("transitionend", onEnd);
     onCleanup(() => {
-      window.clearTimeout(timer);
+      swapClearTimer(timer);
       clipEl.removeEventListener("transitionend", onEnd);
     });
   });

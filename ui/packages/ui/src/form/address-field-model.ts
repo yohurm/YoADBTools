@@ -13,6 +13,16 @@ export type AddressCaret = {
 
 export type AddressScrollPin = "start" | "end" | "keep";
 
+/** 滚到槽头。全选和光标在开头都是这一档。 */
+export function addressScrollPinIsStart(pin: AddressScrollPin): boolean {
+  return pin === "start";
+}
+
+/** 滚到槽尾。光标在末尾。keep 不改滚动。 */
+export function addressScrollPinIsEnd(pin: AddressScrollPin): boolean {
+  return pin === "end";
+}
+
 /** 展开不预选；光标落在末尾。 */
 export function addressOpenCaret(value: string): AddressCaret {
   const end = value.length;

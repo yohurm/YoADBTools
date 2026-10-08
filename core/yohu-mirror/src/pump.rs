@@ -13,7 +13,7 @@ use crate::codec::VideoCodec;
 use crate::consts::ACCEPT;
 use crate::demux::{parse_header, HeaderKind};
 use crate::emit;
-use crate::error::MirrorError;
+use crate::error::{MirrorError, ProtocolFault};
 use crate::frame::{EncodedFrame, FramePipe};
 
 pub struct Handshake {
@@ -38,7 +38,7 @@ pub async fn read_handshake(
     let (width, height) = match parse_header(&header).map_err(MirrorError::Protocol)? {
         HeaderKind::Session { width, height } => (width, height),
         HeaderKind::Media { .. } => {
-            return Err(MirrorError::Protocol("首包不是 session 头".into()));
+            return Err(ProtocolFault::NotSessionHeader.into());
         }
     };
     Ok(Handshake {
@@ -181,7 +181,7 @@ async fn read_exact_timeout(
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(MirrorError::Cancelled),
-        _ = tokio::time::sleep(ACCEPT) => Err(MirrorError::Protocol("读取投屏握手超时".into())),
+        _ = tokio::time::sleep(ACCEPT) => Err(ProtocolFault::HandshakeTimeout.into()),
         r = stream.read_exact(buf) => {
             r?;
             Ok(())

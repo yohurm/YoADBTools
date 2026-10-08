@@ -1,16 +1,17 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { NativeDragDropEvent } from "@yohu/api";
 
 import {
   adoptDropSession,
-  cssPointFromPhysical,
   destDirFromEntries,
   dropCommit,
   DROP_IDLE,
   dropSessionForEvent,
   dropSessionWithDir,
-  localBaseName,
   namesForDrag,
 } from "./drop";
 
@@ -38,25 +39,6 @@ const entries = [
   { name: "a.txt", kind: "file" },
   { name: "DCIM", kind: "dir" },
 ];
-
-describe("cssPointFromPhysical", () => {
-  it("物理点除以 scale；scale≤0 当 1", () => {
-    expect(cssPointFromPhysical(200, 100, 2)).toEqual({ x: 100, y: 50 });
-    expect(cssPointFromPhysical(10, 20, 0)).toEqual({ x: 10, y: 20 });
-  });
-});
-
-describe("localBaseName", () => {
-  it("Windows 文件与目录尾斜杠", () => {
-    expect(localBaseName("C:\\Users\\a\\photo.png")).toBe("photo.png");
-    expect(localBaseName("C:\\Users\\a\\DCIM\\")).toBe("DCIM");
-  });
-
-  it("POSIX 与无分隔符", () => {
-    expect(localBaseName("/tmp/foo.txt")).toBe("foo.txt");
-    expect(localBaseName("readme.md")).toBe("readme.md");
-  });
-});
 
 describe("dropSessionForEvent", () => {
   const ready = { hasDevice: true, blocked: false };
@@ -164,6 +146,20 @@ describe("destDirFromEntries", () => {
     expect(
       destDirFromEntries(10, 50, { ...space, scrollTop: 48 }, entries),
     ).toBe("DCIM");
+  });
+});
+
+describe("投放门与热态落点只写一处", () => {
+  it("会话不再重判设备门，视图不再重判指向文件夹和空路径", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      expect(text, name).not.toContain("!ctx.hasDevice || ctx.blocked");
+      expect(text, name).not.toContain("gate.hasDevice");
+      expect(text, name).not.toContain("files_drop_into_folder ? session.dirName");
+      expect(text, name).not.toContain("if (paths.length === 0) return");
+    }
   });
 });
 

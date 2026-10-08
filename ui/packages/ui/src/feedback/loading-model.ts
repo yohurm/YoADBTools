@@ -5,6 +5,8 @@
  * 不碰 DOM、不画环。
  */
 
+import { fillIsOn, presentDescription } from "./empty-model";
+
 export interface LoadingInput {
   title: string;
   description?: string;
@@ -20,11 +22,10 @@ export interface LoadingSpec {
 }
 
 export function resolveLoadingSpec(input: LoadingInput): LoadingSpec {
-  const description = input.description;
   return {
     title: input.title,
-    description: description ? description : undefined,
+    description: presentDescription(input),
     cover: Boolean(input.cover),
-    fill: Boolean(input.fill),
+    fill: fillIsOn(input),
   };
 }

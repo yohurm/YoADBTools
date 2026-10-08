@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { Stroke } from "../tokens/layout";
@@ -16,6 +19,15 @@ describe("list-frame-model", () => {
       width: 400 - Stroke.Accent * 2,
       height: 28 - Stroke.Accent * 2,
     });
+  });
+
+  it("视图不再自判缺省 variant", () => {
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["ListFrame.tsx", "list-frame-policy.ts", "list-frame-model.ts"]) {
+      const body = readFileSync(join(root, name), "utf8");
+      expect(body, name).not.toContain('?? "hot"');
+      expect(body, name).not.toContain("width <= 0 || height <= 0");
+    }
   });
 
   it("面积不够则不画", () => {

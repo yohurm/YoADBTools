@@ -19,9 +19,13 @@ export const COLLAPSE_INTERPOLATE_RECIPES = ["collapse", "panel", "fill"] as con
 
 export const DEFAULT_COLLAPSE_RECIPE: CollapseRecipe = "collapse";
 
+/** 折叠根在父级 flex 里怎么占高。缺省不写，树行不会被拉高。 */
+export type CollapseFlex = "grow" | "hug";
+
 export interface CollapseInput {
   open?: boolean;
   recipe?: CollapseRecipe;
+  flex?: CollapseFlex;
 }
 
 export interface CollapseSpec {
@@ -31,6 +35,11 @@ export interface CollapseSpec {
 
 export function resolveCollapseRecipe(recipe?: CollapseRecipe): CollapseRecipe {
   return recipe ?? DEFAULT_COLLAPSE_RECIPE;
+}
+
+/** 未知值不当一种新占位。 */
+export function resolveCollapseFlex(flex?: CollapseFlex): CollapseFlex | undefined {
+  return flex === "grow" || flex === "hug" ? flex : undefined;
 }
 
 export function resolveCollapseSpec(input: CollapseInput): CollapseSpec {
@@ -58,4 +67,21 @@ export function resolveCollapseTripSpec(recipe?: CollapseRecipe): MotionSpecName
 /** 减动效不当行程：开闭当拍到位，滚条可立刻计量。 */
 export function resolveCollapseTripOnToggle(skipMotion: boolean): boolean {
   return !skipMotion;
+}
+
+/**
+ * 内容身高先画出 0fr，再跟 open，进页时已经为开的树组才有高度过渡。
+ * fill 吃剩余高，出生即跟 open，避免设备列表先塌再撑开。
+ * 减动效直接跟意图。
+ */
+export function collapseDelaysPaint(recipe: CollapseRecipe | undefined, skipMotion: boolean): boolean {
+  if (skipMotion) return false;
+  return resolveCollapseRecipe(recipe) !== "fill";
+}
+
+/** 画出的开闭。内容身高在关闭帧画出前保持关，即使意图已经为开。 */
+export function collapsePaintOpen(open: boolean, delay: boolean, revealed: boolean): boolean {
+  if (!open) return false;
+  if (!delay) return true;
+  return revealed;
 }

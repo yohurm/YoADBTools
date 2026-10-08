@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto } from "@yohu/api";
@@ -73,6 +76,22 @@ describe("命令管理 store", () => {
     const out = store.library();
     expect(out.schema_version).toBe(COMMAND_LIBRARY_SCHEMA_VERSION);
     expect(out.groups[0]!.entries.map((e) => e.kind)).toEqual(["command", "command", "block"]);
+  });
+
+  it("多选迁到另一组：按原顺序追加，放下后不再选中", () => {
+    const store = createCommandManagerStore();
+    store.load(sample);
+    store.selectEntry("c2", "replace");
+    store.selectEntry("c1", "toggle");
+    expect(store.moveEntriesTo("g2")).toBe(true);
+    expect(store.ui.selectedGroupId).toBe("g2");
+    expect(store.draft.groups[0]?.entries.map((entry) => entry.id)).toEqual(["b1"]);
+    expect(store.selectedGroup()?.entries.map((entry) => entry.id)).toEqual(["c3", "c1", "c2"]);
+    expect(store.ui.selectedEntryIds).toEqual([]);
+    expect(store.ui.entryPivot).toBeNull();
+    expect(store.moveEntriesTo("g2")).toBe(false);
+    store.selectOnly(null);
+    expect(store.moveEntriesTo("g1")).toBe(false);
   });
 
   it("组与条目拖动换位，选中身份跟 id", () => {
@@ -169,5 +188,217 @@ describe("命令管理 store", () => {
         "wait-for-device",
       ]);
     }
+  });
+
+  it("选中块和选中组只各认一处", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    expect(src.match(/!entryIsBlock\(/g)?.length ?? 0).toBe(1);
+    expect(src.match(/ui\.selectedGroupId/g)?.length ?? 0).toBe(1);
+  });
+
+  it("只剩一步时删不掉", () => {
+    const store = createCommandManagerStore();
+    store.load(sample);
+    store.selectEntry("b1", "replace");
+    expect(store.canRemoveBlockStep()).toBe(true);
+    const entry = store.selectedEntry();
+    if (entry?.kind !== "block") throw new Error("expected block");
+    store.removeBlockStep(entry.steps[0]!.id);
+    expect(store.canRemoveBlockStep()).toBe(false);
+    const left = store.selectedEntry();
+    if (left?.kind !== "block") throw new Error("expected block");
+    store.removeBlockStep(left.steps[0]!.id);
+    const stayed = store.selectedEntry();
+    if (stayed?.kind !== "block") throw new Error("expected block");
+    expect(stayed.steps).toHaveLength(1);
+  });
+});
+
+describe("条目选区和块步骤只各认一处", () => {
+  const dir = dirname(fileURLToPath(import.meta.url));
+
+  it("选区集合只构造一次，栏和菜单不再自己读数组", () => {
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const manager = readFileSync(resolve(dir, "../CommandManager.tsx"), "utf8");
+    const editor = readFileSync(resolve(dir, "EditorColumn.tsx"), "utf8");
+    expect(src.match(/ui\.selectedEntryIds/g)?.length ?? 0).toBe(1);
+    expect(manager).not.toContain("selectedEntryIds.includes");
+    expect(manager).not.toContain("ui.selectedEntryIds");
+    expect(editor).not.toContain("selectedEntryIds.length");
+    expect(editor).not.toContain("ui.selectedEntryIds");
+  });
+
+  it("步骤能不能删只在 store", () => {
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const steps = readFileSync(resolve(dir, "BlockSteps.tsx"), "utf8");
+    expect(src.match(/steps\.length > 1/g)?.length ?? 0).toBe(1);
+    expect(src).not.toContain("steps.length <= 1");
+    expect(steps).not.toContain("entryIsBlock");
+    expect(steps).not.toContain("steps.length");
+  });
+});
+
+describe("删掉当前命令组只筛一次", () => {
+  it("remove_group_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "g.id !== " + "gid";
+    expect(src.split(needle).length - 1).toBe(1);
+  });
+});
+
+describe("删掉选中的命令条目只筛一次", () => {
+  it("remove_entries_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "!ids.has(" + "e.id)";
+    expect(src.split(needle).length - 1).toBe(1);
+  });
+});
+
+describe("追加条目只写一次", () => {
+  it("append_entry_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    expect(src.split("[...es, " + "emptyCommand").length - 1).toBe(0);
+    expect(src.split("[...es, " + "emptyBlock").length - 1).toBe(0);
+    expect(src.split("[...es, " + "entry]").length - 1).toBe(1);
+    expect(src).toContain("appendEntry(");
+  });
+});
+
+describe("当前组条目改写只走一处", () => {
+  it("write_group_entries_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    expect(src.split("if (!gid) " + "return;").length - 1).toBe(1);
+    expect(src.split('"entries", ' + "next").length - 1).toBe(1);
+    expect(src).toContain("writeGroupEntries(");
+  });
+});
+
+describe("块步骤改写只走一处", () => {
+  it("write_block_steps_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    expect(src.split("updateEntry({ " + "steps:").length - 1).toBe(1);
+    expect(src.split("if (!entry) " + "return;").length - 1).toBe(1);
+    expect(src).toContain("writeBlockSteps(");
+  });
+});
+
+describe("编辑器选区复位只写一次", () => {
+  it("replace_editor_ui_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "selectedEntryIds: " + "[],";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("replaceEditorUi(");
+  });
+});
+
+describe("当前命令组条目编号只取一次", () => {
+  it("group_entry_ids_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "entries.map((e) => " + "e.id)";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("groupEntryIds(");
+  });
+});
+
+describe("写下条目选中编号和轴点只走一处", () => {
+  it("write_selection_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const idsNeedle = "setUi(\"selected" + "EntryIds\"";
+    const pivotNeedle = "setUi(\"entry" + "Pivot\"";
+    expect(src.split(idsNeedle).length - 1).toBe(1);
+    expect(src.split(pivotNeedle).length - 1).toBe(1);
+    expect(src).toContain("writeSelection(");
+  });
+});
+
+describe("名称输入只写进当前条目一次", () => {
+  it("set_entry_name_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const command = readFileSync(resolve(dir, "CommandEditor.tsx"), "utf8");
+    const block = readFileSync(resolve(dir, "BlockEditor.tsx"), "utf8");
+    const needle = "updateEntry({ " + "name";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(command.split(needle).length - 1).toBe(0);
+    expect(block.split(needle).length - 1).toBe(0);
+    expect(command).toContain("setEntryName(");
+    expect(block).toContain("setEntryName(");
+  });
+});
+
+describe("可选对象没有 id 时当成 null", () => {
+  it("id_or_null", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = ".id " + "?? null";
+    expect(src.split(needle).length - 1).toBe(0);
+    expect(src.split("idOrNull(").length - 1).toBe(5);
+    expect(src).toContain("ui.entryPivot ?? ids[0] ?? null");
+  });
+});
+
+describe("选中组条目没有组时当成空数组", () => {
+  it("selected_entries_empty", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "?? " + "[]";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src.split("selectedEntries(").length - 1).toBe(4);
+    expect(src).toContain("idOrNull(");
+  });
+});
+
+describe("条目列向 store 取当前组条目", () => {
+  it("entry_column_reads_selected_entries", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const column = readFileSync(resolve(dir, "EntryColumn.tsx"), "utf8");
+    const needle = "?? " + "[]";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("selectedEntries,");
+    expect(column).toContain("props.store.selectedEntries()");
+    expect(column.split(needle).length - 1).toBe(0);
+  });
+});
+
+describe("选中条目从选中组条目里找", () => {
+  it("selected_entry_reads_selected_entries", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const needle = "selectedGroup()?.entries";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("selectedEntries().find((e) => e.id === ids[0])");
+    expect(src).toContain("if (ids.length !== 1) return undefined");
+  });
+});
+
+describe("是不是这一组只比一次", () => {
+  it("group_is_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("g.id === " + "id")).toBe(1);
+    expect(times("g.id === " + "gid")).toBe(0);
+    expect(times("function groupIs")).toBe(1);
+    expect(times("export function groupIs")).toBe(0);
+    expect(times("groupIs(g, ")).toBe(4);
+  });
+});
+
+describe("新增组沿用选中组", () => {
+  it("add_group_selects_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "store.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('setUi("selectedGroupId", ' + "id);")).toBe(1);
+    expect(times("selectOnly(" + "null)")).toBe(1);
+    expect(times("selectGroup(id)")).toBe(1);
   });
 });

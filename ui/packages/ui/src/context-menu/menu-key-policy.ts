@@ -3,10 +3,11 @@
  * Host 只管开合；List 消费本文件意图。不写坐标、不画条目。
  */
 
+import { dismissKey, enabledIndexes, horizontalListDelta, itemIsEnabled, listActivateKey, listEdgeKey, tabKey, verticalListDelta } from "../keymap/list-index";
 import { motionDurationMs } from "../tokens/motion";
 import {
   edgeEnabledIndex,
-  enabledMenuIndexes,
+  menuItemIsBranch,
   stepEnabledIndex,
   type MenuListItem,
 } from "./menu-list-model";
@@ -21,11 +22,52 @@ export type MenuKeyIntent =
   | { type: "close"; reason: MenuCloseReason }
   | { type: "move"; index: number }
   | { type: "select" }
+  | { type: "descend" }
+  | { type: "ascend" }
   | { type: "typeahead"; char: string };
+
+/** 关闭菜单。typeahead 是其余分支，不另判。 */
+export function menuIntentIsClose(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "close" }> {
+  return intent.type === "close";
+}
+
+/** 移动焦点。 */
+export function menuIntentIsMove(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "move" }> {
+  return intent.type === "move";
+}
+
+/** 激活当前项。 */
+export function menuIntentIsSelect(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "select" }> {
+  return intent.type === "select";
+}
+
+/** 展开当前项的二级菜单。 */
+export function menuIntentIsDescend(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "descend" }> {
+  return intent.type === "descend";
+}
+
+/** 收起二级菜单，焦点回到父项。 */
+export function menuIntentIsAscend(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "ascend" }> {
+  return intent.type === "ascend";
+}
 
 export interface MenuKeyInput {
   focusIndex: number;
   items: readonly MenuListItem[];
+  /** 当前焦点项带二级菜单。 */
+  branch?: boolean;
+  /** 二级菜单已经展开。左方向键收起。 */
+  submenuOpen?: boolean;
   altKey?: boolean;
   metaKey?: boolean;
   ctrlKey?: boolean;
@@ -33,38 +75,28 @@ export interface MenuKeyInput {
 
 export function menuKeyIntent(key: string, input: MenuKeyInput): MenuKeyIntent | null {
   if (input.altKey || input.metaKey || input.ctrlKey) {
-    if (key === "Escape") return { type: "close", reason: "escape" };
+    if (dismissKey(key)) return { type: "close", reason: "escape" };
     return null;
   }
-  const enabled = enabledMenuIndexes(input.items);
-  switch (key) {
-    case "Escape":
-      return { type: "close", reason: "escape" };
-    case "Tab":
-      return { type: "close", reason: "tab" };
-    case "ArrowDown": {
-      const index = stepEnabledIndex(enabled, input.focusIndex, 1);
-      return index === null ? null : { type: "move", index };
-    }
-    case "ArrowUp": {
-      const index = stepEnabledIndex(enabled, input.focusIndex, -1);
-      return index === null ? null : { type: "move", index };
-    }
-    case "Home": {
-      const index = edgeEnabledIndex(enabled, "start");
-      return index === null ? null : { type: "move", index };
-    }
-    case "End": {
-      const index = edgeEnabledIndex(enabled, "end");
-      return index === null ? null : { type: "move", index };
-    }
-    case "Enter":
-    case " ":
-      return { type: "select" };
-    default:
-      if (key.length === 1 && key !== " ") return { type: "typeahead", char: key };
-      return null;
+  const enabled = enabledIndexes(input.items);
+  const horizontal = horizontalListDelta(key);
+  if (horizontal === 1) return input.branch ? { type: "descend" } : null;
+  if (horizontal === -1) return input.submenuOpen ? { type: "ascend" } : null;
+  const delta = verticalListDelta(key);
+  if (delta !== null) {
+    const index = stepEnabledIndex(enabled, input.focusIndex, delta);
+    return index === null ? null : { type: "move", index };
   }
+  const edge = listEdgeKey(key);
+  if (edge) {
+    const index = edgeEnabledIndex(enabled, edge);
+    return index === null ? null : { type: "move", index };
+  }
+  if (tabKey(key)) return { type: "close", reason: "tab" };
+  if (dismissKey(key)) return { type: "close", reason: "escape" };
+  if (listActivateKey(key)) return input.branch ? { type: "descend" } : { type: "select" };
+  if (key.length === 1) return { type: "typeahead", char: key };
+  return null;
 }
 
 export function nextTypeaheadQuery(
@@ -84,19 +116,23 @@ export interface MenuItemHostAttrs {
   tabindex: 0 | -1;
   "data-tone": MenuItemTone;
   "data-slot": "item";
+  "aria-haspopup"?: "menu";
+  "aria-expanded"?: boolean;
 }
 
-export function menuItemHostAttrs(item: YoMenuItem, focused: boolean): MenuItemHostAttrs {
-  const disabled = Boolean(item.disabled);
+export function menuItemHostAttrs(item: YoMenuItem, focused: boolean, expanded = false): MenuItemHostAttrs {
+  const disabled = !itemIsEnabled(item);
+  const branch = menuItemIsBranch(item);
   return {
     role: "menuitem",
     disabled,
     tabindex: focused && !disabled ? 0 : -1,
     "data-tone": item.danger ? "danger" : "neutral",
     "data-slot": "item",
+    ...(branch ? { "aria-haspopup": "menu" as const, "aria-expanded": expanded } : {}),
   };
 }
 
 export function firstEnabledIndex(items: readonly MenuListItem[]): number {
-  return enabledMenuIndexes(items)[0] ?? 0;
+  return enabledIndexes(items)[0] ?? 0;
 }

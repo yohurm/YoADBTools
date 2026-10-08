@@ -2,9 +2,10 @@
  * 右栏：恰好一条命令。名称 + 具体命令 + `{n}` 描述。
  */
 
+import { placeholderSlots } from "@yohu/api";
 import { YoTextField } from "@yohu/ui";
 
-import { commandTemplateLabel, placeholderSlots } from "../command-line";
+import { commandTemplateLabel } from "../command-line";
 import type { DraftCommand } from "../draft";
 import { ParamDescriptions } from "./ParamDescriptions";
 import { TemplateField } from "./TemplateField";
@@ -17,7 +18,7 @@ export function CommandEditor(props: { command: DraftCommand; store: CommandMana
         block
         label="命令名称"
         value={props.command.name}
-        onInput={(v) => props.store.updateEntry({ name: v })}
+        onInput={(v) => props.store.setEntryName(v)}
       />
       <TemplateField
         label={commandTemplateLabel()}

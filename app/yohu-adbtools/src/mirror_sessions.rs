@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::mirror_present::PresentError;
 use crate::state::AppState;
 use yohu_mirror::MirrorError;
-use yohu_protocol::{MirrorStart, MirrorStartRequest};
+use yohu_protocol::{MirrorSessionSnapshot, MirrorStart, MirrorStartRequest};
 
 pub struct MirrorSessions {
     tasks: Mutex<HashMap<String, u32>>,
@@ -19,19 +19,44 @@ impl MirrorSessions {
         }
     }
 
+    fn lock_tasks(&self) -> std::sync::MutexGuard<'_, std::collections::HashMap<String, u32>> {
+        self.tasks.lock().expect("mirror task lock poisoned")
+    }
+
     pub fn register_task(&self, serial: &str, task_id: u32) {
-        self.tasks
-            .lock()
-            .expect("mirror task lock poisoned")
-            .insert(serial.to_string(), task_id);
+        self.lock_tasks().insert(serial.to_string(), task_id);
     }
 
     pub fn finish_task(&self, serial: &str) -> Option<u32> {
-        self.tasks
-            .lock()
-            .expect("mirror task lock poisoned")
-            .remove(serial)
+        self.lock_tasks().remove(serial)
     }
+}
+
+/// 槽位行叠呈现闩。没有会话的设备不出现。
+pub fn snapshot(state: &AppState) -> Vec<MirrorSessionSnapshot> {
+    state
+        .mirror
+        .session_rows()
+        .into_iter()
+        .map(|row| {
+            let (has_frame, painted_fps) = state.present.paint_for(&row.serial, row.generation);
+            let (paused, fullscreen) = state.present.replay_flags(&row.serial);
+            MirrorSessionSnapshot {
+                serial: row.serial,
+                generation: row.generation,
+                phase: row.phase,
+                width: row.width,
+                height: row.height,
+                codec: row.codec,
+                control: row.control,
+                has_frame,
+                painted_fps,
+                paused,
+                fullscreen,
+                error: None,
+            }
+        })
+        .collect()
 }
 
 /// 调用方已鉴权。
@@ -62,7 +87,7 @@ pub async fn start(state: &AppState, req: MirrorStartRequest) -> Result<MirrorSt
     if !result.adopted {
         let task_id = state.tasks.register(
             format!("投屏: {}", serial),
-            format!("设备 {}", serial),
+            crate::tasks::device_detail(&serial),
             None,
         );
         state.mirror_sessions.register_task(&serial, task_id);

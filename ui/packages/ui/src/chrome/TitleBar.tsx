@@ -9,6 +9,10 @@ import { Layout } from "../tokens/layout";
 import {
   isCaptionTarget,
   resolveTitleBarSlots,
+  titleBarBrandIsIcon,
+  titleBarBrandIsLogo,
+  titleBarCaptionIsMax,
+  titleBarCaptionIsMin,
   titlebarHostAttrs,
   type TitleBarCaptionButton,
 } from "./titlebar-policy";
@@ -36,8 +40,8 @@ export interface YoTitleBarProps {
 }
 
 function onCaption(kind: TitleBarCaptionButton["kind"], props: YoTitleBarProps): void {
-  if (kind === "min") props.onMinimize?.();
-  else if (kind === "max") props.onToggleMaximize?.();
+  if (titleBarCaptionIsMin(kind)) props.onMinimize?.();
+  else if (titleBarCaptionIsMax(kind)) props.onToggleMaximize?.();
   else props.onClose?.();
 }
 
@@ -57,7 +61,7 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
       }}
     >
       <div class="yohu-titlebar__brand" data-tauri-drag-region>
-        <Show when={slots().brand === "logo"}>
+        <Show when={titleBarBrandIsLogo(slots().brand)}>
           <img
             class="yohu-titlebar__logo"
             src={props.logoSrc}
@@ -67,7 +71,7 @@ export function YoTitleBar(props: YoTitleBarProps): JSX.Element {
             draggable={false}
           />
         </Show>
-        <Show when={slots().brand === "icon"}>
+        <Show when={titleBarBrandIsIcon(slots().brand)}>
           <span class="yohu-titlebar__icon" aria-hidden="true">
             <Icon name={props.icon as IconName} size={Layout.IconSm} />
           </span>

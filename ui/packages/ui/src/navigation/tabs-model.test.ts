@@ -1,6 +1,16 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { closeFocusIndex, tabAt, tabsActiveIndex, tabsKeyIntent } from "./tabs-model";
+import {
+  closeFocusIndex,
+  tabAt,
+  tabsActiveIndex,
+  tabsIndexIsActive,
+  tabsKeyIsActivate,
+  tabsKeyIntent,
+} from "./tabs-model";
 
 describe("tabs-model", () => {
   it("左右循环、Home/End", () => {
@@ -33,5 +43,23 @@ describe("tabs-model", () => {
     expect(tabsActiveIndex(tabs, "missing")).toBe(-1);
     expect(tabAt(tabs, 0)?.id).toBe("a");
     expect(tabAt(tabs, 9)).toBeUndefined();
+  });
+
+  it("激活意图只判一次", () => {
+    expect(tabsKeyIsActivate({ type: "activate", index: 0 })).toBe(true);
+    expect(tabsKeyIsActivate({ type: "close", index: 0 })).toBe(false);
+  });
+
+  it("激活下标只判一次", () => {
+    expect(tabsIndexIsActive(0)).toBe(true);
+    expect(tabsIndexIsActive(2)).toBe(true);
+    expect(tabsIndexIsActive(-1)).toBe(false);
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["tabs-model.ts", "tabs-policy.ts", "Tabs.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "tabs-model.ts") body = body.replace("return index >= 0", "");
+      expect(body, name).not.toContain("activeIndex >= 0");
+      expect(body, name).not.toContain("index >= 0");
+    }
   });
 });

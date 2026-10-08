@@ -38,6 +38,10 @@ pub struct AppLog {
 }
 
 impl AppLog {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, VecDeque<AppLogEntry>> {
+        self.inner.lock().expect("applog lock poisoned")
+    }
+
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Mutex::new(VecDeque::with_capacity(capacity)),
@@ -60,7 +64,7 @@ impl AppLog {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let mut inner = self.inner.lock().expect("applog lock poisoned");
+        let mut inner = self.lock_inner();
         inner.push_back(AppLogEntry {
             ts,
             level,
@@ -73,12 +77,7 @@ impl AppLog {
 
     /// 快照（旧 → 新）。
     pub fn snapshot(&self) -> Vec<AppLogEntry> {
-        self.inner
-            .lock()
-            .expect("applog lock poisoned")
-            .iter()
-            .cloned()
-            .collect()
+        self.lock_inner().iter().cloned().collect()
     }
 }
 

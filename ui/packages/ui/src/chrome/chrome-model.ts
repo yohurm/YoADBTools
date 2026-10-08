@@ -9,7 +9,7 @@ export type ChromeDrop = "ignore";
 
 export interface ChromeInput {
   hasLeading?: boolean;
-  hasBar?: boolean;
+  actions?: readonly ChromeActionRef[];
   hasExtra?: boolean;
   dropIgnore?: boolean;
 }
@@ -28,7 +28,7 @@ export interface ChromeActionRef {
 export function resolveChromeSpec(input: ChromeInput): ChromeSpec {
   return {
     showLeading: Boolean(input.hasLeading),
-    showBar: Boolean(input.hasBar),
+    showBar: chromeHasBar(input.actions),
     showExtra: Boolean(input.hasExtra),
     drop: input.dropIgnore ? "ignore" : undefined,
   };

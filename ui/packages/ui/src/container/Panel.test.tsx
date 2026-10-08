@@ -28,6 +28,7 @@ describe("YoPanel", () => {
     expect(container.querySelector(".yohu-panel")?.getAttribute("data-padding")).toBe("md");
     expect(container.querySelector(".yohu-panel")?.getAttribute("data-variant")).toBe("card");
     expect(panel?.hasAttribute("data-edge")).toBe(false);
+    expect(panel?.hasAttribute("data-role")).toBe(false);
   });
 
   it("支持自定义 padding", () => {
@@ -117,6 +118,24 @@ describe("YoPanel", () => {
     expect(panelCss).not.toMatch(
       /\[data-variant="pane"\]\s+\.yohu-panel__body\s*\{[^}]*overflow:\s*auto/,
     );
+  });
+
+  it("操作面板顶栏留在内容区外，内容区铺画布", () => {
+    const { container } = render(() => (
+      <YoPanel variant="pane" role="ops" header={<div>标题</div>}>
+        清单
+      </YoPanel>
+    ));
+    const panel = container.querySelector(".yohu-panel");
+    expect(panel?.getAttribute("data-role")).toBe("ops");
+    expect(panel?.querySelector(".yohu-panel__header")).toBeTruthy();
+    expect(panel?.querySelector(".yohu-panel__body")?.textContent).toBe("清单");
+    expect(panel?.querySelector(".yohu-panel__header")?.parentElement).not.toBe(
+      panel?.querySelector(".yohu-panel__body"),
+    );
+    expect(panelCss).toContain('[data-role="ops"] .yohu-panel__body');
+    expect(panelCss).toContain("background-color: var(--yohu-canvas)");
+    expect(panelCss).not.toContain("data-well");
   });
 
   it("drop 高光是填充盒外圈，不占用面板描边", () => {

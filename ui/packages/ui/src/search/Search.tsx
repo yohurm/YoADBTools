@@ -5,6 +5,8 @@
  */
 import { Show, createEffect, createMemo, createUniqueId, on } from "solid-js";
 import type { JSX } from "solid-js";
+import { flagIsOn, presenceAttr, presenceIsOn } from "../dom/flag";
+import { dismissKey } from "../keymap/list-index";
 import { YoCorner } from "../corner";
 import { ClearMark } from "../form/clear-mark";
 import { Icon } from "../icons";
@@ -15,16 +17,17 @@ import {
   resolveSearchOpen,
   resolveSearchSlot,
   searchEntryPressed,
+  searchHasQuery,
   searchHostAttrs,
   searchShowsBar,
   searchShowsEntry,
   type YoSearchCancel,
   type YoSearchSlot,
-  type YoSearchStatus,
 } from "./search-policy";
+import type { FieldStatus } from "../form/field-status";
 import "./Search.css";
 
-export type { YoSearchCancel, YoSearchSlot, YoSearchStatus };
+export type { YoSearchCancel, YoSearchSlot };
 
 export type YoSearchControl = HTMLInputElement;
 
@@ -46,7 +49,7 @@ export interface YoSearchProps {
   /** 铺满父级。栏默认铺；false 才 hug。 */
   block?: boolean;
   /** 校验态。默认 none。 */
-  status?: YoSearchStatus;
+  status?: FieldStatus;
   /** 过滤生效描边。未写时有查询即亮。 */
   active?: boolean;
   /** Harmony CancelButtonStyle。默认 input。 */
@@ -65,6 +68,10 @@ export interface YoSearchProps {
   id?: string;
   /** 转发内部 input。 */
   inputRef?: (el: YoSearchControl) => void;
+}
+
+function searchEventValue(event: Event): string {
+  return (event.currentTarget as HTMLInputElement).value;
 }
 
 export function YoSearch(props: YoSearchProps): JSX.Element {
@@ -86,6 +93,22 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
   );
   let inputEl: HTMLInputElement | undefined;
 
+  function searchDisabled(): boolean {
+    return host().disabled;
+  }
+
+  function searchOpened(): boolean {
+    return flagIsOn(host()["data-open"]);
+  }
+
+  function searchBarOn(): boolean {
+    return searchShowsBar(slot());
+  }
+
+  function searchFallbackName(): string {
+    return "搜索";
+  }
+
   const bindInput = (el: HTMLInputElement): void => {
     inputEl = el;
     props.inputRef?.(el);
@@ -96,15 +119,15 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
   };
 
   const handleInput = (event: InputEvent): void => {
-    emit((event.currentTarget as HTMLInputElement).value, event);
+    emit(searchEventValue(event), event);
   };
 
   const handleChange = (event: Event): void => {
-    emit((event.currentTarget as HTMLInputElement).value, event as InputEvent);
+    emit(searchEventValue(event), event as InputEvent);
   };
 
   const handleClear = (): void => {
-    if (host().disabled) return;
+    if (searchDisabled()) return;
     if (inputEl) {
       inputEl.value = "";
       inputEl.focus();
@@ -112,15 +135,17 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
     emit("", new InputEvent("input"));
   };
 
+  const fieldValue = (): string => props.value ?? inputEl?.value ?? "";
+
   const handleSubmit = (event: Event): void => {
     event.preventDefault();
-    props.onSubmit?.(props.value ?? inputEl?.value ?? "");
+    props.onSubmit?.(fieldValue());
   };
 
   const handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== "Escape") return;
-    const value = props.value ?? inputEl?.value ?? "";
-    if (value.length > 0) {
+    if (!dismissKey(event.key)) return;
+    const value = fieldValue();
+    if (searchHasQuery(value)) {
       event.preventDefault();
       handleClear();
       return;
@@ -132,13 +157,13 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
   };
 
   const toggleOpen = (): void => {
-    if (host().disabled) return;
+    if (searchDisabled()) return;
     props.onOpenChange?.(!resolveSearchOpen({ collapsible: props.collapsible, open: props.open }));
   };
 
   createEffect(
     on(
-      () => host()["data-open"] === "true" && searchShowsBar(slot()),
+      () => searchOpened() && searchBarOn(),
       (now, was) => {
         if (now && was === false) {
           requestAnimationFrame(() => inputEl?.focus());
@@ -147,25 +172,23 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
     ),
   );
 
-  const entryLabel = (): string => props.title ?? props.ariaLabel ?? "搜索";
+  const entryLabel = (): string => props.title ?? props.ariaLabel ?? searchFallbackName();
 
   const EntryButton = (): JSX.Element => (
     <button
       type="button"
       class="yohu-search__entry yohu-focus-ring"
-      data-pressed={
-        searchEntryPressed({ open: host()["data-open"] === "true", value: props.value })
-          ? true
-          : undefined
-      }
+      data-pressed={presenceAttr(
+        searchEntryPressed({ open: searchOpened(), value: props.value }),
+      )}
       aria-label={entryLabel()}
-      aria-expanded={props.collapsible ? host()["data-open"] === "true" : undefined}
+      aria-expanded={props.collapsible ? searchOpened() : undefined}
       aria-controls={props.collapsible ? searchId() : undefined}
-      disabled={host().disabled}
+      disabled={searchDisabled()}
       onClick={toggleOpen}
     >
       <YoCorner role="control" class="yohu-search__entry-chrome" direction="row" align="center" justify="center">
-        <Icon name="search" />
+        <Icon name="search" size={Layout.IconMd} />
       </YoCorner>
     </button>
   );
@@ -173,7 +196,7 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
   const entry = (
     <Show when={searchShowsEntry(slot())}>
       <Show when={props.title} fallback={<EntryButton />}>
-        <YoTooltip content={props.title ?? ""} disabled={host().disabled}>
+        <YoTooltip content={props.title ?? ""} disabled={searchDisabled()}>
           <EntryButton />
         </YoTooltip>
       </Show>
@@ -214,14 +237,14 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
             size={1}
             value={props.value ?? ""}
             placeholder={props.placeholder}
-            aria-label={props.ariaLabel ?? props.title ?? "搜索"}
+            aria-label={props.ariaLabel ?? props.title ?? searchFallbackName()}
             aria-invalid={host()["aria-invalid"]}
-            disabled={host().disabled}
+            disabled={searchDisabled()}
             onInput={handleInput}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
           />
-          <Show when={host()["data-clearable"]}>
+          <Show when={presenceIsOn(host()["data-clearable"])}>
             <ClearMark onClear={handleClear} />
           </Show>
         </YoCorner>
@@ -243,9 +266,9 @@ export function YoSearch(props: YoSearchProps): JSX.Element {
       data-active={host()["data-active"]}
     >
       {entry}
-      <Show when={searchShowsBar(slot())}>
+      <Show when={searchBarOn()}>
         <Show when={props.collapsible} fallback={<Bar />}>
-          <YoCollapse open={host()["data-open"] === "true"}>
+          <YoCollapse open={searchOpened()}>
             <Bar />
           </YoCollapse>
         </Show>

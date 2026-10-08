@@ -13,6 +13,26 @@ export const DEFAULT_LIST_ITEM_ROLE: YoListItemRole = "option";
 export const DEFAULT_LIST_ITEM_SIZE: YoListItemSize = "nav";
 export const DEFAULT_LIST_ITEM_RING: YoListItemRing = "outset";
 
+/** 导航按钮行。option 是它的另一面。 */
+export function listItemRoleIsButton(role: YoListItemRole | undefined): boolean {
+  return role === "button";
+}
+
+/** 设备卡行高。缺省是导航行。 */
+export function listItemSizeIsDevice(size: YoListItemSize | undefined): boolean {
+  return size === "device";
+}
+
+/** 导航行高。图标回弹只认这一把。 */
+export function listItemSizeIsNav(size: YoListItemSize): boolean {
+  return !listItemSizeIsDevice(size);
+}
+
+/** 内收焦点环。缺省外放。 */
+export function listItemRingIsInset(ring: YoListItemRing | undefined): boolean {
+  return ring === "inset";
+}
+
 export interface ListItemInput {
   role?: YoListItemRole;
   size?: YoListItemSize;
@@ -31,9 +51,9 @@ export interface ListItemSpec {
 
 export function resolveListItemSpec(input: ListItemInput): ListItemSpec {
   return {
-    role: input.role === "button" ? "button" : DEFAULT_LIST_ITEM_ROLE,
-    size: input.size === "device" ? "device" : DEFAULT_LIST_ITEM_SIZE,
-    ring: input.ring === "inset" ? "inset" : DEFAULT_LIST_ITEM_RING,
+    role: listItemRoleIsButton(input.role) ? "button" : DEFAULT_LIST_ITEM_ROLE,
+    size: listItemSizeIsDevice(input.size) ? "device" : DEFAULT_LIST_ITEM_SIZE,
+    ring: listItemRingIsInset(input.ring) ? "inset" : DEFAULT_LIST_ITEM_RING,
     selected: Boolean(input.selected),
     current: Boolean(input.current),
   };

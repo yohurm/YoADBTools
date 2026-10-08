@@ -1,5 +1,11 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  formRowLayoutIsStacked,
+  formRowPadIsFlush,
+  formRowSubIsOpen,
   hasFormRowSlot,
   resolveFormRowLayout,
   resolveFormRowPad,
@@ -8,7 +14,7 @@ import {
 
 describe("formrow-model", () => {
   it("缺省两槽皆空", () => {
-    expect(resolveFormRowSlots({})).toEqual({ description: false, note: false });
+    expect(resolveFormRowSlots({})).toEqual({ description: false, note: false, sub: false });
   });
 
   it("空串与空白不算占槽", () => {
@@ -30,11 +36,34 @@ describe("formrow-model", () => {
     expect(resolveFormRowPad("flush")).toBe("flush");
   });
 
+  it("纵排和去垫只在模型里比较", () => {
+    expect(formRowLayoutIsStacked("stacked")).toBe(true);
+    expect(formRowLayoutIsStacked("row")).toBe(false);
+    expect(formRowLayoutIsStacked()).toBe(false);
+    expect(formRowPadIsFlush("flush")).toBe(true);
+    expect(formRowPadIsFlush("md")).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/^formrow-.*\.tsx?$/.test(name) || name.includes(".test.")) continue;
+      const text = readFileSync(join(dir, name), "utf8");
+      const body =
+        name === "formrow-model.ts"
+          ? text.replace('return layout === "stacked"', "").replace('return pad === "flush"', "")
+          : text;
+      expect(body, name).not.toContain('=== "stacked"');
+      expect(body, name).not.toContain('=== "flush"');
+    }
+  });
+
   it("非空说明与备注算占槽", () => {
     expect(hasFormRowSlot("跟随系统")).toBe(true);
     expect(resolveFormRowSlots({ description: "说明", note: "立即生效" })).toEqual({
       description: true,
       note: true,
+      sub: false,
     });
+    expect(formRowSubIsOpen(undefined, true)).toBe(false);
+    expect(formRowSubIsOpen("组")).toBe(true);
+    expect(formRowSubIsOpen("组", false)).toBe(false);
   });
 });

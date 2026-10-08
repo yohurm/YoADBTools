@@ -10,8 +10,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::fault::{file_error_from_adb, FileError};
 use crate::guard::{normalize_mut, resolve_and_recheck, RecheckKind};
-use yohu_adb::{AdbClient, AdbError};
-use yohu_domain::SafetyRoot;
+use yohu_adb::{AdbClient, AdbError, ShellFault};
+use yohu_domain::{path_segments, SafetyRoot};
 use yohu_protocol::{AppEvent, Direction, TransferFault, TransferProgress, TransferState};
 
 const PROGRESS_THROTTLE: Duration = Duration::from_millis(200);
@@ -84,7 +84,7 @@ impl TransferRunner {
             Direction::Push => match push_local_total(&local_path) {
                 Ok(local_total) => (
                     vec!["push".into(), local.clone(), remote_norm.as_str().into()],
-                    (local_total > 0).then_some(local_total),
+                    known_total(Some(local_total)),
                 ),
                 Err(err) => {
                     return fail_before_stream(&sink, id, direction, &name, &local_path, err).await;
@@ -92,7 +92,7 @@ impl TransferRunner {
             },
             Direction::Pull => (
                 vec!["pull".into(), remote_norm.as_str().into(), local.clone()],
-                expected_bytes.filter(|n| *n > 0),
+                known_total(expected_bytes),
             ),
         };
 
@@ -223,6 +223,23 @@ impl TransferRunner {
     }
 }
 
+/// 非正总量当未知。上传本机长度和下载预期字节都先问这一把。
+fn known_total(total: Option<u64>) -> Option<u64> {
+    total.filter(|n| *n > 0)
+}
+
+/// 观测字节不超过已知总量。没有总量则原样返回。
+fn clamp_observed(observed: u64, expected: Option<u64>) -> u64 {
+    expected
+        .map(|total| observed.min(total))
+        .unwrap_or(observed)
+}
+
+/// 只有普通文件才有传输字节长度。目录仍由调用方另判。
+fn regular_file_len(meta: &std::fs::Metadata) -> Option<u64> {
+    meta.is_file().then_some(meta.len())
+}
+
 struct ProgressAcc {
     completed: u64,
     inflight: u64,
@@ -231,7 +248,7 @@ struct ProgressAcc {
 
 fn paint_progress(progress: &mut TransferProgress, acc: &ProgressAcc) {
     let bytes = acc.completed.saturating_add(acc.inflight);
-    progress.bytes = acc.expected.map(|total| bytes.min(total)).unwrap_or(bytes);
+    progress.bytes = clamp_observed(bytes, acc.expected);
     if let Some(total) = acc.expected {
         progress.total = Some(total.max(progress.bytes));
     } else if progress.bytes > 0 {
@@ -241,7 +258,7 @@ fn paint_progress(progress: &mut TransferProgress, acc: &ProgressAcc) {
 
 fn poll_local_bytes(path: &Path, expected: Option<u64>) -> Option<u64> {
     let len = std::fs::metadata(path).ok()?.len();
-    Some(expected.map(|total| len.min(total)).unwrap_or(len))
+    Some(clamp_observed(len, expected))
 }
 
 /// 仅 Done：本机是文件才写长度。目录或读不到保持观测，禁止回退 expected。
@@ -249,10 +266,9 @@ fn apply_done_local_len(progress: &mut TransferProgress, local: &Path) {
     let Ok(meta) = std::fs::metadata(local) else {
         return;
     };
-    if !meta.is_file() {
+    let Some(n) = regular_file_len(&meta) else {
         return;
-    }
-    let n = meta.len();
+    };
     progress.bytes = n;
     progress.total = Some(n);
 }
@@ -260,7 +276,12 @@ fn apply_done_local_len(progress: &mut TransferProgress, local: &Path) {
 /// `FileError` → wire。Cancelled / ProgressClosed / 树错误不进事件。禁止 `_` 吞变体。
 fn wire_fault(err: &FileError) -> Option<TransferFault> {
     match err {
+        FileError::InvalidName(detail) => Some(TransferFault::InvalidName {
+            detail: detail.clone(),
+        }),
         FileError::Path(path) => Some(TransferFault::Path { path: path.clone() }),
+        FileError::NotAbsolute(path) => Some(TransferFault::NotAbsolute { path: path.clone() }),
+        FileError::Traversal(path) => Some(TransferFault::Traversal { path: path.clone() }),
         FileError::OutsideRoot(path) => Some(TransferFault::OutsideRoot { path: path.clone() }),
         FileError::RemoteNotFound(path) => {
             Some(TransferFault::RemoteNotFound { path: path.clone() })
@@ -272,6 +293,9 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
         FileError::ReadOnly(path) => Some(TransferFault::ReadOnly { path: path.clone() }),
         FileError::AlreadyExists(path) => Some(TransferFault::AlreadyExists { path: path.clone() }),
         FileError::RemoteFailed(path) => Some(TransferFault::RemoteFailed { path: path.clone() }),
+        FileError::ReadlinkUnparseable(path) => {
+            Some(TransferFault::ReadlinkUnparseable { path: path.clone() })
+        }
         FileError::LocalNotFound(path) => Some(TransferFault::LocalNotFound { path: path.clone() }),
         FileError::Local(path) => Some(TransferFault::Local { path: path.clone() }),
         FileError::ProgressJoin => Some(TransferFault::ProgressJoin),
@@ -279,6 +303,7 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
         | FileError::EmptyTree(_)
         | FileError::TreeLimit(_)
         | FileError::TreeDepth(_)
+        | FileError::BrowseMalformed(_)
         | FileError::NotAttached => None,
         FileError::Adb(AdbError::Cancelled) => None,
         FileError::Adb(AdbError::DeviceOffline(serial) | AdbError::NotOnline(serial)) => {
@@ -290,16 +315,27 @@ fn wire_fault(err: &FileError) -> Option<TransferFault> {
         FileError::Adb(AdbError::Io(_)) | FileError::Adb(AdbError::UnsupportedShell) => {
             Some(TransferFault::Io)
         }
-        FileError::Adb(AdbError::ToolUnavailable(_)) => Some(TransferFault::ToolUnavailable),
+        FileError::Adb(AdbError::Truncated) => Some(TransferFault::Truncated),
+        FileError::Adb(AdbError::PumpPanic) => Some(TransferFault::PumpPanic),
+        FileError::Adb(AdbError::Shell(fault)) => Some(match fault {
+            ShellFault::NoStdin => TransferFault::ShellNoStdin,
+            ShellFault::NoStdout => TransferFault::ShellNoStdout,
+            ShellFault::Handshake => TransferFault::ShellHandshake,
+            ShellFault::Ended => TransferFault::ShellEnded,
+            ShellFault::Exec => TransferFault::ShellExec,
+        }),
+        FileError::Adb(AdbError::ToolUnavailable | AdbError::CandidatesFailed) => {
+            Some(TransferFault::ToolUnavailable)
+        }
         FileError::Adb(AdbError::BadExit { .. }) => None,
     }
 }
 
-/// 远端末段。空段（尾斜杠）往前找。
+/// 远端末段。空段（尾斜杠）往前找。段切分用领域 `path_segments`。
 pub fn transfer_name(remote: &str) -> String {
-    remote
-        .rsplit('/')
-        .find(|part| !part.is_empty())
+    path_segments(remote)
+        .last()
+        .copied()
         .unwrap_or(remote)
         .to_string()
 }
@@ -387,8 +423,8 @@ fn local_fs_error(err: std::io::Error, path: &Path) -> FileError {
 /// 文件给 `adb push` 用精确字节；目录交给 adb 递归，总数等摘要行。
 fn push_local_total(path: &Path) -> Result<u64, FileError> {
     let meta = std::fs::metadata(path).map_err(|e| local_fs_error(e, path))?;
-    if meta.is_file() {
-        Ok(meta.len())
+    if let Some(n) = regular_file_len(&meta) {
+        Ok(n)
     } else if meta.is_dir() {
         Ok(0)
     } else {
@@ -430,6 +466,7 @@ fn extract_percent(line: &str) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fault::local_failed_text;
     use yohu_domain::RemotePath;
 
     #[test]
@@ -578,7 +615,7 @@ mod tests {
             path,
         );
         assert!(matches!(denied, FileError::Local(ref p) if p == &shown));
-        assert_eq!(denied.to_string(), format!("本地操作失败: {shown}"));
+        assert_eq!(denied.to_string(), local_failed_text(&shown));
         assert!(!denied.to_string().contains("access denied sentence"));
     }
 
@@ -672,8 +709,26 @@ mod tests {
             Some(TransferFault::Io)
         );
         assert_eq!(
+            wire_fault(&FileError::Adb(AdbError::Truncated)),
+            Some(TransferFault::Truncated)
+        );
+        assert_eq!(
+            wire_fault(&FileError::Adb(AdbError::PumpPanic)),
+            Some(TransferFault::PumpPanic)
+        );
+        assert_eq!(
+            wire_fault(&FileError::Adb(AdbError::Shell(ShellFault::Ended))),
+            Some(TransferFault::ShellEnded)
+        );
+        assert_eq!(
             wire_fault(&FileError::ProgressJoin),
             Some(TransferFault::ProgressJoin)
+        );
+        assert_eq!(
+            wire_fault(&FileError::ReadlinkUnparseable("/sdcard/a".into())),
+            Some(TransferFault::ReadlinkUnparseable {
+                path: "/sdcard/a".into()
+            })
         );
         assert_eq!(wire_fault(&FileError::ProgressClosed), None);
         assert_eq!(wire_fault(&FileError::EmptyTree("/sdcard".into())), None);
@@ -779,5 +834,31 @@ mod tests {
                 })
             );
         });
+    }
+
+    #[test]
+    fn browse_sessions_lock_sentence_once() {
+        let owner_line = "self.sessions.lock().expect(\"browse sessions lock poisoned\")";
+        let needle = "browse sessions lock poisoned";
+        let src = include_str!("browse.rs");
+        let scanned = match src.split_once("mod tests") {
+            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
+            None => src.to_string(),
+        };
+        let scanned = scanned.replacen(owner_line, "", 1);
+        assert!(!scanned.contains(needle), "{needle}");
+    }
+
+    #[test]
+    fn browse_slot_lock_sentence_once() {
+        let owner_line = "self.inner.lock().expect(\"browse slot lock poisoned\")";
+        let needle = "browse slot lock poisoned";
+        let src = include_str!("browse.rs");
+        let scanned = match src.split_once("mod tests") {
+            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
+            None => src.to_string(),
+        };
+        let scanned = scanned.replacen(owner_line, "", 1);
+        assert!(!scanned.contains(needle), "{needle}");
     }
 }

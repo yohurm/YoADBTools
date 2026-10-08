@@ -132,6 +132,9 @@ describe("YoToast", () => {
     expect(el?.getAttribute("data-tone")).toBe("success");
     expect(el?.getAttribute("role")).toBe("status");
     expect(el?.querySelector(".yohu-toast__chrome")).toBeTruthy();
+    expect(toasterSource()).toContain('mode="paint" role="card" stroke');
+    expect(toastCss).toContain("border-radius: var(--yohu-radius-md)");
+    expect(toastCss).toContain("box-shadow: var(--yohu-shadow-overlay)");
     expect(el?.querySelector(".yohu-recipe-dismiss")).toBeTruthy();
     expect(el?.querySelector(".yohu-recipe-dismiss")?.getAttribute("aria-label")).toBe("关闭 单条");
     expect(toastCss).not.toContain(".yohu-corner__content");
@@ -167,5 +170,32 @@ describe("YoToast", () => {
     expect(toastCss).toContain("right: var(--yohu-space-md)");
     expect(toastCss).toContain("bottom: calc(var(--yohu-control-height-sm) + var(--yohu-space-md))");
     expect(toastCss).not.toContain("top: var(--yohu-space-md)");
+  });
+});
+
+function toasterSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Toast.tsx"), "utf8");
+}
+
+describe("提示条摘定时器", () => {
+  it("清定时和到点都摘掉同一个定时器", () => {
+    const src = toasterSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("timers." + "delete(id)")).toBe(1);
+    expect(times("function dropTimer")).toBe(1);
+    expect(times("export function dropTimer")).toBe(0);
+    expect(times("dropTimer(id)")).toBe(2);
+  });
+});
+
+describe("提示条开始关闭", () => {
+  it("到点和手动关闭都提交同一关闭", () => {
+    const src = toasterSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("commit(beginDismissToast(queue, " + "id))")).toBe(1);
+    expect(times("function dismissItem")).toBe(1);
+    expect(times("export function dismissItem")).toBe(0);
+    expect(times("dismissItem(id)")).toBe(2);
+    expect(times("commit(removeToast(queue, id))")).toBe(1);
   });
 });

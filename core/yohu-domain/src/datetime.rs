@@ -162,7 +162,8 @@ fn parse_parts(raw: &str) -> Option<Parts> {
     })
 }
 
-fn is_zone_token(token: &str) -> bool {
+/// 时区偏移：以 `+` / `-` 开头，且至少四位数字（`+0800`、`-0530`）。
+pub fn is_zone_token(token: &str) -> bool {
     matches!(token.as_bytes().first(), Some(b'+' | b'-'))
         && token.chars().filter(|c| c.is_ascii_digit()).count() >= 4
 }

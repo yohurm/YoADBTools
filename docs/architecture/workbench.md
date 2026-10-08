@@ -57,7 +57,7 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
 ```text
 启动：register.ts 登记设置页
       App 只组合 → boot.runBootPipeline
-        load: settingsStore.load + deviceStore.load（各一次；失败记日志不抛）
+        load: settingsStore.load + deviceStore.load + taskStore.load + 模块 hydrate（投屏 mirror.session）（并行各一次；失败记日志不抛）
         boot 只 await load，无死 catch；load 上抛则停止揭窗
         双 rAF → windowShow（失败上抛，不 refresh）
           → invoke boot.showMain（揭窗唯一入口）
@@ -68,8 +68,8 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
         system.info 失败：YoLog.warn + errorText，lastError 仍是主错误
         DeviceRail 只展示 lastError，不拼 hint
 切模块：NavList 事件 → navStore.navigate
-        ModuleStage 身份变化同一拍 → navStore.setMirrorPresent(id)
-          → mirror.present.setActive（只认 ModuleId.Mirror；进投屏立刻建表面，不跟淡出）
+        ModuleStage 身份变化同一拍 → navStore.setMirrorPresent(id, data-theme)
+          → mirror.present.setActive(active, dark)（只认 ModuleId.Mirror；进投屏立刻建表面，不跟淡出；回放覆盖缓存铬色）
         进出投屏同一拍挂载/卸载 MirrorView，不跟 YoPresence 淡出；其它模块仍 fade
 选择：DeviceRail 事件 → deviceStore.selectDevice → DeviceSession
 设置：SettingsForm 事件 → settingsStore.set / browseAdbPath / browseDataRoot / browseExportPath / openLogsDir
@@ -115,7 +115,7 @@ Vite server.port
 
 禁止 HTML 选择器用裸色值当终态。fallback 只在 `--yohu-canvas` 未定义时生效；变量一旦存在，再特异的 `html[data-theme="dark"] …` 也必须消费 token。禁止空 `catch`。禁止把启动编排塞进 `main.tsx`。
 
-3. `App` `onMount` 先 `deviceStore` / `taskStore` / `updateStore.bindIpc()`（`listen` 已可用；设置变更在 `createSettingsStore` 订 `settings/changed`）再 `settingsStore.load` + `deviceStore.load`（各一次）→ 拆掉 HTML 层 → 双 rAF → `windowShow`（`boot.showMain`）。**隐藏文档没有合成帧**，`waitForNextPaint` 不得再等 `requestAnimationFrame`（否则揭窗永不发生）。揭失败上抛，不 `refresh`。壳在 **工作台已画好之后** 才交接，禁止边 hydrate 边播动画。禁止 `@yohu/api` 用延时重试顶订阅时序。
+3. `App` `onMount` 先 `deviceStore` / `taskStore` / `updateStore.bindIpc()`（`listen` 已可用；设置变更在 `createSettingsStore` 订 `settings/changed`）再并行 `settingsStore.load` + `deviceStore.load` + `taskStore.load`（`task.list`）+ 各模块 `hydrate`（投屏为 `mirror.session`）→ 拆掉 HTML 层 → 双 rAF → `windowShow`（`boot.showMain`）。**隐藏文档没有合成帧**，`waitForNextPaint` 不得再等 `requestAnimationFrame`（否则揭窗永不发生）。揭失败上抛，不 `refresh`。壳在 **工作台已画好之后** 才交接，禁止边 hydrate 边播动画。禁止 `@yohu/api` 用延时重试顶订阅时序。命令库、文件路径、日志 Tab、更新关于页不进这条清单（ADR-v6-040）。
    页面 Finished 且 URL 是 `chrome-error` / `chromewebdata` 时，原生失败出口 `show_if_hidden(page-failed)`，关掉启动小窗；这是导航失败，不是 2.5s 超时双轨。`devUrl` 的 Vite 挂掉会走这条。`about:blank` 与应用页不算失败。
 4. 交接分类（小窗矩形 vs 隐藏主窗矩形是否落在小窗锁定的工作区）：
    - **同屏**：主窗一次落到最终外框（仍隐藏）。Shared overlay 盖住后再藏小窗；fill morph 铺满、clip 半径从 splash `Radius.Md` **收到 0** 之后才 `ShowWindow` 主窗，再 100ms 淡出 overlay。铺满 = 目标 HWND 每个像素都是不透明画布；`host_radius`（`Radius.Sm`）是主窗 DWM 圆角，揭窗后才属于主窗，不进 overlay clip。fill 2×2 与 brand 都来自 `BootSurface`（canvas token + paint `BootFrame`）。overlay HWND `DWMWCP_DONOTROUND` + 整窗 `DwmExtendFrameIntoClientArea`。禁止从 HWND DC 抓像素，禁止把 RGB=0 补成画布。禁止在 morph 期间让工作台从透明区透出。禁止 `SetWindowPos` 插值小窗/主窗尺寸。
@@ -140,7 +140,7 @@ Vite server.port
 
 invoke mirror.start → commands/mirror → mirror_sessions::start
   → MirrorService.start → present.attach（只 stash / BindPipe，未 active 不建窗）
-invoke mirror.present.setActive(true) + mirror.layout
+invoke mirror.present.setActive(true, dark) + mirror.layout
   → PresentHost::layout → ensure_surface 建 HWND
   → occupancy DComp clip contain
 

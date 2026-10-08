@@ -14,7 +14,7 @@ use yohu_domain::{
 use yohu_files::{FileBrowser, FileMutator, TransferRunner};
 use yohu_logsrv::CaptureService;
 use yohu_mirror::MirrorService;
-use yohu_protocol::{AppEvent, DeviceInfo, IpcError, IpcErrorCode};
+use yohu_protocol::{AppEvent, DeviceInfo};
 
 use crate::browse_runs::BrowseRuns;
 use crate::capture_runs::CaptureRuns;
@@ -62,27 +62,19 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub(crate) fn lock_devices(&self) -> std::sync::MutexGuard<'_, Vec<yohu_protocol::DeviceInfo>> {
+        self.last_devices.lock().expect("devices lock poisoned")
+    }
+
     /// commands 鉴权。只许 invoke 边界调用，服务禁止再验。
-    pub fn require_online(&self, serial: &str) -> Result<(), IpcError> {
-        let devices = self.last_devices.lock().expect("devices lock poisoned");
-        assert_device_online(serial, &devices).map_err(session_ipc)
+    /// 失败是领域 `DeviceSessionError`；`?` 在命令层经 `ipc_map` 收成 `IpcError`。
+    pub fn require_online(&self, serial: &str) -> Result<(), DeviceSessionError> {
+        let devices = self.lock_devices();
+        assert_device_online(serial, &devices)
     }
 
-    pub fn require_online_many(&self, serials: &[String]) -> Result<(), IpcError> {
-        let devices = self.last_devices.lock().expect("devices lock poisoned");
-        assert_targets_online(serials, &devices).map_err(session_ipc)
-    }
-}
-
-fn session_ipc(e: DeviceSessionError) -> IpcError {
-    let code = match e {
-        DeviceSessionError::Empty => IpcErrorCode::InvalidArgs,
-        DeviceSessionError::Unknown(_) => IpcErrorCode::NotFound,
-        DeviceSessionError::Unauthorized(_) => IpcErrorCode::Unauthorized,
-        DeviceSessionError::Offline(_) => IpcErrorCode::DeviceOffline,
-    };
-    IpcError {
-        code,
-        message: e.to_string(),
+    pub fn require_online_many(&self, serials: &[String]) -> Result<(), DeviceSessionError> {
+        let devices = self.lock_devices();
+        assert_targets_online(serials, &devices)
     }
 }

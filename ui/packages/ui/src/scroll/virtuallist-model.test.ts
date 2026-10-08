@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { Spacing } from "../tokens/spacing";
@@ -15,6 +18,7 @@ import {
   virtualIndicatorBox,
   virtualIndexOfKey,
   virtualKeyIntent,
+  virtualKeyIntentIsCommit,
   virtualNearestScrollTop,
     virtualPoolBindIndex,
     virtualPoolIndex,
@@ -28,7 +32,9 @@ import {
   virtualRowTop,
   virtualRowTransform,
   virtualTotalHeight,
+  resolveVirtualListTone,
   virtualListLayout,
+  virtualListLayoutIsFlow,
   virtualClusterStyle,
   virtualFlowLeadHeight,
   virtualFlowTailHeight,
@@ -193,6 +199,14 @@ describe("virtuallist-model", () => {
     expect(virtualKeyIntent(" ", 2, 5)).toEqual({ type: "commit" });
     expect(virtualKeyIntent("Tab", 0, 5)).toBeNull();
     expect(virtualKeyIntent("ArrowDown", 0, 0)).toBeNull();
+    expect(virtualKeyIntentIsCommit({ type: "commit" })).toBe(true);
+    expect(virtualKeyIntentIsCommit({ type: "move", index: 1 })).toBe(false);
+  });
+
+  it("缺省 tone 只认虚拟列表常量", () => {
+    expect(resolveVirtualListTone()).toBe("document");
+    expect(resolveVirtualListTone("document")).toBe("document");
+    expect(resolveVirtualListTone("list")).toBe("list");
   });
 
   it("文档未开 listbox / 换位才走 flow；簇钉原点，gap 尺仍等于未挂载区", () => {
@@ -200,6 +214,16 @@ describe("virtuallist-model", () => {
     expect(virtualListLayout({ tone: "document", selectable: true, reordering: false })).toBe("pool");
     expect(virtualListLayout({ tone: "document", selectable: false, reordering: true })).toBe("pool");
     expect(virtualListLayout({ tone: "list", selectable: false, reordering: false })).toBe("pool");
+    expect(virtualListLayoutIsFlow("flow")).toBe(true);
+    expect(virtualListLayoutIsFlow("pool")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["virtuallist-model.ts", "virtuallist-policy.ts", "VirtualList.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "virtuallist-model.ts") body = body.replace('return layout === "flow"', "");
+      expect(body, name).not.toContain('layout() === "flow"');
+      expect(body, name).not.toContain('layout === "flow"');
+      expect(body, name).not.toContain('=== "pool"');
+    }
     expect(virtualFlowLeadHeight(8, 20)).toBe(160);
     expect(virtualFlowLeadHeight(0, 20)).toBe(0);
     expect(virtualFlowTailHeight(50, 8, 10, 20)).toBe(640);
@@ -228,5 +252,96 @@ describe("virtuallist-model", () => {
       left: "0px",
       right: "0px",
     });
+  });
+});
+
+describe("虚拟列表提交只在模型判定", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+
+  it("视图不再比较 commit / move", () => {
+    for (const name of ["virtuallist-model.ts", "virtuallist-policy.ts", "VirtualList.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      body = body.replaceAll('return intent.type === "commit"', "");
+      expect(body, name).not.toContain('intent.type === "commit"');
+      expect(body, name).not.toContain('action.type === "commit"');
+      expect(body, name).not.toContain('action.type === "move"');
+      expect(body, name).not.toContain('intent.type === "move"');
+    }
+  });
+});
+
+describe("预扫行数", () => {
+  it("预扫夹零只在 virtualOverscan", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(here, "virtuallist-model.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "overscan)")).toBe(0);
+    expect(times("virtualOverscan(overscan)")).toBe(2);
+    expect(times("function virtualOverscan")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(4);
+    expect(body).toContain("virtualScroll(scrollTop)");
+    expect(body).toContain("Math.max(0, " + "viewportHeight)");
+  });
+});
+
+describe("列表滚动", () => {
+  it("滚动夹零只在 virtualScroll", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(here, "virtuallist-model.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "scrollTop)")).toBe(0);
+    expect(times("virtualScroll(scrollTop)")).toBe(2);
+    expect(times("function virtualScroll")).toBe(1);
+    expect(times("function virtualOverscan")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(4);
+    expect(body).toContain("Math.max(0, " + "viewportHeight)");
+    expect(body).toContain("Math.max(0, " + "rowTop)");
+  });
+});
+
+describe("列表行高", () => {
+  it("行高夹零只在 virtualItemHeight", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(here, "virtuallist-model.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "itemHeight)")).toBe(0);
+    expect(times("virtualItemHeight(itemHeight)")).toBe(2);
+    expect(times("function virtualItemHeight")).toBe(1);
+    expect(times("function virtualScroll")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(4);
+    expect(body).toContain("virtualOrigin(origin)");
+    expect(body).toContain("Math.max(0, " + "rowTop)");
+  });
+});
+
+describe("列表原点", () => {
+  it("原点夹零只在 virtualOrigin", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(here, "virtuallist-model.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "origin)")).toBe(0);
+    expect(times("virtualOrigin(origin)")).toBe(4);
+    expect(times("function virtualOrigin")).toBe(1);
+    expect(times("function virtualItemHeight")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(4);
+    expect(body).toContain("Math.max(0, " + "poolSize)");
+    expect(body).toContain("Math.max(0, " + "rowTop)");
+  });
+});
+
+describe("列表余量", () => {
+  it("余量夹零只在 virtualRemainder", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const body = readFileSync(join(here, "virtuallist-model.ts"), "utf8");
+    const times = (needle: string) => body.split(needle).length - 1;
+    expect(times("Math.max(0, " + "count - poolSize)")).toBe(0);
+    expect(times("Math.max(0, " + "count - mounted)")).toBe(0);
+    expect(body).toContain("virtualRemainder(count, poolSize)");
+    expect(body).toContain("virtualRemainder(count, mounted)");
+    expect(times("function virtualRemainder")).toBe(1);
+    expect(times("return Math.max(0, total - used)")).toBe(1);
+    expect(times("return Math.max(0, value)")).toBe(4);
+    expect(body).toContain("Math.max(0, " + "poolSize)");
+    expect(body).toContain("Math.max(0, " + "raw)");
   });
 });

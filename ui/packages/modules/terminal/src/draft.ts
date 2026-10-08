@@ -5,12 +5,13 @@
 
 import {
   COMMAND_LIBRARY_SCHEMA_VERSION,
+  alignParams,
+  entryIsCommand,
+  placeholderSlots,
   type CommandLibraryDto,
   type CommandParamDto,
   type LibraryEntryDto,
 } from "@yohu/api";
-
-import { alignParams, placeholderSlots } from "./command-line";
 
 export interface DraftStep {
   id: string;
@@ -44,97 +45,120 @@ export interface DraftState {
   groups: DraftGroup[];
 }
 
+function blankTemplate(): { template: string; params: CommandParamDto[] } {
+  return { template: "", params: [] };
+}
+
+function blankName(): { name: string } {
+  return { name: "" };
+}
+
 export const emptyCommand = (id: string): DraftCommand => ({
   kind: "command",
   id,
-  name: "",
-  template: "",
-  params: [],
+  ...blankName(),
+  ...blankTemplate(),
 });
 
-export const emptyStep = (id: string): DraftStep => ({ id, template: "", params: [] });
+export const emptyStep = (id: string): DraftStep => ({ id, ...blankTemplate() });
 
 export const emptyBlock = (id: string, stepId: string): DraftBlock => ({
   kind: "block",
   id,
-  name: "",
+  ...blankName(),
   gap_ms: 0,
   steps: [emptyStep(stepId)],
 });
 
-export const emptyGroup = (id: string): DraftGroup => ({ id, name: "", entries: [] });
+export const emptyGroup = (id: string): DraftGroup => ({ id, ...blankName(), entries: [] });
 
 let draftId = 0;
 export const nextDraftId = (prefix: string): string => `${prefix}-draft-${++draftId}`;
 
+function groupIdentity<T, U>(
+  group: { id: string; name: string; entries: readonly T[] },
+  mapEntry: (entry: T) => U,
+): { id: string; name: string; entries: U[] } {
+  return {
+    id: group.id,
+    name: group.name,
+    entries: group.entries.map(mapEntry),
+  };
+}
+
 /** 命令库 DTO → 编辑器草稿。 */
 export function toDraft(library: CommandLibraryDto): DraftState {
   return {
-    groups: library.groups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      entries: g.entries.map(entryToDraft),
-    })),
+    groups: library.groups.map((g) => groupIdentity(g, entryToDraft)),
   };
 }
 
 /** 编辑器草稿 → 命令库 DTO（提交前转换；校验在 core）。 */
 export function fromDraft(draft: DraftState): CommandLibraryDto {
   return {
-    schema_version: COMMAND_LIBRARY_SCHEMA_VERSION,
-    groups: draft.groups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      entries: g.entries.map(entryFromDraft),
-    })),
+    ...librarySchema(),
+    groups: draft.groups.map((g) => groupIdentity(g, entryFromDraft)),
   };
+}
+
+function draftParams(params: CommandParamDto[] | undefined): CommandParamDto[] {
+  return params ?? [];
+}
+
+function entryIdentity(entry: { id: string; name: string }): { id: string; name: string } {
+  return { id: entry.id, name: entry.name };
+}
+
+function blockGap(entry: { gap_ms: number }): { gap_ms: number } {
+  return { gap_ms: entry.gap_ms };
+}
+
+function librarySchema(): Pick<CommandLibraryDto, "schema_version"> {
+  return { schema_version: COMMAND_LIBRARY_SCHEMA_VERSION };
 }
 
 function entryToDraft(entry: LibraryEntryDto): DraftEntry {
-  if (entry.kind === "command") {
+  if (entryIsCommand(entry)) {
     return {
       kind: "command",
-      id: entry.id,
-      name: entry.name,
+      ...entryIdentity(entry),
       template: entry.template,
-      params: entry.params ?? [],
+      params: draftParams(entry.params),
     };
   }
   return {
     kind: "block",
-    id: entry.id,
-    name: entry.name,
-    gap_ms: entry.gap_ms,
+    ...entryIdentity(entry),
+    ...blockGap(entry),
     steps: entry.steps.map((step) => ({
       id: nextDraftId("s"),
       template: step.template,
-      params: step.params ?? [],
+      params: draftParams(step.params),
     })),
   };
 }
 
+/** 对齐后的参数。空列表不进 DTO。命令和步骤都认这一把。 */
+function withPublishedParams(
+  template: string,
+  params: CommandParamDto[],
+): { template: string; params?: CommandParamDto[] } {
+  const aligned = alignParams(placeholderSlots(template), params);
+  return aligned.length > 0 ? { template, params: aligned } : { template };
+}
+
 function entryFromDraft(entry: DraftEntry): LibraryEntryDto {
-  if (entry.kind === "command") {
-    const params = alignParams(placeholderSlots(entry.template), entry.params);
+  if (entryIsCommand(entry)) {
     return {
       kind: "command",
-      id: entry.id,
-      name: entry.name,
-      template: entry.template,
-      ...(params.length > 0 ? { params } : {}),
+      ...entryIdentity(entry),
+      ...withPublishedParams(entry.template, entry.params),
     };
   }
   return {
     kind: "block",
-    id: entry.id,
-    name: entry.name,
-    gap_ms: entry.gap_ms,
-    steps: entry.steps.map((step) => {
-      const params = alignParams(placeholderSlots(step.template), step.params);
-      return {
-        template: step.template,
-        ...(params.length > 0 ? { params } : {}),
-      };
-    }),
+    ...entryIdentity(entry),
+    ...blockGap(entry),
+    steps: entry.steps.map((step) => withPublishedParams(step.template, step.params)),
   };
 }

@@ -62,13 +62,13 @@ pub struct LogDisplayColumns {
 impl Default for LogDisplayColumns {
     fn default() -> Self {
         Self {
-            ts: true,
+            ts: crate::default_true(),
             uid: false,
-            pid: true,
-            tid: true,
-            tag: true,
-            app: true,
-            level: true,
+            pid: crate::default_true(),
+            tid: crate::default_true(),
+            tag: crate::default_true(),
+            app: crate::default_true(),
+            level: crate::default_true(),
         }
     }
 }
@@ -89,7 +89,7 @@ pub struct AppSettings {
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: usize,
     /// 开始采集前执行 `adb logcat -c`
-    #[serde(default = "default_clear_device")]
+    #[serde(default = "crate::default_true")]
     pub clear_device_on_start: bool,
     #[serde(default)]
     pub theme: Theme,
@@ -100,7 +100,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub export_default_path: String,
     /// 手动导出每次询问保存位置（默认开）
-    #[serde(default = "default_export_ask")]
+    #[serde(default = "crate::default_true")]
     pub export_ask_every_time: bool,
     /// 日志清单显示列（立即生效；消息列始终在）
     #[serde(default)]
@@ -138,6 +138,9 @@ pub struct AppSettings {
     /// 终端 IO 行时间显示形状。立即生效；默认时分秒.毫秒。
     #[serde(default)]
     pub terminal_time_format: TerminalTimeFormat,
+    /// 命令库默认展开。立即生效；默认全部折叠。`ids` 是命令组 id。
+    #[serde(default)]
+    pub terminal_library_expand: LibraryExpand,
 }
 
 fn default_log_time_format() -> TerminalTimeFormat {
@@ -168,14 +171,32 @@ pub enum TerminalTimeFormat {
     Datetime,
 }
 
+/// 命令库展开名单上限（去重前的列表长度）。
+pub const LIBRARY_EXPAND_MAX_IDS: usize = 256;
+
+/// 单个命令组 id 的字数上限。
+pub const LIBRARY_EXPAND_MAX_ID_CHARS: usize = 128;
+
+/// 命令库默认展开哪些组。`ids` 只在 `groups` 时被树读取；另外两种模式仍保留名单。
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LibraryExpand {
+    pub mode: LibraryExpandMode,
+    #[serde(default)]
+    pub ids: Vec<String>,
+}
+
+/// 命令库默认展开策略。产品默认全部折叠。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LibraryExpandMode {
+    #[default]
+    Collapsed,
+    Expanded,
+    Groups,
+}
+
 fn default_buffer_capacity() -> usize {
     10_000
-}
-fn default_clear_device() -> bool {
-    true
-}
-fn default_export_ask() -> bool {
-    true
 }
 
 /// 投屏默认长边（USB 协议；0 = 设备原始）。
@@ -213,25 +234,26 @@ impl Default for AppSettings {
         Self {
             adb_path: String::new(),
             data_root: String::new(),
-            devices_auto_refresh: true,
+            devices_auto_refresh: crate::default_true(),
             buffer_capacity: default_buffer_capacity(),
-            clear_device_on_start: default_clear_device(),
-            theme: Theme::System,
-            density: Density::Comfortable,
+            clear_device_on_start: crate::default_true(),
+            theme: Theme::default(),
+            density: Density::default(),
             export_default_path: String::new(),
-            export_ask_every_time: default_export_ask(),
+            export_ask_every_time: crate::default_true(),
             log_display_columns: LogDisplayColumns::default(),
             log_time_format: default_log_time_format(),
-            log_color_scheme: LogColorScheme::Yohu,
-            log_line_layout: LogLineLayout::Clip,
+            log_color_scheme: LogColorScheme::default(),
+            log_line_layout: LogLineLayout::default(),
             mirror_max_size: default_mirror_max_size(),
             mirror_video_bit_rate: default_mirror_video_bit_rate(),
             mirror_max_fps: default_mirror_max_fps(),
-            mirror_protocol: MirrorProtocol::Usb,
+            mirror_protocol: MirrorProtocol::default(),
             mirror_force_forward: false,
             terminal_prepend_adb: false,
             files_drop_into_folder: false,
-            terminal_time_format: TerminalTimeFormat::TimeMillis,
+            terminal_time_format: TerminalTimeFormat::default(),
+            terminal_library_expand: LibraryExpand::default(),
         }
     }
 }
@@ -261,6 +283,7 @@ pub enum SettingKey {
     TerminalPrependAdb,
     FilesDropIntoFolder,
     TerminalTimeFormat,
+    TerminalLibraryExpand,
 }
 
 impl SettingKey {
@@ -288,6 +311,7 @@ impl SettingKey {
             SettingKey::TerminalPrependAdb => "terminal_prepend_adb",
             SettingKey::FilesDropIntoFolder => "files_drop_into_folder",
             SettingKey::TerminalTimeFormat => "terminal_time_format",
+            SettingKey::TerminalLibraryExpand => "terminal_library_expand",
         }
     }
 }
@@ -318,6 +342,7 @@ mod tests {
         assert!(!s.files_drop_into_folder);
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
+        assert_eq!(s.terminal_library_expand, LibraryExpand::default());
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/app_settings_default.json"))
                 .expect("fixture");
@@ -408,6 +433,7 @@ mod tests {
             SettingKey::TerminalPrependAdb,
             SettingKey::FilesDropIntoFolder,
             SettingKey::TerminalTimeFormat,
+            SettingKey::TerminalLibraryExpand,
         ];
         for key in all {
             let wire = serde_json::to_value(key).unwrap();
@@ -464,6 +490,23 @@ mod tests {
         assert_eq!(s.log_time_format, TerminalTimeFormat::DatetimeMillis);
         assert_eq!(s.log_color_scheme, LogColorScheme::Yohu);
         assert_eq!(s.log_line_layout, LogLineLayout::Clip);
+        assert_eq!(s.terminal_library_expand, LibraryExpand::default());
+    }
+
+    #[test]
+    fn library_expand_mode_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_value(LibraryExpandMode::Collapsed).unwrap(),
+            serde_json::json!("collapsed")
+        );
+        assert_eq!(
+            serde_json::to_value(LibraryExpandMode::Expanded).unwrap(),
+            serde_json::json!("expanded")
+        );
+        assert_eq!(
+            serde_json::to_value(LibraryExpandMode::Groups).unwrap(),
+            serde_json::json!("groups")
+        );
     }
 
     #[test]

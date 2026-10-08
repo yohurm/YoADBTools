@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use crate::library_store::lock_library;
 use crate::limits::GROUP_EVENT_CHANNEL_CAP;
 use crate::state::AppState;
 use yohu_domain::{GroupExecutor, LibraryError, ScheduledStep};
@@ -20,6 +21,12 @@ pub struct GroupRuns {
 }
 
 impl GroupRuns {
+    fn lock_cancels(
+        &self,
+    ) -> std::sync::MutexGuard<'_, std::collections::HashMap<u32, CancellationToken>> {
+        self.cancels.lock().expect("group lock poisoned")
+    }
+
     pub fn new() -> Self {
         Self {
             cancels: Arc::new(Mutex::new(HashMap::new())),
@@ -30,28 +37,16 @@ impl GroupRuns {
     pub fn allocate(&self) -> (u32, CancellationToken) {
         let id = self.next.fetch_add(1, Ordering::Relaxed) + 1;
         let cancel = CancellationToken::new();
-        self.cancels
-            .lock()
-            .expect("group lock poisoned")
-            .insert(id, cancel.clone());
+        self.lock_cancels().insert(id, cancel.clone());
         (id, cancel)
     }
 
     pub fn release(&self, id: u32) {
-        self.cancels
-            .lock()
-            .expect("group lock poisoned")
-            .remove(&id);
+        self.lock_cancels().remove(&id);
     }
 
     pub fn cancel(&self, id: u32) -> bool {
-        if let Some(cancel) = self
-            .cancels
-            .lock()
-            .expect("group lock poisoned")
-            .get(&id)
-            .cloned()
-        {
+        if let Some(cancel) = self.lock_cancels().get(&id).cloned() {
             cancel.cancel();
             true
         } else {
@@ -75,7 +70,7 @@ pub enum GroupRunError {
 /// 查库、校验占位符、登记并异步跑一组条目；立即返回 run_id。
 pub fn start(app: AppHandle, state: &AppState, req: GroupRunRequest) -> Result<u32, GroupRunError> {
     let group = {
-        let library = state.library.lock().expect("library lock poisoned");
+        let library = lock_library(state);
         library
             .group(&req.group_id)
             .cloned()
@@ -93,7 +88,6 @@ pub fn start(app: AppHandle, state: &AppState, req: GroupRunRequest) -> Result<u
         app,
         state,
         format!("命令组: {}", group.name),
-        format!("{} 台设备 · {} 条命令", req.serials.len(), steps.len()),
         steps,
         req.serials,
     ))
@@ -106,7 +100,7 @@ pub fn start_block(
     req: BlockRunRequest,
 ) -> Result<u32, GroupRunError> {
     let block = {
-        let library = state.library.lock().expect("library lock poisoned");
+        let library = lock_library(state);
         library
             .block(&req.block_id)
             .cloned()
@@ -118,22 +112,32 @@ pub fn start_block(
         app,
         state,
         format!("命令块: {}", block.name),
-        format!("{} 台设备 · {} 条命令", req.serials.len(), steps.len()),
         steps,
         req.serials,
     ))
+}
+
+fn to_progress(run_id: u32, event: yohu_domain::GroupRunEvent) -> GroupProgress {
+    GroupProgress {
+        run_id,
+        serial: event.serial,
+        name: event.name,
+        template: event.template,
+        ok: event.exit_code == 0,
+        message: event.message,
+        duration_ms: event.duration_ms,
+    }
 }
 
 fn spawn(
     app: AppHandle,
     state: &AppState,
     task_name: String,
-    detail: String,
     steps: Vec<ScheduledStep>,
     serials: Vec<String>,
 ) -> u32 {
     let (run_id, cancel) = state.group_runs.allocate();
-
+    let detail = format!("{} 台设备 · {} 条命令", serials.len(), steps.len());
     let task_id = state.tasks.register(task_name, detail, Some(run_id));
     let (tx, mut rx) = mpsc::channel::<yohu_domain::GroupRunEvent>(GROUP_EVENT_CHANNEL_CAP);
     let sink = state.event_tx.clone();
@@ -141,19 +145,7 @@ fn spawn(
     tokio::spawn(async move {
         let forward = tokio::spawn(async move {
             while let Some(e) = rx.recv().await {
-                let _ = sink.try_send(AppEvent::GroupProgress(GroupProgress {
-                    run_id,
-                    serial: e.serial,
-                    name: Some(e.name),
-                    template: e.template,
-                    ok: e.exit_code == 0,
-                    message: if e.message.is_empty() {
-                        None
-                    } else {
-                        Some(e.message)
-                    },
-                    duration_ms: e.duration_ms,
-                }));
+                let _ = sink.try_send(AppEvent::GroupProgress(to_progress(run_id, e)));
             }
         });
 
@@ -183,6 +175,28 @@ pub fn cancel(state: &AppState, run_id: u32) -> Result<(), GroupRunError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_output_stays_on_the_progress_event() {
+        let progress = to_progress(
+            4,
+            yohu_domain::GroupRunEvent {
+                serial: "A1".into(),
+                name: "echo".into(),
+                template: "echo hi".into(),
+                command_index: 0,
+                total: 1,
+                message: String::new(),
+                exit_code: 0,
+                duration_ms: 3,
+            },
+        );
+        assert_eq!(progress.run_id, 4);
+        assert_eq!(progress.message, "");
+        assert_eq!(progress.name, "echo");
+        assert!(progress.ok);
+        assert_eq!(progress.duration_ms, 3);
+    }
 
     #[test]
     fn group_event_channel_cap_is_named() {

@@ -26,6 +26,10 @@ pub struct PictureBank {
 }
 
 impl PictureBank {
+    fn lock_slot(&self) -> std::sync::MutexGuard<'_, Option<ReadyFrame>> {
+        self.slot.lock().expect("picture bank lock poisoned")
+    }
+
     pub fn new() -> Self {
         Self {
             slot: Mutex::new(None),
@@ -34,21 +38,17 @@ impl PictureBank {
     }
 
     pub fn publish(&self, frame: ReadyFrame) {
-        *self.slot.lock().expect("picture bank lock poisoned") = Some(frame);
+        *self.lock_slot() = Some(frame);
         self.seq.fetch_add(1, Ordering::SeqCst);
     }
 
     pub fn latest(&self) -> Option<(u64, ReadyFrame)> {
-        let frame = self
-            .slot
-            .lock()
-            .expect("picture bank lock poisoned")
-            .clone()?;
+        let frame = self.lock_slot().clone()?;
         Some((self.seq.load(Ordering::SeqCst), frame))
     }
 
     pub fn clear(&self) {
-        *self.slot.lock().expect("picture bank lock poisoned") = None;
+        *self.lock_slot() = None;
         self.seq.store(0, Ordering::SeqCst);
     }
 }
@@ -79,5 +79,17 @@ mod tests {
         assert_eq!((frame.picture_w, frame.picture_h), (10, 18));
         bank.clear();
         assert!(bank.latest().is_none());
+    }
+
+    #[test]
+    fn present_identity_once() {
+        let src = include_str!("surface.rs");
+        assert_eq!(src.matches("frame.generation ==").count(), 0);
+        assert_eq!(src.matches("h.stage.generation ==").count(), 0);
+        assert_eq!(
+            src.matches("serial_a == serial_b && generation_a == generation_b")
+                .count(),
+            1
+        );
     }
 }

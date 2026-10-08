@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { formatMessage, defaultFormatOptions, DEFAULT_LOG_DISPLAY_COLUMNS } from "./format";
-import { markupRunsFromRanges } from "./markup-model";
+import { markupPaintIsInk, markupPaintIsMark, markupPaintIsWash, markupRunsFromRanges, markupWashCells } from "./markup-model";
 import { nameMarkupRuns } from "./markup-policy";
 
 import type { LogLine } from "@yohu/api";
@@ -49,6 +49,30 @@ describe("MarkupModel 与 Formatter 解耦", () => {
       formatMessage(line({ level: "D" }), { ...shown, scheme: "logcat" }).ranges,
     );
     expect(logcat.some((run) => run.paint.kind === "wash")).toBe(true);
+  });
+
+  it("着色面只在模型里比较", () => {
+    expect(markupPaintIsWash({ kind: "wash", color: "var(--yohu-level-d)", background: "var(--yohu-level-d-bg)" })).toBe(true);
+    expect(markupPaintIsInk({ kind: "ink", color: "var(--yohu-level-d)" })).toBe(true);
+    expect(markupPaintIsMark({ kind: "mark" })).toBe(true);
+    expect(markupPaintIsWash({ kind: "mark" })).toBe(false);
+    const cells = markupWashCells([
+      { from: 0, to: 2, paint: { kind: "wash", color: "var(--yohu-a)", background: "var(--yohu-b)" } },
+      { from: 2, to: 4, paint: { kind: "ink", color: "var(--yohu-a)" } },
+    ]);
+    expect(cells).toEqual([{ from: 0, to: 2, fill: "var(--yohu-b)" }]);
+    for (const name of ["markup-model.ts", "markup-policy.ts", "view.tsx"]) {
+      let body = srcOf(name);
+      if (name === "markup-model.ts") {
+        body = body
+          .replace('return paint.kind === "mark"', "")
+          .replace('return paint.kind === "ink"', "")
+          .replace('return paint.kind === "wash"', "");
+      }
+      expect(body, name).not.toContain('paint.kind === "mark"');
+      expect(body, name).not.toContain('paint.kind === "ink"');
+      expect(body, name).not.toContain('paint.kind === "wash"');
+    }
   });
 
   it("本层不碰 DOM / 选区 / 关键字 / Formatter", () => {

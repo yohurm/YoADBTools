@@ -2,7 +2,8 @@
 
 use std::sync::Mutex;
 
-use windows::Win32::Foundation::{POINT, RECT};
+use windows::Win32::Foundation::{HWND, POINT, RECT};
+use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromPoint, HMONITOR, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
 };
@@ -23,6 +24,14 @@ pub fn rect_width(r: RECT) -> i32 {
 
 pub fn rect_height(r: RECT) -> i32 {
     r.bottom - r.top
+}
+
+pub fn hwnd_rect(hwnd: HWND) -> Option<RECT> {
+    unsafe {
+        let mut r = RECT::default();
+        GetWindowRect(hwnd, &mut r).ok()?;
+        Some(r)
+    }
 }
 
 pub fn rect_center(r: RECT) -> (i32, i32) {
@@ -138,15 +147,19 @@ static LAST_GEOMETRY: Mutex<Option<SplashPlacement>> = Mutex::new(None);
 
 /// 在工作区矩形内居中（避开任务栏）。
 pub fn center_in_work_area(work: RECT, w: i32, h: i32) -> (i32, i32) {
-    let x = work.left + (work.right - work.left - w) / 2;
-    let y = work.top + (work.bottom - work.top - h) / 2;
+    let x = work.left + (rect_width(work) - w) / 2;
+    let y = work.top + (rect_height(work) - h) / 2;
     (x, y)
+}
+
+fn effective_dpi(dpi: u32) -> u32 {
+    dpi.max(USER_DEFAULT_SCREEN_DPI)
 }
 
 /// Per-Monitor V2 下 GDI 不会自动缩放（MSDN / tao `dpi.rs`）：
 /// `MulDiv(logical, dpi, 96)`。禁止 `dpi / 96` 整数截断（168/96 = 1）。
 pub fn scale_px(logical: i32, dpi: u32) -> i32 {
-    let dpi = dpi.max(USER_DEFAULT_SCREEN_DPI);
+    let dpi = effective_dpi(dpi);
     (logical as i64 * i64::from(dpi) / i64::from(USER_DEFAULT_SCREEN_DPI)) as i32
 }
 
@@ -164,7 +177,7 @@ fn monitor_work_dpi(mon: HMONITOR) -> (RECT, u32) {
         let mut dpi_x = USER_DEFAULT_SCREEN_DPI;
         let mut dpi_y = USER_DEFAULT_SCREEN_DPI;
         let _ = GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
-        let dpi = dpi_x.max(USER_DEFAULT_SCREEN_DPI);
+        let dpi = effective_dpi(dpi_x);
         let mut mi = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
             ..Default::default()
@@ -351,5 +364,22 @@ mod tests {
         let scaled = SplashPlacement::from_work(work, 840, 525, 168, false);
         assert_eq!(scaled.corner, 28);
         assert_eq!(scaled.host_corner(), 14);
+    }
+
+    #[test]
+    fn extent_and_dpi_floor_are_decided_once() {
+        let src = include_str!("geometry.rs");
+        let width = format!(".right{}", " - ");
+        let height = format!(".bottom{}", " - ");
+        assert_eq!(src.matches(&width).count(), 1);
+        assert_eq!(src.matches(&height).count(), 1);
+        let floor = format!(".max({name})", name = "USER_DEFAULT_SCREEN_DPI");
+        assert_eq!(src.matches(&floor).count(), 1);
+        assert_eq!(scale_px(480, 80), scale_px(480, 96));
+        assert_eq!(scale_px(480, 144), 720);
+        let win = include_str!("window.rs");
+        let hand = include_str!("handover.rs");
+        assert!(!win.contains("GetWindowRect"));
+        assert!(!hand.contains("GetWindowRect"));
     }
 }

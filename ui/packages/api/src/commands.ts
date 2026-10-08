@@ -18,10 +18,13 @@ import type {
   CommandLibraryDto,
   DeviceInfo,
   DeviceStatus,
+  TaskInfo,
+  MirrorSessionSnapshot,
   ExecOutcome,
   ExportRequest,
   ExportResult,
   GroupRunRequest,
+  ImportPreviewDto,
   LogBatch,
   PathOpRequest,
   ProcessEntry,
@@ -38,7 +41,7 @@ import type {
   RemoteUpdate,
   UpdateChannelInfo,
   UpdateDownloadRequest,
-  UpdateDownloadResult,
+  UpdateDownloadAccepted,
   MirrorStart,
   MirrorStartRequest,
   MirrorInjectRequest,
@@ -58,6 +61,8 @@ export const deviceStatus = (serial?: string) =>
 
 export const deviceSetNightMode = (serial: string, night: boolean) =>
   invoke<DeviceStatus>("device.setNightMode", { serial, night });
+
+export const taskList = () => invoke<TaskInfo[]>("task.list");
 
 // ===== adb =====
 
@@ -83,6 +88,12 @@ export const commandlibLoad = () => invoke<CommandLibraryDto>("commandlib.load")
 
 export const commandlibSave = (dto: CommandLibraryDto) =>
   invoke<void>("commandlib.save", { dto });
+
+export const commandlibPreview = (paths: string[]) =>
+  invoke<ImportPreviewDto>("commandlib.preview", { paths });
+
+export const commandlibApply = (paths: string[], entryIds: string[]) =>
+  invoke<CommandLibraryDto>("commandlib.apply", { paths, entryIds });
 
 // ===== files =====
 
@@ -148,11 +159,14 @@ export const mirrorInject = (req: MirrorInjectRequest) =>
 export const mirrorCloseControl = (serial: string) =>
   invoke<void>("mirror.closeControl", { serial });
 
-/** 工作台在模块身份变化时开关舞台。未激活时 `mirror.layout` 不得建 HWND。 */
-export const mirrorPresentSetActive = (active: boolean) =>
-  invoke<void>("mirror.present.setActive", { active });
+/** 工作台在模块身份变化时开关舞台。`dark` 是当时已解析主题；回放上次 avail 时用它盖住缓存里的铬色。未激活时 `mirror.layout` 不得建 HWND。 */
+export const mirrorPresentSetActive = (active: boolean, dark: boolean) =>
+  invoke<void>("mirror.present.setActive", { active, dark });
 
 export const mirrorLayout = (req: MirrorLayout) => invoke<void>("mirror.layout", { req });
+
+/** 当前投屏投影。hydrate 读一次。 */
+export const mirrorSession = () => invoke<MirrorSessionSnapshot[]>("mirror.session");
 
 export const mirrorPointer = (req: MirrorPointer) => invoke<void>("mirror.pointer", { req });
 
@@ -184,7 +198,7 @@ export const updateCheck = () => invoke<RemoteUpdate>("update.check");
 export const updateInfo = () => invoke<UpdateChannelInfo>("update.info");
 
 export const updateDownload = (request: UpdateDownloadRequest) =>
-  invoke<UpdateDownloadResult>("update.download", { request });
+  invoke<UpdateDownloadAccepted>("update.download", { request });
 
 export const updateInstall = (path: string) => invoke<void>("update.install", { path });
 

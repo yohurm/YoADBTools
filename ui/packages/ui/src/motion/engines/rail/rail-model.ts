@@ -5,18 +5,31 @@
  * 收起当拍关流。宽、槽、卡高、字同一拍，禁止先水平再垂直。
  */
 
+import { Layout } from "../../../tokens/layout";
+
 export type RailIntent = "expanded" | "icons";
 
 export type RailPhase = "expanded" | "collapsing" | "icons" | "expanding";
 
-/** 点开合后的相位。减动效则当拍落到意图。 */
-export function railPhaseOnIntentChange(next: RailIntent, skipMotion: boolean): RailPhase {
-  if (skipMotion) return next === "expanded" ? "expanded" : "icons";
-  return next === "expanded" ? "expanding" : "collapsing";
+/** 展开意图。相位、列宽和壳开合都认这一把。 */
+export function railIntentIsExpanded(intent: RailIntent): boolean {
+  return intent === "expanded";
 }
 
+/** 在展开与图标之间对调。 */
+export function railToggleIntent(intent: RailIntent): RailIntent {
+  return railIntentIsExpanded(intent) ? "icons" : "expanded";
+}
+
+/** 宽度落地后的休息相位。减动效和初次挂载也落在这里。 */
 export function railPhaseAfterWidthSettle(intent: RailIntent): RailPhase {
-  return intent === "expanded" ? "expanded" : "icons";
+  return railIntentIsExpanded(intent) ? "expanded" : "icons";
+}
+
+/** 点开合后的相位。减动效则当拍落到休息相位。 */
+export function railPhaseOnIntentChange(next: RailIntent, skipMotion: boolean): RailPhase {
+  if (skipMotion) return railPhaseAfterWidthSettle(next);
+  return railIntentIsExpanded(next) ? "expanding" : "collapsing";
 }
 
 /** 列宽跟用户意图，当拍起程。 */
@@ -49,13 +62,12 @@ export function railTooltipEnabled(phase: RailPhase): boolean {
   return !railStreamOpen(phase);
 }
 
-export function railWidthMatchesIntent(
-  usedPx: number,
-  expanded: boolean,
-  shellNav: string,
-  shellNavIcons: string,
-): boolean {
-  const expected = Number.parseFloat((expanded ? shellNav : shellNavIcons).trim());
-  if (!Number.isFinite(expected)) return false;
-  return Math.round(usedPx) === Math.round(expected);
+function railPx(value: number): number {
+  return Math.round(value);
+}
+
+/** 列宽对照 `Layout` 侧栏尺。 */
+export function railWidthMatchesIntent(usedPx: number, expanded: boolean): boolean {
+  const expected = expanded ? Layout.ShellNav : Layout.ShellNavIcons;
+  return railPx(usedPx) === railPx(expected);
 }

@@ -48,7 +48,7 @@ pub fn begin_file_drag(paths: &[PathBuf]) -> Result<(), DndError> {
     }
     for path in paths {
         if !path.exists() {
-            return Err(FileError::Local(path.display().to_string()).into());
+            return Err(super::local_fail(path).into());
         }
     }
     let app = NSApplication::sharedApplication(mtm);

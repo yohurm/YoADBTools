@@ -72,7 +72,7 @@ export function insertPlaceholder(
   const chars = [...template];
   const pad = from > 0 && !/\s/.test(chars[from - 1] ?? "");
   const token = `${pad ? " " : ""}{${nextPlaceholderIndex(template)}}`;
-  const next = `${chars.slice(0, from).join("")}${token}${chars.slice(to).join("")}`;
+  const next = `${joinedChars(chars.slice(0, from))}${token}${joinedChars(chars.slice(to))}`;
   return { template: next, caret: from + token.length };
 }
 
@@ -90,41 +90,24 @@ function bindValues(slots: readonly number[], values: readonly string[]): Map<nu
   return bound;
 }
 
+/** 填充只消费 `placeholderTokens`。`{n}` 文法不在这里再扫。 */
 function applyPlaceholders(
   template: string,
   byIndex: ReadonlyMap<number, string>,
   skipEmpty: boolean,
 ): string {
+  const tokens = placeholderTokens(template);
   let out = "";
-  let rest = template;
-  while (true) {
-    const pos = rest.indexOf("{");
-    if (pos < 0) {
-      out += rest;
-      break;
-    }
-    out += rest.slice(0, pos);
-    const after = rest.slice(pos + 1);
-    const end = after.indexOf("}");
-    if (end >= 0) {
-      const inner = after.slice(0, end);
-      if (/^\d+$/.test(inner)) {
-        const n = Number.parseInt(inner, 10);
-        const value = byIndex.get(n);
-        if (value !== undefined && (!skipEmpty || value.length > 0)) {
-          out += value;
-          rest = after.slice(end + 1);
-          continue;
-        }
-        out += `{${inner}}`;
-        rest = after.slice(end + 1);
-        continue;
-      }
-    }
-    out += "{";
-    rest = after;
+  let cursor = 0;
+  for (const token of tokens) {
+    out += template.slice(cursor, token.start);
+    const literal = template.slice(token.start, token.end);
+    const value = byIndex.get(token.index);
+    if (value !== undefined && (!skipEmpty || value.length > 0)) out += value;
+    else out += literal;
+    cursor = token.end;
   }
-  return out;
+  return out + template.slice(cursor);
 }
 
 export function previewFill(template: string, values: readonly string[]): string {
@@ -139,6 +122,10 @@ export function fillTemplate(template: string, values: readonly string[]): strin
   return applyPlaceholders(template, bindValues(slots, values), false);
 }
 
+export function compareParamIndex(a: CommandParamDto, b: CommandParamDto): number {
+  return a.index - b.index;
+}
+
 export function alignParams(
   slots: readonly number[],
   params: readonly CommandParamDto[],
@@ -146,7 +133,7 @@ export function alignParams(
   const allowed = new Set(slots);
   const seen = new Set<number>();
   const out: CommandParamDto[] = [];
-  for (const param of [...params].sort((a, b) => a.index - b.index)) {
+  for (const param of [...params].sort(compareParamIndex)) {
     const description = param.description.trim();
     if (!allowed.has(param.index) || description.length === 0 || seen.has(param.index)) continue;
     seen.add(param.index);
@@ -159,13 +146,29 @@ export function paramDescription(params: readonly CommandParamDto[], index: numb
   return params.find((param) => param.index === index)?.description ?? "";
 }
 
+function joinedChars(chars: string[]): string {
+  return chars.join("");
+}
+
+function loweredCommand(trimmed: string): string {
+  return trimmed.toLowerCase();
+}
+
+function argPending(current: string): boolean {
+  return current.length > 0;
+}
+
+function commitArg(args: string[], current: string): void {
+  args.push(current);
+}
+
 /** 去掉前导 `adb` / `adb.exe`。与 domain `strip_leading_adb` 同一 testdata。 */
 export function commandBody(input: string): string {
   const trimmed = input.trim();
-  if (trimmed.toLowerCase().startsWith("adb.exe")) {
+  if (loweredCommand(trimmed).startsWith("adb.exe")) {
     return trimmed.slice(7).trimStart();
   }
-  if (trimmed.toLowerCase().startsWith("adb")) {
+  if (loweredCommand(trimmed).startsWith("adb")) {
     const rest = trimmed.slice(3);
     if (rest.length === 0 || /^\s/.test(rest)) {
       return rest.trimStart();
@@ -206,14 +209,14 @@ export function splitCommandLine(input: string): string[] {
       continue;
     }
     if ((c === " " || c === "\t") && !inQuotes) {
-      if (current.length > 0) {
-        args.push(current);
+      if (argPending(current)) {
+        commitArg(args, current);
         current = "";
       }
       continue;
     }
     current += c;
   }
-  if (current.length > 0) args.push(current);
+  if (argPending(current)) commitArg(args, current);
   return args;
 }

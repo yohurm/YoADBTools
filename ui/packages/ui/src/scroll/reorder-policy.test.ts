@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   applyReorderKey,
@@ -9,8 +12,11 @@ import {
   moveReorderSession,
   previewDest,
   reorderBarAttrs,
+  reorderSlotAttr,
+  reorderSourceAttr,
   reorderOverlayAttrs,
   resolveReorderKeyDelta,
+  reorderResultIsNoop,
   shouldAcceptReorderPointer,
   shouldBeginReorderFromTarget,
   shouldCancelReorder,
@@ -37,6 +43,10 @@ describe("reorder-policy", () => {
   });
 
   it("条与浮层 attrs 只在 open 时写 data-open", () => {
+    expect(reorderSlotAttr(true)).toBe("placeholder");
+    expect(reorderSlotAttr(false)).toBeUndefined();
+    expect(reorderSourceAttr(true)).toBe("source");
+    expect(reorderSourceAttr(false)).toBeUndefined();
     expect(reorderBarAttrs(true, 64)).toEqual({
       "data-open": "",
       style: { top: "64px" },
@@ -68,5 +78,16 @@ describe("reorder-policy", () => {
     expect(shouldBeginReorderFromTarget(row)).toBe(true);
     expect(shouldBeginReorderFromTarget(input)).toBe(false);
     expect(shouldBeginReorderFromTarget(button)).toBe(false);
+  });
+
+  it("空操作只在 reorderResultIsNoop 里比较", () => {
+    expect(reorderResultIsNoop("noop")).toBe(true);
+    expect(reorderResultIsNoop(null)).toBe(false);
+    expect(reorderResultIsNoop({ from: 0, to: 1 })).toBe(false);
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name.includes(".test.") || name === "reorder-policy.ts") continue;
+      expect(readFileSync(join(dir, name), "utf8"), name).not.toContain('=== "noop"');
+    }
   });
 });

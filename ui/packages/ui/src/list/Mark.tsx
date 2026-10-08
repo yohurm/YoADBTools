@@ -8,7 +8,7 @@ import "./Mark.css";
 export function ListItemMark(): JSX.Element {
   return (
     <span class={LIST_ITEM_MARK_CLASS} aria-hidden="true">
-      <span class={LIST_ITEM_MARK_FILL_CLASS} />
+      <span class={LIST_ITEM_MARK_FILL_CLASS} data-part="bar" />
     </span>
   );
 }

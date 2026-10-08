@@ -20,12 +20,12 @@ YoUI + modules + workbench     UI（WebView）
 yohu-adbtools                  Tauri 壳（commands 薄转发）
         ↓
 files / logsrv / mirror / update     capability
-        ↓（设备能力经 adb；update 不经 adb）
+        ↓（设备能力经 adb；update 不经 adb，下载经 yohu-download）
 yohu-adb                       设备运输（官方 adb sidecar）
         ↓
 yohu-domain                    规则（无 IO）
-yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
-  宿主过程/持久化/OS 根  ∥  wire  ∥  动效时长/曲线/DComp 采样  ∥  检索引擎
+yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search ∥ yohu-download ∥ yohu-textparsing
+  宿主过程/持久化/OS 根  ∥  wire  ∥  动效  ∥  检索  ∥  HTTP 文件落盘  ∥  多格式纯文本（零产品类型）
 ```
 
 不建名为 `yohu-foundation` 的杂烩 crate。
@@ -41,7 +41,9 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 | `yohu-domain` | 命令库/组编排、安全根、过滤、选择、`apply_setting`、内存 AppLog | 进程、fs、reqwest、Tauri、检索引擎 |
 | `yohu-adb` | 工具解析、信号量、devices/ls/ps/packages、`DeviceStatusHub`、`DeviceShell` 原语（008 补偿）、实现 `Runner` | 日志会话、文件浏览用例（SafetyRoot / BrowseSession 在 files）、投屏 demux |
 | `yohu-files` / `logsrv` / `mirror` | 各自用例（files = BrowseSession Empty/Live + 传输/变更） | capability 互引；绕过 SafetyRoot；list 未 attach 不得偷偷开壳 |
-| `yohu-update` | 更新检查 / 下载 / 覆盖安装（GitHub Releases） | 依赖 adb |
+| `yohu-download` | HTTP(S) 大文件落盘：`.part`、SHA-256、取消、重试 | 产品类型、GitHub、protocol、Tauri、adb |
+| `yohu-textparsing` | HTML / Markdown / XML / 纯文本解析为展示纯文本 | 产品类型、GitHub、Tauri、渲染 |
+| `yohu-update` | GitHub 检查、Release 解析、缓存约定、覆盖安装；**编排** `yohu-download`；说明经 `yohu-textparsing` | 依赖 adb；**禁止**内嵌 reqwest 第二套；**禁止**内嵌 HTML/Markdown 解析 |
 | `yohu-adbtools` | 组合根、IPC 映射、任务中心、OLE / Finder 拖出；壳服务 `update_runs` / `transfer_runs` / `browse_runs` / `GroupRuns` / `mirror_sessions` / `settings_apply` / `capture_runs`；Windows 启动 overlay（窗口/swapchain/DComp）与投屏 HWND | 业务判定、路径校验；禁止自写时长/曲线；commands 只转发 |
 
 `yohu-adb → yohu-domain` 是 DIP：`AdbClient` 实现 `Runner`。不要拆。
@@ -64,12 +66,12 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search
 
 ## 产品规则镜像
 
-产品判定权威在 `yohu-domain` + testdata。`@yohu/api` 持 TS 镜像（`datetime` / `path-input` / `safety` / `log-filter` / `log-bind` / `log-format` / `log-signal` / `command-line` / `focus` / `device` / `mirror`）。模块与壳只做铬与接线，禁止再写一份匹配 / 占位符 / 拆行 / 焦点收敛 / 信号扫描 / USB·WIFI 默认档。公共引擎（search / motion）不进 domain、不进 api。不另建 `yohu-foundation`。墙钟、POSIX 拼接、`{n}`、argv 拆行都是本产品规则，不是第二套公共 crate。路径代数在 domain `path`，安全根在 `safety`，同一 crate。`start_encode` 只在 core 展开，不进 View。
+产品判定权威在 `yohu-domain` + testdata。`@yohu/api` 持 TS 镜像（`datetime` / `path-input` / `safety` / `log-filter` / `log-bind` / `log-format` / `log-signal` / `command-line` / `focus` / `device` / `mirror`）。模块与壳只做铬与接线，禁止再写一份匹配 / 占位符 / 拆行 / 焦点收敛 / 信号扫描 / USB·WIFI 默认档。公共引擎（search / motion / download / textparsing）不进 domain、不进 api。不另建 `yohu-foundation`。墙钟、POSIX 拼接、`{n}`、argv 拆行都是本产品规则，不是第二套公共 crate。路径代数在 domain `path`，安全根在 `safety`，同一 crate。`start_encode` 只在 core 展开，不进 View。
 
 ## 仓库布局
 
 ```text
-core/yohu-{runtime,protocol,motion,search,domain,adb,files,logsrv,mirror,update}
+core/yohu-{runtime,protocol,motion,search,domain,adb,files,logsrv,mirror,download,textparsing,update}
 app/yohu-adbtools
 ui/packages/{api,ui,workbench} + modules/* + apps/shell
 tools/  adb sidecar + scrcpy-server + fake-adb

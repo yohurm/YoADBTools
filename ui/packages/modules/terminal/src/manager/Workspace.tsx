@@ -8,7 +8,9 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import { attachPanelKeys } from "@yohu/ui";
 
 import type { DraftEntry } from "../draft";
-import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR } from "./keys";
+import { COMMAND_MANAGER_KEY_BINDINGS, COMMAND_MANAGER_LIST_SELECTOR, commandManagerKeyIsSelectAll } from "./keys";
+import type { MigrateApi } from "./MigrateLayer";
+import { MigrateLayer } from "./MigrateLayer";
 import type { CommandManagerStore } from "./store";
 import { EditorColumn } from "./EditorColumn";
 import { EntryColumn } from "./EntryColumn";
@@ -17,8 +19,14 @@ import { GroupColumn } from "./GroupColumn";
 export function ManagerWorkspace(props: {
   store: CommandManagerStore;
   onContextMenu: (entry: DraftEntry, event: MouseEvent) => void;
+  bindMigrate: (api: MigrateApi) => void;
 }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
+  const [dropKey, setDropKey] = createSignal<string | null>(null);
+  const [migrating, setMigrating] = createSignal(false);
+  let flyTo = (groupId: string): void => {
+    props.store.moveEntriesTo(groupId);
+  };
 
   createEffect(() => {
     const el = root();
@@ -27,17 +35,38 @@ export function ManagerWorkspace(props: {
       listSelector: COMMAND_MANAGER_LIST_SELECTOR,
       bindings: COMMAND_MANAGER_KEY_BINDINGS,
       onAction: (action) => {
-        if (action === "select-all") props.store.selectAllEntries();
+        if (commandManagerKeyIsSelectAll(action)) props.store.selectAllEntries();
       },
     });
     onCleanup(stop);
   });
 
+  const canMigrate = (): boolean => {
+    const id = props.store.ui.selectedGroupId;
+    if (!id || props.store.selectedEntrySet().size < 2) return false;
+    return props.store.draft.groups.some((group) => group.id !== id);
+  };
+
   return (
-    <div class="yohu-cm" ref={setRoot}>
-      <GroupColumn store={props.store} />
+    <div
+      class="yohu-cm"
+      ref={setRoot}
+      data-migrate-source={canMigrate() ? "" : undefined}
+      data-migrating={migrating() ? "" : undefined}
+    >
+      <GroupColumn store={props.store} dropKey={dropKey} />
       <EntryColumn store={props.store} onContextMenu={props.onContextMenu} />
-      <EditorColumn store={props.store} />
+      <EditorColumn store={props.store} onMoveTo={(groupId) => flyTo(groupId)} />
+      <MigrateLayer
+        store={props.store}
+        root={root}
+        onOver={setDropKey}
+        onActive={setMigrating}
+        bind={(api) => {
+          flyTo = api.flyTo;
+          props.bindMigrate(api);
+        }}
+      />
     </div>
   );
 }

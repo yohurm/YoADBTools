@@ -29,6 +29,8 @@ const chipCss = loadCss("../display/Chip.css");
 const toastCss = loadCss("../overlay/Toast.css");
 const textFieldCss = loadCss("../form/TextField.css");
 const searchCss = loadCss("../search/Search.css");
+const dismissCss = loadCss("../display/dismiss-mark.css");
+const clearCss = loadCss("../form/clear-mark.css");
 
 describe("yohu-interactive 叠层契约", () => {
   it("states.css 可读取", () => {
@@ -38,11 +40,14 @@ describe("yohu-interactive 叠层契约", () => {
   it("选中片 ::before 使用负 z-index，避免盖住流内文本节点", () => {
     const block = statesCss.match(/\.yohu-interactive::before\s*\{[^}]+\}/);
     expect(block?.[0]).toMatch(/z-index:\s*-1/);
+    expect(block?.[0]).toContain("transform: var(--yohu-interactive-wash-transform, none)");
+    expect(block?.[0]).not.toContain("scale(");
   });
 
-  it("元素子节点抬到选中片之上（> * { z-index: 1 }）", () => {
-    const block = statesCss.match(/\.yohu-interactive > \*\s*\{[^}]+\}/);
-    expect(block?.[0]).toMatch(/z-index:\s*1/);
+  it("选中片自己在负层，不抬直接子级", () => {
+    expect(statesCss).not.toContain(".yohu-interactive > *");
+    const block = statesCss.match(/\.yohu-interactive::before\s*\{[^}]+\}/);
+    expect(block?.[0]).toMatch(/z-index:\s*-1/);
   });
 
   it("选中字色走 --yohu-state-selected-fg，禁止表面另写 accent 字", () => {
@@ -84,29 +89,35 @@ describe("yohu-interactive 叠层契约", () => {
     expect(statesCss).not.toContain("sel-mid::after");
   });
 
-  it("正圆关闭配方 Chip/Toast 单源，组件 CSS 不再自绘圆", () => {
-    const block = statesCss.match(/\.yohu-recipe-dismiss\s*\{[^}]+\}/);
+  it("正圆关闭由关闭钮自己画，交互态和宿主不再写这颗钮", () => {
+    const block = dismissCss.match(/\.yohu-recipe-dismiss\s*\{[^}]+\}/);
     expect(block?.[0]).toContain("width: var(--yohu-layout-icon-sm)");
     expect(block?.[0]).toContain("height: var(--yohu-layout-icon-sm)");
     expect(block?.[0]).toContain("flex: 0 0 auto");
     expect(block?.[0]).toContain("border-radius: var(--yohu-radius-full)");
     expect(block?.[0]).toContain("background-color: var(--yohu-fg-2)");
     expect(block?.[0]).toContain("color: var(--yohu-surface)");
+    expect(block?.[0]).toContain("position: relative");
+    expect(block?.[0]).toContain("z-index: 1");
     expect(block?.[0]).not.toContain("position: absolute");
-    expect(statesCss).toContain(".yohu-recipe-dismiss:hover");
+    expect(dismissCss).toContain(".yohu-recipe-dismiss:hover");
+    expect(statesCss).not.toContain(".yohu-recipe-dismiss");
+    expect(chipCss).not.toContain(".yohu-recipe-dismiss");
+    expect(toastCss).not.toContain(".yohu-recipe-dismiss");
     expect(chipCss).not.toContain(".yohu-chip__remove");
     expect(chipCss).not.toContain("background-color: var(--yohu-fg-2)");
     expect(toastCss).not.toContain(".yohu-toast__close");
     expect(toastCss).not.toContain("background-color: var(--yohu-fg-2)");
   });
 
-  it("幽灵清除配方 TextField/Search 单源，Tabs 关闭不走本配方", () => {
-    const block = statesCss.match(/\.yohu-recipe-clear\s*\{[^}]+\}/);
+  it("幽灵清除由清除钮自己画，交互态和写入盒不再写这颗钮", () => {
+    const block = clearCss.match(/\.yohu-recipe-clear\s*\{[^}]+\}/);
     expect(block?.[0]).toContain("background: transparent");
     expect(block?.[0]).toContain("color: var(--yohu-fg-3)");
     expect(block?.[0]).toContain("border-radius: var(--yohu-radius-sm)");
     expect(block?.[0]).toContain("var(--yohu-motion-effects-fast)");
-    expect(statesCss).toContain(".yohu-recipe-clear:hover");
+    expect(clearCss).toContain(".yohu-recipe-clear:hover");
+    expect(statesCss).not.toContain(".yohu-recipe-clear");
     expect(textFieldCss).not.toContain(".yohu-text-field__clear");
     expect(searchCss).not.toContain(".yohu-search__clear");
     expect(statesCss).not.toContain(".yohu-tabs__close");

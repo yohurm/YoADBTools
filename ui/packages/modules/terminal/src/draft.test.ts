@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { COMMAND_LIBRARY_SCHEMA_VERSION, type CommandLibraryDto } from "@yohu/api";
@@ -120,5 +123,94 @@ describe("命令管理草稿（DTO ↔ 草稿）", () => {
       expect(block.gap_ms).toBe(500);
       expect(block.steps).toHaveLength(2);
     }
+  });
+});
+
+describe("空参数不落盘只判一次", () => {
+  it("命令和步骤不再各自看参数长度", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "draft.ts"), "utf8");
+    expect(src).not.toContain("params.length > 0");
+    expect(src.match(/aligned\.length > 0/g)?.length ?? 0).toBe(1);
+  });
+});
+
+describe("草稿缺省参数只兜一次", () => {
+  it("draft_params_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const needle = "params " + "?? []";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("draftParams(");
+  });
+});
+
+describe("条目编号和名称原样只带走一次", () => {
+  it("entry_identity_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const idNeedle = "id: " + "entry.id";
+    const nameNeedle = "name: " + "entry.name";
+    expect(src.split(idNeedle).length - 1).toBe(1);
+    expect(src.split(nameNeedle).length - 1).toBe(1);
+    expect(src).toContain("entryIdentity(");
+  });
+});
+
+describe("新建空白模板只写一次", () => {
+  it("blank_template_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const templateNeedle = "template: " + '""';
+    const paramsNeedle = "params: " + "[]";
+    expect(src.split(templateNeedle).length - 1).toBe(1);
+    expect(src.split(paramsNeedle).length - 1).toBe(1);
+    expect(src).toContain("blankTemplate(");
+  });
+});
+
+describe("新建时名称是空字符串只写一次", () => {
+  it("blank_name_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const needle = "name: " + '""';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("blankName(");
+  });
+});
+
+describe("命令组编号和名称原样只带走一次", () => {
+  it("group_identity_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const idNeedle = "id: " + "g.id";
+    const nameNeedle = "name: " + "g.name";
+    const ownerNeedle = "id: " + "group.id";
+    expect(src.split(idNeedle).length - 1).toBe(0);
+    expect(src.split(nameNeedle).length - 1).toBe(0);
+    expect(src.split(ownerNeedle).length - 1).toBe(1);
+    expect(src).toContain("groupIdentity(");
+  });
+});
+
+describe("命令块间隔原样只带走一次", () => {
+  it("block_gap_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "draft.ts"), "utf8");
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("gap_ms: " + "entry.gap_ms")).toBe(1);
+    expect(times("function blockGap")).toBe(1);
+    expect(times("export function blockGap")).toBe(0);
+    expect(times("...blockGap(entry)")).toBe(2);
+  });
+});
+
+describe("命令库版本只盖一次", () => {
+  it("library_schema_once", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, "draft.ts"), "utf8");
+    const store = readFileSync(resolve(dir, "store.ts"), "utf8");
+    const times = (text: string, needle: string) => text.split(needle).length - 1;
+    const needle = "schema_version: " + "COMMAND_LIBRARY_SCHEMA_VERSION";
+    expect(times(src, needle)).toBe(1);
+    expect(times(store, needle)).toBe(0);
+    expect(times(src, "function librarySchema")).toBe(1);
+    expect(times(src, "export function librarySchema")).toBe(0);
+    expect(src).toContain("...librarySchema()");
+    expect(store).toContain("fromDraft({ groups: [] })");
   });
 });

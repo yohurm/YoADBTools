@@ -1,6 +1,16 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { applyTabsKeyIntent, resolveTabsChrome, resolveTabsKeyAction, tabsTabAttrs } from "./tabs-policy";
+import {
+  applyTabsKeyIntent,
+  resolveTabsChrome,
+  resolveTabsKeyAction,
+  tabsActionIsActivate,
+  tabsIndicatorVariant,
+  tabsTabAttrs,
+} from "./tabs-policy";
 
 const TABS = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
@@ -46,5 +56,41 @@ describe("tabs-policy", () => {
     });
     expect(resolveTabsKeyAction("Delete", TABS, "b", true)?.id).toBe("b");
     expect(resolveTabsKeyAction("Delete", TABS, "b", false)).toBeNull();
+  });
+
+  it("激活动作只判一次", () => {
+    expect(tabsActionIsActivate({ type: "activate", id: "a", index: 0, focusIndex: 0 })).toBe(true);
+    expect(tabsActionIsActivate({ type: "close", id: "a", index: 0, focusIndex: 0 })).toBe(false);
+  });
+});
+
+describe("标签页激活只在所属层判定", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+
+  it("意图与动作不再在策略和视图里互比", () => {
+    for (const name of ["tabs-model.ts", "tabs-policy.ts", "Tabs.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "tabs-model.ts") {
+        body = body.replace('export type TabsKeyKind = "activate" | "close";', "");
+        body = body.replace('return item.type === "activate"', "");
+      }
+      expect(body, name).not.toContain('"activate" | "close"');
+      expect(body, name).not.toContain('type === "activate"');
+      expect(body, name).not.toContain('type === "close"');
+    }
+  });
+
+  it("页签指示底边只写一次，不与 fill / thumb 合并", () => {
+    expect(tabsIndicatorVariant()).toBe("underline");
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["tabs-model.ts", "tabs-policy.ts", "Tabs.tsx"]) {
+      let body = readFileSync(join(root, name), "utf8");
+      if (name === "tabs-policy.ts") {
+        body = body.replace('(): "underline"', "").replace('return "underline"', "");
+      }
+      expect(body, name).not.toContain('"underline"');
+      expect(body, name).not.toContain('variant="underline"');
+      expect(body, name).not.toContain('data-indicator-variant="underline"');
+    }
   });
 });

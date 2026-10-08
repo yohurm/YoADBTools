@@ -6,12 +6,20 @@
 
 import {
   captionPaint,
+  titleBarMaxIsRestore,
   resolveTitleBarSpec,
   type TitleBarCaptionKind,
   type TitleBarCaptionPaint,
   type TitleBarCaptions,
   type TitleBarInput,
   type TitleBarSpec,
+} from "./titlebar-model";
+
+export {
+  titleBarBrandIsIcon,
+  titleBarBrandIsLogo,
+  titleBarCaptionIsMax,
+  titleBarCaptionIsMin,
 } from "./titlebar-model";
 
 export type TitleBarCaptionIcon = "window-min" | "window-max" | "window-restore" | "close";
@@ -52,7 +60,7 @@ export function resolveTitleBarSlots(input: TitleBarInput): TitleBarSlots {
 }
 
 export function titlebarCaptionButtons(spec: TitleBarSpec): TitleBarCaptionButton[] {
-  const restore = spec.maxAction === "restore";
+  const restore = titleBarMaxIsRestore(spec.maxAction);
   return [
     { kind: "min", paint: captionPaint("min"), label: "最小化", icon: "window-min" },
     {

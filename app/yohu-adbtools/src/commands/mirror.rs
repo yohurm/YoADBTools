@@ -2,11 +2,11 @@
 
 use tauri::State;
 
-use crate::commands::{ipc_mirror, ipc_present};
+use crate::commands::{ipc_mirror, ipc_present, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
     IpcError, MirrorInjectRequest, MirrorLayout, MirrorPointer, MirrorScreenshotRequest,
-    MirrorStart, MirrorStartRequest,
+    MirrorSessionSnapshot, MirrorStart, MirrorStartRequest,
 };
 
 #[tauri::command(rename = "mirror.start")]
@@ -14,7 +14,7 @@ pub async fn mirror_start(
     state: State<'_, AppState>,
     req: MirrorStartRequest,
 ) -> Result<MirrorStart, IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     crate::mirror_sessions::start(&state, req)
         .await
         .map_err(ipc_mirror)
@@ -32,7 +32,7 @@ pub async fn mirror_inject(
     state: State<'_, AppState>,
     req: MirrorInjectRequest,
 ) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .mirror
         .inject(&req.serial, req.message)
@@ -41,13 +41,22 @@ pub async fn mirror_inject(
 }
 
 #[tauri::command(rename = "mirror.closeControl")]
-pub fn mirror_close_control(state: State<'_, AppState>, serial: String) -> Result<(), IpcError> {
-    state.mirror.close_control(&serial).map_err(ipc_mirror)
+pub async fn mirror_close_control(
+    state: State<'_, AppState>,
+    serial: String,
+) -> Result<(), IpcError> {
+    state.mirror.close_control(&serial).map_err(ipc_mirror)?;
+    state.mirror.republish(&serial).await;
+    Ok(())
 }
 
 #[tauri::command(rename = "mirror.present.setActive")]
-pub fn mirror_present_set_active(state: State<'_, AppState>, active: bool) -> Result<(), IpcError> {
-    state.present.set_active(active);
+pub fn mirror_present_set_active(
+    state: State<'_, AppState>,
+    active: bool,
+    dark: bool,
+) -> Result<(), IpcError> {
+    state.present.set_active(active, dark);
     Ok(())
 }
 
@@ -55,6 +64,14 @@ pub fn mirror_present_set_active(state: State<'_, AppState>, active: bool) -> Re
 pub async fn mirror_layout(state: State<'_, AppState>, req: MirrorLayout) -> Result<(), IpcError> {
     state.present.layout(req);
     Ok(())
+}
+
+/// 当前投屏投影。hydrate 读一次；之后只信 `mirror/state` 与 `mirror/painted`。
+#[tauri::command(rename = "mirror.session")]
+pub fn mirror_session(
+    state: State<'_, AppState>,
+) -> Result<Vec<MirrorSessionSnapshot>, IpcError> {
+    Ok(crate::mirror_sessions::snapshot(&state))
 }
 
 #[tauri::command(rename = "mirror.pointer")]

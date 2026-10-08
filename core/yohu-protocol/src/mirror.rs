@@ -2,8 +2,33 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 可用区任一边低于此物理像素则不 Present（UI `layoutIsPresentable` 对齐）。
+/// 可用区任一边低于此物理像素则不 Present。判定只走 `layout_is_presentable`。
+/// UI `layoutIsPresentable` 与这一份对齐。
 pub const MIRROR_MIN_LAYOUT_PX: u32 = 64;
+
+/// 两边都达到最小可用区。可见性由调用方另判。
+pub fn layout_is_presentable(width: u32, height: u32) -> bool {
+    width >= MIRROR_MIN_LAYOUT_PX && height >= MIRROR_MIN_LAYOUT_PX
+}
+
+/// 一条投屏投影（ADR-v6-040）。壳把槽位和呈现闩合成这一行。
+/// 没有会话的设备不出现。Stopping 不出现。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirrorSessionSnapshot {
+    pub serial: String,
+    pub generation: u64,
+    pub phase: MirrorSessionState,
+    pub width: u32,
+    pub height: u32,
+    pub codec: String,
+    pub control: bool,
+    pub has_frame: bool,
+    pub painted_fps: u32,
+    pub paused: bool,
+    pub fullscreen: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
 
 /// 启动结果（对标 [`crate::CaptureStart`]：adopt = 已有 Live 会话）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,5 +286,23 @@ mod tests {
                 "y": 20
             })
         );
+    }
+
+    #[test]
+    fn layout_edge_is_one_gate() {
+        assert!(!layout_is_presentable(63, 64));
+        assert!(!layout_is_presentable(64, 63));
+        assert!(layout_is_presentable(64, 64));
+        let files = [
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/stage.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/mod.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/host.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/surface.rs"),
+            include_str!("../../../app/yohu-adbtools/src/mirror_present/windows/follow.rs"),
+        ];
+        for file in files {
+            assert!(!file.contains(">= MIRROR_MIN_LAYOUT_PX"));
+            assert!(!file.contains("< MIRROR_MIN_LAYOUT_PX"));
+        }
     }
 }

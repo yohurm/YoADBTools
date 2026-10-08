@@ -4,14 +4,22 @@
  * data-gutter 只写 on：溢出让出侧轨，与显隐相位分开。拖拽几何在 L2；本文件不读盒。
  */
 
-import type { ScrollerAxis, ScrollerBarState, ScrollerPhase } from "./scroller-model";
+import { presenceAttr } from "../dom/flag";
+import { listEdgeKey, type ListEdge } from "../keymap/list-index";
+import {
+  scrollerAxisIsBoth,
+  scrollerPhaseIsNone,
+  type ScrollerAxis,
+  type ScrollerBarState,
+  type ScrollerPhase,
+} from "./scroller-model";
 
 export function scrollerHostAttrs(
   phase: ScrollerPhase,
-  barState: ScrollerBarState = "auto",
-  interactive = true,
+  barState: ScrollerBarState,
+  interactive: boolean,
+  axis: ScrollerAxis,
   gutter = false,
-  axis: ScrollerAxis = "block",
   gutterInline = false,
   phaseInline: ScrollerPhase = "none",
 ): {
@@ -24,22 +32,22 @@ export function scrollerHostAttrs(
   "data-axis"?: "both";
 } {
   return {
-    ...(phase === "none" ? {} : { "data-scroll": phase }),
-    ...(phaseInline === "none" ? {} : { "data-scroll-inline": phaseInline }),
+    ...(scrollerPhaseIsNone(phase) ? {} : { "data-scroll": phase }),
+    ...(scrollerPhaseIsNone(phaseInline) ? {} : { "data-scroll-inline": phaseInline }),
     "data-bar": barState,
     ...(interactive ? {} : { "data-interactive": "off" as const }),
     ...(gutter ? { "data-gutter": "on" as const } : {}),
     ...(gutterInline ? { "data-gutter-inline": "on" as const } : {}),
-    ...(axis === "both" ? { "data-axis": "both" as const } : {}),
+    ...(scrollerAxisIsBoth(axis) ? { "data-axis": "both" as const } : {}),
   };
 }
 
 export function scrollerLaneAttrs(phase: ScrollerPhase): { "data-lane": "on" | "off" } {
-  return { "data-lane": phase === "none" ? "off" : "on" };
+  return { "data-lane": scrollerPhaseIsNone(phase) ? "off" : "on" };
 }
 
-export function scrollerThumbAttrs(pressed: boolean): { "data-pressed"?: "" } {
-  return pressed ? { "data-pressed": "" } : {};
+export function scrollerThumbAttrs(pressed: boolean): { "data-pressed": "" | undefined } {
+  return { "data-pressed": presenceAttr(pressed) };
 }
 
 const STEAL_KEYS =
@@ -50,13 +58,11 @@ export function scrollerStealsKeys(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(STEAL_KEYS));
 }
 
-export type ScrollerKeyAction = "pageNext" | "pagePrev" | "start" | "end";
+export type ScrollerKeyAction = "pageNext" | "pagePrev" | ListEdge;
 
 /** 视口 Page/Home/End。字段焦点由 scrollerStealsKeys 先挡。 */
 export function scrollerKeyAction(key: string): ScrollerKeyAction | undefined {
   if (key === "PageDown") return "pageNext";
   if (key === "PageUp") return "pagePrev";
-  if (key === "Home") return "start";
-  if (key === "End") return "end";
-  return undefined;
+  return listEdgeKey(key) ?? undefined;
 }

@@ -49,20 +49,10 @@
   --yohu-segmented-on: var(--yohu-fg-on);
 }
 
-.yohu-segmented[data-fill-owner="thumb"] .yohu-recipe-indicator--thumb {
-  background: var(--yohu-segmented-thumb-fill);
-  box-shadow: var(--yohu-segmented-thumb-shadow);
-  border-radius: var(--yohu-radius-sm);
-}
-
-.yohu-segmented[data-fill-owner="thumb"]:has(.yohu-segmented__item[data-selected]:hover:not(:disabled))
-  .yohu-recipe-indicator--thumb {
-  box-shadow: var(--yohu-segmented-thumb-shadow), inset 0 0 0 9999px var(--yohu-state-hover);
-}
-
-.yohu-segmented[data-fill-owner="thumb"]:has(.yohu-segmented__item[data-selected]:active:not(:disabled))
-  .yohu-recipe-indicator--thumb {
-  box-shadow: var(--yohu-segmented-thumb-shadow), inset 0 0 0 9999px var(--yohu-state-pressed);
+/* 滑块的填充、阴影、悬停由指示条自己画。这里只把轨的漆色交给它。 */
+.yohu-segmented[data-fill-owner="thumb"] {
+  --yohu-indicator-thumb-fill: var(--yohu-segmented-thumb-fill);
+  --yohu-indicator-thumb-shadow: var(--yohu-segmented-thumb-shadow);
 }
 
 .yohu-segmented__item {
@@ -112,13 +102,11 @@
   font-size: var(--yohu-font-body);
 }
 
-.yohu-segmented[data-icon-size="sm"] .yohu-icon,
 .yohu-segmented[data-icon-size="sm"] .yohu-segmented__image {
   width: var(--yohu-layout-icon-sm);
   height: var(--yohu-layout-icon-sm);
 }
 
-.yohu-segmented[data-icon-size="md"] .yohu-icon,
 .yohu-segmented[data-icon-size="md"] .yohu-segmented__image {
   width: var(--yohu-layout-icon-md);
   height: var(--yohu-layout-icon-md);

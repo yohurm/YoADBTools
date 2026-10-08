@@ -170,7 +170,8 @@ describe("YoTooltip", () => {
     expect(css).toContain("yohu-tooltip__arrow");
     expect(css).toContain("--yohu-layout-tooltip-arrow");
     expect(css).toContain("--yohu-layout-tooltip-edge");
-    expect(css).toContain("yohu-tip-in");
+    expect(css).not.toContain("yohu-tip-in");
+    expect(css).not.toContain(".yohu-presence");
     expect(css).not.toContain("yohu-rise-in");
     expect(css).not.toContain("var(--yohu-surface)");
     expect(css).toContain("--yohu-shadow-overlay-drop");
@@ -193,6 +194,7 @@ describe("YoTooltip", () => {
     enterAnchor("锚");
     vi.advanceTimersByTime(motionSpecMs("effectsEnter"));
     const tip = screen.getByRole("tooltip");
+    expect(tip.getAttribute("data-enter")).toBe("tip");
     expect(tip.querySelector(".yohu-tooltip__arrow")).toBeTruthy();
     expect(tip.querySelector(".yohu-tooltip__content")?.textContent).toBe("刷新");
   });
@@ -234,5 +236,33 @@ describe("YoTooltip", () => {
     } finally {
       skip.mockRestore();
     }
+  });
+});
+
+function tooltipSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Tooltip.tsx"), "utf8");
+}
+
+describe("气泡落点", () => {
+  it("层和气泡都写同一落点", () => {
+    const src = tooltipSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("data-placement={" + "placement()}")).toBe(0);
+    expect(times("return " + "placement()")).toBe(1);
+    expect(times("function tooltipPlacement")).toBe(1);
+    expect(times("export function tooltipPlacement")).toBe(0);
+    expect(times("tooltipPlacement()")).toBe(3);
+    expect(times("data-placement={tooltipPlacement()}")).toBe(2);
+  });
+});
+
+describe("气泡挂上再量", () => {
+  it("层和内容挂上后都再量一次", () => {
+    const src = tooltipSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("if (el) " + "layout()")).toBe(1);
+    expect(times("function layoutIfMounted")).toBe(1);
+    expect(times("export function layoutIfMounted")).toBe(0);
+    expect(times("layoutIfMounted(el)")).toBe(2);
   });
 });

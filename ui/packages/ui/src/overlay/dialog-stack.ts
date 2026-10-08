@@ -14,6 +14,7 @@
  */
 import type { YoDialogInitial } from "./dialog-model";
 import { dialogFocusables, dialogInitialFocus, dialogTabTarget } from "./dialog-focus";
+import { dismissKey, tabKey } from "../keymap/list-index";
 
 export interface DialogStackEntry {
   /** 面板元素取用器（panel 在 ref 回调后才赋值，取用器保持惰性）。 */
@@ -38,12 +39,12 @@ function handleKeyDown(event: KeyboardEvent): void {
   const top = stack[stack.length - 1];
   if (!top) return;
 
-  if (event.key === "Escape") {
+  if (dismissKey(event.key)) {
     top.onClose();
     return;
   }
 
-  if (event.key === "Tab") {
+  if (tabKey(event.key)) {
     const panel = top.getPanel();
     if (!panel) return;
     const items = dialogFocusables(panel);

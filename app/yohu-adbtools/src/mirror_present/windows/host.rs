@@ -7,7 +7,6 @@
 #![cfg(windows)]
 
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use windows::Win32::Foundation::{HWND, RECT};
@@ -15,19 +14,20 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetWindowLongPtrW, SetWindowLongPtrW, ShowWindow, GWLP_USERDATA,
     SW_SHOWNOACTIVATE,
 };
-use yohu_mirror::MirrorService;
-use yohu_protocol::{
-    AppEvent, MirrorControlMessage, MirrorLayout, MirrorPointerKind, MirrorStageMode,
-    MIRROR_MIN_LAYOUT_PX,
-};
+use yohu_mirror::{content_size_usable, MirrorService};
+use yohu_protocol::{layout_is_presentable, AppEvent, MirrorLayout, MirrorPointerKind};
 
 use super::follow::GeomHost;
 use super::gpu::Gpu;
 use super::mf::DecodedPicture;
-use crate::mirror_present::pointer::{PointerGesture, PointerKind, TouchOut};
-use crate::mirror_present::scale::map_client_to_video;
-use crate::mirror_present::stage::{OccupancyMotion, Stage};
-use crate::mirror_present::{screenshot_from_pixels, PresentError};
+use crate::mirror_present::control_hand::{
+    deliver_pointer, lift_press, lift_without_control, ControlHand,
+};
+use crate::mirror_present::present_beat::{
+    open_pipe, release_pipe, settle_presented_frame, PresentBeat, PresentMiss,
+};
+use crate::mirror_present::stage::{OccupancyMotion, PictureAdmit, Stage};
+use crate::mirror_present::{screenshot_sampled, PresentError};
 
 struct ClipJob {
     x: i32,
@@ -52,12 +52,9 @@ struct Slot {
 pub struct Host {
     pub stage: Stage,
     gpu: Option<Gpu>,
-    gesture: PointerGesture,
-    painted: u32,
-    fps_at: Instant,
+    hand: ControlHand,
+    beat: PresentBeat,
     skip_logged: Option<(bool, u32, u32)>,
-    present_err_logged: bool,
-    mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     geom: Arc<GeomHost>,
 }
@@ -73,12 +70,9 @@ impl Host {
         Self {
             stage: Stage::new(serial),
             gpu: Some(gpu),
-            gesture: PointerGesture::default(),
-            painted: 0,
-            fps_at: Instant::now(),
+            hand: ControlHand::new(mirror),
+            beat: PresentBeat::new(),
             skip_logged: None,
-            present_err_logged: false,
-            mirror,
             event_tx,
             geom,
         }
@@ -106,9 +100,7 @@ impl Host {
             video_h = self.stage.video_size().1,
             "投屏可用区已交给几何宿主"
         );
-        if !self.stage.control() {
-            self.end_press();
-        }
+        lift_without_control(&self.stage, &mut self.hand);
     }
 
     pub fn bind(&mut self, hwnd: HWND, serial: String, generation: u64) {
@@ -116,92 +108,27 @@ impl Host {
             self.geom.unregister(&self.stage.serial);
             self.geom.register(&serial, hwnd.0 as isize);
         }
-        self.stage.bind(serial, generation);
-        self.present_err_logged = false;
-        self.painted = 0;
-        tracing::info!(
-            serial = %self.stage.serial,
-            generation,
-            "投屏解码管道已绑定"
-        );
+        open_pipe(&mut self.beat, &mut self.stage, serial, generation);
     }
 
     /// 表面重建时槽里已有同代画面：直接进 Video，禁止再走 Loading→Fill。
     pub fn resume_live_frame(&mut self, content_w: u32, content_h: u32) {
-        self.adopt_encoded_size(content_w, content_h);
-        if self.stage.bound() && content_w > 0 && content_h > 0 {
+        self.stage.adopt_encoded_size(content_w, content_h);
+        if self.stage.bound() && content_size_usable(content_w, content_h) {
             self.stage.mark_frame();
         }
     }
 
     pub fn unbind(&mut self, target: &str) -> bool {
-        if !target.is_empty() && self.stage.serial != target {
-            return false;
-        }
-        self.end_press();
-        let serial = self.stage.serial.clone();
-        self.stage.unbind();
-        tracing::info!(serial = %serial, "投屏解码管道已解开，舞台改画 chrome");
-        true
-    }
-
-    pub fn adopt_encoded_size(&mut self, width: u32, height: u32) {
-        if self.stage.set_video_size(width, height) {
-            tracing::info!(
-                serial = %self.stage.serial,
-                width,
-                height,
-                "投屏记下 session 内容尺寸"
-            );
-        }
+        release_pipe(&mut self.stage, &mut self.hand, target)
     }
 
     pub fn handle_wire_pointer(&mut self, kind: MirrorPointerKind, x: i32, y: i32) {
-        match kind {
-            MirrorPointerKind::Leave => self.handle_leave(),
-            MirrorPointerKind::Down => self.feed_pointer(PointerKind::Down, x, y),
-            MirrorPointerKind::Move => self.feed_pointer(PointerKind::Move, x, y),
-            MirrorPointerKind::Up => self.feed_pointer(PointerKind::Up, x, y),
-        }
-    }
-
-    fn feed_pointer(&mut self, kind: PointerKind, x: i32, y: i32) {
-        if !self.stage.control() {
-            self.end_press();
-            return;
-        }
-        let (video_w, video_h) = self.stage.video_size();
-        let mapped = map_client_to_video(x, y, self.stage.dest(), video_w, video_h);
-        if let Some(out) = self.gesture.feed(kind, mapped, video_w, video_h) {
-            self.inject_touch(out);
-        }
-    }
-
-    pub fn handle_leave(&mut self) {
-        if let Some(out) = self.gesture.feed(PointerKind::Leave, None, 0, 0) {
-            self.inject_touch(out);
-        }
+        deliver_pointer(&self.stage, &mut self.hand, kind, x, y);
     }
 
     pub fn end_press(&mut self) {
-        if let Some(out) = self.gesture.cancel() {
-            self.inject_touch(out);
-        }
-    }
-
-    fn inject_touch(&self, out: TouchOut) {
-        let serial = self.stage.serial.clone();
-        let mirror = Arc::clone(&self.mirror);
-        let message = MirrorControlMessage::Touch {
-            action: out.action,
-            x: out.x,
-            y: out.y,
-            width: out.width,
-            height: out.height,
-        };
-        tauri::async_runtime::spawn(async move {
-            let _ = mirror.inject(&serial, message).await;
-        });
+        lift_press(&self.stage, &mut self.hand);
     }
 
     fn write_geom_visible(&mut self) {
@@ -217,7 +144,7 @@ impl Host {
     fn plan_gpu(&mut self, hwnd: HWND, motion: OccupancyMotion) -> Option<GpuJob> {
         let (w, h) = client_px(hwnd)?;
         self.stage.set_host_size(w, h);
-        if w < MIRROR_MIN_LAYOUT_PX || h < MIRROR_MIN_LAYOUT_PX {
+        if !layout_is_presentable(w, h) {
             return None;
         }
         let gpu = self.gpu.take()?;
@@ -258,7 +185,7 @@ impl Host {
         height: u32,
     ) -> Option<(Gpu, crate::mirror_present::scale::Letterbox, u32)> {
         let _ = self.stage.set_video_size(width, height);
-        if !self.stage.presentable() {
+        if self.stage.admit_picture() == PictureAdmit::WaitingLayout {
             let (lw, lh) = self.stage.host_size();
             let key = (self.stage.visible(), lw, lh);
             if self.skip_logged != Some(key) {
@@ -273,7 +200,7 @@ impl Host {
             }
             return None;
         }
-        if !self.stage.allows_video_present() || !self.gpu_matches_host() {
+        if self.stage.admit_picture() != PictureAdmit::Ready || !self.gpu_matches_host() {
             return None;
         }
         self.skip_logged = None;
@@ -290,45 +217,19 @@ impl Host {
         presented: bool,
         error: Option<&windows::core::Error>,
     ) -> bool {
-        if !presented {
-            if !self.present_err_logged {
-                self.present_err_logged = true;
-                if let Some(e) = error {
-                    tracing::warn!(error = %e, width, height, "投屏 Present 失败");
-                }
-            }
-            return false;
-        }
-        self.present_err_logged = false;
-        self.painted += 1;
-        let now = Instant::now();
-        if !self.stage.has_frame() {
-            self.stage.mark_frame();
-            self.fps_at = now;
-            self.painted = 0;
-            tracing::info!(
-                serial = %self.stage.serial,
-                generation = self.stage.generation,
-                width,
-                height,
-                "投屏首帧已 Present"
-            );
-            let _ = self.event_tx.try_send(AppEvent::MirrorPainted {
-                serial: self.stage.serial.clone(),
-                generation: self.stage.generation,
-                painted_fps: 1,
-            });
-        } else if now.duration_since(self.fps_at) >= crate::limits::PRESENT_BEAT {
-            let fps = self.painted;
-            self.painted = 0;
-            self.fps_at = now;
-            let _ = self.event_tx.try_send(AppEvent::MirrorPainted {
-                serial: self.stage.serial.clone(),
-                generation: self.stage.generation,
-                painted_fps: fps,
-            });
-        }
-        self.stage.visible() && self.stage.shows_video()
+        let miss = match error {
+            Some(e) => PresentMiss::Announce(Some(e)),
+            None => PresentMiss::Quiet,
+        };
+        settle_presented_frame(
+            &mut self.beat,
+            &mut self.stage,
+            &self.event_tx,
+            width,
+            height,
+            presented,
+            miss,
+        )
     }
 
     fn prepare_chrome(&self) -> Option<crate::mirror_present::stage::ChromeDraw> {
@@ -417,13 +318,14 @@ pub fn apply_pointer(hwnd: HWND, kind: MirrorPointerKind, x: i32, y: i32) {
 pub fn screenshot_hwnd(hwnd: HWND, path: &str) -> Result<(), PresentError> {
     let gpu = with_host(hwnd, |h| h.gpu.take()).flatten();
     let Some(mut gpu) = gpu else {
-        return screenshot_from_pixels(path, None);
+        return screenshot_sampled(path, None);
     };
-    let pixels = gpu
-        .screenshot_bgra()
-        .map_err(|e| PresentError::Internal(e.to_string()));
+    let sample = match gpu.screenshot_bgra() {
+        Ok(pixels) => pixels.map(Ok),
+        Err(_) => Some(Err(())),
+    };
     let _ = with_host(hwnd, |h| h.gpu = Some(gpu));
-    screenshot_from_pixels(path, pixels?)
+    screenshot_sampled(path, sample)
 }
 
 fn slot_of(hwnd: HWND) -> Option<&'static Slot> {
@@ -532,5 +434,5 @@ pub fn present_chrome(hwnd: HWND, spin: f32) {
 }
 
 pub fn loading(hwnd: HWND) -> bool {
-    with_host(hwnd, |h| h.stage.mode() == MirrorStageMode::Loading).unwrap_or(false)
+    with_host(hwnd, |h| h.stage.is_loading()).unwrap_or(false)
 }

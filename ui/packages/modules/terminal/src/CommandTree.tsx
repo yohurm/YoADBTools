@@ -8,10 +8,28 @@ import { YoBadge, YoEmptyState, YoTree } from "@yohu/ui";
 import type { TreeNode } from "@yohu/ui";
 import type { CommandGroupDto, LibraryEntryDto } from "@yohu/api";
 
-import { commandBlockGapLabel } from "./block-gap";
+import { commandBlockSummary } from "./block-gap";
 
-import { entryNeedsInput, formatAdbLine } from "./command-line";
+import { entryIsCommand } from "@yohu/api";
+import { commandCopyText, entryNeedsInput, libraryEntryIcon } from "./command-line";
+import { libraryGroupKey } from "./library-expand";
 import { terminalStore } from "./store";
+
+function libraryCommandKey(id: string): string {
+  return `c:${id}`;
+}
+
+function libraryBlockKey(id: string): string {
+  return `b:${id}`;
+}
+
+function entryNodeLabel(entry: { name: string }): { label: string } {
+  return { label: entry.name };
+}
+
+function entryNodeData(entry: LibraryEntryDto): { data: LibraryEntryDto } {
+  return { data: entry };
+}
 
 function isGroup(data: LibraryEntryDto | CommandGroupDto | undefined): data is CommandGroupDto {
   return data != null && "entries" in data && !("kind" in data);
@@ -20,51 +38,46 @@ function isGroup(data: LibraryEntryDto | CommandGroupDto | undefined): data is C
 export function CommandTree(props: {
   groups: CommandGroupDto[];
   sourceEmpty: boolean;
-  expandedKeys?: string[];
+  expandedKeys: string[];
+  onToggle?: (key: string) => void;
   onNeedValues: (entry: LibraryEntryDto) => void;
 }) {
   const treeData = createMemo<TreeNode<LibraryEntryDto | CommandGroupDto>[]>(() =>
     props.groups.map((group) => ({
-      key: `g:${group.id}`,
+      key: libraryGroupKey(group.id),
       label: group.name,
       icon: "folder" as const,
       data: group,
       badge: String(group.entries.length),
       children: group.entries.map((entry) =>
-        entry.kind === "command"
+        entryIsCommand(entry)
           ? {
-              key: `c:${entry.id}`,
-              label: entry.name,
-              icon: "terminal" as const,
-              data: entry,
-              title: formatAdbLine("-", entry.template),
+              key: libraryCommandKey(entry.id),
+              ...entryNodeLabel(entry),
+              icon: libraryEntryIcon(entry.kind),
+              ...entryNodeData(entry),
+              title: commandCopyText(entry.template),
             }
           : {
-              key: `b:${entry.id}`,
-              label: entry.name,
-              icon: "block" as const,
-              data: entry,
-              title: `${entry.steps.length} 条 · 间隔 ${commandBlockGapLabel(entry.gap_ms)}`,
+              key: libraryBlockKey(entry.id),
+              ...entryNodeLabel(entry),
+              icon: libraryEntryIcon(entry.kind),
+              ...entryNodeData(entry),
+              title: commandBlockSummary(entry.steps.length, entry.gap_ms),
             },
       ),
     })),
   );
 
-  const expandedKeys = createMemo(() => props.groups.map((group) => `g:${group.id}`));
-
   const onSelect = (_key: string, node: TreeNode<LibraryEntryDto | CommandGroupDto>): void => {
     if (isGroup(node.data)) return;
     const entry = node.data;
-    if (!entry || !("kind" in entry)) return;
+    if (!entry) return;
     if (entryNeedsInput(entry)) {
       props.onNeedValues(entry);
       return;
     }
-    if (entry.kind === "command") {
-      terminalStore.enqueueCommand(entry, []);
-      return;
-    }
-    terminalStore.enqueueBlock(entry, []);
+    terminalStore.enqueueEntry(entry, []);
   };
 
   return (
@@ -82,7 +95,7 @@ export function CommandTree(props: {
       <YoTree
         data={treeData()}
         expandedKeys={props.expandedKeys}
-        defaultExpandedKeys={expandedKeys()}
+        onToggle={props.onToggle}
         onSelect={onSelect}
         renderBadge={(text) => <YoBadge text={text} />}
       />

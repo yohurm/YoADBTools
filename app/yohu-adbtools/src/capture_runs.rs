@@ -19,18 +19,16 @@ impl CaptureRuns {
         }
     }
 
+    fn lock_tasks(&self) -> std::sync::MutexGuard<'_, std::collections::HashMap<String, u32>> {
+        self.tasks.lock().expect("capture lock poisoned")
+    }
+
     fn register(&self, serial: &str, task_id: u32) {
-        self.tasks
-            .lock()
-            .expect("capture lock poisoned")
-            .insert(serial.to_string(), task_id);
+        self.lock_tasks().insert(serial.to_string(), task_id);
     }
 
     fn take(&self, serial: &str) -> Option<u32> {
-        self.tasks
-            .lock()
-            .expect("capture lock poisoned")
-            .remove(serial)
+        self.lock_tasks().remove(serial)
     }
 }
 
@@ -46,7 +44,7 @@ pub async fn start(state: &AppState, serial: &str) -> Result<CaptureStart, LogEr
     if !result.adopted {
         let task_id = state.tasks.register(
             format!("logcat 采集: {serial}"),
-            format!("设备 {serial}"),
+            crate::tasks::device_detail(serial),
             None,
         );
         state.capture_runs.register(serial, task_id);

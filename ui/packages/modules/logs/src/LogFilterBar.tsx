@@ -5,6 +5,7 @@
 import type { JSX } from "solid-js";
 
 import {
+  enterKey,
   YoBadge,
   YoChip,
   YoListPresence,
@@ -14,28 +15,22 @@ import {
   type YoSearchControl,
 } from "@yohu/ui";
 
-import {
-  LEVELS,
-  joinTagInput,
-  levelKey,
-  levelLabel,
-  normalizeLevels,
-  removeTagNeedle,
-  splitTagInput,
-  tagFilterActive,
-} from "./filter";
+import { LEVELS, levelKey, normalizeLevels, parseTagFilterNeedles, tagFilterActive } from "@yohu/api";
+
+import { yohuLevelVar } from "./editor/format";
+import { joinTagInput, levelLabel, removeTagNeedle, scopeBadge } from "./filter";
 import { logStore } from "./store";
 import type { LogSessionState } from "./workspace";
 
 function TagFilterField(props: { session: LogSessionState }) {
-  const parsed = (): ReturnType<typeof splitTagInput> => splitTagInput(props.session.tagContains);
+  const parsed = (): ReturnType<typeof parseTagFilterNeedles> => parseTagFilterNeedles(props.session.tagContains);
   const write = (raw: string): void => {
     logStore.patchFilter(props.session.id, { tagContains: raw });
   };
   return (
     <YoTextField
       block
-      ariaLabel="Tag，逗号分隔，精确匹配"
+      ariaLabel="Tag，逗号分隔，多针匹配"
       placeholder={parsed().committed.length > 0 ? "" : "Tag，逗号分隔"}
       value={parsed().draft}
       tokens={
@@ -50,11 +45,10 @@ function TagFilterField(props: { session: LogSessionState }) {
           </YoListPresence>
         ) : undefined
       }
-      clearable
       active={tagFilterActive(props.session.tagContains)}
       onInput={(v) => {
         const { committed } = parsed();
-        const typed = splitTagInput(v);
+        const typed = parseTagFilterNeedles(v);
         write(joinTagInput([...committed, ...typed.committed], typed.draft));
       }}
       onKeyDown={(event) => {
@@ -63,7 +57,7 @@ function TagFilterField(props: { session: LogSessionState }) {
           event.preventDefault();
           write(joinTagInput(committed.slice(0, -1), ""));
         }
-        if (event.key === "Enter" && draft.length > 0) {
+        if (enterKey(event.key) && draft.length > 0) {
           event.preventDefault();
           write(joinTagInput([...committed, draft], ""));
         }
@@ -72,20 +66,15 @@ function TagFilterField(props: { session: LogSessionState }) {
   );
 }
 
-function scopeLabel(session: { scope: { kind: string; pkg?: string; pid?: number } }): string {
-  if (session.scope.kind === "package") return `包名: ${session.scope.pkg}`;
-  if (session.scope.kind === "pid") return `PID: ${session.scope.pid}`;
-  return "System";
-}
-
 const LEVEL_ITEMS = LEVELS.map((letter) => {
   const key = levelKey(letter);
+  const color = key ? yohuLevelVar(key) : undefined;
   return {
     value: letter,
     label: letter,
     ariaLabel: levelLabel(letter),
-    ink: key ? `var(--yohu-level-${key})` : undefined,
-    fill: key ? `var(--yohu-level-${key})` : undefined,
+    ink: color,
+    fill: color,
   };
 });
 
@@ -121,7 +110,7 @@ export function LogFilterBar(props: {
         />
       </span>
       <span class="yohu-logs__scope">
-        <YoBadge text={scopeLabel(props.session)} tone="accent" />
+        <YoBadge text={scopeBadge(props.session.scope)} tone="accent" />
       </span>
     </div>
   );

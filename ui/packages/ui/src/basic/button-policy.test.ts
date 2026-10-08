@@ -1,26 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buttonHostAttrs, resolveButtonInteractive } from "./button-policy";
+import { buttonHostAttrs } from "./button-policy";
 
 describe("button-policy", () => {
-  it("默认可点且不报 busy", () => {
-    expect(resolveButtonInteractive({})).toEqual({ disabled: false, busy: false });
-  });
-
-  it("disabled 关掉输入", () => {
-    expect(resolveButtonInteractive({ disabled: true })).toEqual({ disabled: true, busy: false });
-  });
-
-  it("loading 同时禁用并报 busy", () => {
-    expect(resolveButtonInteractive({ loading: true })).toEqual({ disabled: true, busy: true });
-  });
-
-  it("disabled 与 loading 同时出现仍禁用", () => {
-    expect(resolveButtonInteractive({ disabled: true, loading: true })).toEqual({
-      disabled: true,
-      busy: true,
-    });
-  });
-
   it("缺省宿主是 EMPHASIZED，不写 paint / variant", () => {
     expect(buttonHostAttrs({})).toEqual({
       "data-style": "emphasized",
@@ -49,8 +30,8 @@ describe("button-policy", () => {
   });
 
   it("block 才写 data-block", () => {
-    expect(buttonHostAttrs({})).not.toHaveProperty("data-block");
-    expect(buttonHostAttrs({ block: true })["data-block"]).toBe(true);
+    expect(buttonHostAttrs({})["data-block"]).toBeUndefined();
+    expect(buttonHostAttrs({ block: true })["data-block"]).toBe("");
   });
 
   it("loading 写入 disabled 与 aria-busy", () => {

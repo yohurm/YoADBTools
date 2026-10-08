@@ -5,6 +5,7 @@
  * 不碰 DOM、不写色值。
  */
 
+import { cornerExtentIsEmpty } from "../corner/corner-model";
 import { Stroke } from "../tokens/layout";
 
 export type YoListFrameVariant = "hot" | "focus";
@@ -30,7 +31,7 @@ export function listFrameStroke(): number {
 export function listFrameBox(row: ListFrameBox, inset = listFrameInset()): ListFrameBox | null {
   const width = row.width - inset * 2;
   const height = row.height - inset * 2;
-  if (width <= 0 || height <= 0) return null;
+  if (cornerExtentIsEmpty(width, height)) return null;
   return {
     x: row.x + inset,
     y: row.y + inset,

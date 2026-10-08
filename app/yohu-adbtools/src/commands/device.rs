@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::commands::{ipc_adb, ipc_catalog};
+use crate::commands::{ipc_adb, ipc_catalog, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{DeviceInfo, DeviceStatus, IpcError};
 
@@ -39,10 +39,10 @@ pub async fn device_set_night_mode(
     serial: String,
     night: bool,
 ) -> Result<DeviceStatus, IpcError> {
-    state.require_online(&serial)?;
+    state.require_online(&serial).map_err(ipc_session)?;
     state
         .status
         .set_night(&serial, night, state.root_cancel.child_token())
         .await
-        .map_err(ipc_adb)
+        .map_err(|err| ipc_adb(&err))
 }

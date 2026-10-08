@@ -2,6 +2,9 @@
  * 新建窗口提交：点选 + 创建、检索 Enter、先关后开。
  * 订阅由 onCreated 交给 View 的 beginCapture，本文件只断言页签与回调。
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
@@ -153,5 +156,44 @@ describe("NewSessionDialog create path", () => {
 
     expect(logStore.state.sessions.length).toBe(before + 1);
     expect(onCreated).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("当前设备切片", () => {
+  it("同一序列号只读一次设备切片", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "NewSessionDialog.tsx"), "utf8");
+    const needle = "devices[" + "deviceSerial()]";
+    expect(source.split(needle).length - 1).toBe(1);
+    expect(source.split("deviceSlice()").length - 1).toBe(3);
+    expect(source).toContain("sliceList(deviceSlice()?.processEntries)");
+    expect(source).toContain("sliceList(deviceSlice()?.packages)");
+  });
+});
+
+describe("切片上的列表缺省为空数组", () => {
+  it("空数组字面量只留在 sliceList", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "NewSessionDialog.tsx"), "utf8");
+    const needle = "?? " + "[]";
+    expect(source.split(needle).length - 1).toBe(1);
+    expect(source).toContain("const slice = deviceSlice()");
+  });
+});
+
+describe("开闭沿走对话框公开读取", () => {
+  it("不把 open 收成只能调用的函数", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "NewSessionDialog.tsx"), "utf8");
+    expect(source).toContain("resolveDialogOpen(props.open)");
+    expect(source).not.toContain("props.open()");
+  });
+});
+
+describe("刷新时的加载只写一次", () => {
+  it("watch_load_once", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "NewSessionDialog.tsx"), "utf8");
+    const done = "void job.finally(() => " + "setLoading(false))";
+    const start = "setLoading(" + "true)";
+    expect(source.split(done).length - 1).toBe(1);
+    expect(source.split(start).length - 1).toBe(1);
+    expect(source).toContain("watchLoad(");
   });
 });

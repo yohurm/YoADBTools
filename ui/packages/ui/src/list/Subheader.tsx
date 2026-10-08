@@ -3,6 +3,7 @@
  * HarmonyOS 对照：SubHeader 列表型（效率）/ 内容型。
  * meta 贴标题；actions 行尾。禁止把计数徽章放进 actions。
  */
+import { presenceAttr } from "../dom/flag";
 import { Show, createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { resolveSubheaderSpec, type YoSubheaderPad, type YoSubheaderTone } from "./subheader-model";
@@ -37,7 +38,7 @@ export function YoSubheader(props: YoSubheaderProps): JSX.Element {
       class={`yohu-subheader${props.class ? ` ${props.class}` : ""}`}
       data-tone={spec().tone}
       data-pad={spec().pad}
-      data-has-meta={spec().hasMeta ? true : undefined}
+      data-has-meta={presenceAttr(spec().hasMeta)}
     >
       <div class="yohu-subheader__title">{props.title}</div>
       <Show when={props.meta}>{(meta) => <div class="yohu-subheader__meta">{meta()}</div>}</Show>

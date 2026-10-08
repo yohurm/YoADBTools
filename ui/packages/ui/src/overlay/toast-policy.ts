@@ -3,6 +3,7 @@
  * 队列与代际是唯一写入口；宿主 data-* 从快照组装。
  * 不写色值、不画铬、不挂定时器。
  */
+import { presenceAttr } from "../dom/flag";
 
 import { motionDurationMs } from "../tokens/motion";
 import {
@@ -102,11 +103,11 @@ export interface ToastHostAttrs {
 export function toastHostAttrs(item: ToastItem): ToastHostAttrs {
   return {
     "data-tone": toastPaintTone(item.tone),
-    "data-leading": hasToastLeading(item.leading) ? "" : undefined,
-    "data-detail": hasToastDetail(item.detail) ? "" : undefined,
-    "data-progress": hasToastProgress(item.progress) ? "" : undefined,
-    "data-meta": hasToastMeta(item.meta) ? "" : undefined,
-    "data-sticky": item.sticky ? "" : undefined,
+    "data-leading": presenceAttr(hasToastLeading(item.leading)),
+    "data-detail": presenceAttr(hasToastDetail(item.detail)),
+    "data-progress": presenceAttr(hasToastProgress(item.progress)),
+    "data-meta": presenceAttr(hasToastMeta(item.meta)),
+    "data-sticky": presenceAttr(item.sticky),
     role: "status",
   };
 }

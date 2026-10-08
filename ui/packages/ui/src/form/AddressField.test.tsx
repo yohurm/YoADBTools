@@ -141,4 +141,31 @@ describe("YoAddressField", () => {
     expect(addressOpenCaret("/a")).toEqual({ start: 2, end: 2 });
     expect(addressCrumbPath(["sdcard", "DCIM"], 1)).toBe("/sdcard/DCIM");
   });
+
+  it("指针门的松开与取消共用一对登记", () => {
+    const tsx = load("src/form/AddressField.tsx");
+    const times = (needle: string): number => tsx.split(needle).length - 1;
+    expect(times("add" + "EventListener")).toBe(1);
+    expect(times("remove" + "EventListener")).toBe(1);
+    expect(times("addEventListener(\"pointer" + "up\"")).toBe(0);
+    expect(times("addEventListener(\"pointer" + "cancel\"")).toBe(0);
+    expect(times("removeEventListener(\"pointer" + "up\"")).toBe(0);
+    expect(times("removeEventListener(\"pointer" + "cancel\"")).toBe(0);
+    expect(tsx).toContain('listen("pointerup", release)');
+    expect(tsx).toContain('listen("pointercancel", release)');
+    expect(tsx).toContain('listen("pointerdown", onPointerDown)');
+  });
+});
+
+describe("地址栏编辑被挡", () => {
+  it("条件只留在函数体，聚焦与外部按下仍分开", () => {
+    const tsx = load("src/form/AddressField.tsx");
+    const times = (needle: string): number => tsx.split(needle).length - 1;
+    expect(times("!open() || " + "pointerGate()")).toBe(1);
+    expect(times("function addressEditBlocked")).toBe(1);
+    expect(times("export function addressEditBlocked")).toBe(0);
+    expect(times("addressEditBlocked()")).toBe(3);
+    expect(tsx).toContain("requestAnimationFrame");
+    expect(tsx).toContain('listen("pointerdown"');
+  });
 });

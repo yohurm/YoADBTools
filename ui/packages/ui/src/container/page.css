@@ -8,6 +8,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   padding: var(--yohu-layout-page-inset);
   gap: var(--yohu-layout-page-gap);
@@ -22,8 +23,4 @@
   width: 100%;
   max-width: var(--yohu-layout-settings-max);
   margin-inline: auto;
-}
-
-.yohu-page > .yohu-chrome {
-  flex: 0 0 auto;
 }

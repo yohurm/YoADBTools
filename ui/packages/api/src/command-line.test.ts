@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -121,6 +121,43 @@ describe("splitCommandLine（与 domain testdata/command_split.json 同一套向
 
   it.each(fixture)("$input", (c) => {
     expect(splitCommandLine(c.input)).toEqual(c.args);
+  });
+});
+
+describe("占位符文法只解析一次", () => {
+  it("花括号和数字槽只在 placeholderTokens", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const owner = readFileSync(resolve(here, "command-line.ts"), "utf8");
+    expect(owner).toContain('indexOf("{")');
+    expect(owner).toContain('indexOf("}")');
+    expect(owner).toContain("/^\\d+$/.test(inner)");
+    const files = readdirSync(here).filter((name) => name.endsWith(".ts") && !name.includes(".test."));
+    for (const name of files) {
+      let body = readFileSync(resolve(here, name), "utf8");
+      if (name === "command-line.ts") {
+        body = body
+          .replace('const pos = rest.indexOf("{");', "")
+          .replace('const end = after.indexOf("}");', "")
+          .replace("if (/^\\d+$/.test(inner)) {", "")
+          .replace("index: Number.parseInt(inner, 10),", "");
+      }
+      expect(body, name).not.toContain('indexOf("{")');
+      expect(body, name).not.toContain('indexOf("}")');
+      expect(body, name).not.toContain("/^\\d+$/.test(inner)");
+      expect(body, name).not.toContain("parseInt(inner");
+    }
+  });
+});
+
+describe("参数按 index 升序只写一次", () => {
+  it("param_index_order_once", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const needle = "a.index - " + "b.index";
+    const owner = readFileSync(resolve(here, "command-line.ts"), "utf8");
+    const terminal = readFileSync(resolve(here, "../../modules/terminal/src/command-line.ts"), "utf8");
+    expect(owner.split(needle).length - 1).toBe(1);
+    expect(terminal.split(needle).length - 1).toBe(0);
+    expect(terminal).toContain("compareParamIndex");
   });
 });
 

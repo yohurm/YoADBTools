@@ -1,26 +1,21 @@
-//! URL 策略：http(s) 校验、GitHub 主机判定（Authorization 范围）。
+//! URL 策略：查询串截断，以及 GitHub 主机判定（Authorization 范围）。
+//! http(s) 形态只认 `yohu-download`。
 
 use crate::error::UpdateError;
 
-pub fn is_http_url(url: &str) -> bool {
-    let lower = url.trim().to_ascii_lowercase();
-    lower.starts_with("https://") || lower.starts_with("http://")
+/// `?` 或 `#` 之前的原文。安装包文件名和发行标签都从这里再取段。
+pub(crate) fn before_query(text: &str) -> &str {
+    text.split(['?', '#']).next().unwrap_or(text)
 }
 
 /// 仅允许打开或下载 http(s) 地址，且必须带主机。
 pub fn assert_http_url(url: &str) -> Result<&str, UpdateError> {
-    let trimmed = url.trim();
-    if !is_http_url(trimmed) {
-        return Err(UpdateError::InvalidUrl);
-    }
-    let parsed = reqwest::Url::parse(trimmed).map_err(|_| UpdateError::InvalidUrl)?;
-    if !matches!(parsed.scheme(), "http" | "https") {
-        return Err(UpdateError::InvalidUrl);
-    }
-    match parsed.host_str() {
-        Some(host) if !host.is_empty() => Ok(trimmed),
-        _ => Err(UpdateError::InvalidUrl),
-    }
+    yohu_download::assert_http_url(url).map_err(|_| UpdateError::InvalidUrl)
+}
+
+/// GitHub 下载用的 Authorization 头（仅主机命中时）。
+pub fn authorization_header(url: &str, token: &str) -> Option<(String, String)> {
+    github_bearer_token(url, token).map(|t| ("Authorization".into(), format!("Bearer {t}")))
 }
 
 /// GitHub 下载 / API / 附件主机（含 release-assets 同类 CDN）。
@@ -61,13 +56,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn http_and_https_ok() {
-        assert!(is_http_url("https://example.com/a.exe"));
-        assert!(is_http_url("http://example.com/a.exe"));
-        assert!(is_http_url("  https://cdn.example.com/setup.exe  "));
-        assert!(!is_http_url("ftp://x"));
-        assert!(!is_http_url(""));
-        assert!(!is_http_url(r"C:\setup.exe"));
+    fn before_query_drops_query_and_fragment() {
+        assert_eq!(
+            before_query("https://example.com/a.exe?x=1"),
+            "https://example.com/a.exe"
+        );
+        assert_eq!(
+            before_query("https://example.com/a.exe#notes"),
+            "https://example.com/a.exe"
+        );
+        assert_eq!(
+            before_query("https://example.com/a.exe"),
+            "https://example.com/a.exe"
+        );
     }
 
     #[test]
@@ -106,6 +107,15 @@ mod tests {
         ));
         assert!(!is_github_host("http://127.0.0.1:9/a.exe"));
         assert!(!is_github_host("https://example.com/?u=github.com"));
+    }
+
+    #[test]
+    fn authorization_header_matches_bearer_policy() {
+        let url = "https://github.com/yohurm/Windows-YoADBTools/releases/download/v1/a.exe";
+        let h = super::authorization_header(url, "secret").expect("header");
+        assert_eq!(h.0, "Authorization");
+        assert_eq!(h.1, "Bearer secret");
+        assert!(super::authorization_header("https://cdn.example.com/a.exe", "secret").is_none());
     }
 
     #[test]

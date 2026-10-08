@@ -2,9 +2,11 @@
  * 下拉开合 / 键盘 / 禁用（L3）。
  * 视图只提交事件并按快照绘制；选中索引与按键解码仍在 select-model。
  */
+import { presenceAttr } from "../dom/flag";
+import { controlIsDisabled, controlIsBlock } from "../basic/control-busy";
+import { listEdgeIndex } from "../keymap/list-index";
 
 import {
-  edgeIndex,
   selectedIndex,
   selectKeyIntent,
   stepIndex,
@@ -18,10 +20,6 @@ export interface SelectSession {
 
 export function idleSelectSession(): SelectSession {
   return { open: false, activeIndex: -1 };
-}
-
-export function selectIsDisabled(disabled?: boolean): boolean {
-  return Boolean(disabled);
 }
 
 export function openSelect(
@@ -41,7 +39,7 @@ export function toggleSelect(
   value: string | null | undefined,
   disabled?: boolean,
 ): SelectSession {
-  if (selectIsDisabled(disabled)) return idleSelectSession();
+  if (controlIsDisabled(disabled)) return idleSelectSession();
   return wasOpen ? closeSelect() : openSelect(options, value);
 }
 
@@ -49,6 +47,18 @@ export type SelectKeyEffect =
   | { type: "none" }
   | { type: "session"; session: SelectSession }
   | { type: "commit"; value: string; session: SelectSession };
+
+/** 按键不改变开合、活动项或取值。 */
+export function selectEffectIsNone(effect: SelectKeyEffect): effect is { type: "none" } {
+  return effect.type === "none";
+}
+
+/** 提交当前活动项并关闭。 */
+export function selectEffectIsCommit(
+  effect: SelectKeyEffect,
+): effect is Extract<SelectKeyEffect, { type: "commit" }> {
+  return effect.type === "commit";
+}
 
 /** 把模型按键意图落到开合 / 活动项 / 提交。禁用时全部吞掉。 */
 export function applySelectKey(
@@ -58,7 +68,7 @@ export function applySelectKey(
   value: string | null | undefined,
   disabled?: boolean,
 ): SelectKeyEffect {
-  if (selectIsDisabled(disabled)) return { type: "none" };
+  if (controlIsDisabled(disabled)) return { type: "none" };
   const intent = selectKeyIntent(key, session.open);
   if (!intent) return { type: "none" };
 
@@ -75,7 +85,7 @@ export function applySelectKey(
       if (options.length === 0) return { type: "none" };
       return {
         type: "session",
-        session: { open: true, activeIndex: edgeIndex(options.length, intent.edge) },
+        session: { open: true, activeIndex: listEdgeIndex(options.length, intent.edge) },
       };
     case "toggle":
       return { type: "session", session: toggleSelect(session.open, options, value, disabled) };
@@ -91,7 +101,7 @@ export function applySelectKey(
 }
 
 export function applySelectEscape(open: boolean, disabled?: boolean): SelectSession | null {
-  if (selectIsDisabled(disabled) || !open) return null;
+  if (controlIsDisabled(disabled) || !open) return null;
   return closeSelect();
 }
 
@@ -100,7 +110,7 @@ export function selectHostAttrs(input: { disabled?: boolean; block?: boolean }):
   "data-block"?: "";
 } {
   return {
-    "data-disabled": selectIsDisabled(input.disabled) ? "" : undefined,
-    "data-block": input.block ? "" : undefined,
+    "data-disabled": presenceAttr(controlIsDisabled(input.disabled)),
+    "data-block": presenceAttr(controlIsBlock(input.block)),
   };
 }

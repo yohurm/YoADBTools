@@ -528,8 +528,8 @@ YoDialog 落地：标题居中、一级字 `font_primary`、无分割线、操�
 | 根节点 Body + `line-break: strict` | `theme.css` html/body；`.yohu-type-*` |
 | 效率型贴边、设置页 40vp 边距 | `.yohu-layout__content` padding 0；`YoPage` 缺省消费 `--yohu-layout-page-inset` / `page-gap`；`role=settings` 左右 `--yohu-layout-page-margin`，列帽 `--yohu-layout-settings-max` 居中；`YoChrome` 标题行 `--yohu-control-height`、底垫 `--yohu-layout-chrome-pad` |
 | 栅格 gutter 16 / 最大宽 2220 | `--yohu-layout-gutter` / `grid-max` |
-| 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `--yohu-scrim`（浅 10% 黑 / 深 40% 黑）；浮层小圆角 `radius-sm` |
-| Toast ≤3s、最大宽 400；按钮最大 448；菜单最小 224 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-min` |
+| 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `--yohu-scrim`（浅 10% 黑 / 深 40% 黑）；特殊铬 `radius-md`；下拉触发钮 `radius-xl` |
+| Toast ≤3s、最大宽 400；按钮最大 448。鸿蒙菜单最小 224 是面板底；右键菜单宽跟标签，帽 300 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-max` |
 | 对比度：正文浅 4.5:1 / 深 5:1 | `colors.test.ts` 门禁；语义色按官方填充使用 |
 
 消费名与《UI设计系统-v6.md》§2 同步；改色只改 `tokens/colors.ts` 的 `Harmony` 表。默认尺度自 v1.7 起为鸿蒙 PC（comfortable）。

@@ -4,6 +4,7 @@
  * SolidJS 的 JSX 元素是真实 DOM 节点：静态缓存同一份 JSX 会在多处渲染时
  * **被挪走**（导航点进模块后图标消失）。因此每个 glyph 必须是工厂函数。
  */
+import { presenceAttr } from "./dom/flag";
 import type { JSX } from "solid-js";
 import { HARMONY_GLYPHS, HARMONY_VIEWBOX, type HarmonyIconName } from "./harmony-glyphs";
 import { Layout } from "./tokens/layout";
@@ -45,6 +46,8 @@ export interface IconProps {
   name: IconName;
   /** 尺寸（px），默认 Layout.IconSm */
   size?: number;
+  /** 加载旋转。动画写在图标上，调用方不点 class。 */
+  spin?: boolean;
 }
 
 const FILLED: ReadonlySet<IconName> = new Set(["play", "pause", "grip"]);
@@ -227,6 +230,7 @@ export function Icon(props: IconProps): JSX.Element {
       stroke-linejoin="round"
       aria-hidden="true"
       data-icon={props.name}
+      data-spin={presenceAttr(props.spin)}
     >
       {ICON_GLYPHS[props.name]()}
     </svg>

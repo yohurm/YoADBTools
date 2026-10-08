@@ -30,7 +30,7 @@ describe("YoCheckbox", () => {
     render(() => <YoCheckbox label="禁用" checked={false} disabled onChange={onChange} />);
     const box = screen.getByRole("checkbox") as HTMLInputElement;
     expect(box.disabled).toBe(true);
-    expect(box.closest(".yohu-checkbox")?.getAttribute("data-disabled")).toBe("true");
+    expect(box.closest(".yohu-checkbox")?.getAttribute("data-disabled")).toBe("");
     fireEvent.click(box);
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -56,7 +56,57 @@ describe("YoCheckbox", () => {
     const check = host?.querySelector(".yohu-checkbox__check");
     expect(check).toBeTruthy();
     expect(check?.querySelector("polyline")?.getAttribute("pathLength")).toBe("1");
+    expect(check?.querySelector("polyline")?.getAttribute("points")).toBe("4 12 9 17 20 6");
     expect(css).toContain("stroke-dashoffset var(--yohu-motion-spatial-tick)");
-    expect(css).toContain('.yohu-checkbox[data-checked="true"]');
+    expect(css).toContain('.yohu-checkbox__box[data-paint="checked"] .yohu-checkbox__check polyline');
+    expect(css).toContain("--yohu-corner-move: var(--yohu-motion-spatial-tick)");
+    expect(css).not.toContain("[data-checked");
+  });
+
+  it("种类图标在盒与标签之间", () => {
+    render(() => <YoCheckbox label="命令" icon="terminal" checked />);
+    const host = screen.getByRole("checkbox").closest(".yohu-checkbox");
+    const box = host?.querySelector(".yohu-checkbox__box");
+    const mark = host?.querySelector(".yohu-checkbox__mark");
+    const label = host?.querySelector(".yohu-checkbox__label");
+    expect(mark?.querySelector("[data-icon='terminal']")).toBeTruthy();
+    expect(box && mark && (box.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+    expect(mark && label && (mark.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  });
+
+  it("分组墨水走 data-tone=section", () => {
+    render(() => <YoCheckbox label="组" tone="section" checked />);
+    const host = screen.getByRole("checkbox").closest(".yohu-checkbox");
+    expect(host?.getAttribute("data-tone")).toBe("section");
+    expect(css).toContain('.yohu-checkbox[data-tone="section"] .yohu-checkbox__label');
+  });
+});
+
+function checkboxSource(): string {
+  return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "Checkbox.tsx"), "utf8");
+}
+
+describe("复选框涂装", () => {
+  it("标签和盒都读同一涂装", () => {
+    const src = checkboxSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times('host()["' + 'data-paint"]')).toBe(1);
+    expect(times("function checkboxPaint")).toBe(1);
+    expect(times("export function checkboxPaint")).toBe(0);
+    expect(times("checkboxPaint()")).toBe(3);
+    expect(times("data-paint={checkboxPaint()}")).toBe(2);
+  });
+});
+
+describe("复选框禁用", () => {
+  it("提交和输入都问同一把禁用", () => {
+    const src = checkboxSource();
+    const times = (needle: string) => src.split(needle).length - 1;
+    expect(times("host()." + "disabled")).toBe(1);
+    expect(times("function checkboxDisabled")).toBe(1);
+    expect(times("export function checkboxDisabled")).toBe(0);
+    expect(times("checkboxDisabled()")).toBe(3);
+    expect(times("canCommitCheckboxChange(checkboxDisabled())")).toBe(1);
+    expect(times("disabled={checkboxDisabled()}")).toBe(1);
   });
 });

@@ -24,6 +24,9 @@ describe("travel axes", () => {
     const css = load("src/motion/engines/travel/travel.css");
     expect(css).toContain("height var(--yohu-motion-spatial-panel)");
     expect(css).toContain("width var(--yohu-motion-spatial-panel)");
+    expect(css).toContain("width: var(--yohu-travel-inline, auto)");
+    expect(css).toContain("height: var(--yohu-travel-block, auto)");
+    expect(css).toContain("flex: var(--yohu-travel-flex, 0 1 auto)");
     expect(css).toContain(".yohu-travel__slot");
     const slot = css.match(/\.yohu-travel__slot\s*\{[^}]*\}/)?.[0] ?? "";
     expect(slot).toContain("flex: 1 1 auto");
@@ -41,7 +44,35 @@ describe("travel axes", () => {
       load("src/motion/engines/travel/travel-bind.ts"),
     ].join("\n");
     expect(ts).toContain("TRAVEL_SPEC");
-    expect(ts).toContain("props.spec ?? TRAVEL_SPEC");
+    expect(ts).toContain("spec ?? TRAVEL_SPEC");
     expect(ts).toContain("host.spec?.() ?? TRAVEL_SPEC");
+  });
+});
+
+describe("行程缺省行程", () => {
+  it("缺省行程只留在函数体", () => {
+    const body = load("src/motion/engines/travel/travel.tsx");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("props.spec ?? " + "TRAVEL_SPEC")).toBe(0);
+    expect(times("spec ?? " + "TRAVEL_SPEC")).toBe(1);
+    expect(times("function travelSpec")).toBe(1);
+    expect(times("export function travelSpec")).toBe(0);
+    expect(times("travelSpec(props.spec)")).toBe(2);
+    expect(times("props.enabled !== false")).toBe(1);
+  });
+});
+
+describe("行程卸掉绑定", () => {
+  it("卸掉绑定只留在函数体", () => {
+    const body = load("src/motion/engines/travel/travel.tsx");
+    const times = (needle: string): number => body.split(needle).length - 1;
+    expect(times("ctl?." + "dispose()")).toBe(1);
+    expect(times("function travelDispose")).toBe(1);
+    expect(times("export function travelDispose")).toBe(0);
+    expect(times("travelDispose()")).toBe(3);
+    expect(times("ctl = undefined")).toBe(1);
+    expect(times("function travelSpec")).toBe(1);
+    expect(times("travelSpec(props.spec)")).toBe(2);
+    expect(times("props.enabled !== false")).toBe(1);
   });
 });

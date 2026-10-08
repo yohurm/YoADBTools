@@ -32,4 +32,12 @@ describe("YoProgressBar", () => {
     expect(host.getAttribute("aria-valuenow")).toBeNull();
     expect((container.querySelector(".yohu-progress__bar") as HTMLElement).style.width).toBe("");
   });
+
+  it("sm 写 data-size，缺省不写，高度只在组件样式里", () => {
+    const { container } = render(() => <YoProgressBar value={10} size="sm" />);
+    const host = container.querySelector(".yohu-progress") as HTMLElement;
+    expect(host.getAttribute("data-size")).toBe("sm");
+    expect(css).toContain('.yohu-progress[data-size="sm"]');
+    expect(css).toContain("height: var(--yohu-space-sm)");
+  });
 });

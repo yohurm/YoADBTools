@@ -29,8 +29,13 @@ export function modPlatform(): ModifierPlatform {
 /** 平台在模块加载时定格一次；桌面 WebView2 不会运行时切换 OS。 */
 const PLATFORM: ModifierPlatform = modPlatform();
 
+/** 空格键。列表确认和和弦都认这一把。物理码 Space 仍由 eventKey 另判。 */
+export function spaceKey(key: string): boolean {
+  return key === " ";
+}
+
 export function eventKey(event: KeyboardEvent): string {
-  if (event.key === " " || event.code === "Space") return "space";
+  if (spaceKey(event.key) || event.code === "Space") return "space";
   return event.key.toLowerCase();
 }
 
@@ -40,12 +45,15 @@ export function eventKey(event: KeyboardEvent): string {
  * - 其余（Windows 桌面 WebView2）：Ctrl（event.ctrlKey）。
  * 保留 metaKey 的“命令”含义仅限 macOS，Windows 上不再把 Win 键当作命令修饰键。
  */
-export function isModKey(event: KeyboardEvent): boolean {
+export function isModKey(event: { ctrlKey: boolean; metaKey: boolean }): boolean {
   return isCommandModifier(PLATFORM, event);
 }
 
 /** 给定平台时的命令修饰键判定（纯函数，便于跨平台单测与注入）。 */
-export function isCommandModifier(platform: ModifierPlatform, event: KeyboardEvent): boolean {
+export function isCommandModifier(
+  platform: ModifierPlatform,
+  event: { ctrlKey: boolean; metaKey: boolean },
+): boolean {
   return platform === "mac" ? event.metaKey : event.ctrlKey;
 }
 

@@ -6,11 +6,11 @@
 import type { JSX } from "solid-js";
 import { YoCorner } from "../corner";
 import { Radius } from "../tokens/radius";
-import type { ToolbarPad } from "./toolbar-model";
-import { toolbarHostAttrs } from "./toolbar-policy";
+import type { YoToolbarPad } from "./toolbar-model";
+import { toolbarChromeIsPlain, toolbarHostAttrs } from "./toolbar-policy";
 import "./Toolbar.css";
 
-export type YoToolbarPad = ToolbarPad;
+export type { YoToolbarPad };
 
 export interface YoToolbarProps {
   /** 命令带内容。标题请调用方组合 YoSubheader，禁止本容器 import 产品 Yo*。 */
@@ -35,7 +35,7 @@ export function YoToolbar(props: YoToolbarProps): JSX.Element {
     >
       <YoCorner
         role="control"
-        radius={chrome() === "plain" ? Radius.None : undefined}
+        radius={toolbarChromeIsPlain(chrome()) ? Radius.None : undefined}
         class="yohu-toolbar__chrome"
         direction="row"
         align="center"

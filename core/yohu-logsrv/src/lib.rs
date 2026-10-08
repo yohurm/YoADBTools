@@ -11,6 +11,7 @@ mod follow;
 mod index;
 mod parse;
 mod ring;
+mod stack_trace;
 mod task;
 
 pub use capture::{CaptureService, LogError};

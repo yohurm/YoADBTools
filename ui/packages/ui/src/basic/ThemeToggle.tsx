@@ -11,6 +11,7 @@ import {
   themeTransitionOriginFromElement,
 } from "../motion/engines/theme";
 import { getTheme, onResolvedThemeChange, setTheme, type ThemeName } from "../tokens";
+import { Layout } from "../tokens/layout";
 import { YoIconButton, type YoIconButtonPaint } from "./IconButton";
 import { THEME_TOGGLE_MOON, THEME_TOGGLE_SUN } from "./theme-toggle-model";
 import { themeToggleHostAttrs } from "./theme-toggle-policy";
@@ -59,10 +60,10 @@ export function YoThemeToggle(props: YoThemeToggleProps): JSX.Element {
     >
       <span class="yohu-theme-toggle__glyphs" aria-hidden="true">
         <span class="yohu-theme-toggle__sun">
-          <Icon name={THEME_TOGGLE_SUN} />
+          <Icon name={THEME_TOGGLE_SUN} size={Layout.IconSm} />
         </span>
         <span class="yohu-theme-toggle__moon">
-          <Icon name={THEME_TOGGLE_MOON} />
+          <Icon name={THEME_TOGGLE_MOON} size={Layout.IconSm} />
         </span>
       </span>
     </YoIconButton>

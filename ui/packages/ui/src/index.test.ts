@@ -18,6 +18,7 @@ const YO_PUBLIC = [
   "YoSwitch",
   "YoBadge",
   "YoChip",
+  "YoDragPile",
   "YoStatusDot",
   "YoDivider",
   "YoSubheader",
@@ -98,6 +99,12 @@ describe("@yohu/ui 公开组件清单", () => {
   it("含 YoSwitch 与 YoTitleBar", () => {
     expect(ui.YoSwitch).toBeTypeOf("function");
     expect(ui.YoTitleBar).toBeTypeOf("function");
+  });
+
+  it("对话框开闭只公开 resolveDialogOpen", () => {
+    expect(ui.resolveDialogOpen).toBeTypeOf("function");
+    expect(ui.resolveDialogOpen(false)).toBe(false);
+    expect(ui.resolveDialogOpen(() => true)).toBe(true);
   });
 
   it("公开地址策略、搜索引擎与 YoRail", () => {
@@ -227,7 +234,10 @@ describe("@yohu/ui 公开组件清单", () => {
     const locked = [
       "layoutSelectMenu",
       "applyPopoverBox",
-      "readSelectTrigger",
+      "readAnchorBox",
+      "clampSpan",
+      "clampToRect",
+      "clampListIndex",
       "findOption",
       "optionDomId",
       "selectedIndex",
@@ -244,7 +254,12 @@ describe("@yohu/ui 公开组件清单", () => {
       "selectHostAttrs",
       "TEXT_FIELD_STATUSES",
       "TEXT_FIELD_CONTROL_OVERFLOW",
-      "resolveTextFieldStatus",
+      "resolveFieldStatus",
+      "fieldPaintKind",
+      "fieldStatusIsError",
+      "fieldStatusIsWarning",
+      "fieldStatusInvalid",
+      "DEFAULT_FIELD_STATUS",
       "hasTextFieldSlot",
       "resolveTextFieldSlots",
       "resolveTextFieldWidthKind",
@@ -253,10 +268,8 @@ describe("@yohu/ui 公开组件清单", () => {
       "resolveTextFieldActive",
       "resolveTextFieldSpec",
       "textFieldLineBoxPx",
-      "textFieldPaintKind",
       "resolveTextFieldInteractive",
       "textFieldHostAttrs",
-      "DEFAULT_TEXT_FIELD_STATUS",
       "DEFAULT_TEXT_FIELD_ROWS",
       "searchHostAttrs",
       "resolveSearchSlot",
@@ -275,6 +288,9 @@ describe("@yohu/ui 公开组件清单", () => {
       expect((ui as Record<string, unknown>)[name], name).toBeUndefined();
       expect(index, name).not.toContain(name);
     }
+    expect(index).toContain("FieldStatus");
+    expect(index).not.toContain("YoTextFieldStatus");
+    expect(index).not.toContain("YoSearchStatus");
     for (const name of ADDRESS_PUBLIC) {
       expect(typeof (ui as Record<string, unknown>)[name], name).toBe("function");
       expect(index).toContain(name);

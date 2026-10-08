@@ -1,8 +1,8 @@
 //! 查询词高亮区间。
 
-use crate::chars::{find_chars, lowered_chars};
+use crate::chars::{find_chars, fold_search};
 use crate::pinyin::find_pinyin_span;
-use crate::token::{normalize_search_query, tokenize_search_query};
+use crate::token::tokenize_search_query;
 use crate::types::SearchRange;
 
 pub fn merge_search_ranges(ranges: &[SearchRange]) -> Vec<SearchRange> {
@@ -24,27 +24,24 @@ pub fn merge_search_ranges(ranges: &[SearchRange]) -> Vec<SearchRange> {
 }
 
 fn token_ranges(text: &str, token: &str) -> Vec<SearchRange> {
-    let needle = normalize_search_query(token);
-    if needle.is_empty() {
+    let Some(folded) = fold_search(text, token) else {
         return Vec::new();
-    }
-    let hay = lowered_chars(text);
-    let n: Vec<char> = needle.chars().collect();
+    };
     let mut ranges = Vec::new();
     let mut from = 0;
-    while let Some(start) = find_chars(&hay, &n, from) {
-        let end = start + n.len();
+    while let Some(start) = find_chars(&folded.hay, &folded.needle, from) {
+        let end = start + folded.needle.len();
         ranges.push(SearchRange { start, end });
-        from = start + n.len().max(1);
-        if from > hay.len() {
+        from = end.max(start + 1);
+        if from > folded.hay.len() {
             break;
         }
     }
     let mut pinyin_from = 0;
-    while let Some((start, end)) = find_pinyin_span(&hay, &needle, pinyin_from) {
+    while let Some((start, end)) = find_pinyin_span(&folded.hay, &folded.normalized, pinyin_from) {
         ranges.push(SearchRange { start, end });
         pinyin_from = end.max(start + 1);
-        if pinyin_from > hay.len() {
+        if pinyin_from > folded.hay.len() {
             break;
         }
     }

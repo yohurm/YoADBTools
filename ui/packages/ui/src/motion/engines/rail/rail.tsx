@@ -7,6 +7,7 @@ import type { Accessor, JSX } from "solid-js";
 
 import { shouldSkipMotion } from "../../reduced";
 import {
+  railIntentIsExpanded,
   railPhaseAfterWidthSettle,
   railPhaseOnIntentChange,
   railStreamAttr,
@@ -34,9 +35,7 @@ export interface YoRailProps {
 
 export function YoRail(props: YoRailProps): JSX.Element {
   const intent = () => props.intent;
-  const [phase, setPhase] = createSignal<RailPhase>(
-    intent() === "expanded" ? "expanded" : "icons",
-  );
+  const [phase, setPhase] = createSignal<RailPhase>(railPhaseAfterWidthSettle(intent()));
 
   createEffect(
     on(
@@ -52,15 +51,7 @@ export function YoRail(props: YoRailProps): JSX.Element {
     if (event.target !== event.currentTarget) return;
     if (event.propertyName !== "width" && event.propertyName !== "flex-basis") return;
     const host = event.currentTarget as HTMLElement;
-    const styles = getComputedStyle(host);
-    if (
-      !railWidthMatchesIntent(
-        host.offsetWidth,
-        intent() === "expanded",
-        styles.getPropertyValue("--yohu-layout-shell-nav"),
-        styles.getPropertyValue("--yohu-layout-shell-nav-icons"),
-      )
-    ) {
+    if (!railWidthMatchesIntent(host.offsetWidth, railIntentIsExpanded(intent()))) {
       return;
     }
     setPhase(railPhaseAfterWidthSettle(intent()));

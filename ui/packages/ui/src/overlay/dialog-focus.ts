@@ -2,7 +2,7 @@
  * 对话框焦点陷阱（L3）。视图只接线，算法由 dialog-policy 装配。
  */
 
-import { resolveDialogInitial, type YoDialogInitial } from "./dialog-model";
+import { dialogInitialIsFooter, type YoDialogInitial } from "./dialog-model";
 
 export const DIALOG_FOCUSABLE =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -19,7 +19,7 @@ export function dialogFocusables(container: HTMLElement): HTMLElement[] {
 
 /** 入场首焦：initial=footer 落页脚第一钮，否则第一个未 skip 的可聚焦，再否则面板。 */
 export function dialogInitialFocus(panel: HTMLElement, initial?: YoDialogInitial): HTMLElement {
-  if (resolveDialogInitial(initial) === "footer") {
+  if (dialogInitialIsFooter(initial)) {
     const footer = panel.querySelector<HTMLElement>(`.yohu-dialog__footer ${DIALOG_FOCUSABLE}`);
     if (footer && isDialogFocusable(footer)) return footer;
   }

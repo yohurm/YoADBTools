@@ -3,7 +3,7 @@ export type { YoPresenceProps, YoListPresenceProps } from "./engines/presence";
 export { YoCollapse } from "./engines/collapse";
 export type { YoCollapseProps, CollapseRecipe, CollapseTravelApi } from "./engines/collapse";
 export { YoReveal, YoTravel } from "./engines/travel";
-export type { YoRevealProps, YoTravelProps, TravelAxis } from "./engines/travel";
+export type { YoRevealProps, YoTravelProps } from "./engines/travel";
 export { YoGrow } from "./engines/grow";
 export type { YoGrowProps } from "./engines/grow";
 export { YoSwap } from "./engines/swap";
@@ -14,7 +14,9 @@ export {
   YoRail,
   YoRailSlot,
   useRail,
+  railIntentIsExpanded,
   railPhaseAfterWidthSettle,
+  railToggleIntent,
   railPhaseOnIntentChange,
   railSlotOpen,
   railStreamAttr,
@@ -27,7 +29,6 @@ export {
 export type {
   RailIntent,
   RailPhase,
-  RailSlotAxis,
   YoRailContextValue,
   YoRailProps,
   YoRailSlotProps,

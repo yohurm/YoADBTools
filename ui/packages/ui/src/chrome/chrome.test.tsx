@@ -19,6 +19,11 @@ function loadChromeCss(): string {
 }
 
 describe("YoChrome", () => {
+  it("页眉自己不伸长，页壳不点它的 class", () => {
+    const css = loadChromeCss();
+    expect(css).toMatch(/\.yohu-chrome\s*\{[^}]*flex:\s*0 0 auto/);
+  });
+
   it("dropIgnore 标记页眉不当投放目标", () => {
     const { container } = render(() => <YoChrome title="文件管理" dropIgnore />);
     expect(container.querySelector(".yohu-chrome")?.getAttribute("data-drop")).toBe("ignore");

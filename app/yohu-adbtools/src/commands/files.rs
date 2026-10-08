@@ -3,7 +3,7 @@
 use tauri::{AppHandle, State};
 use tokio_util::sync::CancellationToken;
 
-use crate::commands::{ipc_dnd, ipc_file};
+use crate::commands::{ipc_dnd, ipc_file, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
     BrowseAttach, Direction, DragOutRequest, IpcError, PathOpRequest, RemoteEntry, TransferRequest,
@@ -16,7 +16,7 @@ pub async fn files_list(
     path: String,
     generation: u64,
 ) -> Result<Vec<RemoteEntry>, IpcError> {
-    state.require_online(&serial)?;
+    state.require_online(&serial).map_err(ipc_session)?;
     crate::browse_runs::list(&state, &serial, &path, generation)
         .await
         .map_err(ipc_file)
@@ -27,7 +27,7 @@ pub async fn files_session_attach(
     state: State<'_, AppState>,
     serial: String,
 ) -> Result<BrowseAttach, IpcError> {
-    state.require_online(&serial)?;
+    state.require_online(&serial).map_err(ipc_session)?;
     crate::browse_runs::attach(&state, &serial)
         .await
         .map_err(ipc_file)
@@ -49,7 +49,7 @@ pub async fn files_push(
     app: AppHandle,
     req: TransferRequest,
 ) -> Result<u32, IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     Ok(crate::transfer_runs::spawn(app, req, Direction::Push))
 }
 
@@ -59,7 +59,7 @@ pub async fn files_pull(
     app: AppHandle,
     req: TransferRequest,
 ) -> Result<u32, IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     Ok(crate::transfer_runs::spawn(app, req, Direction::Pull))
 }
 
@@ -71,7 +71,7 @@ pub fn files_cancel(state: State<'_, AppState>, id: u32) -> Result<(), IpcError>
 
 #[tauri::command(rename = "files.delete")]
 pub async fn files_delete(state: State<'_, AppState>, req: PathOpRequest) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .mutator
         .delete(&req.serial, &req.path, CancellationToken::new())
@@ -81,7 +81,7 @@ pub async fn files_delete(state: State<'_, AppState>, req: PathOpRequest) -> Res
 
 #[tauri::command(rename = "files.mkdir")]
 pub async fn files_mkdir(state: State<'_, AppState>, req: PathOpRequest) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .mutator
         .mkdir(&req.serial, &req.path, CancellationToken::new())
@@ -91,7 +91,7 @@ pub async fn files_mkdir(state: State<'_, AppState>, req: PathOpRequest) -> Resu
 
 #[tauri::command(rename = "files.create")]
 pub async fn files_create(state: State<'_, AppState>, req: PathOpRequest) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     state
         .mutator
         .create_file(&req.serial, &req.path, CancellationToken::new())
@@ -105,7 +105,7 @@ pub async fn files_drag_out(
     app: AppHandle,
     req: DragOutRequest,
 ) -> Result<(), IpcError> {
-    state.require_online(&req.serial)?;
+    state.require_online(&req.serial).map_err(ipc_session)?;
     crate::dnd::drag_out(&app, &state, req)
         .await
         .map_err(ipc_dnd)

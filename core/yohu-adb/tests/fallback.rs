@@ -105,7 +105,7 @@ async fn fallback_skips_missing_user_path() {
 }
 
 #[tokio::test]
-async fn all_candidates_fail_yields_detailed_error() {
+async fn all_candidates_fail_is_candidates_failed() {
     // 每个测试独立的 data 目录，避免候选互相污染
     let data_dir = std::env::temp_dir().join(format!(
         "yohu-fallback-data-{}-{:?}",
@@ -122,13 +122,13 @@ async fn all_candidates_fail_yields_detailed_error() {
         .await
         .expect_err("全部失败应报错");
     assert!(
-        matches!(err, yohu_adb::AdbError::ToolUnavailable(_)),
-        "全候选失败应是 ToolUnavailable: {err}"
+        matches!(err, yohu_adb::AdbError::CandidatesFailed),
+        "全候选失败应是 CandidatesFailed: {err}"
     );
     let text = err.to_string();
+    assert_eq!(text, yohu_domain::CANDIDATES_FAILED);
     assert!(
-        text.contains("全部 adb 候选扫描失败"),
-        "错误应含候选明细: {text}"
+        !text.contains("no daemon"),
+        "候选 stderr 不进用户句: {text}"
     );
-    assert!(text.contains("no daemon"), "错误应含根因: {text}");
 }

@@ -104,25 +104,26 @@ describe("YoColHeader", () => {
     expect(colHeaderCss).toContain("--yohu-col-header-overlay-radius: var(--yohu-radius-none)");
     expect(colHeaderCss).toContain("--yohu-col-header-content-pad:");
     expect(colHeaderCss).toContain("--yohu-ripple-inset: var(--yohu-col-header-overlay-inset)");
-    expect(colHeaderCss).toMatch(
-      /\.yohu-col-header__content\s*>\s*\.yohu-interactive\s*\{[^}]*padding:\s*0/,
-    );
+    expect(colHeaderCss).toMatch(/\.yohu-col-header__sort\s*\{[^}]*padding:\s*0/);
+    expect(colHeaderCss).not.toContain(".yohu-interactive");
     expect(colHeaderCss).toMatch(
       /\.yohu-col-header__label\s*\{[^}]*padding:\s*var\(--yohu-col-header-content-pad\)/,
     );
     expect(colHeaderCss).not.toMatch(
-      /\.yohu-col-header__content\s*>\s*\.yohu-interactive[^{]*\{[^}]*padding:\s*var\(--yohu-col-header-content-pad\)/,
+      /\.yohu-col-header__sort[^{]*\{[^}]*padding:\s*var\(--yohu-col-header-content-pad\)/,
     );
   });
 
   it("标题默认靠左，列内边距左 md 右 sm，不画列分割线", () => {
-    expect(colHeaderCss).toContain(
-      "--yohu-col-header-content-pad: var(--yohu-col-cell-pad, 0 var(--yohu-space-sm) 0 var(--yohu-space-md))",
-    );
+    expect(colHeaderCss).toContain("--yohu-col-header-content-pad: var(--yohu-col-cell-pad)");
+    expect(colHeaderCss).not.toContain("0 var(--yohu-space-sm) 0 var(--yohu-space-md)");
     expect(colHeaderCss).toMatch(
       /\.yohu-col-header__label\s*\{[^}]*justify-content:\s*flex-start/,
     );
     expect(colHeaderCss).not.toContain(".yohu-col-header:not(:last-child)::after");
+    expect(colHeaderCss).not.toContain(".yohu-col-header__content > *");
+    expect(colHeaderCss).toMatch(/\.yohu-col-header__sort\s*\{[^}]*flex:\s*1 1 auto/);
+    expect(colHeaderCss).toMatch(/\.yohu-col-header__label\s*\{[^}]*flex:\s*1 1 auto/);
     expect(colHeaderCss).not.toContain(":has(.yohu-col-resizer)");
   });
 

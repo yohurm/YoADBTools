@@ -12,7 +12,7 @@ use tokio::process::{ChildStdin, ChildStdout};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::error::AdbError;
+use crate::error::{AdbError, ShellFault};
 use crate::parse::browse as browse_parse;
 use crate::parse::offline;
 use crate::parse::shell_option;
@@ -59,6 +59,7 @@ struct LiveIo {
 
 /// 一条已握手的 `adb shell -T`。`exec` 失败会收割进程；调用方再 `open`。
 pub struct DeviceShell {
+    serial: String,
     halt: CancellationToken,
     io: tokio::sync::Mutex<Option<LiveIo>>,
     nonce: AtomicU64,
@@ -72,6 +73,7 @@ impl DeviceShell {
         cancel: CancellationToken,
     ) -> Result<Self, DeviceShellError> {
         let shell = Self {
+            serial: serial.to_string(),
             halt: CancellationToken::new(),
             io: tokio::sync::Mutex::new(None),
             nonce: AtomicU64::new(1),
@@ -88,16 +90,16 @@ impl DeviceShell {
         cancel: CancellationToken,
     ) -> Result<ProcessOutput, DeviceShellError> {
         let mut io = lock_io(self, &cancel).await?;
-        let live = io.as_mut().ok_or_else(|| {
-            DeviceShellError::Failed(AdbError::Io(std::io::Error::other("浏览 shell 已结束")))
-        })?;
+        let live = io
+            .as_mut()
+            .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::Ended)))?;
         let nonce = self.nonce.fetch_add(1, Ordering::Relaxed);
         let turn = browse_parse::wrap_session_script(nonce, inner);
         match exec_turn(live, &turn, nonce, timeout, &cancel, &self.halt).await {
             Ok(out) => Ok(out),
             Err(e) => {
                 let live = io.take().expect("exec 回合持有会话");
-                Err(classify_close(live, e, CloseKind::Exec).await)
+                Err(classify_close(live, e, CloseKind::Exec, &self.serial).await)
             }
         }
     }
@@ -153,12 +155,14 @@ async fn spawn_live(
     let mut child = runner
         .spawn_child_piped(&adb, &argv)
         .map_err(|e| DeviceShellError::Failed(e.into()))?;
-    let stdin = child.stdin.take().ok_or_else(|| {
-        DeviceShellError::Failed(AdbError::Io(std::io::Error::other("浏览 shell 无 stdin")))
-    })?;
-    let stdout = child.stdout.take().ok_or_else(|| {
-        DeviceShellError::Failed(AdbError::Io(std::io::Error::other("浏览 shell 无 stdout")))
-    })?;
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdin)))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| DeviceShellError::Failed(AdbError::Shell(ShellFault::NoStdout)))?;
     let stderr = child.stderr.take();
     let stderr_tail = Arc::new(Mutex::new(String::new()));
     let stderr_task = spawn_stderr_drain(stderr, Arc::clone(&stderr_tail));
@@ -171,7 +175,7 @@ async fn spawn_live(
     };
     match handshake(&mut live, halt, cancel).await {
         Ok(()) => Ok(live),
-        Err(e) => Err(classify_close(live, e, CloseKind::Handshake).await),
+        Err(e) => Err(classify_close(live, e, CloseKind::Handshake, serial).await),
     }
 }
 
@@ -211,6 +215,7 @@ async fn classify_close(
     live: LiveIo,
     origin: DeviceShellError,
     kind: CloseKind,
+    serial: &str,
 ) -> DeviceShellError {
     let LiveIo {
         mut child,
@@ -235,8 +240,8 @@ async fn classify_close(
     ) {
         return origin;
     }
-    if offline::stderr_is_device_offline(&stderr) {
-        return DeviceShellError::Failed(AdbError::DeviceOffline(stderr.trim().to_string()));
+    if let Some(err) = offline::transport_offline(serial, &stderr) {
+        return DeviceShellError::Failed(err);
     }
     if shell_option::stderr_rejects_shell_option(&stderr) {
         return DeviceShellError::Unsupported;
@@ -260,8 +265,8 @@ async fn handshake(
             return Ok(());
         }
     }
-    Err(DeviceShellError::Failed(AdbError::Io(
-        std::io::Error::other("浏览 shell 握手失败"),
+    Err(DeviceShellError::Failed(AdbError::Shell(
+        ShellFault::Handshake,
     )))
 }
 
@@ -287,31 +292,29 @@ async fn exec_turn(
             STDOUT_BUDGET.saturating_sub(body.len()),
         )
         .await?;
-        if !seen_begin {
-            if line == begin {
-                seen_begin = true;
+        match browse_parse::session_line(&line, &begin, nonce, seen_begin) {
+            browse_parse::SessionLine::Skip => {}
+            browse_parse::SessionLine::Begin => seen_begin = true,
+            browse_parse::SessionLine::End(code) => {
+                let stderr = live
+                    .stderr_tail
+                    .lock()
+                    .map(|s| s.clone())
+                    .unwrap_or_default();
+                return Ok(ProcessOutput {
+                    exit_code: code,
+                    stdout: body,
+                    stderr,
+                });
             }
-            continue;
+            browse_parse::SessionLine::Body => {
+                if body.len() + line.len() + 1 > STDOUT_BUDGET {
+                    return Err(DeviceShellError::Failed(AdbError::Truncated));
+                }
+                body.push_str(&line);
+                body.push('\n');
+            }
         }
-        if let Some(code) = browse_parse::parse_end_line(&line, nonce) {
-            let stderr = live
-                .stderr_tail
-                .lock()
-                .map(|s| s.clone())
-                .unwrap_or_default();
-            return Ok(ProcessOutput {
-                exit_code: code,
-                stdout: body,
-                stderr,
-            });
-        }
-        if body.len() + line.len() + 1 > STDOUT_BUDGET {
-            return Err(DeviceShellError::Failed(AdbError::Io(
-                std::io::Error::other("输出超过捕获预算"),
-            )));
-        }
-        body.push_str(&line);
-        body.push('\n');
     }
 }
 
@@ -334,9 +337,7 @@ async fn read_line(
     remaining: usize,
 ) -> Result<String, DeviceShellError> {
     if remaining == 0 {
-        return Err(DeviceShellError::Failed(AdbError::Io(
-            std::io::Error::other("输出超过捕获预算"),
-        )));
+        return Err(DeviceShellError::Failed(AdbError::Truncated));
     }
     let mut buf = Vec::new();
     tokio::select! {
@@ -347,14 +348,10 @@ async fn read_line(
         n = live.stdout.read_until(b'\n', &mut buf) => {
             let n = n.map_err(|e| DeviceShellError::Failed(AdbError::Io(e)))?;
             if n == 0 {
-                return Err(DeviceShellError::Failed(AdbError::Io(std::io::Error::other(
-                    "浏览 shell 已结束",
-                ))));
+                return Err(DeviceShellError::Failed(AdbError::Shell(ShellFault::Ended)));
             }
             if buf.len() > remaining {
-                return Err(DeviceShellError::Failed(AdbError::Io(std::io::Error::other(
-                    "输出超过捕获预算",
-                ))));
+                return Err(DeviceShellError::Failed(AdbError::Truncated));
             }
             let line = String::from_utf8_lossy(&buf);
             Ok(line.trim_end_matches(['\r', '\n']).to_string())

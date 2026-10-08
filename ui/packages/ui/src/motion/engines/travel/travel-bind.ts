@@ -8,12 +8,13 @@
 import { motionSpecMs, type MotionSpecName } from "../../../tokens/motion";
 import { PRESENCE_EXIT_SAFETY_MS, TRAVEL_SPEC } from "../../spec/recipes";
 import { shouldSkipMotion } from "../../reduced";
-import { resolveTravelSize, type TravelAxis, type TravelSize } from "./travel-model";
+import { logicalAxesHaveBlock, logicalAxesHaveInline, type LogicalAxis } from "../../../placement/axis";
+import { resolveTravelSize, type TravelSize } from "./travel-model";
 import { travelHostAttrs, type TravelPaint } from "./travel-policy";
 
 export interface TravelHost {
   enabled: () => boolean;
-  axes: () => readonly TravelAxis[];
+  axes: () => readonly LogicalAxis[];
   spec?: () => MotionSpecName;
   /** 行程起停。消费者（YoScroller）订这个，禁止再 scrape data-travel。 */
   onTraveling?: (traveling: boolean) => void;
@@ -27,24 +28,88 @@ export interface TravelController {
 
 const EMPTY: TravelSize = { block: 0, inline: 0 };
 
+function travelUnlock(el: HTMLElement, prop: "height" | "width", on: boolean): void {
+  if (on) el.style[prop] = "";
+}
+
+function travelRestore(el: HTMLElement, prop: "height" | "width", value: string): void {
+  el.style[prop] = value;
+}
+
+function travelSaved(el: HTMLElement, prop: "height" | "width"): string {
+  return el.style[prop];
+}
+
+function travelFlush(el: HTMLElement): void {
+  el.offsetHeight;
+}
+
+function travelClearMax(el: HTMLElement, prop: "maxHeight" | "maxWidth"): void {
+  el.style[prop] = "";
+}
+
+function travelFreeze(el: HTMLElement): void {
+  el.style.transition = "none";
+}
+
+function travelBox(el: HTMLElement): TravelSize {
+  return { block: el.offsetHeight, inline: el.offsetWidth };
+}
+
 /**
  * 解开本轴再读宿主布局盒，量完锁回 from 并强制回流。
  * 探测期间关掉过渡，避免 used 被量成 to 后无法起程。
  * 禁止量可视盒。
  */
-export function measureTravelUsed(el: HTMLElement, axes: readonly TravelAxis[]): TravelSize {
-  const keepHeight = el.style.height;
-  const keepWidth = el.style.width;
+export function measureTravelUsed(el: HTMLElement, axes: readonly LogicalAxis[]): TravelSize {
+  const keepHeight = travelSaved(el, "height");
+  const keepWidth = travelSaved(el, "width");
   const keepTransition = el.style.transition;
-  el.style.transition = "none";
-  if (axes.includes("block")) el.style.height = "";
-  if (axes.includes("inline")) el.style.width = "";
-  const size = { block: el.offsetHeight, inline: el.offsetWidth };
-  el.style.height = keepHeight;
-  el.style.width = keepWidth;
-  el.offsetHeight;
+  travelFreeze(el);
+  travelUnlock(el, "height", logicalAxesHaveBlock(axes));
+  travelUnlock(el, "width", logicalAxesHaveInline(axes));
+  const size = travelBox(el);
+  travelRestore(el, "height", keepHeight);
+  travelRestore(el, "width", keepWidth);
+  travelFlush(el);
   el.style.transition = keepTransition;
   return size;
+}
+
+function travelKept(prev: number, measured: number): number {
+  return prev > 0 ? prev : measured;
+}
+
+function travelHeld(el: HTMLElement, prev: TravelSize): TravelSize {
+  return {
+    block: travelKept(prev.block, el.offsetHeight),
+    inline: travelKept(prev.inline, el.offsetWidth),
+  };
+}
+
+function travelCssPx(value: number): string {
+  return `${value}px`;
+}
+
+function travelPinFrom(el: HTMLElement, size: "height" | "width", max: "maxHeight" | "maxWidth", px: number): void {
+  el.style[size] = travelCssPx(px);
+  el.style[max] = travelCssPx(px);
+}
+
+function travelAxisPatch(key: "height" | "width", on: boolean, px: number): { height?: number; width?: number } {
+  return on && px > 0 ? { [key]: px } : {};
+}
+
+function travelDestPatch(key: "height" | "width", on: boolean, tripTo: number | undefined, measured: number): { height?: number; width?: number } {
+  return on ? { [key]: tripTo ?? measured } : {};
+}
+
+function travelPaintAxis(el: HTMLElement, prop: "height" | "width", length: number | undefined): void {
+  if (length !== undefined) el.style[prop] = travelCssPx(length);
+}
+
+function travelNoteEnd(pending: Set<string>, leg: object | undefined, prop: "height" | "width"): void {
+  if (leg) pending.add(prop);
 }
 
 export function bindTravel(el: HTMLElement, host: TravelHost): TravelController {
@@ -57,7 +122,7 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
   let paint: TravelPaint = {};
   let trip = false;
 
-  const axes = (): readonly TravelAxis[] => host.axes();
+  const axes = (): readonly LogicalAxis[] => host.axes();
 
   const notifyTrip = (next: boolean): void => {
     if (trip === next) return;
@@ -70,12 +135,8 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
     if ("travel" in patch && patch.travel === undefined) {
       delete paint.travel;
     }
-    if (paint.height !== undefined) {
-      el.style.height = `${paint.height}px`;
-    }
-    if (paint.width !== undefined) {
-      el.style.width = `${paint.width}px`;
-    }
+    travelPaintAxis(el, "height", paint.height);
+    travelPaintAxis(el, "width", paint.width);
     if (paint.travel === "used") {
       el.setAttribute("data-travel", travelHostAttrs(axes())["data-travel"]);
       notifyTrip(true);
@@ -93,8 +154,8 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
     const next = axes();
     write({
       travel: undefined,
-      ...(next.includes("block") && used.block > 0 ? { height: used.block } : {}),
-      ...(next.includes("inline") && used.inline > 0 ? { width: used.inline } : {}),
+      ...travelAxisPatch("height", logicalAxesHaveBlock(next), used.block),
+      ...travelAxisPatch("width", logicalAxesHaveInline(next), used.inline),
     });
     ready();
     prev = used;
@@ -116,10 +177,7 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
       command();
       return;
     }
-    lock({
-      block: el.offsetHeight,
-      inline: el.offsetWidth,
-    });
+    lock(travelBox(el));
   };
 
   const onEnd = (event: TransitionEvent): void => {
@@ -129,10 +187,7 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
   };
 
   const snapshot = (): void => {
-    snapped = {
-      block: prev.block > 0 ? prev.block : el.offsetHeight,
-      inline: prev.inline > 0 ? prev.inline : el.offsetWidth,
-    };
+    snapped = travelHeld(el, prev);
     notifyTrip(true);
   };
 
@@ -151,10 +206,7 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
       dirty = true;
       return;
     }
-    const from: TravelSize = snapped ?? {
-      block: prev.block > 0 ? prev.block : el.offsetHeight,
-      inline: prev.inline > 0 ? prev.inline : el.offsetWidth,
-    };
+    const from: TravelSize = snapped ?? travelHeld(el, prev);
     snapped = undefined;
     const to = measureTravelUsed(el, next);
     const trip = resolveTravelSize({ from, to, axes: next });
@@ -164,27 +216,25 @@ export function bindTravel(el: HTMLElement, host: TravelHost): TravelController 
     }
     frozen = true;
     pending = new Set<string>();
-    if (trip.block) pending.add("height");
-    if (trip.inline) pending.add("width");
+    travelNoteEnd(pending, trip.block, "height");
+    travelNoteEnd(pending, trip.inline, "width");
     ready();
-    el.style.transition = "none";
-    if (next.includes("block") && from.block > 0) {
-      el.style.height = `${from.block}px`;
-      el.style.maxHeight = `${from.block}px`;
+    travelFreeze(el);
+    if (logicalAxesHaveBlock(next) && from.block > 0) {
+      travelPinFrom(el, "height", "maxHeight", from.block);
     }
-    if (next.includes("inline") && from.inline > 0) {
-      el.style.width = `${from.inline}px`;
-      el.style.maxWidth = `${from.inline}px`;
+    if (logicalAxesHaveInline(next) && from.inline > 0) {
+      travelPinFrom(el, "width", "maxWidth", from.inline);
     }
-    el.offsetHeight;
-    el.style.maxHeight = "";
-    el.style.maxWidth = "";
+    travelFlush(el);
+    travelClearMax(el, "maxHeight");
+    travelClearMax(el, "maxWidth");
     el.style.transition = "";
-    el.offsetHeight;
+    travelFlush(el);
     write({
       travel: "used",
-      ...(next.includes("block") ? { height: trip.block?.to ?? to.block } : {}),
-      ...(next.includes("inline") ? { width: trip.inline?.to ?? to.inline } : {}),
+      ...travelDestPatch("height", logicalAxesHaveBlock(next), trip.block?.to, to.block),
+      ...travelDestPatch("width", logicalAxesHaveInline(next), trip.inline?.to, to.inline),
     });
     clearSafety();
     safety = window.setTimeout(finish, motionSpecMs(host.spec?.() ?? TRAVEL_SPEC) + PRESENCE_EXIT_SAFETY_MS);

@@ -7,18 +7,18 @@ import { createContext, useContext } from "solid-js";
 
 import { YoIconButton, YoReorderList, YoSubheader } from "@yohu/ui";
 
-import { placeholderSlots, stepParamLabel } from "../command-line";
+import { placeholderSlots } from "@yohu/api";
+import { stepParamLabel } from "../command-line";
 import type { DraftStep } from "../draft";
 import { ParamDescriptions } from "./ParamDescriptions";
 import { TemplateField } from "./TemplateField";
 import type { CommandManagerStore } from "./store";
 
-const BlockStore = createContext<CommandManagerStore>();
-
-function canRemoveStep(store: CommandManagerStore): boolean {
-  const entry = store.selectedEntry();
-  return entry?.kind === "block" && entry.steps.length > 1;
+function stepListLabel(): string {
+  return "步骤";
 }
+
+const BlockStore = createContext<CommandManagerStore>();
 
 function BlockStepRow(props: { item: DraftStep; index: number }) {
   const store = useContext(BlockStore)!;
@@ -42,7 +42,7 @@ function BlockStepRow(props: { item: DraftStep; index: number }) {
       <YoIconButton
         icon="trash"
         title="删除步骤"
-        disabled={!canRemoveStep(store)}
+        disabled={!store.canRemoveBlockStep()}
         onClick={() => store.removeBlockStep(props.item.id)}
       />
     </div>
@@ -53,7 +53,7 @@ export function BlockSteps(props: { steps: DraftStep[]; store: CommandManagerSto
   return (
     <div class="yohu-cm__steps">
       <YoSubheader
-        title="步骤"
+        title={stepListLabel()}
         pad="flush"
         actions={<YoIconButton icon="plus" title="新增步骤" onClick={() => props.store.addBlockStep()} />}
       />
@@ -61,7 +61,7 @@ export function BlockSteps(props: { steps: DraftStep[]; store: CommandManagerSto
         <YoReorderList<DraftStep>
           items={() => props.steps}
           getItemKey={(step) => step.id}
-          ariaLabel="步骤"
+          ariaLabel={stepListLabel()}
           onReorder={(from, to) => props.store.moveBlockStepTo(from, to)}
           renderRow={BlockStepRow}
         />

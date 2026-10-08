@@ -31,7 +31,7 @@ describe("YoLoading", () => {
   it("可选描述；cover 铺满父级", () => {
     const { container } = render(() => <YoLoading title="加载中" cover />);
     expect(screen.getByText("加载中")).toBeTruthy();
-    expect(container.querySelector(".yohu-loading")?.getAttribute("data-cover")).toBe("true");
+    expect(container.querySelector(".yohu-loading")?.getAttribute("data-cover")).toBe("");
     expect(container.querySelector(".yohu-loading")?.getAttribute("data-fill")).toBeNull();
     expect(container.querySelector(".yohu-loading--cover")).toBeNull();
     expect(container.querySelector(".yohu-loading__description")).toBeNull();
@@ -39,7 +39,7 @@ describe("YoLoading", () => {
 
   it("fill 写 data-fill，不写 data-cover", () => {
     const { container } = render(() => <YoLoading title="加载中" fill />);
-    expect(container.querySelector(".yohu-loading")?.getAttribute("data-fill")).toBe("true");
+    expect(container.querySelector(".yohu-loading")?.getAttribute("data-fill")).toBe("");
     expect(container.querySelector(".yohu-loading")?.getAttribute("data-cover")).toBeNull();
   });
 

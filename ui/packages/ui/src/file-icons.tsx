@@ -1,11 +1,11 @@
 /**
  * `YoFileIcon` 组件：SVG 渲染层（字形分组见 `./file-glyph`）。
  * HarmonyOS 对照：无系统文件图标控件；模块只消费 YoFileIcon。
- * 受控 API：kind / name / size。色值只走 `--yohu-file-icon-*`（`data-fill`）。
+ * 受控 API：folder / name / size。色值只走 `--yohu-file-icon-*`（`data-fill`）。
  */
 import type { JSX } from "solid-js";
 import "./file-icons.css";
-import { fileGlyphFor, type FileGlyph, type FileIconKind } from "./file-glyph";
+import { fileGlyphFor, type FileGlyph } from "./file-glyph";
 import { Layout } from "./tokens/layout";
 
 const GLYPHS: Record<FileGlyph, () => JSX.Element> = {
@@ -86,12 +86,13 @@ const GLYPHS: Record<FileGlyph, () => JSX.Element> = {
 
 export interface YoFileIconProps {
   name: string;
-  kind: FileIconKind;
+  /** 目录或链接。扩展名只在不是文件夹时生效。 */
+  folder?: boolean;
   size?: number;
 }
 
 export function YoFileIcon(props: YoFileIconProps): JSX.Element {
-  const glyph = () => fileGlyphFor(props.name, props.kind);
+  const glyph = () => fileGlyphFor(props.name, props.folder ?? false);
   const size = () => props.size ?? Layout.IconSm;
   return (
     <svg

@@ -21,8 +21,12 @@
   white-space: nowrap;
   user-select: none;
   box-sizing: border-box;
-  min-width: min-content;
-  max-width: var(--yohu-layout-button-max);
+  /* 默认跟文案。窄槽和页脚只改这些变量，不点按钮。 */
+  flex: var(--yohu-button-flex, 0 1 auto);
+  width: var(--yohu-button-inline, auto);
+  min-width: var(--yohu-button-min-inline, min-content);
+  min-height: var(--yohu-button-min-block, auto);
+  max-width: var(--yohu-button-max, var(--yohu-layout-button-max));
   transition:
     color var(--yohu-motion-effects-fast);
 }

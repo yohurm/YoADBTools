@@ -4,17 +4,18 @@
  * 不写色值、不画铬。
  */
 
+import type { YoListRowTone } from "../list-row/list-row-model";
 import {
   resolveColHeaderSpec,
   type ColHeaderInput,
   type YoColHeaderAlign,
   type YoColHeaderSort,
-  type YoColHeaderTone,
 } from "./col-header-model";
+import { presenceAttr } from "../dom/flag";
 
 export interface ColHeaderHostAttrs {
   "data-align": YoColHeaderAlign;
-  "data-tone": YoColHeaderTone;
+  "data-tone": YoListRowTone;
   "aria-sort": YoColHeaderSort;
   "data-resizing": "" | undefined;
   resizable: boolean;
@@ -29,7 +30,7 @@ export function colHeaderHostAttrs(
     "data-align": spec.align,
     "data-tone": spec.tone,
     "aria-sort": spec.sort,
-    "data-resizing": input.resizing ? "" : undefined,
+    "data-resizing": presenceAttr(input.resizing),
     resizable: spec.resizable,
     edge: spec.edge,
   };

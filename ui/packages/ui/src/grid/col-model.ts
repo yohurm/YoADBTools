@@ -20,8 +20,21 @@ export interface YoColSpec {
 
 export type YoColWidths = Record<string, number>;
 
+/** 列垫。框的 cellPad 和表头 pad 是同一份：list 起笔对齐，none 贴格。 */
+export type YoColCellPad = "list" | "none";
+
+/** 未写的列宽像素按 0。表头传入与拖条读数同一把。 */
+export function resolveColExtentPx(px?: number): number {
+  return px ?? 0;
+}
+
 /** 列宽写入相位。会话在 L3 col-resize；本类型只描述回调契约。 */
 export type ColResizePhase = "start" | "move" | "end";
+
+/** 拖动尚未松手。end 才收起表头拖态。 */
+export function colResizePhaseIsActive(phase: ColResizePhase): boolean {
+  return phase === "start" || phase === "move";
+}
 
 export function clampColWidth(spec: YoColSpec, px: number): number {
   const max = spec.maxWidth ?? Number.POSITIVE_INFINITY;

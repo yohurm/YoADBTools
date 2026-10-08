@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,7 +40,7 @@ describe("YoContextMenuHost", () => {
     });
     render(() => <YoContextMenuHost controller={controller} />);
 
-    // 打开时按估算（宽 224）夹紧 → x=576, y=560；实测宽 600 后才应回收到 200/300。
+    // 打开时按标签估宽夹紧；实测宽 600 后回收到 200/300。
     controller.open(scene, { x: 2000, y: 2000, ctx: {} });
 
     // 菜单已 Portal 到 body；挂载后让测量读到真实尺寸。
@@ -60,5 +63,14 @@ describe("YoContextMenuHost", () => {
     } else {
       Object.defineProperty(window, "visualViewport", vvDesc);
     }
+  });
+
+  it("没有坐标时同一判断回退到 0", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "host.tsx"), "utf-8");
+    const needle = "?? " + "0";
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("coordOrZero(session()?.x)");
+    expect(src).toContain("coordOrZero(session()?.y)");
+    expect(src).toContain("session()?.items ?? []");
   });
 });

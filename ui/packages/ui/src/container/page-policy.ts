@@ -5,6 +5,8 @@
  */
 
 import {
+  pageColumnIsMeasure,
+  pagePadIsMargin,
   resolvePageSpec,
   type YoPageColumn,
   type YoPagePad,
@@ -21,7 +23,7 @@ export function pageHostAttrs(role?: YoPageRole): PageHostAttrs {
   const spec = resolvePageSpec(role);
   return {
     "data-role": spec.role,
-    ...(spec.pad === "margin" ? { "data-pad": "margin" as const } : {}),
-    ...(spec.column === "measure" ? { "data-column": "measure" as const } : {}),
+    ...(pagePadIsMargin(spec.pad) ? { "data-pad": "margin" as const } : {}),
+    ...(pageColumnIsMeasure(spec.column) ? { "data-column": "measure" as const } : {}),
   };
 }

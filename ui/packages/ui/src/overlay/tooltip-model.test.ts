@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -27,5 +30,21 @@ describe("tooltip-model", () => {
 
   it("落点离散，不是滑块轨道", () => {
     expect(tooltipPlaceDiscrete()).toBe(true);
+  });
+
+  it("trimmed_text_present_once", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const paths = [
+      "../container/formrow-model.ts",
+      "../display/description-list-model.ts",
+      "./tooltip-model.ts",
+    ];
+    for (const rel of paths) {
+      let body = readFileSync(join(here, rel), "utf8");
+      if (rel === "../container/formrow-model.ts") {
+        body = body.replace("return value.trim().length > 0", "");
+      }
+      expect(body, rel).not.toContain("trim().length");
+    }
   });
 });

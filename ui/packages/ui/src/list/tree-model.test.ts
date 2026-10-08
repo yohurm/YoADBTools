@@ -4,6 +4,7 @@ import {
   flattenVisible,
   parentIndex,
   treeActivateIntent,
+  treeActivateIsToggle,
   treeHasChildren,
   treeKeyIntent,
   treeKeySelector,
@@ -49,5 +50,12 @@ describe("tree-model", () => {
     expect(treeKeySelector('a"b')).toBe('[data-tree-key="a\\"b"]');
     expect(treeHasChildren({ children: [{ key: "x" }] })).toBe(true);
     expect(treeHasChildren({ children: [] })).toBe(false);
+  });
+
+  it("目录点击只判一次", () => {
+    expect(treeActivateIsToggle(true)).toBe(true);
+    expect(treeActivateIsToggle(false)).toBe(false);
+    expect(treeActivateIntent(true)).toBe("toggle");
+    expect(treeActivateIntent(false)).toBe("select");
   });
 });

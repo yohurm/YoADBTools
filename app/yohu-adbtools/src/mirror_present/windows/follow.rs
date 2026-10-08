@@ -19,7 +19,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_WINDOWPOSCHANGING,
 };
 
-use yohu_protocol::MIRROR_MIN_LAYOUT_PX;
+use yohu_protocol::layout_is_presentable;
 
 const SUBCLASS_ID: usize = 0x594F4855;
 
@@ -43,6 +43,10 @@ pub struct GeomHost {
 }
 
 impl GeomHost {
+    fn lock_inner(&self) -> std::sync::MutexGuard<'_, Data> {
+        self.inner.lock().expect("geom lock poisoned")
+    }
+
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             inner: Mutex::new(Data {
@@ -54,7 +58,7 @@ impl GeomHost {
     }
 
     pub fn set_owner(self: &Arc<Self>, hwnd: isize) {
-        let mut g = self.inner.lock().expect("geom lock poisoned");
+        let mut g = self.lock_inner();
         if g.owner == hwnd && g.hooked {
             return;
         }
@@ -84,23 +88,17 @@ impl GeomHost {
     }
 
     pub fn register(&self, serial: &str, hwnd: isize) {
-        self.inner
-            .lock()
-            .expect("geom lock poisoned")
+        self.lock_inner()
             .slots
             .insert(serial.to_string(), Slot::new(hwnd));
     }
 
     pub fn unregister(&self, serial: &str) {
-        self.inner
-            .lock()
-            .expect("geom lock poisoned")
-            .slots
-            .remove(serial);
+        self.lock_inner().slots.remove(serial);
     }
 
     pub fn set_visible(&self, serial: &str, visible: bool) {
-        let mut g = self.inner.lock().expect("geom lock poisoned");
+        let mut g = self.lock_inner();
         let Some(slot) = g.slots.get_mut(serial) else {
             return;
         };
@@ -109,7 +107,7 @@ impl GeomHost {
 
     /// 子窗铺满主窗客户区。调用方不得持 Host 锁。
     pub fn place_owned(&self, serial: &str) {
-        let mut g = self.inner.lock().expect("geom lock poisoned");
+        let mut g = self.lock_inner();
         let owner = g.owner;
         let Some((cw, ch)) = client_size(owner) else {
             return;
@@ -179,7 +177,7 @@ enum PlaceKind {
 }
 
 fn place_all(host: &GeomHost, client_w: u32, client_h: u32) {
-    let mut g = host.inner.lock().expect("geom lock poisoned");
+    let mut g = host.lock_inner();
     let keys: Vec<String> = g.slots.keys().cloned().collect();
     let mut cmds = Vec::with_capacity(keys.len());
     let mut logs = Vec::new();
@@ -208,7 +206,7 @@ fn target_size(slot: &Slot, client_w: u32, client_h: u32) -> Option<(u32, u32)> 
     if !slot.visible {
         return None;
     }
-    if client_w < MIRROR_MIN_LAYOUT_PX || client_h < MIRROR_MIN_LAYOUT_PX {
+    if !layout_is_presentable(client_w, client_h) {
         return None;
     }
     Some((client_w, client_h))

@@ -51,7 +51,7 @@ pub fn create_hwnd(x: i32, y: i32, w: i32, h: i32) -> Option<HWND> {
     }
 }
 
-fn configure_overlay_hwnd(hwnd: HWND) {
+pub(super) fn dwm_do_not_round(hwnd: HWND) {
     unsafe {
         let pref = DWMWCP_DONOTROUND;
         let _ = DwmSetWindowAttribute(
@@ -60,6 +60,12 @@ fn configure_overlay_hwnd(hwnd: HWND) {
             &pref as *const _ as *const c_void,
             std::mem::size_of_val(&pref) as u32,
         );
+    }
+}
+
+fn configure_overlay_hwnd(hwnd: HWND) {
+    dwm_do_not_round(hwnd);
+    unsafe {
         let disable = BOOL(1);
         let _ = DwmSetWindowAttribute(
             hwnd,
@@ -92,5 +98,17 @@ unsafe extern "system" fn wnd_proc(
             windows::Win32::Foundation::LRESULT(0)
         },
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dwm_square_corners_are_decided_once() {
+        let splash = include_str!("window.rs");
+        assert!(!splash.contains("DWMWCP_DONOTROUND"));
+        let here = include_str!("overlay_window.rs");
+        let needle = format!("fn {}", "dwm_do_not_round");
+        assert_eq!(here.matches(&needle).count(), 1);
     }
 }

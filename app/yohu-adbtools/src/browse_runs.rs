@@ -140,4 +140,18 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn device_task_detail_is_not_rewritten() {
+        assert_eq!(
+            crate::tasks::device_detail("S1"),
+            format!("设备 {}", "S1")
+        );
+        let capture = include_str!("capture_runs.rs");
+        let sessions = include_str!("mirror_sessions.rs");
+        let tasks = include_str!("tasks.rs");
+        assert!(!capture.contains("设备 {"));
+        assert!(!sessions.contains("设备 {"));
+        assert_eq!(tasks.matches("设备 {").count(), 1);
+    }
 }

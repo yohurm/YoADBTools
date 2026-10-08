@@ -26,19 +26,66 @@ pub enum TransferState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TransferFault {
-    Path { path: String },
-    OutsideRoot { path: String },
-    RemoteNotFound { path: String },
-    NotADirectory { path: String },
-    PermissionDenied { path: String },
-    ReadOnly { path: String },
-    AlreadyExists { path: String },
-    RemoteFailed { path: String },
-    LocalNotFound { path: String },
-    Local { path: String },
-    DeviceOffline { serial: String },
+    Path {
+        path: String,
+    },
+    /// 不是绝对路径。`path` 是用户原文。
+    NotAbsolute {
+        path: String,
+    },
+    /// 含 `..` 穿越。`path` 是用户原文。
+    Traversal {
+        path: String,
+    },
+    /// 条目名不合法。`detail` 是领域载荷，不是整句。
+    InvalidName {
+        detail: String,
+    },
+    OutsideRoot {
+        path: String,
+    },
+    RemoteNotFound {
+        path: String,
+    },
+    NotADirectory {
+        path: String,
+    },
+    PermissionDenied {
+        path: String,
+    },
+    ReadOnly {
+        path: String,
+    },
+    AlreadyExists {
+        path: String,
+    },
+    RemoteFailed {
+        path: String,
+    },
+    /// `readlink -f` 输出无法识别。不是远端命令失败。
+    ReadlinkUnparseable {
+        path: String,
+    },
+    LocalNotFound {
+        path: String,
+    },
+    Local {
+        path: String,
+    },
+    DeviceOffline {
+        serial: String,
+    },
     Timeout,
     Io,
+    /// 捕获预算用尽。不是通道 IO。
+    Truncated,
+    /// 输出泵 panic。不是通道 IO。
+    PumpPanic,
+    ShellNoStdin,
+    ShellNoStdout,
+    ShellHandshake,
+    ShellEnded,
+    ShellExec,
     ToolUnavailable,
     ProgressJoin,
 }
@@ -142,6 +189,18 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&TransferFault::Timeout).unwrap(),
             serde_json::json!({ "kind": "timeout" })
+        );
+        assert_eq!(
+            serde_json::to_value(&TransferFault::Truncated).unwrap(),
+            serde_json::json!({ "kind": "truncated" })
+        );
+        assert_eq!(
+            serde_json::to_value(&TransferFault::PumpPanic).unwrap(),
+            serde_json::json!({ "kind": "pump_panic" })
+        );
+        assert_eq!(
+            serde_json::to_value(&TransferFault::ShellEnded).unwrap(),
+            serde_json::json!({ "kind": "shell_ended" })
         );
     }
 

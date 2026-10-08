@@ -155,7 +155,12 @@ mod tests {
         assert_eq!(pixel(&frame, 0, 299), canvas);
         assert_eq!(pixel(&frame, 479, 299), canvas);
         assert_ne!(pixel(&frame, 0, 0), [0, 0, 0, 255]);
-        assert!(frame.pixels.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
+        assert!(frame
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|px| px[3] == 255));
     }
 
     #[test]

@@ -14,7 +14,7 @@
 | [ipc.md](ipc.md) | invoke 命令、事件、背压 |
 | [youi.md](youi.md) | `@yohu/ui`（对外名 YoUI） |
 | [workbench.md](workbench.md) | `@yohu/workbench` + `apps/shell` |
-| [modules/](modules/) | terminal / files / logs / mirror / update / **device** / [device-wireless（方案）](modules/device-wireless.md) |
+| [modules/](modules/) | terminal / files / logs / mirror / [download](modules/download.md) / [textparsing](modules/textparsing.md) / update / **device** / [device-wireless（方案）](modules/device-wireless.md) |
 | [adr/](adr/) | ADR-v6-001～033 |
 | [UI设计系统-v6.md](UI设计系统-v6.md) | token / 密度 / 主题 |
 | [动画系统-v6.md](动画系统-v6.md) | 动效（ADR-v6-017） |
@@ -32,7 +32,8 @@ yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search（互不依赖）
 yohu-domain → yohu-protocol（禁止 yohu-search）
 yohu-adb → yohu-runtime + protocol + domain
 yohu-{files,logsrv,mirror} → yohu-adb（设备运输）
-yohu-update → protocol + runtime（禁止 adb）
+yohu-download ∥ yohu-textparsing ∥ runtime / protocol / motion / search（零产品类型）
+yohu-update → yohu-download + yohu-textparsing + protocol + runtime（禁止 adb）
 yohu-adbtools = 唯一 Tauri crate（动效原语依赖 yohu-motion）
 ```
 

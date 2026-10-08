@@ -7,7 +7,6 @@ import { type Component, Show, createEffect, createMemo, createSignal, onMount }
 
 import { APP_ICON_SRC } from "../app-identity";
 import { selectedDeviceLabel } from "./device-label";
-import { ModuleId } from "@yohu/api";
 import {
   YoContextMenuHost,
   YoTooltipHost,
@@ -16,15 +15,24 @@ import {
   YoRail,
   YoThemeToggle,
   YoTitleBar,
+  getTheme,
+  railIntentIsExpanded,
+  railToggleIntent,
   shouldSkipMotion,
+  themeIsDark,
   type RailIntent,
 } from "@yohu/ui";
 
-import { modules, type ModuleDescriptor } from "../registry";
+import { moduleIsActive, modules, type ModuleDescriptor } from "../registry";
 import { deviceStore, navStore, settingsStore, windowStore } from "../stores";
+import { mirrorPresentShouldBeActive } from "../stores/mirror-present";
 import { DeviceRail } from "./DeviceRail";
 import { NavList } from "./NavList";
 import { StatusBar } from "./StatusBar";
+
+function stageDark(): boolean {
+  return themeIsDark(getTheme());
+}
 
 /** 模块区：PC 层级转场淡入淡出（动画系统-v6.md 配方 module-fade）。 */
 const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
@@ -34,11 +42,11 @@ const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
   const View = props.mod.Component;
   return (
     <View
-      focusSerial={deviceStore.state.focusSerial}
+      focusSerial={deviceStore.focus()}
       selectedSerials={selected().map((d) => d.serial)}
       selectedDevices={selected()}
       selectedLabel={selectedDeviceLabel(selected())}
-      devices={deviceStore.state.devices}
+      devices={deviceStore.catalog()}
       deviceStatuses={deviceStore.state.statuses}
       settings={settingsStore.state}
     />
@@ -48,22 +56,31 @@ const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
 const ModuleStage: Component<{
   current: ModuleDescriptor | undefined;
 }> = (props) => {
-  const [shown, setShown] = createSignal<ModuleDescriptor | undefined>(props.current);
+  function incoming(): ModuleDescriptor | undefined {
+    return props.current;
+  }
+
+  const [shown, setShown] = createSignal<ModuleDescriptor | undefined>(incoming());
   const [gate, setGate] = createSignal(true);
 
+  function openGate(): void {
+    setGate(true);
+  }
+
   onMount(() => {
-    void navStore.setMirrorPresent(shown()?.id);
+    void navStore.setMirrorPresent(shown()?.id, stageDark());
   });
 
   createEffect(() => {
-    const next = props.current;
-    void navStore.setMirrorPresent(next?.id);
+    const next = incoming();
     const cur = shown();
     if (next?.id === cur?.id) return;
-    const mirrorInvolved = next?.id === ModuleId.Mirror || cur?.id === ModuleId.Mirror;
+    void navStore.setMirrorPresent(next?.id, stageDark());
+    const mirrorInvolved =
+      mirrorPresentShouldBeActive(next?.id) || mirrorPresentShouldBeActive(cur?.id);
     if (!cur || shouldSkipMotion() || mirrorInvolved) {
       setShown(next);
-      setGate(true);
+      openGate();
       return;
     }
     setGate(false);
@@ -74,8 +91,8 @@ const ModuleStage: Component<{
       when={gate()}
       recipe="fade"
       onExitComplete={() => {
-        setShown(props.current);
-        setGate(true);
+        setShown(incoming());
+        openGate();
       }}
     >
       <Show when={shown()} keyed>
@@ -87,54 +104,63 @@ const ModuleStage: Component<{
 
 /** 工作台壳。窗口三键与模块身份走 store。 */
 export const AppLayout: Component = () => {
-  const current = () => modules().find((m) => m.id === navStore.activeModuleId());
+  function activeModule(): string {
+    return navStore.activeModuleId();
+  }
+
+  function windowPaint() {
+    return "window" as const;
+  }
+
+  const current = () => modules().find((m) => moduleIsActive(m.id, activeModule()));
   const [railIntent, setRailIntent] = createSignal<RailIntent>("expanded");
 
+  function railExpanded(): boolean {
+    return railIntentIsExpanded(railIntent());
+  }
+
   const toggleRail = (): void => {
-    setRailIntent((current) => (current === "expanded" ? "icons" : "expanded"));
+    setRailIntent((current) => railToggleIntent(current));
   };
 
   return (
     <div class="yohu-window">
       <YoTitleBar
-        title={settingsStore.identity.display_name}
+        title={settingsStore.displayName()}
         logoSrc={APP_ICON_SRC}
         maximized={windowStore.maximized()}
         onMinimize={() => void windowStore.minimize()}
         onToggleMaximize={() => void windowStore.toggleMaximize()}
         onClose={() => void windowStore.close()}
-        nativeCaptions={settingsStore.os() === "macos"}
+        nativeCaptions={settingsStore.macosHost()}
         actions={
           <>
             <YoThemeToggle
-              paint="window"
+              paint={windowPaint()}
               onThemeChange={(theme) => {
                 void settingsStore.set("theme", theme);
               }}
             />
             <YoIconButton
-              paint="window"
+              paint={windowPaint()}
               icon="sidebar"
-              title={railIntent() === "expanded" ? "收起侧栏" : "展开侧栏"}
-              aria-expanded={railIntent() === "expanded"}
+              title={railExpanded() ? "收起侧栏" : "展开侧栏"}
+              aria-expanded={railExpanded()}
               onClick={toggleRail}
             />
           </>
         }
       />
-      <div
-        class="yohu-layout"
-        data-rail={railIntent()}
-      >
+      <div class="yohu-layout">
         <div class="yohu-layout__work">
           <YoRail intent={railIntent()} class="yohu-layout__rail">
             <div class="yohu-layout__rail-inner">
               <DeviceRail
-                moduleId={navStore.activeModuleId()}
+                moduleId={activeModule()}
                 selectionMode={current()?.selectionMode}
               />
               <NavList
-                activeId={navStore.activeModuleId()}
+                activeId={activeModule()}
                 onNavigate={navStore.navigate}
               />
             </div>

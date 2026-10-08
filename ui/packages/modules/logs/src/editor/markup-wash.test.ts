@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { washGrid, washPaint } from "./markup-wash";
+import { washGrid, washPaint, washSpanOpen } from "./markup-wash";
 
 function srcOf(name: string): string {
   return readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), name), "utf-8");
@@ -51,5 +51,30 @@ describe("Markup BACKGROUND 文本节点字符格", () => {
     expect(src).not.toContain("../highlight");
     expect(src).not.toContain("CSS.highlights");
     expect(src).not.toContain("FieldSpan");
+  });
+
+  it("空段只在几何里判一次", () => {
+    expect(washSpanOpen(1, 2)).toBe(true);
+    expect(washSpanOpen(2, 2)).toBe(false);
+    expect(washSpanOpen(3, 1)).toBe(false);
+    const root = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["markup-wash.ts", "markup-model.ts", "markup-registry.ts", "view.tsx"]) {
+      let body = readFileSync(resolve(root, name), "utf8");
+      if (name === "markup-wash.ts") body = body.replace("return from < to", "");
+      expect(body, name).not.toContain("from < to");
+      expect(body, name).not.toContain("to <= from");
+      expect(body, name).not.toContain("to > from");
+      expect(body, name).not.toContain("cell.to > cell.from");
+      expect(body, name).not.toContain("range.end <= range.start");
+    }
+  });
+});
+
+describe("底色列表分隔只写一次", () => {
+  it("css_list_once", () => {
+    const src = srcOf("markup-wash.ts");
+    const needle = '.join(", ' + '")';
+    expect(src.split(needle).length - 1).toBe(1);
+    expect(src).toContain("cssList(");
   });
 });

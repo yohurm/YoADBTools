@@ -186,3 +186,8 @@
 .yohu-panel[data-padding-block="xl"] .yohu-panel__body {
   padding-block: var(--yohu-space-xl);
 }
+
+/* 操作面板：内容区灰。顶栏在 body 外，仍透出外壳 surface。 */
+.yohu-panel[data-role="ops"] .yohu-panel__body {
+  background-color: var(--yohu-canvas);
+}

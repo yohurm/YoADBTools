@@ -19,69 +19,58 @@
   }
 }
 
-.yohu-recipe-selected.yohu-interactive::before {
-  transform: scale(0.94);
-  transform-origin: center;
-  transition:
-    opacity var(--yohu-motion-effects-fast),
-    background-color var(--yohu-motion-effects-fast),
-    box-shadow var(--yohu-motion-effects-fast),
-    transform var(--yohu-motion-effects-fast);
-}
-
-.yohu-recipe-selected.yohu-interactive:hover:not(:disabled):not([aria-disabled="true"]):not(.yohu-interactive--selected)::before,
-.yohu-recipe-selected.yohu-interactive--active:not(.yohu-interactive--selected)::before {
-  transform: scale(1);
-}
-
-.yohu-recipe-selected.yohu-interactive--selected::before {
-  transform: scale(1);
-  transition:
-    opacity var(--yohu-motion-spatial-small),
-    background-color var(--yohu-motion-spatial-tick),
-    box-shadow var(--yohu-motion-spatial-tick),
-    transform var(--yohu-motion-spatial-small);
-}
-
-.yohu-recipe-selected.yohu-interactive {
+.yohu-recipe-selected {
   color: var(--yohu-fg-2);
-  transition: color var(--yohu-motion-spatial-tick);
+  --yohu-interactive-transition: color var(--yohu-motion-spatial-tick);
+  --yohu-interactive-wash-transform: scale(0.94);
+  --yohu-interactive-wash-move: var(--yohu-motion-effects-fast);
+  --yohu-interactive-wash-fade: var(--yohu-motion-effects-fast);
+  --yohu-interactive-wash-color: var(--yohu-motion-effects-fast);
+  --yohu-interactive-wash-shadow: var(--yohu-motion-effects-fast);
+}
+
+.yohu-recipe-selected:hover:not(:disabled):not([aria-disabled="true"]):not(.yohu-interactive--selected),
+.yohu-recipe-selected.yohu-interactive--active:not(.yohu-interactive--selected) {
+  --yohu-interactive-wash-transform: scale(1);
 }
 
 .yohu-recipe-selected.yohu-interactive--selected {
   color: var(--yohu-state-selected-fg);
+  --yohu-interactive-wash-transform: scale(1);
+  --yohu-interactive-wash-move: var(--yohu-motion-spatial-small);
+  --yohu-interactive-wash-fade: var(--yohu-motion-spatial-small);
+  --yohu-interactive-wash-color: var(--yohu-motion-spatial-tick);
+  --yohu-interactive-wash-shadow: var(--yohu-motion-spatial-tick);
 }
 
-.yohu-recipe-selected .yohu-list-item__mark-fill {
+.yohu-recipe-selected [data-part="bar"] {
   transform: scaleY(0);
   transform-origin: center;
   transition: transform var(--yohu-motion-effects-exit);
 }
 
-.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__mark-fill {
+.yohu-recipe-selected.yohu-interactive--selected [data-part="bar"] {
   transform: scaleY(1);
   transition: transform var(--yohu-motion-spatial-stretch);
 }
 
-.yohu-recipe-selected[data-size="nav"] .yohu-list-item__title {
+.yohu-recipe-selected[data-size="nav"] [data-part="title"] {
   font-weight: var(--yohu-font-weight-regular);
   transition: font-weight var(--yohu-motion-spatial-tick);
 }
 
-.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] .yohu-list-item__title {
+.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] [data-part="title"] {
   font-weight: var(--yohu-font-weight-medium);
 }
 
-.yohu-recipe-selected .yohu-list-item__description,
-.yohu-recipe-selected .yohu-list-item__meta {
+.yohu-recipe-selected [data-part="sub"] {
   transition: color var(--yohu-motion-spatial-tick);
 }
 
-.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__description,
-.yohu-recipe-selected.yohu-interactive--selected .yohu-list-item__meta {
+.yohu-recipe-selected.yohu-interactive--selected [data-part="sub"] {
   color: var(--yohu-fg-2);
 }
 
-.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] .yohu-list-item__leading[data-bounce] {
+.yohu-recipe-selected.yohu-interactive--selected[data-size="nav"] [data-bounce] {
   animation: yohu-bounce-down var(--yohu-motion-spatial-local);
 }

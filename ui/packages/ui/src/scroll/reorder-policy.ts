@@ -2,9 +2,11 @@
  * 列表换位策略（L3）。开合、提交、按键增量与条/浮层 attrs。
  * 不写色值、不画铬、不碰 JSX。
  */
+import { presenceAttr } from "../dom/flag";
 
 import { isActionableTarget, isEditableTarget } from "../keymap/target";
-import { moveIndexFromInsert, type ReorderSession } from "./reorder-model";
+import { clampListIndex, dismissKey, verticalListDelta } from "../keymap/list-index";
+import { moveIndexFromInsert, reorderSlotIsPlaceholder, type ReorderSession } from "./reorder-model";
 
 export function canReorderList(count: number): boolean {
   return count >= 2;
@@ -44,12 +46,22 @@ export function previewDest(session: ReorderSession): number {
   return moveIndexFromInsert(session.from, session.insert) ?? session.from;
 }
 
+/** 只有占位槽写 data-slot。邻行与静止行省略。 */
+export function reorderSlotAttr(isSource: boolean): "placeholder" | undefined {
+  return reorderSlotIsPlaceholder(isSource) ? "placeholder" : undefined;
+}
+
+/** 只有源行写 data-reorder。邻行与静止行省略。 */
+export function reorderSourceAttr(isSource: boolean): "source" | undefined {
+  return isSource ? "source" : undefined;
+}
+
 export function reorderBarAttrs(open: boolean, y: number): {
   "data-open": "" | undefined;
   style: { top: string };
 } {
   return {
-    "data-open": open ? "" : undefined,
+    "data-open": presenceAttr(open),
     style: { top: `${y}px` },
   };
 }
@@ -59,7 +71,7 @@ export function reorderOverlayAttrs(open: boolean, y: number, height: number): {
   style: { top: string; height: string };
 } {
   return {
-    "data-open": open ? "" : undefined,
+    "data-open": presenceAttr(open),
     style: { top: `${y}px`, height: `${height}px` },
   };
 }
@@ -67,9 +79,7 @@ export function reorderOverlayAttrs(open: boolean, y: number, height: number): {
 /** Ctrl/Meta + ↑/↓ 换位；无修饰键不抢列表焦点移动。Escape 取消。 */
 export function resolveReorderKeyDelta(key: string, withReorderMod: boolean): number | null {
   if (!withReorderMod) return null;
-  if (key === "ArrowUp") return -1;
-  if (key === "ArrowDown") return 1;
-  return null;
+  return verticalListDelta(key);
 }
 
 /**
@@ -85,11 +95,17 @@ export function applyReorderKey(
   const delta = resolveReorderKeyDelta(key, withReorderMod);
   if (delta === null) return null;
   if (!canReorderList(count)) return "noop";
-  const to = Math.max(0, Math.min(count - 1, index + delta));
+  const to = clampListIndex(index + delta, count);
   if (to === index) return "noop";
   return { from: index, to };
 }
 
+export function reorderResultIsNoop(
+  result: { from: number; to: number } | "noop" | null,
+): result is "noop" {
+  return result === "noop";
+}
+
 export function shouldCancelReorder(key: string): boolean {
-  return key === "Escape";
+  return dismissKey(key);
 }

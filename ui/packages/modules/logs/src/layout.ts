@@ -3,30 +3,16 @@
  * Format 尺只在 editor/format。禁止再写第二把尺，禁止转口表头规格。
  */
 
-import { Density, getDensity, type DensityName } from "@yohu/ui";
+import { densityScale, getDensity } from "@yohu/ui";
 
-import { DEFAULT_CH_PX } from "./editor/format";
+import { logChUnit } from "./editor/format";
 
 /** 新建窗口：设备行 + 分段 + 检索 + 列表。 */
 export const NEW_SESSION_DIALOG_HEIGHT = 520;
 
-const CONTROL_HEIGHT: Record<DensityName, number> = {
-  compact: Density.Compact.controlHeight,
-  comfortable: Density.Comfortable.controlHeight,
-};
-
-const DATA_ROW_HEIGHT: Record<DensityName, number> = {
-  compact: Density.Compact.rowHeight,
-  comfortable: Density.Comfortable.rowHeight,
-};
-
-export function controlRowHeight(): number {
-  return CONTROL_HEIGHT[getDensity()];
-}
-
-/** 日志数据行高 = `--yohu-row-height`。禁止吃 VirtualList 默认 22。 */
+/** 日志数据行高 = `--yohu-row-height`。禁止吃 VirtualList 默认 22。控件行高不在这里。 */
 export function dataRowHeight(): number {
-  return DATA_ROW_HEIGHT[getDensity()];
+  return densityScale(getDensity()).rowHeight;
 }
 
 /**
@@ -41,8 +27,5 @@ export function measureChPx(host: HTMLElement): number {
   host.append(probe);
   const width = probe.getBoundingClientRect().width / 10;
   probe.remove();
-  if (!(width > 0)) {
-    return DEFAULT_CH_PX;
-  }
-  return width;
+  return logChUnit(width);
 }

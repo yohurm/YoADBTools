@@ -8,6 +8,7 @@ import type { LogLine } from "@yohu/api";
 import {
   applyCopyEvent,
   copyHasPayload,
+  copyScopeIsAll,
   documentCopyText,
   LOG_COPY_ALL,
   LOG_COPY_NONE,
@@ -127,6 +128,8 @@ describe("serializeLogCopy", () => {
     expect(serializeLogCopy({ pick: LOG_COPY_NONE, messages, listRoot: null, selection: null })).toBe("");
     expect(copyHasPayload({ pick: LOG_COPY_NONE, listRoot: null, selection: null })).toBe(false);
     expect(copyHasPayload({ pick: LOG_COPY_ALL, listRoot: null, selection: null })).toBe(true);
+    expect(copyScopeIsAll(LOG_COPY_ALL)).toBe(true);
+    expect(copyScopeIsAll(LOG_COPY_NONE)).toBe(false);
   });
 
   it("回退行含 UID 的清单文档带 Format 尾空格，不是 formatLogLine 紧贴格式", () => {
@@ -262,6 +265,43 @@ describe("textOffsetInDoc / logSelectionInList", () => {
   });
 });
 
+describe("document 监听只登记一处", () => {
+  it("listen_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy-gesture.ts"), "utf-8");
+    expect(src.split("document.add" + "EventListener").length - 1).toBe(1);
+    expect(src.split("document.remove" + "EventListener").length - 1).toBe(1);
+    expect(src).toContain("listen(");
+  });
+});
+
+describe("事件目标在列表根只写一处", () => {
+  it("event_target_in_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy-gesture.ts"), "utf-8");
+    expect(src.split("event.target instanceof " + "Node").length - 1).toBe(0);
+    expect(src.split("root.contains(" + "event.target)").length - 1).toBe(0);
+    expect(src.split("root.contains(" + "target)").length - 1).toBe(1);
+    expect(src).toContain("eventTargetIn(");
+  });
+});
+
+describe("序号有限才采用只写一处", () => {
+  it("seq_finite_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy.ts"), "utf-8");
+    const needle = "Number." + "isFinite";
+    expect(src.split(needle).length - 1).toBe(0);
+    expect(src).toContain("finiteOrNull(");
+  });
+});
+
+describe("从节点找 data-seq 行只写一处", () => {
+  it("seq_row_once", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy.ts"), "utf-8");
+    const needle = "closest" + "<HTMLElement>";
+    expect(src.split(needle).length - 1).toBe(0);
+    expect(src).toContain("rowOf(");
+  });
+});
+
 describe("seqFromTarget", () => {
   it("从 data-seq 读行号", () => {
     const root = document.createElement("div");
@@ -288,7 +328,8 @@ describe("caret 选区模型", () => {
 
   it("Ctrl+A 后 selectionchange 不清 ALL", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "copy-gesture.ts"), "utf-8");
-    expect(src).toContain('opts.pick().kind === "all"');
+    expect(src).toContain("copyScopeIsAll(opts.pick())");
+    expect(src).not.toContain('kind === "all"');
     expect(src).toContain("pointerdown");
   });
 });

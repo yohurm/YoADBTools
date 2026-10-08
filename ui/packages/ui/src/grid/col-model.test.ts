@@ -1,13 +1,18 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
   COL_RESIZE_STEP,
   charsTrack,
   clampColWidth,
+  colResizePhaseIsActive,
   colTrackTemplate,
   colWidthOf,
   defaultColWidths,
   nudgeColWidth,
+  resolveColExtentPx,
   setColWidth,
   type ColResizePhase,
   type YoColSpec,
@@ -57,8 +62,40 @@ describe("col-model", () => {
     expect(charsTrack(6, 0)).toBe("6px");
   });
 
+  it("列垫只写在列模型", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["col-model.ts", "ColFrame.tsx", "ColHeader.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "col-model.ts") body = body.replace('export type YoColCellPad = "list" | "none";', "");
+      expect(body, name).not.toContain('"list" | "none"');
+    }
+  });
+
+  it("未写列宽像素按 0，视图不再各自兜底", () => {
+    expect(resolveColExtentPx()).toBe(0);
+    expect(resolveColExtentPx(undefined)).toBe(0);
+    expect(resolveColExtentPx(48)).toBe(48);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["col-model.ts", "ColHeader.tsx", "ColResizer.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "col-model.ts") body = body.replace("return px ?? 0", "");
+      expect(body, name).not.toContain("?? 0");
+    }
+  });
+
   it("列宽相位在 L2", () => {
     const phases: ColResizePhase[] = ["start", "move", "end"];
     expect(phases).toEqual(["start", "move", "end"]);
+    expect(colResizePhaseIsActive("start")).toBe(true);
+    expect(colResizePhaseIsActive("move")).toBe(true);
+    expect(colResizePhaseIsActive("end")).toBe(false);
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const name of ["col-model.ts", "ColHeader.tsx", "ColResizer.tsx"]) {
+      let body = readFileSync(join(here, name), "utf8");
+      if (name === "col-model.ts") body = body.replace('return phase === "start" || phase === "move"', "");
+      expect(body, name).not.toContain('phase === "start"');
+      expect(body, name).not.toContain('phase === "move"');
+      expect(body, name).not.toContain('phase === "end"');
+    }
   });
 });

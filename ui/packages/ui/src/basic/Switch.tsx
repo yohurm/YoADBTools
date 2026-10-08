@@ -8,6 +8,7 @@
 import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import { CornerPillRadius, YoCorner } from "../corner";
+import { flagIsOn } from "../dom/flag";
 import { switchHostAttrs, switchNextChecked } from "./switch-policy";
 import "./Switch.css";
 
@@ -26,8 +27,16 @@ export interface YoSwitchProps {
 export function YoSwitch(props: YoSwitchProps): JSX.Element {
   const host = createMemo(() => switchHostAttrs(props));
 
+  function switchChecked(): ReturnType<typeof switchHostAttrs>["data-checked"] {
+    return host()["data-checked"];
+  }
+
+  function switchDisabled(): boolean {
+    return host().disabled;
+  }
+
   const handleClick = (): void => {
-    const next = switchNextChecked(host()["data-checked"] === "true", host().disabled);
+    const next = switchNextChecked(flagIsOn(switchChecked()), switchDisabled());
     if (next === null) return;
     props.onChange?.(next);
   };
@@ -37,12 +46,12 @@ export function YoSwitch(props: YoSwitchProps): JSX.Element {
       type="button"
       role="switch"
       class="yohu-switch yohu-focus-ring"
-      data-checked={host()["data-checked"]}
+      data-checked={switchChecked()}
       data-paint={host()["data-paint"]}
       data-disabled={host()["data-disabled"]}
       aria-checked={host()["aria-checked"]}
       aria-label={props.ariaLabel}
-      disabled={host().disabled}
+      disabled={switchDisabled()}
       onClick={handleClick}
     >
       <YoCorner role="control" radius={CornerPillRadius} stroke={false} class="yohu-switch__chrome" overflow="hidden">

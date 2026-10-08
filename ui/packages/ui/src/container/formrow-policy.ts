@@ -2,10 +2,11 @@
  * 设置行布局策略（L3）。
  * 只组装槽位 data-*；不校验、不绑定字段、不画铬。
  */
+import { presenceAttr } from "../dom/flag";
 
 import {
-  resolveFormRowLayout,
-  resolveFormRowPad,
+  formRowLayoutIsStacked,
+  formRowPadIsFlush,
   resolveFormRowSlots,
   type FormRowSlotInput,
   type YoFormRowLayout,
@@ -13,8 +14,9 @@ import {
 } from "./formrow-model";
 
 export interface FormRowHostAttrs {
-  "data-has-description": true | undefined;
-  "data-has-note": true | undefined;
+  "data-has-description": "" | undefined;
+  "data-has-note": "" | undefined;
+  "data-has-sub": "" | undefined;
   "data-layout"?: "stacked";
   "data-pad"?: "flush";
 }
@@ -24,9 +26,10 @@ export function formRowHostAttrs(
 ): FormRowHostAttrs {
   const slots = resolveFormRowSlots(input);
   return {
-    "data-has-description": slots.description ? true : undefined,
-    "data-has-note": slots.note ? true : undefined,
-    ...(resolveFormRowLayout(input.layout) === "stacked" ? { "data-layout": "stacked" as const } : {}),
-    ...(resolveFormRowPad(input.pad) === "flush" ? { "data-pad": "flush" as const } : {}),
+    "data-has-description": presenceAttr(slots.description),
+    "data-has-note": presenceAttr(slots.note),
+    "data-has-sub": presenceAttr(slots.sub),
+    ...(formRowLayoutIsStacked(input.layout) ? { "data-layout": "stacked" as const } : {}),
+    ...(formRowPadIsFlush(input.pad) ? { "data-pad": "flush" as const } : {}),
   };
 }

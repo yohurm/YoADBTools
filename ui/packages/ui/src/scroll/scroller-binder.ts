@@ -8,6 +8,8 @@
  */
 
 import { createSignal, type Accessor } from "solid-js";
+import { listEdgeIsStart } from "../keymap/list-index";
+import { logicalAxisIsBlock, type LogicalAxis } from "../placement/axis";
 import { shouldSkipMotion } from "../motion/reduced";
 import {
   resolveScrollerClampedTop,
@@ -20,17 +22,28 @@ import {
   resolveScrollerPageTowardPointer,
   resolveScrollerPageTop,
   resolveScrollerPhase,
+  resolveScrollerReducedPhase,
   resolveScrollerScrollEnd,
   resolveScrollerScrollTop,
   resolveScrollerThumb,
+  scrollerThumbRoom,
   resolveScrollerThumbCoversPointer,
   resolveScrollerThumbTop,
   resolveScrollerWheelDelta,
   resolveScrollerViewFromGutter,
+  resolveScrollerValueNow,
+  scrollerAxisIsBoth,
+  scrollerBarIsAuto,
+  scrollerDriveIsFlow,
+  scrollerPhaseAcceptsPointer,
+  scrollerOverflowIsHidden,
+  scrollerPhaseIsNone,
+  scrollerPhaseIsOut,
   type ScrollerAxis,
   type ScrollerBarState,
   type ScrollerDrive,
   type ScrollerExtent,
+  type ScrollerOverflow,
   type ScrollerMetrics,
   type ScrollerPhase,
   type ScrollerThumb,
@@ -42,7 +55,7 @@ import { scrollerKeyAction, scrollerStealsKeys } from "./scroller-policy";
 import { createScrollerSession } from "./scroller-session";
 
 export interface ScrollerBinderHost {
-  overflow: () => "auto" | "hidden";
+  overflow: () => ScrollerOverflow;
   barState: () => ScrollerBarState;
   interactive: () => boolean;
   traveling: () => boolean;
@@ -92,6 +105,14 @@ export interface ScrollerBinder {
 }
 
 export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
+  function blockEvent(event: Event): void {
+    event.preventDefault();
+  }
+
+  function pointerOnThumb(event: Event): boolean {
+    return event.target instanceof HTMLElement && event.target.classList.contains("yohu-scroller__thumb");
+  }
+
   const [phase, setPhase] = createSignal<ScrollerPhase>("none");
   const [phaseInline, setPhaseInline] = createSignal<ScrollerPhase>("none");
   const [thumb, setThumb] = createSignal<ScrollerThumb | undefined>();
@@ -135,10 +156,10 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const writeFlowDom = (): void => {
     const el = view;
-    if (!el || drive() !== "flow") return;
+    if (!el || !scrollerDriveIsFlow(drive())) return;
     const off = session.offset();
     el.scrollTop = off.block;
-    if (host.axis() === "both") el.scrollLeft = off.inline;
+    if (scrollerAxisIsBoth(host.axis())) el.scrollLeft = off.inline;
     else el.scrollLeft = 0;
   };
 
@@ -171,7 +192,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     metrics.viewInline = resolveScrollerViewFromGutter(el.clientWidth, gutter());
     const declared = host.extent?.();
     const measuredBlock = declared ? 0 : measureFlow(el);
-    const measuredInline = declared || host.axis() !== "both" ? metrics.viewInline : measureFlowInline(el);
+    const measuredInline = declared || !scrollerAxisIsBoth(host.axis()) ? metrics.viewInline : measureFlowInline(el);
     const content = resolveScrollerContentBox(declared, measuredBlock, measuredInline, metrics.viewInline);
     metrics.contentBlock = content.block;
     metrics.contentInline = content.inline;
@@ -182,19 +203,19 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   const commitPhase = (
     next: ScrollerPhase,
     measured: ScrollerThumb | undefined,
-    which: "block" | "inline",
+    which: LogicalAxis,
   ): void => {
-    if (which === "block") {
+    if (logicalAxisIsBlock(which)) {
       if (shouldSkipMotion()) {
-        const shown = next === "in" || next === "on";
-        last = shown ? "on" : undefined;
+        const reduced = resolveScrollerReducedPhase(next);
+        last = reduced.prev;
         lastThumb = measured;
-        setPhase(shown ? "on" : "none");
+        setPhase(reduced.phase);
         setThumb(measured);
         return;
       }
-      last = next === "none" ? undefined : next;
-      if (next === "none") {
+      last = scrollerPhaseIsNone(next) ? undefined : next;
+      if (scrollerPhaseIsNone(next)) {
         lastThumb = undefined;
         setThumb(undefined);
       } else if (measured) {
@@ -207,15 +228,15 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       return;
     }
     if (shouldSkipMotion()) {
-      const shown = next === "in" || next === "on";
-      lastInline = shown ? "on" : undefined;
+      const reduced = resolveScrollerReducedPhase(next);
+      lastInline = reduced.prev;
       lastThumbInline = measured;
-      setPhaseInline(shown ? "on" : "none");
+      setPhaseInline(reduced.phase);
       setThumbInline(measured);
       return;
     }
-    lastInline = next === "none" ? undefined : next;
-    if (next === "none") {
+    lastInline = scrollerPhaseIsNone(next) ? undefined : next;
+    if (scrollerPhaseIsNone(next)) {
       lastThumbInline = undefined;
       setThumbInline(undefined);
     } else if (measured) {
@@ -255,7 +276,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const paint = (): void => {
     const el = view;
-    if (!el || host.overflow() === "hidden") {
+    if (!el || scrollerOverflowIsHidden(host.overflow())) {
       last = undefined;
       lastThumb = undefined;
       idle = false;
@@ -271,7 +292,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     if (next.block !== prev.block || next.inline !== prev.inline) {
       writeFlowDom();
       host.onOffset?.(next.block, next.inline);
-    } else if (drive() === "flow" && host.axis() === "block") {
+    } else if (scrollerDriveIsFlow(drive()) && !scrollerAxisIsBoth(host.axis())) {
       el.scrollLeft = 0;
     }
     const overflowing = resolveScrollerOverflow(box.viewBlock, box.contentBlock);
@@ -295,7 +316,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       measured,
       "block",
     );
-    if (host.axis() !== "both") {
+    if (!scrollerAxisIsBoth(host.axis())) {
       resetInline();
       return;
     }
@@ -336,7 +357,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const scheduleHide = (): void => {
     clearHide();
-    if (host.barState() !== "auto" || holding || holdingInline || dragging || draggingInline || paging || pagingInline) {
+    if (!scrollerBarIsAuto(host.barState()) || holding || holdingInline || dragging || draggingInline || paging || pagingInline) {
       return;
     }
     hideTimer = setTimeout(() => {
@@ -365,7 +386,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const applyScrollLeft = (left: number, refresh = false): void => {
     const el = view;
-    if (!el || host.axis() !== "both") return;
+    if (!el || !scrollerAxisIsBoth(host.axis())) return;
     if (refresh || !(metrics.contentInline > 0 || metrics.viewInline > 0)) refreshMetrics(el);
     const prev = session.offset();
     const next = session.moveTo(prev.block, left);
@@ -435,10 +456,10 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const onWheel = (event: WheelEvent): void => {
     const el = view;
-    if (!el || host.overflow() === "hidden" || !host.interactive()) return;
+    if (!el || scrollerOverflowIsHidden(host.overflow()) || !host.interactive()) return;
     const off = session.offset();
     const inline =
-      host.axis() === "both" && (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY));
+      scrollerAxisIsBoth(host.axis()) && (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY));
     if (inline) {
       const end = resolveScrollerScrollEnd(metrics.viewInline, metrics.contentInline);
       if (!(end > 0)) return;
@@ -453,7 +474,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
         all: metrics.contentInline,
       });
       if (next === off.inline) return;
-      event.preventDefault();
+      blockEvent(event);
       applyScrollLeft(next);
       return;
     }
@@ -471,15 +492,15 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       all: metrics.contentBlock,
     });
     if (next === off.block) return;
-    event.preventDefault();
+    blockEvent(event);
     applyScrollTop(next);
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (!host.interactive() || host.overflow() === "hidden" || scrollerStealsKeys(event.target)) return;
+    if (!host.interactive() || scrollerOverflowIsHidden(host.overflow()) || scrollerStealsKeys(event.target)) return;
     const action = scrollerKeyAction(event.key);
     if (!action) return;
-    event.preventDefault();
+    blockEvent(event);
     if (action === "pageNext") {
       scrollPage(true);
       return;
@@ -488,7 +509,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       scrollPage(false);
       return;
     }
-    if (action === "start") {
+    if (listEdgeIsStart(action)) {
       scrollToStart();
       return;
     }
@@ -503,8 +524,8 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
       paint();
       const box = metrics;
       const block = resolveScrollerOverflow(box.viewBlock, box.contentBlock);
-      const inline = host.axis() === "both" && resolveScrollerOverflow(box.viewInline, box.contentInline);
-      if (host.barState() === "auto" && (block || inline)) {
+      const inline = scrollerAxisIsBoth(host.axis()) && resolveScrollerOverflow(box.viewInline, box.contentInline);
+      if (scrollerBarIsAuto(host.barState()) && (block || inline)) {
         scheduleHide();
       }
     });
@@ -558,13 +579,12 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     const el = view;
     const track = lane;
     const current = thumb();
-    if (!el || !track || !host.interactive() || phase() === "none" || phase() === "out" || !current) return;
-    event.preventDefault();
+    if (!el || !track || !host.interactive() || !scrollerPhaseAcceptsPointer(phase()) || !current) return;
+    blockEvent(event);
     holding = true;
     setPressed(true);
     const box = track.getBoundingClientRect();
-    const onThumb =
-      event.target instanceof HTMLElement && event.target.classList.contains("yohu-scroller__thumb");
+    const onThumb = pointerOnThumb(event);
     if (onThumb) {
       grab = event.clientY - (box.top + current.top);
       applyTop(
@@ -572,7 +592,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientY,
           trackTop: box.top,
           grab,
-          room: Math.max(0, metrics.viewBlock - current.height),
+          room: scrollerThumbRoom(metrics.viewBlock, current.height),
         }),
       );
       dragging = true;
@@ -603,7 +623,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientY,
           trackTop: box.top,
           grab,
-          room: Math.max(0, metrics.viewBlock - current.height),
+          room: scrollerThumbRoom(metrics.viewBlock, current.height),
         }),
       );
     }
@@ -620,7 +640,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   };
 
   const onLaneEnter = (): void => {
-    if (!host.interactive() || phase() === "none") return;
+    if (!host.interactive() || scrollerPhaseIsNone(phase())) return;
     holding = true;
     idle = false;
     paint();
@@ -676,15 +696,14 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     const el = view;
     const track = laneInline;
     const current = thumbInline();
-    if (!el || !track || !host.interactive() || phaseInline() === "none" || phaseInline() === "out" || !current) {
+    if (!el || !track || !host.interactive() || !scrollerPhaseAcceptsPointer(phaseInline()) || !current) {
       return;
     }
-    event.preventDefault();
+    blockEvent(event);
     holdingInline = true;
     setPressedInline(true);
     const box = track.getBoundingClientRect();
-    const onThumb =
-      event.target instanceof HTMLElement && event.target.classList.contains("yohu-scroller__thumb");
+    const onThumb = pointerOnThumb(event);
     if (onThumb) {
       grabInline = event.clientX - (box.left + current.top);
       applyLeft(
@@ -692,7 +711,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientX,
           trackTop: box.left,
           grab: grabInline,
-          room: Math.max(0, metrics.viewInline - current.height),
+          room: scrollerThumbRoom(metrics.viewInline, current.height),
         }),
       );
       draggingInline = true;
@@ -723,7 +742,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
           pointerY: event.clientX,
           trackTop: box.left,
           grab: grabInline,
-          room: Math.max(0, metrics.viewInline - current.height),
+          room: scrollerThumbRoom(metrics.viewInline, current.height),
         }),
       );
     }
@@ -741,7 +760,7 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   };
 
   const onInlineLaneEnter = (): void => {
-    if (!host.interactive() || phaseInline() === "none") return;
+    if (!host.interactive() || scrollerPhaseIsNone(phaseInline())) return;
     holdingInline = true;
     idle = false;
     paint();
@@ -761,14 +780,14 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     const laneEl = event.currentTarget instanceof Element ? event.currentTarget.closest(".yohu-scroller__lane") : null;
     const inline = laneEl?.getAttribute("data-orient") === "inline";
     if (inline) {
-      if (phaseInline() !== "out") return;
+      if (!scrollerPhaseIsOut(phaseInline())) return;
       lastInline = undefined;
       lastThumbInline = undefined;
       setPhaseInline("none");
       setThumbInline(undefined);
       return;
     }
-    if (phase() !== "out") return;
+    if (!scrollerPhaseIsOut(phase())) return;
     last = undefined;
     lastThumb = undefined;
     setPhase("none");
@@ -777,9 +796,9 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
 
   const onNativeScroll = (): void => {
     const el = view;
-    if (!el || drive() !== "flow") return;
+    if (!el || !scrollerDriveIsFlow(drive())) return;
     const prev = session.offset();
-    const next = session.moveTo(el.scrollTop, host.axis() === "both" ? el.scrollLeft : 0);
+    const next = session.moveTo(el.scrollTop, scrollerAxisIsBoth(host.axis()) ? el.scrollLeft : 0);
     if (next.block === prev.block && next.inline === prev.inline) {
       bump();
       return;
@@ -788,25 +807,40 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
     bump();
   };
 
+  let stopScroll = (): void => {};
+  let stopWheel = (): void => {};
+  let stopKey = (): void => {};
+
   const detachView = (): void => {
     const el = view;
     if (!el) return;
-    el.removeEventListener("scroll", onNativeScroll);
-    el.removeEventListener("wheel", onWheel);
-    el.removeEventListener("keydown", onKeyDown);
+    stopScroll();
+    stopWheel();
+    stopKey();
   };
+
+  function listen<K extends keyof HTMLElementEventMap>(
+    target: HTMLElement,
+    type: K,
+    handler: (event: HTMLElementEventMap[K]) => void,
+    options?: AddEventListenerOptions,
+  ): () => void {
+    target.addEventListener(type, handler, options);
+    return () => target.removeEventListener(type, handler, options);
+  }
 
   const attachView = (el: HTMLDivElement): void => {
     detachView();
     view = el;
-    if (drive() === "flow") el.addEventListener("scroll", onNativeScroll, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: false });
-    el.addEventListener("keydown", onKeyDown);
+    if (scrollerDriveIsFlow(drive())) stopScroll = listen(el, "scroll", onNativeScroll, { passive: true });
+    else stopScroll = () => {};
+    stopWheel = listen(el, "wheel", onWheel, { passive: false });
+    stopKey = listen(el, "keydown", onKeyDown);
     observe(el);
     paint();
     const off = session.offset();
     host.onOffset?.(off.block, off.inline);
-    if (host.barState() === "auto") scheduleHide();
+    if (scrollerBarIsAuto(host.barState())) scheduleHide();
   };
 
   const attachLane = (el: HTMLDivElement): void => {
@@ -820,20 +854,14 @@ export function createScrollerBinder(host: ScrollerBinderHost): ScrollerBinder {
   const sync = (): void => {
     if (view) observe(view);
     paint();
-    if (host.barState() === "auto") scheduleHide();
+    if (scrollerBarIsAuto(host.barState())) scheduleHide();
   };
 
-  const valueNow = (): number => {
-    const range = metrics.contentBlock - metrics.viewBlock;
-    if (!(range > 0)) return 0;
-    return Math.round((session.offset().block / range) * 100);
-  };
+  const valueNow = (): number =>
+    resolveScrollerValueNow(session.offset().block, metrics.contentBlock - metrics.viewBlock);
 
-  const valueNowInline = (): number => {
-    const range = metrics.contentInline - metrics.viewInline;
-    if (!(range > 0)) return 0;
-    return Math.round((session.offset().inline / range) * 100);
-  };
+  const valueNowInline = (): number =>
+    resolveScrollerValueNow(session.offset().inline, metrics.contentInline - metrics.viewInline);
 
   const destroy = (): void => {
     if (paintFrame !== 0 && typeof cancelAnimationFrame === "function") {

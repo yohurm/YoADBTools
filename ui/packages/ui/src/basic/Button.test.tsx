@@ -151,7 +151,11 @@ describe("YoButton", () => {
     expect(container.querySelector(".yohu-swap")?.getAttribute("data-anchor")).toBe("center");
     expect(container.querySelector(".yohu-button__chrome")?.getAttribute("data-mode")).toBe("paint");
     expect(container.querySelector(".yohu-button__label")?.textContent).toBe("展开其余 294 项");
-    expect(hostRule()).toContain("min-width: min-content");
+    expect(hostRule()).toContain("flex: var(--yohu-button-flex, 0 1 auto)");
+    expect(hostRule()).toContain("width: var(--yohu-button-inline, auto)");
+    expect(hostRule()).toContain("min-width: var(--yohu-button-min-inline, min-content)");
+    expect(hostRule()).toContain("min-height: var(--yohu-button-min-block, auto)");
+    expect(hostRule()).toContain("max-width: var(--yohu-button-max, var(--yohu-layout-button-max))");
     expect(labelRule()).toContain("min-width: min-content");
   });
 
@@ -161,7 +165,7 @@ describe("YoButton", () => {
         展开
       </YoButton>
     ));
-    expect(screen.getByRole("button", { name: "展开输入" }).getAttribute("data-block")).toBe("true");
+    expect(screen.getByRole("button", { name: "展开输入" }).getAttribute("data-block")).toBe("");
     expect(css).toMatch(/\.yohu-button\[data-block\]\s*\{[^}]*width:\s*100%/);
   });
 

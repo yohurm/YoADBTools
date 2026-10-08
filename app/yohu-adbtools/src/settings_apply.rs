@@ -2,14 +2,24 @@
 
 use std::path::PathBuf;
 
+use crate::settings_store::SettingsStoreError;
 use crate::state::AppState;
 use yohu_protocol::{AppEvent, AppSettings, SettingKey};
+
+/// 设置里的 adb 路径。空串是自动解析，交给 `ToolResolver`。
+pub fn user_adb_path(adb_path: &str) -> Option<PathBuf> {
+    if adb_path.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(adb_path))
+    }
+}
 
 pub async fn set(
     state: &AppState,
     key: SettingKey,
     value: &serde_json::Value,
-) -> Result<AppSettings, String> {
+) -> Result<AppSettings, SettingsStoreError> {
     let updated = state.settings.set(key, value)?;
 
     if key == SettingKey::BufferCapacity {
@@ -17,14 +27,14 @@ pub async fn set(
     }
 
     if key == SettingKey::AdbPath {
-        let path = (!updated.adb_path.is_empty()).then(|| PathBuf::from(&updated.adb_path));
-        state.client.set_user_path(path);
-        crate::browse_runs::reset_transport(state).await;
-        state.app_log.info(if updated.adb_path.is_empty() {
+        let path = user_adb_path(&updated.adb_path);
+        state.app_log.info(if path.is_none() {
             "ADB 路径已重置为自动解析".to_string()
         } else {
             format!("ADB 路径已切换: {}", updated.adb_path)
         });
+        state.client.set_user_path(path);
+        crate::browse_runs::reset_transport(state).await;
     }
 
     let _ = state

@@ -2,6 +2,9 @@
 
 use yohu_protocol::scrcpy;
 
+use crate::content_size_usable;
+use crate::error::ProtocolFault;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeaderKind {
     Session {
@@ -16,23 +19,29 @@ pub enum HeaderKind {
     },
 }
 
+fn header_u32(header: &[u8; scrcpy::VIDEO_PACKET_HEADER_LENGTH], offset: usize) -> u32 {
+    u32::from_be_bytes(header[offset..offset + 4].try_into().expect("4 bytes"))
+}
+
 /// 解析 12 字节视频帧头。`PACKET_FLAG_SESSION` 为 session（无 payload）；否则为 media。
-pub fn parse_header(header: &[u8; scrcpy::VIDEO_PACKET_HEADER_LENGTH]) -> Result<HeaderKind, String> {
+pub fn parse_header(
+    header: &[u8; scrcpy::VIDEO_PACKET_HEADER_LENGTH],
+) -> Result<HeaderKind, ProtocolFault> {
     let pts_flags = u64::from_be_bytes(header[0..8].try_into().expect("8 bytes"));
     if pts_flags & scrcpy::PACKET_FLAG_SESSION != 0 {
-        let width = u32::from_be_bytes([header[4], header[5], header[6], header[7]]);
-        let height = u32::from_be_bytes([header[8], header[9], header[10], header[11]]);
-        if width == 0 || height == 0 {
-            return Err(format!("无效 session 尺寸: {width}x{height}"));
+        let width = header_u32(header, 4);
+        let height = header_u32(header, 8);
+        if !content_size_usable(width, height) {
+            return Err(ProtocolFault::BadSessionSize { width, height });
         }
         return Ok(HeaderKind::Session { width, height });
     }
-    let size = u32::from_be_bytes([header[8], header[9], header[10], header[11]]);
+    let size = header_u32(header, 8);
     if size == 0 {
-        return Err("媒体包长度为 0".into());
+        return Err(ProtocolFault::EmptyMedia);
     }
     if size > scrcpy::MAX_PACKET_SIZE {
-        return Err(format!("媒体包过大: {size}"));
+        return Err(ProtocolFault::MediaTooLarge { size });
     }
     let config = pts_flags & scrcpy::PACKET_FLAG_CONFIG != 0;
     let keyframe = pts_flags & scrcpy::PACKET_FLAG_KEY_FRAME != 0;

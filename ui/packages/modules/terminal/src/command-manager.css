@@ -2,6 +2,7 @@
  * 层与裁切由 YoDialog Portal + fill 定高负责。禁止再点 __body。 */
 
 .yohu-cm {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(var(--yohu-layout-cm-group-min), var(--yohu-layout-cm-group-max)) minmax(var(--yohu-layout-cm-cmd-min), var(--yohu-layout-cm-cmd-max)) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -15,47 +16,10 @@
   box-sizing: border-box;
 }
 
-.yohu-cm__groups,
-.yohu-cm__commands,
-.yohu-cm__editor {
-  min-width: 0;
-  min-height: 0;
-}
-
 .yohu-cm__editor-stack {
   display: flex;
   flex-direction: column;
   gap: var(--yohu-space-md);
-}
-
-.yohu-cm__list {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  /* 框 xs + 行 sm = 12vp，与栏标题 pad=xs 行内 md 对齐。 */
-  padding: var(--yohu-space-xs);
-}
-
-.yohu-cm__commands .yohu-cm__list {
-  background-color: var(--yohu-canvas);
-}
-
-.yohu-cm__row {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-xs);
-  height: 100%;
-  min-width: 0;
-  padding: 0 var(--yohu-space-sm);
-}
-
-.yohu-cm__row-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .yohu-cm__error {
@@ -90,8 +54,8 @@
   gap: var(--yohu-space-sm);
 }
 
-/* 无槽且无出场项时不占编辑栏间隙。出场中仍有 .yohu-presence。 */
-.yohu-cm__param-descs:not(:has(.yohu-presence)) {
+/* 没有元素子级时不占编辑栏间隙。出场中子级仍在，不探测出场 class。 */
+.yohu-cm__param-descs:not(:has(*)) {
   display: none;
 }
 
@@ -101,6 +65,61 @@
   align-items: flex-start;
   gap: var(--yohu-space-xs);
   padding-block: calc(var(--yohu-space-sm) / 2);
+}
+
+/* 多选迁移：右栏只列目标组。预览是唯一浮层，牌面在 YoDragPile。 */
+.yohu-cm__migrate-rest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  padding-top: var(--yohu-space-lg);
+}
+
+.yohu-cm[data-migrate-source] .yohu-cm__entries [aria-selected="true"] {
+  cursor: grab;
+  transition: opacity var(--yohu-motion-spatial-local);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [aria-selected="true"] {
+  cursor: grabbing;
+  opacity: var(--yohu-state-reorder-source);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [data-radius="chip"][data-fill="selected"] > * {
+  transition: background-color var(--yohu-motion-spatial-local);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [aria-selected="true"][data-gather-home] {
+  opacity: 1;
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [data-gather-home][data-radius="chip"][data-fill="selected"] > * {
+  background-color: transparent;
+}
+
+.yohu-cm-migrate {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  --yohu-drag-pile-width: var(--yohu-layout-cm-cmd-max);
+  margin: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.yohu-cm-migrate,
+.yohu-cm-migrate * {
+  pointer-events: none;
+}
+
+.yohu-cm-migrate[data-ready] {
+  transition: opacity var(--yohu-motion-effects-fast);
+}
+
+.yohu-cm-migrate[data-open] {
+  opacity: 1;
 }
 
 .yohu-cm__step-editor {

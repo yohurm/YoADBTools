@@ -9,7 +9,7 @@ use yohu_protocol::scrcpy;
 use yohu_protocol::MirrorControlMessage;
 
 use crate::consts::CONTROL_WRITE;
-use crate::error::MirrorError;
+use crate::error::{MirrorError, ProtocolFault};
 
 pub enum ControlCmd {
     Send(Vec<u8>),
@@ -60,12 +60,13 @@ fn encode_key(action: u8, keycode: u32) -> Vec<u8> {
 }
 
 fn encode_touch(action: u8, x: u32, y: u32, width: u16, height: u16) -> Vec<u8> {
-    let pressure: u16 = if action == scrcpy::ACTION_UP {
+    let finger_up = action == scrcpy::ACTION_UP;
+    let pressure: u16 = if finger_up {
         0
     } else {
         scrcpy::TOUCH_PRESSURE_MAX
     };
-    let (action_button, buttons) = if action == scrcpy::ACTION_UP {
+    let (action_button, buttons) = if finger_up {
         (0i32, 0i32)
     } else {
         (scrcpy::BUTTON_PRIMARY, scrcpy::BUTTON_PRIMARY)
@@ -99,7 +100,7 @@ pub async fn write_all(
         biased;
         _ = cancel.cancelled() => Err(MirrorError::Cancelled),
         _ = tokio::time::sleep(CONTROL_WRITE) => {
-            Err(MirrorError::Protocol("控制通道写入超时".into()))
+            Err(ProtocolFault::ControlWriteTimeout.into())
         }
         res = &mut write => {
             res?;

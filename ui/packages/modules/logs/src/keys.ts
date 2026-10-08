@@ -15,6 +15,38 @@ export type LogsKeyAction =
   | "select-all"
   | "copy";
 
+export function logsKeyIsPause(action: LogsKeyAction): boolean {
+  return action === "pause";
+}
+
+export function logsKeyIsClear(action: LogsKeyAction): boolean {
+  return action === "clear";
+}
+
+export function logsKeyIsFind(action: LogsKeyAction): boolean {
+  return action === "find";
+}
+
+export function logsKeyIsNewTab(action: LogsKeyAction): boolean {
+  return action === "new-tab";
+}
+
+export function logsKeyIsCloseTab(action: LogsKeyAction): boolean {
+  return action === "close-tab";
+}
+
+export function logsKeyIsNextTab(action: LogsKeyAction): boolean {
+  return action === "next-tab";
+}
+
+export function logsKeyIsSelectAll(action: LogsKeyAction): boolean {
+  return action === "select-all";
+}
+
+export function logsKeyIsCopy(action: LogsKeyAction): boolean {
+  return action === "copy";
+}
+
 export const LOGS_LIST_SELECTOR = ".yohu-logs__list";
 
 /** 本页默认操作日志内容。Space 避开侧栏/按钮/页签，以免抢走激活。 */

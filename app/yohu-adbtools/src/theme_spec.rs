@@ -30,11 +30,16 @@ pub fn brand_text_rgb(dark: bool) -> (u8, u8, u8) {
     }
 }
 
+/// GDI DIB / COLORREF 的通道序：B, G, R, A。
+pub fn bgra(r: u8, g: u8, b: u8, a: u8) -> [u8; 4] {
+    [b, g, r, a]
+}
+
 /// DXGI / GDI DIB 用 B8G8R8A8。
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn canvas_bgra(dark: bool) -> [u8; 4] {
     let (r, g, b) = canvas_rgb(dark);
-    [b, g, r, 255]
+    bgra(r, g, b, 255)
 }
 
 #[cfg(test)]
@@ -57,5 +62,14 @@ mod tests {
         assert_eq!(canvas_bgra(true), [0x1C, 0x1A, 0x19, 255]);
         assert_eq!(brand_text_rgb(false), (0, 0, 0));
         assert_eq!(brand_text_rgb(true), (0xE5, 0xE5, 0xE5));
+    }
+
+    #[test]
+    fn gdi_channel_order_lives_in_bgra() {
+        assert_eq!(bgra(0x11, 0x22, 0x33, 0x44), [0x33, 0x22, 0x11, 0x44]);
+        let icon = include_str!("native_splash/icon.rs");
+        let paint = include_str!("native_splash/paint.rs");
+        assert!(!icon.contains("dest[s] = image.data"));
+        assert!(!paint.contains("from(b) |"));
     }
 }

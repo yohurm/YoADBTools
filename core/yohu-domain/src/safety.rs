@@ -10,37 +10,45 @@ use crate::path::{parent_of, PathError, RemotePath};
 pub enum SafetyError {
     #[error(transparent)]
     Path(#[from] PathError),
-    #[error("路径不在安全根内: {0}")]
+    #[error("{}", outside_root_text(.0))]
     OutsideRoot(String),
 }
 
-fn listed_under_root(path: &str, root: &str) -> bool {
-    path == root || path.starts_with(&format!("{root}/"))
+/// 「路径不在安全根内」。文件层同一事实引用这一句。
+pub fn outside_root_text(path: &str) -> String {
+    format!("路径不在安全根内: {path}")
 }
 
-/// 上级停在安全根上，不逃到 `/`。
+/// 上级停在安全根上，不逃到 `/`。是否在根下只问 `RemotePath::is_under`。
 pub fn parent_within_safety(path: &str, roots: &[&str]) -> Option<String> {
     let parent = parent_of(path)?;
     if parent == "/" {
         return None;
     }
-    roots
-        .iter()
-        .any(|root| listed_under_root(&parent, root))
-        .then_some(parent)
+    let parent_path = RemotePath::parse(&parent).ok()?;
+    let under = roots.iter().any(|root| {
+        RemotePath::parse(root)
+            .is_ok_and(|root| parent_path.is_under(&root))
+    });
+    under.then_some(parent)
 }
+
+/// 空名称的载荷。整句由 [`invalid_name_text`] 包上。
+pub const ENTRY_NAME_EMPTY: &str = "名称为空";
+/// 名称含分隔符或 NUL 的载荷。整句由 [`invalid_name_text`] 包上。
+pub const ENTRY_NAME_SEPARATOR: &str = "含路径分隔符";
 
 /// 校验单段条目名（禁止空、`.`/`..`、分隔符）。用于 UI 与 core 双侧。
 pub fn validate_entry_name(name: &str) -> Result<(), PathError> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err(PathError::InvalidName("名称为空".into()));
+        return Err(PathError::InvalidName(ENTRY_NAME_EMPTY.into()));
     }
     if trimmed == "." || trimmed == ".." {
         return Err(PathError::InvalidName(trimmed.into()));
     }
     if trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains('\0') {
-        return Err(PathError::InvalidName("含路径分隔符".into()));
+        return Err(PathError::InvalidName(ENTRY_NAME_SEPARATOR.into()));
     }
     Ok(())
 }
@@ -91,6 +99,14 @@ impl SafetyRoot {
 mod tests {
     use super::*;
     use crate::path::{join_path, parent_of, path_segments};
+
+    #[test]
+    fn outside_root_text_is_the_display() {
+        assert_eq!(
+            SafetyError::OutsideRoot("/data/x".into()).to_string(),
+            outside_root_text("/data/x")
+        );
+    }
 
     #[test]
     fn safety_root_check_shared_fixture() {
@@ -218,15 +234,26 @@ mod tests {
         struct Case {
             name: String,
             valid: bool,
+            #[serde(default)]
+            detail: Option<String>,
         }
         let cases: Vec<Case> =
             serde_json::from_str(include_str!("../testdata/entry_name.json")).expect("fixture");
         for (i, case) in cases.iter().enumerate() {
-            assert_eq!(
-                validate_entry_name(&case.name).is_ok(),
-                case.valid,
-                "case {i}"
-            );
+            match validate_entry_name(&case.name) {
+                Ok(()) => {
+                    assert!(case.valid, "case {i}");
+                    assert!(case.detail.is_none(), "case {i}");
+                }
+                Err(PathError::InvalidName(got)) => {
+                    assert!(!case.valid, "case {i}");
+                    assert_eq!(case.detail.as_deref(), Some(got.as_str()), "case {i}");
+                }
+                Err(other) => panic!("case {i}: {other}"),
+            }
         }
+        let src = include_str!("safety.rs");
+        assert_eq!(src.matches(ENTRY_NAME_EMPTY).count(), 1);
+        assert_eq!(src.matches(ENTRY_NAME_SEPARATOR).count(), 1);
     }
 }

@@ -34,11 +34,14 @@
   box-shadow: var(--yohu-shadow-dialog);
   box-sizing: border-box;
   overflow: visible;
+  /* 行程宿主铺满本盒。关窗锁高时再让它吃满。 */
+  --yohu-travel-inline: 100%;
 }
 
 .yohu-dialog__chrome {
   --yohu-corner-fill: var(--yohu-surface);
   --yohu-corner-stroke: var(--yohu-border);
+  width: 100%;
   min-height: 0;
 }
 
@@ -46,18 +49,6 @@
  * hug used-clip：盒高交给公开 YoTravel。fill 铬直接铺满定高盒。
  * 名单走 YoReveal（始终绝对定位）。panel 自写 data-clip。行程中主槽 clip。侧轨预留，横轴不 snap。
  */
-.yohu-dialog__panel > .yohu-travel {
-  width: 100%;
-}
-
-.yohu-dialog__panel[data-box="fill"] > .yohu-travel,
-.yohu-dialog__panel[data-locked] > .yohu-travel,
-.yohu-dialog__panel[data-box="fill"] > .yohu-dialog__chrome,
-.yohu-dialog__panel[data-locked] > .yohu-dialog__chrome {
-  flex: 1 1 0;
-  height: 100%;
-  min-height: 0;
-}
 
 /* fill 铬铺满定高盒。clip 只服务 fit 行程，不代填剩余高。 */
 .yohu-dialog__panel[data-box="fill"] .yohu-dialog__chrome {
@@ -90,9 +81,11 @@
   max-width: calc(100% - var(--yohu-layout-page-margin) * 2);
 }
 
-/* 关窗锁最后打开盒：放开 90% 帽，不改 data-box。 */
+/* 关窗锁最后打开盒：放开 90% 帽，不改 data-box。行程宿主吃满锁高。 */
 .yohu-dialog__panel[data-locked] {
   max-height: none;
+  --yohu-travel-flex: 1 1 0;
+  --yohu-travel-block: 100%;
 }
 
 .yohu-dialog__panel:not(:focus-within) {
@@ -185,33 +178,30 @@
   max-width: 100%;
 }
 
+.yohu-dialog__body[data-tail="stretch"] > .yohu-dialog__tail {
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+}
+
 .yohu-dialog__scroller {
   flex: 0 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.yohu-dialog__scroller > .yohu-scroller {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: 100%;
+  /* 视口里的滚条不超过本槽。滚条自己吃这条，不点子级。 */
+  --yohu-scroll-max-block: 100%;
 }
 
 .yohu-dialog__panel[data-box="fill"] .yohu-dialog__body[data-region="split"] .yohu-dialog__scroller {
   flex: 1 1 0;
 }
 
-/* auto = 视口槽：只裁切。滚轴由调用方组合 YoScroller，禁止系统条。 */
+/* auto = 视口槽：只裁切。滚轴由调用方组合，禁止系统条。hug 时滚条跟内容，可在帽内缩。 */
 .yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) {
   overflow: hidden;
-}
-
-/* hug 槽：子级滚轴跟内容、可在 body 帽内缩。这是 body 的 flex 子项，不点 __view。 */
-.yohu-dialog__body[data-overflow="auto"]:not([data-region="split"]) > .yohu-scroller {
-  flex: 0 1 auto;
-  min-height: 0;
+  --yohu-scroll-flex: 0 1 auto;
 }
 
 .yohu-dialog__body[data-overflow="auto"][data-region="split"] {
@@ -244,8 +234,8 @@
 }
 
 /*
- * 操作区 AUTO：L2 center|row|stack → 页脚 data-layout。CSS 只认 data。
- * 2 钮对页脚 button 槽铺满。不认 Button 类名。整页对话框不铺满。
+ * 操作区 AUTO：L2 center|row|stack → 页脚 data-layout。
+ * 分栏和整页只发布按钮自己的伸缩变量。不点 button。
  */
 .yohu-dialog__footer {
   display: flex;
@@ -257,28 +247,22 @@
   padding: var(--yohu-space-lg) var(--yohu-space-xl) var(--yohu-space-xl);
 }
 
-.yohu-dialog__footer[data-layout="row"] > button {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
+.yohu-dialog__footer[data-layout="row"] {
+  --yohu-button-flex: 1 1 0;
+  --yohu-button-min-inline: 0;
+  --yohu-button-max: none;
 }
 
 .yohu-dialog__footer[data-layout="stack"] {
   flex-direction: column-reverse;
-}
-
-.yohu-dialog__footer[data-layout="stack"] > button {
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: none;
+  --yohu-button-flex: 0 0 auto;
+  --yohu-button-inline: 100%;
+  --yohu-button-max: none;
 }
 
 .yohu-dialog__panel[data-sized] .yohu-dialog__footer {
   justify-content: flex-end;
   padding: var(--yohu-space-md) var(--yohu-space-lg);
-}
-
-.yohu-dialog__panel[data-sized] .yohu-dialog__footer > button {
-  flex: 0 0 auto;
-  width: auto;
+  --yohu-button-flex: 0 0 auto;
+  --yohu-button-inline: auto;
 }

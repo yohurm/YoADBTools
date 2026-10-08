@@ -9,8 +9,11 @@
  */
 
 import { readViewport } from "../placement/viewport";
+import { clampSpan } from "../placement/clamp";
+import { placementIsBottom, type PopoverPlacement } from "../placement/side";
+import { presenceAttr } from "../dom/flag";
 
-export type PopoverPlacement = "bottom" | "top";
+export { placementIsBottom, type PopoverPlacement };
 
 /** 浮层叠层角色。数值只读 L0 `--yohu-z-*`。禁止魔法数回退。 */
 export type OverlayKind = "dialog" | "popover";
@@ -47,17 +50,11 @@ export interface PlacePopoverResult {
   overflowY: boolean;
 }
 
-export function readCssPx(name: string, fallback: number): number {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const n = parseFloat(raw);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 /** 视口读取单源（L1 共享能力），见 `../placement/viewport`。 */
 export { readViewport };
 
 export function estimateMenuHeight(optionCount: number, rowHeight: number, padY: number): number {
-  return Math.max(0, optionCount) * rowHeight + padY;
+  return popoverExtent(optionCount) * rowHeight + padY;
 }
 
 /** 叠层只读 `--yohu-z-*`。禁止回退魔法数。 */
@@ -99,23 +96,28 @@ export function applyPopoverBox(
   layer.style.zIndex = s.zIndex!;
   layer.style.width = "";
   layer.dataset.placement = box.placement;
-  layer.dataset.placed = "true";
+  const placed = presenceAttr(true);
+  if (placed !== undefined) layer.dataset.placed = placed;
   if (box.overflowY) layer.setAttribute("data-overflow-y", "");
   else layer.removeAttribute("data-overflow-y");
+}
+
+function popoverExtent(value: number): number {
+  return Math.max(0, value);
 }
 
 /** 按视口剩余空间决定上下展开；宽 hug 内容（默认 min=触发钮），高 hug 内容（仅超出才裁）。 */
 export function placePopover(input: PlacePopoverInput): PlacePopoverResult {
   const { trigger, viewport, gap, maxHeightCap } = input;
   const prefer = input.prefer ?? "bottom";
-  const desired = Math.max(0, input.menuHeight);
-  const spaceBelow = Math.max(0, viewport.height - trigger.bottom - gap);
-  const spaceAbove = Math.max(0, trigger.top - gap);
+  const desired = popoverExtent(input.menuHeight);
+  const spaceBelow = popoverExtent(viewport.height - trigger.bottom - gap);
+  const spaceAbove = popoverExtent(trigger.top - gap);
 
   let placement: PopoverPlacement;
   if (desired <= 0) {
     placement = spaceBelow === spaceAbove ? prefer : spaceBelow > spaceAbove ? "bottom" : "top";
-  } else if (prefer === "top" && spaceAbove >= desired) {
+  } else if (!placementIsBottom(prefer) && spaceAbove >= desired) {
     placement = "top";
   } else if (spaceBelow >= desired) {
     placement = "bottom";
@@ -125,7 +127,7 @@ export function placePopover(input: PlacePopoverInput): PlacePopoverResult {
     placement = "bottom";
   }
 
-  const available = placement === "bottom" ? spaceBelow : spaceAbove;
+  const available = placementIsBottom(placement) ? spaceBelow : spaceAbove;
   const clipH = Math.max(0, Math.min(maxHeightCap, available));
   const maxHeight = desired > 0 ? Math.min(desired, clipH) : clipH;
   const overflowY = desired > clipH;
@@ -135,10 +137,10 @@ export function placePopover(input: PlacePopoverInput): PlacePopoverResult {
     input.align === "center"
       ? trigger.left + trigger.width / 2 - minWidth / 2
       : trigger.left;
-  const left = Math.min(Math.max(0, rawLeft), Math.max(0, viewport.width - minWidth));
+  const left = clampSpan(rawLeft, minWidth, viewport.width);
   const maxWidth = Math.max(minWidth, viewport.width - left);
 
-  if (placement === "bottom") {
+  if (placementIsBottom(placement)) {
     return {
       placement,
       top: trigger.bottom + gap,

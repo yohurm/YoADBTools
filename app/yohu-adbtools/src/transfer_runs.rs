@@ -23,6 +23,12 @@ pub struct TransferRuns {
 }
 
 impl TransferRuns {
+    fn lock_cancels(
+        &self,
+    ) -> std::sync::MutexGuard<'_, std::collections::HashMap<u32, CancellationToken>> {
+        self.cancels.lock().expect("transfer lock poisoned")
+    }
+
     pub fn new() -> Self {
         Self {
             cancels: Arc::new(Mutex::new(HashMap::new())),
@@ -33,28 +39,16 @@ impl TransferRuns {
     pub fn allocate(&self) -> (u32, CancellationToken) {
         let id = self.next.fetch_add(1, Ordering::Relaxed) + 1;
         let cancel = CancellationToken::new();
-        self.cancels
-            .lock()
-            .expect("transfer lock poisoned")
-            .insert(id, cancel.clone());
+        self.lock_cancels().insert(id, cancel.clone());
         (id, cancel)
     }
 
     pub fn release(&self, id: u32) {
-        self.cancels
-            .lock()
-            .expect("transfer lock poisoned")
-            .remove(&id);
+        self.lock_cancels().remove(&id);
     }
 
     pub fn cancel(&self, id: u32) {
-        if let Some(cancel) = self
-            .cancels
-            .lock()
-            .expect("transfer lock poisoned")
-            .get(&id)
-            .cloned()
-        {
+        if let Some(cancel) = self.lock_cancels().get(&id).cloned() {
             cancel.cancel();
         }
     }

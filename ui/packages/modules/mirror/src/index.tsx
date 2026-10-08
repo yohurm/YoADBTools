@@ -7,6 +7,7 @@ import { ModuleId, ModuleTitle } from "@yohu/api";
 
 import { MirrorView } from "./MirrorView";
 import { MirrorStatus } from "./Status";
+import { mirrorStore } from "./store";
 
 export const descriptor = {
   id: ModuleId.Mirror,
@@ -15,4 +16,5 @@ export const descriptor = {
   selectionMode: "singleRequired" as const,
   Component: MirrorView,
   Status: MirrorStatus,
+  hydrate: () => mirrorStore.loadProjection(),
 };

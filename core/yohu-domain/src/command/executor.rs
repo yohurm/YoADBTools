@@ -13,19 +13,78 @@ use tokio_util::sync::CancellationToken;
 use super::library::{CommandBlock, CommandDefinition, LibraryEntry};
 use yohu_protocol::ExecOutcome;
 
-/// 执行端口错误（domain 自有类型；适配层映射）。
+/// 掉线用户句。载荷是 serial。
+pub fn device_offline_text(serial: &str) -> String {
+    format!("设备掉线: {serial}")
+}
+
+/// 执行端口错误。字段是运输事实，句子只写在这里。会话未授权走 `DeviceSessionError`。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RunError {
-    #[error("设备掉线: {0}")]
+    /// 载荷是 serial。句子见 [`device_offline_text`]。
+    #[error("{}", device_offline_text(.0))]
     DeviceOffline(String),
-    #[error("设备未授权")]
-    Unauthorized,
+    #[error("{}", crate::device_not_online_text(.0))]
+    NotOnline(String),
+    /// 与宿主 `EXEC_TIMEOUT` 同一句。本层不依赖 runtime，由 yohu-adb 测试锁住。
     #[error("执行超时")]
     Timeout,
+    /// 与运输层「任务已取消」不是同一句。
     #[error("已取消")]
     Cancelled,
-    #[error("执行失败: {0}")]
-    Adb(String),
+    /// 路径不进这句。句子见 [`TOOL_UNAVAILABLE`]。
+    #[error("{}", TOOL_UNAVAILABLE)]
+    ToolUnavailable,
+    /// 各候选明细不进这句。句子见 [`CANDIDATES_FAILED`]。
+    #[error("{}", CANDIDATES_FAILED)]
+    CandidatesFailed,
+    /// `adb shell -T` 不可用。句子见 [`UNSUPPORTED_SHELL`]。
+    #[error("{}", UNSUPPORTED_SHELL)]
+    UnsupportedShell,
+    /// 与宿主 `bad_exit_text` 同一句。本层不依赖 runtime，由 yohu-adb 测试锁住。
+    #[error("执行失败(退出码 {exit_code}): {stderr}")]
+    BadExit { exit_code: i32, stderr: String },
+    /// 与宿主 `io_error_text` 同一句。本层不依赖 runtime，由 yohu-adb 测试锁住。
+    #[error("IO 错误: {0}")]
+    Io(String),
+    /// 与宿主 `ProcessError::Truncated` 同一句，由 yohu-adb 测试锁住。
+    #[error("输出超过捕获预算")]
+    Truncated,
+    /// 与宿主 `ProcessError::PumpPanic` 同一句，由 yohu-adb 测试锁住。
+    #[error("输出泵任务异常结束")]
+    PumpPanic,
+    /// 浏览 shell 通道。句子是 `SHELL_*`。
+    #[error(transparent)]
+    Shell(RunShell),
+}
+
+/// 没有可用 adb。执行端口与运输层共用。路径不进这句。
+pub const TOOL_UNAVAILABLE: &str = "ADB 不可用";
+/// 每个候选都没有给出退出码 0 的 `devices -l`。明细不进这句。
+pub const CANDIDATES_FAILED: &str = "全部 adb 候选扫描失败";
+/// `adb shell -T` 不可用。不是浏览通道故障。
+pub const UNSUPPORTED_SHELL: &str = "浏览 shell 不可用";
+
+/// 浏览 shell 通道用户句。执行端口与运输层共用。
+pub const SHELL_NO_STDIN: &str = "浏览 shell 无 stdin";
+pub const SHELL_NO_STDOUT: &str = "浏览 shell 无 stdout";
+pub const SHELL_HANDSHAKE: &str = "浏览 shell 握手失败";
+pub const SHELL_ENDED: &str = "浏览 shell 已结束";
+pub const SHELL_EXEC: &str = "浏览 shell exec 失败";
+
+/// 执行端口上的浏览 shell 通道。不是 IO。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum RunShell {
+    #[error("{}", SHELL_NO_STDIN)]
+    NoStdin,
+    #[error("{}", SHELL_NO_STDOUT)]
+    NoStdout,
+    #[error("{}", SHELL_HANDSHAKE)]
+    Handshake,
+    #[error("{}", SHELL_ENDED)]
+    Ended,
+    #[error("{}", SHELL_EXEC)]
+    Exec,
 }
 
 /// 命令执行端口（由 yohu-adb 的 `AdbClient` 实现）。
@@ -297,6 +356,12 @@ async fn wait_gap(gap_ms: u64, cancel: &CancellationToken) -> bool {
     }
 }
 
+fn push_arg(args: &mut Vec<String>, current: &mut String) {
+    if !current.is_empty() {
+        args.push(std::mem::take(current));
+    }
+}
+
 /// 按引号规则拆分命令行（双引号分组、反斜杠转义双引号）。
 ///
 /// 例：`shell "echo hello world" getprop` → `["shell", "echo hello world", "getprop"]`
@@ -314,16 +379,12 @@ pub fn split_command_line(input: &str) -> Vec<String> {
                 current.push('"');
             }
             ' ' | '\t' if !in_quotes => {
-                if !current.is_empty() {
-                    args.push(std::mem::take(&mut current));
-                }
+                push_arg(&mut args, &mut current);
             }
             _ => current.push(c),
         }
     }
-    if !current.is_empty() {
-        args.push(current);
-    }
+    push_arg(&mut args, &mut current);
     args
 }
 
@@ -333,6 +394,39 @@ mod tests {
     use std::sync::Mutex;
 
     #[test]
+    fn unit_transport_text_is_the_display() {
+        assert_eq!(RunError::ToolUnavailable.to_string(), TOOL_UNAVAILABLE);
+        assert_eq!(RunError::CandidatesFailed.to_string(), CANDIDATES_FAILED);
+        assert_eq!(RunError::UnsupportedShell.to_string(), UNSUPPORTED_SHELL);
+    }
+
+    #[test]
+    fn shell_channel_text_is_the_display() {
+        assert_eq!(RunShell::NoStdin.to_string(), SHELL_NO_STDIN);
+        assert_eq!(RunShell::NoStdout.to_string(), SHELL_NO_STDOUT);
+        assert_eq!(RunShell::Handshake.to_string(), SHELL_HANDSHAKE);
+        assert_eq!(RunShell::Ended.to_string(), SHELL_ENDED);
+        assert_eq!(RunShell::Exec.to_string(), SHELL_EXEC);
+    }
+
+    #[test]
+    fn not_online_matches_session_sentence() {
+        assert_eq!(
+            RunError::NotOnline("S1".into()).to_string(),
+            crate::device_not_online_text("S1")
+        );
+    }
+
+    #[test]
+    fn device_offline_text_is_the_display() {
+        assert_eq!(device_offline_text("S1"), "设备掉线: S1");
+        assert_eq!(
+            RunError::DeviceOffline("S1".into()).to_string(),
+            device_offline_text("S1")
+        );
+    }
+
+    #[test]
     fn split_shared_fixture() {
         #[derive(serde::Deserialize)]
         struct Case {
@@ -340,7 +434,8 @@ mod tests {
             args: Vec<String>,
         }
         let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../../testdata/command_split.json")).expect("fixture");
+            serde_json::from_str(include_str!("../../testdata/command_split.json"))
+                .expect("fixture");
         for (i, case) in cases.iter().enumerate() {
             assert_eq!(split_command_line(&case.input), case.args, "split {i}");
         }
@@ -581,5 +676,40 @@ mod tests {
         cancel.cancel();
         assert!(!wait_gap(60_000, &cancel).await);
         assert!(wait_gap(0, &CancellationToken::new()).await);
+    }
+
+    #[test]
+    fn placeholder_grammar_is_parsed_once() {
+        let src = include_str!("library.rs");
+        assert_eq!(src.matches("parse::<usize>()").count(), 1);
+        assert_eq!(src.matches("find('{')").count(), 1);
+        assert_eq!(src.matches("find('}')").count(), 1);
+    }
+
+    #[test]
+    fn import_does_not_rejudge_schema_version() {
+        let src = include_str!("import.rs");
+        assert!(!src.contains("unwrap_or(u32::MAX)"));
+        assert!(!src.contains("actual != CommandLibrary::SCHEMA_VERSION"));
+    }
+
+    #[test]
+    fn blank_template_and_fill_len_are_single() {
+        let src = include_str!("library.rs");
+        let prod = src.split("\n#[cfg(test)]").next().unwrap();
+        assert_eq!(prod.matches("value.trim().is_empty()").count(), 1);
+        assert_eq!(prod.matches("template.trim().is_empty()").count(), 0);
+        assert_eq!(prod.matches("entry.name().trim().is_empty()").count(), 0);
+        assert_eq!(prod.matches("description.trim().is_empty()").count(), 0);
+        assert!(!prod.contains("values.len() != slots.len()"));
+        assert_eq!(prod.matches("actual != expected").count(), 1);
+    }
+
+    #[test]
+    fn arity_needs_values_once() {
+        let src = include_str!("library.rs");
+        let stripped = src.replacen("    arity > 0\n", "", 1);
+        assert_eq!(src.matches("    arity > 0\n").count(), 1);
+        assert!(!stripped.contains("self.placeholder_arity() > 0"));
     }
 }

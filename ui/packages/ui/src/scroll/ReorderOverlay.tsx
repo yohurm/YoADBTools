@@ -1,6 +1,7 @@
 /**
  * 列表换位浮层（L4）。跟指针的抬起行副本；不进公开门面。
  */
+import { presenceAttr } from "../dom/flag";
 
 import type { JSX } from "solid-js";
 
@@ -20,7 +21,7 @@ export function ReorderOverlay(props: {
     <div
       class="yohu-recipe-reorder-overlay"
       data-open={attrs()["data-open"]}
-      data-ready={props.ready ? "" : undefined}
+      data-ready={presenceAttr(props.ready)}
       style={attrs().style}
       aria-hidden="true"
     >

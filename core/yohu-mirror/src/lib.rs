@@ -20,6 +20,6 @@ mod warm;
 
 pub use codec::{PIPE_H264, PIPE_H265};
 pub use error::MirrorError;
-pub use frame::{EncodedFrame, FramePipe};
-pub use service::MirrorService;
+pub use frame::{content_size_usable, EncodedFrame, FramePipe};
+pub use service::{MirrorService, SessionRow};
 pub use session::MirrorSessionRequest;

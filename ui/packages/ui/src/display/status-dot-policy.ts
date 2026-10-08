@@ -3,6 +3,7 @@
  * 有 label 才暴露给辅助技术；否则装饰 hidden。
  */
 
+import { closedAttr } from "../dom/flag";
 import {
   resolveStatusDotSpec,
   type StatusDotInput,
@@ -18,10 +19,11 @@ export interface StatusDotHostAttrs {
 
 export function statusDotHostAttrs(input: StatusDotInput): StatusDotHostAttrs {
   const spec = resolveStatusDotSpec(input);
+  const open = Boolean(spec.label);
   return {
     "data-tone": spec.tone,
-    "aria-hidden": spec.label ? undefined : true,
+    "aria-hidden": closedAttr(open),
     "aria-label": spec.label,
-    role: spec.label ? "img" : undefined,
+    role: open ? "img" : undefined,
   };
 }

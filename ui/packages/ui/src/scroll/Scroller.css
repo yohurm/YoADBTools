@@ -16,7 +16,9 @@
   align-items: stretch;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
+  /* 默认吃剩余。hug 槽把 flex 收成跟内容；有帽时再限块向。 */
+  flex: var(--yohu-scroll-flex, 1 1 auto);
+  max-height: var(--yohu-scroll-max-block, none);
   box-sizing: border-box;
 }
 
@@ -41,6 +43,10 @@
 
 .yohu-scroller[data-gutter-inline="on"] > .yohu-scroller__view {
   padding-block-end: var(--yohu-space-lg);
+}
+
+.yohu-scroller[data-fade="end"] > .yohu-scroller__view {
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--yohu-space-lg)), transparent 100%);
 }
 
 .yohu-scroller__lane {
@@ -86,6 +92,27 @@
   border-radius: var(--yohu-radius-xs);
   background-color: var(--yohu-fg-3);
   touch-action: none;
+  opacity: 0;
+  transition:
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
+}
+
+.yohu-scroller[data-scroll="in"] .yohu-scroller__thumb,
+.yohu-scroller[data-scroll="on"] .yohu-scroller__thumb {
+  opacity: 1;
+  transition:
+    opacity var(--yohu-motion-effects-enter),
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
+}
+
+.yohu-scroller[data-scroll="out"] .yohu-scroller__thumb {
+  opacity: 0;
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    background-color var(--yohu-motion-effects-fast),
+    width var(--yohu-motion-effects-fast);
 }
 
 .yohu-scroller__lane[data-orient="block"] .yohu-scroller__thumb {
