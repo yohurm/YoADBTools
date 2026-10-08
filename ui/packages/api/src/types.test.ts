@@ -27,7 +27,7 @@ import {
   LOG_LINE_LAYOUT_DEFAULT,
 } from "./log-line-layout";
 import { APP_SETTINGS_DEFAULT } from "./settings-defaults";
-import { EVENT_NAMES, type AppEvent, type BrowseAttach, type Density, type DeviceStatus, type DragOutRequest, type EvalResult, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
+import { EVENT_NAMES, type AppEvent, type BrowseAttach, type Density, type DeviceStatus, type DragOutRequest, type EvalResult, type LibraryExpand, type LogColorScheme, type LogDisplayColumns, type LogFilter, type LogLine, type LogLineLayout, type MirrorControlMessage, type MirrorLayout, type MirrorPointer, type MirrorStartRequest, type RemoteEntry, type RemoteUpdate, type SettingValue, type TaskInfo, type Theme, type TransferProgress, type TransferRequest, type UpdateChannelInfo, type UpdateDownloadRequest, type UpdateProgress } from "./types";
 
 describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
   it("LogLine 字段为 snake_case", () => {
@@ -401,6 +401,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         terminal_prepend_adb: false,
         files_drop_into_folder: false,
         terminal_time_format: "time_millis",
+        terminal_library_expand: { mode: "collapsed", ids: [] },
       },
     };
     expect(JSON.parse(JSON.stringify(event)).settings.buffer_capacity).toBe(50);
@@ -556,4 +557,5 @@ export type _SettingValue_DevicesAutoRefresh = Expect<Equal<SettingValue<"device
 export type _SettingValue_Object = Expect<Equal<SettingValue<"log_display_columns">, LogDisplayColumns>>;
 export type _SettingValue_LogColorScheme = Expect<Equal<SettingValue<"log_color_scheme">, LogColorScheme>>;
 export type _SettingValue_LogLineLayout = Expect<Equal<SettingValue<"log_line_layout">, LogLineLayout>>;
+export type _SettingValue_LibraryExpand = Expect<Equal<SettingValue<"terminal_library_expand">, LibraryExpand>>;
 export type _SettingValue_MirrorProtocol = Expect<Equal<SettingValue<"mirror_protocol">, "usb" | "wifi">>;

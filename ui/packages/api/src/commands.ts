@@ -18,6 +18,8 @@ import type {
   CommandLibraryDto,
   DeviceInfo,
   DeviceStatus,
+  TaskInfo,
+  MirrorSessionSnapshot,
   ExecOutcome,
   ExportRequest,
   ExportResult,
@@ -59,6 +61,8 @@ export const deviceStatus = (serial?: string) =>
 
 export const deviceSetNightMode = (serial: string, night: boolean) =>
   invoke<DeviceStatus>("device.setNightMode", { serial, night });
+
+export const taskList = () => invoke<TaskInfo[]>("task.list");
 
 // ===== adb =====
 
@@ -160,6 +164,9 @@ export const mirrorPresentSetActive = (active: boolean) =>
   invoke<void>("mirror.present.setActive", { active });
 
 export const mirrorLayout = (req: MirrorLayout) => invoke<void>("mirror.layout", { req });
+
+/** 当前投屏投影。hydrate 读一次。 */
+export const mirrorSession = () => invoke<MirrorSessionSnapshot[]>("mirror.session");
 
 export const mirrorPointer = (req: MirrorPointer) => invoke<void>("mirror.pointer", { req });
 

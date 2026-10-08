@@ -5,10 +5,11 @@
  * AppEvent 内部 tag `kind`（camelCase））。由 fixture 契约测试守护（types.test.ts）。
  */
 
+import type { LibraryExpand } from "./library-expand";
 import type { LogColorScheme } from "./log-color-scheme";
 import type { LogLineLayout } from "./log-line-layout";
 
-export type { LogColorScheme, LogLineLayout };
+export type { LibraryExpand, LogColorScheme, LogLineLayout };
 
 // ===== device =====
 
@@ -136,6 +137,7 @@ export interface AppSettings {
   terminal_prepend_adb: boolean;
   files_drop_into_folder: boolean;
   terminal_time_format: TerminalTimeFormat;
+  terminal_library_expand: LibraryExpand;
 }
 
 /** 日志清单元数据列开关；消息列始终显示。默认对齐官方 STANDARD。 */
@@ -170,7 +172,8 @@ export type SettingKey =
   | "mirror_force_forward"
   | "terminal_prepend_adb"
   | "files_drop_into_folder"
-  | "terminal_time_format";
+  | "terminal_time_format"
+  | "terminal_library_expand";
 
 /** `settings.set` 单键值类型：按键映射到 `AppSettings` 对应字段类型。
  * `SettingKey` 成员与 `AppSettings` 字段一一同名，故索引映射即精确值类型。
@@ -485,6 +488,21 @@ export interface UpdateChannelInfo {
 // ===== mirror =====
 
 export type MirrorSessionState = "starting" | "live" | "stopped" | "failed";
+
+export interface MirrorSessionSnapshot {
+  serial: string;
+  generation: number;
+  phase: MirrorSessionState;
+  width: number;
+  height: number;
+  codec: string;
+  control: boolean;
+  has_frame: boolean;
+  painted_fps: number;
+  paused: boolean;
+  fullscreen: boolean;
+  error?: string | null;
+}
 
 export interface MirrorStart {
   serial: string;

@@ -35,4 +35,5 @@ export * from "./mirror-pointer";
 export * from "./mirror-session";
 export * from "./transfer-state";
 export * from "./library-entry";
+export * from "./library-expand";
 export * from "./update-stage";

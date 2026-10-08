@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import * as commands from "./commands";
-import { deviceSetNightMode, deviceStatus, mirrorLayout, mirrorPointer, mirrorPresentSetActive, mirrorScreenshot, mirrorStart } from "./commands";
+import { deviceSetNightMode, deviceStatus, mirrorLayout, mirrorPointer, mirrorPresentSetActive, mirrorScreenshot, mirrorSession, mirrorStart, taskList } from "./commands";
 
 describe("mirror commands", () => {
   it("导出 layout / screenshot / start（无 Channel、无 status）", () => {
@@ -12,8 +13,17 @@ describe("mirror commands", () => {
     expect(typeof mirrorPresentSetActive).toBe("function");
     expect(typeof mirrorScreenshot).toBe("function");
     expect(typeof mirrorPointer).toBe("function");
+    expect(typeof mirrorSession).toBe("function");
+    expect(mirrorSession.length).toBe(0);
+    expect(typeof taskList).toBe("function");
+    expect(taskList.length).toBe(0);
     expect(mirrorStart.length).toBe(1);
     expect("mirrorStatus" in commands).toBe(false);
+    expect("mirrorSync" in commands).toBe(false);
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "commands.ts"), "utf8");
+    expect(src).toContain('"mirror.session"');
+    expect(src).toContain('"task.list"');
+    expect(src).not.toContain("mirror.sync");
   });
 });
 
@@ -30,6 +40,7 @@ describe("removed dual-source commands", () => {
   it("不导出 settings.get / mirror.status / device.nightMode", () => {
     expect("settingsGet" in commands).toBe(false);
     expect("mirrorStatus" in commands).toBe(false);
+    expect("mirrorSync" in commands).toBe(false);
     expect("deviceNightMode" in commands).toBe(false);
   });
 });

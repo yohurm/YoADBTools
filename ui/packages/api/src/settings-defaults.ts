@@ -3,6 +3,7 @@
  * 运行时仍以 system.info 为准；本对象只作首屏兜底，由 testdata 契约锁死。
  */
 
+import { LIBRARY_EXPAND_DEFAULT } from "./library-expand";
 import { LOG_COLOR_SCHEME_DEFAULT } from "./log-color-scheme";
 import { LOG_LINE_LAYOUT_DEFAULT } from "./log-line-layout";
 import { USB_ENCODE } from "./mirror";
@@ -38,4 +39,8 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   terminal_prepend_adb: false,
   files_drop_into_folder: false,
   terminal_time_format: "time_millis",
+  terminal_library_expand: {
+    mode: LIBRARY_EXPAND_DEFAULT.mode,
+    ids: [...LIBRARY_EXPAND_DEFAULT.ids],
+  },
 };
