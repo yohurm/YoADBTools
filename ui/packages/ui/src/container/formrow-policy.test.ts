@@ -6,6 +6,7 @@ describe("formrow-policy", () => {
     expect(formRowHostAttrs({})).toEqual({
       "data-has-description": undefined,
       "data-has-note": undefined,
+      "data-has-sub": undefined,
     });
   });
 
@@ -13,7 +14,9 @@ describe("formrow-policy", () => {
     expect(formRowHostAttrs({ description: "跟随系统", note: "立即生效" })).toEqual({
       "data-has-description": "",
       "data-has-note": "",
+      "data-has-sub": undefined,
     });
+    expect(formRowHostAttrs({ sub: "组" })["data-has-sub"]).toBe("");
   });
 
   it("stacked 才写 data-layout", () => {

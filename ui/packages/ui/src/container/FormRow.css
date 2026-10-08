@@ -1,8 +1,18 @@
-/* 表单行默认排布：左信息栈吃剩余、右控件 hug 贴尾不收缩，两列垂直居中。
- * justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。
- * 右槽禁止 min-width:0 + flex-shrink：会把路径 input（size=1）压成空铬。 */
+/* 表单行：主行是左信息右控件；子项缩进在下方，高度交给 YoCollapse。
+ * 主行 justify 用 flex-end：折行后控件仍贴行尾，不用 space-between（单列折行会靠左）。
+ * 右槽禁止 min-width:0 + flex-shrink：会把路径 input（size=1）压成空铬。
+ * 行根禁止 overflow:hidden。子项槽 min-height:0，关掉时 0fr 才不被内容顶开。 */
 
 .yohu-form-row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--yohu-space-md) 0;
+  box-sizing: border-box;
+  font-family: var(--yohu-font-sans);
+}
+
+.yohu-form-row__line {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -10,9 +20,6 @@
   column-gap: var(--yohu-space-md);
   row-gap: var(--yohu-space-sm);
   min-width: 0;
-  padding: var(--yohu-space-md) 0;
-  box-sizing: border-box;
-  font-family: var(--yohu-font-sans);
 }
 
 .yohu-form-row__info {
@@ -64,12 +71,82 @@
   margin-inline-start: auto;
 }
 
+.yohu-form-row__sub-slot {
+  min-width: 0;
+  min-height: 0;
+}
+
+.yohu-form-row__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: var(--yohu-space-md);
+  row-gap: var(--yohu-space-xs);
+  min-width: 0;
+  padding-top: var(--yohu-space-sm);
+  padding-inline-start: var(--yohu-space-lg);
+  box-sizing: border-box;
+}
+
+/* 子项标题跟正文同一号，用二级色和正文字重让开主标题。三级色只给肘线。 */
+.yohu-form-row__sub-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yohu-space-sm);
+  flex: 1 1 var(--yohu-layout-settings-label-min);
+  min-width: 0;
+  font-size: var(--yohu-font-body);
+  font-weight: var(--yohu-font-weight-regular);
+  line-height: var(--yohu-font-leading-ui);
+  color: var(--yohu-fg-2);
+}
+
+/* 思维导图子节点：整段是一条四分之一圆，两端切线分别竖直、水平。不接直线。 */
+.yohu-form-row__sub-arc {
+  display: block;
+  flex: 0 0 auto;
+  width: var(--yohu-space-lg);
+  height: var(--yohu-space-lg);
+  overflow: visible;
+  color: var(--yohu-fg-3);
+}
+
+.yohu-form-row__sub-arc path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--yohu-stroke-hairline);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.yohu-form-row__sub-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yohu-form-row__sub-body {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--yohu-space-md);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
 .yohu-form-row[data-layout="stacked"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.yohu-form-row[data-layout="stacked"] .yohu-form-row__line {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
   width: 100%;
-  min-width: 0;
 }
 
 .yohu-form-row[data-layout="stacked"] .yohu-form-row__info {

@@ -68,3 +68,20 @@ export function resolveCollapseTripSpec(recipe?: CollapseRecipe): MotionSpecName
 export function resolveCollapseTripOnToggle(skipMotion: boolean): boolean {
   return !skipMotion;
 }
+
+/**
+ * 内容身高先画出 0fr，再跟 open，进页时已经为开的树组才有高度过渡。
+ * fill 吃剩余高，出生即跟 open，避免设备列表先塌再撑开。
+ * 减动效直接跟意图。
+ */
+export function collapseDelaysPaint(recipe: CollapseRecipe | undefined, skipMotion: boolean): boolean {
+  if (skipMotion) return false;
+  return resolveCollapseRecipe(recipe) !== "fill";
+}
+
+/** 画出的开闭。内容身高在关闭帧画出前保持关，即使意图已经为开。 */
+export function collapsePaintOpen(open: boolean, delay: boolean, revealed: boolean): boolean {
+  if (!open) return false;
+  if (!delay) return true;
+  return revealed;
+}

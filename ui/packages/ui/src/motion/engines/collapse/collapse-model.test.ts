@@ -5,6 +5,8 @@ import {
   COLLAPSE_INTERPOLATE_RECIPES,
   COLLAPSE_TRIP_PROPERTY,
   DEFAULT_COLLAPSE_RECIPE,
+  collapseDelaysPaint,
+  collapsePaintOpen,
   resolveCollapseRows,
   resolveCollapseSpec,
   resolveCollapseTripOnToggle,
@@ -47,6 +49,17 @@ describe("collapse-model / policy", () => {
     expect(resolveCollapseTripSpec("panel")).toBe("spatialStretch");
     expect(resolveCollapseTripOnToggle(false)).toBe(true);
     expect(resolveCollapseTripOnToggle(true)).toBe(false);
+  });
+
+  it("内容身高出生先关，fill 与减动效直接跟意图", () => {
+    expect(collapseDelaysPaint(undefined, false)).toBe(true);
+    expect(collapseDelaysPaint("panel", false)).toBe(true);
+    expect(collapseDelaysPaint("fill", false)).toBe(false);
+    expect(collapseDelaysPaint("collapse", true)).toBe(false);
+    expect(collapsePaintOpen(true, true, false)).toBe(false);
+    expect(collapsePaintOpen(true, true, true)).toBe(true);
+    expect(collapsePaintOpen(true, false, false)).toBe(true);
+    expect(collapsePaintOpen(false, true, true)).toBe(false);
   });
 
   it("collapse/panel/fill 插值，hug 不是 recipe", () => {

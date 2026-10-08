@@ -38,4 +38,21 @@ describe("list-row-policy", () => {
     });
     expect(JSON.stringify(listRowHostAttrs({ hot: true }))).not.toContain("ring");
   });
+
+  it("显式 chip 在 list 与多选上仍写 data-radius=chip", () => {
+    expect(
+      listRowHostAttrs({
+        tone: "list",
+        selectable: true,
+        selected: true,
+        radius: "chip",
+        selectedKeys: new Set(["a", "b"]),
+      }),
+    ).toEqual({
+      "data-tone": "list",
+      "data-fill": "selected",
+      "data-selectable": "",
+      "data-radius": "chip",
+    });
+  });
 });

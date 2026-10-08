@@ -12,6 +12,7 @@ export const DEFAULT_FORM_ROW_PAD: YoFormRowPad = "md";
 export interface FormRowSlotInput {
   description?: unknown;
   note?: unknown;
+  sub?: unknown;
 }
 
 export function formRowLayoutIsStacked(layout?: YoFormRowLayout): boolean {
@@ -33,6 +34,13 @@ export function resolveFormRowPad(pad?: YoFormRowPad): YoFormRowPad {
 export interface FormRowSlots {
   description: boolean;
   note: boolean;
+  sub: boolean;
+}
+
+/** 没有子项就不开。没写 subOpen 时，有子项默认开。 */
+export function formRowSubIsOpen(sub: unknown, open?: boolean): boolean {
+  if (!hasFormRowSlot(sub)) return false;
+  return open !== false;
 }
 
 export function trimmedTextPresent(value: string): boolean {
@@ -50,5 +58,6 @@ export function resolveFormRowSlots(input: FormRowSlotInput): FormRowSlots {
   return {
     description: hasFormRowSlot(input.description),
     note: hasFormRowSlot(input.note),
+    sub: hasFormRowSlot(input.sub),
   };
 }

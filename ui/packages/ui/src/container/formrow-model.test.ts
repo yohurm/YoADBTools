@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   formRowLayoutIsStacked,
   formRowPadIsFlush,
+  formRowSubIsOpen,
   hasFormRowSlot,
   resolveFormRowLayout,
   resolveFormRowPad,
@@ -13,7 +14,7 @@ import {
 
 describe("formrow-model", () => {
   it("缺省两槽皆空", () => {
-    expect(resolveFormRowSlots({})).toEqual({ description: false, note: false });
+    expect(resolveFormRowSlots({})).toEqual({ description: false, note: false, sub: false });
   });
 
   it("空串与空白不算占槽", () => {
@@ -59,6 +60,10 @@ describe("formrow-model", () => {
     expect(resolveFormRowSlots({ description: "说明", note: "立即生效" })).toEqual({
       description: true,
       note: true,
+      sub: false,
     });
+    expect(formRowSubIsOpen(undefined, true)).toBe(false);
+    expect(formRowSubIsOpen("组")).toBe(true);
+    expect(formRowSubIsOpen("组", false)).toBe(false);
   });
 });

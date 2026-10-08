@@ -16,6 +16,7 @@ import {
 export interface FormRowHostAttrs {
   "data-has-description": "" | undefined;
   "data-has-note": "" | undefined;
+  "data-has-sub": "" | undefined;
   "data-layout"?: "stacked";
   "data-pad"?: "flush";
 }
@@ -27,6 +28,7 @@ export function formRowHostAttrs(
   return {
     "data-has-description": presenceAttr(slots.description),
     "data-has-note": presenceAttr(slots.note),
+    "data-has-sub": presenceAttr(slots.sub),
     ...(formRowLayoutIsStacked(input.layout) ? { "data-layout": "stacked" as const } : {}),
     ...(formRowPadIsFlush(input.pad) ? { "data-pad": "flush" as const } : {}),
   };

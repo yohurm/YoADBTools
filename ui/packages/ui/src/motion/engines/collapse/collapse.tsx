@@ -6,7 +6,7 @@
  * 禁止把位移打在裁切盒上，禁止选择器穿到消费者子树。
  * 开闭行程走 traveling()：YoScroller 订这个，禁止 scrape grid-template-rows。
  */
-import { createContext, createEffect, createMemo, createSignal, on, onCleanup, useContext } from "solid-js";
+import { createContext, createEffect, createMemo, createSignal, on, onCleanup, onMount, useContext } from "solid-js";
 import type { JSX } from "solid-js";
 import { closedAttr } from "../../../dom/flag";
 import { motionSpecMs } from "../../../tokens/motion";
@@ -14,6 +14,8 @@ import { shouldSkipMotion } from "../../reduced";
 import { PRESENCE_EXIT_SAFETY_MS } from "../../spec/recipes";
 import {
   COLLAPSE_TRIP_PROPERTY,
+  collapseDelaysPaint,
+  collapsePaintOpen,
   resolveCollapseTripOnToggle,
   resolveCollapseTripSpec,
   type CollapseFlex,
@@ -44,12 +46,25 @@ export interface YoCollapseProps {
   children: JSX.Element;
 }
 
+function collapseNextFrame(run: () => void): number {
+  return window.requestAnimationFrame(run);
+}
+
+function collapseCancelFrame(id: number): void {
+  if (id) window.cancelAnimationFrame(id);
+}
+
 export function YoCollapse(props: YoCollapseProps): JSX.Element {
+  const paintDelay = (): boolean => collapseDelaysPaint(props.recipe, shouldSkipMotion());
+  const [revealed, setRevealed] = createSignal(!paintDelay());
+  const painted = createMemo(() => collapsePaintOpen(Boolean(props.open), paintDelay(), revealed()));
   const host = createMemo(() =>
-    collapseHostAttrs({ open: props.open, recipe: props.recipe, flex: props.flex }),
+    collapseHostAttrs({ open: painted(), recipe: props.recipe, flex: props.flex }),
   );
   const [traveling, setTraveling] = createSignal(false);
   let safety = 0;
+  let enter1 = 0;
+  let enter2 = 0;
 
   const clearSafety = (): void => {
     if (safety === 0) return;
@@ -62,26 +77,44 @@ export function YoCollapse(props: YoCollapseProps): JSX.Element {
     setTraveling(false);
   };
 
+  const cancelEnter = (): void => {
+    collapseCancelFrame(enter1);
+    collapseCancelFrame(enter2);
+    enter1 = 0;
+    enter2 = 0;
+  };
+
+  const arm = (): void => {
+    if (!resolveCollapseTripOnToggle(shouldSkipMotion())) {
+      finish();
+      return;
+    }
+    setTraveling(true);
+    clearSafety();
+    safety = window.setTimeout(
+      finish,
+      motionSpecMs(resolveCollapseTripSpec(props.recipe)) + PRESENCE_EXIT_SAFETY_MS,
+    );
+  };
+
+  onMount(() => {
+    if (!paintDelay()) return;
+    enter1 = collapseNextFrame(() => {
+      enter2 = collapseNextFrame(() => setRevealed(true));
+    });
+  });
+
   createEffect(
-    on(
-      () => props.open,
-      (_open, prev) => {
-        if (prev === undefined) return;
-        if (!resolveCollapseTripOnToggle(shouldSkipMotion())) {
-          finish();
-          return;
-        }
-        setTraveling(true);
-        clearSafety();
-        safety = window.setTimeout(
-          finish,
-          motionSpecMs(resolveCollapseTripSpec(props.recipe)) + PRESENCE_EXIT_SAFETY_MS,
-        );
-      },
-    ),
+    on(painted, (_open, prev) => {
+      if (prev === undefined) return;
+      arm();
+    }),
   );
 
-  onCleanup(clearSafety);
+  onCleanup(() => {
+    cancelEnter();
+    clearSafety();
+  });
 
   const onTransitionEnd = (event: TransitionEvent): void => {
     if (event.target !== event.currentTarget) return;

@@ -140,6 +140,11 @@ export interface YoVirtualListProps<T> {
    */
   tone?: YoListRowTone;
   /**
+   * 显式 chip：每项悬浮/按压/选中都走 `--yohu-ripple-radius`。
+   * 操作清单由 opsListBindings 写入。文件清单不传，hairline 行保持直角。
+   */
+  rowRadius?: "chip";
+  /**
    * 行热态 key（投放命中目录等）。与选中正交。
    * 行底走 YoListRow fill=hot；框走 YoListFrame 叠加层。禁止模块 --drop。
    */
@@ -541,6 +546,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       <YoListRow
         class="yohu-virtual-list__row"
         tone={tone()}
+        radius={props.rowRadius}
         selected={attrs().selected}
         hot={isListRowHot(attrs()["data-key"], currentHotKey())}
         selectable={attrs().interactive}

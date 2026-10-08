@@ -50,6 +50,24 @@ describe("list-row-model", () => {
     });
   });
 
+  it("显式 chip：hairline 与多选仍是每项同一圆角", () => {
+    expect(resolveListRowRadius({ tone: "list", selectable: true, radius: "chip" })).toBe("chip");
+    expect(
+      resolveListRowRadius({
+        selectable: true,
+        radius: "chip",
+        selectedKeys: new Set(["a", "b"]),
+      }),
+    ).toBe("chip");
+    expect(
+      resolveListRowChrome({ tone: "list", selectable: true, selected: true, radius: "chip" }),
+    ).toEqual({
+      fill: "selected",
+      radius: "chip",
+    });
+    expect(resolveListRowRadius({ radius: "chip" })).toBe("none");
+  });
+
   it("热态按 key 精确命中", () => {
     expect(isListRowHot("docs", "docs")).toBe(true);
     expect(isListRowHot("docs", "other")).toBe(false);

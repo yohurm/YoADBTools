@@ -60,6 +60,21 @@ describe("YoTree", () => {
     expect(screen.getByText("子2")).toBeTruthy();
   });
 
+  it("受控且有 onToggle 时把开合交回，自己不改展开", () => {
+    const onToggle = vi.fn();
+    render(() => <YoTree data={DATA} expandedKeys={[]} onToggle={onToggle} />);
+    fireEvent.click(screen.getByText("根1"));
+    expect(onToggle).toHaveBeenCalledWith("root1");
+    expect(document.querySelector('[data-tree-key="c1"]')?.closest(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    const tree = screen.getByRole("tree");
+    tree.focus();
+    fireEvent.keyDown(tree, { key: "ArrowRight" });
+    expect(onToggle).toHaveBeenCalledWith("root1");
+    expect(onToggle).toHaveBeenCalledTimes(2);
+  });
+
   it("键盘 → 展开，← 收起", () => {
     render(() => <YoTree data={DATA} />);
     const tree = screen.getByRole("tree");
@@ -103,6 +118,11 @@ describe("YoTree", () => {
     expect(row?.classList.contains("yohu-tree__row--selected")).toBe(false);
     expect(row?.getAttribute("aria-selected")).toBe("true");
     expect(document.querySelector(".yohu-tree .yohu-recipe-indicator--fill")).toBeNull();
+  });
+
+  it("树不自铺表面，底色只跟所在面板", () => {
+    expect(treeCss).toMatch(/\.yohu-tree\s*\{[^}]*background-color:\s*transparent/);
+    expect(treeCss).not.toMatch(/\.yohu-tree\s*\{[^}]*var\(--yohu-surface\)/);
   });
 
   it("行高走 header 尺，不套数据行，不被 collapse 盖成 min-content", () => {

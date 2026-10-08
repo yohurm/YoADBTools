@@ -541,6 +541,27 @@ describe("YoVirtualList", () => {
     );
   });
 
+  it("rowRadius=chip 时 list 与多选每项仍是圆角片", () => {
+    const items = makeItems(4);
+    const selected = new Set<string | number>(["row-1", "row-2"]);
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => items}
+        itemHeight={22}
+        tone="list"
+        rowRadius="chip"
+        getItemKey={(item) => item}
+        selectedKeys={() => selected}
+        onSelectRow={() => undefined}
+        renderRow={TestRow}
+      />
+    ));
+    const row = (key: string): HTMLElement | null => container.querySelector(`[data-key="${key}"]`);
+    expect(row("row-0")?.getAttribute("data-radius")).toBe("chip");
+    expect(row("row-1")?.getAttribute("data-radius")).toBe("chip");
+    expect(row("row-1")?.getAttribute("data-fill")).toBe("selected");
+  });
+
   it("tone=list 自绘选中底，hotKey 走 list-frame 叠加层", () => {
     const items = makeItems(4);
     const selected = new Set<string | number>(["row-1"]);

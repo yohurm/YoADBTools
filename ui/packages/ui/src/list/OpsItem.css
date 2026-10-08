@@ -1,4 +1,4 @@
-/* 操作项：在弹性槽里伸展，名称占满，尾槽 hug。行盒选中底仍在 list-row。 */
+/* 操作项：在弹性槽里伸展，名称占满，尾槽 hug。选中片由 list-row 画在本元素上。 */
 
 .yohu-ops-item {
   display: flex;

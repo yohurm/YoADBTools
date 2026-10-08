@@ -58,7 +58,9 @@ describe("YoCheckbox", () => {
     expect(check?.querySelector("polyline")?.getAttribute("pathLength")).toBe("1");
     expect(check?.querySelector("polyline")?.getAttribute("points")).toBe("4 12 9 17 20 6");
     expect(css).toContain("stroke-dashoffset var(--yohu-motion-spatial-tick)");
-    expect(css).toContain('.yohu-checkbox[data-checked="true"]');
+    expect(css).toContain('.yohu-checkbox__box[data-paint="checked"] .yohu-checkbox__check polyline');
+    expect(css).toContain("--yohu-corner-move: var(--yohu-motion-spatial-tick)");
+    expect(css).not.toContain("[data-checked");
   });
 
   it("种类图标在盒与标签之间", () => {

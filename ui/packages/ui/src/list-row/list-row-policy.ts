@@ -18,6 +18,7 @@ export interface ListRowHostInput {
   hot?: boolean;
   selectable?: boolean;
   selectedKeys?: ReadonlySet<string | number>;
+  radius?: "chip";
 }
 
 export interface ListRowHostAttrs {
@@ -28,7 +29,14 @@ export interface ListRowHostAttrs {
 }
 
 export function listRowHostAttrs(input: ListRowHostInput): ListRowHostAttrs {
-  const chrome = resolveListRowChrome(input);
+  const chrome = resolveListRowChrome({
+    tone: input.tone,
+    selected: input.selected,
+    hot: input.hot,
+    selectable: input.selectable,
+    selectedKeys: input.selectedKeys,
+    radius: input.radius,
+  });
   return {
     "data-tone": input.tone ?? DEFAULT_LIST_ROW_TONE,
     "data-fill": chrome.fill === "none" ? undefined : chrome.fill,

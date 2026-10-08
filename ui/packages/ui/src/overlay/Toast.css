@@ -29,7 +29,9 @@
   padding: var(--yohu-space-sm);
   overflow: visible;
   border: none;
+  border-radius: var(--yohu-radius-sm);
   background-color: transparent;
+  box-shadow: var(--yohu-shadow-overlay);
   color: var(--yohu-fg);
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);

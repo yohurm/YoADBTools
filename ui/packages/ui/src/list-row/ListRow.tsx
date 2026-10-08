@@ -19,6 +19,8 @@ export interface YoListRowProps {
   selectable?: boolean;
   /** 多选 key 集；只给 L2 判 chip / 直角，行盒不读集合成员。 */
   selectedKeys?: ReadonlySet<string | number>;
+  /** 显式 chip：每项 ripple 走 `--yohu-ripple-radius`，不因 hairline 或多选改直角。 */
+  radius?: "chip";
   dataKey?: string | number;
   dataReorder?: "source";
   /** 源行占位。placeholder 时调用方不挂文本。 */
@@ -43,6 +45,7 @@ export function YoListRow(props: YoListRowProps): JSX.Element {
       hot: props.hot,
       selectable: props.selectable,
       selectedKeys: props.selectedKeys,
+      radius: props.radius,
     });
 
   return (

@@ -15,8 +15,9 @@ describe("YoFormRow", () => {
       </YoFormRow>
     ));
     const row = container.querySelector(".yohu-form-row");
-    const info = row?.querySelector(":scope > .yohu-form-row__info");
-    const control = row?.querySelector(":scope > .yohu-form-row__control");
+    const line = row?.querySelector(":scope > .yohu-form-row__line");
+    const info = line?.querySelector(":scope > .yohu-form-row__info");
+    const control = line?.querySelector(":scope > .yohu-form-row__control");
     expect(info).toBeTruthy();
     expect(control).toBeTruthy();
     expect(row?.getAttribute("data-has-description")).toBe("");
@@ -45,8 +46,9 @@ describe("YoFormRow", () => {
   });
 
   it("行主轴贴尾，控件槽 margin-inline-start:auto，折行后仍靠右", () => {
-    expect(css).toMatch(/\.yohu-form-row \{[\s\S]*?justify-content: flex-end/);
+    expect(css).toMatch(/\.yohu-form-row__line \{[\s\S]*?justify-content: flex-end/);
     expect(css).toMatch(/\.yohu-form-row \{[\s\S]*?min-width:\s*0/);
+    expect(css).not.toMatch(/\.yohu-form-row \{[^}]*overflow:\s*hidden/);
     expect(css).toContain("margin-inline-start: auto");
     expect(css).not.toContain("justify-content: space-between");
   });
@@ -65,7 +67,7 @@ describe("YoFormRow", () => {
       </YoFormRow>
     ));
     expect(container.querySelector(".yohu-form-row")?.getAttribute("data-layout")).toBe("stacked");
-    expect(css).toMatch(/\[data-layout="stacked"\]\s*\{[^}]*flex-direction:\s*column/);
+    expect(css).toMatch(/\[data-layout="stacked"\] \.yohu-form-row__line\s*\{[^}]*flex-direction:\s*column/);
     expect(css).toMatch(/\[data-layout="stacked"\] \.yohu-form-row__control\s*\{[^}]*width:\s*100%/);
   });
 
@@ -77,6 +79,32 @@ describe("YoFormRow", () => {
     ));
     expect(container.querySelector(".yohu-form-row")?.getAttribute("data-pad")).toBe("flush");
     expect(css).toMatch(/\[data-pad="flush"\]\s*\{[^}]*padding:\s*0/);
+  });
+
+  it("子项缩进在主行内，关掉时仍挂着，不另起主行", () => {
+    const { container } = render(() => (
+      <YoFormRow title="命令库默认展开" subTitle="指定命令组" subOpen={false} sub={<span>设备信息</span>}>
+        <button type="button">全部折叠</button>
+      </YoFormRow>
+    ));
+    const row = container.querySelector(".yohu-form-row");
+    expect(row?.getAttribute("data-has-sub")).toBe("");
+    const sub = row?.querySelector(":scope > .yohu-form-row__sub-slot");
+    const title = sub?.querySelector(".yohu-form-row__sub-title");
+    expect(title?.textContent).toBe("指定命令组");
+    const arc = title?.querySelector(".yohu-form-row__sub-arc path");
+    expect(arc?.getAttribute("d")).toBe("M2 2 A12 12 0 0 0 14 14");
+    expect(title?.querySelector("[data-icon='chevron-down']")).toBeNull();
+    expect(css).toMatch(/\.yohu-form-row__sub-arc path\s*\{[^}]*stroke-linecap:\s*round/);
+    expect(css).not.toContain("tree-chevron");
+    expect(css).toMatch(/\.yohu-form-row__sub-title\s*\{[^}]*font-size:\s*var\(--yohu-font-body\)/);
+    expect(css).toMatch(/\.yohu-form-row__sub-title\s*\{[^}]*color:\s*var\(--yohu-fg-2\)/);
+    expect(css).toMatch(/\.yohu-form-row__sub-arc\s*\{[^}]*color:\s*var\(--yohu-fg-3\)/);
+    expect(sub?.querySelector(".yohu-collapse")?.getAttribute("data-open")).toBe("false");
+    expect(sub?.textContent).toContain("设备信息");
+    expect(row?.querySelectorAll(".yohu-form-row__title").length).toBe(1);
+    expect(css).toMatch(/\.yohu-form-row__sub\s*\{[^}]*padding-inline-start:\s*var\(--yohu-space-lg\)/);
+    expect(css).toMatch(/\.yohu-form-row__sub-slot\s*\{[^}]*min-height:\s*0/);
   });
 
   it("相邻行不画分割线", () => {
