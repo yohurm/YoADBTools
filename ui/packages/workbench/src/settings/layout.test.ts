@@ -70,12 +70,32 @@ describe("设置页滚轴", () => {
     expect(css).not.toContain("settings-control-max");
   });
 
+  it("重启与下次采集的保存提示不再复述徽章", () => {
+    expect(form).toContain('return "已保存"');
+    expect(form).toContain("savedAck()");
+    expect(form).toContain('text="重启生效"');
+    expect(form).toContain('text="下次采集生效"');
+    expect(form).not.toContain("已保存（重启生效）");
+    expect(form).not.toContain("已保存（下次采集生效）");
+    expect(form).not.toContain("已保存（下次启动生效）");
+    expect(form).not.toContain("已保存（窗口立即裁剪，采集环下次启动）");
+  });
+
   it("设备自动刷新是开关，无间隔秒数字段", () => {
     expect(form).toContain("autoRefreshCopy()");
     expect(form).toContain('return "设备自动刷新"');
     expect(form).not.toContain("自动刷新间隔");
     expect(form).not.toContain("间隔（秒");
     expect(form).not.toContain("0 = 关");
+  });
+
+  it("关于页挂载读一次通道，渲染期不打 update.info", () => {
+    expect(view).toContain("onMount(() => {\n    void updateStore.loadChannel();");
+    expect(view).not.toContain("updateInfo(");
+    expect(view).not.toContain("createEffect");
+    expect(form).toContain("channelRemote()");
+    expect(form).not.toContain("updateInfo(");
+    expect(form).toContain('title="更新通道"');
   });
 
   it("待装包大小零默认只写在 pendingBytes", () => {

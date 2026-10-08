@@ -7,7 +7,8 @@ import { Component, onCleanup, onMount } from "solid-js";
 
 import { systemReportError, YoLog } from "@yohu/api";
 
-import { runBootPipeline } from "./boot";
+import { loadShellFacts, runBootPipeline } from "./boot";
+import { modules } from "./registry";
 import { formatWindowError } from "./js-error";
 import { allowNativeContextMenu } from "./native-context-menu";
 import "./register";
@@ -25,7 +26,12 @@ export const App: Component = () => {
 
     void runBootPipeline({
       load: async () => {
-        await Promise.all([settingsStore.load(), deviceStore.load()]);
+        await loadShellFacts({
+          settings: () => settingsStore.load(),
+          devices: () => deviceStore.load(),
+          tasks: () => taskStore.load(),
+          hydrates: modules().flatMap((mod) => (mod.hydrate ? [mod.hydrate] : [])),
+        });
         YoLog.info(windowStore.shellChannel(), "设置已加载", { theme: settingsStore.state.theme });
       },
       refresh: () => {

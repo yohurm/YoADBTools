@@ -2,24 +2,29 @@
  * 更新检查 store：检查 / 下载 / 覆盖安装。
  * 编排 @yohu/api（对应 core `yohu-update`）；View 只绑信号与对话框。
  *
- * 下载：`update.download` 立即返回，进度与终态经 `update/progress`（与文件传输 invoke+事件 同纪律）。
+ * 通道：关于页打开时 `loadChannel` → `update.info`，一次，不进 hydrate。
+ * 阶段只跟 `update/progress`。终态必达，下载进度可丢。
+ * invoke 返回不把阶段写成下载中。正在安装时忽略非安装进度，仍是这一份阶段的门闩。
  */
 
 import { createSignal } from "solid-js";
 
 import {
+  errorText,
   onUpdateProgress,
   updateCancel,
   updateCheck,
   updateDownload,
+  updateInfo,
   updateInstall,
   updateOpen,
   updateStageIsApplying,
   updateStageIsFailed,
   updateStageIsReady,
   updateStageIsTransfer,
+  YoLog,
 } from "@yohu/api";
-import type { IpcError, RemoteUpdate, UpdateProgress } from "@yohu/api";
+import type { IpcError, RemoteUpdate, UpdateChannelInfo, UpdateProgress } from "@yohu/api";
 import { ratioPercent } from "@yohu/ui";
 
 import {
@@ -134,6 +139,7 @@ export function createUpdateStore() {
   const [phase, setPhase] = createSignal<UpdateApplyPhase>(idlePhase());
   const [progress, setProgress] = createSignal<UpdateProgress | null>(null);
   const [installerPath, setInstallerPath] = createSignal<string | null>(null);
+  const [channel, setChannel] = createSignal<UpdateChannelInfo | null>(null);
 
   let downloadWaiter: DownloadWaiter | null = null;
 
@@ -204,6 +210,15 @@ export function createUpdateStore() {
     });
   }
 
+  /** 关于页进入时读一次。调用方挂载时打，不在渲染里打，也不进 hydrate。 */
+  async function loadChannel(): Promise<void> {
+    try {
+      setChannel(await updateInfo());
+    } catch (e) {
+      YoLog.warn("update", `读取更新通道失败 ${errorText(e)}`);
+    }
+  }
+
   async function check(): Promise<RemoteUpdate> {
     setChecking(true);
     try {
@@ -238,15 +253,7 @@ export function createUpdateStore() {
       throw error;
     }
     const installerUrl = update.installer_url;
-    if (updatePhaseIsBusy(phase())) return;
-
-    markDownloading();
-    setProgress({
-      version: offerVersion(update),
-      stage: "downloading",
-      received_bytes: 0,
-      total_bytes: offerSize(update),
-    });
+    if (updatePhaseIsBusy(phase()) || readWaiter()) return;
 
     const done = new Promise<void>((resolve, reject) => {
       downloadWaiter = {
@@ -324,8 +331,10 @@ export function createUpdateStore() {
     phase,
     progress,
     installerPath,
+    channel,
     percent,
     canApply,
+    loadChannel,
     check,
     download,
     install,

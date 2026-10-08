@@ -44,7 +44,7 @@ function expectCalls(name: string, calls: number): void {
 describe("立即生效文案", () => {
   it("徽章和语气比较共用这一句，保存提示不并", () => {
     expectOnce('"' + "立即" + "生效" + '"', "immediateCopy");
-    expectCalls("immediateCopy", 15);
+    expectCalls("immediateCopy", 16);
     expect(times(production(), '"' + "已保存（立即" + "生效）" + '"')).toBe(1);
   });
 });
@@ -52,7 +52,7 @@ describe("立即生效文案", () => {
 describe("已保存立即生效", () => {
   it("保存提示只留在函数体，徽章文案不并", () => {
     expectOnce('"' + "已保存（立即" + "生效）" + '"', "savedNow");
-    expectCalls("savedNow", 14);
+    expectCalls("savedNow", 15);
   });
 });
 
@@ -107,6 +107,13 @@ describe("时钟格式值", () => {
     expectCalls("dateTimeMillisValue", 3);
     expectOnce('return "' + "datetime" + '"', "dateTimeValue");
     expectCalls("dateTimeValue", 3);
+  });
+});
+
+describe("命令库展开", () => {
+  it("快照只读一次", () => {
+    expectOnce("settingsStore.state." + "terminal_library_expand", "libraryExpand");
+    expectCalls("libraryExpand", 5);
   });
 });
 
@@ -499,10 +506,10 @@ describe("阶段空闲字", () => {
 });
 
 describe("进入下载", () => {
-  it("本机阶段写成下载只写一次，进度 stage 不并", () => {
+  it("下载阶段只跟进度事件，点击不预写", () => {
     expectOnce('setPhase("' + "downloading" + '")', "markDownloading");
-    expectCalls("markDownloading", 3);
-    expect(production()).toContain('stage: "' + "downloading" + '"');
+    expectCalls("markDownloading", 2);
+    expect(production()).toContain("updateStageIsTransfer(e.stage)");
   });
 });
 
@@ -529,11 +536,11 @@ describe("关掉更新窗", () => {
 });
 
 describe("清掉下载等待", () => {
-  it("等待槽写成空只写一次，登记等待不并", () => {
+  it("等待槽写成空只写一次。读等待四次：声明、失败进度、就绪进度、下载入口防重入，点击不预写下载中", () => {
     expectOnce("downloadWaiter " + "= null", "clearWaiter");
     expectCalls("clearWaiter", 5);
     expectOnce("return " + "downloadWaiter", "readWaiter");
-    expectCalls("readWaiter", 3);
+    expectCalls("readWaiter", 4);
   });
 });
 
@@ -562,11 +569,11 @@ describe("当前要约", () => {
 });
 
 describe("要约版本与大小", () => {
-  it("版本和字节各读一次", () => {
+  it("版本和字节各两次：声明与下载参数，点击不预写下载中", () => {
     expectOnce("return update." + "version", "offerVersion");
-    expect(times(production(), "offerVersion(")).toBe(3);
+    expect(times(production(), "offerVersion(")).toBe(2);
     expectOnce("return update." + "size_bytes", "offerSize");
-    expect(times(production(), "offerSize(")).toBe(3);
+    expect(times(production(), "offerSize(")).toBe(2);
   });
 });
 

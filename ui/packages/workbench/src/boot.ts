@@ -48,6 +48,21 @@ export async function dismissBootOverlay(): Promise<void> {
   el.remove();
 }
 
+/** 揭窗前并行读应用级事实。设备重扫不在这里。 */
+export async function loadShellFacts(parts: {
+  settings: () => Promise<unknown>;
+  devices: () => Promise<unknown>;
+  tasks: () => Promise<unknown>;
+  hydrates: readonly (() => Promise<void>)[];
+}): Promise<void> {
+  await Promise.all([
+    parts.settings(),
+    parts.devices(),
+    parts.tasks(),
+    ...parts.hydrates.map((hydrate) => hydrate()),
+  ]);
+}
+
 export async function runBootPipeline(opts: {
   load: () => Promise<void>;
   refresh: () => void;

@@ -67,9 +67,9 @@ const ModuleStage: Component<{
 
   createEffect(() => {
     const next = incoming();
-    void navStore.setMirrorPresent(next?.id);
     const cur = shown();
     if (next?.id === cur?.id) return;
+    void navStore.setMirrorPresent(next?.id);
     const mirrorInvolved =
       mirrorPresentShouldBeActive(next?.id) || mirrorPresentShouldBeActive(cur?.id);
     if (!cur || shouldSkipMotion() || mirrorInvolved) {

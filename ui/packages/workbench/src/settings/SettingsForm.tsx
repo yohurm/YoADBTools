@@ -2,16 +2,22 @@
  * 设置表单：分组卡片与表单项。浏览/打开/保存走 store；本文件只交事件。
  */
 
-import { For, type JSX } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 
 import { APP_ICON_SRC } from "../app-identity";
 import {
+  LIBRARY_EXPAND_CATALOG,
   LOG_COLOR_SCHEME_CATALOG,
   LOG_DISPLAY_COLUMN_CATALOG,
   LOG_LINE_LAYOUT_CATALOG,
   ModuleTitle,
+  isLibraryExpandMode,
+  libraryExpandGroupsLabel,
+  libraryExpandIsGroups,
+  libraryExpandWithMode,
   type Density,
   type DialogPick,
+  type LibraryExpand,
   type SettingKey,
   type TerminalTimeFormat,
   type Theme,
@@ -30,6 +36,7 @@ import {
 } from "@yohu/ui";
 
 import { settingsStore, updateStore } from "../stores";
+import { LibraryExpandGroups } from "./LibraryExpandGroups";
 import { PathChrome } from "./PathChrome";
 import { effectivePath } from "./path-display";
 
@@ -79,6 +86,15 @@ const LOG_COLOR_SCHEME_OPTIONS = LOG_COLOR_SCHEME_CATALOG.map(({ value, label })
   label,
 }));
 
+const LIBRARY_EXPAND_OPTIONS = LIBRARY_EXPAND_CATALOG.map(({ value, label }) => ({
+  value,
+  label,
+}));
+
+function libraryExpand(): LibraryExpand {
+  return settingsStore.state.terminal_library_expand;
+}
+
 const LOG_LINE_LAYOUT_OPTIONS = LOG_LINE_LAYOUT_CATALOG.map(({ value, label }) => ({
   value,
   label,
@@ -90,6 +106,10 @@ function immediateCopy(): string {
 
 function savedNow(): string {
   return "已保存（立即生效）";
+}
+
+function savedAck(): string {
+  return "已保存";
 }
 
 function browseAction(): string {
@@ -164,6 +184,10 @@ function updateChecking(): boolean {
   return updateStore.checking();
 }
 
+function channelRemote(): string {
+  return updateStore.channel()?.remote ?? "";
+}
+
 function aboutIconSize(): number {
   return Layout.TitlebarCaption;
 }
@@ -182,6 +206,10 @@ export function SettingsForm(props: {
   savedBrowse: (run: () => Promise<DialogPick>, okText: string) => void;
   onCheckUpdate: () => void;
 }): JSX.Element {
+  function saveLibraryExpand(next: LibraryExpand): void {
+    props.save("terminal_library_expand", next, savedNow());
+  }
+
   return (
     <YoScroller class="yohu-settings__scroll">
       <div class="yohu-settings__stack">
@@ -203,7 +231,7 @@ export function SettingsForm(props: {
             path={effectivePath(settingsStore.state.data_root, settingsStore.resolved.data_root)}
             actionLabel={browseAction()}
             onAction={() =>
-              props.savedBrowse(() => settingsStore.browseDataRoot(), "已保存（重启生效）")
+              props.savedBrowse(() => settingsStore.browseDataRoot(), savedAck())
             }
           />
         </YoFormRow>
@@ -223,6 +251,22 @@ export function SettingsForm(props: {
             ariaLabel={prependAdbCopy()}
             checked={settingsStore.state.terminal_prepend_adb}
             onChange={(v) => props.save("terminal_prepend_adb", v, savedNow())}
+          />
+        </YoFormRow>
+        <YoFormRow
+          title="命令库默认展开"
+          note={<EffectBadge text={immediateCopy()} />}
+          subTitle={libraryExpandGroupsLabel()}
+          subOpen={libraryExpandIsGroups(libraryExpand())}
+          sub={<LibraryExpandGroups policy={libraryExpand()} onChange={saveLibraryExpand} />}
+        >
+          <YoSelect
+            options={LIBRARY_EXPAND_OPTIONS}
+            value={libraryExpand().mode}
+            onChange={(value) => {
+              if (!isLibraryExpandMode(value)) return;
+              saveLibraryExpand(libraryExpandWithMode(libraryExpand(), value));
+            }}
           />
         </YoFormRow>
         <YoFormRow title="结果显示时间格式" note={<EffectBadge text={immediateCopy()} />}>
@@ -276,7 +320,7 @@ export function SettingsForm(props: {
             value={String(settingsStore.state.buffer_capacity)}
             ariaLabel={bufferRowsCopy()}
             onInput={(v) =>
-              props.save("buffer_capacity", v, "已保存（窗口立即裁剪，采集环下次启动）")
+              props.save("buffer_capacity", v, savedAck())
             }
           />
         </YoFormRow>
@@ -288,7 +332,7 @@ export function SettingsForm(props: {
           <YoSwitch
             ariaLabel={clearLogCopy()}
             checked={settingsStore.state.clear_device_on_start}
-            onChange={(v) => props.save("clear_device_on_start", v, "已保存（下次采集生效）")}
+            onChange={(v) => props.save("clear_device_on_start", v, savedAck())}
           />
         </YoFormRow>
 
@@ -344,7 +388,7 @@ export function SettingsForm(props: {
           <YoSwitch
             ariaLabel="强制 ADB forward（跳过 reverse）"
             checked={settingsStore.state.mirror_force_forward}
-            onChange={(v) => props.save("mirror_force_forward", v, "已保存（下次启动生效）")}
+            onChange={(v) => props.save("mirror_force_forward", v, savedAck())}
           />
         </YoFormRow>
       </YoPanel>
@@ -394,6 +438,9 @@ export function SettingsForm(props: {
             检查更新
           </YoButton>
         </YoFormRow>
+        <Show when={channelRemote()}>
+          <YoFormRow title="更新通道">{channelRemote()}</YoFormRow>
+        </Show>
         <YoFormRow title="标识">
           {settingsStore.identity.identifier}
         </YoFormRow>

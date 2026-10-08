@@ -4,7 +4,7 @@
 
 import { createStore } from "solid-js/store";
 
-import { onTaskSummary } from "@yohu/api";
+import { errorText, onTaskSummary, taskList, YoLog } from "@yohu/api";
 import type { TaskInfo } from "@yohu/api";
 
 export interface TaskStore {
@@ -20,7 +20,15 @@ export function createTaskStore() {
     });
   }
 
-  return { state, bindIpc };
+  async function load(): Promise<void> {
+    try {
+      setState("tasks", await taskList());
+    } catch (e) {
+      YoLog.error("task", "读取任务列表失败", errorText(e));
+    }
+  }
+
+  return { state, bindIpc, load };
 }
 
 export type TaskStoreApi = ReturnType<typeof createTaskStore>;

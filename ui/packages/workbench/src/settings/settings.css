@@ -15,6 +15,11 @@
   gap: var(--yohu-space-md);
 }
 
+.yohu-settings__hint {
+  font-size: var(--yohu-font-caption);
+  color: var(--yohu-fg-3);
+}
+
 .yohu-settings__about {
   display: flex;
   align-items: center;

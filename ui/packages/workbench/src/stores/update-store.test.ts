@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   updateInstall: vi.fn(),
   updateCancel: vi.fn(),
   updateOpen: vi.fn(),
+  updateInfo: vi.fn(),
   onProgress: null as
     | ((e: {
         version: string;
         stage: string;
         received_bytes: number;
         total_bytes: number;
+        installer_path?: string;
         error?: { code: string; message: string };
       }) => void)
     | null,
@@ -32,6 +34,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     updateDownload: (...a: unknown[]) => mocks.updateDownload(...a),
     updateInstall: (...a: unknown[]) => mocks.updateInstall(...a),
     updateOpen: (...a: unknown[]) => mocks.updateOpen(...a),
+    updateInfo: (...a: unknown[]) => mocks.updateInfo(...a),
   };
 });
 
@@ -59,6 +62,8 @@ describe("createUpdateStore.download", () => {
     mocks.updateCheck.mockReset();
     mocks.updateDownload.mockReset();
     mocks.updateInstall.mockReset();
+    mocks.updateInfo.mockReset();
+    mocks.onProgress = null;
   });
 
   it("没有 installer_url 时失败上抛", async () => {
@@ -259,12 +264,42 @@ describe("createUpdateStore.close / dismiss", () => {
     expect(store.dialogOpen()).toBe(false);
   });
 
+  it("invoke 返回前不把阶段写成下载中，进度事件才进入下载", async () => {
+    mocks.updateCheck.mockResolvedValueOnce(FOUND);
+    mocks.updateDownload.mockImplementation(() => new Promise(() => undefined));
+    const store = createUpdateStore();
+    store.bindIpc();
+    await store.check();
+    void store.download();
+    await vi.waitFor(() => expect(mocks.updateDownload).toHaveBeenCalledTimes(1));
+    expect(store.phase()).toBe("idle");
+    expect(store.progress()).toBeNull();
+    void store.download();
+    expect(mocks.updateDownload).toHaveBeenCalledTimes(1);
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 1,
+      total_bytes: 4,
+    });
+    expect(store.phase()).toBe("downloading");
+    expect(store.percent()).toBe(25);
+  });
+
   it("下载中 close 停下载但不清 pending", async () => {
     mocks.updateCheck.mockResolvedValueOnce(FOUND);
     mocks.updateDownload.mockImplementation(() => new Promise(() => undefined));
     const store = createUpdateStore();
+    store.bindIpc();
     await store.check();
     void store.download();
+    await vi.waitFor(() => expect(mocks.updateDownload).toHaveBeenCalled());
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 0,
+      total_bytes: 0,
+    });
     expect(store.phase()).toBe("downloading");
     store.close();
     expect(mocks.updateCancel).toHaveBeenCalledTimes(1);
@@ -294,6 +329,7 @@ describe("createUpdateStore.close / dismiss", () => {
 describe("createUpdateStore.install", () => {
   beforeEach(() => {
     mocks.updateInstall.mockReset();
+    mocks.updateCheck.mockReset();
   });
 
   it("没有安装包路径时失败上抛", async () => {
@@ -303,5 +339,52 @@ describe("createUpdateStore.install", () => {
       message: "没有可安装的安装包",
     });
     expect(mocks.updateInstall).not.toHaveBeenCalled();
+  });
+
+  it("正在安装时忽略非安装进度", async () => {
+    mocks.updateCheck.mockResolvedValueOnce(FOUND);
+    mocks.updateInstall.mockImplementation(() => new Promise(() => undefined));
+    const store = createUpdateStore();
+    store.bindIpc();
+    await store.check();
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "ready",
+      received_bytes: 1,
+      total_bytes: 1,
+      installer_path: "C:\\setup.exe",
+    });
+    expect(store.phase()).toBe("ready");
+    void store.install();
+    expect(store.phase()).toBe("applying");
+    mocks.onProgress?.({
+      version: "1.2.0",
+      stage: "downloading",
+      received_bytes: 1,
+      total_bytes: 3,
+    });
+    expect(store.phase()).toBe("applying");
+    expect(store.progress()?.stage).toBe("ready");
+  });
+});
+
+describe("createUpdateStore.loadChannel", () => {
+  beforeEach(() => {
+    mocks.updateInfo.mockReset();
+  });
+
+  it("读 update.info，失败留空", async () => {
+    mocks.updateInfo.mockResolvedValueOnce({
+      remote: "yohurm/Windows-YoADBTools",
+      page_url: "https://github.com/yohurm/Windows-YoADBTools",
+    });
+    const store = createUpdateStore();
+    await store.loadChannel();
+    expect(mocks.updateInfo).toHaveBeenCalledTimes(1);
+    expect(store.channel()?.remote).toBe("yohurm/Windows-YoADBTools");
+
+    mocks.updateInfo.mockRejectedValueOnce({ code: "internal", message: "读失败" });
+    await store.loadChannel();
+    expect(store.channel()?.remote).toBe("yohurm/Windows-YoADBTools");
   });
 });

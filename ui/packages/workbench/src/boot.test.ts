@@ -19,6 +19,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
 
 import {
   dismissBootOverlay,
+  loadShellFacts,
   resetMainWindowRevealForTests,
   revealMainWindow,
   runBootPipeline,
@@ -140,6 +141,42 @@ describe("启动编排", () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(document.getElementById("yohu-boot")).toBeTruthy();
     vi.unstubAllGlobals();
+  });
+
+  it("揭窗前并行读设置、目录、任务和模块投影", async () => {
+    const order: string[] = [];
+    let releaseTasks: () => void = () => undefined;
+    const tasksGate = new Promise<void>((resolve) => {
+      releaseTasks = resolve;
+    });
+    const pending = loadShellFacts({
+      settings: async () => {
+        order.push("settings");
+      },
+      devices: async () => {
+        order.push("devices");
+      },
+      tasks: async () => {
+        order.push("tasks");
+        await tasksGate;
+      },
+      hydrates: [
+        async () => {
+          order.push("mirror");
+        },
+      ],
+    });
+    await Promise.resolve();
+    expect(order).toEqual(["settings", "devices", "tasks", "mirror"]);
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    releaseTasks();
+    await pending;
+    expect(settled).toBe(true);
   });
 
   it("揭窗失败上抛，不 refresh", async () => {

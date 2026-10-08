@@ -34,6 +34,8 @@ export interface ModuleDescriptor {
   Component: Component<DeviceSession>;
   /** 状态栏右侧状态槽。模块自绘；无内容时不输出节点。壳不读模块 store。 */
   Status?: Component;
+  /** 界面重建时请回本模块的应用级投影。视图停留不放这里。 */
+  hydrate?: () => Promise<void>;
 }
 
 const registry: ModuleDescriptor[] = [];

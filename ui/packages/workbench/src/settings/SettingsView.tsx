@@ -1,9 +1,10 @@
 /**
  * 设置面板组合：页壳 + 页眉铬 + 表单 + 更新对话框。
- * 启动已 load 设置；本页不二次 settingsStore.load。关于页不展示通道，不打 update.info。
+ * 启动已 load 设置；本页不二次 settingsStore.load。
+ * 关于页打开读一次更新通道（`update.info`），不进 hydrate。
  */
 
-import { Component, onCleanup } from "solid-js";
+import { Component, onCleanup, onMount } from "solid-js";
 
 import { dialogFailureText, dialogPickAccepted, saveFailedText, ModuleTitle, type DialogPick, type SettingKey } from "@yohu/api";
 import { YoChrome, YoPage, YoToaster, createToaster } from "@yohu/ui";
@@ -16,6 +17,9 @@ import "./settings.css";
 
 export const SettingsView: Component = () => {
   const toaster = createToaster();
+  onMount(() => {
+    void updateStore.loadChannel();
+  });
   onCleanup(() => toaster.destroy());
 
   function successTone() {

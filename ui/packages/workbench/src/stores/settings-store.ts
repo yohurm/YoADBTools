@@ -3,6 +3,7 @@
  * 本 store 是设置的唯一 UI 投影；壳经 DeviceSession.settings 注入模块。
  * 启动读 `system.info`；变更跟 `settings/changed`。无单键 get。
  * `system.info` 同时回填身份与路径目录（关于页 / 标题栏 / 状态栏 / 路径展示）。
+ * 读失败上抛主错误，不把创建时的默认快照当成已加载。
  * 外观项（theme/density）只经 applyAppearance 写入 documentElement：创建时用默认快照，加载与变更后再写。
  */
 
@@ -94,6 +95,7 @@ export function createSettingsStore() {
     } catch (e) {
       YoLog.error(settingsChannel(), "加载失败", errorDetail(e));
       console.error("system.info 失败", e);
+      throw e;
     }
   }
 

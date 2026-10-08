@@ -35,9 +35,11 @@ const mocks = vi.hoisted(() => ({
     installer_path?: string;
     message?: string;
   }) => void),
+  commandlibLoad: vi.fn(),
   windowShow: vi.fn(async () => undefined),
   mirrorPresentSetActive: vi.fn(async (..._args: unknown[]) => undefined),
   taskHandler: null as null | ((e: unknown) => void),
+  taskList: vi.fn(async () => []),
 }));
 
 vi.mock("@yohu/api", async (importOriginal) => {
@@ -81,7 +83,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     terminalEval: notConfigured,
     groupRun: notConfigured,
     groupCancel: notConfigured,
-    commandlibLoad: notConfigured,
+    commandlibLoad: (...a: unknown[]) => mocks.commandlibLoad(...a),
     commandlibSave: notConfigured,
     filesList: notConfigured,
     filesSessionAttach: notConfigured,
@@ -116,6 +118,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     onTaskSummary: (h: (e: unknown) => void): void => {
       mocks.taskHandler = h;
     },
+    taskList: () => mocks.taskList(),
     mirrorPresentSetActive: (...a: unknown[]) => mocks.mirrorPresentSetActive(...a),
     mirrorLayout: vi.fn(async () => undefined),
     windowMinimize: vi.fn(async () => undefined),
@@ -252,6 +255,8 @@ beforeEach(() => {
   mocks.updateDownload.mockResolvedValue({ path: "C:\\Temp\\YohuAdbTools-update\\setup.exe", size_bytes: 10 });
   mocks.updateInstall.mockResolvedValue(undefined);
   mocks.updateCancel.mockResolvedValue(undefined);
+  mocks.commandlibLoad.mockReset();
+  mocks.commandlibLoad.mockResolvedValue({ schema_version: 3, groups: [] });
 });
 
 afterEach(() => {
@@ -820,6 +825,33 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     });
   });
 
+  it("命令库默认全部折叠，可改为展开或指定组", async () => {
+    mocks.commandlibLoad.mockResolvedValue({
+      schema_version: 3,
+      groups: [{ id: "g-device", name: "设备信息", entries: [] }],
+    });
+    render(() => <SettingsView />);
+    expect(screen.getByRole("button", { name: "全部折叠" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "全部折叠" }));
+    fireEvent.click(screen.getByRole("option", { name: "全部展开" }));
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_library_expand", {
+        mode: "expanded",
+        ids: [],
+      });
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "全部展开" }));
+    fireEvent.click(screen.getByRole("option", { name: "指定命令组" }));
+    const box = await screen.findByRole("checkbox", { name: "设备信息" });
+    fireEvent.click(box);
+    await waitFor(() => {
+      expect(mocks.settingsSet).toHaveBeenCalledWith("terminal_library_expand", {
+        mode: "groups",
+        ids: ["g-device"],
+      });
+    });
+  });
+
   it("终端时间格式切换立即写入 terminal_time_format", async () => {
     render(() => <SettingsView />);
     expect(screen.getByText("结果显示时间格式")).toBeTruthy();
@@ -885,11 +917,15 @@ describe("SettingsView（§4.4 设置分组卡片）", () => {
     expect(mocks.systemInfo).not.toHaveBeenCalled();
   });
 
-  it("进入设置不打 update.info", async () => {
+  it("打开设置页（关于页）读一次 update.info，不在渲染里重复读", async () => {
     mocks.updateInfo.mockClear();
     render(() => <SettingsView />);
-    await Promise.resolve();
-    expect(mocks.updateInfo).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mocks.updateInfo).toHaveBeenCalledTimes(1);
+    });
+    await mocks.updateInfo.mock.results[0]?.value;
+    expect(screen.getByText("yohurm/Windows-YoADBTools")).toBeTruthy();
+    expect(mocks.updateInfo).toHaveBeenCalledTimes(1);
   });
 
   it("启用项为 YoSwitch，无「启用」字样", () => {
@@ -1180,6 +1216,7 @@ describe("App 启动编排", () => {
   it("揭主窗口后加载，再扫描", async () => {
     mocks.windowShow.mockClear();
     mocks.deviceRefresh.mockClear();
+    mocks.taskList.mockClear();
     const { unmount } = render(() => <App />);
     await waitFor(() => {
       expect(mocks.windowShow).toHaveBeenCalledTimes(1);
@@ -1187,8 +1224,10 @@ describe("App 启动编排", () => {
     await waitFor(() => {
       expect(mocks.deviceRefresh).toHaveBeenCalled();
     });
+    const taskOrder = mocks.taskList.mock.invocationCallOrder[0]!;
     const showOrder = mocks.windowShow.mock.invocationCallOrder[0]!;
     const refreshOrder = mocks.deviceRefresh.mock.invocationCallOrder[0]!;
+    expect(taskOrder).toBeLessThan(showOrder);
     expect(showOrder).toBeLessThan(refreshOrder);
     unmount();
   });
