@@ -477,15 +477,22 @@ describe("命令库拖入导入", () => {
   });
 
   it("命令库树键只拼一次", () => {
+    const keys = load("library-expand.ts");
+    expect(keys.split('"g:"').length - 1).toBe(1);
     const tree = load("CommandTree.tsx")
-      .replace("return `g:${id}`", "")
       .replace("return `c:${id}`", "")
       .replace("return `b:${id}`", "");
     expect(tree).not.toContain("`g:${");
+    expect(tree).not.toContain('"g:"');
     expect(tree).not.toContain("`c:${");
     expect(tree).not.toContain("`b:${");
+    expect(tree).not.toContain("defaultExpandedKeys");
     expect(load("LibraryPane.tsx")).not.toContain("`g:${");
+    expect(load("LibraryPane.tsx")).not.toContain('"g:"');
     expect(load("LibraryPane.tsx")).toContain("libraryGroupKey");
+    expect(load("LibraryPane.tsx")).toContain("nextLibraryOpenIds");
+    expect(load("LibraryPane.tsx")).toContain("if (searching()) return");
+    expect(load("TerminalView.tsx")).toContain("terminal_library_expand");
   });
 
   it("组节点的 kind 只在 isGroup 里看", () => {

@@ -12,12 +12,8 @@ import { commandBlockSummary } from "./block-gap";
 
 import { entryIsCommand } from "@yohu/api";
 import { commandCopyText, entryNeedsInput, libraryEntryIcon } from "./command-line";
+import { libraryGroupKey } from "./library-expand";
 import { terminalStore } from "./store";
-
-/** 组节点键。树、默认展开和检索展开都认这一把。 */
-export function libraryGroupKey(id: string): string {
-  return `g:${id}`;
-}
 
 function libraryCommandKey(id: string): string {
   return `c:${id}`;
@@ -42,7 +38,8 @@ function isGroup(data: LibraryEntryDto | CommandGroupDto | undefined): data is C
 export function CommandTree(props: {
   groups: CommandGroupDto[];
   sourceEmpty: boolean;
-  expandedKeys?: string[];
+  expandedKeys: string[];
+  onToggle?: (key: string) => void;
   onNeedValues: (entry: LibraryEntryDto) => void;
 }) {
   const treeData = createMemo<TreeNode<LibraryEntryDto | CommandGroupDto>[]>(() =>
@@ -72,8 +69,6 @@ export function CommandTree(props: {
     })),
   );
 
-  const expandedKeys = createMemo(() => props.groups.map((group) => libraryGroupKey(group.id)));
-
   const onSelect = (_key: string, node: TreeNode<LibraryEntryDto | CommandGroupDto>): void => {
     if (isGroup(node.data)) return;
     const entry = node.data;
@@ -100,7 +95,7 @@ export function CommandTree(props: {
       <YoTree
         data={treeData()}
         expandedKeys={props.expandedKeys}
-        defaultExpandedKeys={expandedKeys()}
+        onToggle={props.onToggle}
         onSelect={onSelect}
         renderBadge={(text) => <YoBadge text={text} />}
       />

@@ -133,6 +133,7 @@ export function TerminalView(props: DeviceSession) {
 
       <div class="yohu-terminal__body">
         <LibraryPane
+          expand={props.settings.terminal_library_expand}
           onImportPaths={(paths) => void beginImport(paths)}
           onNeedValues={(entry) => {
             setInputEntry(entry);
