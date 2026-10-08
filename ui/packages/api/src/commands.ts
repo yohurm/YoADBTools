@@ -159,9 +159,9 @@ export const mirrorInject = (req: MirrorInjectRequest) =>
 export const mirrorCloseControl = (serial: string) =>
   invoke<void>("mirror.closeControl", { serial });
 
-/** 工作台在模块身份变化时开关舞台。未激活时 `mirror.layout` 不得建 HWND。 */
-export const mirrorPresentSetActive = (active: boolean) =>
-  invoke<void>("mirror.present.setActive", { active });
+/** 工作台在模块身份变化时开关舞台。`dark` 是当时已解析主题；回放上次 avail 时用它盖住缓存里的铬色。未激活时 `mirror.layout` 不得建 HWND。 */
+export const mirrorPresentSetActive = (active: boolean, dark: boolean) =>
+  invoke<void>("mirror.present.setActive", { active, dark });
 
 export const mirrorLayout = (req: MirrorLayout) => invoke<void>("mirror.layout", { req });
 

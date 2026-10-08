@@ -290,10 +290,10 @@ impl PresentHost {
     }
 
     /// 工作台拥有舞台开关。未激活时一切 `mirror.layout`（含 `visible=true`）丢弃。
-    /// 激活时用上次 avail 建窗；解码座继续跑。已经是目标开闭则不再 shutdown。
-    pub fn set_active(&self, active: bool) {
+    /// 激活时用上次 avail 建窗，铬深浅改用这次传入的已解析主题。解码座继续跑。已经是目标开闭则不再 shutdown。
+    pub fn set_active(&self, active: bool, dark: bool) {
         enum Step {
-            On(Option<MirrorLayout>),
+            On(Option<MirrorLayout>, bool),
             Off,
         }
         let step = {
@@ -303,23 +303,25 @@ impl PresentHost {
             }
             inner.active = active;
             if active {
-                Step::On(inner.last_layout.clone())
+                Step::On(inner.last_layout.clone(), dark)
             } else {
                 inner.closes += 1;
                 Step::Off
             }
         };
         match step {
-            Step::On(Some(layout)) => {
+            Step::On(Some(layout), dark) => {
+                let layout = avail_for_replay(layout, dark);
                 tracing::info!(
                     serial = %layout.serial,
                     w = layout.width,
                     h = layout.height,
+                    dark = layout.dark,
                     "投屏舞台激活，沿用上次 avail"
                 );
                 self.layout(layout);
             }
-            Step::On(None) => {
+            Step::On(None, _) => {
                 tracing::info!("投屏舞台激活");
             }
             Step::Off => {
@@ -327,6 +329,14 @@ impl PresentHost {
                 self.shutdown();
             }
         }
+    }
+
+    #[cfg(test)]
+    fn cached_avail(&self) -> Option<(bool, u32, u32)> {
+        lock_present(&self.inner)
+            .last_layout
+            .as_ref()
+            .map(|layout| (layout.dark, layout.width, layout.height))
     }
 
     pub fn layout(&self, layout: MirrorLayout) {
@@ -556,6 +566,12 @@ fn layout_replayable(layout: &MirrorLayout) -> bool {
     layout.visible && layout_is_presentable(layout.width, layout.height)
 }
 
+/// 回放只留格子。铬深浅跟这次激活时的已解析主题，不跟离开页面前冻在缓存里的 `dark`。
+fn avail_for_replay(mut layout: MirrorLayout, dark: bool) -> MirrorLayout {
+    layout.dark = dark;
+    layout
+}
+
 fn send_bind(tx: &Sender<Cmd>, serial: &str, generation: u64, pipe: Arc<FramePipe>) {
     let _ = tx.send(Cmd::BindPipe {
         serial: serial.to_string(),
@@ -625,7 +641,7 @@ fn spawn_backend_surface(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_pending_unbind, assert_screenshot_serial, layout_replayable, probe,
+        apply_pending_unbind, assert_screenshot_serial, avail_for_replay, layout_replayable, probe,
         screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError, PresentHost,
     };
     use yohu_protocol::MirrorLayout;
@@ -744,17 +760,67 @@ mod tests {
             tokio_util::sync::CancellationToken::new(),
         );
         let host = PresentHost::assemble(tx, mirror);
-        host.set_active(false);
+        host.set_active(false, false);
         assert_eq!(host.close_count(), 0);
         host.note_painted("S1", 4, 12);
-        host.set_active(true);
-        host.set_active(true);
+        host.set_active(true, false);
+        host.set_active(true, true);
         assert_eq!(host.close_count(), 0);
-        host.set_active(false);
-        host.set_active(false);
+        host.set_active(false, false);
+        host.set_active(false, false);
         assert_eq!(host.close_count(), 1);
         assert_eq!(host.paint_for("S1", 4), (true, 12));
         host.unbind("S1");
         assert_eq!(host.paint_for("S1", 4), (false, 0));
+    }
+
+    fn presentable_avail(dark: bool) -> MirrorLayout {
+        MirrorLayout {
+            serial: "S1".into(),
+            x: 10,
+            y: 20,
+            width: 800,
+            height: 600,
+            visible: true,
+            dpr: 1.5,
+            fullscreen: false,
+            paused: false,
+            control: true,
+            has_device: true,
+            failed: false,
+            error: String::new(),
+            dark,
+        }
+    }
+
+    #[test]
+    fn replay_keeps_avail_and_replaces_cached_theme() {
+        let layout = avail_for_replay(presentable_avail(false), true);
+        assert!(layout.dark);
+        assert_eq!((layout.width, layout.height), (800, 600));
+        assert_eq!(layout.serial, "S1");
+    }
+
+    #[test]
+    fn reactivate_replays_cached_avail_with_current_theme() {
+        let (tx, _rx) = tokio::sync::mpsc::channel(1);
+        let mirror = yohu_mirror::MirrorService::new(
+            std::sync::Arc::new(yohu_adb::AdbClient::new(
+                yohu_adb::ToolResolver::new(None, std::env::temp_dir(), std::env::temp_dir()),
+                1,
+            )),
+            tx.clone(),
+            std::env::temp_dir(),
+            tokio_util::sync::CancellationToken::new(),
+        );
+        let host = PresentHost::assemble(tx, mirror);
+        host.set_active(true, false);
+        host.layout(presentable_avail(false));
+        assert_eq!(host.cached_avail(), Some((false, 800, 600)));
+        host.set_active(false, false);
+        host.set_active(true, true);
+        assert_eq!(host.cached_avail(), Some((true, 800, 600)));
+        host.layout(presentable_avail(false));
+        assert_eq!(host.cached_avail(), Some((false, 800, 600)));
     }
 }

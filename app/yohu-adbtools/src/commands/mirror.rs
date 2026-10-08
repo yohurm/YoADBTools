@@ -51,8 +51,12 @@ pub async fn mirror_close_control(
 }
 
 #[tauri::command(rename = "mirror.present.setActive")]
-pub fn mirror_present_set_active(state: State<'_, AppState>, active: bool) -> Result<(), IpcError> {
-    state.present.set_active(active);
+pub fn mirror_present_set_active(
+    state: State<'_, AppState>,
+    active: bool,
+    dark: bool,
+) -> Result<(), IpcError> {
+    state.present.set_active(active, dark);
     Ok(())
 }
 

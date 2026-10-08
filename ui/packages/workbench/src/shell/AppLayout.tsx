@@ -15,9 +15,11 @@ import {
   YoRail,
   YoThemeToggle,
   YoTitleBar,
+  getTheme,
   railIntentIsExpanded,
   railToggleIntent,
   shouldSkipMotion,
+  themeIsDark,
   type RailIntent,
 } from "@yohu/ui";
 
@@ -27,6 +29,10 @@ import { mirrorPresentShouldBeActive } from "../stores/mirror-present";
 import { DeviceRail } from "./DeviceRail";
 import { NavList } from "./NavList";
 import { StatusBar } from "./StatusBar";
+
+function stageDark(): boolean {
+  return themeIsDark(getTheme());
+}
 
 /** 模块区：PC 层级转场淡入淡出（动画系统-v6.md 配方 module-fade）。 */
 const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
@@ -62,14 +68,14 @@ const ModuleStage: Component<{
   }
 
   onMount(() => {
-    void navStore.setMirrorPresent(shown()?.id);
+    void navStore.setMirrorPresent(shown()?.id, stageDark());
   });
 
   createEffect(() => {
     const next = incoming();
     const cur = shown();
     if (next?.id === cur?.id) return;
-    void navStore.setMirrorPresent(next?.id);
+    void navStore.setMirrorPresent(next?.id, stageDark());
     const mirrorInvolved =
       mirrorPresentShouldBeActive(next?.id) || mirrorPresentShouldBeActive(cur?.id);
     if (!cur || shouldSkipMotion() || mirrorInvolved) {

@@ -1150,7 +1150,7 @@ describe("AppLayout 窗口铬", () => {
     navStore.navigate(ModuleId.Mirror);
     render(() => <AppLayout />);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, false);
     });
   });
 
@@ -1160,7 +1160,7 @@ describe("AppLayout 窗口铬", () => {
     mocks.mirrorPresentSetActive.mockClear();
     navStore.navigate(ModuleId.Mirror);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, false);
     });
     expect(screen.getByTestId("mirror-stage")).toBeTruthy();
   });
@@ -1169,12 +1169,28 @@ describe("AppLayout 窗口铬", () => {
     navStore.navigate(ModuleId.Mirror);
     render(() => <AppLayout />);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, false);
     });
     mocks.mirrorPresentSetActive.mockClear();
     navStore.navigate(ModuleId.Terminal);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false, false);
+    });
+  });
+
+  it("切回投屏时把当前解析主题交给舞台回放", async () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    navStore.navigate(ModuleId.Terminal);
+    render(() => <AppLayout />);
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Mirror);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, true);
+    });
+    mocks.mirrorPresentSetActive.mockClear();
+    navStore.navigate(ModuleId.Terminal);
+    await waitFor(() => {
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false, true);
     });
   });
 
@@ -1182,16 +1198,16 @@ describe("AppLayout 窗口铬", () => {
     navStore.navigate(ModuleId.Mirror);
     render(() => <AppLayout />);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, false);
     });
     navStore.navigate(ModuleId.Terminal);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(false, false);
     });
     mocks.mirrorPresentSetActive.mockClear();
     navStore.navigate(ModuleId.Mirror);
     await waitFor(() => {
-      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true);
+      expect(mocks.mirrorPresentSetActive).toHaveBeenCalledWith(true, false);
     });
     expect(screen.getByTestId("mirror-stage")).toBeTruthy();
   });

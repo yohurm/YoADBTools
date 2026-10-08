@@ -20,7 +20,7 @@
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.replay` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / 回补 / ps / 已安装包名 |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
-| `mirror.start/stop/inject/closeControl/present.setActive/layout/pointer/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。**舞台开关** `mirror.present.setActive` 只由 `@yohu/workbench` 在模块身份变化时调用（离开 `screen-mirror` 同一拍 `false` 并拆 HWND；已经是目标开闭则不再 shutdown）。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。`dark` 跟工作台 `data-theme`。未激活时一切 layout（含 `visible=true`）丢弃。禁止 `video_width` / `stroke_px` / layout `epoch`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。`mirror.pointer` 与 layout 同一坐标系，UI 不算 dest。阶段只信 `mirror/state`。界面重建读 `mirror.session`（槽位 + 呈现闩，ADR-v6-040）。禁止 `mirror.status`，禁止 `mirror.sync` |
+| `mirror.start/stop/inject/closeControl/present.setActive/layout/pointer/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。**舞台开关** `mirror.present.setActive(active, dark)` 只由 `@yohu/workbench` 在模块身份变化时调用（离开 `screen-mirror` 同一拍 `false` 并拆 HWND；已经是目标开闭则不再 shutdown）。`dark` 是调用当时文档里已解析的主题。回来用上次可呈现 avail 建窗时，用这次的 `dark` 覆盖缓存里的铬色。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。`dark` 跟工作台 `data-theme`。未激活时一切 layout（含 `visible=true`）丢弃。禁止 `video_width` / `stroke_px` / layout `epoch`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。`mirror.pointer` 与 layout 同一坐标系，UI 不算 dest。阶段只信 `mirror/state`。界面重建读 `mirror.session`（槽位 + 呈现闩，ADR-v6-040）。禁止 `mirror.status`，禁止 `mirror.sync` |
 | `mirror.session` | 当前投屏投影列表（Starting/Live；阶段、世代、尺寸、编码、控制、已出画、上一拍 fps、暂停、全屏）。hydrate 读一次。`has_frame` 与 fps 在呈现服务上：拆 HWND 不清，`stop` 与掉线才清。状态栏：Live 且有尺寸显示宽×高，fps 大于 0 才接上 |
 | `task.list` | 任务当前列表，与 `task/summary` 同一 `TaskInfo` 结构。hydrate 读一次；之后只信推送全量替换 |
 | `settings.set` | 更新单键；推 `settings/changed` 全量快照。读走 `system.info` / 事件注入 |
@@ -28,7 +28,7 @@
 | `boot.showMain` | 揭窗**唯一入口**。`commands/boot` 薄转发 `window_boot::show_if_hidden`。工作台已 hydrate：Windows 上同屏铺满后再揭主窗内容 / 异屏出场后再揭；其它平台直接揭窗。幂等。禁止超时双轨。 |
 | `update.check` / `info` / `download` / `install` / `cancel` / `open` | ADR-v6-022 |
 
-本机选路走 `@yohu/api` 的 `dialogOpen*` / `dialogSaveFile`（封装 `tauri-plugin-dialog`）。窗口三键走 `@yohu/api` 的 `windowMinimize` 等（封装 `@tauri-apps/api/window`）；启动是原生小窗（Win32 GDI，进程入口）→ 主窗 hydrate → `windowShow`（`boot.showMain`）按同屏/异屏交接。工作台不直连 Tauri。`mirror.present.setActive` 由工作台调用；`mirror.layout.dark` 跟工作台 `data-theme`；设备夜览只走月亮钮 / `deviceStatuses.night`。
+本机选路走 `@yohu/api` 的 `dialogOpen*` / `dialogSaveFile`（封装 `tauri-plugin-dialog`）。窗口三键走 `@yohu/api` 的 `windowMinimize` 等（封装 `@tauri-apps/api/window`）；启动是原生小窗（Win32 GDI，进程入口）→ 主窗 hydrate → `windowShow`（`boot.showMain`）按同屏/异屏交接。工作台不直连 Tauri。`mirror.present.setActive(active, dark)` 由工作台调用，`dark` 取当时 `data-theme`；回放上次 avail 时用它覆盖缓存铬色。页内改主题仍走 `mirror.layout.dark`。设备夜览只走月亮钮 / `deviceStatuses.night`。
 
 ## `@yohu/api` 门面
 
@@ -125,4 +125,4 @@ invoke settings.set → commands/settings → settings_apply
 invoke boot.showMain → commands/boot → window_boot::show_if_hidden
 ```
 
-`PresentHost::attach` 未 active 不 `ensure_surface`。建窗只走 `setActive(true)` + `layout`。
+`PresentHost::attach` 未 active 不 `ensure_surface`。建窗只走 `setActive(true, dark)` + `layout`。回放覆盖缓存 `dark`。

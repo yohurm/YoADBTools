@@ -68,8 +68,8 @@ settings.json → settings.set / settings/changed → settingsStore → DeviceSe
         system.info 失败：YoLog.warn + errorText，lastError 仍是主错误
         DeviceRail 只展示 lastError，不拼 hint
 切模块：NavList 事件 → navStore.navigate
-        ModuleStage 身份变化同一拍 → navStore.setMirrorPresent(id)
-          → mirror.present.setActive（只认 ModuleId.Mirror；进投屏立刻建表面，不跟淡出）
+        ModuleStage 身份变化同一拍 → navStore.setMirrorPresent(id, data-theme)
+          → mirror.present.setActive(active, dark)（只认 ModuleId.Mirror；进投屏立刻建表面，不跟淡出；回放覆盖缓存铬色）
         进出投屏同一拍挂载/卸载 MirrorView，不跟 YoPresence 淡出；其它模块仍 fade
 选择：DeviceRail 事件 → deviceStore.selectDevice → DeviceSession
 设置：SettingsForm 事件 → settingsStore.set / browseAdbPath / browseDataRoot / browseExportPath / openLogsDir
@@ -140,7 +140,7 @@ Vite server.port
 
 invoke mirror.start → commands/mirror → mirror_sessions::start
   → MirrorService.start → present.attach（只 stash / BindPipe，未 active 不建窗）
-invoke mirror.present.setActive(true) + mirror.layout
+invoke mirror.present.setActive(true, dark) + mirror.layout
   → PresentHost::layout → ensure_surface 建 HWND
   → occupancy DComp clip contain
 
