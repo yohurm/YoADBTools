@@ -29,6 +29,18 @@ pub fn spawn_dispatcher(
                     crate::capture_runs::finish(&app_state, serial);
                 }
             }
+            if let AppEvent::MirrorPainted {
+                serial,
+                generation,
+                painted_fps,
+            } = &event
+            {
+                if let Some(app_state) = app.try_state::<AppState>() {
+                    app_state
+                        .present
+                        .note_painted(serial, *generation, *painted_fps);
+                }
+            }
             if let AppEvent::MirrorState {
                 serial,
                 state,

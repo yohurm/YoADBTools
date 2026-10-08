@@ -12,6 +12,7 @@ pub mod log;
 pub mod mirror;
 pub mod settings;
 pub mod system;
+pub mod task;
 pub mod terminal;
 pub mod update;
 

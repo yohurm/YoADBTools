@@ -11,6 +11,7 @@ mod commands;
 mod device_catalog;
 mod dnd;
 mod events;
+mod exit;
 mod group_runs;
 mod ipc_map;
 mod ipc_update;
@@ -253,15 +254,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            let exit_handle = handle.clone();
-            let exit_cancel = root_cancel.clone();
-            tauri::async_runtime::spawn(async move {
-                exit_cancel.cancelled().await;
-                let state = exit_handle.state::<AppState>();
-                state.mirror.stop_all().await;
-                state.present.shutdown();
-            });
-
             // 5) 启动预热（异步，不阻塞窗口）：解压 sidecar 后与 UI refresh 共用一趟 start-server + 扫描
             let warm_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -359,6 +351,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::mirror::mirror_close_control,
             commands::mirror::mirror_present_set_active,
             commands::mirror::mirror_layout,
+            commands::mirror::mirror_session,
+            commands::task::task_list,
             commands::mirror::mirror_pointer,
             commands::mirror::mirror_screenshot,
             commands::settings::settings_set,
@@ -376,15 +370,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build(tauri::generate_context!())?;
 
-    // 退出序列：根 cancel → 采集/传输收敛 → 设置 flush
+    // 退出序列：根 cancel → 任务收敛，超时杀 adb 进程树 → 设置 flush
     app.run(move |app, event| {
         if let RunEvent::Exit = event {
             if let Some(state) = app.try_state::<AppState>() {
-                state.root_cancel.cancel();
-                if let Err(e) = state.settings.save_atomic() {
-                    tracing::warn!("退出时保存设置失败: {e}");
-                }
-                crate::dnd::cleanup_stale(&state.paths.drag_out_dir());
+                crate::exit::shutdown(&state);
             }
         }
     });

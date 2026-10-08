@@ -2,8 +2,10 @@
 //!
 //! 下载与文件传输同纪律：`update.download` invoke 立即返回，字节进度经 `update/progress` 推送
 //!（禁止在 invoke 内 await 整段 HTTP，否则 WebView 在命令结束前收不到事件）。
+//! 下载中的字节可丢；校验、就绪、失败、安装必达。
 
 use tauri::{AppHandle, Manager};
+use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
 
 use tokio::sync::mpsc;
@@ -51,20 +53,28 @@ impl UpdateRuns {
         }
     }
 
-    /// 下载字节 200ms 节流在 core；壳侧满队列时 fallback `send`，避免进度条长期 0%。
+    /// 下载字节可丢。其余阶段先入队；队列满则等到送出，不丢终态。
     fn emit_progress(tx: &mpsc::Sender<AppEvent>, progress: UpdateProgress) {
         let lossy = matches!(progress.stage, UpdateStage::Downloading);
         let event = AppEvent::UpdateProgress(progress);
+        if lossy {
+            let _ = tx.try_send(event);
+            return;
+        }
+        if tx.try_send(event.clone()).is_ok() {
+            return;
+        }
         let tx = tx.clone();
-        tauri::async_runtime::spawn(async move {
-            if lossy {
-                if tx.try_send(event.clone()).is_err() {
+        match Handle::try_current() {
+            Ok(handle) => {
+                handle.spawn(async move {
                     let _ = tx.send(event).await;
-                }
-            } else {
-                let _ = tx.send(event).await;
+                });
             }
-        });
+            Err(_) => {
+                let _ = tx.blocking_send(event);
+            }
+        }
     }
 
     fn emit_failed(tx: &mpsc::Sender<AppEvent>, version: String, err: UpdateError) {
@@ -138,16 +148,17 @@ pub fn install(app: &AppHandle, state: &AppState, path: &str) -> Result<(), Upda
     let installer = assert_cached_installer(std::path::Path::new(path))?;
     let relaunch = installed_exe_path()?;
     let pid = std::process::id();
-    let _ = state
-        .event_tx
-        .try_send(AppEvent::UpdateProgress(UpdateProgress {
+    UpdateRuns::emit_progress(
+        &state.event_tx,
+        UpdateProgress {
             version: String::new(),
             stage: UpdateStage::Applying,
             received_bytes: 0,
             total_bytes: 0,
             installer_path: None,
             error: None,
-        }));
+        },
+    );
     let should_exit = spawn_overlay_install(&installer, pid, &relaunch)?;
     if should_exit {
         state.app_log.info("已启动覆盖安装，即将退出以便写入主程序");

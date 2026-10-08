@@ -84,8 +84,18 @@ struct Inner {
     last_layout: Option<MirrorLayout>,
     /// 当前会话的 session 内容尺寸。Live 即可记下，不必等首帧。
     last_content: Option<(String, u32, u32)>,
+    /// 已出画与上一拍 fps。跟呈现服务，不跟 HWND。
+    paint: Option<PaintNote>,
+    /// 从开到关调用 shutdown 的次数。已经关闭再关不加。
+    closes: u32,
     #[cfg(windows)]
     decode: Option<DecodeSeat>,
+}
+
+struct PaintNote {
+    serial: String,
+    generation: u64,
+    painted_fps: u32,
 }
 
 pub fn probe() -> Caps {
@@ -129,11 +139,10 @@ pub(crate) fn spawn_present_thread(name: String, body: impl FnOnce() + Send + 's
 }
 
 impl PresentHost {
-    pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
-        // HEVC 探测会走 Media Foundation，冷启动可达数秒；禁止挡 setup / 首屏。
+    fn assemble(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
         #[cfg(windows)]
         let geom = GeomHost::new();
-        let host = Arc::new(Self {
+        Arc::new(Self {
             hevc_ok: AtomicBool::new(false),
             event_tx,
             mirror,
@@ -145,6 +154,8 @@ impl PresentHost {
                 live_bind: None,
                 last_layout: None,
                 last_content: None,
+                paint: None,
+                closes: 0,
                 #[cfg(windows)]
                 decode: None,
             }),
@@ -154,7 +165,12 @@ impl PresentHost {
             d3d: Mutex::new(None),
             #[cfg(windows)]
             pictures: Arc::new(PictureBank::new()),
-        });
+        })
+    }
+
+    pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
+        // HEVC 探测会走 Media Foundation，冷启动可达数秒；禁止挡 setup / 首屏。
+        let host = Self::assemble(event_tx, mirror);
         let probe_host = Arc::clone(&host);
         tauri::async_runtime::spawn(async move {
             match tokio::task::spawn_blocking(probe).await {
@@ -229,6 +245,9 @@ impl PresentHost {
             inner.decode = None;
             self.pictures.clear();
         }
+        if inner.paint.as_ref().is_some_and(|note| note.serial == serial) {
+            inner.paint = None;
+        }
         if let Some(tx) = inner.surface.as_ref() {
             let _ = tx.send(Cmd::UnbindPipe {
                 serial: serial.to_string(),
@@ -236,21 +255,62 @@ impl PresentHost {
         }
     }
 
+    /// 首帧与 fps 节拍。拆 HWND 不清。
+    pub fn note_painted(&self, serial: &str, generation: u64, painted_fps: u32) {
+        let mut inner = lock_present(&self.inner);
+        inner.paint = Some(PaintNote {
+            serial: serial.to_string(),
+            generation,
+            painted_fps,
+        });
+    }
+
+    /// 这一代是否已经出画，以及上一拍 fps。对不上则为没有。
+    pub fn paint_for(&self, serial: &str, generation: u64) -> (bool, u32) {
+        let inner = lock_present(&self.inner);
+        match &inner.paint {
+            Some(note) if note.serial == serial && note.generation == generation => {
+                (true, note.painted_fps)
+            }
+            _ => (false, 0),
+        }
+    }
+
+    /// 上次可回放 layout 上的暂停与全屏。serial 对不上则为关。
+    pub fn replay_flags(&self, serial: &str) -> (bool, bool) {
+        let inner = lock_present(&self.inner);
+        match &inner.last_layout {
+            Some(layout) if layout.serial == serial => (layout.paused, layout.fullscreen),
+            _ => (false, false),
+        }
+    }
+
+    pub fn close_count(&self) -> u32 {
+        lock_present(&self.inner).closes
+    }
+
     /// 工作台拥有舞台开关。未激活时一切 `mirror.layout`（含 `visible=true`）丢弃。
-    /// 激活时用上次 avail 建窗；解码座继续跑。
+    /// 激活时用上次 avail 建窗；解码座继续跑。已经是目标开闭则不再 shutdown。
     pub fn set_active(&self, active: bool) {
-        let replay = {
+        enum Step {
+            On(Option<MirrorLayout>),
+            Off,
+        }
+        let step = {
             let mut inner = lock_present(&self.inner);
+            if inner.active == active {
+                return;
+            }
             inner.active = active;
             if active {
-                inner.last_layout.clone()
+                Step::On(inner.last_layout.clone())
             } else {
-                None
+                inner.closes += 1;
+                Step::Off
             }
         };
-        if active {
-            tracing::info!("投屏舞台激活");
-            if let Some(layout) = replay {
+        match step {
+            Step::On(Some(layout)) => {
                 tracing::info!(
                     serial = %layout.serial,
                     w = layout.width,
@@ -259,9 +319,13 @@ impl PresentHost {
                 );
                 self.layout(layout);
             }
-        } else {
-            tracing::info!("投屏舞台关闭（模块不是投屏）");
-            self.shutdown();
+            Step::On(None) => {
+                tracing::info!("投屏舞台激活");
+            }
+            Step::Off => {
+                tracing::info!("投屏舞台关闭（模块不是投屏）");
+                self.shutdown();
+            }
         }
     }
 
@@ -562,7 +626,7 @@ fn spawn_backend_surface(
 mod tests {
     use super::{
         apply_pending_unbind, assert_screenshot_serial, layout_replayable, probe,
-        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError,
+        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError, PresentHost,
     };
     use yohu_protocol::MirrorLayout;
 
@@ -665,5 +729,32 @@ mod tests {
         #[cfg(target_os = "linux")]
         assert_eq!(caps.id, "vaapi");
         assert!(!caps.id.is_empty());
+    }
+
+    #[test]
+    fn repeated_inactive_does_not_shutdown_and_hwnd_drop_keeps_paint() {
+        let (tx, _rx) = tokio::sync::mpsc::channel(1);
+        let mirror = yohu_mirror::MirrorService::new(
+            std::sync::Arc::new(yohu_adb::AdbClient::new(
+                yohu_adb::ToolResolver::new(None, std::env::temp_dir(), std::env::temp_dir()),
+                1,
+            )),
+            tx.clone(),
+            std::env::temp_dir(),
+            tokio_util::sync::CancellationToken::new(),
+        );
+        let host = PresentHost::assemble(tx, mirror);
+        host.set_active(false);
+        assert_eq!(host.close_count(), 0);
+        host.note_painted("S1", 4, 12);
+        host.set_active(true);
+        host.set_active(true);
+        assert_eq!(host.close_count(), 0);
+        host.set_active(false);
+        host.set_active(false);
+        assert_eq!(host.close_count(), 1);
+        assert_eq!(host.paint_for("S1", 4), (true, 12));
+        host.unbind("S1");
+        assert_eq!(host.paint_for("S1", 4), (false, 0));
     }
 }
