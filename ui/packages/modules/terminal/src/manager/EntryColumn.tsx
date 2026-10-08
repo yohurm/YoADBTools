@@ -31,7 +31,7 @@ export function EntryColumn(props: {
   const rowHeight = controlRowHeight();
 
   return (
-    <YoPanel variant="pane" overflow="hidden" padding="xs" role="ops" header={
+    <YoPanel class="yohu-cm__entries" variant="pane" overflow="hidden" padding="xs" role="ops" header={
       <YoToolbar pad="xs">
         <YoSubheader title={entryColumnLabel()} pad="flush" />
         <YoIconButton icon="plus" title="新增命令" onClick={() => props.store.addCommand()} />
@@ -46,13 +46,15 @@ export function EntryColumn(props: {
         getItemKey={(entry) => entry.id}
         ariaLabel={entryColumnLabel()}
         renderRow={EntryRow}
-        {...opsListBindings({
+        {...opsListBindings<DraftEntry>({
           features: ["multi", "reorder", "menu", "rule"],
           selectedKeys: () => props.store.selectedEntrySet(),
           onSelectRow: (entry, _key, event) => {
             props.store.selectEntry(entry.id, pointerSelectMode(event));
           },
-          onReorder: (from, to) => props.store.moveEntryTo(from, to),
+          onReorder: props.store.selectedEntrySet().size < 2
+            ? (from, to) => props.store.moveEntryTo(from, to)
+            : undefined,
           onRowContextMenu: (entry, _key, event) => {
             props.onContextMenu(entry, event);
           },

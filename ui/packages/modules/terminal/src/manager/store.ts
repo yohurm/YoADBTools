@@ -7,6 +7,7 @@
  *   定高组/条目 YoVirtualList.onReorder → moveGroupTo / moveEntryTo
  *   变高步骤 YoReorderList.onReorder（及 Ctrl/Meta+↑/↓）→ moveBlockStepTo
  *   三者都只调 @yohu/ui moveItemTo。禁止 shift 包装、禁止第二套几何。
+ *   多选迁到其他组：moveEntriesTo。气泡飞行在 MigrateLayer，这里只改草稿，放下后清空条目选区。
  * 设计后链路（占位符）：
  *   `{n}` 只活在一条模板上。命令改 template / params；块改该步 template / params。
  *   块填参身份是 (step, index)，标签 `1-0`。禁止条目级并集。
@@ -18,6 +19,7 @@ import type { CommandLibraryDto, CommandParamDto } from "@yohu/api";
 import { moveItemTo, nextKeys, type SelectMode } from "@yohu/ui";
 
 import { entryIsBlock, entryIsCommand } from "@yohu/api";
+import { moveEntriesIntoGroup } from "./migrate";
 import {
   emptyBlock,
   emptyCommand,
@@ -215,6 +217,17 @@ export function createCommandManagerStore() {
     writeGroupEntries((entries) => moveItemTo(entries, from, to));
   }
 
+  /** 当前选区按清单顺序追加到目标组。放下后不再保持选中。迁不动则原样。 */
+  function moveEntriesTo(targetId: string): boolean {
+    const gid = groupId();
+    if (!gid) return false;
+    const moved = moveEntriesIntoGroup(draft.groups, gid, selectedEntrySet(), targetId);
+    if (!moved) return false;
+    setDraft("groups", moved.groups);
+    selectGroup(targetId);
+    return true;
+  }
+
   function removeEntries(): void {
     const ids = selectedEntrySet();
     if (ids.size === 0) return;
@@ -300,6 +313,7 @@ export function createCommandManagerStore() {
     addCommand,
     addBlock,
     moveEntryTo,
+    moveEntriesTo,
     removeEntries,
     setEntryName,
     updateEntry,

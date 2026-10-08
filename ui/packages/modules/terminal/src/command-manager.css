@@ -2,6 +2,7 @@
  * 层与裁切由 YoDialog Portal + fill 定高负责。禁止再点 __body。 */
 
 .yohu-cm {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(var(--yohu-layout-cm-group-min), var(--yohu-layout-cm-group-max)) minmax(var(--yohu-layout-cm-cmd-min), var(--yohu-layout-cm-cmd-max)) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -64,6 +65,61 @@
   align-items: flex-start;
   gap: var(--yohu-space-xs);
   padding-block: calc(var(--yohu-space-sm) / 2);
+}
+
+/* 多选迁移：右栏只列目标组。预览是唯一浮层，牌面在 YoDragPile。 */
+.yohu-cm__migrate-rest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--yohu-space-sm);
+  min-width: 0;
+  padding-top: var(--yohu-space-lg);
+}
+
+.yohu-cm[data-migrate-source] .yohu-cm__entries [aria-selected="true"] {
+  cursor: grab;
+  transition: opacity var(--yohu-motion-spatial-local);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [aria-selected="true"] {
+  cursor: grabbing;
+  opacity: var(--yohu-state-reorder-source);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [data-radius="chip"][data-fill="selected"] > * {
+  transition: background-color var(--yohu-motion-spatial-local);
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [aria-selected="true"][data-gather-home] {
+  opacity: 1;
+}
+
+.yohu-cm[data-migrating] .yohu-cm__entries [data-gather-home][data-radius="chip"][data-fill="selected"] > * {
+  background-color: transparent;
+}
+
+.yohu-cm-migrate {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  --yohu-drag-pile-width: var(--yohu-layout-cm-cmd-max);
+  margin: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.yohu-cm-migrate,
+.yohu-cm-migrate * {
+  pointer-events: none;
+}
+
+.yohu-cm-migrate[data-ready] {
+  transition: opacity var(--yohu-motion-effects-fast);
+}
+
+.yohu-cm-migrate[data-open] {
+  opacity: 1;
 }
 
 .yohu-cm__step-editor {

@@ -415,7 +415,10 @@ describe("命令终端动效接线", () => {
     expect(load("manager/store.ts")).toContain("export const commandManagerStore");
     expect(load("command-manager.css")).not.toContain("var(--yohu-z-overlay)");
     expect(load("command-manager.css")).not.toContain(".yohu-cm__step-grip");
-    expect(load("command-manager.css")).not.toContain("position: absolute");
+    const managerCss = load("command-manager.css");
+    const withoutFlight = managerCss.replace(/\.yohu-cm-migrate \{[^}]*\}/, "");
+    expect(withoutFlight).not.toContain("position: absolute");
+    expect(managerCss).toContain(".yohu-cm-migrate {");
     expect(load("manager/BlockSteps.tsx")).not.toContain('"z-index": 1');
     expect(load("manager/TemplateField.tsx")).not.toContain("dataset.slotBound");
   });

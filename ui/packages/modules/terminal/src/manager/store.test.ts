@@ -78,6 +78,22 @@ describe("命令管理 store", () => {
     expect(out.groups[0]!.entries.map((e) => e.kind)).toEqual(["command", "command", "block"]);
   });
 
+  it("多选迁到另一组：按原顺序追加，放下后不再选中", () => {
+    const store = createCommandManagerStore();
+    store.load(sample);
+    store.selectEntry("c2", "replace");
+    store.selectEntry("c1", "toggle");
+    expect(store.moveEntriesTo("g2")).toBe(true);
+    expect(store.ui.selectedGroupId).toBe("g2");
+    expect(store.draft.groups[0]?.entries.map((entry) => entry.id)).toEqual(["b1"]);
+    expect(store.selectedGroup()?.entries.map((entry) => entry.id)).toEqual(["c3", "c1", "c2"]);
+    expect(store.ui.selectedEntryIds).toEqual([]);
+    expect(store.ui.entryPivot).toBeNull();
+    expect(store.moveEntriesTo("g2")).toBe(false);
+    store.selectOnly(null);
+    expect(store.moveEntriesTo("g1")).toBe(false);
+  });
+
   it("组与条目拖动换位，选中身份跟 id", () => {
     const store = createCommandManagerStore();
     store.load(sample);

@@ -4,9 +4,9 @@
  * 有页眉时栏标题走 Toolbar children 的 YoSubheader；禁止 YoPanel title / YoToolbar title。
  */
 
-import { Show, createMemo } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 
-import { YoEmptyState, YoPanel, YoScroller, YoSubheader, YoTextField, YoToolbar } from "@yohu/ui";
+import { YoEmptyState, YoListItem, YoPanel, YoScroller, YoSubheader, YoTextField, YoToolbar } from "@yohu/ui";
 
 import { BlockEditor } from "./BlockEditor";
 import { CommandEditor } from "./CommandEditor";
@@ -18,11 +18,16 @@ import {
   editorShowsForm,
   editorTarget,
   editorTargetIsEmpty,
+  draftRowTitle,
   multiCount,
 } from "./editor-target";
+import { migrateDestinations } from "./migrate";
 import type { CommandManagerStore } from "./store";
 
-export function EditorColumn(props: { store: CommandManagerStore }) {
+export function EditorColumn(props: {
+  store: CommandManagerStore;
+  onMoveTo: (groupId: string) => void;
+}) {
   const target = createMemo(() =>
     editorTarget({
       group: props.store.selectedGroup(),
@@ -31,7 +36,11 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
     }),
   );
   const title = createMemo(() => editorPaneTitle(target()));
-
+  const destinations = createMemo(() => {
+    const group = props.store.selectedGroup();
+    if (!group) return [];
+    return migrateDestinations(props.store.draft.groups, group.id);
+  });
   return (
     <YoPanel
       variant="pane"
@@ -49,7 +58,31 @@ export function EditorColumn(props: { store: CommandManagerStore }) {
         <YoEmptyState fill size="sm" title="选择左侧命令组，或新建一组" />
       </Show>
       <Show when={multiCount(target())}>
-        {(count) => <YoEmptyState fill size="sm" title={`已选 ${count()} 条`} />}
+        <YoScroller>
+          <div class="yohu-cm__migrate-rest">
+            <Show
+              when={destinations().length > 0}
+              fallback={
+                <YoEmptyState
+                  size="sm"
+                  title="没有其他命令组"
+                  description="新建一组后，可以把所选条目移过去"
+                />
+              }
+            >
+              <YoSubheader title="移到" pad="flush" />
+              <For each={destinations()}>
+                {(group) => (
+                  <YoListItem
+                    role="button"
+                    title={draftRowTitle(group.name)}
+                    onClick={() => props.onMoveTo(group.id)}
+                  />
+                )}
+              </For>
+            </Show>
+          </div>
+        </YoScroller>
       </Show>
       <Show when={editorShowsForm(target())}>
         <YoScroller>

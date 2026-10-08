@@ -53,7 +53,7 @@ describe("editorTarget", () => {
     const target = editorTarget({ group, entry: undefined, selectedEntryCount: 3 });
     expect(target).toEqual({ kind: "multi", count: 3 });
     expect(multiCount(target)).toBe(3);
-    expect(editorPaneTitle(target)).toBeUndefined();
+    expect(editorPaneTitle(target)).toBe("已选 3 条");
     expect(asGroup(target)).toBeUndefined();
   });
 

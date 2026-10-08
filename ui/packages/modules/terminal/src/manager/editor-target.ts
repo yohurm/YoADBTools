@@ -54,6 +54,7 @@ export function editorPaneTitle(target: EditorTarget): string | undefined {
     case "group":
       return "组属性";
     case "multi":
+      return `已选 ${target.count} 条`;
     case "empty":
       return undefined;
   }

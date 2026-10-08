@@ -17,8 +17,11 @@ import {
 } from "@yohu/ui";
 
 import { commandCopyLines } from "./command-line";
+import { draftRowTitle } from "./manager/editor-target";
+import { migrateDestinations } from "./manager/migrate";
 import { terminalCommandMenu } from "./menu";
 import type { DraftEntry } from "./draft";
+import type { MigrateApi } from "./manager/MigrateLayer";
 import { ManagerWorkspace } from "./manager/Workspace";
 import { MANAGER_DIALOG } from "./layout";
 import { commandManagerStore } from "./manager/store";
@@ -28,6 +31,9 @@ import "./command-manager.css";
 export function CommandManager() {
   const store = commandManagerStore;
   const toaster = createToaster();
+  let flyTo = (groupId: string): void => {
+    store.moveEntriesTo(groupId);
+  };
 
   onCleanup(() => toaster.destroy());
 
@@ -54,11 +60,17 @@ export function CommandManager() {
       store.selectOnly(entry.id);
     }
     const text = commandCopyLines(store.selectedCommands().map((command) => command.template));
+    const sourceId = store.ui.selectedGroupId;
     openContextMenu(terminalCommandMenu, {
       x: event.clientX,
       y: event.clientY,
       ctx: {
         canCopy: text.length > 0,
+        destinations: migrateDestinations(store.draft.groups, sourceId).map((group) => ({
+          id: group.id,
+          name: draftRowTitle(group.name),
+        })),
+        moveTo: (groupId) => flyTo(groupId),
         copy: () => {
           void writeClipboard(text).then((result) => {
             const failure = clipboardFailureText(result);
@@ -97,7 +109,13 @@ export function CommandManager() {
           </>
         }
       >
-        <ManagerWorkspace store={store} onContextMenu={openCommandMenu} />
+        <ManagerWorkspace
+          store={store}
+          onContextMenu={openCommandMenu}
+          bindMigrate={(api: MigrateApi) => {
+            flyTo = api.flyTo;
+          }}
+        />
       </YoDialog>
       <YoToaster toaster={toaster} />
     </>

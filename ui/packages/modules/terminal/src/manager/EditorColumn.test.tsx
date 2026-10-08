@@ -33,7 +33,7 @@ const sample: CommandLibraryDto = {
 describe("EditorColumn 选区", () => {
   it("从空态跟到组、命令、块，不停留空文案", () => {
     const store = createCommandManagerStore();
-    render(() => <EditorColumn store={store} />);
+    render(() => <EditorColumn store={store} onMoveTo={() => undefined} />);
     expect(screen.getByText("选择左侧命令组，或新建一组")).toBeTruthy();
 
     store.load(sample);

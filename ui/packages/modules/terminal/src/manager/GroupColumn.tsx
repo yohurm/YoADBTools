@@ -2,7 +2,10 @@
  * 命令管理左栏：组操作面板。
  * 底色走 YoPanel role=ops（顶栏白、内容灰）。
  * 功能集摊到 YoVirtualList；行内容是 YoOpsItem。只要单选和换位。
+ * 迁移经过时 hotKey 画出投放框，不改当前选中组。
  */
+
+import type { Accessor } from "solid-js";
 
 import { YoBadge, YoIconButton, YoOpsItem, YoPanel, YoSubheader, YoToolbar, YoVirtualList, controlRowHeight, opsListBindings } from "@yohu/ui";
 
@@ -23,7 +26,11 @@ function GroupRow(props: { item: DraftGroup; index: number }) {
   );
 }
 
-export function GroupColumn(props: { store: CommandManagerStore }) {
+export function GroupColumn(props: {
+  store: CommandManagerStore;
+  /** 迁移经过的组。清单投放框，不是选中。 */
+  dropKey: Accessor<string | null>;
+}) {
   const groups = (): DraftGroup[] => props.store.draft.groups;
   const rowHeight = controlRowHeight();
 
@@ -42,12 +49,13 @@ export function GroupColumn(props: { store: CommandManagerStore }) {
         getItemKey={(group) => group.id}
         ariaLabel={groupColumnLabel()}
         renderRow={GroupRow}
-        {...opsListBindings({
+        {...opsListBindings<DraftGroup>({
           features: ["select", "reorder"],
           selectedKey: () => props.store.ui.selectedGroupId,
           onSelectRow: (group) => props.store.selectGroup(group.id),
           onReorder: (from, to) => props.store.moveGroupTo(from, to),
         })}
+        hotKey={() => props.dropKey() ?? null}
       />
     </YoPanel>
   );
