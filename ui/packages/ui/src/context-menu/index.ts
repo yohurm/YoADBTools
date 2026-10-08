@@ -13,7 +13,7 @@ export type {
   ContextMenuSession,
   YoMenuItem,
 } from "./types";
-export { clampContextMenuPoint, estimateContextMenuHeight } from "./place";
+export { clampContextMenuPoint, estimateContextMenuHeight, estimateContextMenuWidth, placeSubmenu } from "./place";
 export {
   closeContextMenu,
   createContextMenuController,

@@ -103,8 +103,11 @@ export const Layout = {
   TooltipArrowInset: 20,
   /** 箭头尖到锚点的空隙 */
   TooltipGap: Spacing.Xs,
-  /** 电脑菜单默认最小宽 224vp */
-  MenuMin: 224,
+  /**
+   * 右键菜单内容帽（Fluent Menu 300px）。
+   * 菜单宽跟最长标签；超过帽则省略。落点估算与 CSS 同一帽。
+   */
+  MenuMax: 300,
   /** 侧栏内容距背板（设备/导航同一槽，选中片不再二次内缩） */
   RailInset: 8,
   /** HarmonyOS Toggle Switch 默认 {width:36vp, height:20vp} */

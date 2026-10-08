@@ -8,6 +8,12 @@ import { itemIsEnabled, listEdgeIndex, stepWrappedIndex, type ListEdge } from ".
 export interface MenuListItem {
   label: string;
   disabled?: boolean;
+  children?: readonly unknown[];
+}
+
+/** 可展开的二级菜单项：未禁用，且至少有一条子项。 */
+export function menuItemIsBranch(item: { disabled?: boolean; children?: readonly unknown[] } | undefined): boolean {
+  return itemIsEnabled(item) && (item?.children?.length ?? 0) > 0;
 }
 
 function enabledAt(enabled: readonly number[], index: number): number | null {

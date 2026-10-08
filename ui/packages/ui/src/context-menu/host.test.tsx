@@ -40,7 +40,7 @@ describe("YoContextMenuHost", () => {
     });
     render(() => <YoContextMenuHost controller={controller} />);
 
-    // 打开时按估算（宽 224）夹紧 → x=576, y=560；实测宽 600 后才应回收到 200/300。
+    // 打开时按标签估宽夹紧；实测宽 600 后回收到 200/300。
     controller.open(scene, { x: 2000, y: 2000, ctx: {} });
 
     // 菜单已 Portal 到 body；挂载后让测量读到真实尺寸。

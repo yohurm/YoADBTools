@@ -28,6 +28,16 @@ describe("menu-key-policy", () => {
     expect(menuKeyIntent("End", input)).toEqual({ type: "move", index: 2 });
   });
 
+  it("右方向展开分支，左方向在二级菜单打开时收起", () => {
+    const branch = { focusIndex: 1, items: ITEMS, branch: true };
+    expect(menuKeyIntent("ArrowRight", branch)).toEqual({ type: "descend" });
+    expect(menuKeyIntent("Enter", branch)).toEqual({ type: "descend" });
+    expect(menuKeyIntent("ArrowLeft", { focusIndex: 0, items: ITEMS, submenuOpen: true })).toEqual({
+      type: "ascend",
+    });
+    expect(menuKeyIntent("ArrowRight", { focusIndex: 0, items: ITEMS })).toBeNull();
+  });
+
   it("Enter / Space 选中；单字符进 typeahead", () => {
     const input = { focusIndex: 0, items: ITEMS };
     expect(menuKeyIntent("Enter", input)).toEqual({ type: "select" });

@@ -3,10 +3,11 @@
  * Host 只管开合；List 消费本文件意图。不写坐标、不画条目。
  */
 
-import { dismissKey, enabledIndexes, itemIsEnabled, listActivateKey, listEdgeKey, tabKey, verticalListDelta } from "../keymap/list-index";
+import { dismissKey, enabledIndexes, horizontalListDelta, itemIsEnabled, listActivateKey, listEdgeKey, tabKey, verticalListDelta } from "../keymap/list-index";
 import { motionDurationMs } from "../tokens/motion";
 import {
   edgeEnabledIndex,
+  menuItemIsBranch,
   stepEnabledIndex,
   type MenuListItem,
 } from "./menu-list-model";
@@ -21,6 +22,8 @@ export type MenuKeyIntent =
   | { type: "close"; reason: MenuCloseReason }
   | { type: "move"; index: number }
   | { type: "select" }
+  | { type: "descend" }
+  | { type: "ascend" }
   | { type: "typeahead"; char: string };
 
 /** 关闭菜单。typeahead 是其余分支，不另判。 */
@@ -44,9 +47,27 @@ export function menuIntentIsSelect(
   return intent.type === "select";
 }
 
+/** 展开当前项的二级菜单。 */
+export function menuIntentIsDescend(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "descend" }> {
+  return intent.type === "descend";
+}
+
+/** 收起二级菜单，焦点回到父项。 */
+export function menuIntentIsAscend(
+  intent: MenuKeyIntent,
+): intent is Extract<MenuKeyIntent, { type: "ascend" }> {
+  return intent.type === "ascend";
+}
+
 export interface MenuKeyInput {
   focusIndex: number;
   items: readonly MenuListItem[];
+  /** 当前焦点项带二级菜单。 */
+  branch?: boolean;
+  /** 二级菜单已经展开。左方向键收起。 */
+  submenuOpen?: boolean;
   altKey?: boolean;
   metaKey?: boolean;
   ctrlKey?: boolean;
@@ -58,6 +79,9 @@ export function menuKeyIntent(key: string, input: MenuKeyInput): MenuKeyIntent |
     return null;
   }
   const enabled = enabledIndexes(input.items);
+  const horizontal = horizontalListDelta(key);
+  if (horizontal === 1) return input.branch ? { type: "descend" } : null;
+  if (horizontal === -1) return input.submenuOpen ? { type: "ascend" } : null;
   const delta = verticalListDelta(key);
   if (delta !== null) {
     const index = stepEnabledIndex(enabled, input.focusIndex, delta);
@@ -70,7 +94,7 @@ export function menuKeyIntent(key: string, input: MenuKeyInput): MenuKeyIntent |
   }
   if (tabKey(key)) return { type: "close", reason: "tab" };
   if (dismissKey(key)) return { type: "close", reason: "escape" };
-  if (listActivateKey(key)) return { type: "select" };
+  if (listActivateKey(key)) return input.branch ? { type: "descend" } : { type: "select" };
   if (key.length === 1) return { type: "typeahead", char: key };
   return null;
 }
@@ -92,16 +116,20 @@ export interface MenuItemHostAttrs {
   tabindex: 0 | -1;
   "data-tone": MenuItemTone;
   "data-slot": "item";
+  "aria-haspopup"?: "menu";
+  "aria-expanded"?: boolean;
 }
 
-export function menuItemHostAttrs(item: YoMenuItem, focused: boolean): MenuItemHostAttrs {
+export function menuItemHostAttrs(item: YoMenuItem, focused: boolean, expanded = false): MenuItemHostAttrs {
   const disabled = !itemIsEnabled(item);
+  const branch = menuItemIsBranch(item);
   return {
     role: "menuitem",
     disabled,
     tabindex: focused && !disabled ? 0 : -1,
     "data-tone": item.danger ? "danger" : "neutral",
     "data-slot": "item",
+    ...(branch ? { "aria-haspopup": "menu" as const, "aria-expanded": expanded } : {}),
   };
 }
 

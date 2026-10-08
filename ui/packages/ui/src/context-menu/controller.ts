@@ -57,7 +57,12 @@ export function createContextMenuController(): ContextMenuHostController {
     request: ContextMenuRequest<Ctx>,
   ): void => {
     const items = [...scene.items(request.ctx)];
-    const point = clampContextMenuPoint(request.x, request.y, items.length, readViewport());
+    const point = clampContextMenuPoint(
+      request.x,
+      request.y,
+      items.map((item) => item.label),
+      readViewport(),
+    );
     const ctx = request.ctx;
     setSession({
       id: scene.id,

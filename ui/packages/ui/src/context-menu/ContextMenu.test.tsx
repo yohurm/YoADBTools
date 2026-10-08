@@ -110,6 +110,52 @@ describe("YoContextMenu", () => {
     expect(item.querySelector('[data-slot="label"]')?.textContent).toBe("删除");
   });
 
+  it("菜单宽跟标签，帽在 token，标签单行省略", () => {
+    expect(menuCss).toContain("border-radius: var(--yohu-radius-md)");
+    expect(menuCss).toContain("width: max-content");
+    expect(menuCss).toContain("min(var(--yohu-layout-menu-max)");
+    expect(menuCss).toContain("white-space: nowrap");
+    expect(menuCss).toContain("text-overflow: ellipsis");
+    expect(menuCss).not.toContain("menu-min");
+    expect(menuCss).toContain('[data-slot="trail"]');
+    expect(menuCss).toMatch(/data-slot="label"\]\s*\{[^}]*flex:\s*1 1 auto/);
+  });
+
+  it("指针停在带子项的条目上展开二级菜单，点选子项", () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(() => (
+      <YoContextMenu
+        open
+        x={8}
+        y={8}
+        items={[
+          { id: "copy", label: "复制" },
+          {
+            id: "move",
+            label: "移到",
+            children: [
+              { id: "move:a", label: "设备信息" },
+              { id: "move:b", label: "连接性" },
+            ],
+          },
+          { id: "delete", label: "删除", danger: true },
+        ]}
+        onSelect={onSelect}
+        onClose={onClose}
+      />
+    ));
+    const move = screen.getByRole("menuitem", { name: "移到" });
+    expect(move.getAttribute("aria-haspopup")).toBe("menu");
+    expect(move.querySelector("[data-icon='chevron-right']")).not.toBeNull();
+    fireEvent.pointerEnter(move);
+    fireEvent.click(screen.getByRole("menuitem", { name: "连接性" }));
+    expect(onSelect).toHaveBeenCalledWith("move:b");
+    expect(onClose).toHaveBeenCalled();
+    fireEvent.click(move);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("菜单可滚，关系统条", () => {
     expect(menuCss).not.toContain(".yohu-corner__content");
     expect(cornerCss).toMatch(
