@@ -1,8 +1,8 @@
 /**
  * 采集客户端：窗口订阅 ↔ 每设备一路 logcat。
  * 引用只认 hold（capturing || starting，计数在 hold.ts）；世代对账在 capture-event。
- * 设备流停靠 captureState 事件；confirmStart 只退订本窗。
- * 退订走 workspace.unsubscribeSession（冻可见区）；扇出只认 capturing。
+ * 设备流停靠 captureState 事件。窗口标成采集中只在 log.capture.status 对账为 capturing 之后。
+ * start 返回不写 capturing。退订走 workspace.unsubscribeSession（冻可见区）；扇出只认 capturing。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * start 每次 await 后用 sessionId 重定位，禁止跨 await 缓存 idx。
  * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
@@ -156,6 +156,12 @@ export function createCapture(
     return session;
   }
 
+  function windowIsLive(sessionId: number): boolean {
+    const session = sessionById(sessionId);
+    if (!session) return false;
+    return sessionCaptureIsLive(session);
+  }
+
   function setDeviceGen(device: string, generation: number): void {
     ensureDevice(state, setState, device);
     setState("devices", device, "generation", generation);
@@ -213,19 +219,21 @@ export function createCapture(
     workspace.trimPanels();
   }
 
-  async function confirmStart(device: string, startedGen: number, sessionId: number): Promise<void> {
+  async function confirmStart(
+    device: string,
+    startedGen: number,
+    sessionId: number,
+    resumeWindow: boolean,
+  ): Promise<void> {
     try {
       const status = await logCaptureStatus(device);
-      if (status.capturing) {
+      if (!heldSession(sessionId, device)) return;
+      if (status.generation >= startedGen) {
         setDeviceGen(device, status.generation);
-        await pullSnapshot(device);
-        return;
       }
-      if (status.generation < startedGen) return;
-      const session = sessionById(sessionId);
-      if (session?.serial === device) {
-        workspace.unsubscribeSession(sessionId);
-      }
+      if (!status.capturing) return;
+      subscribeWindow(sessionId, device, resumeWindow);
+      await pullSnapshot(device);
     } catch (e) {
       logCaptureStatusFailed(e);
     }
@@ -263,12 +271,14 @@ export function createCapture(
       if (sessionCaptureIsLive(sessionAt(idx))) return;
 
       setState("sessions", idx, { starting: true });
+      let opened = false;
       try {
         await refreshProcesses(current);
         if (!heldSession(sessionId, current)) return;
         const resumeWindow = captureStarted(state.sessions[sessionIndex(sessionId)]!.fromSeq);
         let startedGen = deviceSlice(state, current).generation;
         if (foreignHoldCount(state.sessions, current, sessionId) === 0) {
+          opened = true;
           const result = await logCaptureStart(current);
           YoLog.info("logs", "采集已启动", {
             serial: current,
@@ -288,13 +298,14 @@ export function createCapture(
           }
         }
         if (!heldSession(sessionId, current)) return;
-        subscribeWindow(sessionId, current, resumeWindow);
-        await pullSnapshot(current);
-        if (!heldSession(sessionId, current)) {
-          await stopIfIdle(current);
-          return;
+        await confirmStart(current, startedGen, sessionId, resumeWindow);
+        if (!windowIsLive(sessionId)) {
+          const pending = sessionIndex(sessionId);
+          if (!sessionMissing(pending) && sessionAt(pending).starting) {
+            clearStarting(pending);
+          }
+          if (opened) await stopIfIdle(current);
         }
-        await confirmStart(current, startedGen, sessionId);
       } catch (e) {
         const done = sessionIndex(sessionId);
         if (!sessionMissing(done)) {

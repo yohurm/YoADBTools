@@ -215,7 +215,7 @@ beforeEach(() => {
   mocks.logCaptureStop.mockResolvedValue(undefined);
   mocks.logCaptureStatus.mockImplementation(async (serial: unknown) => ({
     serial,
-    capturing: false,
+    capturing: true,
     generation: 0,
     last_seq: 0,
   }));
@@ -647,6 +647,24 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     await expect(store.startCapture()).rejects.toThrow("ipc");
     expect(store.state.sessions[0]!.starting).toBe(false);
     expect(store.state.sessions[0]!.capturing).toBe(false);
+  });
+
+  it("start 返回后 status 未采集则窗口不标成采集中", async () => {
+    const store = track(createLogStore());
+    await store.bindSerial("S1");
+    store.ensureSession();
+    mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S1", generation: 4, adopted: false });
+    mocks.logCaptureStatus.mockResolvedValueOnce({
+      serial: "S1",
+      capturing: false,
+      generation: 0,
+      last_seq: 0,
+    });
+    await store.startCapture();
+    expect(mocks.logCaptureStart).toHaveBeenCalledWith("S1");
+    expect(store.state.sessions[0]!.capturing).toBe(false);
+    expect(store.state.sessions[0]!.starting).toBe(false);
+    expect(mocks.logCaptureStop).toHaveBeenCalledWith("S1");
   });
 
   it("start 成功后若 status 世代已结束则纠正窗口 capturing", async () => {
