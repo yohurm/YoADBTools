@@ -45,3 +45,4 @@
 | [039](ADR-v6-039.md) | 命令库默认展开 | 一键 `terminal_library_expand`；默认全部折叠；指定组认 id；停留开合不写回 |
 | [040](ADR-v6-040.md) | 流程标准步骤 | 每条流程单独登记；hydrate 读设置/目录/任务/投屏投影；禁止预写阶段与 `mirror.sync` |
 | [041](ADR-v6-041.md) | Linux 工作台 | WebKitGTK + XDG / `~/.local/opt` + `.deb`；投屏像素与拖出仍预留 |
+| [042](ADR-v6-042.md) | Linux 投屏像素 | **草案，未接受：** libva H.264 VLD 进已记下的 GtkWindow 子控件；无 `/dev/dri` 或无 VLD 入口则 PresentBind 失败。不授权实现，不含软解 |

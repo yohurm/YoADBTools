@@ -300,7 +300,7 @@ probe
 | 1. `listingPaint` 的 `fault` | 已实现 | 无快照的失败停在 `fault`，文案是 `filesFaultText`，主动作「重新读取」。有快照的失败留行或留空快照，只 Toast，不 `remember` 失败。20 秒预算没改。不走 `sync:` LIST |
 | 2. `PresentBind` | 已实现 | `spawn_unimplemented` 在 `BindPipe` 写成 `Failed`，句子是「没有画面」加「当前平台没有投屏硬解」。`mirror/present` 把绑定送进面板，不改会话 `phase`。Windows / macOS 洞仍透明 |
 | 2. 洞与闸门 | 已实现 | 无原生表面时，Live 且绑定失败，或会话失败，洞里画 `stage_copy`。暂停、全屏、指针在绑定失败时不亮。截图和设备键仍等 `hasFrame` |
-| 3. Linux 像素 ADR | 未做 | 不链 libva，不加 FFmpeg / OpenH264，不新增 ADR 文件 |
+| 3. Linux 像素 ADR | 草案已写，未接受，未实现 | [ADR-v6-042](adr/ADR-v6-042.md)。libva H.264 VLD 进已记下的 GtkWindow 子控件。无 `/dev/dri` 或无 VLD 入口则保持 PresentBind 失败。软解不在这份草案里，要另由 Jessica 接受。不链 libva，不加 FFmpeg / OpenH264 |
 | 慢设备上再量 20 秒 / 15 秒 accept | 未做 | 不与这次绑在一起 |
 
-核对清单 `docs/testing/Linux功能核对清单.md` 记的是改代码之前的 ATD 结果。空目录与失败、以及灰舞台，需要在这版上再跑一次。
+`234eefc` 重装后在 ATD 上对过三项，记在 `docs/testing/Linux功能核对清单.md` 的复测一节：无快照的 `/sdcard` 失败停在「没有这个目录，请重新输入」和「重新读取」；已有 `keep.txt` 时刷新失败留行加 Toast；Live 720×1280 的洞是「没有画面 / 当前平台没有投屏硬解」，暂停、全屏、截图和设备键不亮。没有 `mirror/painted`。像素仍等 042 被接受。
