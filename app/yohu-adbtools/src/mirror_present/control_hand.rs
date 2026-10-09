@@ -61,7 +61,6 @@ pub fn pointer_target(stage: &Stage) -> PointerTarget {
 }
 
 /// 只可操作时映射进画面。不可操作则抬起。离开占用面也抬起。
-#[allow(clippy::too_many_arguments)]
 pub fn plan_wire(
     gesture: &mut PointerGesture,
     kind: MirrorPointerKind,
@@ -69,18 +68,20 @@ pub fn plan_wire(
     y: i32,
     control: bool,
     dest: Letterbox,
-    video_w: u32,
-    video_h: u32,
+    video: (u32, u32),
 ) -> Option<TouchOut> {
     match kind {
         MirrorPointerKind::Leave => gesture.feed(PointerKind::Leave, None, 0, 0),
-        MirrorPointerKind::Down => plan_feed(gesture, PointerKind::Down, x, y, control, dest, video_w, video_h),
-        MirrorPointerKind::Move => plan_feed(gesture, PointerKind::Move, x, y, control, dest, video_w, video_h),
-        MirrorPointerKind::Up => plan_feed(gesture, PointerKind::Up, x, y, control, dest, video_w, video_h),
+        MirrorPointerKind::Down => {
+            plan_feed(gesture, PointerKind::Down, x, y, control, dest, video)
+        }
+        MirrorPointerKind::Move => {
+            plan_feed(gesture, PointerKind::Move, x, y, control, dest, video)
+        }
+        MirrorPointerKind::Up => plan_feed(gesture, PointerKind::Up, x, y, control, dest, video),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn plan_feed(
     gesture: &mut PointerGesture,
     kind: PointerKind,
@@ -88,12 +89,12 @@ fn plan_feed(
     y: i32,
     control: bool,
     dest: Letterbox,
-    video_w: u32,
-    video_h: u32,
+    video: (u32, u32),
 ) -> Option<TouchOut> {
     if !control {
         return gesture.cancel();
     }
+    let (video_w, video_h) = video;
     let mapped = map_client_to_video(x, y, dest, video_w, video_h);
     gesture.feed(kind, mapped, video_w, video_h)
 }
@@ -120,8 +121,7 @@ impl ControlHand {
             y,
             target.control,
             target.dest,
-            target.video_w,
-            target.video_h,
+            (target.video_w, target.video_h),
         ) {
             self.inject(&target.serial, out);
         }
@@ -171,8 +171,7 @@ mod tests {
             20,
             true,
             box_at_origin(),
-            100,
-            200,
+            (100, 200),
         )
         .expect("down");
         assert_eq!(down.action, TOUCH_DOWN);
@@ -183,8 +182,7 @@ mod tests {
             21,
             false,
             box_at_origin(),
-            100,
-            200,
+            (100, 200),
         )
         .expect("lift");
         assert_eq!(up.action, TOUCH_UP);
@@ -201,8 +199,7 @@ mod tests {
             20,
             true,
             box_at_origin(),
-            100,
-            200,
+            (100, 200),
         );
         let up = plan_wire(
             &mut gesture,
@@ -211,8 +208,7 @@ mod tests {
             0,
             true,
             box_at_origin(),
-            100,
-            200,
+            (100, 200),
         )
         .expect("leave");
         assert_eq!(up.action, TOUCH_UP);
@@ -229,8 +225,7 @@ mod tests {
             20,
             false,
             box_at_origin(),
-            100,
-            200,
+            (100, 200),
         )
         .is_none());
     }

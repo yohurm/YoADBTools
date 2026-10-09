@@ -59,10 +59,19 @@ pub fn take_open<T, E>(failed: &mut bool, result: Result<T, E>) -> Result<T, E> 
 
 /// 解码节拍属于哪一端。日志句不同，计数规则相同。
 pub enum DecodeSeatKind {
-    #[cfg_attr(not(windows), allow(dead_code))]
     MediaFoundation,
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     VideoToolbox,
+}
+
+/// 当前宿主的解码座。两个变体都在这一份里构造，各平台用 `cfg!` 选一支。
+pub fn host_decode_seat() -> DecodeSeatKind {
+    if cfg!(windows) {
+        DecodeSeatKind::MediaFoundation
+    } else if cfg!(target_os = "macos") {
+        DecodeSeatKind::VideoToolbox
+    } else {
+        DecodeSeatKind::MediaFoundation
+    }
 }
 
 /// 这一秒有喂入或解出才记一拍，然后两个计数都清零。

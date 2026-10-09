@@ -14,8 +14,9 @@ use super::mf::{DecodedPicture, MfDecoder};
 use super::slot::{PictureBank, ReadyFrame};
 use crate::limits::PRESENT_BEAT;
 use crate::mirror_present::annexb::{
-    begin_feed, claim_first, note_content_size, note_decode_beat, seat_elapsed_ms, select_live_frames,
-    should_open_decoder, sticky_config, take_feed, take_open, DecodeSeatKind, FeedOutcome,
+    begin_feed, claim_first, host_decode_seat, note_content_size, note_decode_beat,
+    seat_elapsed_ms, select_live_frames, should_open_decoder, sticky_config, take_feed, take_open,
+    FeedOutcome,
 };
 
 /// 解码座句柄。丢弃即取消本代际解码任务。
@@ -186,11 +187,7 @@ impl DecodeTick {
     }
 
     pub fn log_beat(&mut self) {
-        note_decode_beat(
-            &mut self.fed,
-            &mut self.decoded,
-            DecodeSeatKind::MediaFoundation,
-        );
+        note_decode_beat(&mut self.fed, &mut self.decoded, host_decode_seat());
     }
 
     pub fn note_first_nv12(
@@ -234,7 +231,11 @@ impl DecodeTick {
                 self.last_config = None;
             }
         }
-        if should_open_decoder(self.decoder.is_some(), self.failed, frame.has_content_size()) {
+        if should_open_decoder(
+            self.decoder.is_some(),
+            self.failed,
+            frame.has_content_size(),
+        ) {
             let hevc = frame.is_hevc();
             match take_open(
                 &mut self.failed,

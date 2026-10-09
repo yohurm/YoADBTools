@@ -8,7 +8,7 @@ use yohu_protocol::{AppEvent, MirrorLayout, MirrorPointerKind};
 
 use super::super::control_hand::{deliver_pointer, lift_press, lift_without_control, ControlHand};
 use super::super::present_beat::{
-    open_pipe, release_pipe, settle_presented_frame, PresentBeat, PresentMiss,
+    open_pipe, present_miss, release_pipe, settle_presented_frame, PresentBeat, PresentMiss,
 };
 use super::super::scale::Letterbox;
 use super::super::stage::{stage_palette, stage_type_px, PictureAdmit, Stage};
@@ -158,6 +158,11 @@ impl Host {
     }
 
     fn commit_video(&mut self, width: u32, height: u32, presented: bool) -> bool {
+        let miss = if presented {
+            present_miss(None)
+        } else {
+            PresentMiss::Announce(None)
+        };
         settle_presented_frame(
             &mut self.beat,
             &mut self.stage,
@@ -165,7 +170,7 @@ impl Host {
             width,
             height,
             presented,
-            PresentMiss::Announce(None),
+            miss,
         )
     }
 }

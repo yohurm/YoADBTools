@@ -6,8 +6,9 @@ use std::time::Instant;
 use yohu_mirror::{EncodedFrame, FramePipe};
 
 use super::super::annexb::{
-    begin_feed, claim_first, note_content_size, note_decode_beat, seat_elapsed_ms, select_live_frames,
-    should_open_decoder, sticky_config, take_feed, take_open, DecodeSeatKind, FeedOutcome,
+    begin_feed, claim_first, host_decode_seat, note_content_size, note_decode_beat,
+    seat_elapsed_ms, select_live_frames, should_open_decoder, sticky_config, take_feed, take_open,
+    FeedOutcome,
 };
 use super::super::backend::AnnexBDecoder;
 use super::vt::{Picture, VideoToolboxDecoder};
@@ -76,7 +77,7 @@ impl DecodeTick {
     }
 
     pub fn log_beat(&mut self) {
-        note_decode_beat(&mut self.fed, &mut self.decoded, DecodeSeatKind::VideoToolbox);
+        note_decode_beat(&mut self.fed, &mut self.decoded, host_decode_seat());
     }
 
     pub fn note_first(&mut self, width: u32, height: u32) {
@@ -124,7 +125,11 @@ impl DecodeTick {
         if self.need_keyframe && !frame.keyframe {
             return None;
         }
-        if should_open_decoder(self.decoder.is_some(), self.failed, frame.has_content_size()) {
+        if should_open_decoder(
+            self.decoder.is_some(),
+            self.failed,
+            frame.has_content_size(),
+        ) {
             let hevc = frame.is_hevc();
             match take_open(
                 &mut self.failed,

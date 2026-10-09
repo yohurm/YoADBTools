@@ -24,7 +24,7 @@ use crate::mirror_present::control_hand::{
     deliver_pointer, lift_press, lift_without_control, ControlHand,
 };
 use crate::mirror_present::present_beat::{
-    open_pipe, release_pipe, settle_presented_frame, PresentBeat, PresentMiss,
+    open_pipe, present_miss, release_pipe, settle_presented_frame, PresentBeat,
 };
 use crate::mirror_present::stage::{OccupancyMotion, PictureAdmit, Stage};
 use crate::mirror_present::{screenshot_sampled, PresentError};
@@ -217,10 +217,7 @@ impl Host {
         presented: bool,
         error: Option<&windows::core::Error>,
     ) -> bool {
-        let miss = match error {
-            Some(e) => PresentMiss::Announce(Some(e)),
-            None => PresentMiss::Quiet,
-        };
+        let miss = present_miss(error.map(|e| e as &dyn std::fmt::Display));
         settle_presented_frame(
             &mut self.beat,
             &mut self.stage,

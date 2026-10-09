@@ -41,17 +41,16 @@ impl PresentBeat {
 
     /// 已画出一帧。`had_frame` 是本帧之前舞台有没有首帧。
     /// 首帧或节拍到了就给出 `mirror/painted`。
-    #[allow(clippy::too_many_arguments)]
     pub fn note_presented(
         &mut self,
         serial: &str,
         generation: u64,
         had_frame: bool,
         now: Instant,
-        width: u32,
-        height: u32,
+        size: (u32, u32),
         beat: Duration,
     ) -> Option<AppEvent> {
+        let (width, height) = size;
         self.err_logged = false;
         self.painted = self.painted.saturating_add(1);
         if !had_frame {
@@ -82,6 +81,14 @@ impl PresentBeat {
 pub enum PresentMiss<'a> {
     Quiet,
     Announce(Option<&'a dyn std::fmt::Display>),
+}
+
+/// 有错误就宣布，没有错误就只钉住。两个变体都在这里构造，Windows 与 macOS 共用。
+pub fn present_miss(error: Option<&dyn std::fmt::Display>) -> PresentMiss<'_> {
+    match error {
+        Some(error) => PresentMiss::Announce(Some(error)),
+        None => PresentMiss::Quiet,
+    }
 }
 
 /// 没画出就钉住失败并按平台决定是否打日志。画出了就记账。
@@ -120,8 +127,7 @@ pub fn accept_presented_frame(
         stage.generation,
         had_frame,
         Instant::now(),
-        width,
-        height,
+        (width, height),
         crate::limits::PRESENT_BEAT,
     ) {
         if !had_frame {
@@ -187,11 +193,11 @@ mod tests {
         let mut beat = PresentBeat::new();
         let t0 = Instant::now();
         let first = beat
-            .note_presented("S1", 7, false, t0, 100, 200, Duration::from_secs(1))
+            .note_presented("S1", 7, false, t0, (100, 200), Duration::from_secs(1))
             .expect("first");
         assert_eq!(painted_fps(&first), 1);
         assert!(beat
-            .note_presented("S1", 7, true, t0, 100, 200, Duration::from_secs(1))
+            .note_presented("S1", 7, true, t0, (100, 200), Duration::from_secs(1))
             .is_none());
         let sample = beat
             .note_presented(
@@ -199,8 +205,7 @@ mod tests {
                 7,
                 true,
                 t0 + Duration::from_secs(1),
-                100,
-                200,
+                (100, 200),
                 Duration::from_secs(1),
             )
             .expect("beat");
@@ -212,7 +217,14 @@ mod tests {
         let mut beat = PresentBeat::new();
         assert!(beat.note_failed());
         assert!(!beat.note_failed());
-        let _ = beat.note_presented("S1", 1, false, Instant::now(), 1, 1, Duration::from_secs(1));
+        let _ = beat.note_presented(
+            "S1",
+            1,
+            false,
+            Instant::now(),
+            (1, 1),
+            Duration::from_secs(1),
+        );
         assert!(beat.note_failed());
     }
 
