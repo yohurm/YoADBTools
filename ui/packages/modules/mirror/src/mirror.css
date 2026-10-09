@@ -31,6 +31,35 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  display: flex;
+}
+
+.yohu-mirror__hole-copy {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yohu-space-xs);
+  padding: var(--yohu-space-lg);
+  text-align: center;
+  background: var(--yohu-surface);
+  color: var(--yohu-fg);
+}
+
+.yohu-mirror__hole-title,
+.yohu-mirror__hole-body {
+  margin: 0;
+}
+
+.yohu-mirror__hole-title {
+  font-size: var(--yohu-font-subtitle);
+  font-weight: var(--yohu-font-weight-medium);
+}
+
+.yohu-mirror__hole-body {
+  font-size: var(--yohu-font-body);
+  color: var(--yohu-fg-2);
 }
 
 .yohu-mirror__ops {

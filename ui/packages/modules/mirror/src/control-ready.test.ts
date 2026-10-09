@@ -5,7 +5,17 @@ import { describe, expect, it } from "vitest";
 
 import { mirrorIsFailed, mirrorIsLive, mirrorIsStarting, mirrorSessionEnded } from "@yohu/api";
 
-import { mirrorControlReady, mirrorLiveBadge, mirrorPictureReady, mirrorSessionAddressable, mirrorSetupEnabled } from "./control-ready";
+import {
+  mirrorControlReady,
+  mirrorHoleCopy,
+  mirrorLiveBadge,
+  mirrorPictureReady,
+  mirrorPlaybackReady,
+  mirrorPointerTarget,
+  mirrorPresentFailed,
+  mirrorSessionAddressable,
+  mirrorSetupEnabled,
+} from "./control-ready";
 
 const ready = {
   phase: "live",
@@ -107,7 +117,7 @@ describe("会话已在播", () => {
     expect(times(source, "mirrorIsLive(state." + "phase)")).toBe(1);
     expect(times(source, "function phaseIsLive")).toBe(1);
     expect(times(source, "export function phaseIsLive")).toBe(0);
-    expect(times(source, "phaseIsLive(state)")).toBe(2);
+    expect(times(source, "phaseIsLive(state)")).toBe(4);
     expect(times(source, "!state." + "readOnly")).toBe(1);
     expect(source).toContain("!mirrorIsStarting(phase)");
   });
@@ -213,12 +223,55 @@ describe("开始和仅显示可点", () => {
 });
 
 describe("暂停和全屏不可点", () => {
-  it("两颗钮都在不在播时不可点，开始文案不并", () => {
+  it("两颗钮都问呈现是否可播，开始文案不并", () => {
     const view = sourceOf("MirrorView.tsx");
-    expect(times(view, "!live" + "()")).toBe(1);
+    expect(times(view, "mirrorPlaybackReady(mirrorStore." + "state)")).toBe(1);
     expect(times(view, "function playbackLocked")).toBe(1);
     expect(times(view, "export function playbackLocked")).toBe(0);
     expect(times(view, "playbackLocked()")).toBe(3);
+    expect(mirrorPlaybackReady({ phase: "live", presentBind: "idle" })).toBe(true);
+    expect(mirrorPlaybackReady({ phase: "live", presentBind: "failed" })).toBe(false);
+    expect(mirrorPlaybackReady({ phase: "starting", presentBind: "idle" })).toBe(false);
+  });
+});
+
+describe("洞内失败文案", () => {
+  it("Live 且绑定失败看得见原因，不铺未开始", () => {
+    const copy = mirrorHoleCopy({
+      phase: "live",
+      presentBind: "failed",
+      presentTitle: "没有画面",
+      presentBody: "当前平台没有投屏硬解",
+      sessionHoleTitle: "",
+      sessionHoleBody: "",
+    });
+    expect(copy).toEqual({ title: "没有画面", body: "当前平台没有投屏硬解" });
+    expect(copy?.title).not.toBe("未开始");
+    expect(mirrorHoleCopy({
+      phase: "live",
+      presentBind: "idle",
+      presentTitle: "",
+      presentBody: "",
+      sessionHoleTitle: "",
+      sessionHoleBody: "",
+    })).toBeNull();
+    expect(mirrorHoleCopy({
+      phase: "failed",
+      presentBind: "idle",
+      presentTitle: "",
+      presentBody: "",
+      sessionHoleTitle: "启动失败",
+      sessionHoleBody: "等待设备连接超时",
+    })).toEqual({ title: "启动失败", body: "等待设备连接超时" });
+    const view = sourceOf("MirrorView.tsx");
+    expect(view).toContain("mirrorHoleCopy(mirrorStore.state)");
+    expect(view).not.toContain("没有画面");
+    expect(view).not.toContain("未开始");
+    expect(view).not.toContain("当前平台没有投屏硬解");
+    expect(mirrorPresentFailed("failed")).toBe(true);
+    expect(mirrorPresentFailed("idle")).toBe(false);
+    expect(mirrorPointerTarget({ serial: "S1", phase: "live", presentBind: "failed" })).toBeNull();
+    expect(mirrorPointerTarget({ serial: "S1", phase: "live", presentBind: "idle" })).toBe("S1");
   });
 });
 

@@ -2,7 +2,7 @@
  * 投屏主视图：只量 `.yohu-mirror__avail`；会话旗标与 invoke 在 store。
  */
 
-import { For, createEffect, onCleanup, onMount, type JSX } from "solid-js";
+import { For, Show, createEffect, onCleanup, onMount, type JSX } from "solid-js";
 import { AndroidKey, boundSerial, connectionOrUsb, DIALOG_FAILED, deviceNightWord, errorText, mirrorIsLive, mirrorIsStarting, mirrorPointerCaptures, mirrorPointerReleases, mirrorProtocolOf, ModuleTitle, saveFailedText, type DeviceSession, type MirrorPointerKind, type MirrorProtocol } from "@yohu/api";
 import { screenshotOutcomeIsFailed, screenshotOutcomeIsSaved } from "./screenshot";
 import {
@@ -38,7 +38,7 @@ import {
   withCurrentOption,
   type QualityOption,
 } from "./quality";
-import { mirrorControlReady, mirrorPictureReady, mirrorSetupEnabled } from "./control-ready";
+import { mirrorControlReady, mirrorHoleCopy, mirrorPictureReady, mirrorPlaybackReady, mirrorSetupEnabled } from "./control-ready";
 import { mirrorStore, type MirrorPhase } from "./store";
 import "./mirror.css";
 
@@ -302,7 +302,11 @@ export function MirrorView(props: DeviceSession) {
   }
 
   function playbackLocked(): boolean {
-    return !live();
+    return !mirrorPlaybackReady(mirrorStore.state);
+  }
+
+  function stageHole(): { title: string; body: string } | null {
+    return mirrorHoleCopy(mirrorStore.state);
   }
 
   function nightTarget(): { serial: string; night: boolean } | null {
@@ -468,7 +472,16 @@ export function MirrorView(props: DeviceSession) {
             onPointerCancel={reportPointerLeave}
             onPointerLeave={reportPointerLeave}
           >
-            <div class="yohu-mirror__hole" aria-hidden="true" />
+            <div class="yohu-mirror__hole" aria-hidden={stageHole() ? undefined : "true"}>
+              <Show when={stageHole()}>
+                {(copy) => (
+                  <div class="yohu-mirror__hole-copy">
+                    <p class="yohu-mirror__hole-title">{copy().title}</p>
+                    <p class="yohu-mirror__hole-body">{copy().body}</p>
+                  </div>
+                )}
+              </Show>
+            </div>
           </div>
         </div>
 

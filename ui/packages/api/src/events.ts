@@ -51,6 +51,9 @@ export const onSettingsChanged = (h: (e: Extract<AppEvent, { kind: "settingsChan
 export const onMirrorState = (h: (e: Extract<AppEvent, { kind: "mirrorState" }>) => void) =>
   on(EVENT_NAMES.mirrorState, h);
 
+export const onMirrorPresent = (h: (e: Extract<AppEvent, { kind: "mirrorPresent" }>) => void) =>
+  on(EVENT_NAMES.mirrorPresent, h);
+
 export const onMirrorPainted = (h: (e: Extract<AppEvent, { kind: "mirrorPainted" }>) => void) =>
   on(EVENT_NAMES.mirrorPainted, h);
 

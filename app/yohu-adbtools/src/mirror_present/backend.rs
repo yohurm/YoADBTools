@@ -4,10 +4,12 @@
 //! GPU 纹理类型是关联类型，不进本模块。
 
 use std::sync::mpsc::{RecvTimeoutError, Sender, TryRecvError};
+use std::sync::{Arc, Mutex};
 
 use yohu_mirror::FramePipe;
-use yohu_protocol::{MirrorLayout, MirrorPointerKind};
+use yohu_protocol::{AppEvent, MirrorLayout, MirrorPointerKind, PresentBindState};
 
+use super::stage_copy::present_unavailable_copy;
 use super::PresentError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,17 +89,101 @@ pub trait AnnexBDecoder: Sized {
     fn drain(&mut self) -> Result<Option<Self::Picture>, String>;
 }
 
+/// 壳内呈现绑定。与会话相位并列。Windows / macOS 的像素时钟仍是 `Stage.bound`。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PresentBind {
+    Idle,
+    Failed(PresentError),
+    Loading,
+    Video,
+    Paused,
+}
+
+impl PresentBind {
+    pub fn wire(&self) -> PresentBindState {
+        match self {
+            Self::Idle => PresentBindState::Idle,
+            Self::Failed(_) => PresentBindState::Failed,
+            Self::Loading => PresentBindState::Loading,
+            Self::Video => PresentBindState::Video,
+            Self::Paused => PresentBindState::Paused,
+        }
+    }
+
+    pub fn hole(&self) -> (String, String) {
+        match self {
+            Self::Failed(err) => {
+                let (title, body) = present_unavailable_copy(&err.to_string());
+                (title.to_string(), body)
+            }
+            _ => (String::new(), String::new()),
+        }
+    }
+}
+
+/// 无原生表面的 BindPipe 失败关闭。有原生表面的成功绑定进入 Loading，首帧再进 Video。
+pub fn bind_after_pipe(native_surface: bool) -> PresentBind {
+    if native_surface {
+        PresentBind::Loading
+    } else {
+        PresentBind::Failed(PresentError::Unimplemented)
+    }
+}
+
+pub fn bind_after_frame(paused: bool) -> PresentBind {
+    if paused {
+        PresentBind::Paused
+    } else {
+        PresentBind::Video
+    }
+}
+
 #[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
 pub(crate) fn unimplemented_screenshot_err() -> PresentError {
     PresentError::Unimplemented
 }
 
+fn publish_bind(
+    slot: &Mutex<PresentBind>,
+    next: PresentBind,
+    events: &Option<tokio::sync::mpsc::Sender<AppEvent>>,
+    serial: &str,
+) {
+    let (bind, hole_title, hole_body) = {
+        let mut guard = slot.lock().expect("present bind poisoned");
+        *guard = next;
+        let bind = guard.wire();
+        let (hole_title, hole_body) = guard.hole();
+        (bind, hole_title, hole_body)
+    };
+    if let Some(tx) = events {
+        let _ = tx.blocking_send(AppEvent::MirrorPresent {
+            serial: serial.to_string(),
+            bind,
+            hole_title,
+            hole_body,
+        });
+    }
+}
+
 #[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
-pub fn spawn_unimplemented(id: &'static str, serial: &str) -> Sender<Cmd> {
+pub fn spawn_unimplemented(
+    id: &'static str,
+    serial: &str,
+    bind: Arc<Mutex<PresentBind>>,
+    events: Option<tokio::sync::mpsc::Sender<AppEvent>>,
+) -> Sender<Cmd> {
     let (tx, rx) = std::sync::mpsc::channel();
     let label = format!("mirror-present-{id}-{serial}");
+    let serial = serial.to_string();
     let _ = std::thread::Builder::new().name(label).spawn(move || loop {
         match rx.recv() {
+            Ok(Cmd::BindPipe { .. }) => {
+                publish_bind(&bind, bind_after_pipe(false), &events, &serial);
+            }
+            Ok(Cmd::UnbindPipe { .. }) => {
+                publish_bind(&bind, PresentBind::Idle, &events, &serial);
+            }
             Ok(Cmd::Screenshot { reply, .. }) => {
                 let _ = reply.send(Err(unimplemented_screenshot_err()));
             }
@@ -110,6 +196,8 @@ pub fn spawn_unimplemented(id: &'static str, serial: &str) -> Sender<Cmd> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use super::{unimplemented_screenshot_err, Cmd};
     use crate::mirror_present::PresentError;
 
@@ -119,7 +207,62 @@ mod tests {
         assert_eq!(err, PresentError::Unimplemented);
         assert_eq!(err.to_string(), "当前平台没有投屏硬解");
 
-        let tx = super::spawn_unimplemented("none", "S1");
+        let bind = Arc::new(Mutex::new(super::PresentBind::Idle));
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(4);
+        let tx = super::spawn_unimplemented("none", "S1", Arc::clone(&bind), Some(event_tx));
+        tx.send(Cmd::Pointer {
+            kind: yohu_protocol::MirrorPointerKind::Leave,
+            x: 0,
+            y: 0,
+        })
+        .expect("pointer");
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        assert_eq!(
+            *bind.lock().expect("present bind poisoned"),
+            super::PresentBind::Idle
+        );
+        tx.send(Cmd::BindPipe {
+            serial: "S1".into(),
+            generation: 2,
+            pipe: yohu_mirror::FramePipe::new(),
+        })
+        .expect("bind");
+        let present = event_rx.blocking_recv().expect("present event");
+        match present {
+            yohu_protocol::AppEvent::MirrorPresent {
+                serial,
+                bind: wire,
+                hole_title,
+                hole_body,
+            } => {
+                assert_eq!(serial, "S1");
+                assert_eq!(wire, yohu_protocol::PresentBindState::Failed);
+                assert_eq!(hole_title, "没有画面");
+                assert_eq!(hole_body, "当前平台没有投屏硬解");
+                assert_ne!(hole_title, "未开始");
+            }
+            other => panic!("expected present bind, got {other:?}"),
+        }
+        assert_eq!(
+            *bind.lock().expect("present bind poisoned"),
+            super::PresentBind::Failed(PresentError::Unimplemented)
+        );
+        tx.send(Cmd::UnbindPipe {
+            serial: "S1".into(),
+        })
+        .expect("unbind");
+        let cleared = event_rx.blocking_recv().expect("clear");
+        match cleared {
+            yohu_protocol::AppEvent::MirrorPresent {
+                bind: wire,
+                hole_title,
+                ..
+            } => {
+                assert_eq!(wire, yohu_protocol::PresentBindState::Idle);
+                assert!(hole_title.is_empty());
+            }
+            other => panic!("expected idle bind, got {other:?}"),
+        }
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
         tx.send(Cmd::Screenshot {
             path: String::new(),
@@ -131,6 +274,12 @@ mod tests {
             .expect("screenshot reply");
         let err = reply.expect_err("unimplemented must fail");
         assert_eq!(err, PresentError::Unimplemented);
+        assert_eq!(
+            super::bind_after_pipe(true),
+            super::PresentBind::Loading
+        );
+        assert_eq!(super::bind_after_frame(false), super::PresentBind::Video);
+        assert_eq!(super::bind_after_frame(true), super::PresentBind::Paused);
         let _ = tx.send(Cmd::Shutdown);
     }
 

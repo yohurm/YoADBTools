@@ -3,13 +3,13 @@
 //! 禁止用 FFmpeg 或 libavcodec 的 vaapi 封装填这个模块。
 
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::MirrorService;
 use yohu_protocol::AppEvent;
 
-use super::backend::{spawn_unimplemented, AnnexBDecoder, Caps, Cmd};
+use super::backend::{spawn_unimplemented, AnnexBDecoder, Caps, Cmd, PresentBind};
 
 pub const ID: &str = "vaapi";
 
@@ -24,9 +24,10 @@ pub fn spawn_surface(
     serial: String,
     _owner: isize,
     _mirror: Arc<MirrorService>,
-    _event_tx: tokio_mpsc::Sender<AppEvent>,
+    event_tx: tokio_mpsc::Sender<AppEvent>,
+    bind: Arc<Mutex<PresentBind>>,
 ) -> Sender<Cmd> {
-    spawn_unimplemented(ID, &serial)
+    spawn_unimplemented(ID, &serial, bind, Some(event_tx))
 }
 
 #[allow(dead_code)]

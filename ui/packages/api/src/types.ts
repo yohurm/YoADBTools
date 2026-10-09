@@ -489,6 +489,9 @@ export interface UpdateChannelInfo {
 
 export type MirrorSessionState = "starting" | "live" | "stopped" | "failed";
 
+/** 壳内呈现绑定。与会话 phase 并列。 */
+export type PresentBindState = "idle" | "failed" | "loading" | "video" | "paused";
+
 export interface MirrorSessionSnapshot {
   serial: string;
   generation: number;
@@ -502,6 +505,9 @@ export interface MirrorSessionSnapshot {
   paused: boolean;
   fullscreen: boolean;
   error?: string | null;
+  present_bind?: PresentBindState;
+  hole_title?: string;
+  hole_body?: string;
 }
 
 export interface MirrorStart {
@@ -620,6 +626,15 @@ export type AppEvent =
       codec: string;
       control: boolean;
       error?: string;
+      hole_title?: string;
+      hole_body?: string;
+    }
+  | {
+      kind: "mirrorPresent";
+      serial: string;
+      bind: PresentBindState;
+      hole_title: string;
+      hole_body: string;
     }
   | { kind: "mirrorPainted"; serial: string; generation: number; painted_fps: number }
   | { kind: "updateProgress" } & UpdateProgress;
@@ -638,6 +653,7 @@ export const EVENT_NAMES = {
   taskSummary: "task/summary",
   settingsChanged: "settings/changed",
   mirrorState: "mirror/state",
+  mirrorPresent: "mirror/present",
   mirrorPainted: "mirror/painted",
   updateProgress: "update/progress",
 } as const;

@@ -1,6 +1,6 @@
 # 重设计 — 文件清单相位与 Linux 呈现
 
-- **状态：** 重设计。不是 ADR，未改产品代码。投屏像素在新 ADR 接受之前不动解码器。
+- **状态：** 第 1、2 阶段已实现（2026-10-09）。第 3 步 ADR 与像素仍未做。不是 ADR。
 - **日期：** 2026-10-09
 - **取代：** [设计简报-文件浏览与Linux投屏.md](设计简报-文件浏览与Linux投屏.md) 里的建议。那一页的实测因果仍然有效，实现以本页的状态机为准。
 - **核对：** 同日 ATD（`yohu_atd34`，`sys.boot_completed=1`）全模块核对见 `docs/testing/Linux功能核对清单.md`。Live 720×1280、舞台纯色、拖出文案、`/data` 安全根拒绝，都与本页模型一致。
@@ -289,3 +289,18 @@ probe
 4. 只有 ADR 接受之后才做第 5.3 节。
 
 不把「超时改大」「空目录文案改一个字」「灰底上盖一句 CSS」当成上述分界的替代。
+
+## 7. 落地（2026-10-09）
+
+第 1 节是改代码之前的因果。下面是已经进仓库的部分，以及还没做的部分。
+
+| 阶段 | 状态 | 落点 |
+|------|------|------|
+| 1. `ls` 退出码成为这一帧的退出码 | 已实现 | `build_list_script` 记下 `ls_status`。`parse_list_output` 的 `LsFailed` 分支没改形状。整段脚本单测：空目录是 `Ok` 且零条目；悬空链接是 `LsFailed` 且 stderr 含 `No such file`。退出码 0 夹一行认不出的警告仍是成功 |
+| 1. `listingPaint` 的 `fault` | 已实现 | 无快照的失败停在 `fault`，文案是 `filesFaultText`，主动作「重新读取」。有快照的失败留行或留空快照，只 Toast，不 `remember` 失败。20 秒预算没改。不走 `sync:` LIST |
+| 2. `PresentBind` | 已实现 | `spawn_unimplemented` 在 `BindPipe` 写成 `Failed`，句子是「没有画面」加「当前平台没有投屏硬解」。`mirror/present` 把绑定送进面板，不改会话 `phase`。Windows / macOS 洞仍透明 |
+| 2. 洞与闸门 | 已实现 | 无原生表面时，Live 且绑定失败，或会话失败，洞里画 `stage_copy`。暂停、全屏、指针在绑定失败时不亮。截图和设备键仍等 `hasFrame` |
+| 3. Linux 像素 ADR | 未做 | 不链 libva，不加 FFmpeg / OpenH264，不新增 ADR 文件 |
+| 慢设备上再量 20 秒 / 15 秒 accept | 未做 | 不与这次绑在一起 |
+
+核对清单 `docs/testing/Linux功能核对清单.md` 记的是改代码之前的 ATD 结果。空目录与失败、以及灰舞台，需要在这版上再跑一次。

@@ -26,6 +26,12 @@ const mocks = vi.hoisted(() => ({
     error?: string;
   }) => void)[],
   paintedHandlers: [] as ((e: { serial: string; generation: number; painted_fps: number }) => void)[],
+  presentHandlers: [] as ((e: {
+    serial: string;
+    bind: "idle" | "failed" | "loading" | "video" | "paused";
+    hole_title: string;
+    hole_body: string;
+  }) => void)[],
   offlineHandlers: [] as ((e: { serial: string }) => void)[],
 }));
 
@@ -55,6 +61,9 @@ vi.mock("@yohu/api", async (importOriginal) => {
   dialogSaveFile: (...a: unknown[]) => mocks.dialogSaveFile(...a),
   onMirrorState: (h: (typeof mocks.stateHandlers)[0]) => {
     mocks.stateHandlers.push(h);
+  },
+  onMirrorPresent: (h: (typeof mocks.presentHandlers)[0]) => {
+    mocks.presentHandlers.push(h);
   },
   onMirrorPainted: (h: (typeof mocks.paintedHandlers)[0]) => {
     mocks.paintedHandlers.push(h);
@@ -92,6 +101,7 @@ describe("mirror store", () => {
     });
     mocks.stateHandlers.length = 0;
     mocks.paintedHandlers.length = 0;
+    mocks.presentHandlers.length = 0;
     mocks.offlineHandlers.length = 0;
   });
 
@@ -123,11 +133,23 @@ describe("mirror store", () => {
       width: 1080,
       height: 1920,
       codec: "h265",
-      control: false,
+      control: true,
     });
     expect(store.state.phase).toBe("live");
     expect(store.state.width).toBe(1080);
     expect(store.state.hasFrame).toBe(false);
+    mocks.presentHandlers.at(-1)!({
+      serial: "S1",
+      bind: "failed",
+      hole_title: "没有画面",
+      hole_body: "当前平台没有投屏硬解",
+    });
+    expect(store.state.phase).toBe("live");
+    expect(store.state.hasFrame).toBe(false);
+    expect(store.state.presentBind).toBe("failed");
+    expect(store.state.presentTitle).toBe("没有画面");
+    store.reportPointer("down", 1, 2);
+    expect(mocks.mirrorPointer).not.toHaveBeenCalled();
   }, 15000);
 
   it("Live 不等于已出画；mirror/painted 才置 hasFrame", async () => {
@@ -819,12 +841,12 @@ describe("这次开始的连接", () => {
 });
 
 describe("只处理当前绑定", () => {
-  it("状态、出画和掉线都先问绑定，出画世代不并", () => {
+  it("状态、呈现、出画和掉线都先问绑定，出画世代不并", () => {
     const source = storeSource();
     expect(times(source, "if (!eventForBound(e.serial)) " + "return;")).toBe(1);
     expect(times(source, "function onBound")).toBe(1);
     expect(times(source, "export function onBound")).toBe(0);
-    expect(times(source, "onBound(")).toBe(3);
+    expect(times(source, "onBound(")).toBe(4);
     expect(source).toContain("event.generation !== state.generation");
   });
 });

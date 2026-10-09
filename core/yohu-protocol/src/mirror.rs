@@ -28,6 +28,15 @@ pub struct MirrorSessionSnapshot {
     pub fullscreen: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// 壳报告的呈现绑定。缺省 Idle。`yohu-mirror` 不写这一项。
+    #[serde(default)]
+    pub present_bind: PresentBindState,
+    /// 无原生表面时洞内标题。空串表示洞保持透明。
+    #[serde(default)]
+    pub hole_title: String,
+    /// 洞内正文，与 `hole_title` 成对。
+    #[serde(default)]
+    pub hole_body: String,
 }
 
 /// 启动结果（对标 [`crate::CaptureStart`]：adopt = 已有 Live 会话）。
@@ -106,6 +115,19 @@ pub struct MirrorPointer {
     pub kind: MirrorPointerKind,
     pub x: i32,
     pub y: i32,
+}
+
+/// 壳内呈现绑定。与会话 `Live` 并列，不进 `yohu-mirror`。
+/// 没有原生表面时 `Failed` 才让 WebView 画舞台文案。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresentBindState {
+    #[default]
+    Idle,
+    Failed,
+    Loading,
+    Video,
+    Paused,
 }
 
 /// 舞台内容模式（壳 chrome 仍用）。文案与色值在壳 chrome，不进 layout。

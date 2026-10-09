@@ -22,6 +22,18 @@ function expectOnce(needle: string, name: string): void {
   expect(src).not.toContain(`export const ${name}`);
 }
 
+describe("清单失败位写成真", () => {
+  it("mark_list_fault_once", () => {
+    expectOnce("setSession(" + '"listFault", true)', "markListFault");
+  });
+});
+
+describe("清单失败位写成假", () => {
+  it("clear_list_fault_once", () => {
+    expectOnce("setSession(" + '"listFault", false)', "clearListFault");
+  });
+});
+
 describe("冷启动旗写成假", () => {
   it("mark_warm_once", () => {
     expectOnce("setSession(" + '"cold", false)', "markWarm");

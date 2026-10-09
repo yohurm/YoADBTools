@@ -535,6 +535,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       expect(name).toMatch(/^[-A-Za-z0-9_/:]+$/);
     }
     expect(EVENT_NAMES.mirrorState).toBe("mirror/state");
+    expect(EVENT_NAMES.mirrorPresent).toBe("mirror/present");
     expect(EVENT_NAMES.mirrorPainted).toBe("mirror/painted");
     expect(EVENT_NAMES.devicesChanged).toBe("devices/changed");
     expect(EVENT_NAMES.deviceStatus).toBe("device/status");

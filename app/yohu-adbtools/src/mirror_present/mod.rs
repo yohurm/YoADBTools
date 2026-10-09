@@ -26,12 +26,15 @@ mod stage_palette;
 mod windows;
 
 pub use backend::{AnnexBDecoder, Caps};
+pub(crate) use stage_copy::session_failure_hole;
 #[cfg(windows)]
 pub use windows::MfDecoder;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+use backend::PresentBind;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::{content_size_usable, FramePipe, MirrorService};
@@ -43,7 +46,7 @@ use backend::Cmd;
 use windows::{D3dDevice, DecodeSeat, GeomHost, PictureBank};
 
 /// 呈现侧可映射错误。IPC 码由 `ipc_present` 按变体判定，禁止扫字符串。
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, thiserror::Error, PartialEq, Eq)]
 pub enum PresentError {
     #[error("当前没有投屏画面")]
     Empty,
@@ -65,6 +68,7 @@ pub struct PresentHost {
     hevc_ok: AtomicBool,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     mirror: Arc<MirrorService>,
+    present_bind: Arc<Mutex<PresentBind>>,
     inner: Mutex<Inner>,
     #[cfg(windows)]
     geom: Arc<GeomHost>,
@@ -150,6 +154,7 @@ impl PresentHost {
             hevc_ok: AtomicBool::new(false),
             event_tx,
             mirror,
+            present_bind: Arc::new(Mutex::new(PresentBind::Idle)),
             inner: Mutex::new(Inner {
                 owner: 0,
                 surface: None,
@@ -278,6 +283,22 @@ impl PresentHost {
             }
             _ => (false, 0),
         }
+    }
+
+    /// 这一台的呈现绑定，以及无原生表面时洞里要画的句子。对不上舞台则为空。
+    pub fn hole_for(&self, serial: &str) -> (yohu_protocol::PresentBindState, String, String) {
+        let stage = lock_present(&self.inner).stage_serial.clone();
+        if stage.as_deref().is_some_and(|current| current != serial) {
+            return (
+                yohu_protocol::PresentBindState::Idle,
+                String::new(),
+                String::new(),
+            );
+        }
+        let guard = self.present_bind.lock().expect("present bind poisoned");
+        let bind = guard.wire();
+        let (title, body) = guard.hole();
+        (bind, title, body)
     }
 
     /// 上次可回放 layout 上的暂停与全屏。serial 对不上则为关。
@@ -457,6 +478,7 @@ impl PresentHost {
         if let Some(tx) = tx {
             let _ = tx.send(Cmd::Shutdown);
         }
+        *self.present_bind.lock().expect("present bind poisoned") = PresentBind::Idle;
     }
 
     fn ensure_surface(&self, serial: &str) -> SurfaceEnsure {
@@ -480,6 +502,7 @@ impl PresentHost {
             owner,
             Arc::clone(&self.mirror),
             self.event_tx.clone(),
+            Arc::clone(&self.present_bind),
             #[cfg(windows)]
             Arc::clone(&self.geom),
             #[cfg(windows)]
@@ -619,26 +642,29 @@ fn spawn_backend_surface(
     owner: isize,
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
+    bind: Arc<Mutex<PresentBind>>,
     #[cfg(windows)] geom: Arc<GeomHost>,
     #[cfg(windows)] d3d: Arc<D3dDevice>,
     #[cfg(windows)] pictures: Arc<PictureBank>,
 ) -> Sender<Cmd> {
     #[cfg(windows)]
     {
+        let _ = bind;
         windows::spawn_surface(serial, owner, mirror, event_tx, geom, d3d, pictures)
     }
     #[cfg(target_os = "macos")]
     {
+        let _ = bind;
         macos::spawn_surface(serial, owner, mirror, event_tx)
     }
     #[cfg(target_os = "linux")]
     {
-        linux::spawn_surface(serial, owner, mirror, event_tx)
+        linux::spawn_surface(serial, owner, mirror, event_tx, bind)
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         let _ = (owner, mirror, event_tx);
-        backend::spawn_unimplemented("none", &serial)
+        backend::spawn_unimplemented("none", &serial, bind, None)
     }
 }
 

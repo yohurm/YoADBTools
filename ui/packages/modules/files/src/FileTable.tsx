@@ -14,6 +14,7 @@ import {
   YoColHeader,
   YoColRow,
   YoColTrack,
+  YoButton,
   YoEmptyState,
   YoFileIcon,
   YoLoading,
@@ -23,7 +24,13 @@ import {
   type YoColHeaderSort,
 } from "@yohu/ui";
 import { listingStore } from "./listing";
-import { listingPaint, listingPaintIsCold, listingPaintIsEmpty, listingPaintIsRows } from "./listing-paint";
+import {
+  listingPaint,
+  listingPaintIsCold,
+  listingPaintIsEmpty,
+  listingPaintIsFault,
+  listingPaintIsRows,
+} from "./listing-paint";
 import {
   FILE_COLUMNS,
   fileColTemplate,
@@ -117,7 +124,12 @@ export function FileTable(props: {
   const colTemplate = (): string => fileColTemplate(listingStore.ui.colWidths);
   const entries = (): ListingEntry[] => listingStore.entries;
   const paint = (): ReturnType<typeof listingPaint> =>
-    listingPaint(entries().length, listingStore.session.loading, listingStore.session.cold);
+    listingPaint(
+      entries().length,
+      listingStore.session.loading,
+      listingStore.session.cold,
+      listingStore.session.listFault,
+    );
 
   return (
     <YoColFrame template={colTemplate()}>
@@ -156,6 +168,16 @@ export function FileTable(props: {
           </Match>
           <Match when={listingPaintIsCold(paint())}>
             <YoLoading fill title="加载中" description="正在读取目录" />
+          </Match>
+          <Match when={listingPaintIsFault(paint())}>
+            <YoEmptyState
+              fill
+              icon="info"
+              title={listingStore.session.error}
+              action={
+                <YoButton onClick={() => void listingStore.refresh()}>重新读取</YoButton>
+              }
+            />
           </Match>
           <Match when={listingPaintIsEmpty(paint())}>
             <YoEmptyState fill icon="folder" title="此文件夹为空" />
