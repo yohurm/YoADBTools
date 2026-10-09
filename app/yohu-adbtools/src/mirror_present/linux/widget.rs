@@ -18,6 +18,7 @@ use pangocairo::cairo::{self, Format};
 use super::super::scale::Letterbox;
 use super::super::stage::chrome_stack;
 use super::super::stage_palette::argb_to_rgba;
+use super::host::CardMotion;
 use super::vaapi::VaBlit;
 use crate::limits::{PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP};
 
@@ -52,6 +53,7 @@ pub struct PaintJob {
     pub body: String,
     pub chrome: bool,
     pub loading: bool,
+    pub motion: Option<CardMotion>,
     pub(super) video: Option<VideoPaint>,
 }
 
@@ -66,6 +68,7 @@ thread_local! {
     static CANVAS: RefCell<Option<Canvas>> = const { RefCell::new(None) };
     static TIMER: RefCell<bool> = const { RefCell::new(false) };
     static SPIN_ARMED: RefCell<bool> = const { RefCell::new(false) };
+    static CARD_ARMED: RefCell<bool> = const { RefCell::new(false) };
 }
 
 struct Canvas {
@@ -140,6 +143,7 @@ pub struct StagePaint {
     pub body: String,
     pub chrome: bool,
     pub loading: bool,
+    pub motion: Option<CardMotion>,
 }
 
 impl StagePaint {
@@ -167,6 +171,7 @@ impl StagePaint {
             body: self.body,
             chrome: self.chrome,
             loading: self.loading,
+            motion: self.motion,
             video: None,
         }
     }
@@ -273,7 +278,10 @@ impl Canvas {
         let Some(frame) = child.begin_draw_frame(&region) else {
             return;
         };
-        let card = CardPx::from(logical_box(job.card, scale));
+        let card = CardPx::from(logical_box(visual_card(job), scale));
+        if job.motion.as_ref().is_some_and(CardMotion::running) && gtk_motion_allowed() {
+            arm_card();
+        }
         let unit = scale.max(1) as f64;
         let radius = f64::from(job.radius) / unit;
         let stroke = f64::from(job.stroke) / unit;
@@ -399,6 +407,37 @@ fn blit_bgra(cr: &cairo::Context, bgra: &[u8], width: i32, height: i32, dest: Le
     let _ = cr.set_source_surface(&image, 0.0, 0.0);
     let _ = cr.paint();
     cr.restore().ok();
+}
+
+fn visual_card(job: &PaintJob) -> Letterbox {
+    let Some(motion) = &job.motion else {
+        return job.card;
+    };
+    if gtk_motion_allowed() && motion.running() {
+        motion.sample()
+    } else {
+        motion.to
+    }
+}
+
+fn gtk_motion_allowed() -> bool {
+    gtk::Settings::default()
+        .map(|settings| settings.is_gtk_enable_animations())
+        .unwrap_or(true)
+}
+
+fn arm_card() {
+    CARD_ARMED.with(|flag| {
+        if *flag.borrow() {
+            return;
+        }
+        *flag.borrow_mut() = true;
+        glib::timeout_add_local(PRESENT_SPIN_STEP, || {
+            CARD_ARMED.with(|flag| *flag.borrow_mut() = false);
+            redraw();
+            glib::ControlFlow::Break
+        });
+    });
 }
 
 fn arm_spin() {

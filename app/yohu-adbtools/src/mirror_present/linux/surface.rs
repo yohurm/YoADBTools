@@ -169,9 +169,7 @@ impl Live {
                 self.sync(None);
             }
             Cmd::AdoptContent { width, height } => {
-                crate::mirror_present::lock_present(&self.host)
-                    .stage
-                    .adopt_encoded_size(width, height);
+                crate::mirror_present::lock_present(&self.host).adopt_content(width, height);
                 self.sync(None);
             }
             Cmd::Screenshot { path, reply } => {
@@ -368,6 +366,7 @@ fn stage_paint(snap: &LayoutSnap, show: bool) -> StagePaint {
         body: snap.description.clone(),
         chrome: snap.chrome,
         loading: snap.loading,
+        motion: snap.motion.clone(),
     }
 }
 
@@ -403,5 +402,6 @@ fn hidden_paint() -> StagePaint {
         body: String::new(),
         chrome: false,
         loading: false,
+        motion: None,
     }
 }
