@@ -66,6 +66,25 @@ pub fn spawn_overlay_install(
                 Err(UpdateError::UnsupportedOs)
             }
         }
+        InstallerKind::Deb => {
+            #[cfg(target_os = "linux")]
+            {
+                let _ = (app_pid, relaunch_exe);
+                std::process::Command::new("xdg-open")
+                    .arg(&installer)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .map_err(|_| UpdateError::LaunchFailed)?;
+                Ok(false)
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                let _ = (app_pid, relaunch_exe);
+                Err(UpdateError::UnsupportedOs)
+            }
+        }
     }
 }
 

@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { hostOsIsMacos, hostOsIsWindows } from "./host-os";
+import { hostOsIsLinux, hostOsIsMacos, hostOsIsWindows } from "./host-os";
 
 describe("宿主系统", () => {
   it("windows 与 macos 各判一次", () => {
@@ -13,6 +13,9 @@ describe("宿主系统", () => {
     expect(hostOsIsMacos("windows")).toBe(false);
     expect(hostOsIsWindows("")).toBe(false);
     expect(hostOsIsMacos("linux")).toBe(false);
+    expect(hostOsIsLinux("linux")).toBe(true);
+    expect(hostOsIsLinux("windows")).toBe(false);
+    expect(hostOsIsWindows("linux")).toBe(false);
   });
 });
 

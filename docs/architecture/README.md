@@ -3,7 +3,7 @@
 > **状态：** 已落地（S1–S4 + 投屏主路径）；2026-08 起重规划：`yohu-runtime` ∥ `yohu-protocol` ∥ `yohu-motion`，壳 crate `yohu-adbtools`，前端壳 `@yohu/workbench`。  
 > **需求：** [`docs/requirements/需求分析.md`](../requirements/需求分析.md)
 
-**一句话：** Rust 领域核心 + Tauri 2 窗口/IPC + SolidJS WebView UI（YoUI）。交付 Windows x64 与 macOS；投屏解码编译期选 OS 原生后端（ADR-v6-028/029/030），macOS = VideoToolbox + NSView，Linux 预留。
+**一句话：** Rust 领域核心 + Tauri 2 窗口/IPC + SolidJS WebView UI（YoUI）。交付 Windows x64、macOS 与 Linux（WebKitGTK）；投屏解码编译期选 OS 原生后端（ADR-v6-028/029/030/041），macOS = VideoToolbox + NSView，Linux 工作台可运行，投屏像素仍是 VA-API 预留。
 
 ## 文档地图
 
@@ -15,7 +15,7 @@
 | [youi.md](youi.md) | `@yohu/ui`（对外名 YoUI） |
 | [workbench.md](workbench.md) | `@yohu/workbench` + `apps/shell` |
 | [modules/](modules/) | terminal / files / logs / mirror / [download](modules/download.md) / [textparsing](modules/textparsing.md) / update / **device** / [device-wireless（方案）](modules/device-wireless.md) |
-| [adr/](adr/) | ADR-v6-001～033 |
+| [adr/](adr/) | ADR-v6-001～041 |
 | [UI设计系统-v6.md](UI设计系统-v6.md) | token / 密度 / 主题 |
 | [动画系统-v6.md](动画系统-v6.md) | 动效（ADR-v6-017） |
 | [右键菜单-v6.md](右键菜单-v6.md) | 右键引擎（ADR-v6-019） |

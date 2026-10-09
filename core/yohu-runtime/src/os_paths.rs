@@ -73,8 +73,9 @@ pub fn app_data_root(product_dir_name: &str) -> std::io::Result<PathBuf> {
 /// 本机 per-user 安装根（载荷，与数据根分离）。
 ///
 /// Windows：`%LOCALAPPDATA%\Programs\<name>`（VS Code User / Known Folder 约定）。
-/// macOS：`/Applications/<name>.app`。其它 Unix：与 [`app_data_root`] 相同（产品不交付）。
-/// Windows 缺 `LOCALAPPDATA` 时返回 `Err`，不回落到当前工作目录。
+/// macOS：`/Applications/<name>.app`。
+/// 其它 Unix：`$HOME/.local/opt/<name>`（对照 Programs；不跟 `XDG_DATA_HOME` 走）。
+/// 缺环境变量或值为空时返回 `Err`，不回落到当前工作目录。
 pub fn app_install_root(product_dir_name: &str) -> std::io::Result<PathBuf> {
     #[cfg(windows)]
     {
@@ -88,7 +89,10 @@ pub fn app_install_root(product_dir_name: &str) -> std::io::Result<PathBuf> {
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        app_data_root(product_dir_name)
+        Ok(env_dir("HOME")?
+            .join(".local")
+            .join("opt")
+            .join(product_dir_name))
     }
     #[cfg(not(any(windows, unix)))]
     {
@@ -223,6 +227,29 @@ mod tests {
             assert!(install.ends_with("YohuAdbTools.app"));
             assert_ne!(data, install);
         }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            assert!(install.ends_with("YohuAdbTools"));
+            assert!(install
+                .parent()
+                .map(|d| d.ends_with("opt"))
+                .unwrap_or(false));
+            assert_ne!(data, install);
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn app_install_root_uses_home_local_opt() {
+        let home = std::env::var("HOME").expect("HOME");
+        let p = app_install_root("YohuAdbTools").expect("os install root");
+        assert_eq!(
+            p,
+            PathBuf::from(home)
+                .join(".local")
+                .join("opt")
+                .join("YohuAdbTools")
+        );
     }
 
     #[cfg(windows)]

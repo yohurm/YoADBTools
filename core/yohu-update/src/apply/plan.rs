@@ -131,5 +131,13 @@ mod tests {
                 .join(PRODUCT_NAME);
             assert_eq!(p, expected);
         }
+        #[cfg(target_os = "linux")]
+        {
+            let expected = app_install_root(DATA_DIR_NAME)
+                .expect("os install root")
+                .join(PRODUCT_NAME);
+            assert_eq!(p, expected);
+            assert!(expected.ends_with("YohuAdbTools"));
+        }
     }
 }

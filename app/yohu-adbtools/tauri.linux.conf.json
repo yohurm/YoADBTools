@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "targets": ["deb"],
+    "resources": {
+      "../../tools/adb": "tools/adb"
+    }
+  }
+}

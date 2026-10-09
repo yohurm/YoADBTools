@@ -1,10 +1,11 @@
 //! sidecar adb 工具解析（需求文档 §4.3）。
 //!
-//! 运行时只保留一份官方 sidecar：用户设置（`adb.path`，可运行时更新、立即生效）→
+//! 运行时优先一份官方 sidecar：用户设置（`adb.path`，可运行时更新、立即生效）→
 //! `DataRoot/tools/adb/`（从资源目录解压）。资源目录是安装载荷，解压成功后不再当第二套 adb 用，
-//! 避免两份副本抢 5037。本模块零 Tauri 依赖：目录由 app 层解析后传入。
+//! 避免两份副本抢 5037。Linux 在 sidecar 缺失时再找 `ANDROID_HOME` / `ANDROID_SDK_ROOT` /
+//! `~/Android/Sdk` / `PATH` 里的可执行 `adb`。本模块零 Tauri 依赖：目录由 app 层解析后传入。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use crate::error::AdbError;
@@ -82,9 +83,14 @@ impl ToolResolver {
     pub fn candidates(&self) -> Vec<PathBuf> {
         let mut out: Vec<PathBuf> = Vec::new();
         let mut push = |p: PathBuf| {
-            if p.is_file() && !out.contains(&p) {
-                out.push(p);
+            if !p.is_file() || out.contains(&p) {
+                return;
             }
+            let _ = yohu_runtime::ensure_executable(&p);
+            if !usable_adb(&p) {
+                return;
+            }
+            out.push(p);
         };
         if let Some(p) = lock_tool(self.preferred.read()).clone() {
             push(p);
@@ -101,6 +107,12 @@ impl ToolResolver {
             push(extracted);
         } else {
             push(self.resource_dir.join(adb_file_name()));
+            #[cfg(target_os = "linux")]
+            {
+                for extra in system_adb_candidates() {
+                    push(extra);
+                }
+            }
         }
         out
     }
@@ -150,6 +162,81 @@ impl ToolResolver {
     }
 }
 
+fn usable_adb(path: &Path) -> bool {
+    let Ok(meta) = path.metadata() else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        meta.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+/// 本机 adb 搜索面。测试直接构造，运行时从环境变量读。
+#[derive(Debug, Clone)]
+struct AdbSearch {
+    android_home: Option<PathBuf>,
+    android_sdk_root: Option<PathBuf>,
+    home: Option<PathBuf>,
+    path_entries: Vec<PathBuf>,
+}
+
+impl AdbSearch {
+    #[cfg(target_os = "linux")]
+    fn from_env() -> Self {
+        let path_entries = std::env::var_os("PATH")
+            .map(|raw| std::env::split_paths(&raw).collect())
+            .unwrap_or_default();
+        Self {
+            android_home: std::env::var_os("ANDROID_HOME").map(PathBuf::from),
+            android_sdk_root: std::env::var_os("ANDROID_SDK_ROOT").map(PathBuf::from),
+            home: std::env::var_os("HOME").map(PathBuf::from),
+            path_entries,
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn system_adb_candidates() -> Vec<PathBuf> {
+    discover_adb(&AdbSearch::from_env())
+}
+
+/// SDK 与 `PATH` 上的可执行 `adb`。已有 sidecar 时不要调用，避免第二套 adb 抢 5037。
+fn discover_adb(search: &AdbSearch) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut push = |p: PathBuf| {
+        if usable_adb(&p) && !out.contains(&p) {
+            out.push(p);
+        }
+    };
+    if let Some(home) = &search.android_home {
+        push(home.join("platform-tools").join(adb_file_name()));
+    }
+    if let Some(root) = &search.android_sdk_root {
+        push(root.join("platform-tools").join(adb_file_name()));
+    }
+    if let Some(home) = &search.home {
+        push(
+            home.join("Android")
+                .join("Sdk")
+                .join("platform-tools")
+                .join(adb_file_name()),
+        );
+    }
+    for dir in &search.path_entries {
+        push(dir.join(adb_file_name()));
+    }
+    out
+}
+
 fn sidecar_stamp(resource_dir: &std::path::Path) -> String {
     let mut out = String::new();
     for name in ADB_FILES {
@@ -184,13 +271,23 @@ mod tests {
         let resource = root.join("res");
         let data = root.join("data");
         let tool = ToolResolver::new(None, resource.clone(), data);
-        let err = tool.resolve().expect_err("no adb");
-        assert!(matches!(err, AdbError::ToolUnavailable));
-        assert_eq!(err.to_string(), yohu_domain::TOOL_UNAVAILABLE);
-        assert!(tool
-            .unavailable_hint()
-            .contains(&resource.display().to_string()));
-        assert!(!err.to_string().contains(&root.display().to_string()));
+        match tool.resolve() {
+            Err(err) => {
+                assert!(matches!(err, AdbError::ToolUnavailable));
+                assert_eq!(err.to_string(), yohu_domain::TOOL_UNAVAILABLE);
+                assert!(tool
+                    .unavailable_hint()
+                    .contains(&resource.display().to_string()));
+                assert!(!err.to_string().contains(&root.display().to_string()));
+            }
+            Ok(path) => {
+                assert!(path.is_file());
+                assert!(
+                    !path.starts_with(&resource),
+                    "空资源目录不得把不存在的 sidecar 当成 adb"
+                );
+            }
+        }
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -213,6 +310,13 @@ mod tests {
         tool.ensure_extracted().unwrap();
         for name in ADB_FILES {
             assert_eq!(fs::read_to_string(data.join(name)).unwrap(), *name);
+            #[cfg(unix)]
+            {
+                assert!(
+                    usable_adb(&data.join(name)),
+                    "{name} 解压后必须可执行"
+                );
+            }
         }
 
         let candidates = tool.candidates();
@@ -265,6 +369,48 @@ mod tests {
             "v2-longer"
         );
         assert!(data.join(yohu_protocol::dir::SIDECAR_STAMP).is_file());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn discover_adb_reads_sdk_then_path_and_skips_non_executable() {
+        let root = std::env::temp_dir().join(format!(
+            "yohu-tool-discover-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let sdk = root.join("sdk").join("platform-tools");
+        let path_dir = root.join("bin");
+        fs::create_dir_all(&sdk).unwrap();
+        fs::create_dir_all(&path_dir).unwrap();
+        let sdk_adb = sdk.join(adb_file_name());
+        let path_adb = path_dir.join(adb_file_name());
+        fs::write(&sdk_adb, b"sdk").unwrap();
+        fs::write(&path_adb, b"path").unwrap();
+        let mut path_entries = vec![path_dir];
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let inert_dir = root.join("inert");
+            let inert = inert_dir.join(adb_file_name());
+            fs::create_dir_all(&inert_dir).unwrap();
+            fs::write(&inert, b"noexec").unwrap();
+            path_entries.push(inert_dir);
+            for path in [&sdk_adb, &path_adb] {
+                let mut perms = fs::metadata(path).unwrap().permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(path, perms).unwrap();
+            }
+        }
+
+        let found = discover_adb(&AdbSearch {
+            android_home: Some(root.join("sdk")),
+            android_sdk_root: None,
+            home: Some(root.join("missing-home")),
+            path_entries,
+        });
+        assert_eq!(found, vec![sdk_adb, path_adb]);
         let _ = fs::remove_dir_all(&root);
     }
 }

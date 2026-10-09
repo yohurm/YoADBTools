@@ -607,7 +607,7 @@ describe("待装更新", () => {
     expectOnce("return updateStore." + "pending()", "pendingUpdate");
     expectCalls("pendingUpdate", 5);
     expectOnce("pendingUpdate()?" + ".version", "pendingVersion");
-    expectCalls("pendingVersion", 4);
+    expectCalls("pendingVersion", 5);
     expectOnce("pendingUpdate()?" + ".installer_name", "pendingInstallerName");
     expectCalls("pendingInstallerName", 3);
     expectOnce("pendingUpdate()?" + ".description", "pendingDescription");

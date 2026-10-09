@@ -56,6 +56,29 @@ use crate::settings_store::SettingsStore;
 use crate::state::AppState;
 use crate::tasks::TaskCenter;
 
+/// Gtk 主窗指针。投屏占位只记下宿主，不在这里建表面。
+#[cfg(target_os = "linux")]
+fn gtk_owner_ptr(window: &impl GtkWindowPtr) -> isize {
+    window.as_ptr() as isize
+}
+
+#[cfg(target_os = "linux")]
+trait GtkWindowPtr {
+    fn as_ptr(&self) -> *mut std::ffi::c_void;
+}
+
+#[cfg(target_os = "linux")]
+impl<T: glib_object_ptr::ObjectType> GtkWindowPtr for T {
+    fn as_ptr(&self) -> *mut std::ffi::c_void {
+        glib_object_ptr::ObjectType::as_ptr(self) as *mut std::ffi::c_void
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod glib_object_ptr {
+    pub use gtk::glib::object::ObjectType;
+}
+
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     crate::window_boot::mark_origin();
     // 原生小窗必须在 WebView2 / tracing 之前画出（AS / IntelliJ / keyhop）。
@@ -251,6 +274,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 match win.ns_view() {
                     Ok(view) => present.set_owner(view as isize),
                     Err(e) => tracing::error!("无法取得主窗口 NSView: {e}"),
+                }
+                #[cfg(target_os = "linux")]
+                match win.gtk_window() {
+                    Ok(gtk_win) => present.set_owner(gtk_owner_ptr(&gtk_win)),
+                    Err(e) => tracing::error!("无法取得主窗口 GtkWindow: {e}"),
                 }
             }
 

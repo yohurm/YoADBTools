@@ -12,8 +12,8 @@
 - **UI**：TypeScript + SolidJS + Vite，pnpm workspace（`--filter`，含 `ui/turbo.json` 任务声明）：`@yohu/api`（类型化 IPC）→ `@yohu/ui`（YoUI）→ `@yohu/workbench`（壳）+ `@yohu/modules/*`
 - **组件库**：YoUI / `@yohu/ui` 第一公民（公开组件 `Yo*` 标注；token 单源；lint 禁硬编码色值/字号/动效时长/圆角）；见 `docs/architecture/youi.md`
 - **右键菜单（ADR-v6-019）**：引擎在 `@yohu/ui` `context-menu/`（`defineContextMenu` / `openContextMenu` / 壳唯一 `YoContextMenuHost`）；场景表按模块 `menu.ts` 收口；禁止模块自挂 `YoContextMenu`。详见 `docs/architecture/右键菜单-v6.md`
-- **目标平台**：Windows 10/11 x64（WebView2）；macOS 12+（系统 WKWebView）。Linux 不交付
-- **打包**：Windows = Tauri NSIS per-user + WebView2 embedBootstrapper；macOS = `.app` / `.dmg`。sidecar 官方 platform-tools `adb`（不重实现 ADB 协议，ADR-v6-008/029）
+- **目标平台**：Windows 10/11 x64（WebView2）；macOS 12+（系统 WKWebView）；Linux x64/arm64（系统 WebKitGTK 4.1，ADR-v6-041）。Linux 投屏像素与拖出仍预留
+- **打包**：Windows = Tauri NSIS per-user + WebView2 embedBootstrapper；macOS = `.app` / `.dmg`；Linux = `.deb`（WebKitGTK 系统依赖）。sidecar 官方 platform-tools `adb`（不重实现 ADB 协议，ADR-v6-008/029/041）
 
 ## 核心功能
 1. **设备管理** — `yohu-adb` 的 `devices -l` 扫描（device/unauthorized/offline + 型号）是**目录**唯一源（空列表即无设备）；在线设备运行时状态（夜览/电量/SDK/亮屏等）由 `DeviceStatusHub` 统一采样，经 `device/status` 投影到设备栏与 `DeviceSession.deviceStatuses`（ADR-v6-025，禁止模块自轮询）；全局焦点 + 每模块选择作用域（终端 MultiOptional，文件/日志 SingleRequired）；手动刷新 + 启动预热 + 可选自动刷新（`devices_auto_refresh`，开关，默认开，周期 2 秒产品常量）

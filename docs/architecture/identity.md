@@ -10,8 +10,8 @@
 | 产品 / NSIS `productName` / 主程序 | `YohuAdbTools` |
 | 窗口标题 / 状态栏 / 关于 | `Yohu ADB Tools` |
 | 包标识 | `com.yohu.adbtools` |
-| 产品家园 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`（`yohu-runtime::app_data_root`） |
-| 安装根 | Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；macOS `/Applications/YohuAdbTools.app`（`yohu-runtime::app_install_root`） |
+| 产品家园 | Windows `%LOCALAPPDATA%\YohuAdbTools\`；macOS `~/Library/Application Support/YohuAdbTools\`；Linux `$XDG_DATA_HOME/YohuAdbTools` 或 `~/.local/share/YohuAdbTools`（`yohu-runtime::app_data_root`） |
+| 安装根 | Windows `%LOCALAPPDATA%\Programs\YohuAdbTools\`；macOS `/Applications/YohuAdbTools.app`；Linux `~/.local/opt/YohuAdbTools`（`yohu-runtime::app_install_root`）。`.deb` 把主程序装到 `/usr/bin` |
 | Tauri 壳 crate | **`yohu-adbtools`**（`app/yohu-adbtools`；唯一引用 Tauri） |
 | 原生动效 crate | **`yohu-motion`**（`core/yohu-motion`；与 runtime / protocol / search 并列，零 Tauri、零产品 HWND） |
 | 检索引擎 crate | **`yohu-search`**（`core/yohu-search`；与 motion 并列，零产品类型、零 domain） |
@@ -30,7 +30,9 @@
 安装根与产品家园分离（ADR-v6-031）。Windows per-user 载荷在 `Programs\`，可变文件在家园。改 `data_root` 不搬家。
 
 ```text
-<os_app_data>/Programs/<DATA_DIR_NAME>/   # 安装根（Windows）；macOS = /Applications/<name>.app
+<install-root>/                           # Windows = <os_app_data>/Programs/<name>
+                                          # macOS = /Applications/<name>.app
+                                          # Linux = ~/.local/opt/<name>
 <os_app_data>/<DATA_DIR_NAME>/            # 产品家园（不随 data_root 迁移）
 ├── config/settings.json
 ├── config/devices-catalog.json           # 上次成功 `devices -l`

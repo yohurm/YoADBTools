@@ -3,6 +3,10 @@
 //! Windows = Media Foundation → D3D11 YUV → HWND。
 //! macOS = VideoToolbox → NSView。Linux 预留，禁止 FFmpeg。
 //! UI 上报稳定可用区；表面独占像素。解码会话跟 `mirror.start`/`stop` 走，表面跟舞台可见性走。
+//!
+//! Linux 只走 `probe` / `spawn_unimplemented`。共享呈现代码留给 Windows / macOS，
+//! 在 Linux 上不算出未使用（ADR-v6-041）。
+#![cfg_attr(target_os = "linux", allow(dead_code))]
 
 mod annexb;
 mod control_hand;

@@ -1,14 +1,17 @@
 //! 路径规划：安装根与产品家园分离（ADR-v6-031）。
 //!
 //! ```text
-//! %LOCALAPPDATA%\Programs\<DATA_DIR_NAME>\   # 安装根（载荷）
-//! %LOCALAPPDATA%\<DATA_DIR_NAME>\            # 产品家园，不随 data_root 迁移
-//! ├── config\settings.json
-//! ├── logs\
-//! ├── cache\webview\ | update\ | drag-out\
-//! └── data\                                  # DataRoot（可配置，重启生效）
-//!     ├── tools\adb\
-//!     └── modules\
+//! <install-root>/                            # 载荷。Win: %LOCALAPPDATA%\Programs\<name>
+//!                                            # macOS: /Applications/<name>.app
+//!                                            # Linux: ~/.local/opt/<name>
+//! <app-data>/<DATA_DIR_NAME>/                # 产品家园，不随 data_root 迁移
+//!                                            # Linux: $XDG_DATA_HOME 或 ~/.local/share
+//! ├── config/settings.json
+//! ├── logs/
+//! ├── cache/webview/ | update/ | drag-out/
+//! └── data/                                  # DataRoot（可配置，重启生效）
+//!     ├── tools/adb/
+//!     └── modules/
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -169,7 +172,7 @@ mod tests {
             p.install_dir,
             AppPaths::install_dir().expect("os install root")
         );
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         assert_ne!(p.install_dir, p.local_root);
     }
 
