@@ -10,7 +10,7 @@
 
 本机没有 `/dev/dri`。投屏像素仍阻塞。面板状态按实机 Live 会话核对。
 
-`234eefc` 的复测在下一节。再往下的表是改代码之前的，行没有改写。像素仍不通过。
+`234eefc` 的复测在下一节。再往下的表是改代码之前的，行没有改写。像素核对在「像素」一节，不改这些旧行。
 
 ## 复测（`234eefc` 重装，2026-10-09）
 
@@ -21,6 +21,18 @@
 | 没有快照的失败 | **通过。** 把 `primary` 临时指到不存在的 `/storage/emulated/0-missing` 后重开应用。第一次 `files.list /sdcard` 失败。日志 `浏览失败`，文案「没有这个目录，请重新输入」。无障碍树有「重新读取」。画面上没有「此文件夹为空」。指回真实卷后再点「重新读取」，`/sdcard` `count:17` |
 | 已有行时刷新失败 | **通过。** `/sdcard/yohu-keep` 列出 `keep.txt` 后删掉目录再刷新。行还在，Toast 是「没有这个目录，请重新输入」。没有变成空文件夹。日志同一句 `浏览失败`，没有把失败 `remember` 成 `count:0` |
 | Live 但没有硬解 | **通过（仍无像素）。** 第一路 generation=1 在 reverse 预热完成前失败，洞里是「启动失败」和「server 在建立隧道前退出」。预热之后 generation=2 为 Live，`h264` 720×1280。洞里是「没有画面」和「当前平台没有投屏硬解」。状态栏只有 `720×1280`，没有 fps，日志没有 `mirror/painted`。「停止」可点。「暂停画面」「面板内全屏」「截图」和返回 / Home / 多任务 / 音量 / 电源 / 亮度都不可点 |
+
+## 像素（ADR-v6-042，`3368f56`，2026-10-09）
+
+用同一分支重新打的 `.deb` 覆盖安装。`yohu_atd34` 仍是 `-accel off`，没有 `/dev/dri`。Cisco OpenH264 2.4.1 的 `libopenh264.so.7` 只放在 `~/.local/share/YohuAdbTools/data/openh264/`，不在 git，也不在包里（`dpkg -c` 没有 `openh264` / `ffmpeg`）。缺文件时把 `http://ciscobinary.openh264.org/libopenh264-2.4.1-linux64.7.so.bz2` 解开到该目录，或让 `YOHU_OPENH264` 指向这个文件。设置里的开关标题是 `OpenH264 Video Codec provided by Cisco Systems, Inc.`。关掉或找不到时，洞标题仍是「没有画面」，正文说明这份单独下载的二进制，不是「当前平台没有投屏硬解」。
+
+| 项 | 结果 |
+|----|------|
+| 探针 | **通过。** 日志 `投屏后端探测 backend="vaapi" hevc_ok=false`，随后 `没有 H.264 VLD，改试 OpenH264`，`Linux 投屏 Convert 使用 OpenH264` |
+| 子窗口 | **通过。** `投屏 GTK 子窗口已盖住洞 xid=33554593 x=212 y=104 w=704 h=661` |
+| 首帧 | **通过。** 预热已经完成，generation=1 直接 Live，`h264` 720×1280。日志 `投屏首帧已 Present`，`首帧已绘制 painted_fps=1`，之后 `Linux 解码节拍` 的 fed 与 decoded 对齐 |
+| 画面 | **通过（设备缓冲本身是黑的）。** `adb exec-out screencap` 为 720×1280 全黑。ATD 前台是 `EmptyHomeActivity`。洞里是居中的黑条，两侧是浅色 contain 边。暂停后子窗口画出「已暂停」和「画面已隐藏，点击继续」 |
+| 解锁 | **通过。** 「截图」「面板内全屏」「返回」「多任务」「音量-」「音量+」「电源」「亮度-」「亮度+」在首帧之后都是 sensitive。暂停钮变成「继续」 |
 
 ## 安装、路径、打包
 
