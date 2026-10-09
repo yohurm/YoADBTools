@@ -11,7 +11,10 @@ use yohu_mirror::{FramePipe, MirrorService};
 use yohu_protocol::AppEvent;
 
 use super::super::annexb::{begin_feed, note_decode_beat, select_live_frames, DecodeSeatKind};
-use super::super::backend::{bind_after_pipe, poll_ready, poll_timeout, Cmd, PresentBind, SurfacePoll};
+use super::super::backend::{
+    bind_after_pipe, poll_ready, poll_timeout, Cmd, PresentBind, SurfacePoll,
+};
+use super::super::scale::Letterbox;
 use super::color::scale_bgra;
 use super::host::{Host, LayoutSnap};
 use super::openh264::OpenH264Decoder;
@@ -348,14 +351,23 @@ fn stage_paint(snap: &LayoutSnap, show: bool) -> StagePaint {
         avail_y: snap.avail_y,
         avail_w: snap.avail_w as i32,
         avail_h: snap.avail_h as i32,
+        card: snap.dest,
+        radius: snap.radius,
+        stroke: snap.stroke,
+        border: snap.border,
         canvas: snap.canvas,
+        page: snap.page,
         title_argb: snap.title_argb,
         body_argb: snap.body_argb,
+        icon_argb: snap.icon_argb,
+        well_argb: snap.well_argb,
+        icon_px: snap.icon_px,
         title_px: snap.title_px,
         body_px: snap.body_px,
         title: snap.title.to_string(),
         body: snap.description.clone(),
         chrome: snap.chrome,
+        loading: snap.loading,
     }
 }
 
@@ -366,13 +378,30 @@ fn hidden_paint() -> StagePaint {
         avail_y: 0,
         avail_w: 0,
         avail_h: 0,
+        card: Letterbox {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            nearest: false,
+            crop_w: 0,
+            crop_h: 0,
+        },
+        radius: 0.0,
+        stroke: 0.0,
+        border: 0,
         canvas: 0,
+        page: 0,
         title_argb: 0,
         body_argb: 0,
+        icon_argb: 0,
+        well_argb: 0,
+        icon_px: 0,
         title_px: 0,
         body_px: 0,
         title: String::new(),
         body: String::new(),
         chrome: false,
+        loading: false,
     }
 }

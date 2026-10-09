@@ -1,20 +1,25 @@
 //! GTK 3 子窗口。只在主线程创建和翻页。解码线程把最后一帧放进槽里再叫醒主循环。
+//!
+//! 洞仍盖住 avail。可见卡片是占用 dest：卡片外铺窗口 canvas（letterbox），
+//! 铬和描边画在卡片上，跟 Windows DComp clip + chrome 同一套几何。
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gtk::gdk;
 use gtk::glib;
 use gtk::glib::translate::{FromGlibPtrNone, ToGlibPtr};
 use gtk::prelude::*;
-use pangocairo::cairo::{self, Format};
 use pango::FontDescription;
+use pangocairo::cairo::{self, Format};
 
 use super::super::scale::Letterbox;
+use super::super::stage::chrome_stack;
 use super::super::stage_palette::argb_to_rgba;
 use super::vaapi::VaBlit;
+use crate::limits::{PRESENT_SPIN_DELTA, PRESENT_SPIN_STEP};
 
 pub(super) struct VideoPaint {
     bgra: Vec<u8>,
@@ -30,14 +35,23 @@ pub struct PaintJob {
     pub avail_y: i32,
     pub avail_w: i32,
     pub avail_h: i32,
+    pub card: Letterbox,
+    pub radius: f32,
+    pub stroke: f32,
+    pub border: u32,
     pub canvas: u32,
+    pub page: u32,
     pub title_argb: u32,
     pub body_argb: u32,
+    pub icon_argb: u32,
+    pub well_argb: u32,
+    pub icon_px: u32,
     pub title_px: u32,
     pub body_px: u32,
     pub title: String,
     pub body: String,
     pub chrome: bool,
+    pub loading: bool,
     pub(super) video: Option<VideoPaint>,
 }
 
@@ -51,6 +65,7 @@ pub struct Shared {
 thread_local! {
     static CANVAS: RefCell<Option<Canvas>> = const { RefCell::new(None) };
     static TIMER: RefCell<bool> = const { RefCell::new(false) };
+    static SPIN_ARMED: RefCell<bool> = const { RefCell::new(false) };
 }
 
 struct Canvas {
@@ -59,6 +74,8 @@ struct Canvas {
     child: Option<gdk::Window>,
     last: Option<PaintJob>,
     shared: Arc<Shared>,
+    spin: f32,
+    spin_at: Instant,
 }
 
 pub fn shared(xid: Arc<AtomicU64>) -> Arc<Shared> {
@@ -82,6 +99,8 @@ pub fn boot(owner: isize, shared: Arc<Shared>) {
                 child: None,
                 last: None,
                 shared,
+                spin: 0.0,
+                spin_at: Instant::now(),
             });
         });
         redraw();
@@ -104,14 +123,23 @@ pub struct StagePaint {
     pub avail_y: i32,
     pub avail_w: i32,
     pub avail_h: i32,
+    pub card: Letterbox,
+    pub radius: f32,
+    pub stroke: f32,
+    pub border: u32,
     pub canvas: u32,
+    pub page: u32,
     pub title_argb: u32,
     pub body_argb: u32,
+    pub icon_argb: u32,
+    pub well_argb: u32,
+    pub icon_px: u32,
     pub title_px: u32,
     pub body_px: u32,
     pub title: String,
     pub body: String,
     pub chrome: bool,
+    pub loading: bool,
 }
 
 impl StagePaint {
@@ -122,14 +150,23 @@ impl StagePaint {
             avail_y: self.avail_y,
             avail_w: self.avail_w,
             avail_h: self.avail_h,
+            card: self.card,
+            radius: self.radius,
+            stroke: self.stroke,
+            border: self.border,
             canvas: self.canvas,
+            page: self.page,
             title_argb: self.title_argb,
             body_argb: self.body_argb,
+            icon_argb: self.icon_argb,
+            well_argb: self.well_argb,
+            icon_px: self.icon_px,
             title_px: self.title_px,
             body_px: self.body_px,
             title: self.title,
             body: self.body,
             chrome: self.chrome,
+            loading: self.loading,
             video: None,
         }
     }
@@ -179,8 +216,13 @@ fn redraw() {
                 canvas.last = Some(next);
             }
         }
-        if canvas.shared.job.lock().ok().is_some_and(|job| job.is_some()) &&
-            !canvas.shared.scheduled.swap(true, Ordering::AcqRel)
+        if canvas
+            .shared
+            .job
+            .lock()
+            .ok()
+            .is_some_and(|job| job.is_some())
+            && !canvas.shared.scheduled.swap(true, Ordering::AcqRel)
         {
             glib::idle_add_once(redraw);
         }
@@ -190,16 +232,26 @@ fn redraw() {
 
 impl Canvas {
     fn paint(&mut self) {
-        let Some(job) = self.last.as_mut() else {
-            return;
-        };
-        if !job.show || job.avail_w <= 0 || job.avail_h <= 0 {
+        let visible = self
+            .last
+            .as_ref()
+            .is_some_and(|job| job.show && job.avail_w > 0 && job.avail_h > 0);
+        if !visible {
             if let Some(child) = self.child.as_ref() {
                 child.hide();
             }
             return;
         }
-        let Some((parent, scale)) = parent_window(self.owner) else {
+        let loading = self
+            .last
+            .as_ref()
+            .is_some_and(|job| job.loading && job.chrome);
+        let spin = self.advance_spin(loading);
+        let owner = self.owner;
+        let Some(job) = self.last.as_mut() else {
+            return;
+        };
+        let Some((parent, scale)) = parent_window(owner) else {
             return;
         };
         let (x, y, w, h) = logical_rect(job.avail_x, job.avail_y, job.avail_w, job.avail_h, scale);
@@ -221,8 +273,18 @@ impl Canvas {
         let Some(frame) = child.begin_draw_frame(&region) else {
             return;
         };
+        let card = CardPx::from(logical_box(job.card, scale));
+        let unit = scale.max(1) as f64;
+        let radius = f64::from(job.radius) / unit;
+        let stroke = f64::from(job.stroke) / unit;
         if let Some(cr) = frame.cairo_context() {
-            fill_rgb(&cr, job.canvas);
+            fill_rgb(&cr, job.page);
+            cr.save().ok();
+            clip_round(&cr, &card, radius);
+            if job.chrome {
+                fill_rgb(&cr, job.canvas);
+                draw_chrome(&cr, job, &card, scale, spin);
+            }
             let mut used_put = false;
             if let Some(video) = job.video.as_mut() {
                 let dest = logical_box(video.dest, scale);
@@ -234,11 +296,27 @@ impl Canvas {
                     blit_bgra(&cr, &video.bgra, video.width, video.height, dest);
                 }
             }
-            if job.chrome {
-                draw_copy(&cr, job, w, h);
-            }
+            cr.restore().ok();
+            stroke_frame(&cr, &card, radius, stroke, job.border);
         }
         child.end_draw_frame(&frame);
+    }
+
+    fn advance_spin(&mut self, loading: bool) -> f32 {
+        if !loading {
+            return self.spin;
+        }
+        let elapsed = self.spin_at.elapsed();
+        if elapsed >= PRESENT_SPIN_STEP {
+            let steps = (elapsed.as_secs_f32() / PRESENT_SPIN_STEP.as_secs_f32())
+                .floor()
+                .max(1.0);
+            let turn = std::f32::consts::PI * 2.0;
+            self.spin = (self.spin + PRESENT_SPIN_DELTA * steps) % turn;
+            self.spin_at = Instant::now();
+        }
+        arm_spin();
+        self.spin
     }
 }
 
@@ -247,8 +325,7 @@ fn parent_window(owner: isize) -> Option<(gdk::Window, i32)> {
         return None;
     }
     unsafe {
-        let widget: gtk::Widget =
-            gtk::Widget::from_glib_none(owner as *mut gtk::ffi::GtkWidget);
+        let widget: gtk::Widget = gtk::Widget::from_glib_none(owner as *mut gtk::ffi::GtkWidget);
         let scale = widget.scale_factor().max(1);
         Some((widget.window()?, scale))
     }
@@ -273,12 +350,7 @@ fn make_child(parent: &gdk::Window, x: i32, y: i32, w: i32, h: i32) -> gdk::Wind
 
 fn logical_rect(x: i32, y: i32, w: i32, h: i32, scale: i32) -> (i32, i32, i32, i32) {
     let scale = scale.max(1);
-    (
-        x / scale,
-        y / scale,
-        (w / scale).max(1),
-        (h / scale).max(1),
-    )
+    (x / scale, y / scale, (w / scale).max(1), (h / scale).max(1))
 }
 
 fn logical_box(dest: Letterbox, scale: i32) -> Letterbox {
@@ -329,37 +401,219 @@ fn blit_bgra(cr: &cairo::Context, bgra: &[u8], width: i32, height: i32, dest: Le
     cr.restore().ok();
 }
 
-fn draw_copy(cr: &cairo::Context, job: &PaintJob, width: i32, height: i32) {
-    if job.title.is_empty() && job.body.is_empty() {
+fn arm_spin() {
+    SPIN_ARMED.with(|flag| {
+        if *flag.borrow() {
+            return;
+        }
+        *flag.borrow_mut() = true;
+        glib::timeout_add_local(PRESENT_SPIN_STEP, || {
+            SPIN_ARMED.with(|flag| *flag.borrow_mut() = false);
+            redraw();
+            glib::ControlFlow::Break
+        });
+    });
+}
+
+struct CardPx {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+impl From<Letterbox> for CardPx {
+    fn from(box_: Letterbox) -> Self {
+        Self {
+            x: f64::from(box_.x),
+            y: f64::from(box_.y),
+            w: f64::from(box_.width),
+            h: f64::from(box_.height),
+        }
+    }
+}
+
+fn clip_round(cr: &cairo::Context, card: &CardPx, radius: f64) {
+    trace_round(cr, card.x, card.y, card.w, card.h, radius);
+    cr.clip();
+}
+
+fn trace_round(cr: &cairo::Context, x: f64, y: f64, w: f64, h: f64, radius: f64) {
+    let r = radius.max(0.0).min(w * 0.5).min(h * 0.5);
+    if r <= 0.0 {
+        cr.rectangle(x, y, w, h);
         return;
     }
+    let pi = std::f64::consts::PI;
+    cr.new_sub_path();
+    cr.arc(x + w - r, y + r, r, -pi / 2.0, 0.0);
+    cr.arc(x + w - r, y + h - r, r, 0.0, pi / 2.0);
+    cr.arc(x + r, y + h - r, r, pi / 2.0, pi);
+    cr.arc(x + r, y + r, r, pi, pi * 1.5);
+    cr.close_path();
+}
+
+fn stroke_frame(cr: &cairo::Context, card: &CardPx, radius: f64, stroke: f64, border: u32) {
+    if stroke <= 0.0 || border == 0 {
+        return;
+    }
+    let inset = stroke.max(1.0);
+    let x = card.x + inset;
+    let y = card.y + inset;
+    let w = (card.w - inset * 2.0).max(1.0);
+    let h = (card.h - inset * 2.0).max(1.0);
+    let corner = (radius - inset).max(0.0);
+    set_argb(cr, border);
+    cr.set_line_width(stroke);
+    cr.set_line_cap(cairo::LineCap::Round);
+    cr.set_line_join(cairo::LineJoin::Round);
+    trace_round(cr, x, y, w, h, corner);
+    let _ = cr.stroke();
+}
+
+fn draw_chrome(cr: &cairo::Context, job: &PaintJob, card: &CardPx, scale: i32, spin: f32) {
+    let unit = scale.max(1) as f64;
+    let icon = f64::from(job.icon_px) / unit;
+    let title_px = f64::from(job.title_px) / unit;
+    let body_px = f64::from(job.body_px) / unit;
+    let stack = chrome_stack(job.icon_px as f32, job.title_px as f32, job.body_px as f32);
+    let gap = f64::from(stack.gap) / unit;
+    let block = f64::from(stack.block) / unit;
+    let title_inset = f64::from(stack.title_inset) / unit;
+    let body_inset = f64::from(stack.body_inset) / unit;
+    let title_box = f64::from(stack.title_box) / unit;
+    let after_title = f64::from(stack.after_title) / unit;
+    let mut y = card.y + ((card.h - block) * 0.5).max(0.0);
+    let cx = card.x + card.w * 0.5;
+    draw_icon_well(cr, cx, y + icon * 0.5, icon * 0.56, job.well_argb);
+    if job.loading {
+        draw_spinner(
+            cr,
+            cx,
+            y + icon * 0.5,
+            icon * 0.42,
+            spin,
+            job.icon_argb,
+            job.body_argb,
+        );
+    } else {
+        draw_mirror_icon(cr, cx, y, icon, job.icon_argb);
+    }
+    y += icon + gap;
+    draw_label(
+        cr,
+        &job.title,
+        LabelBox {
+            px: title_px,
+            medium: true,
+            argb: job.title_argb,
+            x: card.x + title_inset,
+            y,
+            width: (card.w - title_inset * 2.0).max(1.0),
+        },
+    );
+    y += title_box + after_title;
+    draw_label(
+        cr,
+        &job.body,
+        LabelBox {
+            px: body_px,
+            medium: false,
+            argb: job.body_argb,
+            x: card.x + body_inset,
+            y,
+            width: (card.w - body_inset * 2.0).max(1.0),
+        },
+    );
+}
+
+struct LabelBox {
+    px: f64,
+    medium: bool,
+    argb: u32,
+    x: f64,
+    y: f64,
+    width: f64,
+}
+
+fn draw_label(cr: &cairo::Context, text: &str, label: LabelBox) {
     let layout = pangocairo::create_layout(cr);
     let mut desc = FontDescription::new();
     desc.set_family("WenQuanYi Micro Hei, Droid Sans Fallback, Sans");
-    desc.set_absolute_size(job.title_px.max(1) as f64 * f64::from(pango::SCALE));
+    desc.set_weight(if label.medium {
+        pango::Weight::Medium
+    } else {
+        pango::Weight::Normal
+    });
+    desc.set_absolute_size(label.px.max(1.0) * f64::from(pango::SCALE));
     layout.set_font_description(Some(&desc));
     layout.set_alignment(pango::Alignment::Center);
-    layout.set_width(width.max(1) * pango::SCALE);
-    layout.set_text(&job.title);
-    let (_, title_h) = layout.pixel_size();
-    desc.set_absolute_size(job.body_px.max(1) as f64 * f64::from(pango::SCALE));
-    let body_layout = pangocairo::create_layout(cr);
-    body_layout.set_font_description(Some(&desc));
-    body_layout.set_alignment(pango::Alignment::Center);
-    body_layout.set_width(width.max(1) * pango::SCALE);
-    body_layout.set_text(&job.body);
-    let (_, body_h) = body_layout.pixel_size();
-    let gap = 8;
-    let block = title_h + gap + body_h;
-    let top = ((height - block) / 2).max(0);
-    let [r, g, b, a] = argb_to_rgba(job.title_argb);
-    cr.set_source_rgba(r as f64, g as f64, b as f64, a as f64);
-    cr.move_to(0.0, top as f64);
+    layout.set_width((label.width.round() as i32).max(1) * pango::SCALE);
+    layout.set_text(text);
+    set_argb(cr, label.argb);
+    cr.move_to(label.x, label.y);
     pangocairo::show_layout(cr, &layout);
-    let [r, g, b, a] = argb_to_rgba(job.body_argb);
+}
+
+fn draw_icon_well(cr: &cairo::Context, cx: f64, cy: f64, radius: f64, argb: u32) {
+    if radius <= 0.0 {
+        return;
+    }
+    set_argb(cr, argb);
+    cr.arc(cx, cy, radius, 0.0, std::f64::consts::PI * 2.0);
+    let _ = cr.fill();
+}
+
+fn draw_mirror_icon(cr: &cairo::Context, cx: f64, top: f64, size: f64, argb: u32) {
+    if size <= 0.0 {
+        return;
+    }
+    let stroke = (size / 10.0).clamp(2.0, 3.5);
+    let s = size / 24.0;
+    let ox = cx - size * 0.5;
+    set_argb(cr, argb);
+    cr.set_line_width(stroke);
+    cr.set_line_cap(cairo::LineCap::Round);
+    cr.set_line_join(cairo::LineJoin::Round);
+    trace_round(cr, ox + 2.0 * s, top + 2.0 * s, 11.0 * s, 13.0 * s, 2.0 * s);
+    let _ = cr.stroke();
+    trace_round(cr, ox + 9.0 * s, top + 9.0 * s, 13.0 * s, 13.0 * s, 2.0 * s);
+    let _ = cr.stroke();
+}
+
+fn draw_spinner(
+    cr: &cairo::Context,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    spin: f32,
+    accent: u32,
+    track: u32,
+) {
+    if radius <= 0.0 {
+        return;
+    }
+    let stroke = (radius / 6.0).clamp(2.0, 4.0);
+    cr.set_line_width(stroke);
+    cr.set_line_cap(cairo::LineCap::Round);
+    set_argb(cr, track);
+    cr.arc(cx, cy, radius, 0.0, std::f64::consts::PI * 2.0);
+    let _ = cr.stroke();
+    let spin = f64::from(spin);
+    set_argb(cr, accent);
+    cr.arc(
+        cx + radius * spin.cos(),
+        cy + radius * spin.sin(),
+        stroke * 1.1,
+        0.0,
+        std::f64::consts::PI * 2.0,
+    );
+    let _ = cr.fill();
+}
+
+fn set_argb(cr: &cairo::Context, argb: u32) {
+    let [r, g, b, a] = argb_to_rgba(argb);
     cr.set_source_rgba(r as f64, g as f64, b as f64, a as f64);
-    cr.move_to(0.0, (top + title_h + gap) as f64);
-    pangocairo::show_layout(cr, &body_layout);
 }
 
 fn window_xid(window: &gdk::Window) -> u64 {
