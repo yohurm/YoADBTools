@@ -13,6 +13,8 @@
       "nsis": {
         "installMode": "currentUser",
         "languages": ["SimpChinese"],
+        "installerIcon": "./icons/installer.ico",
+        "uninstallerIcon": "./icons/installer.ico",
         "installerHooks": "./windows/installer-hooks.nsh"
       }
     }
