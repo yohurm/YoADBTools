@@ -29,6 +29,8 @@ Linux 在舞台铬对齐之后仍是一拍切到 contain。本轮让 GTK 子窗�
 
 单测锁住：Fill→Dest 从 settled 起跳且规格是 SpatialPanel；Dest→Fill 规格是 SpatialEnter；Follow 目标不变保留动画，目标变了则停；播完采样等于 dest。
 
+ATD（`yohu_atd34`，`-accel off`，没有 `/dev/dri`）上两路会话都打出 `704×661 → 372×661`、300ms，以及停止时 `369×656 → 704×656`、350ms。稳态两侧仍是窗口 canvas `#F1F3F5`。停止后第一张白卡片约 383px 宽，角上仍是 canvas；随后洞高差了 5px，Follow 改目标，卡片铺满洞。这和 Windows「Follow 且目标变了就不插值」一致。出画仍是 OpenH264，`.deb` 里没有这份 `.so`。
+
 ## 有意保留的差异
 
 这些不是漏改。改它们要么违反已接受的 ADR，要么 Windows API 在 Linux 上没有对应物，而产品已经选了替换。
