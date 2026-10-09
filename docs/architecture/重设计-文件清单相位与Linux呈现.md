@@ -231,7 +231,9 @@ PresentBind
 
 ## 5. Linux 像素（先有 ADR）
 
-建议新 ADR（编号等接受时再写入 `adr/README.md`）。未接受前不改 `linux.rs` 的解码行为，不链 `libva` 的 VLD。
+草案是 [ADR-v6-042](adr/ADR-v6-042.md)。对照见 [调研-Linux投屏呈现与私有软解.md](调研-Linux投屏呈现与私有软解.md)。未接受前不改 `linux.rs` 的解码行为，不链 `libva` 的 VLD，不 `dlopen` OpenH264。
+
+Jessica 拒绝了「没有 `/dev/dri` 就放弃」。Windows 的 MF / DComp 搬不过来，Linux 用自己的子控件和自己的 CPU 回退。壳是 GTK 3，不把出画绑在 GTK 4 的 Wayland dmabuf 上。
 
 ### 5.1 要决定的事
 
@@ -240,52 +242,44 @@ Linux 的 Convert / Present 只活在 `mirror_present/linux/`。`FramePipe`、`C
 ```text
 有 VA-API 设备且 H.264 VLD 能打开
   → libva 直接解码（不经 FFmpeg 的 vaapi 封装）
-  → DMA-BUF 或 VA 表面进入 GtkWindow 的子表面
-  → 子表面铺满 avail，可见卡片 = contain dest
+  → X11：vaPutSurface 进 GtkWindow 的子控件
+  → Wayland：vaExportSurfaceHandle 的 DMA-BUF 进同一子控件
   → PresentBind：Loading → Video
 没有设备，或 vaInitialize / 入口失败
-  → PresentBind = Failed，正文说明没有解码设备
-  → 不软件解码，不假装 vaapi id 已经出画
+  → linux/ 私有 dlopen Cisco OpenH264
+  → 同一子控件仍 Present，第一帧之后 Video
+  → .so 不在或用户关掉时才是 Failed，正文是许可闸门
 probe
-  → id 保持 vaapi
+  → id 保持 vaapi（CPU 回退期间也是）
   → hevc 改为打开设备之后的真实能力；打不开设备时仍是 false
 ```
 
-五层在 Linux 上的归属：
+五层在 Linux 上的归属见 042。Fit 仍是 `present_dest`。Convert 在硬解时是 libva，在回退时是 OpenH264。Scale 只在 `linux/`，不引入 libplacebo / libswscale / libyuv。Compose 是子控件里的卡片 = dest。Present 是这块子控件翻页。
 
-| 层 | 归属 |
-|----|------|
-| Fit | 现成 `present_dest`。不选核 |
-| Convert | `linux/` 里 libva H.264 VLD，1:1 到该后端的表面。不缩放 |
-| Scale | 只在 `linux/`。缩小用面积核或 GPU 对已导入表面的缩放。不引入 libplacebo / libswscale / libyuv |
-| Compose | 子表面里的卡片 = dest。不再算一遍 contain |
-| Present | GTK 子表面翻页。父级用 041 已记下的 `GtkWindow` |
-
-无 `/dev/dri` 的机器、以及只有 SwiftShader 没有 VA 入口的机器，停在第 4 节的失败绑定。这是本 ADR 的产品行为，不是缺测。
+没有 `/dev/dri` 的核对 VM 走 CPU 路径出画。这是产品行为，不是缺测。二进制还没单独下载时，洞里说明缺的是 OpenH264，不是平台没有硬解。
 
 ### 5.2 明确不选
 
 | 方案 | 为何不在这一 ADR |
 |------|------------------|
-| FFmpeg / libavcodec / ffmpeg vaapi | 028、030、032、041 禁止。scrcpy 的 `--hwdec=vaapi` 走的就是这条，不移植 |
-| 把 OpenH264 打进 `.deb` 当 Linux 后端 | 030 禁止用它冒充原生后端。Cisco 的专利授权还要求最终用户单独下载官方二进制，不能事先打进安装包 |
-| Vulkan Video 作为 Linux 身份 | 覆盖更窄；无 GPU 时软光栅不解码。028 已拒绝用它替换 Windows 路径 |
-| GStreamer、libplacebo、WebCodecs | 032 / 024 已否决 |
-| 仅因为这台 VM 没有 DRM 就改用软件解码当默认 | 把「无设备」和「交付像素」缠在一起。无设备先失败关闭 |
-
-后端私有的 CPU NV12 回退如果以后要做，另写 ADR：只在 VA-API 打开失败时走，不改变 `Caps.id`，不进 Windows / macOS，不把 NV12 缓冲放进 `yohu-mirror`。库的专利和再分发在那份 ADR 里单独写。本页不预先选 OpenH264。
+| FFmpeg / libavcodec / ffmpeg vaapi | 028、030、032、041 仍禁止。scrcpy 的解码身份是这条，只借它的「auto 则回软件仍出画」。要改禁令须另接受，042 文末写了要改的句子 |
+| 把 OpenH264 打进 `.deb` 或写成 `Caps.id` | 030 禁止冒充原生后端。Cisco 要求二进制单独下载，并且用户能关掉 |
+| Vulkan Video 作为 Linux 身份 | 覆盖更窄。028 已拒绝用它替换 Windows 路径 |
+| GStreamer、libplacebo、WebCodecs、GTK 4 整窗下沉 | 032 / 024 已否决 GStreamer。GTK 4 对不上当前壳 |
+| 没有 DRM 就永久失败 | 已拒绝。那是 scrcpy `--hwdec=vaapi` 的失败关闭，不是 `--hwdec=auto` |
 
 ### 5.3 阶段（ADR 接受之后）
 
-1. `vaInitialize` 探针。有设备才把 `hevc` 从常量改成查询。无设备保持第 4 节的失败绑定。
-2. H.264 VLD Convert + GTK 子表面 Present。占用仍是 avail 铺满、dest = contain。`mirror/painted` 从这条 Present 发出，`hasFrame` 和 fps 才开始为真。截图从最后一帧表面导出，不再走「未实现」。
-3. 删掉洞里的 Web 铬。空态 / 失败 / 暂停回到原生表面，与 Windows / macOS 同一 `stage_copy`。
+1. `vaInitialize` 探针。有设备才把 `hevc` 从常量改成查询。无设备进入 CPU 分支，不把绑定写成永久失败。
+2. H.264 VLD 或 OpenH264 接到同一 GTK 3 子控件。`mirror/painted` 从画出的帧发出。截图从最后一帧导出。
+3. 许可界面和缺二进制时的洞内正文。
+4. 删掉洞里的 Web 铬。空态 / 失败 / 暂停回到子控件上的 `stage_copy`。
 
 ## 6. 顺序
 
 1. 文件清单的退出码和 `fault` 相位。不依赖投屏。
 2. 呈现绑定与洞内失败文案，暂停 / 全屏闸门。不交像素。需要的话给 041 补一句「占位必须可见」。
-3. 新 ADR 接受或拒绝「Linux 用 libva 出像素，无设备则失败关闭」。
+3. 新 ADR 接受或拒绝「Linux 有 VLD 用 libva，否则私有 CPU 仍出画」。没有 `/dev/dri` 不是终点。
 4. 只有 ADR 接受之后才做第 5.3 节。
 
 不把「超时改大」「空目录文案改一个字」「灰底上盖一句 CSS」当成上述分界的替代。
@@ -300,7 +294,7 @@ probe
 | 1. `listingPaint` 的 `fault` | 已实现 | 无快照的失败停在 `fault`，文案是 `filesFaultText`，主动作「重新读取」。有快照的失败留行或留空快照，只 Toast，不 `remember` 失败。20 秒预算没改。不走 `sync:` LIST |
 | 2. `PresentBind` | 已实现 | `spawn_unimplemented` 在 `BindPipe` 写成 `Failed`，句子是「没有画面」加「当前平台没有投屏硬解」。`mirror/present` 把绑定送进面板，不改会话 `phase`。Windows / macOS 洞仍透明 |
 | 2. 洞与闸门 | 已实现 | 无原生表面时，Live 且绑定失败，或会话失败，洞里画 `stage_copy`。暂停、全屏、指针在绑定失败时不亮。截图和设备键仍等 `hasFrame` |
-| 3. Linux 像素 ADR | 草案已写，未接受，未实现 | [ADR-v6-042](adr/ADR-v6-042.md)。libva H.264 VLD 进已记下的 GtkWindow 子控件。无 `/dev/dri` 或无 VLD 入口则保持 PresentBind 失败。软解不在这份草案里，要另由 Jessica 接受。不链 libva，不加 FFmpeg / OpenH264 |
+| 3. Linux 像素 ADR | 草案已修订，未接受，未实现 | [ADR-v6-042](adr/ADR-v6-042.md) 与 [调研](调研-Linux投屏呈现与私有软解.md)。有 VLD 用 libva，否则 `dlopen` Cisco OpenH264，仍画进 GTK 3 子控件。没有 `/dev/dri` 不是永久失败。二进制不进 `.deb`。FFmpeg 另案，本草案不接受 |
 | 慢设备上再量 20 秒 / 15 秒 accept | 未做 | 不与这次绑在一起 |
 
-`234eefc` 重装后在 ATD 上对过三项，记在 `docs/testing/Linux功能核对清单.md` 的复测一节：无快照的 `/sdcard` 失败停在「没有这个目录，请重新输入」和「重新读取」；已有 `keep.txt` 时刷新失败留行加 Toast；Live 720×1280 的洞是「没有画面 / 当前平台没有投屏硬解」，暂停、全屏、截图和设备键不亮。没有 `mirror/painted`。像素仍等 042 被接受。
+`234eefc` 重装后在 ATD 上对过三项，记在 `docs/testing/Linux功能核对清单.md` 的复测一节：无快照的 `/sdcard` 失败停在「没有这个目录，请重新输入」和「重新读取」；已有 `keep.txt` 时刷新失败留行加 Toast；Live 720×1280 的洞是「没有画面 / 当前平台没有投屏硬解」，暂停、全屏、截图和设备键不亮。没有 `mirror/painted`。那是占位行为。修订后的 042 若被接受，这台没有 `/dev/dri` 的 VM 走 CPU 路径出画，而不是停在这句。解码器这次没有实现。
