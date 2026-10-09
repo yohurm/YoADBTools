@@ -35,6 +35,7 @@ import {
   YoTextField,
 } from "@yohu/ui";
 
+import { OPENH264_BINARY_LICENSE } from "./openh264-license";
 import { settingsStore, updateStore } from "../stores";
 import { LibraryExpandGroups } from "./LibraryExpandGroups";
 import { PathChrome } from "./PathChrome";
@@ -391,6 +392,17 @@ export function SettingsForm(props: {
             onChange={(v) => props.save("mirror_force_forward", v, savedAck())}
           />
         </YoFormRow>
+        <YoFormRow
+          title="OpenH264 Video Codec provided by Cisco Systems, Inc."
+          description="没有 VA-API H.264 硬解时，用这份单独下载的二进制出画。不打进安装包。关掉之后，没有硬解的机器停在说明里。"
+          note={<EffectBadge text={immediateCopy()} />}
+        >
+          <YoSwitch
+            ariaLabel="OpenH264 Video Codec provided by Cisco Systems, Inc."
+            checked={settingsStore.state.mirror_openh264}
+            onChange={(v) => props.save("mirror_openh264", v, savedNow())}
+          />
+        </YoFormRow>
       </YoPanel>
 
       <YoPanel title="外观" overflow={panelOverflow()}>
@@ -446,6 +458,9 @@ export function SettingsForm(props: {
         </YoFormRow>
         <YoFormRow title="版权">
           {settingsStore.identity.copyright}
+        </YoFormRow>
+        <YoFormRow title="OpenH264">
+          <pre class="yohu-settings__license">{OPENH264_BINARY_LICENSE}</pre>
         </YoFormRow>
         <YoFormRow title={appLogsCopy()}>
           <PathChrome

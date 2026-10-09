@@ -4,8 +4,8 @@
 //! macOS = VideoToolbox → NSView。Linux 预留，禁止 FFmpeg。
 //! UI 上报稳定可用区；表面独占像素。解码会话跟 `mirror.start`/`stop` 走，表面跟舞台可见性走。
 //!
-//! Linux 只走 `probe` / `spawn_unimplemented`。共享呈现代码留给 Windows / macOS，
-//! 在 Linux 上不算出未使用（ADR-v6-041）。
+//! Linux 的 Convert / Present 在 `linux/`（ADR-v6-042）：有 H.264 VLD 用 libva，
+//! 否则 `dlopen` Cisco OpenH264，画进已记下的 `GtkWindow` 子窗口。`Caps.id` 仍是 `vaapi`。
 #![cfg_attr(target_os = "linux", allow(dead_code))]
 
 mod annexb;
@@ -58,6 +58,16 @@ pub enum PresentError {
     Timeout,
     #[error("当前平台没有投屏硬解")]
     Unimplemented,
+    /// 没有 VLD，并且用户关掉了 Cisco 二进制。洞标题仍是「没有画面」。
+    #[error(
+        "已关闭 OpenH264 Video Codec provided by Cisco Systems, Inc.。没有硬解时，请在设置里重新打开这份单独下载的二进制"
+    )]
+    OpenH264Disabled,
+    /// 没有 VLD，机器上也还没有那份单独下载的 .so。
+    #[error(
+        "还没有单独下载的 OpenH264 二进制。请放到数据目录的 openh264/ 下（libopenh264.so.7），或让 YOHU_OPENH264 指向该文件。设置里可以关闭再打开 OpenH264 Video Codec provided by Cisco Systems, Inc."
+    )]
+    OpenH264Missing,
     #[error("截图写入失败")]
     ScreenshotWrite,
     #[error("截图读取失败")]
@@ -76,6 +86,12 @@ pub struct PresentHost {
     d3d: Mutex<Option<Arc<D3dDevice>>>,
     #[cfg(windows)]
     pictures: Arc<PictureBank>,
+    /// 用户可以关掉 Cisco 二进制。默认开。只在 Linux 读取。
+    #[cfg(target_os = "linux")]
+    openh264_on: Arc<AtomicBool>,
+    /// 数据目录下的 `openh264/`。二进制不进安装包。
+    #[cfg(target_os = "linux")]
+    openh264_dir: Mutex<std::path::PathBuf>,
 }
 
 struct Inner {
@@ -174,7 +190,23 @@ impl PresentHost {
             d3d: Mutex::new(None),
             #[cfg(windows)]
             pictures: Arc::new(PictureBank::new()),
+            #[cfg(target_os = "linux")]
+            openh264_on: Arc::new(AtomicBool::new(true)),
+            #[cfg(target_os = "linux")]
+            openh264_dir: Mutex::new(std::path::PathBuf::new()),
         })
+    }
+
+    /// 设置里的 OpenH264 开关。关掉之后，没有 VLD 的机器停在许可说明。
+    #[cfg(target_os = "linux")]
+    pub fn set_openh264_enabled(&self, on: bool) {
+        self.openh264_on.store(on, Ordering::SeqCst);
+    }
+
+    /// 单独下载的 Cisco 二进制目录。不是安装包里的路径。
+    #[cfg(target_os = "linux")]
+    pub fn set_openh264_dir(&self, dir: std::path::PathBuf) {
+        *lock_present(&self.openh264_dir) = dir;
     }
 
     pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
@@ -509,6 +541,10 @@ impl PresentHost {
             d3d,
             #[cfg(windows)]
             Arc::clone(&self.pictures),
+            #[cfg(target_os = "linux")]
+            Arc::clone(&self.openh264_on),
+            #[cfg(target_os = "linux")]
+            lock_present(&self.openh264_dir).clone(),
         );
         lock_present(&self.inner).surface = Some(tx);
         SurfaceEnsure::Created
@@ -646,6 +682,8 @@ fn spawn_backend_surface(
     #[cfg(windows)] geom: Arc<GeomHost>,
     #[cfg(windows)] d3d: Arc<D3dDevice>,
     #[cfg(windows)] pictures: Arc<PictureBank>,
+    #[cfg(target_os = "linux")] openh264_on: Arc<AtomicBool>,
+    #[cfg(target_os = "linux")] openh264_dir: std::path::PathBuf,
 ) -> Sender<Cmd> {
     #[cfg(windows)]
     {
@@ -659,7 +697,15 @@ fn spawn_backend_surface(
     }
     #[cfg(target_os = "linux")]
     {
-        linux::spawn_surface(serial, owner, mirror, event_tx, bind)
+        linux::spawn_surface(
+            serial,
+            owner,
+            mirror,
+            event_tx,
+            bind,
+            openh264_on,
+            openh264_dir,
+        )
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {

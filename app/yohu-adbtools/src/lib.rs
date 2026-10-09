@@ -233,6 +233,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 root_cancel.clone(),
             );
             let present = PresentHost::new(event_tx.clone(), std::sync::Arc::clone(&mirror));
+            #[cfg(target_os = "linux")]
+            {
+                present.set_openh264_enabled(snapshot.mirror_openh264);
+                present.set_openh264_dir(paths.data_root.join(yohu_protocol::dir::OPENH264));
+            }
             tracing::info!(ms = crate::window_boot::elapsed_ms(), "投屏宿主已创建");
 
             let state = AppState {

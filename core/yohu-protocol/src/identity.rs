@@ -115,6 +115,8 @@ pub mod dir {
     pub const LIBRARY_FILE: &str = "library.json";
     pub const EXPORTS: &str = "exports";
     pub const DRAG_OUT: &str = "drag-out";
+    /// Cisco OpenH264 二进制的单独目录。不进安装包。
+    pub const OPENH264: &str = "openh264";
 }
 
 /// 应用身份（`system.info.identity`）。

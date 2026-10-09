@@ -129,6 +129,9 @@ pub struct AppSettings {
     /// 强制 ADB forward（跳过 reverse）。下次启动生效。
     #[serde(default)]
     pub mirror_force_forward: bool,
+    /// Linux 没有 H.264 VLD 时，是否 `dlopen` 单独下载的 Cisco OpenH264。立即生效；默认开。
+    #[serde(default = "crate::default_true")]
+    pub mirror_openh264: bool,
     /// 终端输入默认在命令前加上 `adb`。立即生效；默认关。
     #[serde(default)]
     pub terminal_prepend_adb: bool,
@@ -250,6 +253,7 @@ impl Default for AppSettings {
             mirror_max_fps: default_mirror_max_fps(),
             mirror_protocol: MirrorProtocol::default(),
             mirror_force_forward: false,
+            mirror_openh264: crate::default_true(),
             terminal_prepend_adb: false,
             files_drop_into_folder: false,
             terminal_time_format: TerminalTimeFormat::default(),
@@ -280,6 +284,7 @@ pub enum SettingKey {
     MirrorMaxFps,
     MirrorProtocol,
     MirrorForceForward,
+    MirrorOpenh264,
     TerminalPrependAdb,
     FilesDropIntoFolder,
     TerminalTimeFormat,
@@ -308,6 +313,7 @@ impl SettingKey {
             SettingKey::MirrorMaxFps => "mirror_max_fps",
             SettingKey::MirrorProtocol => "mirror_protocol",
             SettingKey::MirrorForceForward => "mirror_force_forward",
+            SettingKey::MirrorOpenh264 => "mirror_openh264",
             SettingKey::TerminalPrependAdb => "terminal_prepend_adb",
             SettingKey::FilesDropIntoFolder => "files_drop_into_folder",
             SettingKey::TerminalTimeFormat => "terminal_time_format",
@@ -338,6 +344,7 @@ mod tests {
         assert_eq!(s.mirror_max_fps, 0);
         assert_eq!(s.mirror_protocol, MirrorProtocol::Usb);
         assert!(!s.mirror_force_forward);
+        assert!(s.mirror_openh264);
         assert!(!s.terminal_prepend_adb);
         assert!(!s.files_drop_into_folder);
         assert_eq!(s.terminal_time_format, TerminalTimeFormat::TimeMillis);
@@ -430,6 +437,7 @@ mod tests {
             SettingKey::MirrorMaxFps,
             SettingKey::MirrorProtocol,
             SettingKey::MirrorForceForward,
+            SettingKey::MirrorOpenh264,
             SettingKey::TerminalPrependAdb,
             SettingKey::FilesDropIntoFolder,
             SettingKey::TerminalTimeFormat,

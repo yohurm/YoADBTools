@@ -45,4 +45,4 @@
 | [039](ADR-v6-039.md) | 命令库默认展开 | 一键 `terminal_library_expand`；默认全部折叠；指定组认 id；停留开合不写回 |
 | [040](ADR-v6-040.md) | 流程标准步骤 | 每条流程单独登记；hydrate 读设置/目录/任务/投屏投影；禁止预写阶段与 `mirror.sync` |
 | [041](ADR-v6-041.md) | Linux 工作台 | WebKitGTK + XDG / `~/.local/opt` + `.deb`；投屏像素与拖出仍预留 |
-| [042](ADR-v6-042.md) | Linux 投屏像素 | **草案，未接受：** 有 H.264 VLD 用 libva，否则 `linux/` 私有 OpenH264 仍画进 GTK 3 子控件。没有 `/dev/dri` 不是永久失败。不把二进制打进 `.deb`。FFmpeg 另案，本页不接受 |
+| [042](ADR-v6-042.md) | Linux 投屏像素 | **已接受：** 有 H.264 VLD 用 libva，否则 `linux/` 私有 OpenH264 仍画进已记下的 `GtkWindow` 的 GDK 子窗口。没有 `/dev/dri` 不是永久失败。不把二进制打进 `.deb`。`Caps.id` 仍是 `vaapi`。FFmpeg 另案，本页不接受 |

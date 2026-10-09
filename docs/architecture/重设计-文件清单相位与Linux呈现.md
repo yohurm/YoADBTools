@@ -231,7 +231,7 @@ PresentBind
 
 ## 5. Linux 像素（先有 ADR）
 
-草案是 [ADR-v6-042](adr/ADR-v6-042.md)。对照见 [调研-Linux投屏呈现与私有软解.md](调研-Linux投屏呈现与私有软解.md)。未接受前不改 `linux.rs` 的解码行为，不链 `libva` 的 VLD，不 `dlopen` OpenH264。
+[ADR-v6-042](adr/ADR-v6-042.md) 已接受，实现在 `mirror_present/linux/`。对照见 [调研-Linux投屏呈现与私有软解.md](调研-Linux投屏呈现与私有软解.md)。有 H.264 VLD 用 libva，否则 `dlopen` OpenH264。二进制不进 `.deb`。
 
 Jessica 拒绝了「没有 `/dev/dri` 就放弃」。Windows 的 MF / DComp 搬不过来，Linux 用自己的子控件和自己的 CPU 回退。壳是 GTK 3，不把出画绑在 GTK 4 的 Wayland dmabuf 上。
 
@@ -294,7 +294,7 @@ probe
 | 1. `listingPaint` 的 `fault` | 已实现 | 无快照的失败停在 `fault`，文案是 `filesFaultText`，主动作「重新读取」。有快照的失败留行或留空快照，只 Toast，不 `remember` 失败。20 秒预算没改。不走 `sync:` LIST |
 | 2. `PresentBind` | 已实现 | `spawn_unimplemented` 在 `BindPipe` 写成 `Failed`，句子是「没有画面」加「当前平台没有投屏硬解」。`mirror/present` 把绑定送进面板，不改会话 `phase`。Windows / macOS 洞仍透明 |
 | 2. 洞与闸门 | 已实现 | 无原生表面时，Live 且绑定失败，或会话失败，洞里画 `stage_copy`。暂停、全屏、指针在绑定失败时不亮。截图和设备键仍等 `hasFrame` |
-| 3. Linux 像素 ADR | 草案已修订，未接受，未实现 | [ADR-v6-042](adr/ADR-v6-042.md) 与 [调研](调研-Linux投屏呈现与私有软解.md)。有 VLD 用 libva，否则 `dlopen` Cisco OpenH264，仍画进 GTK 3 子控件。没有 `/dev/dri` 不是永久失败。二进制不进 `.deb`。FFmpeg 另案，本草案不接受 |
+| 3. Linux 像素 ADR | 已接受，已实现 | [ADR-v6-042](adr/ADR-v6-042.md) 与 [调研](调研-Linux投屏呈现与私有软解.md)。有 VLD 用 libva，否则 `dlopen` Cisco OpenH264，画进已记下的 `GtkWindow` 的 GDK 子窗口。没有 `/dev/dri` 不是永久失败。二进制不进 `.deb`。FFmpeg 另案，不接受 |
 | 慢设备上再量 20 秒 / 15 秒 accept | 未做 | 不与这次绑在一起 |
 
-`234eefc` 重装后在 ATD 上对过三项，记在 `docs/testing/Linux功能核对清单.md` 的复测一节：无快照的 `/sdcard` 失败停在「没有这个目录，请重新输入」和「重新读取」；已有 `keep.txt` 时刷新失败留行加 Toast；Live 720×1280 的洞是「没有画面 / 当前平台没有投屏硬解」，暂停、全屏、截图和设备键不亮。没有 `mirror/painted`。那是占位行为。修订后的 042 若被接受，这台没有 `/dev/dri` 的 VM 走 CPU 路径出画，而不是停在这句。解码器这次没有实现。
+`234eefc` 重装后在 ATD 上对过三项，记在 `docs/testing/Linux功能核对清单.md` 的复测一节：无快照的 `/sdcard` 失败停在「没有这个目录，请重新输入」和「重新读取」；已有 `keep.txt` 时刷新失败留行加 Toast；Live 720×1280 的洞是「没有画面 / 当前平台没有投屏硬解」，暂停、全屏、截图和设备键不亮。没有 `mirror/painted`。那是占位行为。042 已接受。这台没有 `/dev/dri` 的 VM 走 OpenH264，二进制单独放在数据目录 `openh264/libopenh264.so.7`，不进 `.deb`。

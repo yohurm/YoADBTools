@@ -134,6 +134,7 @@ export interface AppSettings {
   mirror_max_fps: number;
   mirror_protocol: MirrorProtocol;
   mirror_force_forward: boolean;
+  mirror_openh264: boolean;
   terminal_prepend_adb: boolean;
   files_drop_into_folder: boolean;
   terminal_time_format: TerminalTimeFormat;
@@ -170,6 +171,7 @@ export type SettingKey =
   | "mirror_max_fps"
   | "mirror_protocol"
   | "mirror_force_forward"
+  | "mirror_openh264"
   | "terminal_prepend_adb"
   | "files_drop_into_folder"
   | "terminal_time_format"

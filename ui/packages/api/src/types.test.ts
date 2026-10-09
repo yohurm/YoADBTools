@@ -398,6 +398,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         mirror_max_fps: 0,
         mirror_protocol: "usb",
         mirror_force_forward: false,
+        mirror_openh264: true,
         terminal_prepend_adb: false,
         files_drop_into_folder: false,
         terminal_time_format: "time_millis",

@@ -36,6 +36,7 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   mirror_max_fps: USB_ENCODE.max_fps,
   mirror_protocol: "usb",
   mirror_force_forward: false,
+  mirror_openh264: true,
   terminal_prepend_adb: false,
   files_drop_into_folder: false,
   terminal_time_format: "time_millis",

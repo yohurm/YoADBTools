@@ -45,6 +45,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     mirror_max_fps: 0,
     mirror_protocol: "usb",
     mirror_force_forward: false,
+    mirror_openh264: true,
   },
   MIRROR_MIN_LAYOUT_PX: 64,
   errorText: (e: unknown) => String(e),
@@ -98,6 +99,7 @@ describe("mirror store", () => {
       mirror_max_fps: 0,
       mirror_protocol: "usb",
       mirror_force_forward: false,
+      mirror_openh264: true,
     });
     mocks.stateHandlers.length = 0;
     mocks.paintedHandlers.length = 0;

@@ -143,7 +143,7 @@ pub(crate) fn unimplemented_screenshot_err() -> PresentError {
     PresentError::Unimplemented
 }
 
-fn publish_bind(
+pub(crate) fn publish_bind(
     slot: &Mutex<PresentBind>,
     next: PresentBind,
     events: &Option<tokio::sync::mpsc::Sender<AppEvent>>,

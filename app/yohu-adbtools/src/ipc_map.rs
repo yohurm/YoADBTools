@@ -126,6 +126,8 @@ pub fn ipc_present(e: PresentError) -> IpcError {
         PresentError::Exited
         | PresentError::Timeout
         | PresentError::Unimplemented
+        | PresentError::OpenH264Disabled
+        | PresentError::OpenH264Missing
         | PresentError::ScreenshotWrite
         | PresentError::ScreenshotRead => IpcErrorCode::Internal,
     };
