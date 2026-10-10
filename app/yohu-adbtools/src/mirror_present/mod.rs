@@ -59,11 +59,13 @@ pub enum PresentError {
     #[error("当前平台没有投屏硬解")]
     Unimplemented,
     /// 没有 VLD，并且用户关掉了 Cisco 二进制。洞标题仍是「没有画面」。
+    #[cfg(target_os = "linux")]
     #[error(
         "已关闭 OpenH264 Video Codec provided by Cisco Systems, Inc.。没有硬解时，请在设置里重新打开这份单独下载的二进制"
     )]
     OpenH264Disabled,
     /// 没有 VLD，机器上也还没有那份单独下载的 .so。
+    #[cfg(target_os = "linux")]
     #[error(
         "还没有单独下载的 OpenH264 二进制。请放到数据目录的 openh264/ 下（libopenh264.so.7），或让 YOHU_OPENH264 指向该文件。设置里可以关闭再打开 OpenH264 Video Codec provided by Cisco Systems, Inc."
     )]

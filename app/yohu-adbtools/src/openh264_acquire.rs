@@ -35,16 +35,18 @@ pub fn status(state: &AppState) -> Openh264Status {
 }
 
 pub async fn acquire(state: &AppState) -> Result<Openh264Status, IpcError> {
+    #[cfg(target_os = "linux")]
+    {
+        acquire_linux(state).await
+    }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = state;
-        return Err(ipc_code(
+        Err(ipc_code(
             IpcErrorCode::InvalidArgs,
             "OpenH264 单独下载只在 Linux 上",
-        ));
+        ))
     }
-    #[cfg(target_os = "linux")]
-    acquire_linux(state).await
 }
 
 #[cfg(target_os = "linux")]
@@ -52,13 +54,15 @@ async fn acquire_linux(state: &AppState) -> Result<Openh264Status, IpcError> {
     #[cfg(not(target_arch = "x86_64"))]
     {
         let _ = state;
-        return Err(ipc_code(
+        Err(ipc_code(
             IpcErrorCode::InvalidArgs,
             "这台机器不是 x86_64，不能下载这份 x86_64 的 OpenH264。请换对应架构的官方包，或自行放到数据目录的 openh264/ 下",
-        ));
+        ))
     }
     #[cfg(target_arch = "x86_64")]
-    acquire_x64(state).await
+    {
+        acquire_x64(state).await
+    }
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

@@ -95,7 +95,10 @@ pub enum PresentBind {
     Idle,
     Failed(PresentError),
     Loading,
+    /// 首帧之后的画面。Windows / macOS 的像素时钟仍是 `Stage.bound`，不构造这两档。
+    #[cfg(target_os = "linux")]
     Video,
+    #[cfg(target_os = "linux")]
     Paused,
 }
 
@@ -105,7 +108,9 @@ impl PresentBind {
             Self::Idle => PresentBindState::Idle,
             Self::Failed(_) => PresentBindState::Failed,
             Self::Loading => PresentBindState::Loading,
+            #[cfg(target_os = "linux")]
             Self::Video => PresentBindState::Video,
+            #[cfg(target_os = "linux")]
             Self::Paused => PresentBindState::Paused,
         }
     }
@@ -130,6 +135,7 @@ pub fn bind_after_pipe(native_surface: bool) -> PresentBind {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn bind_after_frame(paused: bool) -> PresentBind {
     if paused {
         PresentBind::Paused
@@ -274,12 +280,12 @@ mod tests {
             .expect("screenshot reply");
         let err = reply.expect_err("unimplemented must fail");
         assert_eq!(err, PresentError::Unimplemented);
-        assert_eq!(
-            super::bind_after_pipe(true),
-            super::PresentBind::Loading
-        );
-        assert_eq!(super::bind_after_frame(false), super::PresentBind::Video);
-        assert_eq!(super::bind_after_frame(true), super::PresentBind::Paused);
+        assert_eq!(super::bind_after_pipe(true), super::PresentBind::Loading);
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(super::bind_after_frame(false), super::PresentBind::Video);
+            assert_eq!(super::bind_after_frame(true), super::PresentBind::Paused);
+        }
         let _ = tx.send(Cmd::Shutdown);
     }
 
