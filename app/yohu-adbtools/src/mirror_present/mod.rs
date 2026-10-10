@@ -553,23 +553,23 @@ impl PresentHost {
         let Some(d3d) = self.ensure_d3d() else {
             return SurfaceEnsure::Failed;
         };
-        let tx = spawn_backend_surface(
-            serial.to_string(),
+        let tx = spawn_backend_surface(SurfaceLaunch {
+            serial: serial.to_string(),
             owner,
-            Arc::clone(&self.mirror),
-            self.event_tx.clone(),
-            Arc::clone(&self.present_bind),
+            mirror: Arc::clone(&self.mirror),
+            event_tx: self.event_tx.clone(),
+            bind: Arc::clone(&self.present_bind),
             #[cfg(windows)]
-            Arc::clone(&self.geom),
+            geom: Arc::clone(&self.geom),
             #[cfg(windows)]
             d3d,
             #[cfg(windows)]
-            Arc::clone(&self.pictures),
+            pictures: Arc::clone(&self.pictures),
             #[cfg(target_os = "linux")]
-            Arc::clone(&self.openh264_on),
+            openh264_on: Arc::clone(&self.openh264_on),
             #[cfg(target_os = "linux")]
-            lock_present(&self.openh264_dir).clone(),
-        );
+            openh264_dir: lock_present(&self.openh264_dir).clone(),
+        });
         lock_present(&self.inner).surface = Some(tx);
         SurfaceEnsure::Created
     }
@@ -697,44 +697,60 @@ fn apply_pending_unbind<P, G>(pending: &mut Option<(String, P, G)>, serial: &str
     }
 }
 
-fn spawn_backend_surface(
+/// 一次表面启动要带的东西。平台字段用 cfg，避免 Windows 上参数超过 Clippy 的 7 个。
+struct SurfaceLaunch {
     serial: String,
     owner: isize,
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     bind: Arc<Mutex<PresentBind>>,
-    #[cfg(windows)] geom: Arc<GeomHost>,
-    #[cfg(windows)] d3d: Arc<D3dDevice>,
-    #[cfg(windows)] pictures: Arc<PictureBank>,
-    #[cfg(target_os = "linux")] openh264_on: Arc<AtomicBool>,
-    #[cfg(target_os = "linux")] openh264_dir: std::path::PathBuf,
-) -> Sender<Cmd> {
+    #[cfg(windows)]
+    geom: Arc<GeomHost>,
+    #[cfg(windows)]
+    d3d: Arc<D3dDevice>,
+    #[cfg(windows)]
+    pictures: Arc<PictureBank>,
+    #[cfg(target_os = "linux")]
+    openh264_on: Arc<AtomicBool>,
+    #[cfg(target_os = "linux")]
+    openh264_dir: std::path::PathBuf,
+}
+
+fn spawn_backend_surface(launch: SurfaceLaunch) -> Sender<Cmd> {
     #[cfg(windows)]
     {
-        let _ = bind;
-        windows::spawn_surface(serial, owner, mirror, event_tx, geom, d3d, pictures)
+        let _ = launch.bind;
+        windows::spawn_surface(
+            launch.serial,
+            launch.owner,
+            launch.mirror,
+            launch.event_tx,
+            launch.geom,
+            launch.d3d,
+            launch.pictures,
+        )
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = bind;
-        macos::spawn_surface(serial, owner, mirror, event_tx)
+        let _ = launch.bind;
+        macos::spawn_surface(launch.serial, launch.owner, launch.mirror, launch.event_tx)
     }
     #[cfg(target_os = "linux")]
     {
         linux::spawn_surface(
-            serial,
-            owner,
-            mirror,
-            event_tx,
-            bind,
-            openh264_on,
-            openh264_dir,
+            launch.serial,
+            launch.owner,
+            launch.mirror,
+            launch.event_tx,
+            launch.bind,
+            launch.openh264_on,
+            launch.openh264_dir,
         )
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
-        let _ = (owner, mirror, event_tx);
-        backend::spawn_unimplemented("none", &serial, bind, None)
+        let _ = (launch.owner, launch.mirror, launch.event_tx);
+        backend::spawn_unimplemented("none", &launch.serial, launch.bind, None)
     }
 }
 
