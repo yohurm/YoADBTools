@@ -162,6 +162,39 @@
 | 关掉开关取消下载 | **未单独点。** 这份 bz2 只有 633796 字节，点击后当次就写完，来不及在传输中拨开关。取消挂在设置变为关的时候 |
 | 多设备 / 未授权 / 第二台 offline | **仍是环境。** 这台 VM 没有第二台设备，没有开 KVM |
 
+## 净场复测（已安装的 `8117ab8`，2026-10-10）
+
+上一节没有改。这一节是先清掉残留，再从第一次启动点完的。二进制仍是 `/usr/bin/YohuAdbTools`（10682136 字节，03:25）。没有重打包，没有合入 main。
+
+清场：
+
+- 退出正在跑的工作台。删掉上一轮留在 `/sdcard` 的 `yohu-drop-in.txt`、`yohu-full-dir`、`yohu-full-drop.txt`、`yohu-full-upload.txt`、`yohu-probe`（含 `note.txt`）、`yohu-upload-probe.txt`、`新建文件夹`。系统目录（Alarms、Download 等）留着。清完 `ls /sdcard` 只有这 13 个系统目录。
+- `adb kill-server` 之后整份删掉 `~/.local/share/YohuAdbTools`，包括当时的 OpenH264（SHA-256 `1392d21466bc638e68151b716d5b2086d54cd812afd43253f1adb5b6e0185f51`，1731112 字节）。没有留配置、命令库、日志或缓存。
+- 停掉当时的 qemu。重新拉起仍是 `-avd yohu_atd34 -port 5554 -accel off -gpu swiftshader_indirect -no-snapshot*`。`sys.boot_completed=1` 之后才做要设备的项。
+- 工作台在模拟器起来之前先开了一次。数据目录是这次启动自己写出来的。OpenH264 不在启动时下载，是后来在设置里点的。
+
+| 项 | 结果 |
+|----|------|
+| 无设备首次启动 | **通过。** 数据根、`config/` `data/` `cache/` `logs/` 都是这次新建的。日志「adb 解压完成」后扫描成功 `n=0`，不是「设备扫描失败」。默认命令库写到 `library.json`（2059 字节）。设备栏「无设备」「连接设备并授权后刷新」。状态栏「设备: 无在线设备」。没有错误对话框。启动日志没有 OpenH264，也没有 `ciscobinary.openh264.org` |
+| 安装与 sidecar | **通过。** `ii yohu-adb-tools 0.1.3`。窗口标题「Yohu ADB Tools」。`/usr/lib/YohuAdbTools/tools/` 有 `adb` 与 `scrcpy-server`。数据目录 `adb version` 为 1.0.41 / 36.0.2-14143358。已安装的 `.deb` 清单里没有 OpenH264，也没有 FFmpeg |
+| 关于页 | **通过。** 「发布仓库」值是 `yohurm/Windows-YoADBTools`。「安装根」是 `/home/ubuntu/.local/opt/YohuAdbTools`，这个目录还不存在。「本次程序」是 `/usr/bin/YohuAdbTools`。检查更新日志 `os=linux arch=x86_64`，随后「已是最新版本 version=0.1.3」。没有下载或覆盖安装 |
+| 设备卡片与自动刷新 | **通过。** 起来之后卡片是 Android SDK built for x86_64、「Android 14」「100% 充电」，扫描 `n=1`。开关开着时扫描大约 2 秒一次（03:50:27、29、31、33）。把「设备自动刷新」关掉后，04:11:25 到 04:11:32 没有新的扫描，再打开，保存值回到 true |
+| 终端 | **通过。** 三组默认折叠，展开后叶子是 `adb shell …`。点「型号」入队再发送：日志是 `shell getprop ro.product.model`（不带 adb），画面 `>>> 03:56:03.385` 和 `Android SDK built for x86_64`。电源三条按 03:56:24.589、25.351、26.382 串行发完。「查询属性」填 `ro.product.manufacturer`，发送的是 `shell getprop ro.product.manufacturer`，输出 `unknown`。「收起输入」变成「展开输入」，再点回来 |
+| `terminal_prepend_adb` | **通过，并拨回默认。** 打开后发送日志是 `adb shell getprop ro.build.version.release`，命令完成。再关掉，保存值 false |
+| 时间格式 | **通过，并拨回默认。** 改成「时分秒」后，已经画出的结果块不再带毫秒（`03:56:03` 这种）。再改回「时分秒.毫秒」 |
+| 命令管理取消 | **通过。** 把「型号」改掉后点取消。`library.json` 仍是 03:50:27、2059 字节，里面没有「型号改」 |
+| 文件浏览 | **通过。** 第一次 `files.list /sdcard` `count:13`，和清场后的 `adb ls` 一致。行上有名称、类型、修改时间。`/sdcard/Download` `count:0`，`adb` 为 `total 0`，画面「此文件夹为空」。面包屑 `sdcard` 回到 `/sdcard` `count:13`。地址栏提交 `/data` 后无障碍名是「关闭 路径不在安全根内: /data」，没有 `path=/data` 的浏览 |
+| 新建 / 删除 | **通过。** `/sdcard/yohu-clean-dir` 为 `drwxrws---`，04:04。新建 `/sdcard/yohu-clean.txt`（0 字节）后 `count:15`。确认删除后设备上不存在，刷新 `count:14`。目录还在 |
+| 上传 / 下载 | **通过。** 上传 `/tmp/yohu-clean-upload.txt`。设备上 16 字节，内容 `clean-upload-ok`。下载保存时对话框把名字收成 `/tmp/yohu-clean-dl.txt.txt`，16 字节，和设备文件一致 |
+| 拖入 / 拖出 | **通过默认档。** 「拖入时指向文件夹」没有打开。从 Thunar `/tmp` 把 `yohu-clean-drop.txt` 拖进清单，设备上 14 字节，内容 `clean-drop-ok`，`count:16`。拖出这一行后无障碍名是「关闭 拖出仅支持 Windows 与 macOS」，桌面没有这个文件 |
+| 日志 | **通过。** 默认页签 `System · 5554`，空态有「开始采集」。`log.capture.start` 后「采集已启动」generation=1。画面有 `beginning of kernel`、`beginning of main`。`log -p i -t YohuClean hello-clean-line` 打进去之后，关键字 `hello-clean` 把 kernel 行滤掉。导出 `/tmp/yohu-clean-log.txt` 只有一行：`I YohuClean: hello-clean-line`。「暂停」变成「继续」，再点回到「暂停」。清设备缓冲后再打 `hello-after-clear`，导出文件里没有原来的 `hello-clean-line`，有这一行新的。第二个页签 `com.android.fakesystemapp · 5554` 没有第二次 `log.capture.start`。页眉「停止」之后按钮回到「开始」 |
+| 日志版式 | **通过，并拨回默认。** 「超宽换行」保存为 `wrap`，再改回「单行（LogCat）」`clip`。级别、Tag、PID 没有单独改。离开底部只计数没有单独点 |
+| OpenH264 | **通过。** 数据目录里一开始没有这份库。设置里点「下载 OpenH264」。日志「OpenH264 已写入数据目录，未启动投屏」，当时没有 `mirror.start`。文件 1731112 字节，SHA-256 与清场前那份相同。`cache/openh264/` 里的 bz2 已删。关掉开关取消下载这一下没有单独点，这份 bz2 当次就写完 |
+| 投屏 | **通过。** 未开始时「开始」「仅显示」「设备浅色」可点，暂停、截图、全屏、返回、Home、多任务、音量、电源、亮度不可点。没有 H.264 VLD，OpenH264。子窗口 `x=212 y=104 w=704 h=661`。`704×661 → 372×661`、300ms。generation=1 首帧 `painted_fps=1`，720×1280。洞中线两侧 `(241,243,245)`，黑画面大约 x=200–520，中心 `(0,0,0)`。首帧后截图、暂停、全屏、返回、音量、电源、亮度都是 sensitive。暂停后按钮「继续」，OCR「已暂停」「画面已隐藏，点击继续」，角上仍是画布色，卡片内井色 `(229,229,234)`。面板内全屏时按钮变成「退出全屏」，「下次开始生效」从树上消失，退出后回来。停止后 `369×656 → 704×656`、350ms，暂停和截图再次不可点。「设备浅色」点成「设备深色」，再点回来。质量栏看见了，本路 `max_size=0 bit_rate=16000000 max_fps=0`，没有改档 |
+| 有意掉线 | **通过。** 文件页已经画出 `/sdcard`（含 `yohu-clean-*`），日志 generation=3 采集中，投屏 generation=2 已出画。04:13:47 停掉 qemu。扫描成功 `n=0`，不是「设备扫描失败」。日志是「设备掉线: emulator-5554」、`browse went_offline`、「采集停止」generation=3。设备栏「无设备」「连接设备并授权后刷新」，状态栏「设备: 无在线设备」，没有错误对话框。日志页已画出的行还在，按钮是「开始」。投屏洞是「未选择设备」「在左侧设备栏选择一台在线设备」，按钮是「开始」。再开文件页时没有新的 `files.list`，因为已经没有选中设备，画面是「未选择设备」，面包屑仍是 `sdcard` |
+| 再上线 | **通过。** 同一条命令重新拉起，`-accel off`，`sys.boot_completed=1`。04:17:51 起扫描 `n=1`，卡片回到「Android 14」「100% 充电」。04:13:47 之后没有新的「采集已启动」，也没有新的 `mirror.start`。日志页按钮仍是「开始」 |
+| 仍不作为完成态 | 多设备、未授权、目录里的第二台 offline 这台 VM 没有，没有开 KVM。拖出仍只支持 Windows 与 macOS。没有 `/dev/dri`，出画走 OpenH264，HEVC 仍关闭。质量档、主题、密度、缓冲行数、数据目录、adb 路径没有改值。拖入指向文件夹没有打开 |
+
 ## 安装、路径、打包
 
 | 项 | 期望 | 怎么核对 | 本次结果 |
