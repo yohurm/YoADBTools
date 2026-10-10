@@ -195,6 +195,20 @@
 | 再上线 | **通过。** 同一条命令重新拉起，`-accel off`，`sys.boot_completed=1`。04:17:51 起扫描 `n=1`，卡片回到「Android 14」「100% 充电」。04:13:47 之后没有新的「采集已启动」，也没有新的 `mirror.start`。日志页按钮仍是「开始」 |
 | 仍不作为完成态 | 多设备、未授权、目录里的第二台 offline 这台 VM 没有，没有开 KVM。拖出仍只支持 Windows 与 macOS。没有 `/dev/dri`，出画走 OpenH264，HEVC 仍关闭。质量档、主题、密度、缓冲行数、数据目录、adb 路径没有改值。拖入指向文件夹没有打开 |
 
+## 未点项补测（已安装的 `18c6e15`，2026-10-10）
+
+上一节没有改。这一节是三端验证变绿之后，用这次提交重打的 `.deb` 补上净场复测里还没改值的几项。二进制 `/usr/bin/YohuAdbTools` 10683480 字节，05:17:22 UTC。模拟器仍是 `-accel off` 的 `yohu_atd34`。测完把改过的设置拨回默认，并清掉设备和主机上的探针文件。
+
+| 项 | 结果 |
+|----|------|
+| 主题 | **通过，并拨回默认。** 徽章「立即生效」。从「跟随系统」点成「深色」。`settings.json` 的 `theme` 变成 `dark`。画布 (40,200) 和 (1100,60) 从 `(241,243,245)` 变成 `(25,26,28)`。再点回「跟随系统」，`theme` 回到 `system`，这两点回到 `(241,243,245)` |
+| 密度 | **通过，并拨回默认。** 徽章「立即生效」。从「舒适」点成「紧凑」。`density` 变成 `compact`。主题、密度两个下拉的高度从 32 变成 26，「浏览」按钮高度也是 26。再点回「舒适」，`density` 回到 `comfortable`，下拉高度回到 32 |
+| 缓冲行数 | **通过，并拨回默认。** 徽章「窗口立即裁剪，采集环下次启动」。采集中状态行是「行数79」。把「缓冲最大行数」改成 8，`buffer_capacity` 为 8。窗口只剩 8 行；列表区域高 522、一行 22，装得下二十多行。同一时刻再导出，环是 122 行（改值前那次导出是 74 行），没有跟着裁成 8。点「停止」再「开始」，generation=2。之后打入 `YohuCap` 的 cap-line-1 到 cap-line-20。窗口仍是 8 行，导出正好 8 行，内容是 cap-line-13 到 cap-line-20。再把缓冲改回 100000 |
+| 质量档 | **通过，并拨回默认。** 徽章「下次开始生效」。先按默认开始：`mirror.start` 为 `max_size=0 bit_rate=16000000 max_fps=0`，Live 720×1280，面板「720×1280」。直播中把长边改成 640、码率 4 Mbps、帧率 30 fps。保存值已是 640 / 4000000 / 30，没有新的 `mirror.start`，按钮仍是「停止」，面板仍是「720×1280」。停止再开始：`max_size=640 bit_rate=4000000 max_fps=30`，Live 360×640，面板「360×640」。拨回「原始 / 16 Mbps / 不限」后再开始一次：`max_size=0 bit_rate=16000000 max_fps=0`，Live 720×1280。然后停止 |
+| 关掉开关取消下载 | **通过，并拨回默认。** 先把 `libopenh264.so.7` 挪走，离开设置再进来，出现「下载 OpenH264」。这份 bz2 只有 633796 字节，直连时当次就写完。这次把 `ciscobinary.openh264.org` 指到本机，按大约 1KB/250ms 送同一份钉过 SHA-256 的 bz2。点下载后按钮不可用，缓存里出现 `.part`（当时 2048 字节）。把 OpenH264 开关关掉。提示「下载已取消」，`mirror_openh264` 为 false，同时有「已保存（立即生效）」。`.part` 已删，数据目录没有装上 `.so`。开关拨回开，`mirror_openh264` 回到 true。去掉本机指向后再点下载。日志「OpenH264 已写入数据目录，未启动投屏」，之后没有新的 `mirror.start`。文件 1731112 字节，SHA-256 `1392d21466bc638e68151b716d5b2086d54cd812afd43253f1adb5b6e0185f51`，和挪走的那份逐字节相同。`cache/openh264/` 里的 bz2 已删 |
+| 清场 | **通过。** 删掉 `/sdcard/yohu-clean-dir`、`yohu-clean-drop.txt`、`yohu-clean-upload.txt`。`ls /sdcard` 只剩 Alarms、Android、Audiobooks、DCIM、Documents、Download、Movies、Music、Notifications、Pictures、Podcasts、Recordings、Ringtones 这 13 个系统目录。主机上这次和上一轮的导出、上传、下载探针已删，包括 `/tmp/yohu-ci-ring-*.txt`、`/tmp/yohu-clean-*.txt`、`/tmp/yohu-from-device.bin`，以及 `/tmp` 里早先放着的 OpenH264 副本。本机 hosts 里的 OpenH264 指向已去掉，80 端口的慢速服务已停，网卡 IPv6 已恢复。数据目录里的 `libopenh264.so.7` 留着，那是拨回默认之后重新下载的库 |
+| 仍不作为完成态 | 和上一节相同。这台 VM 没有第二台设备，没有开 KVM。拖出仍只支持 Windows 与 macOS。没有 `/dev/dri`，出画走 OpenH264，HEVC 仍关闭 |
+
 ## 安装、路径、打包
 
 | 项 | 期望 | 怎么核对 | 本次结果 |
