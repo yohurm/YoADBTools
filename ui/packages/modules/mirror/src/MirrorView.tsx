@@ -2,8 +2,8 @@
  * 投屏主视图：只量 `.yohu-mirror__avail`；会话旗标与 invoke 在 store。
  */
 
-import { For, createEffect, onCleanup, onMount, type JSX } from "solid-js";
-import { AndroidKey, boundSerial, connectionOrUsb, DIALOG_FAILED, deviceNightWord, errorText, mirrorIsLive, mirrorIsStarting, mirrorPointerCaptures, mirrorPointerReleases, mirrorProtocolOf, ModuleTitle, saveFailedText, type DeviceSession, type MirrorPointerKind, type MirrorProtocol } from "@yohu/api";
+import { For, Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import { AndroidKey, boundSerial, connectionOrUsb, DIALOG_FAILED, deviceNightWord, errorText, mirrorIsLive, mirrorIsStarting, mirrorOpenh264Acquire, mirrorPointerCaptures, mirrorPointerReleases, mirrorProtocolOf, ModuleTitle, saveFailedText, type DeviceSession, type MirrorPointerKind, type MirrorProtocol } from "@yohu/api";
 import { screenshotOutcomeIsFailed, screenshotOutcomeIsSaved } from "./screenshot";
 import {
   dismissKey,
@@ -38,7 +38,7 @@ import {
   withCurrentOption,
   type QualityOption,
 } from "./quality";
-import { mirrorControlReady, mirrorPictureReady, mirrorSetupEnabled } from "./control-ready";
+import { mirrorControlReady, mirrorHoleCopy, mirrorPictureReady, mirrorPlaybackReady, mirrorSetupEnabled } from "./control-ready";
 import { mirrorStore, type MirrorPhase } from "./store";
 import "./mirror.css";
 
@@ -302,7 +302,33 @@ export function MirrorView(props: DeviceSession) {
   }
 
   function playbackLocked(): boolean {
-    return !live();
+    return !mirrorPlaybackReady(mirrorStore.state);
+  }
+
+  const [openh264Ready, setOpenh264Ready] = createSignal(false);
+  const [openh264Busy, setOpenh264Busy] = createSignal(false);
+
+  function stageHole(): { title: string; body: string } | null {
+    return mirrorHoleCopy(mirrorStore.state);
+  }
+
+  function showOpenh264Download(): boolean {
+    const body = stageHole()?.body ?? "";
+    return body.includes("还没有单独下载的 OpenH264") && !openh264Ready();
+  }
+
+  async function downloadOpenh264(): Promise<void> {
+    if (openh264Busy()) return;
+    setOpenh264Busy(true);
+    try {
+      const status = await mirrorOpenh264Acquire();
+      setOpenh264Ready(status.ready);
+      toaster.show("OpenH264 已下载到数据目录。若正在投屏，请先停止，再点「开始」。", "success");
+    } catch (e) {
+      showFailure(caughtText(e));
+    } finally {
+      setOpenh264Busy(false);
+    }
   }
 
   function nightTarget(): { serial: string; night: boolean } | null {
@@ -468,7 +494,30 @@ export function MirrorView(props: DeviceSession) {
             onPointerCancel={reportPointerLeave}
             onPointerLeave={reportPointerLeave}
           >
-            <div class="yohu-mirror__hole" aria-hidden="true" />
+            <div class="yohu-mirror__hole" aria-hidden={stageHole() ? undefined : "true"}>
+              <Show when={stageHole()}>
+                {(copy) => (
+                  <div class="yohu-mirror__hole-copy">
+                    <p class="yohu-mirror__hole-title">{copy().title}</p>
+                    <p class="yohu-mirror__hole-body">{copy().body}</p>
+                    <Show when={showOpenh264Download()}>
+                      <span onPointerDown={(event) => event.stopPropagation()}>
+                        <YoButton
+                          size={headerButtonSize()}
+                          buttonStyle="normal"
+                          tone="neutral"
+                          loading={openh264Busy()}
+                          disabled={openh264Busy()}
+                          onClick={() => void downloadOpenh264()}
+                        >
+                          下载 OpenH264
+                        </YoButton>
+                      </span>
+                    </Show>
+                  </div>
+                )}
+              </Show>
+            </div>
           </div>
         </div>
 

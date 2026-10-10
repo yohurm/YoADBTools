@@ -2,9 +2,9 @@
 //! invoke 拒绝与 `update/progress` 的失败都走同一映射；更新映射在 `ipc_update`，避免经设备目录绕回。
 
 use yohu_adb::AdbError;
-use yohu_domain::{DeviceSessionError, LibraryError};
 #[cfg(test)]
 use yohu_domain::SettingError;
+use yohu_domain::{DeviceSessionError, LibraryError};
 use yohu_files::FileError;
 use yohu_logsrv::LogError;
 use yohu_mirror::MirrorError;
@@ -128,6 +128,8 @@ pub fn ipc_present(e: PresentError) -> IpcError {
         | PresentError::Unimplemented
         | PresentError::ScreenshotWrite
         | PresentError::ScreenshotRead => IpcErrorCode::Internal,
+        #[cfg(target_os = "linux")]
+        PresentError::OpenH264Disabled | PresentError::OpenH264Missing => IpcErrorCode::Internal,
     };
     ipc_code(code, e.to_string())
 }

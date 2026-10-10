@@ -43,6 +43,7 @@ pub async fn download_installer_from(
         headers,
         expected_size: request.size_bytes,
         expected_sha256: request.sha256,
+        allowed_hosts: Vec::new(),
     };
     let outcome = http_fetch(spec, cancel, |p| {
         let stage = match p.phase {

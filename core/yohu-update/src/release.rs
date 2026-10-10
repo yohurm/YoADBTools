@@ -133,6 +133,11 @@ fn asset_score(name: &str, platform: &PlatformInfo) -> Option<i32> {
                 score += SCORE_DMG_HOST;
             }
         }
+        InstallerKind::Deb => {
+            if contains_any(&n, &["linux", "amd64", "arm64"]) {
+                score += SCORE_DMG_HOST;
+            }
+        }
     }
     if is_x64 && contains_any(&n, &["x64", "x86_64", "amd64", "win64"]) {
         score += SCORE_ARCH;
@@ -170,6 +175,8 @@ pub fn conventional_installer_name(platform: &PlatformInfo, version: &str) -> Op
         }
         (InstallerKind::Dmg, CpuArch::X64) => Some(format!("YohuAdbTools_{version}_x64.dmg")),
         (InstallerKind::Nsis, CpuArch::Arm64) => None,
+        (InstallerKind::Deb, CpuArch::X64) => Some(format!("YohuAdbTools_{version}_amd64.deb")),
+        (InstallerKind::Deb, CpuArch::Arm64) => Some(format!("YohuAdbTools_{version}_arm64.deb")),
     }
 }
 
@@ -344,6 +351,44 @@ mod tests {
             1,
         )];
         assert!(pick_asset(&assets, &platform).is_some());
+    }
+
+    #[test]
+    fn pick_asset_prefers_linux_amd64_deb() {
+        let platform = PlatformInfo {
+            version: "0.1.0".into(),
+            identifier: "com.yohu.adbtools".into(),
+            os: "linux".into(),
+            arch: "x86_64".into(),
+        };
+        let assets = vec![
+            asset(
+                "YohuAdbTools_1.2.0_x64-setup.exe",
+                "https://example.com/win.exe",
+                20,
+            ),
+            asset(
+                "YohuAdbTools_1.2.0_amd64.AppImage",
+                "https://example.com/app.AppImage",
+                40,
+            ),
+            asset(
+                "YohuAdbTools_1.2.0_amd64.deb",
+                "https://example.com/YohuAdbTools_1.2.0_amd64.deb",
+                15,
+            ),
+            asset(
+                "YohuAdbTools_1.2.0_arm64.deb",
+                "https://example.com/arm.deb",
+                16,
+            ),
+        ];
+        let picked = pick_asset(&assets, &platform).unwrap();
+        assert!(picked.name.contains("amd64.deb"));
+        assert_eq!(
+            conventional_installer_name(&platform, "1.2.0").as_deref(),
+            Some("YohuAdbTools_1.2.0_amd64.deb")
+        );
     }
 
     #[test]

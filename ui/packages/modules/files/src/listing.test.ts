@@ -27,6 +27,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
   };
 });
 
+import { listingPaint } from "./listing-paint";
 import {
   browseGenerationAbsent,
   createListingStore,
@@ -242,6 +243,7 @@ describe("goTo / detach fault", () => {
     await expect(store.goTo("/data/local/tmp")).resolves.toBe(false);
     expect(store.session.path).toBe("/sdcard");
     expect(store.session.error).toBe("路径不在安全根内: /data/local/tmp");
+    expect(store.session.listFault).toBe(false);
     expect(mocks.filesList).not.toHaveBeenCalled();
   });
 
@@ -412,6 +414,72 @@ describe("目录快照会话", () => {
     expect(mocks.filesList.mock.calls.length).toBe(listed);
     await store.enterDirectory("link");
     expect(store.session.path).toBe("/sdcard/link");
+  });
+});
+
+describe("清单失败相位", () => {
+  function dirEntry(name: string): RemoteEntry {
+    return { name, kind: "dir", size: 4096, permission: "drwxr-xr-x" };
+  }
+
+  it("无快照的失败停在 fault，不画成空目录，也不进缓存", async () => {
+    mocks.filesList.mockRejectedValue({
+      code: "not_found",
+      message: "没有这个目录，请重新输入",
+    });
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.session.loading).toBe(false));
+    expect(store.entries).toHaveLength(0);
+    expect(store.session.listFault).toBe(true);
+    expect(store.session.error).toBe("没有这个目录，请重新输入");
+    expect(listingPaint(store.entries.length, store.session.loading, store.session.cold, store.session.listFault)).toBe(
+      "fault",
+    );
+
+    let release!: (list: RemoteEntry[]) => void;
+    mocks.filesList.mockImplementationOnce(
+      () =>
+        new Promise((resolveList) => {
+          release = resolveList;
+        }),
+    );
+    const pending = store.refresh();
+    expect(store.session.loading).toBe(true);
+    expect(listingPaint(0, true, store.session.cold, store.session.listFault)).toBe("pending");
+    release([]);
+    await pending;
+    expect(store.session.listFault).toBe(false);
+    expect(listingPaint(0, false, false, store.session.listFault)).toBe("empty");
+  });
+
+  it("已有行时刷新失败留行，不把空列表写进快照", async () => {
+    mocks.filesList.mockImplementation(async (_serial, path) => {
+      if (path === "/sdcard") return [dirEntry("DCIM")];
+      return [fileEntry("shot.jpg")];
+    });
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.entries.map((e) => e.name)).toEqual(["DCIM"]));
+    mocks.filesList.mockRejectedValueOnce({ code: "adb_error", message: "执行超时" });
+    await store.refresh();
+    expect(store.entries.map((e) => e.name)).toEqual(["DCIM"]);
+    expect(store.session.listFault).toBe(false);
+    expect(store.session.error).toBe("执行超时");
+    await store.enterDirectory("DCIM");
+    expect(store.session.path).toBe("/sdcard/DCIM");
+    let release!: (list: RemoteEntry[]) => void;
+    mocks.filesList.mockImplementationOnce(
+      () =>
+        new Promise((resolveList) => {
+          release = resolveList;
+        }),
+    );
+    const pending = store.goUp();
+    expect(store.session.path).toBe("/sdcard");
+    expect(store.entries.map((e) => e.name)).toEqual(["DCIM"]);
+    release([dirEntry("DCIM")]);
+    await pending;
   });
 });
 

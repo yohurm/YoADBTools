@@ -83,6 +83,8 @@ export function createListingStore() {
     loading: false,
     /** 无快照的首次绑定才全屏 loading；进目录不是 cold。 */
     cold: false,
+    /** 这次 list 失败，且没有可画的快照。成功的空目录不是这一位。 */
+    listFault: false,
     mutating: false,
     error: "",
     errorTick: 0,
@@ -113,6 +115,14 @@ export function createListingStore() {
 
   function markWarm(): void {
     setSession("cold", false);
+  }
+
+  function markListFault(): void {
+    setSession("listFault", true);
+  }
+
+  function clearListFault(): void {
+    setSession("listFault", false);
   }
 
   function markCold(): void {
@@ -298,6 +308,7 @@ export function createListingStore() {
       const list = await filesList(current, target, coreGeneration);
       if (listGenStale(gen)) return false;
       const next = sortEntries(list.map(listingEntryFromWire), sort.key, sort.dir);
+      clearListFault();
       remember(current, target, next);
       if (commit === "on-ok" && target !== session.path) {
         showTargetPath(target);
@@ -320,11 +331,19 @@ export function createListingStore() {
       if (listingCommitNow(commit) && target !== pathBefore) {
         setSession("path", pathBefore);
         clearSelection();
-        paintSnapshot(snapshotOf(current, pathBefore));
+        const prev = snapshotOf(current, pathBefore);
+        paintSnapshot(prev);
+        if (prev) clearListFault();
+        else markListFault();
       } else if (listingCommitStays(commit)) {
         const keep = snapshotOf(current, session.path);
-        if (keep) paintSnapshot(keep);
-        else clearEntries();
+        if (keep) {
+          paintSnapshot(keep);
+          clearListFault();
+        } else {
+          clearEntries();
+          markListFault();
+        }
       }
       markWarm();
       return false;
@@ -383,6 +402,7 @@ export function createListingStore() {
       clearDirCache();
       clearEntries();
       clearFault();
+      clearListFault();
       clearSelection();
       markIdle();
       markWarm();
@@ -399,6 +419,7 @@ export function createListingStore() {
     clearCoreGeneration();
     cancelTransferListing();
     clearFault();
+    clearListFault();
     if (prev) detachCore(prev, prevGen);
     clearDirCache();
     setSession("path", DEFAULT_BROWSE_ROOT);
@@ -438,6 +459,7 @@ export function createListingStore() {
     bumpListGen();
     cancelTransferListing();
     clearFault();
+    clearListFault();
     detachCore(session.serial, coreGeneration);
     clearCoreGeneration();
   }

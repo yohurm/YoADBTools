@@ -148,6 +148,9 @@ pub fn apply_setting(
         SettingKey::MirrorForceForward => {
             settings.mirror_force_forward = must_bool(key, value)?;
         }
+        SettingKey::MirrorOpenh264 => {
+            settings.mirror_openh264 = must_bool(key, value)?;
+        }
         SettingKey::TerminalPrependAdb => {
             settings.terminal_prepend_adb = must_bool(key, value)?;
         }

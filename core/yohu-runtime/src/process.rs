@@ -158,7 +158,7 @@ impl ProcessRunner {
         timeout: Option<Duration>,
         cancel: CancellationToken,
     ) -> Result<ProcessOutput, ProcessError> {
-        let mut child = self.spawn(program, args, Stdio::null())?;
+        let mut child = self.spawn(program, args, false)?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -295,7 +295,7 @@ impl ProcessRunner {
         line_tx: mpsc::Sender<String>,
         join_stderr: bool,
     ) -> Result<i32, ProcessError> {
-        let mut child = self.spawn(program, args, Stdio::null())?;
+        let mut child = self.spawn(program, args, false)?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
@@ -452,11 +452,7 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(
-            program,
-            args,
-            Stdio::null(),
-        )?))
+        Ok(ChildHandle::wrap(self.spawn(program, args, false)?))
     }
 
     /// 长驻且 stdin 可写（浏览 raw shell）。logcat / 投屏仍走 [`Self::spawn_child`]。
@@ -465,25 +461,45 @@ impl ProcessRunner {
         program: &Path,
         args: &[String],
     ) -> Result<ChildHandle, ProcessError> {
-        Ok(ChildHandle::wrap(self.spawn(
-            program,
-            args,
-            Stdio::piped(),
-        )?))
+        Ok(ChildHandle::wrap(self.spawn(program, args, true)?))
     }
 
-    fn spawn(&self, program: &Path, args: &[String], stdin: Stdio) -> Result<Child, ProcessError> {
-        let mut cmd = Command::new(program);
-        cmd.args(args)
-            .stdin(stdin)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        #[cfg(unix)]
-        cmd.process_group(0);
-        cmd.spawn().map_err(ProcessError::Io)
+    fn spawn(
+        &self,
+        program: &Path,
+        args: &[String],
+        piped_stdin: bool,
+    ) -> Result<Child, ProcessError> {
+        let mut last = None;
+        for attempt in 0..SPAWN_BUSY_TRIES {
+            let mut cmd = Command::new(program);
+            cmd.args(args)
+                .stdin(if piped_stdin { Stdio::piped() } else { Stdio::null() })
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            #[cfg(windows)]
+            cmd.creation_flags(CREATE_NO_WINDOW);
+            #[cfg(unix)]
+            cmd.process_group(0);
+            match cmd.spawn() {
+                Ok(child) => return Ok(child),
+                Err(error) if retry_executable_busy(error.kind(), attempt) => {
+                    last = Some(error);
+                    std::thread::sleep(SPAWN_BUSY_PAUSE);
+                }
+                Err(error) => return Err(ProcessError::Io(error)),
+            }
+        }
+        Err(ProcessError::Io(last.expect("忙等之后仍有一次 IO 错误")))
     }
+}
+
+/// 刚写完就 exec，Linux 可能短暂返回 ETXTBSY。只对这一类再试。
+const SPAWN_BUSY_TRIES: u32 = 5;
+const SPAWN_BUSY_PAUSE: Duration = Duration::from_millis(20);
+
+fn retry_executable_busy(kind: std::io::ErrorKind, attempt: u32) -> bool {
+    kind == std::io::ErrorKind::ExecutableFileBusy && attempt + 1 < SPAWN_BUSY_TRIES
 }
 
 fn spawn_bounded_pump<R>(
@@ -599,7 +615,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{Cursor, ErrorKind};
+
+    #[test]
+    fn executable_busy_retries_then_stops() {
+        assert!(retry_executable_busy(ErrorKind::ExecutableFileBusy, 0));
+        assert!(retry_executable_busy(ErrorKind::ExecutableFileBusy, 3));
+        assert!(!retry_executable_busy(ErrorKind::ExecutableFileBusy, 4));
+        assert!(!retry_executable_busy(ErrorKind::NotFound, 0));
+    }
 
     #[tokio::test]
     async fn pump_panic_is_not_io() {

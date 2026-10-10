@@ -52,6 +52,7 @@ export const APP_IDENTITY: AppIdentity = {
 export const EMPTY_PATH_CATALOG: AppPathCatalog = {
   local_root: "",
   install_dir: "",
+  executable: "",
   config_dir: "",
   settings_file: "",
   logs_dir: "",

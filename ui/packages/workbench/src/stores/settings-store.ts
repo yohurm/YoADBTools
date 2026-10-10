@@ -35,7 +35,7 @@ import type {
 } from "@yohu/api";
 import { setDensity, setTheme } from "@yohu/ui";
 
-import { hostOsIsMacos, hostOsIsWindows } from "./host-os";
+import { hostOsIsLinux, hostOsIsMacos, hostOsIsWindows } from "./host-os";
 import { wireSettingValue } from "./settings-wire";
 
 const EMPTY_RESOLVED = {
@@ -156,6 +156,10 @@ export function createSettingsStore() {
     return hostOsIsMacos(os());
   }
 
+  function linuxHost(): boolean {
+    return hostOsIsLinux(os());
+  }
+
   function logsDirectory(): string {
     return paths.logs_dir;
   }
@@ -212,6 +216,7 @@ export function createSettingsStore() {
     openLogsDir,
     displayName,
     macosHost,
+    linuxHost,
     logsDirectory,
     normalStyle,
     neutralTone,

@@ -10,6 +10,8 @@ pub struct DownloadSpec {
     pub headers: Vec<(String, String)>,
     pub expected_size: u64,
     pub expected_sha256: String,
+    /// 空名单保持原行为。非空时，跟随重定向之后的最终主机必须在这份名单里。
+    pub allowed_hosts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

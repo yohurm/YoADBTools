@@ -1,7 +1,9 @@
 //! L1 MotionSpec —— 与 `@yohu/ui` `tokens/motion.ts` 同名同值。
 //! 产品层只点规格名，禁止再写 300 / 自造贝塞尔。数值由 testdata/motion_spec.json 锁死。
 
-use crate::curve::{ease_accel, ease_decel, ease_emphasized, ease_standard};
+use std::time::Duration;
+
+use crate::curve::{ease_accel, ease_decel, ease_emphasized, ease_standard, unit_interval};
 
 /// 语义规格。时长取自鸿蒙分级；曲线按元素四类（进场减速 / 出场加速 / 持续标准）。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,7 +46,9 @@ impl MotionSpec {
             Self::EffectsFast => 100,
             Self::SpatialSmall | Self::SpatialTick => 150,
             Self::EffectsEnter => 160,
-            Self::EffectsExit | Self::SpatialStretch | Self::SpatialLocal | Self::SpatialExit => 200,
+            Self::EffectsExit | Self::SpatialStretch | Self::SpatialLocal | Self::SpatialExit => {
+                200
+            }
             Self::SpatialPanel | Self::SpatialRail | Self::SpatialGrow => 300,
             Self::SpatialEnter => 350,
         }
@@ -59,14 +63,27 @@ impl MotionSpec {
             | Self::SpatialSmall
             | Self::SpatialTick
             | Self::SpatialStretch
-            | Self::SpatialGrow => {
-                ease_standard
-            }
+            | Self::SpatialGrow => ease_standard,
             Self::EffectsEnter | Self::SpatialEnter => ease_decel,
             Self::EffectsExit | Self::SpatialExit => ease_accel,
             Self::SpatialLocal => ease_emphasized,
         }
     }
+
+    /// 按已播时长在规格曲线上取样。Windows DComp 打断和 Linux 占用卡片共用。
+    pub fn ease_at(self, elapsed: Duration) -> f32 {
+        ease_at(self, elapsed)
+    }
+}
+
+/// 按已播时长在规格曲线上取样。调用点拿的是规格值，不是方法接收者。
+pub fn ease_at(spec: MotionSpec, elapsed: Duration) -> f32 {
+    if spec.duration_is_zero() {
+        return 1.0;
+    }
+    let ms = spec.duration_ms();
+    let u = unit_interval(elapsed.as_secs_f64() / (ms as f64 / 1000.0));
+    spec.ease()(u) as f32
 }
 
 #[cfg(test)]
@@ -140,6 +157,15 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn ease_at_follows_spec_duration() {
+        let spec = MotionSpec::SpatialPanel;
+        assert!((spec.ease_at(Duration::ZERO) - spec.ease()(0.0) as f32).abs() < 1e-6);
+        assert!((spec.ease_at(Duration::from_millis(spec.duration_ms())) - 1.0).abs() < 1e-5);
+        let mid = Duration::from_millis(spec.duration_ms() / 2);
+        assert!((spec.ease_at(mid) - spec.ease()(0.5) as f32).abs() < 1e-5);
     }
 
     #[test]

@@ -112,6 +112,10 @@ while :; do
         printf '%s\n' "$remainder"
         echo '{mark_ls}'
         ls -lla "${{path%/}}/"
+        ls_status=$?
+        if [ "$ls_status" -ne 0 ]; then
+          exit "$ls_status"
+        fi
         exit 0
         ;;
     esac
@@ -204,6 +208,31 @@ mod tests {
         let script = build_list_script("'/sdcard/DCIM'");
         assert!(script.contains("path='/sdcard/DCIM'"));
         assert!(script.contains(MARK_LS));
+        let ls_at = script.find("ls -lla").expect("ls");
+        let after = &script[ls_at..];
+        let status_at = after.find("ls_status=$?").expect("ls status");
+        let exit_at = after.find("exit \"$ls_status\"").expect("propagate ls status");
+        assert!(status_at < exit_at);
+        assert!(script.contains(MARK_FAIL));
+    }
+
+    #[test]
+    fn only_dot_entries_are_an_empty_directory() {
+        let stdout = format!(
+            "{MARK_RESOLVED}\n/sdcard/Download\n{MARK_REM}\n\n{MARK_LS}\ntotal 0\ndrwxr-xr-x 2 root root 4096 2026-01-01 12:00:53.000000000 +0800 .\ndrwxr-xr-x 3 root root 4096 2026-01-01 12:00:53.000000000 +0800 ..\n"
+        );
+        let raw = parse_list_output(&stdout, 0, "").unwrap();
+        assert!(raw.entries.is_empty());
+    }
+
+    #[test]
+    fn zero_exit_keeps_unrecognized_line_out_of_entries() {
+        let stdout = format!(
+            "{MARK_RESOLVED}\n/sdcard\n{MARK_REM}\n\n{MARK_LS}\nls: ignored warning\ndrwxr-xr-x 2 root root 4096 2026-01-01 12:00:53.000000000 +0800 Alarms\n"
+        );
+        let raw = parse_list_output(&stdout, 0, "warning: not a failure").unwrap();
+        assert_eq!(raw.entries.len(), 1);
+        assert_eq!(raw.entries[0].name, "Alarms");
     }
 
     #[test]
@@ -308,5 +337,57 @@ mod tests {
             parse_session_frame("__YOHU_END_1__ 0\n", 1),
             Err(BrowseParseError::Malformed)
         );
+    }
+
+    #[cfg(unix)]
+    fn run_script(path: &std::path::Path) -> (String, String, i32) {
+        let quoted = crate::shell_quote(&path.to_string_lossy());
+        let script = build_list_script(&quoted);
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(script)
+            .output()
+            .expect("sh");
+        let code = out.status.code().unwrap_or(1);
+        (
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+            code,
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn script_empty_dir_is_ok_with_no_entries() {
+        let root = std::env::temp_dir().join(format!("yohu-browse-empty-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("dir");
+        let (stdout, stderr, code) = run_script(&root);
+        parse_list_output(&stdout, code, &stderr).expect("empty dir lists");
+        assert_eq!(code, 0);
+        assert!(stdout.contains(MARK_LS), "{stdout}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn script_dangling_link_is_ls_failed_not_empty() {
+        let root = std::env::temp_dir().join(format!("yohu-browse-miss-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("dir");
+        let link = root.join("sdcard");
+        std::os::unix::fs::symlink(root.join("missing-primary"), &link).expect("symlink");
+        let (stdout, stderr, code) = run_script(&link);
+        match parse_list_output(&stdout, code, &stderr) {
+            Err(BrowseParseError::LsFailed { exit_code, stderr }) => {
+                assert_ne!(exit_code, 0);
+                assert!(
+                    stderr.contains("No such file"),
+                    "stderr={stderr} stdout={stdout}"
+                );
+            }
+            other => panic!("expected LsFailed, got {other:?} stdout={stdout} stderr={stderr}"),
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

@@ -115,6 +115,8 @@ pub mod dir {
     pub const LIBRARY_FILE: &str = "library.json";
     pub const EXPORTS: &str = "exports";
     pub const DRAG_OUT: &str = "drag-out";
+    /// Cisco OpenH264 二进制的单独目录。不进安装包。
+    pub const OPENH264: &str = "openh264";
 }
 
 /// 应用身份（`system.info.identity`）。
@@ -147,8 +149,10 @@ impl AppIdentity {
 pub struct AppPathCatalog {
     /// 产品家园（Windows `%LOCALAPPDATA%\YohuAdbTools`）
     pub local_root: String,
-    /// 安装根（Windows `%LOCALAPPDATA%\Programs\YohuAdbTools`）
+    /// 安装根（Windows `%LOCALAPPDATA%\Programs\YohuAdbTools`）。不跟着进程路径改。
     pub install_dir: String,
+    /// 这次启动的程序文件（`std::env::current_exe`）。
+    pub executable: String,
     pub config_dir: String,
     pub settings_file: String,
     pub logs_dir: String,

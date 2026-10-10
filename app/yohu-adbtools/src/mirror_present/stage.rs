@@ -11,9 +11,10 @@ use super::scale::{present_dest, Letterbox};
 
 pub use super::stage_copy::stage_copy;
 pub use super::stage_palette::{
-    argb_to_rgba, host_corner_radius, stage_border_argb, stage_palette, stage_stroke_px,
-    stage_type_px,
+    host_corner_radius, stage_border_argb, stage_palette, stage_stroke_px, stage_type_px,
 };
+#[cfg(any(windows, target_os = "macos"))]
+pub use super::stage_palette::argb_to_rgba;
 
 pub struct ChromeSpec<'a> {
     pub mode: MirrorStageMode,

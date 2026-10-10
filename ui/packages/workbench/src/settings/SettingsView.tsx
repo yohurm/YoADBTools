@@ -74,6 +74,7 @@ export const SettingsView: Component = () => {
         save={save}
         savedBrowse={savedBrowse}
         onCheckUpdate={() => void checkAppUpdate()}
+        showToast={(text, tone) => toaster.show(text, tone)}
       />
       <UpdateDialogs show={(text, tone) => toaster.show(text, tone)} />
       <YoToaster toaster={toaster} />

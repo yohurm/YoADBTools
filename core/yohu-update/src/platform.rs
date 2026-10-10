@@ -19,6 +19,7 @@ pub enum CpuArch {
 pub enum HostOs {
     Windows,
     Macos,
+    Linux,
 }
 
 pub fn cpu_arch(arch: &str) -> Option<CpuArch> {
@@ -33,6 +34,7 @@ pub fn host_os(os: &str) -> Option<HostOs> {
     match os.trim().to_ascii_lowercase().as_str() {
         "windows" => Some(HostOs::Windows),
         "macos" | "darwin" => Some(HostOs::Macos),
+        "linux" => Some(HostOs::Linux),
         _ => None,
     }
 }
@@ -73,7 +75,8 @@ mod tests {
         assert_eq!(host_os("windows"), Some(HostOs::Windows));
         assert_eq!(host_os(" Darwin "), Some(HostOs::Macos));
         assert_eq!(host_os("macos"), Some(HostOs::Macos));
-        assert_eq!(host_os("linux"), None);
+        assert_eq!(host_os("linux"), Some(HostOs::Linux));
+        assert_eq!(host_os("Linux"), Some(HostOs::Linux));
         assert_eq!(cpu_arch("AMD64"), Some(CpuArch::X64));
         assert_eq!(cpu_arch("x86_64"), Some(CpuArch::X64));
         assert_eq!(cpu_arch("arm64"), Some(CpuArch::Arm64));

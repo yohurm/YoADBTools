@@ -17,7 +17,7 @@ pub fn spawn_dispatcher(
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut rx = rx;
-        while let Some(event) = rx.recv().await {
+        while let Some(mut event) = rx.recv().await {
             if let AppEvent::CaptureState {
                 serial,
                 state: CaptureState::Stopped,
@@ -46,8 +46,11 @@ pub fn spawn_dispatcher(
                 state,
                 width,
                 height,
+                error,
+                hole_title,
+                hole_body,
                 ..
-            } = &event
+            } = &mut event
             {
                 if let Some(app_state) = app.try_state::<AppState>() {
                     match state {
@@ -60,6 +63,16 @@ pub fn spawn_dispatcher(
                         }
                         _ => {}
                     }
+                }
+                let native = cfg!(any(windows, target_os = "macos"));
+                let failed = matches!(state, MirrorSessionState::Failed);
+                if let Some((title, body)) = crate::mirror_present::session_failure_hole(
+                    native,
+                    failed,
+                    error.as_deref().unwrap_or(""),
+                ) {
+                    *hole_title = Some(title.to_string());
+                    *hole_body = Some(body);
                 }
             }
             let name = event.name();

@@ -20,5 +20,7 @@ pub use parse::browse::{BrowseListRaw, BrowseParseError};
 pub use parse::readlink::ReadlinkF;
 pub use shell::shell_quote;
 pub use status::DeviceStatusHub;
+#[cfg(target_os = "linux")]
+pub use tool::AdbSearch;
 pub use tool::{adb_file_name, repo_sidecar_adb, ToolResolver, ADB_FILES};
 pub use yohu_runtime::ChildHandle;

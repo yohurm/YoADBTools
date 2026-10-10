@@ -23,12 +23,14 @@ import {
   mirrorStop,
   onDeviceOffline,
   onMirrorPainted,
+  onMirrorPresent,
   onMirrorState,
   settingsSet,
   type AppSettings,
   type MirrorControlMessage,
   type MirrorPointerKind,
   type MirrorProtocol,
+  type PresentBindState,
   type MirrorSessionSnapshot,
   type MirrorSessionState,
   type SettingKey,
@@ -45,7 +47,7 @@ import {
   shouldReportLayout,
   type AvailZone,
 } from "./layout";
-import { mirrorControlReady, mirrorSessionAddressable } from "./control-ready";
+import { mirrorControlReady, mirrorPointerTarget, mirrorSessionAddressable } from "./control-ready";
 import type { MirrorScreenshotOutcome } from "./screenshot";
 
 export type MirrorPhase = "idle" | "starting" | "live" | "failed";
@@ -68,6 +70,11 @@ export interface MirrorUiState {
   maxFps: number;
   protocol: MirrorProtocol;
   paintedFps: number;
+  presentBind: PresentBindState;
+  presentTitle: string;
+  presentBody: string;
+  sessionHoleTitle: string;
+  sessionHoleBody: string;
   nightHub: boolean | null;
   nightPending: boolean | null;
   night: boolean | null;
@@ -149,6 +156,18 @@ function clearedPlayback(): Pick<MirrorUiState, "hasFrame" | "paused" | "fullscr
   };
 }
 
+/** 呈现绑定收起。会话失败的洞文案不在这一份。 */
+function clearedPresent(): Pick<MirrorUiState, "presentBind" | "presentTitle" | "presentBody"> {
+  return { presentBind: "idle", presentTitle: "", presentBody: "" };
+}
+
+function sessionHoleFrom(title?: string, body?: string): Pick<MirrorUiState, "sessionHoleTitle" | "sessionHoleBody"> {
+  return {
+    sessionHoleTitle: title ? title : "",
+    sessionHoleBody: body ? body : "",
+  };
+}
+
 function idleAfterUnbind(): Pick<
   MirrorUiState,
   | "phase"
@@ -159,6 +178,11 @@ function idleAfterUnbind(): Pick<
   | "paused"
   | "fullscreen"
   | "paintedFps"
+  | "presentBind"
+  | "presentTitle"
+  | "presentBody"
+  | "sessionHoleTitle"
+  | "sessionHoleBody"
   | "nightHub"
   | "nightPending"
   | "night"
@@ -169,6 +193,8 @@ function idleAfterUnbind(): Pick<
     ...controlOff(),
     ...clearedError(),
     ...clearedPlayback(),
+    ...clearedPresent(),
+    ...sessionHoleFrom(),
     nightHub: null,
     ...pendingOff(),
     night: null,
@@ -315,6 +341,9 @@ export function createMirrorStore() {
       paused: row.paused,
       fullscreen: row.fullscreen,
       error: row.error ?? null,
+      presentBind: row.present_bind ?? clearedPresent().presentBind,
+      presentTitle: row.hole_title ? row.hole_title : "",
+      presentBody: row.hole_body ? row.hole_body : "",
       ...(mirrorIsLive(row.phase) ? { readOnly: !row.control } : {}),
     });
   }
@@ -423,7 +452,7 @@ export function createMirrorStore() {
   }
 
   function reportPointer(kind: MirrorPointerKind, x: number, y: number): void {
-    const serial = mirrorSessionAddressable(state);
+    const serial = mirrorPointerTarget(state);
     if (!serial || readOnlyNow() || !state.control) return;
     void mirrorPointer({ serial, kind, x, y });
   }
@@ -544,12 +573,25 @@ export function createMirrorStore() {
             : {}),
           control: event.control,
           error: event.error ?? null,
+          ...sessionHoleFrom(event.hole_title, event.hole_body),
           ...(mirrorIsLive(event.state) ? { readOnly: !event.control } : {}),
         });
         if (mirrorSessionEnded(event.state)) {
           setState(clearedPlayback());
+          setState(clearedPresent());
         }
         flushLayout();
+      })(e);
+    }),
+  );
+  unlistens.push(
+    onMirrorPresent((e) => {
+      onBound((event: typeof e) => {
+        setState({
+          presentBind: event.bind,
+          presentTitle: event.hole_title,
+          presentBody: event.hole_body,
+        });
       })(e);
     }),
   );

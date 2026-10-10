@@ -86,6 +86,18 @@ pub enum AppEvent {
         control: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        /// 无原生表面且会话失败时，洞内标题。`yohu-mirror` 恒为 None，壳在转发前填。
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hole_title: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hole_body: Option<String>,
+    },
+    /// 壳报告呈现绑定。不进 `yohu-mirror` 的会话机。
+    MirrorPresent {
+        serial: String,
+        bind: crate::PresentBindState,
+        hole_title: String,
+        hole_body: String,
     },
     MirrorPainted {
         serial: String,
@@ -118,6 +130,7 @@ pub mod event_names {
     pub const TASK_SUMMARY: &str = "task/summary";
     pub const SETTINGS_CHANGED: &str = "settings/changed";
     pub const MIRROR_STATE: &str = "mirror/state";
+    pub const MIRROR_PRESENT: &str = "mirror/present";
     pub const MIRROR_PAINTED: &str = "mirror/painted";
     pub const UPDATE_PROGRESS: &str = "update/progress";
 }
@@ -140,6 +153,7 @@ impl AppEvent {
             AppEvent::TaskSummary { .. } => TASK_SUMMARY,
             AppEvent::SettingsChanged { .. } => SETTINGS_CHANGED,
             AppEvent::MirrorState { .. } => MIRROR_STATE,
+            AppEvent::MirrorPresent { .. } => MIRROR_PRESENT,
             AppEvent::MirrorPainted { .. } => MIRROR_PAINTED,
             AppEvent::UpdateProgress(_) => UPDATE_PROGRESS,
         }
@@ -245,6 +259,8 @@ mod tests {
             codec: "h264".into(),
             control: false,
             error: None,
+            hole_title: None,
+            hole_body: None,
         };
         let v = serde_json::to_value(&event).expect("serialize");
         assert_eq!(v["kind"], "mirrorState");
@@ -324,6 +340,7 @@ mod tests {
             event_names::TASK_SUMMARY,
             event_names::SETTINGS_CHANGED,
             event_names::MIRROR_STATE,
+            event_names::MIRROR_PRESENT,
             event_names::MIRROR_PAINTED,
             event_names::UPDATE_PROGRESS,
         ] {

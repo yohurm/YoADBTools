@@ -122,7 +122,7 @@ listing.ts
   detachView / bindSerial(null) → files.session.detach(所持 generation)
   navigate / enter / goUp：立刻切 path，命中快照即画行，files.list(serial, path, generation) 只对账
   goTo：成功才切 path（手输未知路径）
-  listingPaint：rows | empty | cold | pending；YoLoading 只 cold
+  listingPaint：rows | empty | cold | pending | fault；YoLoading 只 cold；fault 是无快照的失败，不画「此文件夹为空」
   listGen / requestListing / 挂载期 fault
   detachView：error=""，errorTick=0；快照保留到换 serial
   不 import transfers，不订 transfer/progress

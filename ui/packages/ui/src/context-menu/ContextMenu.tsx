@@ -23,7 +23,7 @@ import {
 import { itemIsEnabled } from "../keymap/list-index";
 import { YoCorner } from "../corner";
 import { presenceAttr } from "../dom/flag";
-import "../menu/menu-row.css";
+import "./menu-row.css";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { readViewport } from "../placement/viewport";

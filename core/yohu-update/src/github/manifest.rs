@@ -78,6 +78,8 @@ pub fn platform_manifest_key(platform: &PlatformInfo) -> Option<&'static str> {
         (HostOs::Windows, CpuArch::X64) => Some("windows-x86_64"),
         (HostOs::Macos, CpuArch::Arm64) => Some("darwin-aarch64"),
         (HostOs::Macos, CpuArch::X64) => Some("darwin-x86_64"),
+        (HostOs::Linux, CpuArch::X64) => Some("linux-x86_64"),
+        (HostOs::Linux, CpuArch::Arm64) => Some("linux-aarch64"),
         (HostOs::Windows, CpuArch::Arm64) => None,
     }
 }

@@ -26,6 +26,16 @@ pub async fn set(
         state.capture.set_ring_capacity(updated.buffer_capacity);
     }
 
+    if key == SettingKey::MirrorOpenh264 {
+        if !updated.mirror_openh264 {
+            if let Some(token) = state.openh264_acquire.lock().await.take() {
+                token.cancel();
+            }
+        }
+        #[cfg(target_os = "linux")]
+        state.present.set_openh264_enabled(updated.mirror_openh264);
+    }
+
     if key == SettingKey::AdbPath {
         let path = user_adb_path(&updated.adb_path);
         state.app_log.info(if path.is_none() {

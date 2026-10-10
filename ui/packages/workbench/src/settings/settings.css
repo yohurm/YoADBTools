@@ -50,6 +50,13 @@
   color: var(--yohu-fg-3);
 }
 
+.yohu-settings__license {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--yohu-font-caption);
+  color: var(--yohu-fg-3);
+}
+
 .yohu-settings__update-ver {
   margin: 0;
   font-size: var(--yohu-font-body);

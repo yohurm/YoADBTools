@@ -87,3 +87,17 @@ pub fn mirror_screenshot(
 ) -> Result<(), IpcError> {
     crate::mirror_sessions::screenshot(&state, &req.serial, &req.path).map_err(ipc_present)
 }
+
+#[tauri::command(rename = "mirror.openh264.status")]
+pub fn mirror_openh264_status(
+    state: State<'_, AppState>,
+) -> crate::openh264_acquire::Openh264Status {
+    crate::openh264_acquire::status(&state)
+}
+
+#[tauri::command(rename = "mirror.openh264.acquire")]
+pub async fn mirror_openh264_acquire(
+    state: State<'_, AppState>,
+) -> Result<crate::openh264_acquire::Openh264Status, IpcError> {
+    crate::openh264_acquire::acquire(&state).await
+}

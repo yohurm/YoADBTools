@@ -3,10 +3,14 @@
 //! Windows = Media Foundation → D3D11 YUV → HWND。
 //! macOS = VideoToolbox → NSView。Linux 预留，禁止 FFmpeg。
 //! UI 上报稳定可用区；表面独占像素。解码会话跟 `mirror.start`/`stop` 走，表面跟舞台可见性走。
+//!
+//! Linux 的 Convert / Present 在 `linux/`（ADR-v6-042）：有 H.264 VLD 用 libva，
+//! 否则 `dlopen` Cisco OpenH264，画进已记下的 `GtkWindow` 子窗口。`Caps.id` 仍是 `vaapi`。
+#![cfg_attr(target_os = "linux", allow(dead_code))]
 
 mod annexb;
-mod control_hand;
 mod backend;
+mod control_hand;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
@@ -22,12 +26,15 @@ mod stage_palette;
 mod windows;
 
 pub use backend::{AnnexBDecoder, Caps};
+pub(crate) use stage_copy::session_failure_hole;
 #[cfg(windows)]
 pub use windows::MfDecoder;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+use backend::PresentBind;
 
 use tokio::sync::mpsc as tokio_mpsc;
 use yohu_mirror::{content_size_usable, FramePipe, MirrorService};
@@ -39,7 +46,7 @@ use backend::Cmd;
 use windows::{D3dDevice, DecodeSeat, GeomHost, PictureBank};
 
 /// 呈现侧可映射错误。IPC 码由 `ipc_present` 按变体判定，禁止扫字符串。
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, thiserror::Error, PartialEq, Eq)]
 pub enum PresentError {
     #[error("当前没有投屏画面")]
     Empty,
@@ -51,16 +58,35 @@ pub enum PresentError {
     Timeout,
     #[error("当前平台没有投屏硬解")]
     Unimplemented,
+    /// 没有 VLD，并且用户关掉了 Cisco 二进制。洞标题仍是「没有画面」。
+    #[cfg(target_os = "linux")]
+    #[error(
+        "已关闭 OpenH264 Video Codec provided by Cisco Systems, Inc.。没有硬解时，请在设置里重新打开这份单独下载的二进制"
+    )]
+    OpenH264Disabled,
+    /// 没有 VLD，机器上也还没有那份单独下载的 .so。
+    #[cfg(target_os = "linux")]
+    #[error(
+        "还没有单独下载的 OpenH264 二进制。请放到数据目录的 openh264/ 下（libopenh264.so.7），或让 YOHU_OPENH264 指向该文件。设置里可以关闭再打开 OpenH264 Video Codec provided by Cisco Systems, Inc."
+    )]
+    OpenH264Missing,
     #[error("截图写入失败")]
     ScreenshotWrite,
     #[error("截图读取失败")]
     ScreenshotRead,
 }
 
+/// 缺文件说明里的这一句。洞上的下载按钮和「让网页盖住 GTK 子窗口」都认它。
+#[cfg(target_os = "linux")]
+pub(crate) fn openh264_download_hole(body: &str) -> bool {
+    body.contains("还没有单独下载的 OpenH264")
+}
+
 pub struct PresentHost {
     hevc_ok: AtomicBool,
     event_tx: tokio_mpsc::Sender<AppEvent>,
     mirror: Arc<MirrorService>,
+    present_bind: Arc<Mutex<PresentBind>>,
     inner: Mutex<Inner>,
     #[cfg(windows)]
     geom: Arc<GeomHost>,
@@ -68,6 +94,12 @@ pub struct PresentHost {
     d3d: Mutex<Option<Arc<D3dDevice>>>,
     #[cfg(windows)]
     pictures: Arc<PictureBank>,
+    /// 用户可以关掉 Cisco 二进制。默认开。只在 Linux 读取。
+    #[cfg(target_os = "linux")]
+    openh264_on: Arc<AtomicBool>,
+    /// 数据目录下的 `openh264/`。二进制不进安装包。
+    #[cfg(target_os = "linux")]
+    openh264_dir: Mutex<std::path::PathBuf>,
 }
 
 struct Inner {
@@ -146,6 +178,7 @@ impl PresentHost {
             hevc_ok: AtomicBool::new(false),
             event_tx,
             mirror,
+            present_bind: Arc::new(Mutex::new(PresentBind::Idle)),
             inner: Mutex::new(Inner {
                 owner: 0,
                 surface: None,
@@ -165,7 +198,35 @@ impl PresentHost {
             d3d: Mutex::new(None),
             #[cfg(windows)]
             pictures: Arc::new(PictureBank::new()),
+            #[cfg(target_os = "linux")]
+            openh264_on: Arc::new(AtomicBool::new(true)),
+            #[cfg(target_os = "linux")]
+            openh264_dir: Mutex::new(std::path::PathBuf::new()),
         })
+    }
+
+    /// 设置里的 OpenH264 开关。关掉之后，没有 VLD 的机器停在许可说明。
+    #[cfg(target_os = "linux")]
+    pub fn set_openh264_enabled(&self, on: bool) {
+        self.openh264_on.store(on, Ordering::SeqCst);
+    }
+
+    /// 单独下载的 Cisco 二进制目录。不是安装包里的路径。
+    #[cfg(target_os = "linux")]
+    pub fn set_openh264_dir(&self, dir: std::path::PathBuf) {
+        *lock_present(&self.openh264_dir) = dir;
+    }
+
+    /// `locate` 已经能找到一份 .so（环境变量或数据目录）。其他系统没有这条下载。
+    #[cfg(target_os = "linux")]
+    pub fn openh264_located(&self) -> bool {
+        let dir = lock_present(&self.openh264_dir).clone();
+        linux::locate_openh264(&dir).is_some()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn openh264_located(&self) -> bool {
+        true
     }
 
     pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
@@ -245,7 +306,11 @@ impl PresentHost {
             inner.decode = None;
             self.pictures.clear();
         }
-        if inner.paint.as_ref().is_some_and(|note| note.serial == serial) {
+        if inner
+            .paint
+            .as_ref()
+            .is_some_and(|note| note.serial == serial)
+        {
             inner.paint = None;
         }
         if let Some(tx) = inner.surface.as_ref() {
@@ -274,6 +339,22 @@ impl PresentHost {
             }
             _ => (false, 0),
         }
+    }
+
+    /// 这一台的呈现绑定，以及无原生表面时洞里要画的句子。对不上舞台则为空。
+    pub fn hole_for(&self, serial: &str) -> (yohu_protocol::PresentBindState, String, String) {
+        let stage = lock_present(&self.inner).stage_serial.clone();
+        if stage.as_deref().is_some_and(|current| current != serial) {
+            return (
+                yohu_protocol::PresentBindState::Idle,
+                String::new(),
+                String::new(),
+            );
+        }
+        let guard = self.present_bind.lock().expect("present bind poisoned");
+        let bind = guard.wire();
+        let (title, body) = guard.hole();
+        (bind, title, body)
     }
 
     /// 上次可回放 layout 上的暂停与全屏。serial 对不上则为关。
@@ -453,6 +534,7 @@ impl PresentHost {
         if let Some(tx) = tx {
             let _ = tx.send(Cmd::Shutdown);
         }
+        *self.present_bind.lock().expect("present bind poisoned") = PresentBind::Idle;
     }
 
     fn ensure_surface(&self, serial: &str) -> SurfaceEnsure {
@@ -471,18 +553,23 @@ impl PresentHost {
         let Some(d3d) = self.ensure_d3d() else {
             return SurfaceEnsure::Failed;
         };
-        let tx = spawn_backend_surface(
-            serial.to_string(),
+        let tx = spawn_backend_surface(SurfaceLaunch {
+            serial: serial.to_string(),
             owner,
-            Arc::clone(&self.mirror),
-            self.event_tx.clone(),
+            mirror: Arc::clone(&self.mirror),
+            event_tx: self.event_tx.clone(),
+            bind: Arc::clone(&self.present_bind),
             #[cfg(windows)]
-            Arc::clone(&self.geom),
+            geom: Arc::clone(&self.geom),
             #[cfg(windows)]
             d3d,
             #[cfg(windows)]
-            Arc::clone(&self.pictures),
-        );
+            pictures: Arc::clone(&self.pictures),
+            #[cfg(target_os = "linux")]
+            openh264_on: Arc::clone(&self.openh264_on),
+            #[cfg(target_os = "linux")]
+            openh264_dir: lock_present(&self.openh264_dir).clone(),
+        });
         lock_present(&self.inner).surface = Some(tx);
         SurfaceEnsure::Created
     }
@@ -610,31 +697,60 @@ fn apply_pending_unbind<P, G>(pending: &mut Option<(String, P, G)>, serial: &str
     }
 }
 
-fn spawn_backend_surface(
+/// 一次表面启动要带的东西。平台字段用 cfg，避免 Windows 上参数超过 Clippy 的 7 个。
+struct SurfaceLaunch {
     serial: String,
     owner: isize,
     mirror: Arc<MirrorService>,
     event_tx: tokio_mpsc::Sender<AppEvent>,
-    #[cfg(windows)] geom: Arc<GeomHost>,
-    #[cfg(windows)] d3d: Arc<D3dDevice>,
-    #[cfg(windows)] pictures: Arc<PictureBank>,
-) -> Sender<Cmd> {
+    bind: Arc<Mutex<PresentBind>>,
+    #[cfg(windows)]
+    geom: Arc<GeomHost>,
+    #[cfg(windows)]
+    d3d: Arc<D3dDevice>,
+    #[cfg(windows)]
+    pictures: Arc<PictureBank>,
+    #[cfg(target_os = "linux")]
+    openh264_on: Arc<AtomicBool>,
+    #[cfg(target_os = "linux")]
+    openh264_dir: std::path::PathBuf,
+}
+
+fn spawn_backend_surface(launch: SurfaceLaunch) -> Sender<Cmd> {
     #[cfg(windows)]
     {
-        windows::spawn_surface(serial, owner, mirror, event_tx, geom, d3d, pictures)
+        let _ = launch.bind;
+        windows::spawn_surface(
+            launch.serial,
+            launch.owner,
+            launch.mirror,
+            launch.event_tx,
+            launch.geom,
+            launch.d3d,
+            launch.pictures,
+        )
     }
     #[cfg(target_os = "macos")]
     {
-        macos::spawn_surface(serial, owner, mirror, event_tx)
+        let _ = launch.bind;
+        macos::spawn_surface(launch.serial, launch.owner, launch.mirror, launch.event_tx)
     }
     #[cfg(target_os = "linux")]
     {
-        linux::spawn_surface(serial, owner, mirror, event_tx)
+        linux::spawn_surface(
+            launch.serial,
+            launch.owner,
+            launch.mirror,
+            launch.event_tx,
+            launch.bind,
+            launch.openh264_on,
+            launch.openh264_dir,
+        )
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
-        let _ = (owner, mirror, event_tx);
-        backend::spawn_unimplemented("none", &serial)
+        let _ = (launch.owner, launch.mirror, launch.event_tx);
+        backend::spawn_unimplemented("none", &launch.serial, launch.bind, None)
     }
 }
 
@@ -642,7 +758,8 @@ fn spawn_backend_surface(
 mod tests {
     use super::{
         apply_pending_unbind, assert_screenshot_serial, avail_for_replay, layout_replayable, probe,
-        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError, PresentHost,
+        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError,
+        PresentHost,
     };
     use yohu_protocol::MirrorLayout;
 

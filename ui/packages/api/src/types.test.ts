@@ -398,6 +398,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
         mirror_max_fps: 0,
         mirror_protocol: "usb",
         mirror_force_forward: false,
+        mirror_openh264: true,
         terminal_prepend_adb: false,
         files_drop_into_folder: false,
         terminal_time_format: "time_millis",
@@ -448,6 +449,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     const paths = {
       local_root: "C:/Local/YohuAdbTools",
       install_dir: "C:/Local/Programs/YohuAdbTools",
+      executable: "C:/Local/Programs/YohuAdbTools/YohuAdbTools.exe",
       config_dir: "C:/Local/YohuAdbTools/config",
       settings_file: "C:/Local/YohuAdbTools/config/settings.json",
       logs_dir: "C:/Local/YohuAdbTools/logs",
@@ -535,6 +537,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
       expect(name).toMatch(/^[-A-Za-z0-9_/:]+$/);
     }
     expect(EVENT_NAMES.mirrorState).toBe("mirror/state");
+    expect(EVENT_NAMES.mirrorPresent).toBe("mirror/present");
     expect(EVENT_NAMES.mirrorPainted).toBe("mirror/painted");
     expect(EVENT_NAMES.devicesChanged).toBe("devices/changed");
     expect(EVENT_NAMES.deviceStatus).toBe("device/status");

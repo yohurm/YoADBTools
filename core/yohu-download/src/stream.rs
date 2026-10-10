@@ -13,6 +13,17 @@ use crate::resume::{partial_path, resume_plan, ResumeAction};
 use crate::spec::{DownloadOutcome, DownloadPhase, DownloadProgress, DownloadSpec};
 use crate::verify::{hex_lower, sha256_hex, sha256_matches, MAX_FILE_BYTES};
 
+/// 空名单不限制主机。非空时最终响应的主机必须整段相等，不看端口。
+pub(crate) fn final_host_allowed(host: Option<&str>, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    match host {
+        Some(host) => allowed.iter().any(|item| item == host),
+        None => false,
+    }
+}
+
 pub(crate) const PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -86,6 +97,10 @@ pub(crate) async fn stream_once(
         _ = cancel.cancelled() => return Err(DownloadError::Cancelled),
         sent = req.send() => sent?,
     };
+    if !final_host_allowed(response.url().host_str(), &spec.allowed_hosts) {
+        tracing::warn!(url = %response.url(), "下载被重定向到允许名单以外的主机");
+        return Err(DownloadError::InvalidUrl);
+    }
     let status = response.status().as_u16();
     let action = resume_plan(have, status)?;
 

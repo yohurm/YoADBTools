@@ -61,6 +61,7 @@ pub fn take_open<T, E>(failed: &mut bool, result: Result<T, E>) -> Result<T, E> 
 pub enum DecodeSeatKind {
     MediaFoundation,
     VideoToolbox,
+    Linux,
 }
 
 /// 当前宿主的解码座。两个变体都在这一份里构造，各平台用 `cfg!` 选一支。
@@ -70,7 +71,7 @@ pub fn host_decode_seat() -> DecodeSeatKind {
     } else if cfg!(target_os = "macos") {
         DecodeSeatKind::VideoToolbox
     } else {
-        DecodeSeatKind::MediaFoundation
+        DecodeSeatKind::Linux
     }
 }
 
@@ -83,6 +84,9 @@ pub fn note_decode_beat(fed: &mut u32, decoded: &mut u32, kind: DecodeSeatKind) 
             }
             DecodeSeatKind::VideoToolbox => {
                 tracing::info!(fed = *fed, decoded = *decoded, "VT 解码节拍");
+            }
+            DecodeSeatKind::Linux => {
+                tracing::info!(fed = *fed, decoded = *decoded, "Linux 解码节拍");
             }
         }
     }

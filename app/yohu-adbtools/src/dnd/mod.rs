@@ -41,6 +41,7 @@ pub enum DndError {
     #[error(transparent)]
     Files(#[from] FileError),
     #[error("拖出已中断")]
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     Interrupted,
     #[error("拖出仅支持 Windows 与 macOS")]
     #[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
@@ -64,6 +65,7 @@ pub enum DndError {
     #[cfg_attr(not(windows), allow(dead_code))]
     OleFailed,
     #[error("拖出宿主调度失败")]
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     Host,
 }
 

@@ -154,8 +154,11 @@ describe("会话不在这台设备只判一次", () => {
 
 describe("清空面板只写一次", () => {
   it("clear_panel_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "workspace.ts"), "utf8");
-    const needle = "writePanel(idx, " + "EMPTY_VIEW_ROWS, 0)";
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "workspace.ts"), "utf8").replaceAll(
+      "\r\n",
+      "\n",
+    );
+    const needle = "visible: " + "EMPTY_VIEW_ROWS,\n      signalCount: 0,\n      pendingCount: 0";
     expect(body.split(needle).length - 1).toBe(1);
     expect(body).toContain("clearPanel(");
   });

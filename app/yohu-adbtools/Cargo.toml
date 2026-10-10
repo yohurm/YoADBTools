@@ -31,7 +31,15 @@ yohu-logsrv.workspace = true
 yohu-files.workspace = true
 yohu-mirror.workspace = true
 yohu-update.workspace = true
+yohu-download.workspace = true
+bzip2 = "0.5"
 png = "0.17"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+libc = "0.2"
+pango = "0.18"
+pangocairo = "0.18"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"

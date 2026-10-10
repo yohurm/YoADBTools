@@ -172,10 +172,10 @@ export function UpdateDialogs(props: {
             </Show>
             <YoButton loading={applying()} disabled={applying()} onClick={() => void installUpdate()}>
               {applying()
-                ? settingsStore.macosHost()
+                ? settingsStore.macosHost() || settingsStore.linuxHost()
                   ? "正在打开…"
                   : "正在安装…"
-                : settingsStore.macosHost()
+                : settingsStore.macosHost() || settingsStore.linuxHost()
                   ? "打开安装包"
                   : "安装并重启"}
             </YoButton>
@@ -186,7 +186,9 @@ export function UpdateDialogs(props: {
           <p class="yohu-settings__update-copy">
             {settingsStore.macosHost()
               ? `已下载 ${pendingVersion()}。将打开 DMG，请拖入应用程序文件夹。`
-              : `已下载 ${pendingVersion()}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
+              : settingsStore.linuxHost()
+                ? `已下载 ${pendingVersion()}。将打开 .deb 安装包，请用系统软件安装器完成安装。`
+                : `已下载 ${pendingVersion()}。安装将关闭应用并覆盖当前版本，完成后自动启动。`}
           </p>
           <Show when={applying()}>
             <p class={progressTextClass()}>正在覆盖安装，应用即将重启…</p>

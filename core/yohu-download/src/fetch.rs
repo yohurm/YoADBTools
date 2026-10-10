@@ -58,6 +58,7 @@ pub async fn fetch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::DownloadError;
     use crate::policy::assert_http_url;
     use crate::verify::sha256_hex;
     #[tokio::test]
@@ -89,10 +90,72 @@ mod tests {
             headers: vec![],
             expected_size: body.len() as u64,
             expected_sha256: sha,
+            allowed_hosts: Vec::new(),
         };
         let out = fetch(spec, CancellationToken::new(), |_| {}).await.unwrap();
         assert_eq!(out.path, dest);
         assert_eq!(tokio::fs::read(&dest).await.unwrap(), body);
         let _ = tokio::fs::remove_file(&dest).await;
+    }
+
+    #[test]
+    fn allowlist_rejects_a_different_host() {
+        use crate::stream::final_host_allowed;
+        let cisco = vec!["ciscobinary.openh264.org".to_string()];
+        assert!(final_host_allowed(Some("ciscobinary.openh264.org"), &cisco));
+        assert!(!final_host_allowed(Some("example.com"), &cisco));
+        assert!(!final_host_allowed(None, &cisco));
+        assert!(final_host_allowed(Some("example.com"), &[]));
+    }
+
+    #[tokio::test]
+    async fn redirect_off_the_allowlist_does_not_write() {
+        let foreign = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let foreign_addr = foreign.local_addr().unwrap();
+        let body = b"should-not-land";
+        tokio::spawn(async move {
+            let (mut sock, _) = foreign.accept().await.unwrap();
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut buf = vec![0u8; 2048];
+            let _ = sock.read(&mut buf).await;
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = sock.write_all(header.as_bytes()).await;
+            let _ = sock.write_all(body).await;
+        });
+
+        let gate = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let gate_addr = gate.local_addr().unwrap();
+        let location = format!("http://{foreign_addr}/pkg.bin");
+        tokio::spawn(async move {
+            let (mut sock, _) = gate.accept().await.unwrap();
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut buf = vec![0u8; 2048];
+            let _ = sock.read(&mut buf).await;
+            let header = format!(
+                "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let _ = sock.write_all(header.as_bytes()).await;
+        });
+
+        let dest =
+            std::env::temp_dir().join(format!("yohu-dl-{}-redirect.bin", std::process::id()));
+        let _ = tokio::fs::remove_file(&dest).await;
+        let spec = DownloadSpec {
+            url: format!("http://{gate_addr}/start"),
+            dest: dest.clone(),
+            user_agent: "YohuDownload/test".into(),
+            headers: vec![],
+            expected_size: body.len() as u64,
+            expected_sha256: "unused".into(),
+            allowed_hosts: vec!["ciscobinary.openh264.org".into()],
+        };
+        let err = fetch(spec, CancellationToken::new(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(err, DownloadError::InvalidUrl);
+        assert!(!tokio::fs::try_exists(&dest).await.unwrap());
     }
 }

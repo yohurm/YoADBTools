@@ -115,7 +115,17 @@ async fn all_candidates_fail_is_candidates_failed() {
     let resource_dir = data_dir.join("res");
     let broken =
         isolated_fake_adb(r#"{ "devices_exit_code": 1, "devices_stderr": "adb: no daemon" }"#);
-    let tool = ToolResolver::new(Some(broken), resource_dir, data_dir.join("tools"));
+    let tools = data_dir.join("tools");
+    // Linux 的候选表在 sidecar 缺失时会扫本机 SDK。测试给空搜索面，不能读到运行机的 adb。
+    #[cfg(target_os = "linux")]
+    let tool = ToolResolver::with_system_search(
+        Some(broken),
+        resource_dir,
+        tools,
+        yohu_adb::AdbSearch::empty(),
+    );
+    #[cfg(not(target_os = "linux"))]
+    let tool = ToolResolver::new(Some(broken), resource_dir, tools);
     let client = AdbClient::new(tool, 4);
     let err = client
         .devices_resilient(CancellationToken::new())

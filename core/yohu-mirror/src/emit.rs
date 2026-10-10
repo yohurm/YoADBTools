@@ -22,6 +22,8 @@ pub async fn emit_live(
             codec: codec.to_string(),
             control,
             error: None,
+            hole_title: None,
+            hole_body: None,
         })
         .await;
 }
@@ -43,6 +45,8 @@ pub async fn emit_terminal_state(
             codec: String::new(),
             control: false,
             error,
+            hole_title: None,
+            hole_body: None,
         })
         .await;
 }

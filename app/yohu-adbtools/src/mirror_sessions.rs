@@ -41,6 +41,7 @@ pub fn snapshot(state: &AppState) -> Vec<MirrorSessionSnapshot> {
         .map(|row| {
             let (has_frame, painted_fps) = state.present.paint_for(&row.serial, row.generation);
             let (paused, fullscreen) = state.present.replay_flags(&row.serial);
+            let (present_bind, hole_title, hole_body) = state.present.hole_for(&row.serial);
             MirrorSessionSnapshot {
                 serial: row.serial,
                 generation: row.generation,
@@ -54,6 +55,9 @@ pub fn snapshot(state: &AppState) -> Vec<MirrorSessionSnapshot> {
                 paused,
                 fullscreen,
                 error: None,
+                present_bind,
+                hole_title,
+                hole_body,
             }
         })
         .collect()

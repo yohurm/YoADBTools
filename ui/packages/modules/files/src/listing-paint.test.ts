@@ -8,23 +8,33 @@ import {
   listingPaint,
   listingPaintIsCold,
   listingPaintIsEmpty,
+  listingPaintIsFault,
   listingPaintIsRows,
 } from "./listing-paint";
 
 describe("listingPaint", () => {
-  it("有行就画表，即使正在后台对账", () => {
-    expect(listingPaint(3, true, true)).toBe("rows");
-    expect(listingPaint(1, true, false)).toBe("rows");
+  it("有行就画表，即使正在后台对账或这次失败", () => {
+    expect(listingPaint(3, true, true, false)).toBe("rows");
+    expect(listingPaint(1, true, false, false)).toBe("rows");
+    expect(listingPaint(2, false, false, true)).toBe("rows");
   });
 
-  it("无行且不在飞只表示空目录", () => {
-    expect(listingPaint(0, false, false)).toBe("empty");
-    expect(listingPaint(0, false, true)).toBe("empty");
+  it("无行且不在飞、没有失败，只表示空目录", () => {
+    expect(listingPaint(0, false, false, false)).toBe("empty");
+    expect(listingPaint(0, false, true, false)).toBe("empty");
   });
 
-  it("冷启动才全屏 loading；导航 miss 是 pending", () => {
-    expect(listingPaint(0, true, true)).toBe("cold");
-    expect(listingPaint(0, true, false)).toBe("pending");
+  it("冷启动才全屏 loading；导航 miss 是 pending；在飞不画失败", () => {
+    expect(listingPaint(0, true, true, false)).toBe("cold");
+    expect(listingPaint(0, true, false, false)).toBe("pending");
+    expect(listingPaint(0, true, false, true)).toBe("pending");
+  });
+
+  it("失败且没有行才是 fault，不画成空目录", () => {
+    expect(listingPaint(0, false, false, true)).toBe("fault");
+    expect(listingPaint(0, false, true, true)).toBe("fault");
+    expect(listingPaintIsFault("fault")).toBe(true);
+    expect(listingPaintIsFault("empty")).toBe(false);
   });
 });
 
@@ -53,10 +63,12 @@ describe("清单相位只在绘制模块判定", () => {
       body = body.replaceAll('return paint === "rows"', "");
       body = body.replaceAll('return paint === "cold"', "");
       body = body.replaceAll('return paint === "empty"', "");
+      body = body.replaceAll('return paint === "fault"', "");
       expect(body, name).not.toContain('paint === "rows"');
       expect(body, name).not.toContain('paint === "cold"');
       expect(body, name).not.toContain('paint === "empty"');
       expect(body, name).not.toContain('paint === "pending"');
+      expect(body, name).not.toContain('paint === "fault"');
       expect(body, name).not.toContain('paint() === "rows"');
       expect(body, name).not.toContain('paint() === "cold"');
       expect(body, name).not.toContain('paint() === "empty"');
