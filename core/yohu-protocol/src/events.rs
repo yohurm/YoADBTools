@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogBatch, MirrorSessionState,
+    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogBatch, LogHits, MirrorSessionState,
     ProcessIndexSnapshot, TransferProgress, UpdateProgress,
 };
 
@@ -55,6 +55,7 @@ pub enum AppEvent {
         status: DeviceStatus,
     },
     LogBatch(LogBatchPayload),
+    LogHits(LogHits),
     LogOverflow {
         serial: String,
         dropped_batches: u64,
@@ -108,6 +109,7 @@ pub mod event_names {
     pub const DEVICE_OFFLINE: &str = "device/offline";
     pub const DEVICE_STATUS: &str = "device/status";
     pub const LOG_LINES: &str = "log/lines";
+    pub const LOG_HITS: &str = "log/hits";
     pub const LOG_OVERFLOW: &str = "log/overflow";
     pub const PROCESS_INDEX: &str = "log/processIndex";
     pub const CAPTURE_STATE: &str = "log/captureState";
@@ -129,6 +131,7 @@ impl AppEvent {
             AppEvent::DeviceOffline { .. } => DEVICE_OFFLINE,
             AppEvent::DeviceStatus { .. } => DEVICE_STATUS,
             AppEvent::LogBatch(_) => LOG_LINES,
+            AppEvent::LogHits(_) => LOG_HITS,
             AppEvent::LogOverflow { .. } => LOG_OVERFLOW,
             AppEvent::ProcessIndex(_) => PROCESS_INDEX,
             AppEvent::CaptureState { .. } => CAPTURE_STATE,
@@ -228,7 +231,7 @@ mod tests {
         let v = serde_json::to_value(&event).expect("serialize");
         assert_eq!(v["kind"], "settingsChanged");
         assert_eq!(v["key"], "buffer_capacity");
-        assert_eq!(v["settings"]["buffer_capacity"], 10_000);
+        assert_eq!(v["settings"]["buffer_capacity"], 100_000);
     }
 
     #[test]
