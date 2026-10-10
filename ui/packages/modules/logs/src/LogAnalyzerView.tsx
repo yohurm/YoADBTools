@@ -589,6 +589,7 @@ export function LogAnalyzerView(props: DeviceSession) {
                     paused={() =>
                       Boolean(live()?.paused)
                     }
+                    docShift={() => live()?.docShift ?? 0}
                     documentRef={(doc) => {
                       activeDoc = doc;
                     }}

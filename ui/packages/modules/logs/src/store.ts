@@ -1,8 +1,8 @@
 /**
  * 日志模块门面：工作区 + 窗口扇出 + 采集客户端。只依赖 @yohu/api。
- * 焦点由 View 经 bindSerial 注入默认设备；窗口/过滤/可见区在消费端（ADR-v6-006）。
- * 显示面板只由 workspace 写入。ingest 只推进镜像。
- * close / resumeFollow 以 capture 为准（先停采 / 再补快照）。
+ * 焦点由 View 经 bindSerial 注入默认设备；过滤定义在消费端，命中索引在环旁边（ADR-v6-041）。
+ * 显示面板只由 workspace 写入当前页。
+ * close / resumeFollow 以 capture 为准（先停采 / 再要尾页）。
  */
 
 import { createStore } from "solid-js/store";
@@ -10,7 +10,6 @@ import { APP_SETTINGS_DEFAULT } from "@yohu/api";
 
 import { createCapture } from "./capture";
 import { createIngest } from "./ingest";
-import { MirrorBank } from "./mirror";
 import { createWorkspace, type LogSessionState, type LogUiState } from "./workspace";
 
 export type { DeviceUiState, LogSessionState } from "./workspace";
@@ -25,14 +24,12 @@ export function createLogStore() {
     bufferCapacity: APP_SETTINGS_DEFAULT.buffer_capacity,
   });
 
-  const mirrors = new MirrorBank(APP_SETTINGS_DEFAULT.buffer_capacity);
-  const workspace = createWorkspace(state, setState, mirrors);
-  const ingest = createIngest(mirrors, workspace);
-  const capture = createCapture(state, setState, mirrors, workspace, ingest);
+  const workspace = createWorkspace(state, setState);
+  const ingest = createIngest(workspace);
+  const capture = createCapture(state, setState, workspace, ingest);
 
   return {
     state,
-    mirrors,
     ensureSession: workspace.ensureSession,
     createSession: workspace.createSession,
     renameSession: workspace.renameSession,
@@ -48,7 +45,6 @@ export function createLogStore() {
     flushPanel: workspace.flushPanel,
     flushDevicePanels: workspace.flushDevicePanels,
     setFollowing: workspace.setFollowing,
-    detachFollow: workspace.detachFollow,
     ...capture,
   };
 }

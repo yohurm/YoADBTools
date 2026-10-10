@@ -95,14 +95,12 @@ describe("采集停止只记一次", () => {
   });
 });
 
-describe("从游标回放只写一次", () => {
-  it("replay_from_cursor_once", () => {
+describe("当前页只向窗口索引要一次", () => {
+  it("load_page_once", () => {
     const body = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "capture.ts"), "utf8");
-    const replay = "logReplay({ serial: device, from_seq: from, limit: " + "bufferCapacity() })";
-    const cursor = "mirrors.of(device)." + "nextSeq()";
-    expect(body.split(replay).length - 1).toBe(1);
-    expect(body.split(cursor).length - 1).toBe(1);
-    expect(body).toContain("replayFromCursor(");
+    expect(body.split("async function loadPage").length - 1).toBe(1);
+    expect(body).toContain("logWindowBind(");
+    expect(body).not.toContain("mirrors.of(");
   });
 });
 

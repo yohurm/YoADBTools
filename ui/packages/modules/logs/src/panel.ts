@@ -171,7 +171,7 @@ export function projectWindow(opts: {
 }
 
 /**
- * 入镜 / 补洞。暂停丢弃；未跟滚只加 pending；跟滚按 seq 追加。
+ * 入镜 / 补洞。暂停丢弃。未跟滚仍把正文写入文档并累计 pending，视口不跟。
  * 无新行且跟滚中：把 pending 清零（尾部已对齐）。
  */
 export function applyAppend(opts: {
@@ -202,9 +202,10 @@ export function applyAppend(opts: {
     };
   }
   if (!following) {
+    const visible = appendLines(opts.visible, fresh, opts.cap);
     return {
-      visible: trimRows(opts.visible, opts.cap),
-      signalCount: signalCountOf(opts.visible),
+      visible,
+      signalCount: signalCountOf(visible),
       pendingCount: opts.pendingCount + fresh.length,
     };
   }

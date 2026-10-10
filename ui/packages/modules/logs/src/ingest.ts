@@ -1,21 +1,19 @@
 /**
- * 设备批次入镜像。面板写入一律交给 workspace.onDeviceLines，禁止在此改 visible。
+ * 窗口命中入当前页。禁止在此持有全文。
  */
 
-import type { LogBatch } from "@yohu/api";
+import type { LogHits } from "@yohu/api";
 
-import type { MirrorBank } from "./mirror";
 import type { WorkspaceApi } from "./workspace";
 
 export type IngestApi = {
-  onBatch: (batch: LogBatch) => void;
+  onHits: (hits: LogHits) => void;
 };
 
-export function createIngest(mirrors: MirrorBank, workspace: WorkspaceApi): IngestApi {
+export function createIngest(workspace: WorkspaceApi): IngestApi {
   return {
-    onBatch(batch: LogBatch): void {
-      mirrors.of(batch.serial).pushBatch(batch);
-      workspace.onDeviceLines(batch.serial, batch.lines);
+    onHits(hits: LogHits): void {
+      workspace.applyHits(hits);
     },
   };
 }
