@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, ReplayRequest};
+use yohu_protocol::{AppEvent, LogFilter, LogWindowBind, ReplayRequest};
 
 /// 定位 fake-adb：workspace member 的明文 bin 位于
 /// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
@@ -107,7 +107,7 @@ async fn collect_lines(
     let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
     while lines.len() < want && tokio::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
-            Ok(Some(AppEvent::LogBatch(payload))) => lines.extend(payload.batch.lines),
+            Ok(Some(AppEvent::LogHits(hits))) => lines.extend(hits.tail),
             Ok(Some(_)) => {}
             Ok(None) => break,
             Err(_) => {}
@@ -120,6 +120,14 @@ async fn collect_lines(
 async fn capture_streams_parses_and_batches() {
     let (service, mut rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
 
+    service.bind_window(LogWindowBind {
+        id: 1,
+        serial: "R58M1234A".into(),
+        filter: LogFilter::default(),
+        from_seq: 0,
+        following: true,
+        through_seq: None,
+    });
     service.start("R58M1234A", false).await.expect("开始采集");
 
     let lines = collect_lines(&mut rx, 3).await;

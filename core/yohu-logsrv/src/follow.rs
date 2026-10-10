@@ -17,6 +17,7 @@ use crate::assembler::MessageAssembler;
 use crate::batch::Batcher;
 use crate::ring::{ResumeSkip, RingBuffer};
 use crate::task::AbortOnDrop;
+use crate::windows::WindowBook;
 use yohu_adb::{AdbClient, AdbError};
 use yohu_protocol::LogLine;
 
@@ -54,16 +55,39 @@ fn skip_resume(skip: &ResumeSkip, line: &LogLine) -> bool {
     })
 }
 
-async fn emit(ring: &RingBuffer, batcher: &Batcher, mut line: LogLine) -> Result<(), ()> {
-    line.seq = ring.push(line.clone());
-    batcher.feed(line).await
+fn follow_resumes(end: FollowEnd) -> bool {
+    matches!(end, FollowEnd::Exited { .. } | FollowEnd::Error)
+}
+
+/// 行的所有权交给环。只有钉底窗口才为这一页克隆正文。
+async fn emit(
+    ring: &RingBuffer,
+    book: &WindowBook,
+    batcher: &Batcher,
+    serial: &str,
+    line: LogLine,
+) -> Result<(), ()> {
+    let prepared = book.prepare(serial, &line);
+    let pushed = ring.push(line);
+    let wire = if prepared.needs_body() {
+        ring.lines_by_seq(&[pushed.seq]).into_iter().next()
+    } else {
+        None
+    };
+    let notes = book.commit(serial, pushed.seq, pushed.oldest, prepared, wire);
+    for note in notes {
+        batcher.note(note).await?;
+    }
+    Ok(())
 }
 
 /// 续流重复行丢掉；墙钟往前走就清掉跳过集，然后入环。
 async fn admit_line(
     skip: &mut Option<ResumeSkip>,
     ring: &RingBuffer,
+    book: &WindowBook,
     batcher: &Batcher,
+    serial: &str,
     line: LogLine,
 ) -> Result<(), ()> {
     if skip
@@ -75,7 +99,7 @@ async fn admit_line(
     if skip.as_ref().is_some_and(|known| line.ts != known.ts) {
         *skip = None;
     }
-    emit(ring, batcher, line).await
+    emit(ring, book, batcher, serial, line).await
 }
 
 fn classify(result: &Result<i32, AdbError>, slot_cancelled: bool) -> FollowEnd {
@@ -104,6 +128,7 @@ pub(crate) async fn run_follow(
     adb: Arc<AdbClient>,
     serial: String,
     ring: Arc<RingBuffer>,
+    book: Arc<WindowBook>,
     batcher: Batcher,
     cancel: CancellationToken,
     resume: bool,
@@ -112,7 +137,9 @@ pub(crate) async fn run_follow(
     let since = skip.as_ref().map(|s| s.ts.clone());
     let (line_tx, mut line_rx) = mpsc::channel::<String>(1024);
     let ring_pump = Arc::clone(&ring);
+    let book_pump = Arc::clone(&book);
     let batcher_pump = batcher.clone();
+    let serial_pump = serial.clone();
     let pump = AbortOnDrop::new(tokio::spawn(async move {
         let mut assembler = MessageAssembler::new();
         let mut skip = skip;
@@ -123,7 +150,7 @@ pub(crate) async fn run_follow(
                         break;
                     };
                     for line in assembler.ingest(&raw) {
-                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
+                        if admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line)
                             .await
                             .is_err()
                         {
@@ -133,7 +160,7 @@ pub(crate) async fn run_follow(
                 }
                 _ = tokio::time::sleep(LAST_MESSAGE_DELAY), if assembler.has_pending() => {
                     if let Some(line) = assembler.take() {
-                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
+                        if admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line)
                             .await
                             .is_err()
                         {
@@ -144,7 +171,7 @@ pub(crate) async fn run_follow(
             }
         }
         if let Some(line) = assembler.take() {
-            let _ = admit_line(&mut skip, &ring_pump, &batcher_pump, line).await;
+            let _ = admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line).await;
         }
     }));
 
@@ -182,6 +209,7 @@ pub(crate) async fn supervise_follow(
     adb: Arc<AdbClient>,
     serial: String,
     ring: Arc<RingBuffer>,
+    book: Arc<WindowBook>,
     batcher: Batcher,
     cancel: CancellationToken,
 ) -> FollowEnd {
@@ -192,25 +220,26 @@ pub(crate) async fn supervise_follow(
             Arc::clone(&adb),
             serial.clone(),
             Arc::clone(&ring),
+            Arc::clone(&book),
             batcher.clone(),
             attempt,
             resume,
         )
         .await;
-        match end {
-            FollowEnd::Cancelled | FollowEnd::Offline => return end,
-            FollowEnd::Exited { .. } | FollowEnd::Error => {
-                if cancel.is_cancelled() {
-                    return FollowEnd::Cancelled;
-                }
-                resume = true;
-                tracing::info!(serial = %serial, "采集跟流同世代重启");
-                tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => return FollowEnd::Cancelled,
-                    _ = tokio::time::sleep(FOLLOW_RESTART_WAIT) => {}
-                }
-            }
+        if !follow_resumes(end) || cancel.is_cancelled() {
+            return if cancel.is_cancelled() {
+                FollowEnd::Cancelled
+            } else {
+                end
+            };
+        }
+        resume = true;
+        let resume_ts = ring.resume_skip().map(|skip| skip.ts);
+        tracing::info!(serial = %serial, resume_ts = resume_ts.as_deref().unwrap_or(""), "采集跟流同世代重启");
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return FollowEnd::Cancelled,
+            _ = tokio::time::sleep(FOLLOW_RESTART_WAIT) => {}
         }
     }
 }
@@ -250,6 +279,33 @@ mod tests {
         );
         assert_eq!(classify(&Ok(0), false), FollowEnd::Exited { code: 0 });
         assert_eq!(classify(&Ok(0), true), FollowEnd::Cancelled);
+    }
+
+    #[test]
+    fn bad_exit_255_resumes_without_clearing_the_slot() {
+        let end = classify(
+            &Err(AdbError::BadExit {
+                exit_code: 255,
+                stderr: String::new(),
+            }),
+            false,
+        );
+        assert_eq!(end, FollowEnd::Error);
+        assert!(follow_resumes(end));
+        assert!(!follow_resumes(FollowEnd::Offline));
+        assert!(!follow_resumes(FollowEnd::Cancelled));
+        let src = include_str!("follow.rs");
+        let emit = src
+            .split("async fn emit")
+            .nth(1)
+            .expect("emit")
+            .split("async fn admit_line")
+            .next()
+            .expect("emit body");
+        assert!(
+            !emit.contains("line.clone()"),
+            "入环不得再克隆整行"
+        );
     }
 
     #[test]

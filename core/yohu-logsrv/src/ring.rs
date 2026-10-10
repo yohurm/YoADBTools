@@ -5,15 +5,36 @@
 //! - 导出/重放永远基于本缓冲快照（与推送通道状态无关 → 数据不丢）
 //! - 过滤不在本环：导出在 `export` 调 domain `log_filter_matches`
 
-use std::collections::VecDeque;
-use std::sync::{Mutex, MutexGuard};
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use yohu_protocol::LogLine;
 
+/// 环内一行。Tag / App 驻留，消息正文只存一份。
+struct StoredLine {
+    seq: u64,
+    ts: String,
+    pid: u32,
+    tid: u32,
+    uid: Option<String>,
+    app: Option<Arc<str>>,
+    level: char,
+    tag: Arc<str>,
+    msg: String,
+}
+
 struct State {
-    buf: VecDeque<LogLine>,
+    buf: VecDeque<StoredLine>,
     next_seq: u64,
     capacity: usize,
+    tags: HashMap<String, Arc<str>>,
+    apps: HashMap<String, Arc<str>>,
+}
+
+/// 写入结果。`oldest` 是淘汰后仍在环内的最小 seq。
+pub(crate) struct Pushed {
+    pub seq: u64,
+    pub oldest: u64,
 }
 
 /// 环容量至少为 1。采集服务存的也是这一把。
@@ -28,12 +49,35 @@ impl State {
         }
     }
 
+    fn intern(pool: &mut HashMap<String, Arc<str>>, value: String) -> Arc<str> {
+        if let Some(existing) = pool.get(&value) {
+            return Arc::clone(existing);
+        }
+        let arc: Arc<str> = Arc::from(value.as_str());
+        pool.insert(value, Arc::clone(&arc));
+        arc
+    }
+
+    fn to_wire(line: &StoredLine) -> LogLine {
+        LogLine {
+            seq: line.seq,
+            ts: line.ts.clone(),
+            pid: line.pid,
+            tid: line.tid,
+            uid: line.uid.clone(),
+            app: line.app.as_ref().map(|s| s.to_string()),
+            level: line.level,
+            tag: line.tag.to_string(),
+            msg: line.msg.clone(),
+        }
+    }
+
     fn lines_from(&self, from_seq: u64, limit: usize) -> Vec<LogLine> {
         self.buf
             .iter()
-            .filter(|line| line.seq >= from_seq)
+            .filter(|line| from_seq <= line.seq)
             .take(limit)
-            .cloned()
+            .map(Self::to_wire)
             .collect()
     }
 }
@@ -59,9 +103,11 @@ impl RingBuffer {
         let capacity = ring_capacity(capacity);
         Self {
             inner: Mutex::new(State {
-                buf: VecDeque::with_capacity(capacity.min(4096)),
+                buf: VecDeque::with_capacity(capacity),
                 next_seq: 0,
                 capacity,
+                tags: HashMap::new(),
+                apps: HashMap::new(),
             }),
         }
     }
@@ -74,15 +120,72 @@ impl RingBuffer {
         state.evict_overflow();
     }
 
-    /// 写入一条 logd 记录（分配 seq）；返回该记录 seq。
-    pub(crate) fn push(&self, mut line: LogLine) -> u64 {
+    /// 写入一条 logd 记录（分配 seq）。所有权留在环内，Tag / App 驻留。
+    pub(crate) fn push(&self, line: LogLine) -> Pushed {
         let mut state = self.lock_state();
         let seq = state.next_seq;
-        line.seq = seq;
-        state.buf.push_back(line);
+        let tag = State::intern(&mut state.tags, line.tag);
+        let app = line.app.map(|value| State::intern(&mut state.apps, value));
+        state.buf.push_back(StoredLine {
+            seq,
+            ts: line.ts,
+            pid: line.pid,
+            tid: line.tid,
+            uid: line.uid,
+            app,
+            level: line.level,
+            tag,
+            msg: line.msg,
+        });
         state.evict_overflow();
         state.next_seq += 1;
-        seq
+        let oldest = state.buf.front().map(|l| l.seq).unwrap_or(seq);
+        Pushed { seq, oldest }
+    }
+
+    /// 按序号取正文。环内序号连续，下标是 `seq - 最旧序号`。
+    pub(crate) fn lines_by_seq(&self, seqs: &[u64]) -> Vec<LogLine> {
+        if seqs.is_empty() {
+            return Vec::new();
+        }
+        let state = self.lock_state();
+        let Some(oldest) = state.buf.front().map(|line| line.seq) else {
+            return Vec::new();
+        };
+        let mut out = Vec::with_capacity(seqs.len());
+        for seq in seqs {
+            let Some(offset) = seq.checked_sub(oldest) else {
+                continue;
+            };
+            let Some(line) = state.buf.get(offset as usize) else {
+                continue;
+            };
+            if line.seq == *seq {
+                out.push(State::to_wire(line));
+            }
+        }
+        out
+    }
+
+    /// 从 `from_seq` 起遍历，供窗口登记重建索引。回调里的行是临时线拷贝。
+    pub(crate) fn for_each_from(&self, from_seq: u64, mut visit: impl FnMut(&LogLine)) {
+        let state = self.lock_state();
+        for line in state.buf.iter().filter(|line| from_seq <= line.seq) {
+            let wire = State::to_wire(line);
+            visit(&wire);
+        }
+    }
+
+    /// 同一 Tag 驻留为同一份 `Arc`。
+    #[cfg(test)]
+    pub(crate) fn tag_ptr_eq(&self, seq_a: u64, seq_b: u64) -> bool {
+        let state = self.lock_state();
+        let a = state.buf.iter().find(|l| l.seq == seq_a);
+        let b = state.buf.iter().find(|l| l.seq == seq_b);
+        match (a, b) {
+            (Some(a), Some(b)) => Arc::ptr_eq(&a.tag, &b.tag),
+            _ => false,
+        }
     }
 
     /// 快照：从指定序号起的前 `limit` 条记录（回补用）。
@@ -135,7 +238,7 @@ impl RingBuffer {
             .buf
             .iter()
             .filter(|l| l.ts == ts)
-            .map(|l| (l.pid, l.tid, l.tag.clone(), l.msg.clone()))
+            .map(|l| (l.pid, l.tid, l.tag.to_string(), l.msg.clone()))
             .collect();
         Some(ResumeSkip { ts, identities })
     }
@@ -166,8 +269,8 @@ mod tests {
     #[test]
     fn assigns_monotonic_seq() {
         let ring = RingBuffer::new(10);
-        assert_eq!(ring.push(line(999)), 0);
-        assert_eq!(ring.push(line(999)), 1);
+        assert_eq!(ring.push(line(999)).seq, 0);
+        assert_eq!(ring.push(line(999)).seq, 1);
         assert_eq!(ring.last_seq(), 1);
     }
 
@@ -203,7 +306,7 @@ mod tests {
         ring.push(line(0));
         ring.clear();
         assert!(ring.is_empty());
-        assert_eq!(ring.push(line(0)), 1);
+        assert_eq!(ring.push(line(0)).seq, 1);
     }
 
     #[test]
@@ -252,6 +355,26 @@ mod tests {
         assert_eq!(skip.identities, vec![(2, 2, "B".into(), "new".into())]);
         ring.clear();
         assert!(ring.resume_skip().is_none());
+    }
+
+    #[test]
+    fn repeated_tag_is_one_arc() {
+        let ring = RingBuffer::new(10);
+        let a = ring
+            .push(LogLine {
+                tag: "ActivityManager".into(),
+                msg: "one".into(),
+                ..LogLine::default()
+            })
+            .seq;
+        let b = ring
+            .push(LogLine {
+                tag: "ActivityManager".into(),
+                msg: "two".into(),
+                ..LogLine::default()
+            })
+            .seq;
+        assert!(ring.tag_ptr_eq(a, b));
     }
 
     #[test]
