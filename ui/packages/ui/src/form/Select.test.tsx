@@ -334,7 +334,7 @@ describe("YoSelect 触发布局契约", () => {
     expect(trigger).toMatch(/border-radius:\s*var\(--yohu-radius-xl\)/);
     expect(trigger).not.toMatch(/box-shadow/);
     expect(css).toMatch(/\.yohu-select__menu\s*\{[^}]*border-radius:\s*var\(--yohu-radius-md\)/);
-    const menuRow = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../menu/menu-row.css"), "utf-8");
+    const menuRow = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../context-menu/menu-row.css"), "utf-8");
     expect(menuRow).toMatch(/\.yohu-menu-well\s*\{[^}]*padding:\s*var\(--yohu-space-sm\)/);
     expect(menuRow).toMatch(/padding:\s*0 var\(--yohu-space-sm\)/);
     expect(menuRow).toMatch(/gap:\s*var\(--yohu-space-sm\)/);

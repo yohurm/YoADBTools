@@ -75,6 +75,7 @@ pub enum PresentError {
 }
 
 /// 缺文件说明里的这一句。洞上的下载按钮和「让网页盖住 GTK 子窗口」都认它。
+#[cfg(target_os = "linux")]
 pub(crate) fn openh264_download_hole(body: &str) -> bool {
     body.contains("还没有单独下载的 OpenH264")
 }

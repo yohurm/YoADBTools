@@ -3,7 +3,7 @@
  * 可选项下标、步进与 typeahead 匹配是不变式；不碰 DOM / 不解释按键。
  */
 
-import { itemIsEnabled, listEdgeIndex, stepWrappedIndex, type ListEdge } from "../keymap/list-index";
+import { itemIsEnabled, listEdgeIndex, listIndexHasSuccessor, stepWrappedIndex, type ListEdge } from "../keymap/list-index";
 
 export interface MenuListItem {
   label: string;
@@ -18,7 +18,7 @@ export function menuItemIsBranch(item: { disabled?: boolean; children?: readonly
 
 /** 项间分割线。末项没有。 */
 export function menuItemDrawsRule(index: number, count: number): boolean {
-  return index >= 0 && index < count - 1;
+  return listIndexHasSuccessor(index, count);
 }
 
 function enabledAt(enabled: readonly number[], index: number): number | null {

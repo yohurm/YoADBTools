@@ -2,19 +2,25 @@
 //!
 //! 不在进程启动时调用。不打进 `.deb`。成功只把 `libopenh264.so.7` 放进数据目录，不调用 `mirror.start`。
 
-use std::path::{Path, PathBuf};
-
 use yohu_protocol::IpcError;
 use yohu_protocol::IpcErrorCode;
 
 use crate::ipc_map::ipc_code;
 use crate::state::AppState;
 
+/// x86_64 Linux 才下载这份官方包。其它平台不编译针脚和解压，避免变成死代码。
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+use std::path::{Path, PathBuf};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const CISCO_HOST: &str = "ciscobinary.openh264.org";
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const ARCHIVE_NAME: &str = "libopenh264-2.4.1-linux64.7.so.bz2";
 /// 2026-10-10 从该主机取到的 bz2。改版本必须同时改这一行和下面的长度。
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const ARCHIVE_SHA256: &str = "ca413853d99d960ebcd5ae5b4c65a85bb2b5598e9042e64700a9f4b737ca3a3f";
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const ARCHIVE_BYTES: u64 = 633_796;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const SONAME: &str = "libopenh264.so.7";
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -165,6 +171,7 @@ fn part_path(dest: &Path) -> PathBuf {
     ))
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) fn decode_bz2(bytes: &[u8]) -> Result<Vec<u8>, String> {
     use std::io::Read;
     let mut decoder = bzip2::read::BzDecoder::new(bytes);
@@ -176,6 +183,7 @@ pub(crate) fn decode_bz2(bytes: &[u8]) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) fn install_soname(dir: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let tmp = dir.join(format!(".{SONAME}.{}.partial", std::process::id()));
@@ -188,7 +196,7 @@ pub(crate) fn install_soname(dir: &Path, bytes: &[u8]) -> Result<PathBuf, String
     Ok(dest)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux", target_arch = "x86_64"))]
 mod tests {
     use super::*;
 

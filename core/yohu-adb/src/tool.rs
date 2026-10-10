@@ -40,6 +40,9 @@ pub struct ToolResolver {
     resource_dir: PathBuf,
     /// 解压目标：`DataRoot/tools/adb/`
     data_tools_dir: PathBuf,
+    /// Linux 在 sidecar 缺失时才查的本机搜索面。测试传入空面，不读进程环境。
+    #[cfg(target_os = "linux")]
+    system_search: AdbSearch,
 }
 
 fn lock_tool<T>(result: Result<T, std::sync::PoisonError<T>>) -> T {
@@ -48,11 +51,39 @@ fn lock_tool<T>(result: Result<T, std::sync::PoisonError<T>>) -> T {
 
 impl ToolResolver {
     pub fn new(user_path: Option<PathBuf>, resource_dir: PathBuf, data_tools_dir: PathBuf) -> Self {
+        Self::from_parts(
+            user_path,
+            resource_dir,
+            data_tools_dir,
+            #[cfg(target_os = "linux")]
+            AdbSearch::from_env(),
+        )
+    }
+
+    /// 指定本机搜索面。集成测试传 [`AdbSearch::empty`]，避免读到运行机上的 `ANDROID_HOME`。
+    #[cfg(target_os = "linux")]
+    pub fn with_system_search(
+        user_path: Option<PathBuf>,
+        resource_dir: PathBuf,
+        data_tools_dir: PathBuf,
+        system_search: AdbSearch,
+    ) -> Self {
+        Self::from_parts(user_path, resource_dir, data_tools_dir, system_search)
+    }
+
+    fn from_parts(
+        user_path: Option<PathBuf>,
+        resource_dir: PathBuf,
+        data_tools_dir: PathBuf,
+        #[cfg(target_os = "linux")] system_search: AdbSearch,
+    ) -> Self {
         Self {
             user_path: Arc::new(RwLock::new(user_path)),
             preferred: Arc::new(RwLock::new(None)),
             resource_dir,
             data_tools_dir,
+            #[cfg(target_os = "linux")]
+            system_search,
         }
     }
 
@@ -109,7 +140,7 @@ impl ToolResolver {
             push(self.resource_dir.join(adb_file_name()));
             #[cfg(target_os = "linux")]
             {
-                for extra in system_adb_candidates() {
+                for extra in discover_adb(&self.system_search) {
                     push(extra);
                 }
             }
@@ -180,17 +211,29 @@ fn usable_adb(path: &Path) -> bool {
     }
 }
 
-/// 本机 adb 搜索面。测试直接构造，运行时从环境变量读。
+/// 本机 adb 搜索面。运行时从环境变量读；测试构造空面或指定目录。
+/// 只在 Linux 存在：Windows / macOS 的 sidecar 缺失不再扫本机 SDK。
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
-struct AdbSearch {
+pub struct AdbSearch {
     android_home: Option<PathBuf>,
     android_sdk_root: Option<PathBuf>,
     home: Option<PathBuf>,
     path_entries: Vec<PathBuf>,
 }
 
+#[cfg(target_os = "linux")]
 impl AdbSearch {
-    #[cfg(target_os = "linux")]
+    /// 不查 SDK，也不扫 `PATH`。
+    pub fn empty() -> Self {
+        Self {
+            android_home: None,
+            android_sdk_root: None,
+            home: None,
+            path_entries: Vec::new(),
+        }
+    }
+
     fn from_env() -> Self {
         let path_entries = std::env::var_os("PATH")
             .map(|raw| std::env::split_paths(&raw).collect())
@@ -204,12 +247,8 @@ impl AdbSearch {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn system_adb_candidates() -> Vec<PathBuf> {
-    discover_adb(&AdbSearch::from_env())
-}
-
 /// SDK 与 `PATH` 上的可执行 `adb`。已有 sidecar 时不要调用，避免第二套 adb 抢 5037。
+#[cfg(target_os = "linux")]
 fn discover_adb(search: &AdbSearch) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut push = |p: PathBuf| {
@@ -312,10 +351,7 @@ mod tests {
             assert_eq!(fs::read_to_string(data.join(name)).unwrap(), *name);
             #[cfg(unix)]
             {
-                assert!(
-                    usable_adb(&data.join(name)),
-                    "{name} 解压后必须可执行"
-                );
+                assert!(usable_adb(&data.join(name)), "{name} 解压后必须可执行");
             }
         }
 
@@ -372,8 +408,10 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn discover_adb_reads_sdk_then_path_and_skips_non_executable() {
+        use std::os::unix::fs::PermissionsExt;
         let root = std::env::temp_dir().join(format!(
             "yohu-tool-discover-{}-{:?}",
             std::process::id(),
@@ -389,19 +427,15 @@ mod tests {
         fs::write(&sdk_adb, b"sdk").unwrap();
         fs::write(&path_adb, b"path").unwrap();
         let mut path_entries = vec![path_dir];
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let inert_dir = root.join("inert");
-            let inert = inert_dir.join(adb_file_name());
-            fs::create_dir_all(&inert_dir).unwrap();
-            fs::write(&inert, b"noexec").unwrap();
-            path_entries.push(inert_dir);
-            for path in [&sdk_adb, &path_adb] {
-                let mut perms = fs::metadata(path).unwrap().permissions();
-                perms.set_mode(0o755);
-                fs::set_permissions(path, perms).unwrap();
-            }
+        let inert_dir = root.join("inert");
+        let inert = inert_dir.join(adb_file_name());
+        fs::create_dir_all(&inert_dir).unwrap();
+        fs::write(&inert, b"noexec").unwrap();
+        path_entries.push(inert_dir);
+        for path in [&sdk_adb, &path_adb] {
+            let mut perms = fs::metadata(path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(path, perms).unwrap();
         }
 
         let found = discover_adb(&AdbSearch {

@@ -44,7 +44,7 @@ function expectCalls(name: string, calls: number): void {
 describe("立即生效文案", () => {
   it("徽章和语气比较共用这一句，保存提示不并", () => {
     expectOnce('"' + "立即" + "生效" + '"', "immediateCopy");
-    expectCalls("immediateCopy", 16);
+    expectCalls("immediateCopy", 17);
     expect(times(production(), '"' + "已保存（立即" + "生效）" + '"')).toBe(1);
   });
 });
@@ -52,7 +52,7 @@ describe("立即生效文案", () => {
 describe("已保存立即生效", () => {
   it("保存提示只留在函数体，徽章文案不并", () => {
     expectOnce('"' + "已保存（立即" + "生效）" + '"', "savedNow");
-    expectCalls("savedNow", 15);
+    expectCalls("savedNow", 16);
   });
 });
 
@@ -131,14 +131,14 @@ describe("日志列与检查更新", () => {
 describe("普通钮样式", () => {
   it("普通样式只写一次，强调和中性不并", () => {
     expectOnce('return "' + "normal" + '"', "normalStyle");
-    expectCalls("normalStyle", 8);
+    expectCalls("normalStyle", 9);
   });
 });
 
 describe("中性语气", () => {
   it("中性语气只写一次，强调不并", () => {
     expectOnce('return "' + "neutral" + '"', "neutralTone");
-    expectCalls("neutralTone", 8);
+    expectCalls("neutralTone", 9);
   });
 });
 
@@ -152,7 +152,7 @@ describe("强调语气", () => {
 describe("小号尺寸", () => {
   it("小号只写一次", () => {
     expectOnce('return "' + "sm" + '"', "smSize");
-    expectCalls("smSize", 5);
+    expectCalls("smSize", 6);
   });
 });
 

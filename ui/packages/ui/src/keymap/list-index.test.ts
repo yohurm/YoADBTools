@@ -13,6 +13,7 @@ import {
   enterKey,
   listActivateKey,
   listEdgeIndex,
+  listIndexHasSuccessor,
   tabKey,
   listEdgeIsStart,
   listEdgeKey,
@@ -48,6 +49,10 @@ describe("clampListIndex", () => {
     expect(listEdgeIndex(3, "start")).toBe(0);
     expect(listEdgeIndex(3, "end")).toBe(2);
     expect(listEdgeIndex(0, "end")).toBe(-1);
+    expect(listIndexHasSuccessor(0, 3)).toBe(true);
+    expect(listIndexHasSuccessor(2, 3)).toBe(false);
+    expect(listIndexHasSuccessor(-1, 3)).toBe(false);
+    expect(listIndexHasSuccessor(0, 0)).toBe(false);
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
     for (const src of productionSources(root)) {
       expect(src).not.toContain('edge === "start"');

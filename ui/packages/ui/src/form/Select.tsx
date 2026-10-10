@@ -23,7 +23,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount }
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
-import "../menu/menu-row.css";
+import "../context-menu/menu-row.css";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";

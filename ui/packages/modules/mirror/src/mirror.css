@@ -43,7 +43,6 @@
   gap: var(--yohu-space-xs);
   padding: var(--yohu-space-lg);
   text-align: center;
-  background: var(--yohu-surface);
   color: var(--yohu-fg);
 }
 

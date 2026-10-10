@@ -7,9 +7,9 @@ function phaseIsLive(state: { phase: string }): boolean {
   return mirrorIsLive(state.phase);
 }
 
-/** 呈现绑定失败。没有表面时暂停、全屏和指针都不该亮。 */
+/** 呈现绑定失败。没有表面时暂停、全屏和指针都不该亮。失败词与会话共用。 */
 export function mirrorPresentFailed(bind: string): boolean {
-  return bind === "failed";
+  return mirrorIsFailed(bind);
 }
 
 /** 有序列号且会话已在播。控制消息送到这台设备。不要求已经出画。 */

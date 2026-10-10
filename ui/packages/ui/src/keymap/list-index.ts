@@ -65,6 +65,12 @@ export function listEdgeIndex(count: number, edge: ListEdge): number {
   return listEdgeIsStart(edge) ? 0 : count - 1;
 }
 
+/** 这一项后面还有下一项。空表、负下标和末项都没有。 */
+export function listIndexHasSuccessor(index: number, count: number): boolean {
+  if (count <= 0 || index < 0) return false;
+  return index < count - 1;
+}
+
 /** 空长为 -1。其余在 [0, count) 内循环。 */
 export function stepWrappedIndex(count: number, from: number, delta: number): number {
   if (count <= 0) return -1;
