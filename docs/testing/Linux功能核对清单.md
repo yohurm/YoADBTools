@@ -56,6 +56,22 @@
 | Dest→Fill | **通过（起跳）。** 点「停止」后日志 `from_w=369 from_h=656 to_w=704 to_h=656 ms=350`。停止后约 85ms，洞中线白卡片宽 383（x=160–542），左右角仍是 canvas。再约 40ms 白区已铺满洞。这一拍洞高从 656 收到 661，Follow 按 Windows 规则改目标时不继续插值 |
 | 出画路径 | **未改。** generation=1 与 generation=2 都是 `没有 H.264 VLD，改试 OpenH264`，然后 `投屏首帧已 Present`，720×1280 |
 
+## 合入 main 之后（`298a8ca`，2026-10-10）
+
+`origin/main` 合进 `cursor/linux-support-c999` 后重新打 `.deb` 并覆盖安装。`yohu_atd34` 仍是 `-accel off`，`emulator-5554 device`。没有 `/dev/dri`。OpenH264 仍只在 `~/.local/share/YohuAdbTools/data/openh264/`，包里没有 `openh264` / `ffmpeg`。上面的旧行没有改。
+
+| 项 | 结果 |
+|----|------|
+| 设备卡片 | **通过。** 卡片 OCR 为「Android 14」「100% 充电」。扫描日志 `n=1` |
+| 终端 | **通过。** 展开后可见 `adb shell getprop ro.product.model` 等三条。点进队列「型号 · adb shell getprop ro.product.model」，发送日志是 `shell getprop ro.product.model`（不带 adb 前缀）。结果区 OCR 到 `<<<` 和 `Android SDK built for x86_64` |
+| 文件浏览 | **通过。** `files.list /sdcard` `count:17`，与 `adb shell ls /sdcard` 的 17 项一致。清单有目录和修改时间列 |
+| 安全根 | **通过。** 地址栏提交 `/data` 后提示「路径不在安全根内: /data」。没有新的 `path=/data` 浏览 |
+| 文件写入 / 拖入 / 拖出 | **未在本轮重做。** 新建、上传、下载、拖入仍以 2026-10-09 的通过行为准。拖出仍是「仅 Windows 与 macOS」，本轮没有再拖一次 |
+| 日志 | **通过。** System 页签绑定 5554。`log.capture.start` 后「采集已启动」generation=1。画面有 `beginning of kernel` / `beginning of main`。`log -t YohuMerge hello-merge-line` 出现在清单。关键字 `hello-merge` 之后清单只剩这一条。暂停钮变成「继续」。停止后钮回到「开始」 |
+| 投屏 | **通过。** 没有 H.264 VLD，OpenH264 出画。子窗口 `x=212 y=104 w=704 h=661`。`704×661 → 372×661`、300ms。首帧 `painted_fps=1`，720×1280。洞中线两侧 `(241,243,245)`，黑画面约 x=200–520。截图、暂停、返回在首帧后 sensitive。暂停后 OCR「已暂停」「画面已隐藏，点击继续」，白卡片在 contain 内、角上仍是 canvas。停止后钮回到「开始」 |
+| 设置 | **通过（未改值）。** 工具链、数据目录、终端、文件、日志、投屏、外观、关于都在。缓冲最大行数是 `100000`，徽章「窗口立即裁剪，采集环下次启动」。主题「跟随系统」，密度「舒适」。OpenH264 开关文案仍说明二进制不进安装包。检查更新日志 `os=linux arch=x86_64`，随后「已是最新版本 version=0.1.3」 |
+| 模拟器 | **保持。** qemu 仍是 `-accel off`。本轮没有关模拟器，所以无设备启动和掉线未测 |
+
 ## 安装、路径、打包
 
 | 项 | 期望 | 怎么核对 | 本次结果 |
