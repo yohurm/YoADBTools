@@ -1,6 +1,7 @@
 /**
  * 命令管理中栏：条目操作面板。
- * 与组栏同一 role=ops。功能比组栏多：多选、行菜单、名称间 hairline。
+ * 与组栏同一套行：贴齐、点按铺满、默认 Ripple 圆角、名称间 hairline。四边留白与菜单井同一档。
+ * 功能比组栏多：多选、行菜单。
  */
 
 import { YoBadge, YoIconButton, YoOpsItem, YoPanel, YoSubheader, YoToolbar, YoVirtualList, controlRowHeight, opsListBindings, pointerSelectMode } from "@yohu/ui";
@@ -31,7 +32,7 @@ export function EntryColumn(props: {
   const rowHeight = controlRowHeight();
 
   return (
-    <YoPanel class="yohu-cm__entries" variant="pane" overflow="hidden" padding="xs" role="ops" header={
+    <YoPanel class="yohu-cm__entries" variant="pane" overflow="hidden" padding="sm" role="ops" header={
       <YoToolbar pad="xs">
         <YoSubheader title={entryColumnLabel()} pad="flush" />
         <YoIconButton icon="plus" title="新增命令" onClick={() => props.store.addCommand()} />
