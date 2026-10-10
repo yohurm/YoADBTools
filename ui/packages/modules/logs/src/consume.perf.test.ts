@@ -1,7 +1,5 @@
 /**
- * 消费端过滤（filter + stack + mirror）性能回归（架构文档 §12 子集）：
- * 50k 缓冲规模 + 3 会话过滤 + 单批 1000 行过滤 < 16ms（ADR-v6-007 批量预算）。
- * 宽松上界防 CI 抖动：预算 16ms 下实际量级 ~0.1ms。
+ * 当前页格式化预算。全文不进界面；一页 80 行过滤加折叠应远小于一批 16ms。
  */
 
 import { describe, expect, it } from "vitest";
@@ -9,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { LEVELS, matchesWireFilter, type LogLine } from "@yohu/api";
 
 import { sessionWire, type SessionFilter } from "./filter";
-import { RingMirror } from "./mirror";
 import { collapseStack } from "./stack";
+import { LOG_VIEW_PAGE } from "./viewport";
 
 const line = (seq: number): LogLine => ({
   seq,
@@ -19,21 +17,8 @@ const line = (seq: number): LogLine => ({
   tid: 1,
   level: LEVELS[seq % LEVELS.length]!,
   tag: ["ActivityManager", "SystemServer", "BatteryService", "OkHttp"][seq % 4]!,
-  msg:
-    seq % 13 === 0
-      ? "FATAL EXCEPTION: main"
-      : `log message number ${seq} with some payload text for filtering performance`,
+  msg: `log message number ${seq} with some payload text for filtering performance`,
 });
-
-/** 50k 行 → 50 批（每批 1000，ADR-v6-007 上限）。 */
-function fillMirror(capacity: number): RingMirror {
-  const mirror = new RingMirror(capacity);
-  for (let start = 0; start < 50_000; start += 1000) {
-    const lines = Array.from({ length: 1000 }, (_, i) => line(start + i));
-    mirror.pushBatch({ serial: "S", from_seq: start, lines, truncated: false });
-  }
-  return mirror;
-}
 
 const sessionFilter = (over: Partial<SessionFilter>): SessionFilter => ({
   levels: ["W"],
@@ -44,56 +29,21 @@ const sessionFilter = (over: Partial<SessionFilter>): SessionFilter => ({
   ...over,
 });
 
-describe("日志管线性能回归（50k 缓冲 · 3 会话）", () => {
-  it("50k 缓冲注入后容量裁剪正确（环形保留尾部）", () => {
-    const mirror = fillMirror(50_000);
-    expect(mirror.size()).toBe(50_000);
-    expect(mirror.lastSeqNumber()).toBe(49_999);
-    const tail = mirror.replay(() => true, 5);
-    expect(tail[0]!.seq).toBe(49_995);
-  });
-
-  it("单批 1000 行过滤 + 折叠 < 16ms（ADR-v6-007 批量预算，含 10x 余量）", () => {
-    const mirror = fillMirror(50_000);
+describe("日志当前页性能", () => {
+  it("一页过滤加折叠低于一批预算", () => {
+    const page = Array.from({ length: LOG_VIEW_PAGE }, (_, seq) => line(seq));
     const filters = [
       sessionFilter({ levels: ["W"], keyword: "payload" }),
       sessionFilter({ levels: ["E"] }),
-      sessionFilter({ levels: ["V"], tagContains: "activity", scope: { kind: "package", pkg: "com.foo", includeChild: false }, pidSet: [100] }),
+      sessionFilter({ levels: ["I"] }),
     ];
-    // 预热（JIT）
-    for (const f of filters) {
-      const wire = sessionWire(f);
-      mirror.replay((l) => matchesWireFilter(l, wire), 2000);
-    }
     const start = performance.now();
     for (let i = 0; i < 50; i++) {
-      const slice = mirror.replay(() => true, 0); // 空操作对齐开销基线
-      void slice;
-      for (const f of filters) {
-        const wire = sessionWire(f);
-        const rows = mirror.replay((l) => matchesWireFilter(l, wire), 2000);
-        collapseStack(rows);
+      for (const filter of filters) {
+        const wire = sessionWire(filter);
+        collapseStack(page.filter((row) => matchesWireFilter(row, wire)));
       }
     }
-    const elapsed = performance.now() - start;
-    // 3 会话 × 50 批全量过滤；每批预算 16ms → 总预算 50×3×16 = 2400ms
-    expect(elapsed).toBeLessThan(2400);
-  });
-
-  it("3 会话过滤管线端到端（批处理 + 可见区裁剪）在预算内", () => {
-    const mirror = fillMirror(50_000);
-    const filters = [
-      sessionFilter({ levels: ["I"] }),
-      sessionFilter({ levels: ["W"], tagContains: "battery" }),
-      sessionFilter({ scope: { kind: "pid", pid: 123 }, levels: [] }),
-    ];
-    const start = performance.now();
-    for (const f of filters) {
-      const wire = sessionWire(f);
-      const rows = mirror.replay((l) => matchesWireFilter(l, wire), 2000);
-      collapseStack(rows);
-    }
-    const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(500);
+    expect(performance.now() - start).toBeLessThan(16 * 50);
   });
 });

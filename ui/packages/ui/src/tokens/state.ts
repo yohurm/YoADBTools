@@ -1,19 +1,21 @@
 /**
  * 交互态填充与选中片几何（UI设计系统-v6.md §2.7）。
- * 唯一配方：hover/pressed 中性叠色；选中 = interactive_select（品牌 20% + 正文色）。
+ * 唯一配方：hover/pressed = 官方 interactive；选中 = interactive_select。
  * 禁止表面另写选中底或选中字色。实心底留给按钮 / 开关，不进列表选中。
  */
 
+import { Harmony } from "./colors";
+
 export const StateFill = {
-  Hover: "#0000000C",
-  Pressed: "#00000019",
+  Hover: Harmony.interactiveHover.light,
+  Pressed: Harmony.interactivePressed.light,
   Selected: "var(--yohu-accent-soft)",
   SelectedFg: "var(--yohu-fg)",
 } as const;
 
 export const DarkStateFill = {
-  Hover: "#FFFFFF0C",
-  Pressed: "#FFFFFF19",
+  Hover: Harmony.interactiveHover.dark,
+  Pressed: Harmony.interactivePressed.dark,
   Selected: "var(--yohu-accent-soft)",
   SelectedFg: "var(--yohu-fg)",
 } as const;

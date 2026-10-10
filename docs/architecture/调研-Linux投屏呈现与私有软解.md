@@ -16,7 +16,7 @@
 | [030](adr/ADR-v6-030.md) §1 | 用 FFmpeg 或 OpenH264 **充当原生后端** | 没有禁止 `linux/` 内部在硬解失败后私有回退，只要 `Caps.id` 仍不是 OpenH264 |
 | 030 否决 | 本期（2026-09-05）交付 Linux 像素 | 041 已经把工作台交给 Linux。像素仍单独留着 |
 | [032](adr/ADR-v6-032.md) 否决 | libplacebo、`libswscale`、libyuv、GStreamer、zimg 进直播路径 | Linux 自己的 Convert / Scale / Present 文件。面积核已经是 Windows 的政策，不必搬 HLSL |
-| [041](adr/ADR-v6-041.md) §5 | 像素与拖出仍不交付；禁止 FFmpeg / libavcodec | 主窗 `GtkWindow` 指针就是留给以后的表面。接受 042 只改像素这一条，不改拖出，不改 FFmpeg 禁令 |
+| [043](adr/ADR-v6-043.md) §5 | 像素与拖出仍不交付；禁止 FFmpeg / libavcodec | 主窗 `GtkWindow` 指针就是留给以后的表面。接受 042 只改像素这一条，不改拖出，不改 FFmpeg 禁令 |
 
 028 否决的是「默认 CPU packed NV12 当跨平台路径」。不是「Linux 没有 DRM 就永远不出画」。
 

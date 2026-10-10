@@ -1,13 +1,13 @@
 /**
  * YoContextMenu —— 右键菜单 List 呈现（L4）。
- * 宽跟最长标签（hug），帽为 Layout.MenuMax；标签单行，超出省略。
+ * 宽跟最长标签加菜单井与字槽，帽为 Layout.MenuMax；超帽省略。
  * 有子项的条目尾槽是 chevron；指针停上或向右展开二级菜单。
  * Host 管开合与落点；本组件管槽位与键盘。页面不要直接挂：走 defineContextMenu + openContextMenu。
  */
 import { For, Show, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import type { JSX } from "solid-js";
 import type { YoMenuItem } from "./types";
-import { menuItemIsBranch, typeaheadMatchIndex } from "./menu-list-model";
+import { menuItemDrawsRule, menuItemIsBranch, typeaheadMatchIndex } from "./menu-list-model";
 import {
   MENU_TYPEAHEAD_WINDOW_MS,
   firstEnabledIndex,
@@ -22,6 +22,8 @@ import {
 } from "./menu-key-policy";
 import { itemIsEnabled } from "../keymap/list-index";
 import { YoCorner } from "../corner";
+import { presenceAttr } from "../dom/flag";
+import "../menu/menu-row.css";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { readViewport } from "../placement/viewport";
@@ -247,7 +249,8 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
           role="menu"
           style={{ left: `${props.x}px`, top: `${props.y}px` }}
         >
-          <YoCorner role="card" class="yohu-context-menu__chrome" overflow="auto" pad="block-xs">
+          <YoCorner role="card" class="yohu-context-menu__chrome" overflow="auto">
+            <div class="yohu-menu-well">
             <For each={props.items}>
               {(item, index) => {
                 const attrs = () => menuItemHostAttrs(item, index() === focusIndex(), index() === subIndex());
@@ -255,8 +258,9 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
                   <button
                     type="button"
                     role={attrs().role}
-                    class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
+                    class="yohu-context-menu__item yohu-menu-row yohu-interactive yohu-focus-ring--inset"
                     classList={{ "yohu-interactive--active": index() === subIndex() }}
+                    data-rule={presenceAttr(menuItemDrawsRule(index(), props.items.length))}
                     data-tone={attrs()["data-tone"]}
                     data-slot={attrs()["data-slot"]}
                     disabled={attrs().disabled}
@@ -290,6 +294,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
                 );
               }}
             </For>
+            </div>
           </YoCorner>
         </div>
         <Show when={submenu()}>
@@ -304,7 +309,8 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
               role="menu"
               style={{ left: `${subPoint().x}px`, top: `${subPoint().y}px` }}
             >
-              <YoCorner role="card" class="yohu-context-menu__chrome" overflow="auto" pad="block-xs">
+              <YoCorner role="card" class="yohu-context-menu__chrome" overflow="auto">
+                <div class="yohu-menu-well">
                 <For each={parent().children ?? []}>
                   {(child, index) => {
                     const attrs = () => menuItemHostAttrs(child, subKeyboard() && index() === subFocus());
@@ -312,7 +318,8 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
                       <button
                         type="button"
                         role={attrs().role}
-                        class="yohu-context-menu__item yohu-interactive yohu-focus-ring--inset"
+                        class="yohu-context-menu__item yohu-menu-row yohu-interactive yohu-focus-ring--inset"
+                        data-rule={presenceAttr(menuItemDrawsRule(index(), parent().children?.length ?? 0))}
                         data-tone={attrs()["data-tone"]}
                         data-slot={attrs()["data-slot"]}
                         disabled={attrs().disabled}
@@ -326,6 +333,7 @@ export function YoContextMenu(props: YoContextMenuProps): JSX.Element {
                     );
                   }}
                 </For>
+                </div>
               </YoCorner>
             </div>
           )}

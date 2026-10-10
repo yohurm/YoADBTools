@@ -27,7 +27,6 @@ import {
   scopeIsPackage,
   type SessionFilter,
 } from "./filter";
-import { RingMirror } from "./mirror";
 import { collapseStack, stackFrameMessage } from "./stack";
 
 const line = (over: Partial<LogLine>): LogLine => ({
@@ -287,55 +286,3 @@ describe("collapseStack", () => {
   });
 });
 
-describe("RingMirror 共享缓冲镜像", () => {
-  it("seq 去重与容量环形", () => {
-    const m = new RingMirror(3);
-    expect(m.nextSeq()).toBe(0);
-    expect(
-      m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 }), line({ seq: 1 })] }),
-    ).toBe(2);
-    // 重复重放去重
-    expect(
-      m.pushBatch({ serial: "s", from_seq: 1, truncated: false, lines: [line({ seq: 1 }), line({ seq: 2 })] }),
-    ).toBe(1);
-    expect(m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 3 }), line({ seq: 4 })] })).toBe(2);
-    expect(m.size()).toBe(3);
-    expect(m.lastSeqNumber()).toBe(4);
-  });
-
-  it("过滤重放取尾部 limit 条", () => {
-    const m = new RingMirror(10);
-    m.pushBatch({
-      serial: "s",
-      from_seq: 0,
-      truncated: false,
-      lines: [0, 1, 2, 3, 4].map((seq) => line({ seq, level: seq % 2 === 0 ? "E" : "I" })),
-    });
-    const out = m.replay((l) => l.level === "E", 2);
-    expect(out.map((l) => l.seq)).toEqual([2, 4]);
-  });
-
-  it("clear 丢行但 lastSeq 不回退，拒绝过期批次", () => {
-    const m = new RingMirror(10);
-    m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 9 })] });
-    m.clear();
-    expect(m.size()).toBe(0);
-    expect(m.lastSeqNumber()).toBe(9);
-    expect(m.nextSeq()).toBe(10);
-    expect(m.pushBatch({ serial: "s", from_seq: 0, truncated: false, lines: [line({ seq: 0 })] })).toBe(0);
-    expect(m.pushBatch({ serial: "s", from_seq: 10, truncated: false, lines: [line({ seq: 10 })] })).toBe(1);
-  });
-
-  it("setCapacity 裁剪过长缓冲", () => {
-    const m = new RingMirror(10);
-    m.pushBatch({
-      serial: "s",
-      from_seq: 0,
-      truncated: false,
-      lines: [0, 1, 2, 3, 4].map((seq) => line({ seq })),
-    });
-    m.setCapacity(2);
-    expect(m.size()).toBe(2);
-    expect(m.replay(() => true, 10).map((l) => l.seq)).toEqual([3, 4]);
-  });
-});

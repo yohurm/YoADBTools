@@ -75,7 +75,7 @@
 | `comp_background_primary` | `#FFFFFF` | `#202224` | 组件一级背景（白底/深色卡片） |
 | `comp_background_gray` | `#F1F3F5` | `#E5E5EA` | 灰色背景（Theme Colors：暂无组件使用） |
 | `comp_background_secondary` | 黑 @ 10% | 白 @ 10% | 组件二级背景（Switch 关闭轨） |
-| `comp_background_tertiary` | 黑 @ 5% | 白 @ **10%**（API 26；表内写 5%） | Container 洗：普通按钮 / 搜索框 / Chip / Select |
+| `comp_background_tertiary` | 黑 @ 5% | 白 @ **5%**（全量表 `#0cffffff`） | Container 洗：普通按钮 / 搜索框 / Chip / Select |
 | `comp_background_emphasize` | `#0A59F7` | `#317AF7` | 强调按钮底 |
 | `comp_background_neutral` | `#000000` | `#FFFFFF` | 中性高亮底（如子页签选中态） |
 | `comp_emphasize_secondary` | `#0A59F7` @ 20% | `#317AF7` @ 20% | 20% 高亮背景 |
@@ -514,7 +514,7 @@ YoDialog 落地：标题居中、一级字 `font_primary`、无分割线、操�
 | `font_on_primary` | `--yohu-fg-on`（强调底反色字） |
 | `background_secondary` 雪域灰 / `#191A1C` | `--yohu-bg-base` |
 | `comp_background_primary` | `--yohu-surface` |
-| `comp_background_tertiary` Container 5%/10% | `--yohu-comp-gray`（展示类底板；浅 `#0000000C` / 深 `#FFFFFF19`）。`comp_background_gray` 仍记 primitive，组件不消费 |
+| `comp_background_tertiary` Container 5%/5% | `--yohu-comp-gray`（展示类底板；浅 `#0000000C` / 深 `#FFFFFF0C`）。`comp_background_gray` 仍记 primitive，组件不消费 |
 | `comp_emphasize_secondary` 20% | `--yohu-accent-soft`（徽章/芯片） |
 | `interactive_select` 品牌 20% | `--yohu-state-selected` + `--yohu-state-selected-fg`（列表/导航/树选中软底） |
 | `interactive_active` 品牌实底 | 按钮 / 开关 / 级别格按下，不进列表选中 |
@@ -529,7 +529,7 @@ YoDialog 落地：标题居中、一级字 `font_primary`、无分割线、操�
 | 效率型贴边、设置页 40vp 边距 | `.yohu-layout__content` padding 0；`YoPage` 缺省消费 `--yohu-layout-page-inset` / `page-gap`；`role=settings` 左右 `--yohu-layout-page-margin`，列帽 `--yohu-layout-settings-max` 居中；`YoChrome` 标题行 `--yohu-control-height`、底垫 `--yohu-layout-chrome-pad` |
 | 栅格 gutter 16 / 最大宽 2220 | `--yohu-layout-gutter` / `grid-max` |
 | 电脑对话框阴影分层、不强遮罩 | `--yohu-shadow-dialog` / `-unfocused`；遮罩 `--yohu-scrim`（浅 10% 黑 / 深 40% 黑）；特殊铬 `radius-md`；下拉触发钮 `radius-xl` |
-| Toast ≤3s、最大宽 400；按钮最大 448。鸿蒙菜单最小 224 是面板底；右键菜单宽跟标签，帽 300 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-max` |
+| Toast ≤3s、最大宽 400；按钮最大 448。下拉菜单至少跟触发钮一样宽，短钮按文案撑开，帽 300；右键菜单宽跟标签，帽 300 | `--yohu-dur-toast` / `--yohu-layout-dialog-max` / `button-max` / `menu-max` |
 | 对比度：正文浅 4.5:1 / 深 5:1 | `colors.test.ts` 门禁；语义色按官方填充使用 |
 
 消费名与《UI设计系统-v6.md》§2 同步；改色只改 `tokens/colors.ts` 的 `Harmony` 表。默认尺度自 v1.7 起为鸿蒙 PC（comfortable）。

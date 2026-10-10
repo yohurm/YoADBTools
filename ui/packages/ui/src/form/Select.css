@@ -13,11 +13,10 @@
 
 .yohu-select__trigger {
   --yohu-corner-fill: var(--yohu-comp-gray);
-  --yohu-corner-stroke: var(--yohu-border);
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--yohu-space-xs);
+  gap: var(--yohu-space-sm);
   box-sizing: border-box;
   width: max-content;
   max-width: 100%;
@@ -25,7 +24,6 @@
   padding-block: 0;
   padding-inline: var(--yohu-space-lg);
   border-radius: var(--yohu-radius-xl);
-  box-shadow: var(--yohu-shadow-xs);
   overflow: visible;
   border: none;
   background-color: transparent;
@@ -43,7 +41,6 @@
 .yohu-select[data-block] .yohu-select__trigger {
   display: flex;
   width: 100%;
-  gap: var(--yohu-space-sm);
 }
 
 .yohu-select__trigger:not(:disabled):hover {
@@ -104,6 +101,8 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
+  width: var(--yohu-layout-icon-inline);
   color: var(--yohu-fg-2);
   transition: transform var(--yohu-motion-effects-fast);
 }
@@ -112,7 +111,7 @@
   transform: rotate(180deg);
 }
 
-/* 铬：落点与夹紧。内容 hug，禁止写死 width。叠层走 popover-place overlay token。 */
+/* 铬：落点。宽由落点写成触发钮宽。叠层走 popover-place overlay token。 */
 .yohu-select__layer {
   position: fixed;
   z-index: var(--yohu-z-overlay);
@@ -124,7 +123,7 @@
   visibility: hidden;
 }
 
-/* 内容区：默认裁切。仅 overflow=auto 时纵滚（Corner 藏条）；横向随内容 hug。 */
+/* 内容区铺满触发钮宽。仅 overflow=auto 时纵滚（Corner 藏条）；横向不滚。 */
 .yohu-select__menu {
   --yohu-corner-fill: var(--yohu-surface);
   --yohu-corner-stroke: var(--yohu-border);
@@ -148,17 +147,13 @@
 }
 
 .yohu-select__menu-chrome {
+  width: 100%;
   min-height: 0;
   max-height: 100%;
 }
 
 .yohu-select__option {
-  display: flex;
-  align-items: center;
-  gap: var(--yohu-space-sm);
-  box-sizing: border-box;
-  min-height: var(--yohu-control-height);
-  padding: 0 var(--yohu-space-sm);
+  width: 100%;
   font-size: var(--yohu-font-body);
   line-height: var(--yohu-font-leading-ui);
   color: var(--yohu-fg);
@@ -174,9 +169,24 @@
   white-space: nowrap;
 }
 
+/* 尾标槽与箭头同尺寸。未选中留空，字不窜到箭头的位置。 */
+.yohu-select__mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--yohu-layout-icon-inline);
+  height: var(--yohu-layout-icon-inline);
+  color: var(--yohu-fg);
+  visibility: hidden;
+}
+
+.yohu-select__option[data-selected] .yohu-select__mark {
+  visibility: visible;
+}
+
 .yohu-select[data-disabled] .yohu-select__trigger {
-  --yohu-corner-fill: var(--yohu-surface-2);
-  color: var(--yohu-disabled);
+  color: var(--yohu-fg-4);
   cursor: not-allowed;
 }
 

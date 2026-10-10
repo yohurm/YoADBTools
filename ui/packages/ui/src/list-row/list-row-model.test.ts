@@ -68,6 +68,11 @@ describe("list-row-model", () => {
     expect(resolveListRowRadius({ radius: "chip" })).toBe("none");
   });
 
+  it("显式 ripple：默认圆角铺满行，list 不改成 chip", () => {
+    expect(resolveListRowRadius({ tone: "list", selectable: true, radius: "ripple" })).toBe("ripple");
+    expect(resolveListRowRadius({ radius: "ripple" })).toBe("none");
+  });
+
   it("热态按 key 精确命中", () => {
     expect(isListRowHot("docs", "docs")).toBe(true);
     expect(isListRowHot("docs", "other")).toBe(false);

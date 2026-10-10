@@ -1,15 +1,31 @@
-//! 批量器（ADR-v6-007 核心）：已组装的 `LogLine`（logd 记录）聚合后成批推送，**禁逐条**。
+//! 批量器（ADR-v6-007 / ADR-v6-041）：窗口命中聚合后成批推送，**禁逐条**。
 //!
 //! 聚合策略：定时 100–200ms 或满 `max_lines` 条 / `max_bytes` 字节，先到先发。
 //! 背压策略：下游事件队列有界（try_send）——溢出时**丢推送不丢环**，
-//! 计数经 `LogOverflow` 事件告知 UI，由 `log.replay(fromSeq)` 补齐。
+//! 计数经 `LogOverflow` 事件告知 UI，由 `log.page` 补当前页。
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use yohu_protocol::{AppEvent, LogBatch, LogBatchPayload, LogLine};
+use yohu_protocol::{AppEvent, LogHits, LogLine};
+
+/// 一条已入索引的命中。`line` 只在窗口钉底时才有正文。
+pub(crate) struct HitNote {
+    pub window_id: u64,
+    pub total: u64,
+    pub signals: u32,
+    pub line: Option<LogLine>,
+}
+
+struct Acc {
+    total: u64,
+    signals: u32,
+    appended: u32,
+    tail: Vec<LogLine>,
+}
 
 /// ADR-v6-007：定时 100–200ms 内取 150ms。
 pub(crate) const BATCH_FLUSH_INTERVAL: Duration = Duration::from_millis(150);
@@ -19,7 +35,7 @@ pub(crate) const BATCH_MAX_BYTES: usize = 512 * 1024;
 /// 批量器句柄（feed 一条 logd 记录）。Clone 给各次跟流 attempt；聚合环属代际。
 #[derive(Clone)]
 pub(crate) struct Batcher {
-    line_tx: mpsc::Sender<LogLine>,
+    line_tx: mpsc::Sender<HitNote>,
 }
 
 impl Batcher {
@@ -32,7 +48,7 @@ impl Batcher {
         max_bytes: usize,
         cancel: CancellationToken,
     ) -> (Self, tokio::task::JoinHandle<()>) {
-        let (line_tx, line_rx) = mpsc::channel::<LogLine>(4096);
+        let (line_tx, line_rx) = mpsc::channel::<HitNote>(4096);
         let handle = tokio::spawn(aggregate_loop(
             serial,
             line_rx,
@@ -45,15 +61,15 @@ impl Batcher {
         (Self { line_tx }, handle)
     }
 
-    /// 送入一条 logd 记录（异步背压：聚合环消费快于生产，正常不阻塞）。
-    pub(crate) async fn feed(&self, line: LogLine) -> Result<(), ()> {
-        self.line_tx.send(line).await.map_err(|_| ())
+    /// 送入一条窗口命中（异步背压：聚合环消费快于生产，正常不阻塞）。
+    pub(crate) async fn note(&self, note: HitNote) -> Result<(), ()> {
+        self.line_tx.send(note).await.map_err(|_| ())
     }
 }
 
 async fn aggregate_loop(
     serial: String,
-    mut line_rx: mpsc::Receiver<LogLine>,
+    mut line_rx: mpsc::Receiver<HitNote>,
     sink: mpsc::Sender<AppEvent>,
     flush_interval: Duration,
     max_lines: usize,
@@ -63,8 +79,9 @@ async fn aggregate_loop(
     let mut interval = tokio::time::interval(flush_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
-    let mut pending: Vec<LogLine> = Vec::with_capacity(1024);
+    let mut pending: HashMap<u64, Acc> = HashMap::new();
     let mut pending_bytes: usize = 0;
+    let mut pending_lines: usize = 0;
     let mut dropped_batches: u64 = 0;
 
     loop {
@@ -74,23 +91,36 @@ async fn aggregate_loop(
                 // 取消：不再推送（UI 已随停止处理，缓冲可重放）
                 break;
             }
-            line = line_rx.recv() => {
-                let Some(line) = line else {
-                    // 生产端结束：最后一搏冲刷剩余记录，避免尾部批次丢失
+            note = line_rx.recv() => {
+                let Some(note) = note else {
+                    // 生产端结束：冲刷剩余命中，避免尾部批次丢失
                     if !pending.is_empty() {
-                        flush(&mut pending, &mut pending_bytes, &serial, &sink, &mut dropped_batches);
+                        flush(&mut pending, &mut pending_bytes, &mut pending_lines, &serial, &sink, &mut dropped_batches);
                     }
                     break;
                 };
-                pending_bytes += line.ts.len() + line.tag.len() + line.msg.len() + 32;
-                pending.push(line);
-                if pending.len() >= max_lines || pending_bytes >= max_bytes {
-                    flush(&mut pending, &mut pending_bytes, &serial, &sink, &mut dropped_batches);
+                let bytes = note.line.as_ref().map(|row| row.msg.len() + row.tag.len() + 32).unwrap_or(16);
+                let acc = pending.entry(note.window_id).or_insert(Acc {
+                    total: note.total,
+                    signals: note.signals,
+                    appended: 0,
+                    tail: Vec::new(),
+                });
+                acc.total = note.total;
+                acc.signals = note.signals;
+                acc.appended = acc.appended.saturating_add(1);
+                if let Some(row) = note.line {
+                    acc.tail.push(row);
+                }
+                pending_bytes += bytes;
+                pending_lines += 1;
+                if pending_lines >= max_lines || pending_bytes >= max_bytes {
+                    flush(&mut pending, &mut pending_bytes, &mut pending_lines, &serial, &sink, &mut dropped_batches);
                 }
             }
             _ = interval.tick() => {
                 if !pending.is_empty() {
-                    flush(&mut pending, &mut pending_bytes, &serial, &sink, &mut dropped_batches);
+                    flush(&mut pending, &mut pending_bytes, &mut pending_lines, &serial, &sink, &mut dropped_batches);
                 } else if dropped_batches > 0 {
                     emit_overflow(&sink, &serial, &mut dropped_batches);
                 }
@@ -100,35 +130,40 @@ async fn aggregate_loop(
 }
 
 fn flush(
-    pending: &mut Vec<LogLine>,
+    pending: &mut HashMap<u64, Acc>,
     pending_bytes: &mut usize,
+    pending_lines: &mut usize,
     serial: &str,
     sink: &mpsc::Sender<AppEvent>,
     dropped_batches: &mut u64,
 ) {
-    let lines = std::mem::take(pending);
+    let ready = std::mem::take(pending);
     *pending_bytes = 0;
-    if lines.is_empty() {
+    *pending_lines = 0;
+    if ready.is_empty() {
         return;
     }
-    let from_seq = lines[0].seq;
-    let batch = LogBatch {
-        serial: serial.to_string(),
-        from_seq,
-        lines,
-        truncated: false,
-    };
-    match sink.try_send(AppEvent::LogBatch(LogBatchPayload { batch })) {
-        Ok(()) => {
-            if *dropped_batches > 0 {
-                emit_overflow(sink, serial, dropped_batches);
+    for (window_id, acc) in ready {
+        let event = AppEvent::LogHits(LogHits {
+            serial: serial.to_string(),
+            window_id,
+            total: acc.total,
+            appended: acc.appended,
+            signals: acc.signals,
+            tail: acc.tail,
+        });
+        match sink.try_send(event) {
+            Ok(()) => {
+                if *dropped_batches > 0 {
+                    emit_overflow(sink, serial, dropped_batches);
+                }
             }
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                // 丢推送不丢环：索引与环仍持有命中，UI 经 log.page 补当前页
+                *dropped_batches += 1;
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {}
         }
-        Err(mpsc::error::TrySendError::Full(_)) => {
-            // 丢推送不丢环：RingBuffer 仍持有全量，UI 经 replay 补齐
-            *dropped_batches += 1;
-        }
-        Err(mpsc::error::TrySendError::Closed(_)) => {}
     }
 }
 
@@ -149,16 +184,21 @@ fn emit_overflow(sink: &mpsc::Sender<AppEvent>, serial: &str, dropped: &mut u64)
 mod tests {
     use super::*;
 
-    fn line(i: u64) -> LogLine {
-        LogLine {
-            seq: i,
-            ts: "2026-01-01 00:00:00.000".into(),
-            pid: 1,
-            tid: 1,
-            level: 'I',
-            tag: "T".into(),
-            msg: format!("line {i}"),
-            ..LogLine::default()
+    fn note(i: u64) -> HitNote {
+        HitNote {
+            window_id: 1,
+            total: i + 1,
+            signals: 0,
+            line: Some(LogLine {
+                seq: i,
+                ts: "2026-01-01 00:00:00.000".into(),
+                pid: 1,
+                tid: 1,
+                level: 'I',
+                tag: "T".into(),
+                msg: format!("line {i}"),
+                ..LogLine::default()
+            }),
         }
     }
 
@@ -173,17 +213,18 @@ mod tests {
             BATCH_MAX_BYTES,
             CancellationToken::new(),
         );
-        batcher.feed(line(0)).await.unwrap();
-        batcher.feed(line(1)).await.unwrap();
+        batcher.note(note(0)).await.unwrap();
+        batcher.note(note(1)).await.unwrap();
 
         let event = tokio::time::timeout(Duration::from_secs(2), sink_rx.recv())
             .await
             .expect("聚合超时")
             .expect("channel closed");
         match event {
-            AppEvent::LogBatch(LogBatchPayload { batch }) => {
-                assert_eq!(batch.from_seq, 0);
-                assert_eq!(batch.lines.len(), 2);
+            AppEvent::LogHits(hits) => {
+                assert_eq!(hits.window_id, 1);
+                assert_eq!(hits.tail.len(), 2);
+                assert_eq!(hits.appended, 2);
             }
             other => panic!("unexpected event: {other:?}"),
         }
@@ -203,14 +244,14 @@ mod tests {
             CancellationToken::new(),
         );
         for i in 0..3 {
-            batcher.feed(line(i)).await.unwrap();
+            batcher.note(note(i)).await.unwrap();
         }
         let event = tokio::time::timeout(Duration::from_secs(2), sink_rx.recv())
             .await
             .expect("条数阈值未触发")
             .expect("channel closed");
         match event {
-            AppEvent::LogBatch(LogBatchPayload { batch }) => assert_eq!(batch.lines.len(), 3),
+            AppEvent::LogHits(hits) => assert_eq!(hits.tail.len(), 3),
             other => panic!("unexpected event: {other:?}"),
         }
         drop(batcher);
@@ -231,14 +272,14 @@ mod tests {
         );
         // 喂 6 条 → 3 批；下游只取 1 批 → 2 批溢出
         for i in 0..6 {
-            batcher.feed(line(i)).await.unwrap();
+            batcher.note(note(i)).await.unwrap();
         }
         let mut saw_batch = false;
         let mut saw_overflow = false;
         let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
         while tokio::time::Instant::now() < deadline && !(saw_batch && saw_overflow) {
             match sink_rx.recv().await {
-                Some(AppEvent::LogBatch(_)) => saw_batch = true,
+                Some(AppEvent::LogHits(_)) => saw_batch = true,
                 Some(AppEvent::LogOverflow {
                     dropped_batches, ..
                 }) => {
@@ -270,7 +311,7 @@ mod tests {
         );
         let started = std::time::Instant::now();
         for i in 0..TOTAL {
-            batcher.feed(line(i)).await.unwrap();
+            batcher.note(note(i)).await.unwrap();
         }
         drop(batcher);
         let _ = handle.await;
@@ -279,9 +320,9 @@ mod tests {
         let mut batches = 0u32;
         let mut lines = 0usize;
         while let Ok(event) = sink_rx.try_recv() {
-            if let AppEvent::LogBatch(LogBatchPayload { batch }) = event {
+            if let AppEvent::LogHits(hits) = event {
                 batches += 1;
-                lines += batch.lines.len();
+                lines += hits.tail.len();
             }
         }
         assert_eq!(

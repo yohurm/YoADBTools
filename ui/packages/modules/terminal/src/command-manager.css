@@ -87,7 +87,7 @@
   opacity: var(--yohu-state-reorder-source);
 }
 
-.yohu-cm[data-migrating] .yohu-cm__entries [data-radius="chip"][data-fill="selected"] > * {
+.yohu-cm[data-migrating] .yohu-cm__entries [data-fill="selected"] {
   transition: background-color var(--yohu-motion-spatial-local);
 }
 
@@ -95,7 +95,7 @@
   opacity: 1;
 }
 
-.yohu-cm[data-migrating] .yohu-cm__entries [data-gather-home][data-radius="chip"][data-fill="selected"] > * {
+.yohu-cm[data-migrating] .yohu-cm__entries [data-gather-home][data-fill="selected"] {
   background-color: transparent;
 }
 

@@ -124,7 +124,7 @@ ADR-v6-030：macOS 改为 VideoToolbox 出画时写明，不为 Linux 用 FFmpeg
 
 ADR-v6-032：Fit / Convert / Scale / Compose / Present。Fit 与 Stage 已与 OS 无关。Convert 以下在 Windows 是 Media Foundation + DComp，在 macOS 是 VideoToolbox + NSView。Linux 没有这四层。
 
-ADR-v6-041：Linux 工作台交付；投屏像素仍不交付；主窗记下 `GtkWindow`，留给以后的表面。`spawn_surface` 仍是未实现。
+ADR-v6-043：Linux 工作台交付；投屏像素仍不交付；主窗记下 `GtkWindow`，留给以后的表面。`spawn_surface` 仍是未实现。
 
 ### 2.4 方案与取舍
 

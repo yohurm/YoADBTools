@@ -32,7 +32,7 @@ describe("opsListBindings", () => {
       onSelectRow: () => undefined,
     });
     expect(bindings.tone).toBe("list");
-    expect(bindings.rowRadius).toBe("chip");
+    expect(bindings.rowRadius).toBe("ripple");
     expect(bindings.selectedKeys).toBe(keys);
     expect(bindings).not.toHaveProperty("selectedKey");
     expect(bindings.onSelectRow).toBeTypeOf("function");

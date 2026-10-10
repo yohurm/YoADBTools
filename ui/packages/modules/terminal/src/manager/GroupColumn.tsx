@@ -1,7 +1,8 @@
 /**
  * 命令管理左栏：组操作面板。
  * 底色走 YoPanel role=ops（顶栏白、内容灰）。
- * 功能集摊到 YoVirtualList；行内容是 YoOpsItem。只要单选和换位。
+ * 功能集摊到 YoVirtualList；行内容是 YoOpsItem。单选、换位、行间线。
+ * 点按铺满行，圆角走默认 Ripple。四边留白与菜单井同一档。
  * 迁移经过时 hotKey 画出投放框，不改当前选中组。
  */
 
@@ -35,7 +36,7 @@ export function GroupColumn(props: {
   const rowHeight = controlRowHeight();
 
   return (
-    <YoPanel variant="pane" overflow="hidden" padding="xs" role="ops" header={
+    <YoPanel variant="pane" overflow="hidden" padding="sm" role="ops" header={
       <YoToolbar pad="xs">
         <YoSubheader title={groupColumnLabel()} pad="flush" />
         <YoIconButton icon="plus" title="新增组" onClick={() => props.store.addGroup()} />

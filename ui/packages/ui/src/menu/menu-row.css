@@ -1,0 +1,39 @@
+/*
+ * 菜单井。下拉列表与右键菜单共用。
+ * 内容块相对卡片四边同一留白。行与行贴齐。
+ * 点按走全局 Ripple：默认圆角，不另写半径、不内缩。
+ * 字与分割线对齐。
+ */
+
+.yohu-menu-well {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--yohu-space-sm);
+}
+
+.yohu-menu-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--yohu-space-sm);
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--yohu-control-height);
+  padding: 0 var(--yohu-space-sm);
+}
+
+.yohu-menu-row[data-rule]::after {
+  content: "";
+  position: absolute;
+  left: var(--yohu-space-sm);
+  right: var(--yohu-space-sm);
+  bottom: 0;
+  height: var(--yohu-stroke-hairline);
+  background: var(--yohu-border);
+  pointer-events: none;
+}

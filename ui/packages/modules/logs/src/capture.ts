@@ -5,10 +5,10 @@
  * start 返回不写 capturing。退订走 workspace.unsubscribeSession（冻可见区）；扇出只认 capturing。
  * 切焦点不停其他设备流。闸门按 serial，禁止跨设备互等。
  * start 每次 await 后用 sessionId 重定位，禁止跨 await 缓存 idx。
- * 同窗口 adopt 续采：保留 fromSeq 与可见区，只从 core 环补洞；新流才清镜像/本窗口面板。
- * 窗口第一次点开始：fromSeq=0，按本窗口过滤从当前环/镜像补齐，再跟新行。
- * 清空可见区走 discardView（推进 fromSeq）。清设备缓冲清环与镜像并 flush 面板。
- * 掉线只停采集、清镜像；已画出的行保留。
+ * 同窗口 adopt 续采：保留 fromSeq 与当前页，再向环要尾页；新流才清本窗口面板。
+ * 窗口第一次点开始：fromSeq=0，按本窗口过滤向环要当前页，再跟新行。
+ * 清空可见区走 discardView（推进 fromSeq）。清设备缓冲清环并 flush 面板。
+ * 掉线只停采集；已画出的行保留。
  * 订阅可 dispose；测试与生产同一条链。
  */
 
@@ -22,11 +22,14 @@ import {
   logClearDevice,
   logExport,
   logPackageSnapshot,
+  logPage,
   logProcessSnapshot,
-  logReplay,
+  logWindowBind,
+  logWindowLatch,
+  logWindowRelease,
   onCaptureState,
   onDeviceOffline,
-  onLogBatch,
+  onLogHits,
   onLogOverflow,
   onProcessIndex,
   onSettingsChanged,
@@ -36,11 +39,11 @@ import {
 import type { ProcessEntry } from "@yohu/api";
 
 import { applyCaptureEvent, captureDecisionIsIgnore, captureDecisionIsStopped } from "./capture-event";
-import { foreignHoldCount, heldBoundSerials, holdCount, sessionHolds, sessionHoldsBound, sessionHoldsSerial } from "./hold";
+import { foreignHoldCount, heldBoundSerials, holdCount, sessionHolds, sessionHoldsSerial } from "./hold";
 import { sessionCaptureIsLive } from "./session-chrome";
 import type { IngestApi } from "./ingest";
-import type { MirrorBank } from "./mirror";
-import { captureStarted } from "./panel";
+import { captureStarted, SESSION_NEVER_STARTED } from "./panel";
+import { pageCap } from "./viewport";
 import {
   deviceSlice,
   ensureDevice,
@@ -64,7 +67,9 @@ export type CaptureApi = {
   exportSession: (path?: string) => Promise<string | null>;
   closeSession: (id: number) => void;
   closeOthers: (id: number) => void;
-  resumeFollow: (id: number) => void;
+  resumeFollow: (id: number) => Promise<void>;
+  detachFollow: (id: number) => void;
+  requestPage: (id: number, index: number) => Promise<void>;
   serial: () => string | null;
   bufferCapacity: () => number;
   dispose: () => void;
@@ -73,11 +78,13 @@ export type CaptureApi = {
 export function createCapture(
   state: CaptureStore,
   setState: SetStoreFunction<CaptureStore>,
-  mirrors: MirrorBank,
   workspace: WorkspaceApi,
   ingest: IngestApi,
 ): CaptureApi {
   let bindGen = 0;
+  const pageGen = new Map<number, number>();
+  const pullWanted = new Map<number, number>();
+  const pullFlight = new Set<number>();
   const gates = new Map<string, Promise<void>>();
   const pending: Promise<() => void>[] = [];
 
@@ -129,10 +136,53 @@ export function createCapture(
     setState("sessions", done, { starting: false });
   }
 
-  async function replayFromCursor(device: string) {
-    const from = mirrors.of(device).nextSeq();
-    return logReplay({ serial: device, from_seq: from, limit: bufferCapacity() });
+  function bumpPage(id: number): number {
+    const next = (pageGen.get(id) ?? 0) + 1;
+    pageGen.set(id, next);
+    return next;
   }
+
+  async function pullPage(id: number, index: number): Promise<void> {
+    pullWanted.set(id, index);
+    if (pullFlight.has(id)) return;
+    pullFlight.add(id);
+    try {
+      while (pullWanted.has(id)) {
+        const next = pullWanted.get(id) ?? index;
+        pullWanted.delete(id);
+        const session = sessionById(id);
+        if (!session) return;
+        const count = pageCap(bufferCapacity());
+        const page = await logPage({ window_id: id, index: next, count });
+        if (pullWanted.has(id)) continue;
+        workspace.applyPage(id, page, "replace");
+      }
+    } catch (e) {
+      console.error("log.page 失败", e);
+    } finally {
+      pullFlight.delete(id);
+      if (pullWanted.has(id)) {
+        void pullPage(id, pullWanted.get(id) ?? index);
+      }
+    }
+  }
+
+  async function loadPage(id: number, mode: "replace" | "keep"): Promise<void> {
+    const session = sessionById(id);
+    if (!session?.serial || !sessionCaptureIsLive(session)) return;
+    const gen = bumpPage(id);
+    const page = await logWindowBind({
+      id: session.id,
+      serial: session.serial,
+      filter: toWireFilter(session),
+      from_seq: Math.max(0, session.fromSeq),
+      following: session.following,
+    });
+    if (pageGen.get(id) !== gen) return;
+    workspace.applyPage(id, page, mode);
+  }
+
+  workspace.setPageRequest(loadPage);
 
   const sessionIndex = (id: number): number => state.sessions.findIndex((s) => sessionIdIs(s, id));
 
@@ -213,7 +263,6 @@ export function createCapture(
 
   function setBufferCapacity(capacity: number): void {
     const next = Math.max(1, capacity);
-    mirrors.setCapacity(next);
     if (next === state.bufferCapacity) return;
     setState("bufferCapacity", next);
     workspace.trimPanels();
@@ -233,7 +282,7 @@ export function createCapture(
       }
       if (!status.capturing) return;
       subscribeWindow(sessionId, device, resumeWindow);
-      await pullSnapshot(device);
+      await loadPage(sessionId, "replace");
     } catch (e) {
       logCaptureStatusFailed(e);
     }
@@ -292,7 +341,6 @@ export function createCapture(
           startedGen = result.generation;
           setDeviceGen(current, result.generation);
           if (!result.adopted) {
-            mirrors.clear(current);
             setOverflowed(current, false);
             workspace.flushPanel(sessionId);
           }
@@ -343,16 +391,6 @@ export function createCapture(
         frozenThroughSeq: null,
       });
     }
-    workspace.catchUpSession(sessionId);
-  }
-
-  async function pullSnapshot(device: string): Promise<void> {
-    try {
-      const batch = await replayFromCursor(device);
-      if (batch?.lines && batch.lines.length > 0) ingest.onBatch(batch);
-    } catch (e) {
-      console.error("log.replay 快照失败", e);
-    }
   }
 
   async function stopCapture(): Promise<void> {
@@ -398,6 +436,7 @@ export function createCapture(
   function closeSession(id: number): void {
     const session = sessionById(id);
     const hadHold = session ? sessionHolds(session) : false;
+    void logWindowRelease(id);
     workspace.closeSession(id);
     releaseDeviceIfIdle(session?.serial ?? null, hadHold);
   }
@@ -419,13 +458,18 @@ export function createCapture(
     const current = commandSerial(activeSession());
     if (!current) return;
     await logClearDevice(current);
-    mirrors.clear(current);
     workspace.flushDevicePanels(current);
     state.sessions.forEach((session, i) => {
       if (session.serial !== current) return;
       if (sessionCaptureIsLive(session)) {
-        const fromSeq = mirrors.of(current).nextSeq();
-        setState("sessions", i, { fromSeq, following: true, frozenThroughSeq: null });
+        setState("sessions", i, {
+          fromSeq: 0,
+          following: true,
+          frozenThroughSeq: null,
+          hitTotal: 0,
+          pageIndex: 0,
+          lastSeenSeq: SESSION_NEVER_STARTED,
+        });
       }
     });
   }
@@ -469,10 +513,13 @@ export function createCapture(
 
   async function onOverflow(device: string): Promise<void> {
     setOverflowed(device, true);
-    try {
-      ingest.onBatch(await replayFromCursor(device));
-    } catch (e) {
-      console.error("log.replay 回补失败", e);
+    for (const session of state.sessions) {
+      if (!sessionCaptureIsLive(session) || session.serial !== device) continue;
+      try {
+        await loadPage(session.id, "replace");
+      } catch (e) {
+        console.error("log.window.bind 回补失败", e);
+      }
     }
   }
 
@@ -491,15 +538,14 @@ export function createCapture(
     setOverflowed(device, false);
     setProcessIndex(device, [], false);
     setPackages(device, [], false);
-    mirrors.clear(device);
     stopWindowsOn(device);
   }
 
   const onUiResume = (): void => {
     if (documentIsHidden()) return;
-    const serials = new Set(heldBoundSerials(state.sessions));
-    for (const device of serials) {
-      void pullSnapshot(device);
+    for (const session of state.sessions) {
+      if (!sessionCaptureIsLive(session)) continue;
+      void loadPage(session.id, "keep");
     }
   };
 
@@ -514,7 +560,12 @@ export function createCapture(
       }
     }),
   );
-  watch(onLogBatch((e) => ingest.onBatch(e.batch)));
+  watch(
+    onLogHits((e) => {
+      bumpPage(e.window_id);
+      ingest.onHits(e);
+    }),
+  );
   watch(onLogOverflow((e) => void onOverflow(e.serial)));
   watch(onProcessIndex((e) => onIndex(e)));
   watch(
@@ -553,13 +604,19 @@ export function createCapture(
     exportSession,
     closeSession,
     closeOthers,
-    resumeFollow: (id: number): void => {
-      workspace.resumeFollow(id);
-      const session = sessionById(id);
-      if (session && sessionHoldsBound(session)) {
-        void pullSnapshot(session.serial);
-      }
+    resumeFollow: (id: number): Promise<void> => {
+      void logWindowLatch({ window_id: id, following: true }).catch((e) => {
+        console.error("log.window.latch 失败", e);
+      });
+      return workspace.resumeFollow(id);
     },
+    detachFollow: (id: number): void => {
+      workspace.detachFollow(id);
+      void logWindowLatch({ window_id: id, following: false }).catch((e) => {
+        console.error("log.window.latch 失败", e);
+      });
+    },
+    requestPage: (id: number, index: number): Promise<void> => pullPage(id, index),
     serial,
     bufferCapacity,
     dispose,

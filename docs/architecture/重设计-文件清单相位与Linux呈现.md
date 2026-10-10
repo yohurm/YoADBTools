@@ -79,11 +79,11 @@ yohu-mirror
   macOS：VideoToolbox + NSView（ADR-v6-030）
 ```
 
-`FramePipe`、Fit（`scale.rs` `present_dest`）、`Stage` 文案表已经与 OS 无关。Convert 以下在 Linux 不存在。ADR-v6-041 把 Linux 工作台交付了，像素和拖出仍预留，主窗记下 `GtkWindow` 给以后的表面。`spawn_surface` 仍是未实现。
+`FramePipe`、Fit（`scale.rs` `present_dest`）、`Stage` 文案表已经与 OS 无关。Convert 以下在 Linux 不存在。ADR-v6-043 把 Linux 工作台交付了，像素和拖出仍预留，主窗记下 `GtkWindow` 给以后的表面。`spawn_surface` 仍是未实现。
 
 面板不 Toast `state.error`。`showFailure` 只覆盖夜览、截图对话框和质量写入。所以「等待设备连接超时」、「从未开始」和「Live 但没有像素」在舞台上看起来都是同一块灰。核对清单把前一种标成舞台文案失败，把像素标成阻塞。
 
-拖出不在本页重做。ADR-v6-041 / 030：Linux 返回「拖出仅支持 Windows 与 macOS」。核对已见到这句 Toast。
+拖出不在本页重做。ADR-v6-043 / 030：Linux 返回「拖出仅支持 Windows 与 macOS」。核对已见到这句 Toast。
 
 ## 2. 对照之后借什么
 

@@ -10,7 +10,7 @@
 | G4 | 性能 | 默认 10k 环 + 3 会话 + 虚拟列表；批量 IPC |
 | G5 | 中文 | WebView 原生 IME |
 
-Linux 工作台可构建运行（WebKitGTK、XDG 数据根、`~/.local/opt` 安装根、官方 adb sidecar，ADR-v6-041）。投屏像素与拖出仍预留（ADR-v6-028/030），禁止用 FFmpeg 填坑。亦不做插件热加载、重实现 ADB 协议、每窗口一条 logcat、查询 DSL。macOS 工作台与投屏像素见 ADR-v6-029/030。投屏在面板内嵌（ADR-v6-015/024/027/028/030：Windows HWND / macOS NSView 在舞台透明洞内 contain，不是独立 scrcpy 窗），不是非目标。
+Linux 工作台可构建运行（WebKitGTK、XDG 数据根、`~/.local/opt` 安装根、官方 adb sidecar，ADR-v6-043）。投屏像素与拖出仍预留（ADR-v6-028/030），禁止用 FFmpeg 填坑。亦不做插件热加载、重实现 ADB 协议、每窗口一条 logcat、查询 DSL。macOS 工作台与投屏像素见 ADR-v6-029/030。投屏在面板内嵌（ADR-v6-015/024/027/028/030：Windows HWND / macOS NSView 在舞台透明洞内 contain，不是独立 scrcpy 窗），不是非目标。
 
 ## 层模型
 

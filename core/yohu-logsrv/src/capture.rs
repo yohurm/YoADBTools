@@ -17,9 +17,11 @@ use crate::follow::{supervise_follow, FollowEnd};
 use crate::index::ProcessIndexService;
 use crate::ring::RingBuffer;
 use crate::task::join_or_abort;
+use crate::windows::WindowBook;
 use yohu_adb::AdbClient;
 use yohu_protocol::{
-    AppEvent, CaptureStart, CaptureState, CaptureStatus, LogBatch, ProcessEntry, ReplayRequest,
+    AppEvent, CaptureStart, CaptureState, CaptureStatus, LogBatch, LogLatch, LogPage, LogPageQuery,
+    LogWindowBind, ProcessEntry, ReplayRequest,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -109,6 +111,7 @@ pub struct CaptureService {
     adb: Arc<AdbClient>,
     index: ProcessIndexService,
     sink: mpsc::Sender<AppEvent>,
+    windows: Arc<WindowBook>,
     ring_capacity: AtomicUsize,
     inner: Mutex<Inner>,
     changed: Notify,
@@ -133,6 +136,7 @@ impl CaptureService {
             adb,
             index,
             sink,
+            windows: Arc::new(WindowBook::new()),
             ring_capacity: AtomicUsize::new(crate::ring::ring_capacity(ring_capacity)),
             inner: Mutex::new(Inner {
                 rings: HashMap::new(),
@@ -276,6 +280,7 @@ impl CaptureService {
         let ring = self.ring(serial);
         ring.set_capacity(self.ring_capacity.load(Ordering::Relaxed));
         ring.clear();
+        self.windows.clear_serial(serial);
         let (batcher, _batch_handle) = Batcher::spawn(
             serial.to_string(),
             self.sink.clone(),
@@ -298,8 +303,15 @@ impl CaptureService {
         let serial_owned = serial.to_string();
         let follow_cancel = cancel.clone();
         let capture_handle = tokio::spawn(async move {
-            let end =
-                supervise_follow(adb, serial_owned.clone(), ring, batcher, follow_cancel).await;
+            let end = supervise_follow(
+                adb,
+                serial_owned.clone(),
+                ring,
+                Arc::clone(&service.windows),
+                batcher,
+                follow_cancel,
+            )
+            .await;
             if matches!(end, FollowEnd::Offline) {
                 service
                     .release_if_current(&serial_owned, my_generation)
@@ -405,6 +417,28 @@ impl CaptureService {
         if let Some(ring) = inner.rings.get(serial) {
             ring.clear();
         }
+        self.windows.clear_serial(serial);
+    }
+
+    pub fn bind_window(&self, spec: LogWindowBind) -> LogPage {
+        let ring = self.ring(&spec.serial);
+        self.windows.bind(spec, &ring)
+    }
+
+    pub fn release_window(&self, id: u64) {
+        self.windows.release(id);
+    }
+
+    pub fn latch_window(&self, latch: LogLatch) -> Option<LogPage> {
+        let serial = self.windows.serial_of(latch.window_id)?;
+        let ring = self.ring(&serial);
+        self.windows.latch(latch.window_id, latch.following, &ring)
+    }
+
+    pub fn page(&self, query: LogPageQuery) -> Option<LogPage> {
+        let serial = self.windows.serial_of(query.window_id)?;
+        let ring = self.ring(&serial);
+        self.windows.page(query.window_id, query.index, query.count, &ring)
     }
 
     pub async fn clear_device_buffer(&self, serial: &str) -> Result<(), LogError> {

@@ -1,6 +1,6 @@
 # Linux 与 Windows 产品对齐
 
-对照的是已经交付的 Windows 行为，不是把 Win32 调用原样搬过来。Linux 能走同一套 UI 和同一套舞台几何的，跟 Windows 对齐。Windows API 在 Linux 上不存在时，用已经接受的 Linux 替换（ADR-v6-041 / ADR-v6-042），不另起一套产品。
+对照的是已经交付的 Windows 行为，不是把 Win32 调用原样搬过来。Linux 能走同一套 UI 和同一套舞台几何的，跟 Windows 对齐。Windows API 在 Linux 上不存在时，用已经接受的 Linux 替换（ADR-v6-043 / ADR-v6-042），不另起一套产品。
 
 本轮在 `cursor/linux-support-c999` 上改代码，不新开 PR，不合入 `main`。
 
@@ -37,7 +37,7 @@ ATD（`yohu_atd34`，`-accel off`，没有 `/dev/dri`）上两路会话都打出
 
 | 项 | Linux 现状 | 为什么留着 |
 |----|------------|------------|
-| 拖出 | `DndError::Unsupported`，toast「拖出仅支持 Windows 与 macOS」 | ADR-v6-041 / 042 写明拖出仍不交付 |
+| 拖出 | `DndError::Unsupported`，toast「拖出仅支持 Windows 与 macOS」 | ADR-v6-043 / 042 写明拖出仍不交付 |
 | HEVC | `probe().hevc` 保持 `false`。USB 默认 `h265` 时，只发 HEVC 的手机会没有画面 | ADR-v6-042：查到 HEVC Main 也不提交，直到有能交画面的解码器。本机 ATD 会话是 H.264 |
 | 解码库 | 不链 FFmpeg / libavcodec / GStreamer / libyuv。OpenH264 的 `.so` 不进 `.deb` | ADR-v6-042。缺文件时洞文案说明要单独下载 Cisco 二进制 |
 | Wayland DMA-BUF | 呈现是 X11 GDK 子窗口 + cairo。有 VA 表面时 `vaPutSurface` 不吃 cairo 圆角裁剪 | ADR-v6-042 把 DMA-BUF 放在同一子控件之后，不作为这一步的前提 |

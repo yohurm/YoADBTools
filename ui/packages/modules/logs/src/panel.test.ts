@@ -240,7 +240,7 @@ describe("applyAppend", () => {
     expect(next?.pendingCount).toBe(0);
   });
 
-  it("未跟滚只加 pending", () => {
+  it("未跟滚仍写入文档并累计 pending", () => {
     const next = applyAppend({
       visible: collapseStack([line(0)]),
       lines: [line(1)],
@@ -251,7 +251,7 @@ describe("applyAppend", () => {
       cap: 100,
       pendingCount: 2,
     });
-    expect(next?.visible.map((r) => r.line.seq)).toEqual([0]);
+    expect(next?.visible.map((r) => r.line.seq)).toEqual([0, 1]);
     expect(next?.pendingCount).toBe(3);
   });
 
@@ -357,22 +357,14 @@ describe("没有新行只判一次", () => {
   });
 });
 
-describe("镜像超出容量只裁一次", () => {
-  it("drop_overflow_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "mirror.ts"), "utf8");
-    const longer = "this.buf.length > " + "this.capacity";
-    const splice = "this.buf.splice(0, this.buf.length - " + "this.capacity)";
-    expect(body.split(longer).length - 1).toBe(1);
-    expect(body.split(splice).length - 1).toBe(1);
-    expect(body).toContain("dropOverflow(");
-  });
-});
-
-describe("容量至少为一只写一次", () => {
-  it("clamp_capacity_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "mirror.ts"), "utf8");
-    const needle = "Math.max(1, " + "capacity)";
-    expect(body.split(needle).length - 1).toBe(1);
-    expect(body).toContain("clampCapacity(");
+describe("当前页不超过一屏", () => {
+  it("page_cap_once", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "viewport.ts"), "utf8");
+    const cap = "Math.min(buffer, " + "LOG_VIEW_PAGE)";
+    const floor = "Math.max(1, " + "bufferCapacity)";
+    expect(body.split(cap).length - 1).toBe(1);
+    expect(body.split(floor).length - 1).toBe(2);
+    expect(body).toContain("export function pageCap");
+    expect(body).toContain("export function docCap");
   });
 });

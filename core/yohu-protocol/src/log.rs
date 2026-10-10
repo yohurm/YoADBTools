@@ -42,9 +42,64 @@ impl Default for LogLine {
     }
 }
 
+/// `log.page` 显式取页时的默认行数。窗口文档本身按 `buffer_capacity` 驻留，不按这一页裁。
+pub const LOG_PAGE_LINES: u32 = 80;
+
+/// 窗口过滤登记。命中索引在环旁边重建，返回当前页。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogWindowBind {
+    pub id: u64,
+    pub serial: String,
+    pub filter: LogFilter,
+    pub from_seq: u64,
+    pub following: bool,
+    /// 离开底部时的可见末序号。页不超过它，其后计入 `pending`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub through_seq: Option<u64>,
+}
+
+/// 跟尾闩。松开后命中通知不再带正文。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogLatch {
+    pub window_id: u64,
+    pub following: bool,
+}
+
+/// `log.page`：按命中下标取一页。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogPageQuery {
+    pub window_id: u64,
+    pub index: u64,
+    pub count: u32,
+}
+
+/// 一页命中。`index` 是本页首行在命中索引中的位置。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogPage {
+    pub window_id: u64,
+    pub serial: String,
+    pub index: u64,
+    pub total: u64,
+    pub signals: u32,
+    pub pending: u32,
+    pub lines: Vec<LogLine>,
+}
+
+/// 一批窗口命中。`tail` 是这批新增命中的正文。界面跟尾时钉底，离开底部仍写入文档但不移动视口。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogHits {
+    pub serial: String,
+    pub window_id: u64,
+    pub total: u64,
+    pub appended: u32,
+    pub signals: u32,
+    pub tail: Vec<LogLine>,
+}
+
 /// 一个批量推送（ADR-v6-007：100–200ms 聚合，禁逐行）。
 ///
 /// `from_seq` = 本批首行的 seq；`truncated` 表示本批之后环内仍有更新行。
+/// 清单不再靠它灌全文；导出旁路与 `log.replay` 仍用这份快照。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogBatch {
     pub serial: String,

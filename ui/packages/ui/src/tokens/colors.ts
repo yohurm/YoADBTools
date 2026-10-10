@@ -13,9 +13,9 @@
  * （低于卡片明度）；次级表面走 background_fourth。
  *
  * 展示类底板（普通按钮 / 搜索框）走基础色 Container，不是 `comp_background_gray`。
- * 色彩.md：Container = 普通按钮/搜索框底；默认与 Primary 同级（浅黑 / 深白）。
- * Theme Colors API 26：`compBackgroundTertiary` 浅 = Container 5%，深 = Container 10%。
- * 见 harmonyos-design-notes.md §1.4 / §1.6。
+ * 色彩.md 全量表：`comp_background_tertiary` 浅/深都是 Container 5%（`#0c000000` / `#0cffffff`）。
+ * 悬停/按压是官方 `interactive_hover` / `interactive_pressed` 叠在底上，不是把不透明墨水拌进透明洗。
+ * 见 harmonyos-design-notes.md §1.4 / §1.5。
  */
 
 import type { ThemeName } from "./theme-name";
@@ -52,27 +52,60 @@ export const Harmony = {
   fontFourth: { light: fromArgb("#33000000"), dark: fromArgb("#33ffffff") },
   fontEmphasize: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
   fontOnPrimary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ffffffff") },
+  fontOnSecondary: { light: fromArgb("#99ffffff"), dark: fromArgb("#99ffffff") },
+  fontOnTertiary: { light: fromArgb("#66ffffff"), dark: fromArgb("#66ffffff") },
+  fontOnFourth: { light: fromArgb("#33ffffff"), dark: fromArgb("#33ffffff") },
 
+  iconPrimary: { light: fromArgb("#e5000000"), dark: fromArgb("#e5ffffff") },
+  iconSecondary: { light: fromArgb("#99000000"), dark: fromArgb("#99ffffff") },
+  iconTertiary: { light: fromArgb("#66000000"), dark: fromArgb("#66ffffff") },
+  iconFourth: { light: fromArgb("#33000000"), dark: fromArgb("#33ffffff") },
+  iconEmphasize: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
+  iconOnPrimary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ffffffff") },
+  iconOnSecondary: { light: fromArgb("#99ffffff"), dark: fromArgb("#99ffffff") },
+  iconOnTertiary: { light: fromArgb("#66ffffff"), dark: fromArgb("#66ffffff") },
+  iconOnFourth: { light: fromArgb("#33ffffff"), dark: fromArgb("#33ffffff") },
+
+  /**
+   * 深色表值 `#E5E5E5` 与同文「Primary / Secondary 默认黑」冲突。
+   * primitive 记正文的黑，不进画布。
+   */
   backgroundPrimary: { light: fromArgb("#ffffffff"), dark: "#000000" },
   backgroundSecondary: { light: fromArgb("#fff1f3f5"), dark: fromArgb("#ff191a1c") },
   backgroundTertiary: { light: fromArgb("#ffe5e5ea"), dark: fromArgb("#ff202224") },
   backgroundFourth: { light: fromArgb("#ffd1d1d6"), dark: fromArgb("#ff2e3033") },
   backgroundEmphasize: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
 
+  compForegroundPrimary: { light: fromArgb("#ff000000"), dark: fromArgb("#ffe5e5e5") },
   compBackgroundPrimary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ff202224") },
+  compBackgroundPrimaryContrary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ffe5e5e5") },
   /** 灰色背景。色彩.md 全量表原值；Theme Colors：暂无组件使用。 */
   compBackgroundGray: { light: fromArgb("#fff1f3f5"), dark: fromArgb("#ffe5e5ea") },
   /** Container 10%。Switch 关闭轨、Slider 轨。 */
   compBackgroundSecondary: { light: fromArgb("#19000000"), dark: fromArgb("#19ffffff") },
   /**
-   * Container 洗。Theme Colors：Button / Chip / Select / TextInput / Search。
-   * 浅 = 表内 5% 黑 `#0c000000`；深 = API 26 的 Container 10% `#19ffffff`（不是表内 5% 白）。
+   * Container 洗。色彩.md 全量表：Button / Chip / Select / TextInput / Search。
+   * 浅/深都是 5%（`#0c000000` / `#0cffffff`）。
    */
-  compBackgroundTertiary: { light: fromArgb("#0c000000"), dark: fromArgb("#19ffffff") },
+  compBackgroundTertiary: { light: fromArgb("#0c000000"), dark: fromArgb("#0cffffff") },
+  compBackgroundEmphasize: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
+  compBackgroundNeutral: { light: fromArgb("#ff000000"), dark: fromArgb("#ffffffff") },
   compEmphasizeSecondary: { light: fromArgb("#330a59f7"), dark: fromArgb("#33317af7") },
   compEmphasizeTertiary: { light: fromArgb("#190a59f7"), dark: fromArgb("#19317af7") },
   compDivider: { light: fromArgb("#33000000"), dark: fromArgb("#33ffffff") },
+  compCommonContrary: { light: fromArgb("#ffffffff"), dark: fromArgb("#ff000000") },
+  compBackgroundFocus: { light: fromArgb("#fff1f3f5"), dark: fromArgb("#ff000000") },
+  compFocusedPrimary: { light: fromArgb("#e5000000"), dark: fromArgb("#e5ffffff") },
+  compFocusedSecondary: { light: fromArgb("#99000000"), dark: fromArgb("#99ffffff") },
+  compFocusedTertiary: { light: fromArgb("#66000000"), dark: fromArgb("#66ffffff") },
   iconSubEmphasize: { light: fromArgb("#660a59f7"), dark: fromArgb("#66317af7") },
+
+  interactiveHover: { light: fromArgb("#0c000000"), dark: fromArgb("#0cffffff") },
+  interactivePressed: { light: fromArgb("#19000000"), dark: fromArgb("#19ffffff") },
+  interactiveClick: { light: fromArgb("#19000000"), dark: fromArgb("#19ffffff") },
+  interactiveFocus: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
+  interactiveActive: { light: fromArgb("#ff0a59f7"), dark: fromArgb("#ff317af7") },
+  interactiveSelect: { light: fromArgb("#330a59f7"), dark: fromArgb("#33317af7") },
 
   /** 10% 语义色软底（官方透明度映射，无独立 Token 名）。 */
   confirmSoft: { light: fromArgb("#1964bb5c"), dark: fromArgb("#195ba854") },
@@ -83,6 +116,30 @@ export const Harmony = {
 /** 实心底 hover/pressed = 语义色叠官方 interactive 5% / 10%。 */
 function brandOverlay(brand: string, ink: "#000000" | "#FFFFFF", percent: number): string {
   return `color-mix(in srgb, ${ink} ${percent}%, ${brand})`;
+}
+
+/** 透明洗叠官方 interactive。按 alpha 合成，排出 `#RRGGBBAA`。 */
+function stackWash(base: string, top: string): string {
+  const parse = (hex: string): { r: number; g: number; b: number; a: number } => {
+    const body = hex.replace(/^#/, "");
+    const rgb = body.slice(0, 6);
+    const aa = body.length === 8 ? body.slice(6, 8) : "FF";
+    return {
+      r: Number.parseInt(rgb.slice(0, 2), 16),
+      g: Number.parseInt(rgb.slice(2, 4), 16),
+      b: Number.parseInt(rgb.slice(4, 6), 16),
+      a: Number.parseInt(aa, 16) / 255,
+    };
+  };
+  const b = parse(base);
+  const t = parse(top);
+  const a = t.a + b.a * (1 - t.a);
+  const ch = (bc: number, tc: number) =>
+    Math.round(a <= 0 ? 0 : (tc * t.a + bc * b.a * (1 - t.a)) / a);
+  const h = (n: number) => n.toString(16).padStart(2, "0").toUpperCase();
+  const rgb = `${h(ch(b.r, t.r))}${h(ch(b.g, t.g))}${h(ch(b.b, t.b))}`;
+  const aa = Math.round(a * 255);
+  return aa >= 255 ? `#${rgb}` : `#${rgb}${h(aa)}`;
 }
 
 /** 两枚 #RRGGBB 按 percentA 混合。Fatal ink = warning 压黑（AS Assert 深于 Error）。 */
@@ -116,12 +173,12 @@ export const Colors = {
   Surface: Harmony.compBackgroundPrimary.light,
   Surface2: Harmony.backgroundTertiary.light,
   /**
-   * 展示类底板 = Container 洗（色彩.md / Theme Colors），不是 `comp_background_gray` 实灰。
-   * 浅 5% 黑；深 10% 白。禁止 CSS 再点 `--yohu-surface-2`。
+   * 展示类底板 = Container 5% 洗，不是 `comp_background_gray` 实灰。
+   * 悬停/按压叠官方 interactive。禁止 CSS 再点 `--yohu-surface-2`。
    */
   CompGray: Harmony.compBackgroundTertiary.light,
-  CompGrayHover: brandOverlay(Harmony.compBackgroundTertiary.light, "#000000", 5),
-  CompGrayPressed: brandOverlay(Harmony.compBackgroundTertiary.light, "#000000", 10),
+  CompGrayHover: stackWash(Harmony.compBackgroundTertiary.light, Harmony.interactiveHover.light),
+  CompGrayPressed: stackWash(Harmony.compBackgroundTertiary.light, Harmony.interactivePressed.light),
   Fg: Harmony.fontPrimary.light,
   Fg2: Harmony.fontSecondary.light,
   Fg3: Harmony.fontTertiary.light,
@@ -130,7 +187,7 @@ export const Colors = {
   Border: Harmony.compDivider.light,
   BorderStrong: Harmony.fontTertiary.light,
   Accent: Harmony.brand.light,
-  AccentSoft: Harmony.compEmphasizeSecondary.light,
+  AccentSoft: Harmony.interactiveSelect.light,
   AccentHover: brandOverlay(Harmony.brand.light, "#000000", 5),
   AccentPressed: brandOverlay(Harmony.brand.light, "#000000", 10),
   Success: Harmony.confirm.light,
@@ -187,8 +244,8 @@ export const DarkColors: Record<SemanticColorName, string> = {
   /** 深色灰阶随层级抬升：画布 #191A1C → 卡片 #202224 → 次级 #2E3033（background_fourth）。 */
   Surface2: Harmony.backgroundFourth.dark,
   CompGray: Harmony.compBackgroundTertiary.dark,
-  CompGrayHover: brandOverlay(Harmony.compBackgroundTertiary.dark, "#FFFFFF", 5),
-  CompGrayPressed: brandOverlay(Harmony.compBackgroundTertiary.dark, "#FFFFFF", 10),
+  CompGrayHover: stackWash(Harmony.compBackgroundTertiary.dark, Harmony.interactiveHover.dark),
+  CompGrayPressed: stackWash(Harmony.compBackgroundTertiary.dark, Harmony.interactivePressed.dark),
   Fg: Harmony.fontPrimary.dark,
   Fg2: Harmony.fontSecondary.dark,
   Fg3: Harmony.fontTertiary.dark,
@@ -197,7 +254,7 @@ export const DarkColors: Record<SemanticColorName, string> = {
   Border: Harmony.compDivider.dark,
   BorderStrong: Harmony.fontTertiary.dark,
   Accent: Harmony.brand.dark,
-  AccentSoft: Harmony.compEmphasizeSecondary.dark,
+  AccentSoft: Harmony.interactiveSelect.dark,
   AccentHover: brandOverlay(Harmony.brand.dark, "#FFFFFF", 5),
   AccentPressed: brandOverlay(Harmony.brand.dark, "#FFFFFF", 10),
   Success: Harmony.confirm.dark,
