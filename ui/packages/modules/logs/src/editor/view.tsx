@@ -106,6 +106,7 @@ export function EditorView(props: {
   keyword: Accessor<string>;
   following: Accessor<boolean>;
   paused: Accessor<boolean>;
+  docShift: Accessor<number>;
   onAtBottomChange: (atBottom: boolean) => void;
   onRowContextMenu: (row: { line: LogLine }, event: MouseEvent) => void;
   documentRef?: (doc: LogDocument) => void;
@@ -159,6 +160,12 @@ export function EditorView(props: {
           getItemKey={visualRowKey}
           contentWidth={contentWidth}
           autoScrollToBottom={() => props.following() && !props.paused()}
+          lineScale={() => {
+            const total = props.rows().length;
+            if (total <= 0) return undefined;
+            return { total, at: 0 };
+          }}
+          docShift={props.docShift}
           onAtBottomChange={props.onAtBottomChange}
           ariaLabel="日志列表"
           onOffset={(_, inline) => props.onInlineScroll?.(inline)}

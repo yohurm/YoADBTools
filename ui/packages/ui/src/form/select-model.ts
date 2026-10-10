@@ -22,10 +22,12 @@ export function optionDescription(option: YoSelectOption | undefined): string | 
   return text ? text : undefined;
 }
 
-/** 菜单高度估计输入：实测高 + 选项行数。 */
+/** 菜单高度估计输入：实测高、选项行数、文案（用来把短钮撑开）。 */
 export interface SelectMenuMeasure {
   optionCount: number;
   scrollHeight: number;
+  labels?: readonly string[];
+  descriptions?: readonly string[];
 }
 
 /** L3 落点写回视图的快照。 */
@@ -58,6 +60,33 @@ export function selectedIndex(
   value: string | null | undefined,
 ): number {
   return options.findIndex((option) => optionIsSelected(option, value));
+}
+
+/** 菜单一行。选中、分割线在这里定，视图只绑。 */
+export interface SelectMenuRow {
+  id: string;
+  value: string;
+  label: string;
+  description?: string;
+  selected: boolean;
+  /** 除末项外画分割线。 */
+  rule: boolean;
+}
+
+/** 选项投影成菜单行。末项不带分割线。 */
+export function selectMenuRows(
+  options: readonly YoSelectOption[],
+  value: string | null | undefined,
+): SelectMenuRow[] {
+  const last = options.length - 1;
+  return options.map((option, index) => ({
+    id: optionDomId(option.value),
+    value: option.value,
+    label: option.label,
+    description: optionDescription(option),
+    selected: optionIsSelected(option, value),
+    rule: index < last,
+  }));
 }
 
 export function stepIndex(count: number, current: number, delta: number): number {

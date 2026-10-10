@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, LogFilter, ReplayRequest};
+use yohu_protocol::{AppEvent, LogFilter, LogPage, LogWindowBind, ReplayRequest, LOG_PAGE_LINES};
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -54,15 +54,26 @@ fn spawn_event_pump(
     let collected = Arc::clone(&lines);
     let handle = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
-            if let AppEvent::LogBatch(payload) = event {
+            if let AppEvent::LogHits(hits) = event {
                 collected
                     .lock()
                     .expect("event pump")
-                    .extend(payload.batch.lines);
+                    .extend(hits.tail);
             }
         }
     });
     (lines, handle)
+}
+
+fn bind_follow(service: &CaptureService, serial: &str) {
+    service.bind_window(LogWindowBind {
+        id: 1,
+        serial: serial.to_string(),
+        filter: LogFilter::default(),
+        from_seq: 0,
+        following: true,
+        through_seq: None,
+    });
 }
 
 async fn wait_pumped_lines(
@@ -105,6 +116,7 @@ async fn real_capture_stream_batch_and_ring() {
         tokio_util::sync::CancellationToken::new(),
     );
 
+    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
         .await
         .expect("start 超时")
@@ -177,6 +189,7 @@ async fn real_capture_with_clear_device() {
     );
 
     // 开采前 logcat -c：start(clear_device=true) 内部执行
+    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, true))
         .await
         .expect("start 超时")
@@ -253,6 +266,7 @@ async fn real_export_filtered_ring_snapshot() {
         tokio_util::sync::CancellationToken::new(),
     );
 
+    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
         .await
         .expect("start 超时")
@@ -280,6 +294,100 @@ async fn real_export_filtered_ring_snapshot() {
     );
 
     let _ = std::fs::remove_dir_all(&root);
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
+}
+
+fn assert_follow_tail(page: &LogPage) {
+    let len = page.lines.len() as u64;
+    assert!(len > 0, "跟尾快照应有正文");
+    assert_eq!(page.index, 0, "登记快照从命中起点装入文档");
+    assert_eq!(len, page.total, "登记快照带上全部命中，滚动不再按页回环");
+    assert_eq!(
+        page.lines.last().map(|line| line.seq),
+        page.lines.iter().map(|line| line.seq).max(),
+        "快照末行是最新一条"
+    );
+}
+
+async fn wait_ring_len(service: &CaptureService, serial: &str, min: usize) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    loop {
+        let n = replay_lines(service, serial).len();
+        if n >= min {
+            return;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!("环行数 {n} 未到 {min}");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_restart_follow_page_is_tail() {
+    let client = Arc::new(AdbClient::new(
+        ToolResolver::new(Some(real_adb()), scratch("res-tail"), scratch("data-tail")),
+        4,
+    ));
+    let Some(serial) = online_device(&client).await else {
+        eprintln!("跳过：无在线设备");
+        return;
+    };
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (_pumped, pump) = spawn_event_pump(rx);
+    let service = CaptureService::new(
+        client,
+        tx,
+        50_000,
+        tokio_util::sync::CancellationToken::new(),
+    );
+    let min = LOG_PAGE_LINES as usize + 1;
+
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("start 超时")
+        .expect("开始采集");
+    wait_ring_len(&service, &serial, min).await;
+    let first = service.bind_window(LogWindowBind {
+        id: 7,
+        serial: serial.clone(),
+        filter: LogFilter::default(),
+        from_seq: 0,
+        following: true,
+        through_seq: None,
+    });
+    assert_follow_tail(&first);
+    eprintln!(
+        "[真机] 首次跟尾 index={} total={}",
+        first.index, first.total
+    );
+
+    tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
+        .await
+        .expect("stop 超时");
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("再开始超时")
+        .expect("再开始");
+    wait_ring_len(&service, &serial, min).await;
+    let again = service.bind_window(LogWindowBind {
+        id: 7,
+        serial: serial.clone(),
+        filter: LogFilter::default(),
+        from_seq: 0,
+        following: true,
+        through_seq: None,
+    });
+    assert_follow_tail(&again);
+    eprintln!(
+        "[真机] 停止后再开始跟尾 index={} total={}",
+        again.index, again.total
+    );
+
+    tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
+        .await
+        .expect("收尾 stop 超时");
     drop(service);
     let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }

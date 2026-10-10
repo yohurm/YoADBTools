@@ -81,8 +81,12 @@ describe("YoSelect", () => {
     const selected = screen.getByRole("option", { name: "全部" });
     expect(selected.textContent).toBe("全部");
     expect(selected.getAttribute("aria-selected")).toBe("true");
-    expect(selected.classList.contains("yohu-interactive--selected")).toBe(true);
-    expect(selected.classList.contains("yohu-select__option--selected")).toBe(false);
+    expect(selected.hasAttribute("data-selected")).toBe(true);
+    expect(selected.hasAttribute("data-rule")).toBe(true);
+    expect(selected.classList.contains("yohu-interactive--active")).toBe(false);
+    expect(selected.classList.contains("yohu-interactive--selected")).toBe(false);
+    expect(screen.getByRole("option", { name: "E" }).hasAttribute("data-rule")).toBe(false);
+    expect(screen.getByRole("option", { name: "V" }).hasAttribute("data-selected")).toBe(false);
     expect(selected.querySelector(".yohu-select__option-label")?.textContent).toBe("全部");
     expect(screen.getByRole("button").getAttribute("aria-activedescendant")).toBe("yohu-option-empty");
   });
@@ -97,7 +101,7 @@ describe("YoSelect", () => {
     expect(layer?.getAttribute("data-placement")).toMatch(/^(top|bottom)$/);
     expect(layer?.getAttribute("data-placed")).toBe("");
     expect(layer?.style.position).toBe("fixed");
-    expect(layer?.style.width).toBe("");
+    expect(layer?.style.width).toBe(layer?.style.minWidth);
     expect(layer?.style.minWidth).not.toBe("");
     expect(layer?.hasAttribute("data-overflow-y")).toBe(false);
   });
@@ -143,7 +147,21 @@ describe("YoSelect", () => {
     const selected = screen.getByRole("option", { name: "选项C" });
     expect(selected.textContent).toBe("选项C");
     expect(selected.getAttribute("aria-selected")).toBe("true");
-    expect(selected.classList.contains("yohu-interactive--selected")).toBe(true);
+    expect(selected.hasAttribute("data-selected")).toBe(true);
+    expect(selected.querySelector("[data-icon='check']")).not.toBeNull();
+    expect(selected.classList.contains("yohu-interactive--selected")).toBe(false);
+    expect(selected.classList.contains("yohu-interactive--active")).toBe(false);
+  });
+
+  it("打开时选中项没有悬停洗；指针移入后才有", () => {
+    render(() => <YoSelect options={OPTIONS} value="a" />);
+    fireEvent.click(screen.getByRole("button", { name: /选项A/ }));
+    const selected = screen.getByRole("option", { name: "选项A" });
+    expect(selected.classList.contains("yohu-interactive--active")).toBe(false);
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "选项B" }));
+    expect(screen.getByRole("option", { name: "选项B" }).classList.contains("yohu-interactive--active")).toBe(true);
+    expect(selected.classList.contains("yohu-interactive--active")).toBe(false);
+    expect(selected.hasAttribute("data-selected")).toBe(true);
   });
 
   it("键盘：Home/End 跳到首尾活动项", () => {
@@ -273,6 +291,9 @@ describe("YoSelect 分层契约", () => {
     expect(src).toMatch(/radius=\{Radius\.Xl\}/);
     expect(src).toMatch(/role="card"/);
     expect(src).toMatch(/class="yohu-select__chevron"/);
+    expect(src).toMatch(/name="check"/);
+    expect(src).not.toMatch(/yohu-recipe-selected/);
+    expect(src).not.toMatch(/yohu-interactive--selected/);
   });
 
   it("重排监听经 listen 成对登记与摘掉", () => {
@@ -307,12 +328,20 @@ describe("YoSelect 触发布局契约", () => {
     const trigger = css.match(/^\.yohu-select__trigger\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(root).not.toMatch(/min-width/);
     expect(trigger).not.toMatch(/min-width/);
-    expect(trigger).toMatch(/gap:\s*var\(--yohu-space-xs\)/);
+    expect(trigger).toMatch(/gap:\s*var\(--yohu-space-sm\)/);
     expect(trigger).toMatch(/--yohu-corner-fill:\s*var\(--yohu-comp-gray\)/);
-    expect(trigger).toMatch(/--yohu-corner-stroke:\s*var\(--yohu-border\)/);
+    expect(trigger).not.toMatch(/--yohu-corner-stroke/);
     expect(trigger).toMatch(/border-radius:\s*var\(--yohu-radius-xl\)/);
-    expect(trigger).toMatch(/box-shadow:\s*var\(--yohu-shadow-xs\)/);
+    expect(trigger).not.toMatch(/box-shadow/);
     expect(css).toMatch(/\.yohu-select__menu\s*\{[^}]*border-radius:\s*var\(--yohu-radius-md\)/);
+    const menuRow = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../menu/menu-row.css"), "utf-8");
+    expect(menuRow).toMatch(/\.yohu-menu-well\s*\{[^}]*padding:\s*var\(--yohu-space-sm\)/);
+    expect(menuRow).toMatch(/padding:\s*0 var\(--yohu-space-sm\)/);
+    expect(menuRow).toMatch(/gap:\s*var\(--yohu-space-sm\)/);
+    expect(menuRow).not.toMatch(/--yohu-ripple-/);
+    expect(menuRow).toMatch(/\[data-rule\]::after\s*\{[^}]*height:\s*var\(--yohu-stroke-hairline\)/);
+    expect(css).toMatch(/\.yohu-select__option\[data-selected\] \.yohu-select__mark\s*\{[^}]*visibility:\s*visible/);
+    expect(css).not.toContain(".yohu-select__rule");
     const value = css.match(/^\.yohu-select__value\s*\{([^}]*)\}/m)?.[1] ?? "";
     expect(value).toMatch(/flex:\s*0 1 auto/);
     expect(css).toMatch(

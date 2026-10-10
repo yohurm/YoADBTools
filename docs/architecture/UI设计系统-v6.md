@@ -1,9 +1,21 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.133（2026-10-08，多选松开后不再保持选中）
+> **状态：** v3.139（2026-10-09，短下拉钮按文案撑开）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v3.139 变更（短下拉钮按文案撑开）：** `YoSelect` 菜单宽至少等于触发钮，左对齐。短胶囊按最长选项撑开，超过 `Layout.MenuMax` 才省略。宽字段仍与钮两侧对齐。见 [youi.md](youi.md)。
+>
+> **v3.138 变更（菜单井与默认 Ripple 圆角）：** 菜单内容相对卡片四边同一留白（`--yohu-space-sm`），收在 `yohu-menu-well`。行与行贴齐。点按走全局 Ripple，圆角是 `--yohu-ripple-radius`，不再把半径写成 0。命令管理组栏与条目栏同一井距，行圆角是 `data-radius=ripple`。见 [youi.md](youi.md)、[右键菜单-v6.md](右键菜单-v6.md)、[modules/terminal.md](modules/terminal.md)。
+>
+> **v3.137 变更（列表外留白、行间贴齐）：** 菜单卡片四边留白（pad xs）。行与行贴齐，点按铺满行，不再在行间内缩。命令管理组栏与条目栏同一套：面板 padding 是外留白，行不再用 chip 圆角片。见 [youi.md](youi.md)、[modules/terminal.md](modules/terminal.md)。
+>
+> **v3.136 变更（菜单行点按与宽度）：** 列表行点按 Ripple 铺满行盒，不再内缩成一条。右键菜单宽跟最长标签加两侧 16vp，超 300 才省略；短词不再垫成 224 空板。下拉菜单仍跟触发钮。见 [youi.md](youi.md)、[右键菜单-v6.md](右键菜单-v6.md)。
+>
+> **v3.135 变更（菜单、下拉按钮、色板）：** 下拉列表和右键菜单共用菜单行：左右 16vp、间隙 8vp、项间分割线、内缩圆角悬停。右键宽最短 224vp、最长 300vp。下拉菜单仍跟触发钮。触发钮是 Container 洗的胶囊（圆角 32），字与箭头间隙 8vp，无描边、无投影；悬停/按压叠官方 interactive；禁用字走四级。`comp_background_tertiary` 深色改回全量表 5% 白。`interactive_*` 进 primitive。见 [youi.md](youi.md)、[右键菜单-v6.md](右键菜单-v6.md)、[harmonyos-design-notes.md](harmonyos-design-notes.md)。
+>
+> **v3.134 变更（下拉菜单两侧对齐）：** `YoSelect` 菜单宽等于触发钮、左对齐、间距 8vp。字与尾标和钮上的字、箭头同一内距、同一槽宽，两侧对齐。选中只画尾部勾；打开时不画悬停洗，指针移入或方向键离开后才画。项间分割线由行模型决定，末项没有。行数据在 `selectMenuRows`，开合与悬停洗在政策。高仍 hug，上限为视口 80%。右键菜单仍跟标签、帽 300。见 [youi.md](youi.md)。
 >
 > **v3.133 变更（多选松开后不再保持选中）：** 牌落到自己的行时，选中填色退去。手势结束清空条目选区。迁到其他组后这些条目也不再是选中项。见 [modules/terminal.md](modules/terminal.md)。
 >
@@ -501,7 +513,7 @@ Primitive 层 = 鸿蒙系统 Token 原值（ARGB → CSS `#RRGGBB` / `#RRGGBBAA`
 | `bg-base` | `background_secondary` | `#F1F3F5` 雪域灰 | `#191A1C` | 窗口底色（浅/深同构凹槽） |
 | `surface` | `comp_background_primary` | `#FFFFFF` | `#202224` | 面板/卡片 |
 | `surface-2` | `background_tertiary` / 深色 `background_fourth` | `#E5E5EA` | `#2E3033` | 次级表面（深色随层级抬升明度）；禁止冒充普通按钮底 |
-| `comp-gray` / `-hover` / `-pressed` | Container 洗 `comp_background_tertiary` + `interactive` 5%/10% | 黑 5% | 白 10% | 展示类底板（按钮/搜索/分段轨）；浅深都从 Container 推，不是实灰 |
+| `comp-gray` / `-hover` / `-pressed` | Container 洗 `comp_background_tertiary` + `interactive` 5%/10% | 黑 5% | 白 5% | 展示类底板（按钮/搜索/分段轨）；浅深都从全量表 Container 5% 推，不是实灰 |
 | `fg` / `fg-2` / `fg-3` / `fg-4` | `font_primary`…`fourth` | 黑 90/60/40/20% | 白 90/60/40/20% | 文本四级 |
 | `fg-on` | `font_on_primary` | `#FFFFFF` | `#FFFFFF` | 强调底上的反色字 |
 | `border` | `comp_divider` | 黑 20% | 白 20% | 常规边框/分割 |
@@ -647,7 +659,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 | `--yohu-ripple-radius` | `var(--yohu-radius-sm)` | 选中片圆角 |
 | `--yohu-ripple-inset` | `0` | 铺满行盒；距背板 = 容器 padding |
 
-**载体**：`tokens/states.css` 的 `.yohu-interactive`。选中只用 `.yohu-interactive--selected`（**不要**用 `[aria-selected]` 上填充：`YoTabs` 的 `aria-selected` 表示下划线激活，不是选中填充）。键盘活动用 `.yohu-interactive--active`。禁止 Tree/Select/命令管理/壳再写选中字色。短列表单选软底走配方 `selected`（项内：软底弹簧绽开；强调条填充贴边 `scaleY` 展开 `spatialStretch`、收回 `effectsExit`；字色/字重 `spatialTick`；导航图标换项 DOWN。禁止 fill 滑块换行，禁止整项 scale）。`YoVirtualList` listbox 行关掉 `isolation` / `::before`，选中底画在行上；行级禁动。禁止虚拟列表再给每行开合成层。选中悬停/按压在软底上叠 `--yohu-state-hover` / `--yohu-state-pressed`，禁止改走 `--yohu-accent-hover`。
+**载体**：`tokens/states.css` 的 `.yohu-interactive`。选中只用 `.yohu-interactive--selected`（**不要**用 `[aria-selected]` 上填充：`YoTabs` 的 `aria-selected` 表示下划线激活，不是选中填充）。键盘活动用 `.yohu-interactive--active`。禁止 Tree/命令管理/壳再写选中字色。短列表单选软底走配方 `selected`（导航 / 设备栏 / 树。项内：软底弹簧绽开；强调条填充贴边 `scaleY` 展开 `spatialStretch`、收回 `effectsExit`；字色/字重 `spatialTick`；导航图标换项 DOWN。禁止 fill 滑块换行，禁止整项 scale）。下拉菜单选中是尾部勾，不挂该配方；悬停与键盘活动仍走 interactive 洗。`YoVirtualList` listbox 行关掉 `isolation` / `::before`，选中底画在行上；行级禁动。禁止虚拟列表再给每行开合成层。选中悬停/按压在软底上叠 `--yohu-state-hover` / `--yohu-state-pressed`，禁止改走 `--yohu-accent-hover`。
 
 - 实心底控件不走列表 ripple。`YoButton` 只认 `data-style` × `data-tone`：EMPHASIZED 用 `accent`/`error` 实底 + `fg-on`，hover/pressed 走对应 `*-hover/pressed`；NORMAL 用 `--yohu-comp-gray`，hover 叠在灰底上，禁止换成 `state-hover`。`YoCheckbox` 选中走 `--yohu-accent-hover/pressed`。`YoSegmentedButton` 选中 hover/pressed 叠 `--yohu-state-*`，不换 accent-hover 实底。
 - **YoButton 三档：** 公开 `buttonStyle` 对照鸿蒙 EMPHASIZED / NORMAL / TEXTUAL。`tone` 只有 `accent | neutral | danger`（danger = ButtonRole.ERROR）。页眉主操作默认无 props。次要操作 `normal+neutral`。弹出框脚钮：取消 `normal+accent`、破坏 `normal+danger`，建设确认默认强调。禁止脚钮再走 TEXTUAL。禁止再写 `variant` / `outlined` / `data-paint` / Button `success|warning`。禁用背板不变、字 `--yohu-fg-3`。
@@ -656,7 +668,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 - 语义色逃生：`.yohu-badge`（徽章）与 `.yohu-tone`（日志级别 / 检索高亮等）在选中行内保持自身色。行级 `--yohu-log-ink` 只给清单左条 / 级别字 / Tag / 已知级别消息，不桥到按钮 inherit。禁止再叠 ink 软底，禁止筛选槽写 `data-paint`。
 - 选中宿主必须透明底：自绘 `background` 会盖住 `z-index: -1` 的选中片。
 - 禁止再挂表面 dual class（`yohu-tree__row--selected` / `yohu-select__option--selected` / `yohu-*-item--active`）。键盘高亮仍用 `.yohu-interactive--active`。
-- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。文件清单 `tone=list` 行盒走 `list-row/`：直角通栏，hairline 贴齐左右。命令管理组栏与条目栏由 `opsListBindings` 写 `rowRadius=chip`：每项悬浮/按压/选中都是 `--yohu-radius-md`，圆角在行内容上，多选不并成直角块；条目 hairline 仍是行盒直线。多选拖动预览牌面同一 16。禁止在文件清单行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。
+- **多选邻接圆角（Tree / Nav）**：`adjacentJoin` 判断上下行是否同属选中块。`--sel-start` 削底角、`--sel-mid` 四角皆直、`--sel-end` 削顶角；孤立选中仍四角 `--yohu-ripple-radius`。文件清单 `tone=list` 行盒走 `list-row/`：直角通栏，hairline 贴齐左右。命令管理组栏与条目栏由 `opsListBindings` 写成 `tone=list` 且 `rowRadius=ripple`：行贴齐，点按铺满行，圆角走 `--yohu-ripple-radius`，名称间 hairline，四边留白与菜单井同一 `--yohu-space-sm`。多选拖动预览牌面仍是 16。禁止在文件清单行盒上叠圆角 / `yohu-focus-ring`。选中行同样画 hairline，禁止再藏成透明。禁止模块再写一套选中圆角或行间线。禁止菜单行覆盖 `--yohu-ripple-radius`。
 
 **焦点环（单源）**
 
@@ -757,7 +769,7 @@ HarmonyOS 电脑/大屏补齐：`--yohu-layout-window-default-w/h: 1200×800`、
 |------|------|------|
 | YoDialog | Esc 关；焦点陷阱；打开后 `dialogInitialFocus`；关闭后还原焦点 | `role=dialog aria-modal`；标题 `aria-labelledby` |
 | YoTabs | ←/→ 切换；Home/End；Delete 关闭（可关时）；Ctrl+Tab 循环 | `role=tablist/tab/tabpanel` |
-| YoSelect | 展开后 ↑/↓ 选项；Enter 选；Esc 关；Portal 上下展开；触发钮 hug 文案簇；`block` 主文案吃剩余、次文案贴尾；菜单宽 hug（min=触发钮）；仅超出才纵向滚动 | `aria-haspopup=listbox aria-expanded aria-activedescendant` |
+| YoSelect | 展开后 ↑/↓ 选项；Enter 选；Esc 关；Portal 上下展开；触发钮 hug 文案簇、无描边；`block` 主文案吃剩余、次文案贴尾；菜单宽=触发钮，行与右键同一套，字与勾两侧对齐；选中只画勾；仅超出视口 80% 才纵向滚动 | `aria-haspopup=listbox aria-expanded aria-activedescendant` |
 | YoTree | ↑/↓ 移动；→ 展开/← 收起；Enter / 空格：目录开合、叶子选中 | `role=tree/treeitem aria-expanded` |
 | YoVirtualList | 选择模式：roving tabindex + ↑/↓/Home/End/Enter/Space | 选择模式 `role=listbox/option` + `aria-selected` |
 | YoContextMenuHost | 应用根唯一实例；Portal 到 body；同时只开一个场景。模块禁止自挂 List | `role=menu/menuitem`（Host 内 List） |

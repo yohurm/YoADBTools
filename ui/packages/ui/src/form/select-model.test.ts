@@ -10,6 +10,7 @@ import {
   optionIsSelected,
   selectedIndex,
   selectKeyIntent,
+  selectMenuRows,
   stepIndex,
 } from "./select-model";
 
@@ -49,6 +50,14 @@ describe("select-model", () => {
     expect(optionDescription({ value: "a", label: "A", description: "   " })).toBeUndefined();
     expect(optionDescription({ value: "a", label: "A" })).toBeUndefined();
     expect(optionDescription(undefined)).toBeUndefined();
+  });
+
+  it("菜单行：选中、分割线、空 value 的 id", () => {
+    const rows = selectMenuRows(OPTIONS, "");
+    expect(rows.map((row) => row.id)).toEqual(["yohu-option-a", "yohu-option-b", "yohu-option-empty"]);
+    expect(rows.map((row) => row.selected)).toEqual([false, false, true]);
+    expect(rows.map((row) => row.rule)).toEqual([true, true, false]);
+    expect(rows[0]).toMatchObject({ value: "a", label: "A", description: undefined });
   });
 
   it("选中下标；未命中为 -1", () => {

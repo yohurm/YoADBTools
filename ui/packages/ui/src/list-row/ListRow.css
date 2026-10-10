@@ -13,6 +13,11 @@
   border-radius: var(--yohu-radius-md);
 }
 
+/* 操作清单：默认 Ripple 圆角画在行盒上。行间不留缝，hairline 仍贴行底。 */
+.yohu-list-row[data-radius="ripple"] {
+  border-radius: var(--yohu-ripple-radius);
+}
+
 /* 有分割线时片与线分开，线不切进圆角。 */
 .yohu-list-row[data-tone="list"][data-radius="chip"] > * {
   margin-block: var(--yohu-space-2xs);

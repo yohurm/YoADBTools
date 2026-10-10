@@ -108,6 +108,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     onDeviceOffline: noop,
     onDeviceStatus: noop,
     onLogBatch: noop,
+    onLogHits: noop,
     onLogOverflow: noop,
     onProcessIndex: noop,
     onCaptureState: noop,

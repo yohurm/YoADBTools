@@ -16,21 +16,37 @@ import {
 export interface SelectSession {
   open: boolean;
   activeIndex: number;
+  /**
+   * 悬停洗。打开时活动项落在选中项上，只作键盘起点，不画洗。
+   * 指针移入或方向键离开后才画。选中本身只看勾。
+   */
+  highlight: boolean;
 }
 
 export function idleSelectSession(): SelectSession {
-  return { open: false, activeIndex: -1 };
+  return { open: false, activeIndex: -1, highlight: false };
 }
 
 export function openSelect(
   options: readonly YoSelectOption[],
   value: string | null | undefined,
 ): SelectSession {
-  return { open: true, activeIndex: selectedIndex(options, value) };
+  return { open: true, activeIndex: selectedIndex(options, value), highlight: false };
 }
 
 export function closeSelect(): SelectSession {
-  return { open: false, activeIndex: -1 };
+  return { open: false, activeIndex: -1, highlight: false };
+}
+
+/** 指针移到这一项：活动项跟上，并打开悬停洗。 */
+export function pointSelect(session: SelectSession, index: number): SelectSession {
+  if (!session.open) return session;
+  return { open: true, activeIndex: index, highlight: true };
+}
+
+/** 悬停洗只在 highlight 之后画到活动项上。 */
+export function optionIsHot(session: SelectSession, index: number): boolean {
+  return session.highlight && session.activeIndex === index;
 }
 
 export function toggleSelect(
@@ -79,13 +95,21 @@ export function applySelectKey(
       }
       return {
         type: "session",
-        session: { open: true, activeIndex: stepIndex(options.length, session.activeIndex, intent.delta) },
+        session: {
+          open: true,
+          activeIndex: stepIndex(options.length, session.activeIndex, intent.delta),
+          highlight: true,
+        },
       };
     case "edge":
       if (options.length === 0) return { type: "none" };
       return {
         type: "session",
-        session: { open: true, activeIndex: listEdgeIndex(options.length, intent.edge) },
+        session: {
+          open: true,
+          activeIndex: listEdgeIndex(options.length, intent.edge),
+          highlight: true,
+        },
       };
     case "toggle":
       return { type: "session", session: toggleSelect(session.open, options, value, disabled) };

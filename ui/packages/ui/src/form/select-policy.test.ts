@@ -9,6 +9,8 @@ import {
   closeSelect,
   idleSelectSession,
   openSelect,
+  optionIsHot,
+  pointSelect,
   selectEffectIsCommit,
   selectEffectIsNone,
   selectHostAttrs,
@@ -30,41 +32,41 @@ describe("select-policy", () => {
     expect(applySelectEscape(true, true)).toBeNull();
   });
 
-  it("点击开合：打开时活动项落到选中；再点关闭", () => {
-    expect(openSelect(OPTIONS, "b")).toEqual({ open: true, activeIndex: 1 });
-    expect(toggleSelect(false, OPTIONS, "c")).toEqual({ open: true, activeIndex: 2 });
+  it("点击开合：打开时活动项落到选中且不画悬停洗；再点关闭", () => {
+    expect(openSelect(OPTIONS, "b")).toEqual({ open: true, activeIndex: 1, highlight: false });
+    expect(toggleSelect(false, OPTIONS, "c")).toEqual({ open: true, activeIndex: 2, highlight: false });
     expect(toggleSelect(true, OPTIONS, "c")).toEqual(closeSelect());
   });
 
-  it("闭合态方向键只展开，不步进", () => {
+  it("闭合态方向键只展开，不步进、不画悬停洗", () => {
     expect(applySelectKey("ArrowDown", idleSelectSession(), OPTIONS, "a")).toEqual({
       type: "session",
-      session: { open: true, activeIndex: 0 },
+      session: { open: true, activeIndex: 0, highlight: false },
     });
   });
 
-  it("展开态方向键步进；Home/End 到首尾", () => {
-    const open = { open: true, activeIndex: 0 };
+  it("展开态方向键步进；Home/End 到首尾，并打开悬停洗", () => {
+    const open = { open: true, activeIndex: 0, highlight: false };
     expect(applySelectKey("ArrowDown", open, OPTIONS, "a")).toEqual({
       type: "session",
-      session: { open: true, activeIndex: 1 },
+      session: { open: true, activeIndex: 1, highlight: true },
     });
     expect(applySelectKey("End", open, OPTIONS, "a")).toEqual({
       type: "session",
-      session: { open: true, activeIndex: 2 },
+      session: { open: true, activeIndex: 2, highlight: true },
     });
-    expect(applySelectKey("Home", { open: true, activeIndex: 2 }, OPTIONS, "a")).toEqual({
+    expect(applySelectKey("Home", { open: true, activeIndex: 2, highlight: false }, OPTIONS, "a")).toEqual({
       type: "session",
-      session: { open: true, activeIndex: 0 },
+      session: { open: true, activeIndex: 0, highlight: true },
     });
   });
 
   it("Enter/Space 闭合态开合，展开态提交活动项", () => {
     expect(applySelectKey("Enter", idleSelectSession(), OPTIONS, "a")).toEqual({
       type: "session",
-      session: { open: true, activeIndex: 0 },
+      session: { open: true, activeIndex: 0, highlight: false },
     });
-    expect(applySelectKey(" ", { open: true, activeIndex: 1 }, OPTIONS, "a")).toEqual({
+    expect(applySelectKey(" ", { open: true, activeIndex: 1, highlight: true }, OPTIONS, "a")).toEqual({
       type: "commit",
       value: "b",
       session: closeSelect(),
@@ -72,7 +74,7 @@ describe("select-policy", () => {
   });
 
   it("Tab 提交活动项并关闭", () => {
-    expect(applySelectKey("Tab", { open: true, activeIndex: 2 }, OPTIONS, "a")).toEqual({
+    expect(applySelectKey("Tab", { open: true, activeIndex: 2, highlight: true }, OPTIONS, "a")).toEqual({
       type: "commit",
       value: "c",
       session: closeSelect(),
@@ -94,6 +96,16 @@ describe("select-policy", () => {
       "data-disabled": "",
       "data-block": "",
     });
+  });
+
+  it("打开时不画悬停洗；指针移入后才画在活动项上", () => {
+    const opened = openSelect(OPTIONS, "a");
+    expect(optionIsHot(opened, 0)).toBe(false);
+    const pointed = pointSelect(opened, 1);
+    expect(pointed).toEqual({ open: true, activeIndex: 1, highlight: true });
+    expect(optionIsHot(pointed, 1)).toBe(true);
+    expect(optionIsHot(pointed, 0)).toBe(false);
+    expect(pointSelect(idleSelectSession(), 0)).toEqual(idleSelectSession());
   });
 
   it("没有 applySelectHover 空政策", () => {

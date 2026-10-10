@@ -196,7 +196,7 @@ pub enum LibraryExpandMode {
 }
 
 fn default_buffer_capacity() -> usize {
-    10_000
+    100_000
 }
 
 /// 投屏默认长边（USB 协议；0 = 设备原始）。
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(s.theme, Theme::System);
         assert_eq!(s.density, Density::Comfortable);
         assert!(s.devices_auto_refresh);
-        assert_eq!(s.buffer_capacity, 10_000);
+        assert_eq!(s.buffer_capacity, 100_000);
         assert!(s.clear_device_on_start);
         assert!(s.export_ask_every_time);
         assert!(s.export_default_path.is_empty());

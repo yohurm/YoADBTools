@@ -19,8 +19,8 @@ export interface YoListRowProps {
   selectable?: boolean;
   /** 多选 key 集；只给 L2 判 chip / 直角，行盒不读集合成员。 */
   selectedKeys?: ReadonlySet<string | number>;
-  /** 显式 chip：每项圆角走特殊铬 16，不因 hairline 或多选改直角。 */
-  radius?: "chip";
+  /** chip：特殊铬 16。ripple：默认 Ripple 圆角，铺满行、行间不留缝。 */
+  radius?: "chip" | "ripple";
   dataKey?: string | number;
   dataReorder?: "source";
   /** 源行占位。placeholder 时调用方不挂文本。 */

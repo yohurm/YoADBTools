@@ -2,7 +2,7 @@
  * 清单行盒（L2）。
  * Family B 数据网格行：直角通栏 + 底。投放框不在本层。
  * 选中底一律行自绘；document 单选半径 chip，list / 多选块缺省直角通栏。
- * 显式 radius=chip 时每项同一圆角（操作清单），文件清单不走这条。
+ * 显式 radius=chip 时每项同一圆角（特殊铬 16）。操作清单走 ripple（默认圆角、行间不留缝）。文件清单不走这两条。
  * 不碰 DOM、不写色值。
  */
 
@@ -18,8 +18,8 @@ export function listRowToneIsList(tone?: string): boolean {
   return tone === "list";
 }
 export type YoListRowFill = "none" | "selected" | "hot";
-/** none = 直角通栏；chip = document 单选圆角片。 */
-export type YoListRowRadius = "none" | "chip";
+/** none = 直角通栏；chip = document 单选圆角片；ripple = 默认 Ripple 圆角，铺满行、行间不留缝。 */
+export type YoListRowRadius = "none" | "chip" | "ripple";
 
 export const DEFAULT_LIST_ROW_TONE: YoListRowTone = "document";
 
@@ -31,10 +31,11 @@ export interface ListRowChromeInput {
   /** 多选 key 集。未显式 chip 且 size>1 时半径走 none。 */
   selectedKeys?: ReadonlySet<string | number>;
   /**
-   * 显式 chip：操作项每项同一特殊铬 16。
-   * 不因 list hairline 或多选块改成直角。文件清单不传。
+   * chip：特殊铬 16，画在行内容上。
+   * ripple：默认 Ripple 圆角，画在行盒上，行间不留缝。
+   * 文件清单不传。
    */
-  radius?: "chip";
+  radius?: "chip" | "ripple";
 }
 
 export interface ListRowChrome {
@@ -48,6 +49,7 @@ export interface ListRowChrome {
  */
 export function resolveListRowRadius(input: ListRowChromeInput = {}): YoListRowRadius {
   if (!input.selectable) return "none";
+  if (input.radius === "ripple") return "ripple";
   if (input.radius === "chip") return "chip";
   if (listRowToneIsList(input.tone)) return "none";
   if (input.selectedKeys !== undefined && input.selectedKeys.size > 1) return "none";

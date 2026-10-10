@@ -106,6 +106,7 @@ describe("scroller-model", () => {
     expect(resolveScrollerGutter({ overflowing: true, barState: "auto" })).toBe(true);
     expect(resolveScrollerGutter({ overflowing: true, barState: "on" })).toBe(true);
     expect(resolveScrollerGutter({ overflowing: true, barState: "off" })).toBe(false);
+    expect(resolveScrollerGutter({ overflowing: false, barState: "on" })).toBe(true);
   });
 
   it("BarState：Auto 停滚隐藏，On 常驻，Off 不画条", () => {

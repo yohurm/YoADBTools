@@ -16,9 +16,9 @@ export interface OpsListHandlers<T> {
 }
 
 export interface OpsListBindings<T> {
+  /** 选择打开即列表面：行贴齐、点按铺满、行间 hairline。圆角走默认 Ripple。 */
   tone?: "list";
-  /** 操作项每项 ripple 同一圆角。选择打开才写。 */
-  rowRadius?: "chip";
+  rowRadius?: "ripple";
   selectedKey?: Accessor<string | number | null>;
   selectedKeys?: Accessor<ReadonlySet<string | number>>;
   onSelectRow?: OpsListHandlers<T>["onSelectRow"];
@@ -30,8 +30,10 @@ export interface OpsListBindings<T> {
 export function opsListBindings<T>(input: OpsListHandlers<T>): OpsListBindings<T> {
   const spec = resolveOpsFeatures(input.features);
   const bindings: OpsListBindings<T> = {};
-  if (spec.rule) bindings.tone = "list";
-  if (spec.select) bindings.rowRadius = "chip";
+  if (spec.rule || spec.select) {
+    bindings.tone = "list";
+    bindings.rowRadius = "ripple";
+  }
   if (spec.multi) {
     if (input.selectedKeys) bindings.selectedKeys = input.selectedKeys;
   } else if (spec.select && input.selectedKey) {

@@ -131,7 +131,7 @@ describe("keyed 回调按 id 再读收成 live", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
     const needle = "sessionById(" + "session.id)";
     expect(view.split(needle).length - 1).toBe(1);
-    expect(view.split("live()").length - 1).toBe(5);
+    expect(view.split("live()").length - 1).toBe(6);
     expect(view).toContain("session={session}");
     expect(view).toContain("visible ?? EMPTY_ROWS");
   });

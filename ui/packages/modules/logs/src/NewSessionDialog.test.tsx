@@ -27,6 +27,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logReplay: vi.fn(async () => ({ serial: "", from_seq: 0, lines: [] })),
     logExport: vi.fn(),
     onLogBatch: unlisten,
+    onLogHits: unlisten,
     onLogOverflow: unlisten,
     onProcessIndex: unlisten,
     onCaptureState: unlisten,

@@ -66,7 +66,7 @@ const EXPECTED_DARK: Record<string, string> = {
   BgBase: "#191A1C",
   Surface: "#202224",
   Surface2: "#2E3033",
-  CompGray: "#FFFFFF19",
+  CompGray: "#FFFFFF0C",
   Accent: "#317AF7",
   AccentSoft: "#317AF733",
   Success: "#5BA854",
@@ -159,9 +159,9 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     expect(luminance(DarkColors.Surface)).toBeLessThan(luminance(DarkColors.Surface2));
   });
 
-  it("深色展示类底板是 Container 10% 白，叠在画布上仍是暗面", () => {
+  it("深色展示类底板是 Container 5% 白，叠在画布上仍是暗面", () => {
     const plate = composite(DarkColors.CompGray, DarkColors.BgBase);
-    expect(DarkColors.CompGray).toBe("#FFFFFF19");
+    expect(DarkColors.CompGray).toBe("#FFFFFF0C");
     expect(luminance(plate)).toBeGreaterThan(luminance(DarkColors.BgBase));
     expect(luminance(plate)).toBeLessThan(0.15);
     expect(DarkColors.CompGray).not.toBe("#E5E5EA");
@@ -206,7 +206,19 @@ describe("tokens/colors HarmonyOS 官方色", () => {
     expect(Harmony.container.light).toBe("#000000");
     expect(Harmony.container.dark).toBe("#FFFFFF");
     expect(Harmony.compBackgroundTertiary.light).toBe("#0000000C");
-    expect(Harmony.compBackgroundTertiary.dark).toBe("#FFFFFF19");
+    expect(Harmony.compBackgroundTertiary.dark).toBe("#FFFFFF0C");
+    expect(Harmony.interactiveHover.light).toBe("#0000000C");
+    expect(Harmony.interactiveHover.dark).toBe("#FFFFFF0C");
+    expect(Harmony.interactivePressed.light).toBe("#00000019");
+    expect(Harmony.interactiveSelect.light).toBe("#0A59F733");
+    expect(Harmony.compDivider.light).toBe("#00000033");
+    expect(Harmony.fontOnSecondary.light).toBe("#FFFFFF99");
+    expect(Harmony.compBackgroundEmphasize.dark).toBe("#317AF7");
+    expect(Harmony.compBackgroundNeutral.dark).toBe("#FFFFFF");
+    expect(Colors.CompGrayHover).toBe("#00000017");
+    expect(Colors.CompGrayPressed).toBe("#00000024");
+    expect(DarkColors.CompGrayHover).toBe("#FFFFFF17");
+    expect(DarkColors.CompGrayPressed).toBe("#FFFFFF24");
     expect(Colors.CompGray).toBe(Harmony.compBackgroundTertiary.light);
     expect(DarkColors.CompGray).toBe(Harmony.compBackgroundTertiary.dark);
     expect(DarkColors.CompGray).not.toBe(Harmony.compBackgroundGray.dark);
@@ -364,7 +376,7 @@ describe("theme.css 变量", () => {
     expect(darkBlock).toContain("--yohu-scrim: #00000066");
     expect(darkBlock).toContain("--yohu-surface: #202224");
     expect(darkBlock).toContain("--yohu-surface-2: #2E3033");
-    expect(darkBlock).toContain("--yohu-comp-gray: #FFFFFF19");
+    expect(darkBlock).toContain("--yohu-comp-gray: #FFFFFF0C");
     expect(darkBlock).toContain("--yohu-success: #5BA854");
   });
 

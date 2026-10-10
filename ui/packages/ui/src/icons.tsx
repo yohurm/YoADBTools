@@ -22,6 +22,7 @@ export type IconName =
   | "mirror"
   | "close"
   | "plus"
+  | "check"
   | "chevron-down"
   | "chevron-left"
   | "chevron-right"
@@ -123,6 +124,7 @@ const ICON_GLYPHS: Record<IconName, () => JSX.Element> = {
       <line x1="5" y1="12" x2="19" y2="12" />
     </>
   ),
+  check: () => <polyline points="20 6 9 17 4 12" />,
   "chevron-down": () => <polyline points="6 9 12 15 18 9" />,
   "chevron-left": () => <polyline points="15 18 9 12 15 6" />,
   "chevron-right": () => <polyline points="9 18 15 12 9 6" />,

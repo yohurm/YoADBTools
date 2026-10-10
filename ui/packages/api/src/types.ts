@@ -56,6 +56,48 @@ export interface LogBatch {
   truncated: boolean;
 }
 
+/** 窗口过滤登记。命中索引在环旁边，返回当前页。 */
+export interface LogWindowBind {
+  id: number;
+  serial: string;
+  filter: LogFilter;
+  from_seq: number;
+  following: boolean;
+  through_seq?: number;
+}
+
+export interface LogLatch {
+  window_id: number;
+  following: boolean;
+}
+
+export interface LogPageQuery {
+  window_id: number;
+  index: number;
+  count: number;
+}
+
+/** 一页命中。`index` 是本页首行在命中索引中的位置。 */
+export interface LogPage {
+  window_id: number;
+  serial: string;
+  index: number;
+  total: number;
+  signals: number;
+  pending: number;
+  lines: LogLine[];
+}
+
+/** 一批窗口命中。钉底时 `tail` 是新增命中；离开底部 `tail` 为空。 */
+export interface LogHits {
+  serial: string;
+  window_id: number;
+  total: number;
+  appended: number;
+  signals: number;
+  tail: LogLine[];
+}
+
 export type CaptureState = "running" | "stopped";
 
 export interface CaptureStart {
@@ -603,6 +645,7 @@ export type AppEvent =
   | { kind: "deviceOffline"; serial: string }
   | { kind: "deviceStatus"; status: DeviceStatus }
   | { kind: "logBatch"; batch: LogBatch }
+  | ({ kind: "logHits" } & LogHits)
   | { kind: "logOverflow"; serial: string; dropped_batches: number }
   | ({ kind: "processIndex" } & ProcessIndexSnapshot)
   | { kind: "captureState"; serial: string; generation: number; state: CaptureState }
@@ -630,6 +673,7 @@ export const EVENT_NAMES = {
   deviceOffline: "device/offline",
   deviceStatus: "device/status",
   logLines: "log/lines",
+  logHits: "log/hits",
   logOverflow: "log/overflow",
   processIndex: "log/processIndex",
   captureState: "log/captureState",
