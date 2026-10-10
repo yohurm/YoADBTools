@@ -360,6 +360,36 @@ describe("YoVirtualList", () => {
     expect(plane.style.transform).toBe(scrollerPlaneTransform(46));
   });
 
+  it("文档已在本地时跟尾钉在轨道末端，拖动不向环要页", async () => {
+    const onLine = vi.fn();
+    const [scale, setScale] = createSignal({ total: 1000, at: 920 });
+    const api = captureHandle();
+    const { container } = render(() => (
+      <YoVirtualList
+        items={() => makeItems(80)}
+        itemHeight={20}
+        autoScrollToBottom={() => true}
+        lineScale={scale}
+        onLine={onLine}
+        handle={api.bind}
+        renderRow={TestRow}
+      />
+    ));
+    const list = scroller(container);
+    Object.defineProperty(list, "clientHeight", { value: 200, configurable: true });
+    setScale({ total: 1000, at: 920 });
+    await Promise.resolve();
+    expect(api.current?.offset()).toBe(1000 * 20 - 200);
+    expect(innerEl(container).style.transform).toBe(scrollerPlaneTransform(0));
+    expect(innerEl(container).style.height).toBe("200px");
+
+    onLine.mockClear();
+    api.current?.scrollTo(920 * 20 + 400);
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    expect(onLine).not.toHaveBeenCalled();
+    expect(api.current?.offset()).toBe(920 * 20 + 400);
+  });
+
   it("离开底部 onAtBottomChange(false)，回到底部时 true", () => {
     const onAtBottom = vi.fn();
     const items = makeItems(100);

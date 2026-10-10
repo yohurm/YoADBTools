@@ -57,6 +57,16 @@ import {
 } from "./reorder-policy";
 import { isModKey } from "../keymap/chord";
 import { YoScroller, type YoScrollerHandle, type ScrollerBarState } from "./Scroller";
+import {
+  INDEX_PAGE_MARGIN,
+  indexAtTail,
+  indexFetchAt,
+  indexFromOffset,
+  indexPageHolds,
+  indexPageShift,
+  indexTailOffset,
+  indexViewRows,
+} from "./index-model";
 import { scrollerPlaneTransform, type ScrollerAxis } from "./scroller-model";
 import {
   VIRTUAL_DEFAULT_ITEM_HEIGHT,
@@ -134,16 +144,26 @@ export interface YoVirtualListProps<T> {
   /** 会话偏移。像素滚动不进 Solid；表头横滑读 inline。 */
   onOffset?: (block: number, inline: number) => void;
   /**
+   * 行号滚轴。`total` 是文档行数，`at` 是 `items[0]` 对应的文档行。
+   * `at + items.length >= total` 时文档已在本地：内层只留视口高，拖动只改可见下标。
+   * 盖不住整份文档时才经 `onLine` 补页。
+   */
+  lineScale?: Accessor<{ total: number; at: number } | undefined>;
+  /** 文档头被裁掉的累计行数。未跟尾时滚动偏移退回同样的行。 */
+  docShift?: Accessor<number>;
+  /** 文档盖不住视口时，要补的文档行号。同一帧只报一次。 */
+  onLine?: (index: number) => void;
+  /**
    * 行铬。默认 document：虚拟化只负责视口，不画格子线。
    * Family B 文件清单显式 tone="list" 才有行间 hairline。
    * 禁止默认画线再让文档列表去关。
    */
   tone?: YoListRowTone;
   /**
-   * 显式 chip：每项悬浮/按压/选中都走特殊铬 16。
-   * 操作清单由 opsListBindings 写入。文件清单不传，hairline 行保持直角。
+   * chip：特殊铬 16。ripple：默认 Ripple 圆角，铺满行。
+   * 操作清单由 opsListBindings 写入 ripple。文件清单不传，保持直角。
    */
-  rowRadius?: "chip";
+  rowRadius?: "chip" | "ripple";
   /**
    * 行热态 key（投放命中目录等）。与选中正交。
    * 行底走 YoListRow fill=hot；框走 YoListFrame 叠加层。禁止模块 --drop。
@@ -216,14 +236,44 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
 
   const activeKey = createMemo(() => virtualActiveKey(selectedKeys(), selectedKey(), focusKey()));
 
+  let lineSync = false;
+  let lineFrame = 0;
+  let lineLatched = false;
+  let lineSeenAt = Number.NaN;
+  let lineAsked = -1;
+  let lineSeenDrop = 0;
+  const [lineAnchor, setLineAnchor] = createSignal(0);
+
+  const lineScale = (): { total: number; at: number } | undefined => props.lineScale?.();
+
+  const lineCovers = (): boolean => {
+    const scale = lineScale();
+    if (!scale || scale.total <= 0) return false;
+    return scale.at + props.items().length >= scale.total;
+  };
+
+  const lineShift = (block: number): number => {
+    const scale = lineScale();
+    if (!scale) return block;
+    return indexPageShift(
+      block,
+      scale.at,
+      props.items().length,
+      itemHeight(),
+      container?.clientHeight ?? viewportHeight(),
+    );
+  };
+
   const measureAtBottom = (): boolean => {
     if (!container || !scrollerHandle) return true;
-    return isStuckToBottom(totalHeight(), container.clientHeight, scrollerHandle.offset());
+    return isStuckToBottom(extentBlock(), container.clientHeight, scrollerHandle.offset());
   };
 
   const emitAtBottom = (): void => {
     if (!props.onAtBottomChange) return;
+    if (lineSync) return;
     const atBottom = measureAtBottom();
+    if (lineScale() && props.autoScrollToBottom?.() && !atBottom) return;
     if (!shouldEmitAtBottom(isAutoScrolling, atBottom, lastAtBottom)) return;
     lastAtBottom = atBottom;
     props.onAtBottomChange(atBottom);
@@ -245,11 +295,24 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     }
   };
 
-  const totalHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
+  const pageHeight = (): number => virtualTotalHeight(props.items().length, itemHeight());
+
+  const frameHeight = (): number => {
+    if (!lineCovers()) return pageHeight();
+    const view = container?.clientHeight || viewportHeight();
+    return Math.max(view, itemHeight());
+  };
+
+  const extentBlock = (): number => {
+    const scale = lineScale();
+    if (scale && scale.total > 0) return virtualTotalHeight(scale.total, itemHeight());
+    return pageHeight();
+  };
 
   const paintPlane = (block: number, inline: number): void => {
     if (!inner) return;
-    inner.style.transform = scrollerPlaneTransform(block, inline);
+    const shift = lineCovers() ? 0 : lineScale() ? lineShift(block) : block;
+    inner.style.transform = scrollerPlaneTransform(shift, inline);
   };
 
   const scrollerOffset = (): number => {
@@ -260,9 +323,21 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     if (!container) return;
     const view = container.clientHeight;
     if (view !== viewportHeight()) setViewportHeight(view);
+    const height = itemHeight();
+    const scale = lineScale();
+    let originBlock = block;
+    if (scale && lineCovers()) {
+      const local = Math.max(0, block - scale.at * height);
+      const next = virtualPoolOrigin(local, height, overscan(), props.items().length, poolSize());
+      setLineAnchor(next * height - local);
+      if (next !== origin()) setOrigin(next);
+      emitAtBottom();
+      return;
+    }
+    if (scale) originBlock = lineShift(block);
     const next = virtualPoolOrigin(
-      block,
-      itemHeight(),
+      originBlock,
+      height,
       overscan(),
       props.items().length,
       poolSize(),
@@ -272,7 +347,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   };
 
   createEffect(() => {
-    void totalHeight();
+    void extentBlock();
     void innerWidth();
     const api = scrollerHandle;
     if (!api) return;
@@ -475,14 +550,14 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   onMount(() => {
     if (container) {
       noteViewport(container);
-      if (props.autoScrollToBottom?.()) {
+      if (props.autoScrollToBottom?.() && !lineScale()) {
         snapToBottom();
       }
       if (typeof ResizeObserver !== "undefined") {
         const observer = new ResizeObserver(() => {
           if (container) {
             noteViewport(container);
-            if (props.autoScrollToBottom?.()) snapToBottom();
+            if (props.autoScrollToBottom?.() && !lineScale()) snapToBottom();
           }
         });
         observer.observe(container);
@@ -491,6 +566,9 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     }
     onCleanup(() => {
       reorder.destroy();
+      if (lineFrame !== 0 && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(lineFrame);
+      }
       if (autoScrollReset !== 0 && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(autoScrollReset);
       }
@@ -502,7 +580,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     const length = props.items().length;
     void poolSize();
     if (!container) return;
-    if (props.autoScrollToBottom?.() && length >= 0) {
+    if (props.autoScrollToBottom?.() && !lineScale() && length >= 0) {
       snapToBottom();
       return;
     }
@@ -608,6 +686,105 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     );
   };
 
+  const moveLine = (top: number): void => {
+    const api = scrollerHandle;
+    if (lineFrame !== 0 && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(lineFrame);
+      lineFrame = 0;
+    }
+    if (!api || Math.abs(api.offset() - top) < 1) return;
+    lineSync = true;
+    api.scrollTo(top);
+    lineSync = false;
+  };
+
+  createEffect(() => {
+    const scale = lineScale();
+    const view = container?.clientHeight || viewportHeight();
+    const height = itemHeight();
+    const follow = props.autoScrollToBottom?.() ?? false;
+    const drop = props.docShift?.() ?? 0;
+    void props.items().length;
+    if (!scale || !scrollerHandle) return;
+    const at = scale.at;
+    const delta = drop - lineSeenDrop;
+    lineSeenDrop = drop;
+    if (at !== lineSeenAt) lineAsked = -1;
+    if (follow) {
+      lineLatched = true;
+      lineSeenAt = at;
+      moveLine(indexTailOffset(virtualTotalHeight(scale.total, height), view));
+      return;
+    }
+    if (lineCovers() && delta > 0) {
+      lineSeenAt = at;
+      moveLine(Math.max(0, scrollerHandle.offset() - delta * height));
+    }
+    const max = indexTailOffset(virtualTotalHeight(scale.total, height), view);
+    if (lineCovers() && scrollerHandle.offset() > max) {
+      moveLine(max);
+    }
+    if (lineLatched) {
+      lineLatched = false;
+      lineSeenAt = at;
+      paintPlane(scrollerHandle.offset(), scrollerHandle.offsetInline());
+      return;
+    }
+    if (!lineCovers() && at === lineSeenAt && delta === 0) return;
+    lineSeenAt = at;
+    paintPlane(scrollerHandle.offset(), scrollerHandle.offsetInline());
+    adoptWindow();
+  });
+
+  const settleLine = (block: number): void => {
+    const scale = lineScale();
+    if (!scale) return;
+    const height = itemHeight();
+    if (height <= 0) return;
+    const view = container?.clientHeight ?? viewportHeight();
+    const viewRows = indexViewRows(view, height);
+    const first = indexFromOffset(block, height);
+    const atTail = indexAtTail(first, viewRows, scale.total);
+    const follow = props.autoScrollToBottom?.() ?? false;
+    if (follow && !atTail) {
+      if (lastAtBottom) {
+        lastAtBottom = false;
+        props.onAtBottomChange?.(false);
+      }
+    } else if (!follow && atTail && !lastAtBottom) {
+      lastAtBottom = true;
+      props.onAtBottomChange?.(true);
+    }
+    if (lineCovers()) return;
+    const pageRows = props.items().length;
+    if (indexPageHolds(scale.at, pageRows, first, viewRows, scale.total, INDEX_PAGE_MARGIN)) {
+      return;
+    }
+    if (!props.onLine) return;
+    const fetchAt = indexFetchAt(first, Math.max(pageRows, viewRows), viewRows);
+    if (fetchAt === lineAsked) return;
+    lineAsked = fetchAt;
+    props.onLine(fetchAt);
+  };
+
+  const reportLine = (block: number): void => {
+    if (lineSync) return;
+    if (!lineScale()) return;
+    if (lineFrame !== 0 && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(lineFrame);
+    }
+    const emit = (): void => {
+      lineFrame = 0;
+      if (lineSync) return;
+      settleLine(block);
+    };
+    if (typeof requestAnimationFrame === "function") {
+      lineFrame = requestAnimationFrame(emit);
+    } else {
+      emit();
+    }
+  };
+
   return (
     <div
       class={`yohu-virtual-list${props.class ? ` ${props.class}` : ""}`}
@@ -622,7 +799,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
         axis={scrollerAxis()}
         state={props.state}
         extent={() => ({
-          block: totalHeight(),
+          block: extentBlock(),
           inline: innerWidth(),
         })}
         handle={(api) => {
@@ -633,6 +810,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           paintPlane(block, inline);
           adoptWindow(block);
           props.onOffset?.(block, inline);
+          reportLine(block);
         }}
         viewRef={(el) => {
           container = el;
@@ -645,7 +823,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
           inner = el;
         }}
         style={{
-          height: `${totalHeight()}px`,
+          height: `${frameHeight()}px`,
           ...(innerWidth() > 0 ? { width: `${innerWidth()}px`, "min-width": "100%" } : {}),
         }}
       >
@@ -671,7 +849,18 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
         }>
           <div
             class="yohu-virtual-list__cluster"
-            style={virtualClusterStyle(origin(), itemHeight(), innerWidth())}
+            style={
+              lineCovers()
+                ? {
+                    position: "absolute",
+                    top: `${lineAnchor()}px`,
+                    left: "0px",
+                    ...(innerWidth() > 0
+                      ? { width: `${innerWidth()}px`, right: "auto" as const }
+                      : { right: "0px" as const }),
+                  }
+                : virtualClusterStyle(origin(), itemHeight(), innerWidth())
+            }
           >
             <For each={flowWindow()}>
               {(itemIndex) => <RowView index={() => itemIndex} />}

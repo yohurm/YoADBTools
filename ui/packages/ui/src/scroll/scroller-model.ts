@@ -248,12 +248,15 @@ export function resolveScrollerInteractive(interactive?: boolean): boolean {
   return interactive !== false;
 }
 
-/** 溢出且未 Off 则让出侧轨。Auto 隐条也留槽，避免内容跳。 */
+/** 溢出且未 Off 则让出侧轨。On 即使未溢出也常驻，避免内容涨落改视口宽。Auto 隐条在溢出时留槽。 */
 export function resolveScrollerGutter(input: {
   overflowing: boolean;
   barState?: ScrollerBarState;
 }): boolean {
-  return input.overflowing && !scrollerBarIsOff(resolveScrollerBarState(input.barState));
+  const bar = resolveScrollerBarState(input.barState);
+  if (scrollerBarIsOff(bar)) return false;
+  if (scrollerBarIsOn(bar)) return true;
+  return input.overflowing;
 }
 
 export function resolveScrollerPhase(input: {
