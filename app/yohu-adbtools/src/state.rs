@@ -59,6 +59,8 @@ pub struct AppState {
     pub update_runs: UpdateRuns,
     pub browse_runs: BrowseRuns,
     pub catalog_gate: tokio::sync::Mutex<Option<CatalogWatch>>,
+    /// 进行中的 OpenH264 下载。关掉开关时取走并取消。启动时不会往这里放任务。
+    pub openh264_acquire: tokio::sync::Mutex<Option<Arc<CancellationToken>>>,
 }
 
 impl AppState {

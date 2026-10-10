@@ -449,6 +449,7 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
     const paths = {
       local_root: "C:/Local/YohuAdbTools",
       install_dir: "C:/Local/Programs/YohuAdbTools",
+      executable: "C:/Local/Programs/YohuAdbTools/YohuAdbTools.exe",
       config_dir: "C:/Local/YohuAdbTools/config",
       settings_file: "C:/Local/YohuAdbTools/config/settings.json",
       logs_dir: "C:/Local/YohuAdbTools/logs",

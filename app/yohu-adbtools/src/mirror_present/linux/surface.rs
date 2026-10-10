@@ -207,10 +207,8 @@ impl Live {
             return;
         }
         if let Some(err) = self.seat.failed {
-            let retry = enabled
-                && (err == PresentError::OpenH264Disabled
-                    || (err == PresentError::OpenH264Missing
-                        && super::openh264::locate(&self.openh264_dir).is_some()));
+            // 缺文件停在这一次会话。下载完成不在这里自动打开解码器，用户再点「开始」（ADR-v6-044）。
+            let retry = enabled && err == PresentError::OpenH264Disabled;
             if !retry {
                 return;
             }
@@ -367,6 +365,7 @@ fn stage_paint(snap: &LayoutSnap, show: bool) -> StagePaint {
         chrome: snap.chrome,
         loading: snap.loading,
         motion: snap.motion.clone(),
+        yield_web: crate::mirror_present::openh264_download_hole(&snap.description),
     }
 }
 
@@ -403,5 +402,6 @@ fn hidden_paint() -> StagePaint {
         chrome: false,
         loading: false,
         motion: None,
+        yield_web: false,
     }
 }

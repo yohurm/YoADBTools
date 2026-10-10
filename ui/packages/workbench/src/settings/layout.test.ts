@@ -95,7 +95,7 @@ describe("设置页滚轴", () => {
     expect(view).not.toContain("createEffect");
     expect(form).toContain("channelRemote()");
     expect(form).not.toContain("updateInfo(");
-    expect(form).toContain('title="更新通道"');
+    expect(form).toContain('title="发布仓库"');
   });
 
   it("待装包大小零默认只写在 pendingBytes", () => {

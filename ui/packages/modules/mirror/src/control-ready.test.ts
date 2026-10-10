@@ -342,12 +342,12 @@ describe("失败提示", () => {
 });
 
 describe("捕获的异常句子", () => {
-  it("三处失败都把异常收成句子，开始失败不并", () => {
+  it("失败都把异常收成句子，开始失败不并", () => {
     const view = sourceOf("MirrorView.tsx");
     expect(times(view, "error" + "Text(e)")).toBe(1);
     expect(times(view, "function caughtText")).toBe(1);
     expect(times(view, "export function caughtText")).toBe(0);
-    expect(times(view, "caughtText(e)")).toBe(3);
+    expect(times(view, "caughtText(e)")).toBe(4);
   });
 });
 
@@ -400,13 +400,13 @@ describe("质量下拉", () => {
 });
 
 describe("页头钮尺寸", () => {
-  it("开始和仅显示都是小号，功能栏间隔不并", () => {
+  it("开始、仅显示和下载都是小号，功能栏间隔不并", () => {
     const view = sourceOf("MirrorView.tsx");
     expect(times(view, "size=" + "\"sm\"")).toBe(0);
     expect(times(view, "return " + "\"sm\"")).toBe(1);
     expect(times(view, "function headerButtonSize")).toBe(1);
     expect(times(view, "export function headerButtonSize")).toBe(0);
-    expect(times(view, "headerButtonSize()")).toBe(3);
+    expect(times(view, "headerButtonSize()")).toBe(4);
     expect(view).toContain("gap=" + "\"sm\"");
   });
 });

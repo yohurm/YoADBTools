@@ -185,6 +185,18 @@ export const mirrorPointer = (req: MirrorPointer) => invoke<void>("mirror.pointe
 export const mirrorScreenshot = (req: MirrorScreenshotRequest) =>
   invoke<void>("mirror.screenshot", { req });
 
+export interface Openh264Status {
+  ready: boolean;
+}
+
+/** 数据目录里是否已经有单独下载的 OpenH264。不会发网络请求。 */
+export const mirrorOpenh264Status = () =>
+  invoke<Openh264Status>("mirror.openh264.status");
+
+/** 用户点击后从 Cisco 下载 OpenH264。成功不启动投屏。 */
+export const mirrorOpenh264Acquire = () =>
+  invoke<Openh264Status>("mirror.openh264.acquire");
+
 // ===== settings =====
 
 /** 返回全量快照。壳 settingsStore.set 回写后经会话 settings 注入模块。 */

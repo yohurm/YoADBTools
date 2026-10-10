@@ -9,8 +9,8 @@
 #![cfg_attr(target_os = "linux", allow(dead_code))]
 
 mod annexb;
-mod control_hand;
 mod backend;
+mod control_hand;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
@@ -72,6 +72,11 @@ pub enum PresentError {
     ScreenshotWrite,
     #[error("截图读取失败")]
     ScreenshotRead,
+}
+
+/// 缺文件说明里的这一句。洞上的下载按钮和「让网页盖住 GTK 子窗口」都认它。
+pub(crate) fn openh264_download_hole(body: &str) -> bool {
+    body.contains("还没有单独下载的 OpenH264")
 }
 
 pub struct PresentHost {
@@ -209,6 +214,18 @@ impl PresentHost {
         *lock_present(&self.openh264_dir) = dir;
     }
 
+    /// `locate` 已经能找到一份 .so（环境变量或数据目录）。其他系统没有这条下载。
+    #[cfg(target_os = "linux")]
+    pub fn openh264_located(&self) -> bool {
+        let dir = lock_present(&self.openh264_dir).clone();
+        linux::locate_openh264(&dir).is_some()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn openh264_located(&self) -> bool {
+        true
+    }
+
     pub fn new(event_tx: tokio_mpsc::Sender<AppEvent>, mirror: Arc<MirrorService>) -> Arc<Self> {
         // HEVC 探测会走 Media Foundation，冷启动可达数秒；禁止挡 setup / 首屏。
         let host = Self::assemble(event_tx, mirror);
@@ -286,7 +303,11 @@ impl PresentHost {
             inner.decode = None;
             self.pictures.clear();
         }
-        if inner.paint.as_ref().is_some_and(|note| note.serial == serial) {
+        if inner
+            .paint
+            .as_ref()
+            .is_some_and(|note| note.serial == serial)
+        {
             inner.paint = None;
         }
         if let Some(tx) = inner.surface.as_ref() {
@@ -718,7 +739,8 @@ fn spawn_backend_surface(
 mod tests {
     use super::{
         apply_pending_unbind, assert_screenshot_serial, avail_for_replay, layout_replayable, probe,
-        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError, PresentHost,
+        screenshot_from_pixels, screenshot_host_reply, screenshot_sampled, PresentError,
+        PresentHost,
     };
     use yohu_protocol::MirrorLayout;
 

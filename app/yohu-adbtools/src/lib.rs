@@ -24,6 +24,7 @@ mod mirror_sessions;
 pub use mirror_present::MfDecoder;
 #[cfg(windows)]
 mod native_splash;
+mod openh264_acquire;
 mod panic_hook;
 mod paths;
 mod settings_apply;
@@ -265,6 +266,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 update_runs: crate::update_runs::UpdateRuns::new(),
                 browse_runs: crate::browse_runs::BrowseRuns::new(),
                 catalog_gate: tokio::sync::Mutex::new(None),
+                openh264_acquire: tokio::sync::Mutex::new(None),
             };
             app.manage(state);
             crate::device_catalog::restore(&app.state::<AppState>());
@@ -392,6 +394,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::task::task_list,
             commands::mirror::mirror_pointer,
             commands::mirror::mirror_screenshot,
+            commands::mirror::mirror_openh264_status,
+            commands::mirror::mirror_openh264_acquire,
             commands::settings::settings_set,
             commands::system::system_info,
             commands::system::system_open_path,

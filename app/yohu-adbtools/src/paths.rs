@@ -140,8 +140,16 @@ impl AppPaths {
             library_file: path_string(&self.library_file()),
             exports_dir: path_string(&self.exports_dir()),
             drag_out_dir: path_string(&self.drag_out_dir()),
+            executable: current_executable(),
         }
     }
+}
+
+/// 这次进程的可执行文件。解析失败时给空串，安装根仍用产品目录，不改成进程所在目录。
+pub fn current_executable() -> String {
+    std::env::current_exe()
+        .map(|path| path_string(&path))
+        .unwrap_or_default()
 }
 
 fn path_string(path: &Path) -> String {
@@ -253,6 +261,8 @@ mod tests {
         assert_eq!(c.config_dir, path_string(&p.config_dir));
         assert_eq!(c.cache_dir, path_string(&p.cache_dir));
         assert_eq!(c.install_dir, path_string(&p.install_dir));
+        assert!(!c.executable.is_empty());
+        assert_ne!(c.executable, c.install_dir);
         assert!(c.settings_file.ends_with(dir::SETTINGS_FILE));
         assert!(c.drag_out_dir.ends_with(dir::DRAG_OUT));
         assert!(c.webview_dir.ends_with(dir::WEBVIEW));

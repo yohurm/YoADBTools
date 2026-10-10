@@ -54,6 +54,7 @@ pub struct PaintJob {
     pub chrome: bool,
     pub loading: bool,
     pub motion: Option<CardMotion>,
+    pub yield_web: bool,
     pub(super) video: Option<VideoPaint>,
 }
 
@@ -144,6 +145,8 @@ pub struct StagePaint {
     pub chrome: bool,
     pub loading: bool,
     pub motion: Option<CardMotion>,
+    /// 缺 OpenH264 时藏起 GTK 子窗口，让网页上的下载按钮露出来。
+    pub yield_web: bool,
 }
 
 impl StagePaint {
@@ -172,6 +175,7 @@ impl StagePaint {
             chrome: self.chrome,
             loading: self.loading,
             motion: self.motion,
+            yield_web: self.yield_web,
             video: None,
         }
     }
@@ -242,6 +246,13 @@ impl Canvas {
             .as_ref()
             .is_some_and(|job| job.show && job.avail_w > 0 && job.avail_h > 0);
         if !visible {
+            if let Some(child) = self.child.as_ref() {
+                child.hide();
+            }
+            return;
+        }
+        let yield_web = self.last.as_ref().is_some_and(|job| job.yield_web);
+        if yield_web {
             if let Some(child) = self.child.as_ref() {
                 child.hide();
             }

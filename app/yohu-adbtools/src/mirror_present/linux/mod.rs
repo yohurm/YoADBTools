@@ -8,6 +8,7 @@ mod color;
 mod h264;
 mod host;
 mod openh264;
+pub(super) use openh264::locate as locate_openh264;
 mod surface;
 mod vaapi;
 mod widget;

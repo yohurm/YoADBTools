@@ -202,6 +202,7 @@ const RESOLVED_EXPORT = "C:\\Users\\me\\AppData\\Local\\YohuAdbTools\\data\\modu
 const RESOLVED_PATHS = {
   local_root: RESOLVED_LOCAL,
   install_dir: "C:\\Users\\me\\AppData\\Local\\Programs\\YohuAdbTools",
+  executable: "C:\\Users\\me\\AppData\\Local\\Programs\\YohuAdbTools\\YohuAdbTools.exe",
   config_dir: `${RESOLVED_LOCAL}\\config`,
   settings_file: `${RESOLVED_LOCAL}\\config\\settings.json`,
   logs_dir: `${RESOLVED_LOCAL}\\logs`,

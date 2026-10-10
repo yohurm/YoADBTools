@@ -2,7 +2,7 @@
  * 设置表单：分组卡片与表单项。浏览/打开/保存走 store；本文件只交事件。
  */
 
-import { For, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, For, Show, type JSX } from "solid-js";
 
 import { APP_ICON_SRC } from "../app-identity";
 import {
@@ -11,10 +11,13 @@ import {
   LOG_DISPLAY_COLUMN_CATALOG,
   LOG_LINE_LAYOUT_CATALOG,
   ModuleTitle,
+  errorText,
   isLibraryExpandMode,
   libraryExpandGroupsLabel,
   libraryExpandIsGroups,
   libraryExpandWithMode,
+  mirrorOpenh264Acquire,
+  mirrorOpenh264Status,
   type Density,
   type DialogPick,
   type LibraryExpand,
@@ -27,6 +30,7 @@ import {
   YoBadge,
   YoButton,
   YoCheckbox,
+  type ToastTone,
   YoFormRow,
   YoPanel,
   YoScroller,
@@ -206,7 +210,33 @@ export function SettingsForm(props: {
   save: (key: SettingKey, value: unknown, okText: string) => void;
   savedBrowse: (run: () => Promise<DialogPick>, okText: string) => void;
   onCheckUpdate: () => void;
+  showToast: (text: string, tone: ToastTone) => void;
 }): JSX.Element {
+  const [openh264Ready, setOpenh264Ready] = createSignal(true);
+  const [openh264Busy, setOpenh264Busy] = createSignal(false);
+  let askedOpenh264 = false;
+
+  createEffect(() => {
+    if (!settingsStore.linuxHost() || askedOpenh264) return;
+    askedOpenh264 = true;
+    void mirrorOpenh264Status()
+      .then((status) => setOpenh264Ready(status.ready))
+      .catch(() => setOpenh264Ready(true));
+  });
+
+  async function downloadOpenh264(): Promise<void> {
+    if (openh264Busy()) return;
+    setOpenh264Busy(true);
+    try {
+      const status = await mirrorOpenh264Acquire();
+      setOpenh264Ready(status.ready);
+      props.showToast("OpenH264 已下载到数据目录。若正在投屏，请先停止，再点「开始」。", "success");
+    } catch (e) {
+      props.showToast(errorText(e), "error");
+    } finally {
+      setOpenh264Busy(false);
+    }
+  }
   function saveLibraryExpand(next: LibraryExpand): void {
     props.save("terminal_library_expand", next, savedNow());
   }
@@ -397,6 +427,18 @@ export function SettingsForm(props: {
           description="没有 VA-API H.264 硬解时，用这份单独下载的二进制出画。不打进安装包。关掉之后，没有硬解的机器停在说明里。"
           note={<EffectBadge text={immediateCopy()} />}
         >
+          <Show when={settingsStore.linuxHost() && !openh264Ready()}>
+            <YoButton
+              size={settingsStore.smSize()}
+              buttonStyle={settingsStore.normalStyle()}
+              tone={settingsStore.neutralTone()}
+              loading={openh264Busy()}
+              disabled={openh264Busy()}
+              onClick={() => void downloadOpenh264()}
+            >
+              下载 OpenH264
+            </YoButton>
+          </Show>
           <YoSwitch
             ariaLabel="OpenH264 Video Codec provided by Cisco Systems, Inc."
             checked={settingsStore.state.mirror_openh264}
@@ -451,10 +493,19 @@ export function SettingsForm(props: {
           </YoButton>
         </YoFormRow>
         <Show when={channelRemote()}>
-          <YoFormRow title="更新通道">{channelRemote()}</YoFormRow>
+          <YoFormRow title="发布仓库">{channelRemote()}</YoFormRow>
         </Show>
         <YoFormRow title="标识">
           {settingsStore.identity.identifier}
+        </YoFormRow>
+        <YoFormRow
+          title="安装根"
+          description="按用户的产品安装根。用 Debian 包装上时，程序在 /usr/bin，这个目录可以还不存在。"
+        >
+          {settingsStore.paths.install_dir}
+        </YoFormRow>
+        <YoFormRow title="本次程序" description="这次启动的程序文件。">
+          {settingsStore.paths.executable}
         </YoFormRow>
         <YoFormRow title="版权">
           {settingsStore.identity.copyright}

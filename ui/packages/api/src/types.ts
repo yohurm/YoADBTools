@@ -239,6 +239,7 @@ export interface AppIdentity {
 export interface AppPathCatalog {
   local_root: string;
   install_dir: string;
+  executable: string;
   config_dir: string;
   settings_file: string;
   logs_dir: string;
