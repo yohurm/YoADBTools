@@ -1,8 +1,9 @@
 name: CI
 
-# Yohu ADB Tools v6 — 持续集成与发布流水线（架构文档 §11.3）
+# Yohu ADB Tools v6 — 持续集成与发布流水线（架构文档 §11.3；ADR-v6-045）
 # 触发：push / PR 到 main；手动 workflow_dispatch。
 # 验收门槛与 CLAUDE.md「发布检查清单」一致（1/2/3/7 项自动化）。
+# 验证：Windows / macOS / Linux。打包：NSIS / DMG / deb（仅 push 与手动，PR 不打）。
 
 on:
   push:
@@ -248,8 +249,158 @@ jobs:
       - name: 上传安装包产物
         uses: actions/upload-artifact@v4
         with:
-          name: YohuAdbTools-installer
+          name: YohuAdbTools-windows-nsis
           path: |
             target/**/nsis/*setup.exe
             app/**/nsis/*setup.exe
+          if-no-files-found: error
+
+  package-linux:
+    name: 打包（deb）
+    runs-on: ubuntu-latest
+    needs: verify-linux
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: WebKitGTK 与打包依赖
+        run: bash scripts/setup-linux-deps.sh
+
+      - name: Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+
+      - name: sidecar adb
+        run: bash scripts/setup-adb.sh
+
+      - name: sidecar scrcpy-server
+        run: bash scripts/setup-scrcpy-server.sh
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: 前端依赖 + 构建
+        working-directory: ui
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: tauri-cli
+        run: cargo install tauri-cli --locked
+
+      - name: 打包 deb
+        working-directory: app/yohu-adbtools
+        run: cargo tauri build
+
+      - name: 校验约定文件名并记录体积
+        run: |
+          set -euo pipefail
+          deb="$(find target app -path '*/bundle/deb/*.deb' -type f | sort | tail -n 1)"
+          if [[ -z "$deb" ]]; then
+            echo "未找到 .deb 产物" >&2
+            find target app -type d -name bundle 2>/dev/null || true
+            exit 1
+          fi
+          base="$(basename "$deb")"
+          if [[ ! "$base" =~ ^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_amd64\.deb$ ]]; then
+            echo "deb 文件名不符合约定（期望 YohuAdbTools_X.Y.Z_amd64.deb）：$base" >&2
+            exit 1
+          fi
+          mb="$(du -h "$deb" | awk '{print $1}')"
+          echo "安装包：$deb = $mb"
+          mkdir -p dist-ci
+          cp -f "$deb" "dist-ci/$base"
+
+      - name: 上传安装包产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: YohuAdbTools-linux-deb
+          path: dist-ci/*.deb
+          if-no-files-found: error
+
+  package-macos:
+    name: 打包（DMG）
+    runs-on: macos-latest
+    needs: verify-macos
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+
+      - name: sidecar adb
+        run: bash scripts/setup-adb.sh
+
+      - name: sidecar scrcpy-server
+        run: bash scripts/setup-scrcpy-server.sh
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: 前端依赖 + 构建
+        working-directory: ui
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: tauri-cli
+        run: cargo install tauri-cli --locked
+
+      # 未配置 Apple Developer 证书 / 公证时产出未签名 DMG（ADR-v6-045）。
+      # 勿设置空的 APPLE_* / TAURI_SIGNING_*，以免 bundler 误入签名路径。
+      - name: 打包 DMG（未签名）
+        working-directory: app/yohu-adbtools
+        run: cargo tauri build
+
+      - name: 校验约定文件名并记录体积
+        run: |
+          set -euo pipefail
+          dmg="$(find target app -path '*/bundle/dmg/*.dmg' -type f | sort | tail -n 1)"
+          if [[ -z "$dmg" ]]; then
+            echo "未找到 .dmg 产物" >&2
+            find target app -type d -name bundle 2>/dev/null || true
+            exit 1
+          fi
+          base="$(basename "$dmg")"
+          # macos-latest 现为 arm64 → aarch64；若 runner 为 Intel 则 x64。
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64) expect_re='^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_aarch64\.dmg$' ;;
+            x86_64) expect_re='^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_x64\.dmg$' ;;
+            *) echo "未知 macOS 架构：$arch" >&2; exit 1 ;;
+          esac
+          if [[ ! "$base" =~ $expect_re ]]; then
+            echo "dmg 文件名不符合约定（arch=$arch）：$base" >&2
+            exit 1
+          fi
+          mb="$(du -h "$dmg" | awk '{print $1}')"
+          echo "安装包：$dmg = $mb（未签名，见 ADR-v6-045）"
+          mkdir -p dist-ci
+          cp -f "$dmg" "dist-ci/$base"
+
+      - name: 上传安装包产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: YohuAdbTools-macos-dmg
+          path: dist-ci/*.dmg
           if-no-files-found: error

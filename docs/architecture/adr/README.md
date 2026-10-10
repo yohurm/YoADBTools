@@ -48,3 +48,4 @@
 | [042](ADR-v6-042.md) | Linux 投屏像素 | **已接受：** 有 H.264 VLD 用 libva，否则 `linux/` 私有 OpenH264 仍画进已记下的 `GtkWindow` 的 GDK 子窗口。没有 `/dev/dri` 不是永久失败。不把二进制打进 `.deb`。`Caps.id` 仍是 `vaapi`。FFmpeg 另案，本页不接受 |
 | [043](ADR-v6-043.md) | Linux 工作台 | WebKitGTK + XDG / `~/.local/opt` + `.deb`；像素见 042；拖出仍不交付 |
 | [044](ADR-v6-044.md) | Linux 签收 | **已接受（设计）：** OpenH264 由用户点一下才从 Cisco 单独下载；关于页分列安装根与本次程序；发布仓库保持 022 的名字，标签改为「发布仓库」；无设备与掉线沿用 025。本页不改产品代码 |
+| [045](ADR-v6-045.md) | 三端安装包 CI/Release | **已接受：** CI 推 main 打 NSIS/DMG/deb；tag 汇总多平台 `update-manifest.json`；macOS 默认未签名 |

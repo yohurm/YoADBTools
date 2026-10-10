@@ -1,9 +1,11 @@
 name: Release
 
-# 打 vX.Y.Z 标签后打包 NSIS，并挂到该 tag 的 GitHub Release。
+# 打 vX.Y.Z 标签后并行打包 Windows NSIS / macOS DMG / Linux deb，
+# 汇总生成多平台 update-manifest.json，并挂到该 tag 的 GitHub Release（ADR-v6-045）。
 # 应用内检查更新优先读 releases/latest/download/update-manifest.json（无 REST 配额）；
 # 无 manifest 时走 Atom / Web Latest / REST 兜底。
 # 公开仓库检查更新不需要 PAT；本 workflow 用 GITHUB_TOKEN（contents: write）。
+# macOS 包默认未签名（无 Apple 证书 secrets）；见 ADR-v6-045。
 
 on:
   push:
@@ -17,11 +19,31 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    name: 打包并发布
-    runs-on: windows-latest
+  build:
+    name: 打包（${{ matrix.label }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows NSIS
+            artifact: YohuAdbTools-windows-nsis
+            kind: nsis
+          - os: ubuntu-latest
+            label: Linux deb
+            artifact: YohuAdbTools-linux-deb
+            kind: deb
+          - os: macos-latest
+            label: macOS DMG
+            artifact: YohuAdbTools-macos-dmg
+            kind: dmg
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: WebKitGTK 与打包依赖
+        if: matrix.kind == 'deb'
+        run: bash scripts/setup-linux-deps.sh
 
       - name: Rust 工具链
         uses: dtolnay/rust-toolchain@stable
@@ -29,13 +51,23 @@ jobs:
       - name: Rust 缓存
         uses: swatinem/rust-cache@v2
 
-      - name: sidecar adb
+      - name: sidecar adb（Windows）
+        if: matrix.kind == 'nsis'
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts/setup-adb.ps1
 
-      - name: sidecar scrcpy-server
+      - name: sidecar scrcpy-server（Windows）
+        if: matrix.kind == 'nsis'
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts/setup-scrcpy-server.ps1
+
+      - name: sidecar adb（Unix）
+        if: matrix.kind != 'nsis'
+        run: bash scripts/setup-adb.sh
+
+      - name: sidecar scrcpy-server（Unix）
+        if: matrix.kind != 'nsis'
+        run: bash scripts/setup-scrcpy-server.sh
 
       - name: pnpm
         uses: pnpm/action-setup@v4
@@ -57,57 +89,135 @@ jobs:
         run: cargo build --workspace
 
       - name: Rust 测试
-        # 集成测试要先有 target/*/fake-adb.exe；real_* 在发版机上跳过。
+        # 集成测试要先有 target/*/fake-adb；real_* 在发版机上跳过。
         run: cargo test --workspace -- --skip real_
 
       - name: tauri-cli
         run: cargo install tauri-cli --locked
 
-      - name: 打包 NSIS
+      - name: 打包（Tauri）
         working-directory: app/yohu-adbtools
         run: cargo tauri build
 
-      - name: 记录安装包体积
+      - name: 收集 Windows NSIS
+        if: matrix.kind == 'nsis'
         shell: powershell
         run: |
           $setup = Get-ChildItem -Path target, app -Recurse -Filter "*setup.exe" -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match '[\\/]bundle[\\/]nsis[\\/]' } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
-          if (-not $setup) {
-            Write-Host "target 目录："
-            Get-ChildItem target -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-            throw "未找到安装包产物"
+          if (-not $setup) { throw "未找到安装包产物" }
+          if ($setup.Name -notmatch '^YohuAdbTools_\d+\.\d+\.\d+_x64-setup\.exe$') {
+            throw "NSIS 文件名不符合约定：$($setup.Name)"
           }
+          New-Item -ItemType Directory -Force -Path dist-release | Out-Null
+          Copy-Item $setup.FullName (Join-Path dist-release $setup.Name) -Force
           $mb = [math]::Round($setup.Length / 1MB, 2)
           Write-Host "安装包：$($setup.FullName) = $mb MB"
-          "SETUP_PATH=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: 上传安装包产物
+      - name: 收集 Linux deb
+        if: matrix.kind == 'deb'
+        run: |
+          set -euo pipefail
+          deb="$(find target app -path '*/bundle/deb/*.deb' -type f | sort | tail -n 1)"
+          if [[ -z "$deb" ]]; then echo "未找到 .deb" >&2; exit 1; fi
+          base="$(basename "$deb")"
+          if [[ ! "$base" =~ ^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_amd64\.deb$ ]]; then
+            echo "deb 文件名不符合约定：$base" >&2
+            exit 1
+          fi
+          mkdir -p dist-release
+          cp -f "$deb" "dist-release/$base"
+          echo "安装包：$deb ($(du -h "$deb" | awk '{print $1}'))"
+
+      - name: 收集 macOS DMG（未签名）
+        if: matrix.kind == 'dmg'
+        run: |
+          set -euo pipefail
+          dmg="$(find target app -path '*/bundle/dmg/*.dmg' -type f | sort | tail -n 1)"
+          if [[ -z "$dmg" ]]; then echo "未找到 .dmg" >&2; exit 1; fi
+          base="$(basename "$dmg")"
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64) expect_re='^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_aarch64\.dmg$' ;;
+            x86_64) expect_re='^YohuAdbTools_[0-9]+\.[0-9]+\.[0-9]+_x64\.dmg$' ;;
+            *) echo "未知 macOS 架构：$arch" >&2; exit 1 ;;
+          esac
+          if [[ ! "$base" =~ $expect_re ]]; then
+            echo "dmg 文件名不符合约定（arch=$arch）：$base" >&2
+            exit 1
+          fi
+          mkdir -p dist-release
+          cp -f "$dmg" "dist-release/$base"
+          echo "安装包：$dmg ($(du -h "$dmg" | awk '{print $1}'))（未签名，ADR-v6-045）"
+
+      - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: YohuAdbTools-installer
-          path: |
-            target/**/nsis/*setup.exe
-            app/**/nsis/*setup.exe
+          name: ${{ matrix.artifact }}
+          path: dist-release/*
           if-no-files-found: error
 
-      - name: 生成 update-manifest.json
-        shell: powershell
-        run: |
-          $setup = $env:SETUP_PATH
-          $ver = $env:GITHUB_REF_NAME -replace '^v',''
-          powershell -ExecutionPolicy Bypass -File scripts/build-update-manifest.ps1 `
-            -Version $ver -SetupPath $setup -Tag $env:GITHUB_REF_NAME `
-            -OutFile (Join-Path (Split-Path $setup) "update-manifest.json")
+  publish:
+    name: 汇总发布
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: 创建 GitHub Release
+      - name: 下载三端安装包
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: YohuAdbTools-*
+          merge-multiple: false
+
+      - name: 生成 update-manifest.json 并创建 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: powershell
         run: |
-          $setup = $env:SETUP_PATH
-          if (-not $setup -or -not (Test-Path $setup)) { throw "未找到安装包产物" }
-          $manifest = Join-Path (Split-Path $setup) "update-manifest.json"
-          if (-not (Test-Path $manifest)) { throw "缺少 update-manifest.json" }
-          gh release create $env:GITHUB_REF_NAME $setup $manifest --generate-notes --title $env:GITHUB_REF_NAME
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          tag="$GITHUB_REF_NAME"
+          find release-assets -type f | sort
+
+          win="$(find release-assets -name '*_x64-setup.exe' -type f | head -n 1)"
+          deb="$(find release-assets -name '*_amd64.deb' -type f | head -n 1)"
+          dmg="$(find release-assets -name '*.dmg' -type f | head -n 1)"
+
+          if [[ -z "$win" || -z "$deb" || -z "$dmg" ]]; then
+            echo "缺少安装包：win=${win:-none} deb=${deb:-none} dmg=${dmg:-none}" >&2
+            exit 1
+          fi
+
+          dmg_base="$(basename "$dmg")"
+          if [[ "$dmg_base" == *_aarch64.dmg ]]; then
+            mac_key=darwin-aarch64
+          elif [[ "$dmg_base" == *_x64.dmg ]]; then
+            mac_key=darwin-x86_64
+          else
+            echo "无法从 DMG 名推断 manifest 键：$dmg_base" >&2
+            exit 1
+          fi
+
+          mkdir -p release-out
+          cp -f "$win" "$deb" "$dmg" release-out/
+          bash scripts/build-update-manifest.sh \
+            --version "$ver" \
+            --tag "$tag" \
+            --out release-out/update-manifest.json \
+            --asset "windows-x86_64=release-out/$(basename "$win")" \
+            --asset "linux-x86_64=release-out/$(basename "$deb")" \
+            --asset "${mac_key}=release-out/$(basename "$dmg")"
+
+          # 与应用内 DEFAULT_REPO 一致（ADR-v6-022/044）；GitHub 重命名后会跳到当前仓。
+          # 若需强制写当前仓 slug，可加：--owner … --repo …
+
+          gh release create "$tag" \
+            "release-out/$(basename "$win")" \
+            "release-out/$(basename "$deb")" \
+            "release-out/$(basename "$dmg")" \
+            release-out/update-manifest.json \
+            --generate-notes \
+            --title "$tag"
