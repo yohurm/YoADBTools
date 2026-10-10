@@ -15,7 +15,7 @@ describe("clampContextMenuPoint", () => {
     const viewport = { width: 800, height: 600 };
     const point = clampContextMenuPoint(2000, 2000, labels, viewport);
     const width = estimateContextMenuWidth(labels, viewport.width);
-    expect(width).toBe(Spacing.Md * 2 + 2 * FontSizes.Body);
+    expect(width).toBe(Spacing.Sm * 4 + 2 * FontSizes.Body);
     expect(point.x).toBe(800 - width);
     expect(point.y).toBeLessThan(600);
     expect(point.x).toBeGreaterThanOrEqual(0);
@@ -37,6 +37,7 @@ describe("clampContextMenuPoint", () => {
     const short = estimateContextMenuWidth(["复制", "删除"], 800);
     const longer = estimateContextMenuWidth(["复制路径"], 800);
     expect(longer).toBeGreaterThan(short);
+    expect(short).toBe(Spacing.Sm * 4 + 2 * FontSizes.Body);
     expect(short).toBeLessThan(Layout.MenuMax);
     const huge = "令".repeat(40);
     expect(estimateContextMenuWidth([huge], 800)).toBe(Layout.MenuMax);

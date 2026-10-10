@@ -18,7 +18,7 @@ export interface ListRowHostInput {
   hot?: boolean;
   selectable?: boolean;
   selectedKeys?: ReadonlySet<string | number>;
-  radius?: "chip";
+  radius?: "chip" | "ripple";
 }
 
 export interface ListRowHostAttrs {

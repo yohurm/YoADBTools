@@ -114,9 +114,9 @@ describe("YoContextMenu", () => {
     expect(menuCss).toContain("border-radius: var(--yohu-radius-md)");
     expect(menuCss).toContain("width: max-content");
     expect(menuCss).toContain("min(var(--yohu-layout-menu-max)");
+    expect(menuCss).not.toContain("menu-min");
     expect(menuCss).toContain("white-space: nowrap");
     expect(menuCss).toContain("text-overflow: ellipsis");
-    expect(menuCss).not.toContain("menu-min");
     expect(menuCss).toContain('[data-slot="trail"]');
     expect(menuCss).toMatch(/data-slot="label"\]\s*\{[^}]*flex:\s*1 1 auto/);
   });

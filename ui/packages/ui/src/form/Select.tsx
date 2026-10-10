@@ -7,19 +7,23 @@
  * block 才让文案吃剩余、次文案与箭头贴尾。宿主是 button；YoCorner 只 paint。
  * 触发钮圆角 32，带描边和轻阴影。下拉菜单是特殊铬，圆角 16。
  * 文案与箭头在钮上，禁止 clip-path 裁箭头。
+ * 菜单宽至少等于触发钮；短钮按最长选项撑开，超过菜单帽才省略。
+ * 选中只画尾部勾。打开时不画悬停洗；指针移入或方向键离开后才画。
+ * 项间分割线由行模型的 rule 决定，末项没有。
  *
  * 交互：
  * - 点击展开、点击外部关闭、Esc 关闭（逐层退出）
  * - 展开后 ↑/↓ 移动活动选项（aria-activedescendant）、Home/End 首尾、
  *   Enter/Space 选择、Tab 关闭并提交活动选项
  * - 触发钮 `aria-haspopup=listbox aria-expanded`；菜单 `role=listbox`；选项 `role=option`
- * - 菜单 Portal 到 body；宽 hug 内容（min=触发钮）；高 hug 内容，仅超出视口才纵向滚动
+ * - 菜单 Portal 到 body；宽至少等于触发钮，短钮按文案撑开；高 hug 内容，上限视口 80%
  */
 import { presenceAttr, presenceIsOn } from "../dom/flag";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import type { JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { YoCorner } from "../corner";
+import "../menu/menu-row.css";
 import { Icon } from "../icons";
 import { YoPresence } from "../motion/engines/presence";
 import { Layout } from "../tokens/layout";
@@ -28,7 +32,7 @@ import {
   findOption,
   optionDescription,
   optionDomId,
-  optionIsSelected,
+  selectMenuRows,
   type SelectMenuLayout,
   type YoSelectOption,
 } from "./select-model";
@@ -39,6 +43,8 @@ import {
   applySelectEscape,
   applySelectKey,
   idleSelectSession,
+  optionIsHot,
+  pointSelect,
   selectEffectIsCommit,
   selectEffectIsNone,
   selectHostAttrs,
@@ -104,7 +110,12 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
     if (!trigger || !layer || !menu) return;
     const laid = layoutSelectMenu(
       readAnchorBox(trigger),
-      { optionCount: props.options.length, scrollHeight: menu.scrollHeight },
+      {
+        optionCount: props.options.length,
+        scrollHeight: menu.scrollHeight,
+        labels: props.options.map((option) => option.label),
+        descriptions: props.options.map((option) => optionDescription(option) ?? ""),
+      },
     );
     setPlacement(laid.placement);
     setOverflowY(laid.overflowY);
@@ -216,6 +227,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
   });
 
   const host = createMemo(() => selectHostAttrs({ disabled: props.disabled, block: props.block }));
+  const rows = createMemo(() => selectMenuRows(props.options, props.value));
 
   const onTriggerKeyDown = (event: KeyboardEvent): void => {
     const effect = applySelectKey(event.key, session(), props.options, props.value, props.disabled);
@@ -246,7 +258,7 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
         onClick={openMenu}
         onKeyDown={onTriggerKeyDown}
       >
-        <YoCorner mode="paint" role="control" radius={Radius.Xl} stroke class="yohu-select__chrome" />
+        <YoCorner mode="paint" role="control" radius={Radius.Xl} class="yohu-select__chrome" />
         <span
           class="yohu-select__value"
           data-placeholder={selected() ? undefined : ""}
@@ -287,32 +299,34 @@ export function YoSelect(props: YoSelectProps): JSX.Element {
                 role="card"
                 class="yohu-select__menu-chrome"
                 overflow={overflowY() ? "auto" : "hidden"}
-                pad="block-xs"
               >
-                <For each={props.options}>
-                  {(option, index) => {
-                    const picked = () => optionIsSelected(option, props.value);
-                    return (
+                <div class="yohu-menu-well">
+                <For each={rows()}>
+                  {(row, index) => (
                     <div
-                      id={optionDomId(option.value)}
-                      class="yohu-select__option yohu-interactive yohu-recipe-selected"
+                      id={row.id}
+                      class="yohu-select__option yohu-menu-row yohu-interactive"
                       classList={{
-                        "yohu-interactive--selected": picked(),
-                        "yohu-interactive--active": index() === activeIndex(),
+                        "yohu-interactive--active": optionIsHot(session(), index()),
                       }}
+                      data-selected={presenceAttr(row.selected)}
+                      data-rule={presenceAttr(row.rule)}
                       role="option"
-                      aria-selected={picked()}
-                      onMouseEnter={() => setSession((cur) => ({ ...cur, activeIndex: index() }))}
-                      onClick={() => commitValue(option.value)}
+                      aria-selected={row.selected}
+                      onMouseEnter={() => setSession((cur) => pointSelect(cur, index()))}
+                      onClick={() => commitValue(row.value)}
                     >
-                      <span class="yohu-select__option-label">{option.label}</span>
-                      <Show when={optionDescription(option)}>
+                      <span class="yohu-select__option-label">{row.label}</span>
+                      <Show when={row.description}>
                         {(meta) => selectDescription(meta)}
                       </Show>
+                      <span class="yohu-select__mark" aria-hidden="true">
+                        <Icon name="check" size={Layout.IconInline} />
+                      </span>
                     </div>
-                    );
-                  }}
+                  )}
                 </For>
+                </div>
               </YoCorner>
             </div>
           </div>

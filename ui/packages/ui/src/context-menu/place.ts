@@ -2,7 +2,7 @@
  * 右键菜单落点策略（L3）。按视口夹紧，避免贴边时整块溢出。
  * 打开时先按标签估算宽、按条目估算高（`clampContextMenuPoint`）；菜单挂载后应再以
  * **实测** `offsetWidth/offsetHeight` 二次夹紧（`clampToRect`）。
- * 宽跟最长标签，帽为 `Layout.MenuMax`，与 List 的 `max-width` 同一条。
+ * 宽跟最长标签，加菜单井四边同一留白与行内字槽，帽为 `Layout.MenuMax`。
  * 上下展开不走浮层 `placePopover`。夹紧数字在 placement。
  */
 
@@ -19,16 +19,16 @@ function estimateLabelPx(label: string): number {
 
 export function estimateContextMenuHeight(itemCount: number): number {
   const rows = Math.max(1, itemCount);
-  return Spacing.Xs * 2 + rows * controlRowHeight();
+  return Spacing.Sm * 2 + rows * controlRowHeight();
 }
 
 /**
- * 菜单宽 = 最长标签 + 两侧 `--yohu-space-md`。
- * 再与内容帽、视口边距取小。与 `ContextMenu.css` 的 padding / max-width 对齐。
+ * 菜单宽 = 最长标签 + 井两侧 + 行内字槽两侧。四边井距都是 `Spacing.Sm`。
+ * 再与内容帽、视口边距取小。短标签不垫空板。
  */
 export function estimateContextMenuWidth(labels: readonly string[], viewportWidth: number): number {
   const longest = labels.reduce((max, label) => Math.max(max, estimateLabelPx(label)), 0);
-  const content = Spacing.Md * 2 + longest;
+  const content = Spacing.Sm * 2 + Spacing.Sm * 2 + longest;
   const viewportCap = Math.max(0, viewportWidth - Spacing.Lg);
   return Math.min(Layout.MenuMax, viewportCap, content);
 }

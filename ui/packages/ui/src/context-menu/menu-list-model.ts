@@ -16,6 +16,11 @@ export function menuItemIsBranch(item: { disabled?: boolean; children?: readonly
   return itemIsEnabled(item) && (item?.children?.length ?? 0) > 0;
 }
 
+/** 项间分割线。末项没有。 */
+export function menuItemDrawsRule(index: number, count: number): boolean {
+  return index >= 0 && index < count - 1;
+}
+
 function enabledAt(enabled: readonly number[], index: number): number | null {
   return enabled[index] ?? null;
 }
