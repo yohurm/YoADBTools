@@ -5,8 +5,8 @@ use tauri::State;
 use crate::commands::{ipc_log, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
-    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogBatch, ProcessEntry,
-    ReplayRequest,
+    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, IpcErrorCode, LogBatch,
+    LogLatch, LogPage, LogPageQuery, LogWindowBind, ProcessEntry, ReplayRequest,
 };
 
 #[tauri::command(rename = "log.capture.start")]
@@ -44,6 +44,32 @@ pub async fn log_clear_device(state: State<'_, AppState>, serial: String) -> Res
         .clear_device_buffer(&serial)
         .await
         .map_err(ipc_log)
+}
+
+#[tauri::command(rename = "log.window.bind")]
+pub fn log_window_bind(state: State<'_, AppState>, spec: LogWindowBind) -> LogPage {
+    state.capture.bind_window(spec)
+}
+
+#[tauri::command(rename = "log.window.release")]
+pub fn log_window_release(state: State<'_, AppState>, id: u64) {
+    state.capture.release_window(id);
+}
+
+#[tauri::command(rename = "log.window.latch")]
+pub fn log_window_latch(state: State<'_, AppState>, latch: LogLatch) -> Result<LogPage, IpcError> {
+    state.capture.latch_window(latch).ok_or_else(|| IpcError {
+        code: IpcErrorCode::NotFound,
+        message: "日志窗口未登记".into(),
+    })
+}
+
+#[tauri::command(rename = "log.page")]
+pub fn log_page(state: State<'_, AppState>, query: LogPageQuery) -> Result<LogPage, IpcError> {
+    state.capture.page(query).ok_or_else(|| IpcError {
+        code: IpcErrorCode::NotFound,
+        message: "日志窗口未登记".into(),
+    })
 }
 
 #[tauri::command(rename = "log.replay")]
