@@ -4,7 +4,7 @@
 - 固定 GitHub Releases（`yohurm/Windows-YoADBTools`）；无更新源切换
 - **公开仓用户不必配置 token**；检查顺序见 ADR-v6-035（manifest → Atom → Web Latest → REST 兜底）
 - 仓库覆盖：环境变量 + `config/update.json`（不要把 PAT 打进安装包）
-- 安装包：打 `vX.Y.Z` 标签 → workflow 挂 NSIS / DMG 到 Release
+- 安装包：打 `vX.Y.Z` 标签 → workflow 挂 NSIS / DMG / `.deb` 到 Release（ADR-v6-045）
 - IPC：`update.check` / `update.info` / `update.download` / `update.install` / `update.cancel` / `update.open`
 - 事件：`update/progress`（字节 200ms 可丢；**阶段切换必达**）
 - 不使用 `tauri-plugin-updater`
@@ -35,7 +35,7 @@ View（UpdateDialogs / SettingsForm）
 | credentials | `credentials.rs` | `update.json` / env |
 | url_policy | `url_policy.rs` | http(s) + **GitHub 主机 Bearer 范围** |
 | cache | `cache.rs` | `cache/update/` 路径、安装包形态校验 |
-| apply | `apply/` | NSIS 助手 / DMG |
+| apply | `apply/` | NSIS 助手 / DMG / `xdg-open` `.deb` |
 | fetch 编排 | `fetch.rs`（或 `lib` 内） | `DownloadSpec` + 调 `yohu_download::fetch` |
 
 ## 下载链路（设计后）
