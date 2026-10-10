@@ -13,7 +13,7 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   adb_path: "",
   data_root: "",
   devices_auto_refresh: true,
-  buffer_capacity: 10000,
+  buffer_capacity: 100000,
   clear_device_on_start: true,
   theme: "system",
   density: "comfortable",
