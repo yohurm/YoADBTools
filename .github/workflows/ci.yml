@@ -393,8 +393,8 @@ jobs:
             echo "dmg 文件名不符合约定（arch=$arch）：$base" >&2
             exit 1
           fi
-          mb="$(du -h "$dmg" | awk '{print $1}')"
-          echo "安装包：$dmg = $mb（未签名，见 ADR-v6-045）"
+          size_h="$(du -h "$dmg" | awk '{print $1}')"
+          echo "installer=$dmg size=$size_h unsigned=ADR-v6-045"
           mkdir -p dist-ci
           cp -f "$dmg" "dist-ci/$base"
 
