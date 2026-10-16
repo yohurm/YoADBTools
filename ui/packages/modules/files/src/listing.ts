@@ -11,6 +11,7 @@ import {
   filesDelete,
   filesList,
   filesMkdir,
+  filesRename,
   filesSessionAttach,
   filesSessionDetach,
   DEFAULT_BROWSE_ROOT,
@@ -557,6 +558,15 @@ export function createListingStore() {
     await mutateNewEntry(name, (serial, path) => filesCreate({ serial, path }));
   }
 
+  /** 同目录换名。落点由 core 拼，这里只交源路径与新条目名。 */
+  async function rename(from: string, to: string): Promise<void> {
+    await mutate(async (current) => {
+      const child = childPath(session.path, from);
+      if (childPathRejected(child)) return child.reason;
+      await filesRename({ serial: current, path: child.path, name: to.trim() });
+    });
+  }
+
   function setSort(key: SortKey): void {
     const dir: SortDir = sort.key === key ? (sortDirIsAsc(sort.dir) ? "desc" : "asc") : DEFAULT_SORT_DIR[key];
     setSortState({ key, dir });
@@ -604,9 +614,14 @@ export function createListingStore() {
 
   const selectedEntries = (): ListingEntry[] => entries.filter((e) => selection.names.includes(e.name));
 
+  const singleEntry = (): ListingEntry | undefined => {
+    const picked = selectedEntries();
+    return picked.length === 1 ? picked[0] : undefined;
+  };
+
   const singleFile = (): ListingEntry | undefined => {
-    const only = selectedEntries()[0];
-    return selectedEntries().length === 1 && only && entryIsFile(only.kind) ? only : undefined;
+    const only = singleEntry();
+    return only && entryIsFile(only.kind) ? only : undefined;
   };
 
   return {
@@ -626,6 +641,7 @@ export function createListingStore() {
     removeMany,
     mkdir,
     createFile,
+    rename,
     setSort,
     selectGestureTarget,
     select,
@@ -635,6 +651,7 @@ export function createListingStore() {
     togglePreview,
     selectedSet,
     selectedEntries,
+    singleEntry,
     singleFile,
     serial,
     generation,

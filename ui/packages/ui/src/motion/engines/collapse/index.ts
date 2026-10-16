@@ -3,14 +3,16 @@ export type { YoCollapseProps, CollapseTravelApi } from "./collapse";
 export type { CollapseRecipe } from "./collapse";
 export {
   COLLAPSE_INTERPOLATE_RECIPES,
-  COLLAPSE_TRIP_PROPERTY,
+  DEFAULT_COLLAPSE_AXIS,
   DEFAULT_COLLAPSE_RECIPE,
+  collapseTripProperty,
+  resolveCollapseAxis,
   resolveCollapseRecipe,
-  resolveCollapseRows,
   resolveCollapseSpec,
+  resolveCollapseTrack,
   resolveCollapseTripOnToggle,
   resolveCollapseTripSpec,
 } from "./collapse-model";
-export type { CollapseInput, CollapseRows, CollapseSpec } from "./collapse-model";
+export type { CollapseInput, CollapseSpec, CollapseTrack } from "./collapse-model";
 export { collapseHostAttrs } from "./collapse-policy";
 export type { CollapseHostAttrs } from "./collapse-policy";

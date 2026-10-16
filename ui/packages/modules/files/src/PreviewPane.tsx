@@ -6,7 +6,7 @@ import { listingStore } from "./listing";
 import { entryOpensAsDir, entrySizeText, fileColumnHeader, fileTypeLabel } from "./model";
 import { PREVIEW_COLLAPSE, PREVIEW_TITLE, previewEmptyDetail } from "./preview-label";
 
-/** 独立预览分区：YoPanel overflow=hidden + YoScroller + YoDescriptionList。 */
+/** 独立预览分区：YoPanel overflow=hidden + YoScroller + YoDescriptionList。宽由外层坞锁，本组件不写宽。 */
 export function PreviewPane() {
   const preview = () => {
     const list = listingStore.selectedEntries();
@@ -16,7 +16,6 @@ export function PreviewPane() {
   return (
     <YoPanel
       variant="pane"
-      class="yohu-files__preview"
       overflow="hidden"
       title={PREVIEW_TITLE}
       aria-label={PREVIEW_TITLE}

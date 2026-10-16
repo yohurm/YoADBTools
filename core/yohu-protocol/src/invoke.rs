@@ -48,6 +48,16 @@ pub struct PathOpRequest {
     pub path: String,
 }
 
+/// `files.rename` 请求。只给新条目名，落点由 core 拼在同目录，不是跨目录移动。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RenameRequest {
+    pub serial: String,
+    /// 源（设备绝对路径）
+    pub path: String,
+    /// 新条目名（不含分隔符）
+    pub name: String,
+}
+
 /// `files.push/pull` 请求。方向由命令名决定；id 由壳发号，不进 DTO。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TransferRequest {

@@ -370,6 +370,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::files::files_delete,
             commands::files::files_mkdir,
             commands::files::files_create,
+            commands::files::files_rename,
             commands::files::files_drag_out,
             commands::log::log_capture_start,
             commands::log::log_capture_stop,

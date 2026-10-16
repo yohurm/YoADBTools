@@ -1,6 +1,6 @@
 //! 真实设备集成测试（第三层：yohu-files 浏览/传输/变更 + SafetyRoot）。
 //!
-//! 覆盖：真实 /sdcard 浏览解析；push/pull 内容一致；mkdir + 删除；
+//! 覆盖：真实 /sdcard 浏览解析；push/pull 内容一致；mkdir + 重命名 + 删除；
 //! SafetyRoot 拒绝危险路径。无在线设备时自动跳过。
 
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
-use yohu_files::{FileBrowser, FileMutator, TransferRunner, TransferSpec};
+use yohu_files::{FileBrowser, FileError, FileMutator, TransferRunner, TransferSpec};
 use yohu_protocol::{AppEvent, Direction, TransferState};
 
 fn real_adb() -> PathBuf {
@@ -141,9 +141,10 @@ async fn real_browse_and_transfer_roundtrip() {
     assert_eq!(pulled, content, "pull 内容应与 push 一致");
     eprintln!("[真机] pull 内容一致");
 
-    // 4) 新建目录 + 删除（core 侧 SafetyRoot）
+    // 4) 新建目录 + 重命名 + 删除（core 侧 SafetyRoot）
     let mutator = FileMutator::new(client.clone());
     let dir = format!("/sdcard/yohu-real-dir-{stamp}");
+    let dir_name = dir.trim_start_matches("/sdcard/").to_string();
     mutator
         .mkdir(&serial, &dir, CancellationToken::new())
         .await
@@ -158,20 +159,53 @@ async fn real_browse_and_transfer_roundtrip() {
         .await
         .unwrap();
     assert!(
-        entries_after
-            .iter()
-            .any(|e| e.name == dir.trim_start_matches("/sdcard/")),
+        entries_after.iter().any(|e| e.name == dir_name),
         "新目录应可见"
     );
+
+    // 5) 重命名：同目录换名；落点已存在即拒，不覆盖
+    let renamed_name = format!("yohu-real-renamed-{stamp}.txt");
+    let renamed = format!("/sdcard/{renamed_name}");
+    mutator
+        .rename(&serial, &remote, &renamed_name, CancellationToken::new())
+        .await
+        .expect("重命名失败");
+    let clash = mutator
+        .rename(&serial, &renamed, &dir_name, CancellationToken::new())
+        .await;
+    assert!(
+        matches!(clash, Err(FileError::AlreadyExists(_))),
+        "落点已存在必须被拒: {clash:?}"
+    );
+    let entries_renamed = browser
+        .list(
+            &serial,
+            "/sdcard",
+            attached.generation,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        entries_renamed.iter().any(|e| e.name == renamed_name),
+        "新名应可见"
+    );
+    assert!(
+        !entries_renamed
+            .iter()
+            .any(|e| e.name == remote.trim_start_matches("/sdcard/")),
+        "旧名应消失"
+    );
+
     mutator
         .delete(&serial, &dir, CancellationToken::new())
         .await
         .expect("删除目录失败");
     mutator
-        .delete(&serial, &remote, CancellationToken::new())
+        .delete(&serial, &renamed, CancellationToken::new())
         .await
         .expect("删除测试文件失败");
-    eprintln!("[真机] mkdir/delete 完成，清理完毕");
+    eprintln!("[真机] mkdir/rename/delete 完成，清理完毕");
 
     let _ = std::fs::remove_file(&local);
     let _ = std::fs::remove_file(&pulled_path);
@@ -201,6 +235,19 @@ async fn real_safety_root_rejects_dangerous_path() {
         .delete(&serial, "/sdcard", CancellationToken::new())
         .await;
     assert!(result.is_err(), "禁止删除安全根本身");
+    let result = mutator
+        .rename(&serial, "/data/local/tmp/x", "y", CancellationToken::new())
+        .await;
+    assert!(result.is_err(), "安全根外重命名必须被 core 拒绝");
+    let result = mutator
+        .rename(
+            &serial,
+            "/sdcard/a.txt",
+            "../data/x",
+            CancellationToken::new(),
+        )
+        .await;
+    assert!(result.is_err(), "重命名不得借条目名跨目录逃逸");
     eprintln!("[真机] SafetyRoot 拒绝危险路径验证通过");
 }
 

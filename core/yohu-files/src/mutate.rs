@@ -1,4 +1,4 @@
-//! 危险操作（删除/新建）：core 侧 SafetyRoot + 末段名强制校验。
+//! 危险操作（删除/新建/重命名）：core 侧 SafetyRoot + 末段名强制校验。
 //!
 //! 变更超时只在本文件。`readlink -f` 超时在运输层。
 
@@ -7,10 +7,10 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 use crate::fault::{file_error_from_adb, FileError};
-use crate::guard::{normalize_mut, resolve_and_recheck, RecheckKind};
+use crate::guard::{normalize_mut, resolve_and_recheck, sibling_rename, RecheckKind};
 use yohu_adb::shell_quote;
 use yohu_adb::AdbClient;
-use yohu_domain::SafetyRoot;
+use yohu_domain::{RemotePath, SafetyRoot};
 
 const DELETE_TIMEOUT_MS: u64 = 30_000;
 const MUTATE_TIMEOUT_MS: u64 = 15_000;
@@ -125,6 +125,80 @@ impl FileMutator {
             cancel,
         )
         .await
+    }
+
+    /// 重命名（同目录换名，`mv`）。落点由本方法拼，源与落点各自过安全根。
+    /// 设备 `mv` 静默覆盖同名条目，所以落点先问一次占用，不覆盖。
+    pub async fn rename(
+        &self,
+        serial: &str,
+        path: &str,
+        name: &str,
+        cancel: CancellationToken,
+    ) -> Result<(), FileError> {
+        let source = normalize_mut(&self.safety, path)?;
+        let target = sibling_rename(&self.safety, &source, name)?;
+        resolve_and_recheck(
+            &self.adb,
+            &self.safety,
+            serial,
+            &source,
+            RecheckKind::Descendant,
+            cancel.clone(),
+        )
+        .await?;
+        resolve_and_recheck(
+            &self.adb,
+            &self.safety,
+            serial,
+            &target,
+            RecheckKind::Descendant,
+            cancel.clone(),
+        )
+        .await?;
+        reject_taken(&self.adb, serial, &target, cancel.clone()).await?;
+        finish_shell(
+            &self.adb,
+            serial,
+            &[
+                "shell".into(),
+                "mv".into(),
+                shell_quote(source.as_str()),
+                shell_quote(target.as_str()),
+            ],
+            MUTATE_TIMEOUT_MS,
+            source.as_str(),
+            cancel,
+        )
+        .await
+    }
+}
+
+/// 落点占用探测。`ls -d` 的退出码即答案：只有「远端不存在」算空位，其余失败原样上抛。
+async fn reject_taken(
+    adb: &AdbClient,
+    serial: &str,
+    target: &RemotePath,
+    cancel: CancellationToken,
+) -> Result<(), FileError> {
+    let probe = finish_shell(
+        adb,
+        serial,
+        &[
+            "shell".into(),
+            "ls".into(),
+            "-d".into(),
+            shell_quote(target.as_str()),
+        ],
+        MUTATE_TIMEOUT_MS,
+        target.as_str(),
+        cancel,
+    )
+    .await;
+    match probe {
+        Ok(()) => Err(FileError::AlreadyExists(target.as_str().to_string())),
+        Err(FileError::RemoteNotFound(_)) => Ok(()),
+        Err(other) => Err(other),
     }
 }
 

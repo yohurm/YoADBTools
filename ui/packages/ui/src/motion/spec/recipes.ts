@@ -59,10 +59,10 @@ export const PRESENCE_EXIT_DURATION: Record<PresenceRecipe, MotionDurationName> 
  */
 export const PRESENCE_EXIT_SAFETY_MS = 50;
 
-/** 按钮文案槽：与预览栏同一 spatial-panel 宽度过渡。 */
+/** 按钮文案槽：与 collapse inline 轴同一 spatial-panel。 */
 export const SWAP_DURATION: MotionDurationName = MotionSpec.spatialPanel.duration;
 
-/** 尺寸行程：与 swap / preview 同一 spatial-panel。 */
+/** 尺寸行程：与 swap / collapse inline 同一 spatial-panel。 */
 export const TRAVEL_SPEC = "spatialPanel" as const;
 
 /** 内容用后高：微过冲弹簧。折叠 0fr/1fr 仍走 spatialLocal。 */

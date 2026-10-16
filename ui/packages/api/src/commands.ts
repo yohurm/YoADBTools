@@ -34,6 +34,7 @@ import type {
   ProcessEntry,
   ReplayRequest,
   RemoteEntry,
+  RenameRequest,
   SerialEvalResult,
   SettingKey,
   SettingValue,
@@ -121,6 +122,8 @@ export const filesDelete = (req: PathOpRequest) => invoke<void>("files.delete", 
 export const filesMkdir = (req: PathOpRequest) => invoke<void>("files.mkdir", { req });
 
 export const filesCreate = (req: PathOpRequest) => invoke<void>("files.create", { req });
+
+export const filesRename = (req: RenameRequest) => invoke<void>("files.rename", { req });
 
 export const filesDragOut = (req: DragOutRequest) => invoke<void>("files.dragOut", { req });
 

@@ -1,4 +1,4 @@
-//! 文件模块命令：浏览/传输/取消/删除/新建。薄转发。
+//! 文件模块命令：浏览/传输/取消/删除/新建/重命名。薄转发。
 
 use tauri::{AppHandle, State};
 use tokio_util::sync::CancellationToken;
@@ -6,7 +6,8 @@ use tokio_util::sync::CancellationToken;
 use crate::commands::{ipc_dnd, ipc_file, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
-    BrowseAttach, Direction, DragOutRequest, IpcError, PathOpRequest, RemoteEntry, TransferRequest,
+    BrowseAttach, Direction, DragOutRequest, IpcError, PathOpRequest, RemoteEntry, RenameRequest,
+    TransferRequest,
 };
 
 #[tauri::command(rename = "files.list")]
@@ -95,6 +96,16 @@ pub async fn files_create(state: State<'_, AppState>, req: PathOpRequest) -> Res
     state
         .mutator
         .create_file(&req.serial, &req.path, CancellationToken::new())
+        .await
+        .map_err(ipc_file)
+}
+
+#[tauri::command(rename = "files.rename")]
+pub async fn files_rename(state: State<'_, AppState>, req: RenameRequest) -> Result<(), IpcError> {
+    state.require_online(&req.serial).map_err(ipc_session)?;
+    state
+        .mutator
+        .rename(&req.serial, &req.path, &req.name, CancellationToken::new())
         .await
         .map_err(ipc_file)
 }

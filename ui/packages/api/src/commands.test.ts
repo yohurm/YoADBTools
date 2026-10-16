@@ -67,4 +67,13 @@ describe("files session commands", () => {
     expect(src).toContain('invoke<void>("files.session.detach", { serial, generation })');
     expect(src).toContain('invoke<RemoteEntry[]>("files.list", { serial, path, generation })');
   });
+
+  it("突变命令都以 req 单参转发", () => {
+    expect(commands.filesRename.length).toBe(1);
+    const src = readFileSync(resolve("packages/api/src/commands.ts"), "utf8");
+    expect(src).toContain('invoke<void>("files.delete", { req })');
+    expect(src).toContain('invoke<void>("files.mkdir", { req })');
+    expect(src).toContain('invoke<void>("files.create", { req })');
+    expect(src).toContain('invoke<void>("files.rename", { req })');
+  });
 });

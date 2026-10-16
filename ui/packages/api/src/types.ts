@@ -355,6 +355,13 @@ export interface PathOpRequest {
   path: string;
 }
 
+/** `files.rename`：只给新条目名，落点由 core 拼在同目录，不是跨目录移动。 */
+export interface RenameRequest {
+  serial: string;
+  path: string;
+  name: string;
+}
+
 export interface TransferRequest {
   serial: string;
   local: string;

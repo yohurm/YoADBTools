@@ -45,6 +45,23 @@ describe("YoCollapse", () => {
     expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("axis 写入 data-axis，缺省 block", () => {
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <YoCollapse open={open()} axis="inline" recipe="panel" flex="hug">
+        <div>预览窗格</div>
+      </YoCollapse>
+    ));
+    const root = document.querySelector(".yohu-collapse");
+    expect(root?.getAttribute("data-axis")).toBe("inline");
+    expect(root?.getAttribute("data-recipe")).toBe("panel");
+    expect(root?.getAttribute("data-flex")).toBe("hug");
+    expect(root?.getAttribute("data-open")).toBe("true");
+    setOpen(false);
+    expect(root?.getAttribute("data-open")).toBe("false");
+    expect(root?.querySelector(".yohu-collapse__inner")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("画出的开闭问出生函数，内容身高两帧后再开", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "collapse.tsx"), "utf8");
     expect(src).toContain("collapsePaintOpen");

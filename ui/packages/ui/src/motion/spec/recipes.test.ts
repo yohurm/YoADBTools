@@ -189,16 +189,16 @@ describe("motion recipes", () => {
   it("fill 内层 column flex，__content 填满可收缩，高度仍 0fr/1fr", () => {
     const css = loadMotionCss();
     const fill = css.slice(css.indexOf("配方 fill"));
-    const untilRail = fill.slice(0, fill.indexOf(".yohu-recipe-rail"));
-    expect(untilRail).toContain('.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner');
-    expect(untilRail).toContain("flex-direction: column");
-    expect(untilRail).toContain(".yohu-collapse__content");
-    expect(untilRail).not.toContain(".yohu-collapse__inner > *");
-    expect(untilRail).not.toContain(".yohu-collapse__content > *");
-    expect(untilRail).toContain("flex: 1");
-    expect(untilRail).toContain("min-height: 0");
-    expect(untilRail).not.toContain("grid-template-rows");
-    expect(untilRail).not.toContain("min-height: min-content");
+    const untilInline = fill.slice(0, fill.indexOf("轴 inline"));
+    expect(untilInline).toContain('.yohu-collapse[data-recipe="fill"] .yohu-collapse__inner');
+    expect(untilInline).toContain("flex-direction: column");
+    expect(untilInline).toContain(".yohu-collapse__content");
+    expect(untilInline).not.toContain(".yohu-collapse__inner > *");
+    expect(untilInline).not.toContain(".yohu-collapse__content > *");
+    expect(untilInline).toContain("flex: 1");
+    expect(untilInline).toContain("min-height: 0");
+    expect(untilInline).not.toContain("grid-template-rows");
+    expect(untilInline).not.toContain("min-height: min-content");
   });
 
   it("inline-end 双轴插值，禁止高度离散跳变", () => {
@@ -235,34 +235,41 @@ describe("motion recipes", () => {
   it("rail 一拍软弹簧：宽、高、字同时起步", () => {
     const css = loadMotionCss();
     const rail = css.slice(css.indexOf(".yohu-recipe-rail"));
-    const untilPreview = rail.slice(0, rail.indexOf(".yohu-recipe-preview"));
-    expect(untilPreview).toContain("width var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("flex-basis var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("grid-template-rows var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("grid-template-columns var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("max-width var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).not.toContain(".yohu-list-item");
-    expect(untilPreview).toContain("opacity var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("transform var(--yohu-motion-spatial-rail)");
-    expect(untilPreview).toContain("translateX(calc(-1 * var(--yohu-space-sm)))");
-    expect(untilPreview).toContain(".yohu-rail-slot:not([data-open]) .yohu-rail-slot__content");
-    expect(untilPreview).toContain("overflow: hidden");
-    expect(untilPreview).toContain(".yohu-rail-slot");
-    expect(untilPreview).not.toContain("width var(--yohu-motion-spatial-panel)");
-    expect(untilPreview).not.toContain("opacity var(--yohu-motion-effects-exit)");
-    expect(untilPreview).not.toContain("opacity var(--yohu-motion-effects-enter)");
-    expect(untilPreview).not.toContain("grid-template-rows var(--yohu-motion-spatial-local)");
-    expect(untilPreview).not.toContain("min-height var(--yohu-motion-spatial-local)");
-    expect(untilPreview).not.toContain("display: none");
-    expect(untilPreview).not.toContain("spatial-panel-soft");
-    const preview = css.slice(css.indexOf(".yohu-recipe-preview"));
-    const untilChevron = preview.slice(0, preview.indexOf(".yohu-reveal"));
-    expect(untilChevron).toContain("grid-template-columns var(--yohu-motion-spatial-panel)");
-    expect(untilChevron).not.toContain("transition: width");
+    const untilReveal = rail.slice(0, rail.indexOf(".yohu-reveal"));
+    expect(untilReveal).toContain("width var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("flex-basis var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("grid-template-rows var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("grid-template-columns var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("max-width var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).not.toContain(".yohu-list-item");
+    expect(untilReveal).toContain("opacity var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("transform var(--yohu-motion-spatial-rail)");
+    expect(untilReveal).toContain("translateX(calc(-1 * var(--yohu-space-sm)))");
+    expect(untilReveal).toContain(".yohu-rail-slot:not([data-open]) .yohu-rail-slot__content");
+    expect(untilReveal).toContain("overflow: hidden");
+    expect(untilReveal).toContain(".yohu-rail-slot");
+    expect(untilReveal).not.toContain("width var(--yohu-motion-spatial-panel)");
+    expect(untilReveal).not.toContain("opacity var(--yohu-motion-effects-exit)");
+    expect(untilReveal).not.toContain("opacity var(--yohu-motion-effects-enter)");
+    expect(untilReveal).not.toContain("grid-template-rows var(--yohu-motion-spatial-local)");
+    expect(untilReveal).not.toContain("min-height var(--yohu-motion-spatial-local)");
+    expect(untilReveal).not.toContain("display: none");
+    expect(untilReveal).not.toContain("spatial-panel-soft");
     const reduce = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(reduce).toContain("transition-duration: 0.01ms !important");
     expect(reduce).not.toContain(".yohu-recipe-rail");
     expect(reduce).not.toContain(".yohu-list-item");
+  });
+
+  it("预览栏归 collapse inline 轴，不再单立 preview 配方", () => {
+    const css = loadMotionCss();
+    expect(css).not.toContain("yohu-recipe-preview");
+    const inline = css.slice(css.indexOf("轴 inline"));
+    expect(inline.length).toBeGreaterThan(0);
+    const untilReveal = inline.slice(0, inline.indexOf(".yohu-reveal"));
+    expect(untilReveal).toContain("grid-template-columns var(--yohu-motion-spatial-panel)");
+    expect(untilReveal).not.toContain("transition: width");
+    expect(untilReveal).not.toContain("minmax(0, 1fr)");
   });
 
   it("换位行铬在 L1，reduce 覆盖邻行让位", () => {

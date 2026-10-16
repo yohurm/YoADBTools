@@ -3,14 +3,6 @@ import { describe, expect, it } from "vitest";
 import { loadMotionLayerCss } from "../css";
 
 describe("L3 recipe CSS", () => {
-  it("preview 只插列宽，不写 width 过渡", () => {
-    const css = loadMotionLayerCss("recipes/preview.css");
-    expect(css).toContain(".yohu-recipe-preview");
-    expect(css).toContain("grid-template-columns var(--yohu-motion-spatial-panel)");
-    expect(css).not.toContain("transition: width");
-    expect(css).not.toMatch(/\b\d+ms\b/);
-  });
-
   it("inline-end 双轴同拍，禁止离散 max-height", () => {
     const css = loadMotionLayerCss("recipes/inline-end.css");
     expect(css).toContain("yohu-recipe-inline-end");

@@ -1,15 +1,16 @@
 # 模块：文件管理
 
 - 能力 crate：`yohu-files`（browse / transfer / mutate）
-- 安全根：`yohu-domain::SafetyRoot`（ADR-v6-013）；浏览 `check`；突变与传输 `check_descendant` + `validate_entry_name`；符号链接 `readlink -f` 复核（运输错误/无法解析失败；目标不存在则祖先 realpath）。`ReadlinkF` 从 `yohu-adb` 根导出，files 不点 `parse`。`FileError` 只分类+路径/计数/层数，不实现 `From<AdbError>`；未分类 BadExit 走 `RemoteFailed(path)`，Display 无 stderr。拖出树 `TreeLimit` / `TreeDepth` 触顶 fail-closed。变更超时在 `mutate.rs`
+- 安全根：`yohu-domain::SafetyRoot`（ADR-v6-013）；浏览 `check`；突变与传输 `check_descendant` + `validate_entry_name`；符号链接 `readlink -f` 复核（运输错误/无法解析失败；目标不存在则祖先 realpath）。`ReadlinkF` 从 `yohu-adb` 根导出，files 不点 `parse`。`FileError` 只分类+路径/计数/层数，不实现 `From<AdbError>`；未分类 BadExit 走 `RemoteFailed(path)`，Display 无 stderr。拖出树 `TreeLimit` / `TreeDepth` 触顶 fail-closed。变更超时在 `mutate.rs`。重命名落点由 `sibling_rename` 拼（只换末段，不接受调用方给的目标路径）；设备 `mv` 静默覆盖同名条目，所以 `mv` 前用 `ls -d` 问占用，占用即 `AlreadyExists`，不覆盖
 - UI：`@yohu/module-files`；`singleRequired`
 - **路径槽：** `AddressSlot` 只接线。上级钮（`.yohu-files__up`，不挂地址栏 `data-address`）+ 公开 `YoAddressField`（`.yohu-address*`）。地址策略在 `@yohu/ui` `address-field-model`（由 `YoAddressField` 消费）；模块禁止再维护 `address-edit`，禁止再 import 交互函数。行铺满，盒外不是路径栏。浏览态：面包屑 + 短热区。点铬内热区 / 分隔符 / `Ctrl+L` 后输入同格从左向右揭开；打开手势 `pointerup` 后再 focus，光标在末尾、不预选；点分段跳转。收回只 clip 输入铬，时长只消费 `spatialLocal`，面包屑 `display: none` 不占位，播完再卸。输入盒 `field-sizing: content`，跟文字 hug；长路径 `max-width: 100%` 当铬视野。编辑盒铬走 `YoCorner`（描边 accent / 校验 error），禁止再 `border` + `overflow:hidden` 叠圆角，禁止套 `YoTextField`。取消只认输入铬外。禁止 JS 测宽。Enter 只交 `listingStore.goTo(原文)`（模块内唯一 `resolveRemotePath`：`path-parse` 句法、不折叠 `..` → `path-guard` → `files.list`）。面包屑 / 上级走 `navigate` / `goUp`（夹紧绝对段，不经 resolve）。`path-guard` 与 domain `testdata/safety_root.json` 同一向量（拒绝相对 / `..` / 根外）。解析/安全根失败或设备上不存在/不是目录/无权限：不改当前路径、不关输入，`YoToast` 提示（远端不存在为「没有这个目录，请重新输入」）。禁止路径栏上方错误卡片，禁止扫 `ls` stderr。分类在 core `FileError`；壳 `ipc_file`：`RemoteNotFound` → `not_found`，`LocalNotFound` 与其余路径类 → `invalid_args`。`SafetyRoot` 仍强制校验
 - **清单列：** 文件走 Family B 列架：`YoColFrame` + `YoColRow` / `YoColHeader`、`cellPad=list`、`YoColTrack` / `YoColCell`、`YoVirtualList tone="list"`。投放目录热态走 `hotKey`：行底在 `list-row/`，投放框在 `list-frame/` 叠加层，禁止模块 `--drop` / `focus-ring`。行高走 `@yohu/ui` 的 `controlRowHeight()`（当前密度的 `controlHeight`）。日志是 Family A 文档：表头同样走 `YoColFrame` / `YoColHeader`，但 `cellPad=none`、轨道是 Format `ch`；行是 Document.text，不走 `YoColTrack`。列宽走 `col-model` / `col-resize`，文件模块只 `setColWidth`，不进设置。排序走 `YoColHeader.onSort`，模块不自绘排序钮、不挂 `__label`。删除名单走 `YoChip` leading + onDismiss（关闭即库内 `DismissMark` / `.yohu-recipe-dismiss`），禁止自造关闭钮。地址折叠在 `YoAddressField`。传输进度走文件页 `YoToast`，禁止再铺传输坞。禁止再自绘第二套路径栏。模块 CSS 禁止点 `.yohu-panel__body` / `__content` / `.yohu-scroller*` / `:has`，禁止 `overflow: auto` 当产品滚轴，禁止再铺 surface + radius 当面板铬
 - **页眉：** `YoChrome.leading={<YoBadge text={selectedLabel} tone="neutral" />}`；功能栏 `actions[{key,node}]`（上传 / 下载 / 刷新 / 预览），进出走库 chip。禁止 `deviceLabel`，禁止模块自挂 Presence 补页眉。
 - **修改时间：** `ls -lla`（toybox `-ll` = 秒+纳秒+时区）在解析边界经 domain `canonicalize_datetime_seconds` 收到 `YYYY-MM-DD HH:mm:ss`。列表与预览按原文显示，不补毫秒、不把「只有时分」补成秒
+- **预览分区：** 舞台是 flex 行（清单 `flex:1 1 auto` 吃剩余，预览槽 `flex:0 0 auto`）。开合走 `YoCollapse axis="inline" recipe="panel" flex="hug"`，列宽 `0fr↔1fr`；`inert` / `aria-hidden` 由引擎的 `__inner` 写，模块不接 `closedAttr`。窗格宽锁在自己的坞 `.yohu-files__preview-dock`（`page-gap + preview`，`padding-left` 出分隔缝）上，槽收窄只从分隔线一侧裁切，窗格不折行——禁止把宽写回 `YoPanel`，那会被 `.yohu-panel[data-variant="pane"]` 的 `flex:1 1 auto; min-width:0` 压掉、把文本上下挤压。`files.css` 一条 `transition` 都不写，时长曲线归 L1/L3。见 [动画系统-v6.md](../动画系统-v6.md)、[youi.md](../youi.md)
 - **传输作业：** [文件传输-v6.md](../文件传输-v6.md)。四个入口同一 `TransferJob`；DropSession 热态（官方拖入 enter 即亮虚线）；默认进当前目录，`files_drop_into_folder`（立即，默认关，无副标题）才指向目录行；浏览在 `listing.ts`，作业寿命在 `transfers.ts`；清单只经 `listingStore.requestListing`；传输终态只点名 `requestListing("transfer")`；进度走 `TransferToasts` → `YoToast`。禁止 `fileStore` 别名
 - 拖出协议细节：[文件拖拽-v6.md](../文件拖拽-v6.md) + ADR-v6-018。空态/加载走 `YoEmptyState` / `YoLoading` 的 `fill`；**`YoLoading` 只用于无快照的设备冷启动**（`listingPaint === cold`）。进目录命中快照直接画行；miss 为 pending（表头在、不铺加载、不把 loading 画成空目录）。拖入虚线走清单 `YoPanel edge="drop"`（填充盒外一圈 YoCorner halo，不是面板描边），禁止 CSS `outline` 直角环，禁止模块再写 `--drop` 补丁，禁止点库根 `.yohu-empty-state` / `.yohu-loading` / `.yohu-panel`
-- 右键：`files/src/menu.ts` → `openContextMenu`
+- 右键：`files/src/menu.ts` → `openContextMenu`。条目：新建文件、新建目录、下载、复制路径、重命名、删除。下载认「单选且是文件」，重命名认「单选一条」（目录也可），复制/删除认「有选中」。重命名开 `RenameDialog`（源名预填），落点占用与非法名在 `rename.ts` 出句，提交走 `listingStore.rename(源名, 新名)`
 
 ### 设计前（清单 / 错误）
 
@@ -258,9 +259,17 @@ delete:
     → map_err(file_error_from_adb)
     → exit≠0 → file_error_from_adb(BadExit)
     → ipc_file
+
+rename:
+  FileMutator.rename
+    → normalize_mut(源) + sibling_rename(落点)   落点只换末段；跨目录移动不在能力里
+    → resolve_and_recheck(源) + resolve_and_recheck(落点)
+    → ls -d 落点：退出 0 = 占用 → AlreadyExists（readlink -f 对「只有末段不存在」仍退出 0，答不了占用）
+    → adb.run(mv 源 落点, MUTATE_TIMEOUT_MS)
+    → file_error_from_adb → ipc_file
 ```
 
-不做什么：不恢复 `From<AdbError>`；不把分类推到壳；files 不写 `yohu_adb::parse::`；守卫只做词典 + 祖先拼接 + SafetyRoot 复核。
+不做什么：不恢复 `From<AdbError>`；不把分类推到壳；files 不写 `yohu_adb::parse::`；守卫只做词典 + 祖先拼接 + SafetyRoot 复核；重命名不收目标路径（只收新条目名），不拿 `readlink -f` 当占用探测，不用 `mv -n`（toybox 0.8.11 的 mv 只有 `-FfinTvx`）。
 
 ### 设计前（浏览运输）
 

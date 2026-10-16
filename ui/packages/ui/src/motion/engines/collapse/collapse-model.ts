@@ -1,14 +1,17 @@
 /**
  * 折叠领域模型（L2）。
- * 开闭与配方是不变式；不碰 DOM、不测 scrollHeight。
+ * 开闭、配方与轴是不变式；不碰 DOM、不测 scrollHeight。
  *
- * 插值（grid-template-rows 0fr↔1fr）：collapse / panel / fill。
- * 只在高度不确定的流里成立。
+ * 插值（0fr↔1fr）：collapse / panel / fill。轴只换插值的那根轨道名——
+ * block 裁高度（grid-template-rows），inline 裁宽度（grid-template-columns）。
+ * 可打断的 transition 就是这两根，与 Presence 的 clip 同一套分轴。
+ * inline 只在宿主自己 hug、窗格锁宽贴 inline-end 时成立；槽变窄不得让窗格折行。
  * hug 不是第四个 recipe：默认 collapse 在 auto 流里跟内容身高，
  * 不吃父级确定高剩余（DeviceRail 无设备）；fill 才让 __content 吃剩余高。
  * 对话框名单不走 Collapse；那是 YoReveal 的布局轴。
  */
 
+import { logicalAxisIsBlock, type LogicalAxis } from "../../../placement/axis";
 import type { MotionSpecName } from "../../../tokens/motion";
 import type { CollapseRecipe } from "../../spec/recipes";
 
@@ -19,18 +22,31 @@ export const COLLAPSE_INTERPOLATE_RECIPES = ["collapse", "panel", "fill"] as con
 
 export const DEFAULT_COLLAPSE_RECIPE: CollapseRecipe = "collapse";
 
-/** 折叠根在父级 flex 里怎么占高。缺省不写，树行不会被拉高。 */
+/** 裁切轴。跟轨槽、行程共用同一份逻辑轴词汇。 */
+export const DEFAULT_COLLAPSE_AXIS: LogicalAxis = "block";
+
+export function resolveCollapseAxis(axis?: LogicalAxis): LogicalAxis {
+  return logicalAxisIsBlock(axis ?? DEFAULT_COLLAPSE_AXIS) ? "block" : "inline";
+}
+
+function collapseAxisIsInline(axis?: LogicalAxis): boolean {
+  return resolveCollapseAxis(axis) === "inline";
+}
+
+/** 折叠根在父级 flex 里怎么占位。缺省不写，树行不会被拉高。inline 走 hug 才让列宽跟窗格。 */
 export type CollapseFlex = "grow" | "hug";
 
 export interface CollapseInput {
   open?: boolean;
   recipe?: CollapseRecipe;
   flex?: CollapseFlex;
+  axis?: LogicalAxis;
 }
 
 export interface CollapseSpec {
   open: boolean;
   recipe: CollapseRecipe;
+  axis: LogicalAxis;
 }
 
 export function resolveCollapseRecipe(recipe?: CollapseRecipe): CollapseRecipe {
@@ -46,21 +62,27 @@ export function resolveCollapseSpec(input: CollapseInput): CollapseSpec {
   return {
     open: Boolean(input.open),
     recipe: resolveCollapseRecipe(input.recipe),
+    axis: resolveCollapseAxis(input.axis),
   };
 }
 
-export type CollapseRows = "0fr" | "1fr";
+export type CollapseTrack = "0fr" | "1fr";
 
-/** 行高只认 open。禁止为 Dialog 再开一条特殊行。 */
-export function resolveCollapseRows(open: boolean): CollapseRows {
+/** 轨道只认 open，两轴同一对。禁止为 Dialog 再开一条特殊轨道。 */
+export function resolveCollapseTrack(open: boolean): CollapseTrack {
   return open ? "1fr" : "0fr";
 }
 
-/** 折叠行程 CSS 属性。Scroller 订 traveling()，禁止 scrape 这根名。 */
-export const COLLAPSE_TRIP_PROPERTY = "grid-template-rows";
+/** 折叠行程 CSS 属性：行向裁高度，列向裁宽度。Scroller 订 traveling()，禁止 scrape 这根名。 */
+export function collapseTripProperty(
+  axis?: LogicalAxis,
+): "grid-template-rows" | "grid-template-columns" {
+  return collapseAxisIsInline(axis) ? "grid-template-columns" : "grid-template-rows";
+}
 
-/** panel 走尺寸软弹簧；其余局部折叠走 spatialLocal。 */
-export function resolveCollapseTripSpec(recipe?: CollapseRecipe): MotionSpecName {
+/** inline 走 spatialPanel（标准曲线）；block panel 走尺寸软弹簧；其余局部折叠走 spatialLocal。 */
+export function resolveCollapseTripSpec(recipe?: CollapseRecipe, axis?: LogicalAxis): MotionSpecName {
+  if (collapseAxisIsInline(axis)) return "spatialPanel";
   return resolveCollapseRecipe(recipe) === "panel" ? "spatialStretch" : "spatialLocal";
 }
 

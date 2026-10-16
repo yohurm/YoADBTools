@@ -302,6 +302,32 @@ function loadDropSession(): string {
 
 const dropSessionSrc = loadDropSession();
 
+describe("预览栏折叠", () => {
+  it("走 YoCollapse inline 轴，模块不自持过渡", () => {
+    expect(fileView).toContain("YoCollapse");
+    expect(fileView).toContain('axis="inline"');
+    expect(fileView).toContain('flex="hug"');
+    expect(fileView).not.toContain("yohu-recipe-preview");
+    expect(fileView).not.toContain("yohu-recipe-rail");
+    expect(fileView).not.toContain("preview-collapsed");
+    // inert / aria-hidden 由 Collapse 的 __inner 管，模块不再手接。
+    expect(fileView).not.toContain("closedAttr");
+    // 时长曲线归 L1/L3：files.css 一条 transition 都不写。
+    expect(filesCss).not.toContain("transition");
+    expect(filesCss).not.toMatch(/\.yohu-files__stage[^}]*grid-template-columns/);
+  });
+
+  it("锁宽在坞上，窗格不随槽变窄折行", () => {
+    expect(fileView).toContain("yohu-files__preview-dock");
+    expect(filesCss).toMatch(
+      /\.yohu-files__preview-dock\s*\{[^}]*width:\s*calc\(var\(--yohu-layout-page-gap\) \+ var\(--yohu-layout-preview\)\)/,
+    );
+    expect(filesCss).toMatch(/\.yohu-files__preview-dock\s*\{[^}]*flex:\s*0 0 auto/);
+    // 面板自己不再锁宽，否则会跟 YoPanel pane 变体的 flex 抢位。
+    expect(filesCss).not.toMatch(/\.yohu-files__preview\s*\{/);
+  });
+});
+
 describe("官方拖放契约", () => {
   it("api 形状进 dest；换算不读 globalThis", () => {
     expect(dropSrc).toContain("NativeDragDropEvent");
@@ -313,8 +339,6 @@ describe("官方拖放契约", () => {
     expect(dropSrc).not.toContain("files.dropIn");
     expect(dropSrc).not.toContain("readFolderTargets");
     expect(dropSrc).not.toContain("destDirName(");
-    expect(fileView).toContain("yohu-recipe-preview");
-    expect(fileView).not.toContain("yohu-recipe-rail");
     expect(fileView).toContain("createDropSession");
     expect(fileView).toContain("listRef");
     expect(fileView).toContain("listOffset");
@@ -550,8 +574,7 @@ function filesModuleSources(dir: string): string[] {
 }
 
 describe("关掉写成 true", () => {
-  it("预览槽只调 closedAttr，生产源不再手写开合省略", () => {
-    expect(fileView).toContain("inert={closedAttr(previewShown())}");
+  it("生产源不手写开合省略", () => {
     const root = dirname(fileURLToPath(import.meta.url));
     const offenders = filesModuleSources(root).filter((file) => {
       let text = readFileSync(file, "utf8");
