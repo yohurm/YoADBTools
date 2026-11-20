@@ -19,7 +19,7 @@
 | `files.list` / `push` / `pull` / `cancel` / `delete` / `mkdir` / `create` / `rename` / `dragOut` | 安全根在 core。files.list(serial, path, generation)：无槽 / Closed → NotAttached；世代不符 → Cancelled；Starting 且同世代则等待；Live 且同世代才 list。后一次取消前一次。永不在 list 里偷偷 attach。files.dragOut / FileBrowser.list_tree(serial, remotes, generation)携带 BrowseAttach.generation；禁止 peek 槽位世代。设备侧 `ls`/`rm`/`push` 失败由 `yohu-files::file_error_from_adb` 分类为 `RemoteNotFound` / `NotADirectory` / `PermissionDenied` 等；未分类 BadExit → `RemoteFailed(path)`，不带 stderr。`FileError` 不 `From<AdbError>`。拖出树触顶 `TreeLimit(项)` / `TreeDepth(层)` fail-closed，禁止当成功截断。壳 `ipc_file`：远端不存在 → `not_found`，本地不存在与其余路径类（含 `TreeLimit` / `TreeDepth` / `NotAttached`）→ `invalid_args`，`Adb`（含 `Cancelled`）→ `ipc_adb`。禁止把 `执行失败(退出码 n): ls: ...` 原文交给 UI；UI 禁止再扫 stderr。`files.rename(serial, path, name)` 只收新条目名，落点由 core 拼在同目录（`sibling_rename`），不是跨目录移动；设备 `mv` 静默覆盖同名条目，所以落点先 `ls -d` 问占用，占用即 `AlreadyExists` → `invalid_args`；`readlink -f` 对「只有末段不存在」仍退出 0 并打印规范路径，答不了占用，禁止拿它当探测 |
 | `log.capture.start/stop/status` | 仅 Live adopt；generation |
 | `log.clear` / `log.clearDevice` / `log.processSnapshot` / `log.packageSnapshot` | 环 / logcat -c / ps / 已安装包名 |
-| `log.window.bind` / `log.window.release` | 窗口过滤登记、退订（ADR-v6-041）。全文不出 WebView |
+| `log.range` | 从设备环按 seq 取原始行（UI 游标实时拉取，过滤在 UI；ADR-v6-049）。全文不出 WebView |
 | `log.export` | 当前窗口过滤条件下的环快照（ADR-v6-021） |
 | `mirror.start/stop/inject/closeControl/present.setActive/layout/pointer/screenshot` | 投屏槽位；画面在壳内 Present（ADR-v6-024/026/027）。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。**舞台开关** `mirror.present.setActive(active, dark)` 只由 `@yohu/workbench` 在模块身份变化时调用（离开 `screen-mirror` 同一拍 `false` 并拆 HWND；已经是目标开闭则不再 shutdown）。`dark` 是调用当时文档里已解析的主题。回来用上次可呈现 avail 建窗时，用这次的 `dark` 覆盖缓存里的铬色。`mirror.layout` 为相对主窗客户区的物理矩形：**.yohu-mirror__avail 格子**。另带会话旗标 `dpr/fullscreen/paused/control/has_device/failed/error/dark`。`dark` 跟工作台 `data-theme`。未激活时一切 layout（含 `visible=true`）丢弃。禁止 `video_width` / `stroke_px` / layout `epoch`。HWND 按 FramePipe 编码尺寸 contain 并画占用卡片，idle 铺满 avail。`mirror.pointer` 与 layout 同一坐标系，UI 不算 dest。阶段只信 `mirror/state`。界面重建读 `mirror.session`（槽位 + 呈现闩，ADR-v6-040）。禁止 `mirror.status`，禁止 `mirror.sync` |
 | `mirror.session` | 当前投屏投影列表（Starting/Live；阶段、世代、尺寸、编码、控制、已出画、上一拍 fps、暂停、全屏）。hydrate 读一次。`has_frame` 与 fps 在呈现服务上：拆 HWND 不清，`stop` 与掉线才清。状态栏：Live 且有尺寸显示宽×高，fps 大于 0 才接上 |
@@ -88,10 +88,9 @@ App onMount bindIpc()（listen 已可用）→ 各 store 订阅
 |------|------|
 | `devices/changed` / `device/offline` | 扫描 / 掉线即发（offline 必达） |
 | `device/status` | 运行时快照内容变化才发（可丢）；对账走 `device.status` |
-| `log/hits` | 100–200ms；每窗口命中条数，钉底才带本页新增行；可丢推送 |
+| `log/appended` | 100–200ms；设备环水位 `last_seq`（不含正文）；可丢（下次水位补齐） |
 | `log/processIndex` | 2.5s |
 | `log/captureState` | 必达 |
-| `log/overflow` | 丢批计数 |
 | `transfer/progress` | Running 200ms 可丢；终态必达 |
 | `group/progress` / `task/summary` | 命令/任务；`TaskInfo.run_id` 仅组/块 |
 | `settings/changed` | 必达；带全量快照 |
@@ -102,9 +101,9 @@ App onMount bindIpc()（listen 已可用）→ 各 store 订阅
 
 ## 背压
 
-RingBuffer seq 单调；Batcher 有界 mpsc 满则丢**推送**不丢环；UI 经 overflow 后重新 `log.window.bind` 当前窗口取尾页，不把整环拉进界面。
+RingBuffer seq 单调；Batcher 聚合为设备水位信号（`log/appended`），有界 mpsc 满则丢信号不丢环；UI 持 seq 游标，按水位调用 `log.range` 从环拉取补齐（ADR-v6-049）。
 
-**导出：** `log.export` 读环（`seq >= from_seq` + domain 过滤），仅用户操作落盘。溢出/首次补页统一走 `log.window.bind` 重新登记当前窗口，不再有 `log.replay`（ADR-v6-046）。
+**导出：** `log.export` 读环（`seq >= from_seq` + domain 过滤），仅用户操作落盘。首次/换过滤/恢复统一走 `log.range` 按游标拉环，不再有 `log.window.bind` / `log.replay`（ADR-v6-046/049）。
 
 **投屏帧：** 不进 JS。`yohu-mirror::FramePipe` 有界 8 帧，sticky 最后一份 config（先丢 delta，不丢 config）；**呈现线程 `try_recv` 直取**，禁止再泵进无界通道。满则丢待发帧，不影响设备 TCP。`mirror.start` 只传 `serial/control/connection/session_quality_touched`。
 
@@ -129,4 +128,4 @@ invoke boot.showMain → commands/boot → window_boot::show_if_hidden
 
 `PresentHost::attach` 未 active 不 `ensure_surface`。建窗只走 `setActive(true, dark)` + `layout`。回放覆盖缓存 `dark`。
 
-**日志任务与诊断（ADR-v6-047）：** `log.clear` 无 UI 调用方，仅诊断入口（离线可用）。`log/processIndex` 负载 `ProcessIndexSnapshot` 必带 `generation`；`log/hits` 与 `log.window.bind` 的 `LogHits`/`LogPage` 不再携带 `signals`（信号由 UI 从可见行派生）。任务中心按 `(serial, generation)` 收口。
+**日志任务与诊断（ADR-v6-047/049）：** `log.clear` 无 UI 调用方，仅诊断入口（离线可用）。`log/processIndex` 负载 `ProcessIndexSnapshot` 必带 `generation`；实时取数为设备环水位 `log/appended` + `log.range` 游标拉取，过滤在 UI，信号由 UI 从可见行派生。任务中心按 `(serial, generation)` 收口。
