@@ -125,3 +125,16 @@ pub fn spawn(app: AppHandle, req: TransferRequest, direction: Direction) -> u32 
 pub fn cancel(state: &AppState, id: u32) {
     state.transfer_runs.cancel(id);
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn transfer_lock_sentence_once() {
+        let src = include_str!("transfer_runs.rs");
+        let production = src
+            .split_once("mod tests")
+            .map(|(head, _)| head)
+            .unwrap_or(src);
+        assert_eq!(production.matches("transfer lock poisoned").count(), 1);
+    }
+}

@@ -235,4 +235,19 @@ mod tests {
             .unwrap_or(src);
         assert_eq!(production.matches("group lock poisoned").count(), 1);
     }
+
+    #[test]
+    fn command_outcome_is_settled_once() {
+        let needle = "into_eval_result()";
+        let src = include_str!("terminal_eval.rs");
+        let production = src
+            .split_once("mod tests")
+            .map(|(head, _)| head)
+            .unwrap_or(src);
+        assert_eq!(
+            production.matches(needle).count(),
+            1,
+            "{needle} 只在 terminal_eval 收口一次"
+        );
+    }
 }

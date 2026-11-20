@@ -27,6 +27,7 @@ mod native_splash;
 mod openh264_acquire;
 mod panic_hook;
 mod paths;
+mod run_ledger;
 mod settings_apply;
 mod settings_store;
 mod sidecar;
@@ -218,6 +219,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             let (event_tx, event_rx) = mpsc::channel::<AppEvent>(crate::limits::EVENT_CHANNEL_CAP);
             events::spawn_dispatcher(event_rx, handle.clone());
+            // 任务中心唯一推送者：串行 drainer（禁止并发 spawn 发快照）。
+            let tasks = std::sync::Arc::new(TaskCenter::new(event_tx.clone()));
+            tasks.spawn_drainer();
 
             let capture = CaptureService::new(
                 client.clone(),
@@ -254,7 +258,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 settings,
                 paths: paths.clone(),
                 app_log: AppLog::new(crate::limits::APP_LOG_CAP),
-                tasks: std::sync::Arc::new(TaskCenter::new(event_tx.clone())),
+                tasks,
                 event_tx: event_tx.clone(),
                 root_cancel: root_cancel.clone(),
                 last_devices: std::sync::Mutex::new(Vec::new()),
@@ -379,9 +383,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::log::log_clear_device,
             commands::log::log_window_bind,
             commands::log::log_window_release,
-            commands::log::log_window_latch,
-            commands::log::log_page,
-            commands::log::log_replay,
             commands::log::log_export,
             commands::log::log_process_snapshot,
             commands::log::log_package_snapshot,

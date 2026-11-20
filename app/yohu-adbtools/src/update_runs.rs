@@ -182,3 +182,16 @@ pub fn open(url: &str) -> Result<(), UpdateError> {
     yohu_runtime::open_url(url).map_err(|_| UpdateError::OpenFailed)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn update_cancel_lock_sentence_once() {
+        let src = include_str!("update_runs.rs");
+        let production = src
+            .split_once("mod tests")
+            .map(|(head, _)| head)
+            .unwrap_or(src);
+        assert_eq!(production.matches("update cancel lock poisoned").count(), 1);
+    }
+}
