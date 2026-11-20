@@ -25,7 +25,7 @@
 
 ## 架构约定（v6，ADR 全量见 `docs/architecture/adr/`）
 - **依赖方向**：`UI → @yohu/api → IPC ← commands ← core crates`；`yohu-runtime ∥ yohu-protocol ∥ yohu-motion ∥ yohu-search`；`yohu-adb → runtime+protocol+domain`；设备 capability → adb；`yohu-update` 禁止 adb。`yohu-domain` 禁止依赖 `yohu-search`。`apps/shell` 是唯一组合点（`registerModule`）；模块只依赖 `@yohu/api` + `@yohu/ui`。禁止 core 引用 Tauri、UI 模块互 import / 依赖 `@yohu/workbench`（`scripts/check-ui-deps.mjs`）、跨层绕过 IPC
-- **批量 IPC（ADR-v6-007）**：logcat 行/传输进度 100–200ms 聚合（单批 ≤1000 行 / 512KB，先到先发），**禁逐行**；背压：下游事件队列有界，溢出**丢推送不丢环**（RingBuffer seq 单调），UI 经 `log/overflow` 提示后 `log.replay(fromSeq)` 补齐。**导出现状**见 ADR-v6-021（环快照，仅用户导出时落盘）。**投屏帧**不进 JS（ADR-v6-024），壳内 Present；`mirror/painted` 报首帧与 fps。**Tauri 2.9 事件名禁止点号**（ADR-v6-020），事件用 `/`（`log/lines`），invoke 命令名仍点分（`log.export`）
+- **批量 IPC（ADR-v6-007）**：logcat 行/传输进度 100–200ms 聚合（单批 ≤1000 行 / 512KB，先到先发），**禁逐行**；背压：下游事件队列有界，溢出**丢推送不丢环**（RingBuffer seq 单调），UI 经 `log/overflow` 提示后重新 `log.window.bind` 当前窗口补齐。**导出现状**见 ADR-v6-021（环快照，仅用户导出时落盘）。**投屏帧**不进 JS（ADR-v6-024），壳内 Present；`mirror/painted` 报首帧与 fps。**Tauri 2.9 事件名禁止点号**（ADR-v6-020），事件用 `/`（如 `log/hits`），invoke 命令名仍点分（`log.export`）
 - **采集模型（ADR-v6-006/016）**：每设备至多一路 logcat 流（多设备可并行）；槽位 Empty/Starting/Live/Stopping；`start` **仅 Live adopt**，Starting/Stopping 等待；`CaptureState` 带 generation 且必达；窗口=会话订阅（serial/capturing/fromSeq），过滤/可见列表仍在 UI；设备流按窗口引用计数；切焦点不停其他设备；`start` 失败与成功均以 `log.capture.status` 快照对账；启动中可并发 `stop` 取消 Starting
 - **会话与过滤**：Scope（All=System / Package / Pid）；包名匹配 = PidSet ∪ HistoryPidSet；PID 精确相等；级别精确集合（空=不限，非空=独立多选）；Tag 逗号分隔多针 OR 精确命中 / 关键字包含（OrdinalIgnoreCase）；过滤变更仅当前窗口重建可见区（且只重放 seq≥fromSeq）
 - **终端结果（ADR-v6-009）**：只展示输入与输出行；不配置成功/失败正则；wire `ok` 仅反映退出码；库命令与发送栏同一 `terminal.exec`
@@ -44,7 +44,7 @@ docs/
 └── architecture/                       # README.md + identity/layers/ipc/youi/workbench/modules/adr
 core/
 ├── yohu-runtime/                       # 宿主：process / persist / os_paths（零产品类型）
-├── yohu-protocol/                      # wire 类型（serde，无 IO）：DeviceInfo/LogLine/LogBatch/AppEvent…
+├── yohu-protocol/                      # wire 类型（serde，无 IO）：DeviceInfo/LogLine/AppEvent…
 ├── yohu-motion/                        # 动效原语：时长/曲线；Windows 时钟与 DComp 采样（零产品 HWND、零 Tauri）
 ├── yohu-search/                        # 检索引擎：分词/命中/拼音/评分/组扩展/高亮（零产品类型、零 Tauri、零 domain）
 ├── yohu-domain/                        # 纯领域：命令库/GroupExecutor/RemotePath/SafetyRoot/设置模型
@@ -104,7 +104,7 @@ cargo tauri build
 - **S1 骨架已落地**：Cargo workspace + Tauri 壳（`app/yohu-adbtools`，含 `log.capture.status`）+ YoUI + `@yohu/api` + `@yohu/workbench` + sidecar adb
 - **S2 终端模块已落地**：命令库（默认库 3 组 9 命令，首次启动写入）/ 命令组 / 多设备并行 / 组内串行（无延时、不因失败中断）/ 命令管理窗口（快照编辑、全量提交、取消零污染）/ 占位符填值对话框 / 统一输入输出行（`>>>` / `<<<` + 时间 + 内容）/ 可收缩发送栏与排队发送；GroupProgress 回流为 IO 行
 - **S3 文件模块已落地**：设备目录浏览（YoVirtualList 虚拟化）/ 上传（tauri-plugin-dialog 选文件）/ 下载（save 对话框）/ 删除（确认框 + core 侧 SafetyRoot）/ 新建目录 / 重命名（右键单选一条，`RenameDialog` 预填源名；core 只收新条目名，`sibling_rename` 拼落点，`ls -d` 问占用即 `AlreadyExists` 不覆盖）/ 传输面板（进度条/取消/状态徽章）
-- **S4 日志模块已落地**：多窗口 Tab（默认 System；按包名/PID 再开，每窗口绑定设备）/ 每设备一路 `logcat -v long,uid,year` + 组装为 logd 记录 / 窗口引用计数启停 / 切焦点不停其他设备 / AS 风格过滤栏（级别独立精确筛选/Tag 逗号多选 OR/关键字，无正则）/ 进程索引重绑（历史 PID 集上限 8）/ 信号扫描（崩溃/ANR 徽章）/ 堆叠折叠 / 溢出回补（log.replay）/ 导出 / 快捷键（Space/Ctrl+L/F/T/W/Tab）/ 消费端过滤在 `filter.ts` + `stack.ts` + `panel.ts`
+- **S4 日志模块已落地**：多窗口 Tab（默认 System；按包名/PID 再开，每窗口绑定设备）/ 每设备一路 `logcat -v long,uid,year` + 组装为 logd 记录 / 窗口引用计数启停 / 切焦点不停其他设备 / AS 风格过滤栏（级别独立精确筛选/Tag 逗号多选 OR/关键字，无正则）/ 进程索引重绑（历史 PID 集上限 8）/ 信号扫描（崩溃/ANR 徽章）/ 堆叠折叠 / 溢出回补（log.window.bind）/ 导出 / 快捷键（Space/Ctrl+L/F/T/W/Tab）/ 消费端过滤在 `filter.ts` + `stack.ts` + `panel.ts`
 - **体积优化**：release profile 启用 lto + codegen-units=1 + strip + panic=abort → exe 6.4 MB
 - **NSIS 安装包已打通**：`cargo tauri build` 产出安装包（含 sidecar adb 内嵌 + WebView2 embedBootstrapper 引导）；原生 tauri-cli（cargo install）；tauri.conf 路径约定（frontendDist 相对 config 目录、beforeX 命令 cwd=app/）；NSIS 工具链离线缓存方案（winget NSIS → `%LOCALAPPDATA%\tauri\nsis-3.11`）；scripts/build-release.ps1 全流程封装
 - **fake-adb 集成测试已落地**：tools/fake-adb（脚本化假 adb，零共享状态：测试拷贝 exe + 同名 json 到独立临时目录）；yohu-logsrv 集成测试含 adopt / stop 期间 start 等世代；期间修复两个真实缺陷：run_capture 关闭通道忙循环（饿死 stderr 读任务）与 Batcher 生产端结束丢尾部批次（现冲刷 flush）
