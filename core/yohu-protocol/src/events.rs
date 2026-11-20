@@ -55,10 +55,6 @@ pub enum AppEvent {
         status: DeviceStatus,
     },
     LogHits(LogHits),
-    LogOverflow {
-        serial: String,
-        dropped_batches: u64,
-    },
     ProcessIndex(ProcessIndexSnapshot),
     CaptureState {
         serial: String,
@@ -114,7 +110,6 @@ pub mod event_names {
     pub const DEVICE_OFFLINE: &str = "device/offline";
     pub const DEVICE_STATUS: &str = "device/status";
     pub const LOG_HITS: &str = "log/hits";
-    pub const LOG_OVERFLOW: &str = "log/overflow";
     pub const PROCESS_INDEX: &str = "log/processIndex";
     pub const CAPTURE_STATE: &str = "log/captureState";
     pub const TRANSFER_PROGRESS: &str = "transfer/progress";
@@ -136,7 +131,6 @@ impl AppEvent {
             AppEvent::DeviceOffline { .. } => DEVICE_OFFLINE,
             AppEvent::DeviceStatus { .. } => DEVICE_STATUS,
             AppEvent::LogHits(_) => LOG_HITS,
-            AppEvent::LogOverflow { .. } => LOG_OVERFLOW,
             AppEvent::ProcessIndex(_) => PROCESS_INDEX,
             AppEvent::CaptureState { .. } => CAPTURE_STATE,
             AppEvent::TransferProgress(_) => TRANSFER_PROGRESS,
@@ -306,7 +300,7 @@ mod tests {
             event_names::DEVICES_CHANGED,
             event_names::DEVICE_OFFLINE,
             event_names::DEVICE_STATUS,
-            event_names::LOG_OVERFLOW,
+            event_names::LOG_HITS,
             event_names::PROCESS_INDEX,
             event_names::CAPTURE_STATE,
             event_names::TRANSFER_PROGRESS,
@@ -332,12 +326,11 @@ mod tests {
         let raw = include_str!("../../../testdata/event_names.json");
         let fixture: std::collections::BTreeMap<String, String> =
             serde_json::from_str(raw).expect("fixture json");
-        let expected: [(&str, &str); 15] = [
+        let expected: [(&str, &str); 14] = [
             ("devicesChanged", event_names::DEVICES_CHANGED),
             ("deviceOffline", event_names::DEVICE_OFFLINE),
             ("deviceStatus", event_names::DEVICE_STATUS),
             ("logHits", event_names::LOG_HITS),
-            ("logOverflow", event_names::LOG_OVERFLOW),
             ("processIndex", event_names::PROCESS_INDEX),
             ("captureState", event_names::CAPTURE_STATE),
             ("transferProgress", event_names::TRANSFER_PROGRESS),

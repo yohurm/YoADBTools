@@ -590,27 +590,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     });
   });
 
-  it("溢出回补成功：重新 bind 当前窗口取尾页，且徽章复位", async () => {
-    const store = await liveStore();
-    push("S1", [mk(0), mk(1)]);
-    const binds = mocks.logWindowBind.mock.calls.length;
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
-    await vi.waitFor(() => {
-      expect(mocks.logWindowBind.mock.calls.length).toBeGreaterThan(binds);
-      expect(overflowedOf(store, "S1")).toBe(false);
-    });
-  });
-
-  it("溢出回补失败：徽章保留，等待下次回补", async () => {
-    const store = await liveStore();
-    push("S1", [mk(0), mk(1)]);
-    mocks.logWindowBind.mockRejectedValueOnce(new Error("ipc bind"));
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
-    await vi.waitFor(() => expect(overflowedOf(store, "S1")).toBe(true));
-    await Promise.resolve();
-    expect(overflowedOf(store, "S1")).toBe(true);
-  });
-
   it("容量口径：文档是缓存，重绑后只显示环仍持有的行（已被环淘汰的行不再显示）", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
@@ -629,7 +608,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     // 环里已有 2、3，但信号尚未送达
     remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
 
-    // 溢出触发的整页 bind 延迟解析（模拟在途页）
+    // 回前台触发的整页 bind 延迟解析（模拟在途页）
     let releaseBind!: () => void;
     let snapshot: LogPage | undefined;
     mocks.logWindowBind.mockImplementationOnce((spec: LogWindowBind) => {
@@ -638,7 +617,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
         releaseBind = () => resolve(snapshot!);
       });
     });
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
+    store.resumeVisible();
     await vi.waitFor(() => expect(releaseBind).toBeDefined());
 
     // 在途期间又来一条 seq4 的水位：UI 从环按游标补齐 2、3、4
@@ -1290,22 +1269,6 @@ describe("logStore 多窗口 × 多设备", () => {
     });
     store.patchFilter(a, { tagContains: "x" });
     expect(pidSetOf(store.state.sessions.find((s) => s.id === a)!.binding).sort((x, y) => x - y)).toEqual([10, 11]);
-  });
-
-  it("overflowed 按设备：A 溢出不影响正在看 B 的窗口", async () => {
-    const store = wiredStore();
-    await store.startCapture();
-    const b = store.createSession({ kind: "all" }, "B", "S2");
-    store.setActive(b);
-    mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S2", generation: 3, adopted: false });
-    await store.startCapture();
-    // A 的回补失败 → 徽章保留（成功则按新语义复位）
-    mocks.logWindowBind.mockRejectedValueOnce(new Error("ipc bind"));
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
-    await vi.waitFor(() => {
-      expect(overflowedOf(store, "S1")).toBe(true);
-    });
-    expect(overflowedOf(store, "S2")).toBe(false);
   });
 
   it("不同设备 start 互不等待同一把闸门", async () => {

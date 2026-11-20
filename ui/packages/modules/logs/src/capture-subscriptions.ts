@@ -12,7 +12,6 @@ import {
   onCaptureState,
   onDeviceOffline,
   onLogHits,
-  onLogOverflow,
   onProcessIndex,
   onSettingsChanged,
   SETTING_KEYS,
@@ -49,24 +48,8 @@ export function createCaptureSubscriptions(
   setState: SetStoreFunction<LogUiState>,
   deps: CaptureSubscriptionsDeps,
 ): CaptureSubscriptionsApi {
-  const { workspace, viewport, orchestrator } = deps;
+  const { workspace, orchestrator } = deps;
   const pending: Promise<() => void>[] = [];
-
-  async function onOverflow(device: string): Promise<void> {
-    setOverflowed(state, setState, device, true);
-    let recovered = true;
-    for (const session of state.sessions) {
-      if (!sessionCaptureIsLive(session) || session.serial !== device) continue;
-      try {
-        await viewport.loadPage(session.id);
-      } catch (e) {
-        recovered = false;
-        console.error("log.window.bind 回补失败", e);
-      }
-    }
-    // 徽章只在「该设备全部在采窗口都完成一次环对账」后才复位；失败保留，等下次回补。
-    if (recovered) setOverflowed(state, setState, device, false);
-  }
 
   /**
    * 按 seq 游标从设备环把窗口拉齐到 `throughSeq`（含）。原始行由 UI 过滤。
@@ -142,7 +125,6 @@ export function createCaptureSubscriptions(
       void pullThrough(e.window_id, e.last_seq);
     }),
   );
-  watch(onLogOverflow((e) => void onOverflow(e.serial)));
   watch(onProcessIndex((e) => onIndex(e)));
   watch(
     onCaptureState((e) => {

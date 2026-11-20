@@ -79,7 +79,6 @@ async fn aggregate_loop(
     // 有序：同一批内跨窗口信号顺序可复现。
     let mut pending: BTreeMap<u64, Acc> = BTreeMap::new();
     let mut pending_lines: usize = 0;
-    let mut dropped_batches: u64 = 0;
 
     loop {
         tokio::select! {
@@ -88,7 +87,7 @@ async fn aggregate_loop(
             note = line_rx.recv() => {
                 let Some(note) = note else {
                     if !pending.is_empty() {
-                        flush(&mut pending, &mut pending_lines, &serial, &sink, &mut dropped_batches);
+                        flush(&mut pending, &mut pending_lines, &serial, &sink);
                     }
                     break;
                 };
@@ -102,14 +101,12 @@ async fn aggregate_loop(
                 acc.last_seq = note.seq;
                 pending_lines += 1;
                 if pending_lines >= max_lines {
-                    flush(&mut pending, &mut pending_lines, &serial, &sink, &mut dropped_batches);
+                    flush(&mut pending, &mut pending_lines, &serial, &sink);
                 }
             }
             _ = interval.tick() => {
                 if !pending.is_empty() {
-                    flush(&mut pending, &mut pending_lines, &serial, &sink, &mut dropped_batches);
-                } else if dropped_batches > 0 {
-                    emit_overflow(&sink, &serial, &mut dropped_batches);
+                    flush(&mut pending, &mut pending_lines, &serial, &sink);
                 }
             }
         }
@@ -121,7 +118,6 @@ fn flush(
     pending_lines: &mut usize,
     serial: &str,
     sink: &mpsc::Sender<AppEvent>,
-    dropped_batches: &mut u64,
 ) {
     let ready = std::mem::take(pending);
     *pending_lines = 0;
@@ -136,40 +132,8 @@ fn flush(
             appended: acc.appended,
             last_seq: acc.last_seq,
         });
-        push(sink, event, serial, dropped_batches);
-    }
-}
-
-fn push(
-    sink: &mpsc::Sender<AppEvent>,
-    event: AppEvent,
-    serial: &str,
-    dropped_batches: &mut u64,
-) {
-    match sink.try_send(event) {
-        Ok(()) => {
-            if *dropped_batches > 0 {
-                emit_overflow(sink, serial, dropped_batches);
-            }
-        }
-        Err(mpsc::error::TrySendError::Full(_)) => {
-            // 丢信号不丢环：下一次水位更高或兜底 tick 仍能补齐
-            *dropped_batches += 1;
-        }
-        Err(mpsc::error::TrySendError::Closed(_)) => {}
-    }
-}
-
-fn emit_overflow(sink: &mpsc::Sender<AppEvent>, serial: &str, dropped: &mut u64) {
-    if *dropped == 0 {
-        return;
-    }
-    let event = AppEvent::LogOverflow {
-        serial: serial.to_string(),
-        dropped_batches: *dropped,
-    };
-    if sink.try_send(event).is_ok() {
-        *dropped = 0;
+        // 丢信号不丢环：下一次水位更高即可补齐（无需 overflow 恢复事件）。
+        let _ = sink.try_send(event);
     }
 }
 
@@ -235,38 +199,6 @@ mod tests {
             AppEvent::LogHits(hits) => assert_eq!(hits.appended, 3),
             other => panic!("unexpected event: {other:?}"),
         }
-        drop(batcher);
-        let _ = handle.await;
-    }
-
-    #[tokio::test]
-    async fn overflow_drops_signal_but_reports() {
-        let (sink, mut sink_rx) = mpsc::channel::<AppEvent>(1);
-        let (batcher, handle) = Batcher::spawn(
-            "s1".into(),
-            sink,
-            Duration::from_millis(10),
-            2,
-            CancellationToken::new(),
-        );
-        for i in 0..6 {
-            batcher.note(note(1, i)).await.unwrap();
-        }
-        let mut saw_batch = false;
-        let mut saw_overflow = false;
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
-        while tokio::time::Instant::now() < deadline && !(saw_batch && saw_overflow) {
-            match sink_rx.recv().await {
-                Some(AppEvent::LogHits(_)) => saw_batch = true,
-                Some(AppEvent::LogOverflow { dropped_batches, .. }) => {
-                    assert!(dropped_batches > 0);
-                    saw_overflow = true;
-                }
-                _ => {}
-            }
-        }
-        assert!(saw_batch, "应有至少一批成功推送");
-        assert!(saw_overflow, "溢出必须被计数上报");
         drop(batcher);
         let _ = handle.await;
     }

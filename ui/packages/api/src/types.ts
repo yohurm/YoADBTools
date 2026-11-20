@@ -672,7 +672,6 @@ export type AppEvent =
   | { kind: "deviceOffline"; serial: string }
   | { kind: "deviceStatus"; status: DeviceStatus }
   | ({ kind: "logHits" } & LogHits)
-  | { kind: "logOverflow"; serial: string; dropped_batches: number }
   | ({ kind: "processIndex" } & ProcessIndexSnapshot)
   | { kind: "captureState"; serial: string; generation: number; state: CaptureState }
   | { kind: "transferProgress" } & TransferProgress
@@ -708,7 +707,6 @@ export const EVENT_NAMES = {
   deviceOffline: "device/offline",
   deviceStatus: "device/status",
   logHits: "log/hits",
-  logOverflow: "log/overflow",
   processIndex: "log/processIndex",
   captureState: "log/captureState",
   transferProgress: "transfer/progress",

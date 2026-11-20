@@ -27,9 +27,6 @@ export const onDeviceStatus = (h: (e: Extract<AppEvent, { kind: "deviceStatus" }
 export const onLogHits = (h: (e: Extract<AppEvent, { kind: "logHits" }>) => void) =>
   on(EVENT_NAMES.logHits, h);
 
-export const onLogOverflow = (h: (e: Extract<AppEvent, { kind: "logOverflow" }>) => void) =>
-  on(EVENT_NAMES.logOverflow, h);
-
 export const onProcessIndex = (h: (e: Extract<AppEvent, { kind: "processIndex" }>) => void) =>
   on(EVENT_NAMES.processIndex, h);
 

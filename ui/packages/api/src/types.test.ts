@@ -243,14 +243,20 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
 
   it("AppEvent 内部 tag 为 camelCase kind", () => {
     const event: AppEvent = {
-      kind: "logOverflow",
+      kind: "logHits",
       serial: "s1",
-      dropped_batches: 2,
+      window_id: 1,
+      total: 2,
+      appended: 1,
+      last_seq: 9,
     };
     expect(JSON.parse(JSON.stringify(event))).toEqual({
-      kind: "logOverflow",
+      kind: "logHits",
       serial: "s1",
-      dropped_batches: 2,
+      window_id: 1,
+      total: 2,
+      appended: 1,
+      last_seq: 9,
     });
   });
 

@@ -3,7 +3,6 @@
   "deviceOffline": "device/offline",
   "deviceStatus": "device/status",
   "logHits": "log/hits",
-  "logOverflow": "log/overflow",
   "processIndex": "log/processIndex",
   "captureState": "log/captureState",
   "transferProgress": "transfer/progress",
