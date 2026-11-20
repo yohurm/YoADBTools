@@ -556,15 +556,99 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
   });
 
-  it("溢出回补：重新 bind 当前窗口取尾页", async () => {
+  it("溢出回补成功：重新 bind 当前窗口取尾页，且徽章复位", async () => {
     const store = await liveStore();
     push("S1", [mk(0), mk(1)]);
     const binds = mocks.logWindowBind.mock.calls.length;
     mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
     await vi.waitFor(() => {
       expect(mocks.logWindowBind.mock.calls.length).toBeGreaterThan(binds);
+      expect(overflowedOf(store, "S1")).toBe(false);
     });
+  });
+
+  it("溢出回补失败：徽章保留，等待下次回补", async () => {
+    const store = await liveStore();
+    push("S1", [mk(0), mk(1)]);
+    mocks.logWindowBind.mockRejectedValueOnce(new Error("ipc bind"));
+    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
+    await vi.waitFor(() => expect(overflowedOf(store, "S1")).toBe(true));
+    await Promise.resolve();
     expect(overflowedOf(store, "S1")).toBe(true);
+  });
+
+  it("容量口径：文档是缓存，重绑后只显示环仍持有的行（已被环淘汰的行不再显示）", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1), mk(2), mk(3)]);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3]);
+    // 环按容量淘汰了 0、1，只剩 2、3
+    rings.set("S1", [mk(2), mk(3)]);
+    await store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([2, 3]);
+  });
+
+  it("溢出回补遇上并发命中：回补页不得整页作废，环里被漏掉的行必须补回（不丢行）", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    // 已画 seq 0、1
+    push("S1", [mk(0), mk(1)]);
+    // 模拟 seq 2、3 的 log/hits 批次在传输中丢失（环里仍有）
+    remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
+
+    // 让溢出回补的 bind 延迟解析，并在「绑定时刻」抓取快照（只含 0..3，不含后续新行）
+    let releaseBind!: () => void;
+    let snapshot: LogPage | undefined;
+    mocks.logWindowBind.mockImplementationOnce((spec: LogWindowBind) => {
+      snapshot = pageFor(spec);
+      return new Promise<LogPage>((resolve) => {
+        releaseBind = () => resolve(snapshot!);
+      });
+    });
+
+    // 触发溢出回补（loadPage 进入等待）
+    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
+    await vi.waitFor(() => expect(releaseBind).toBeDefined());
+
+    // 回补在途期间：新命中 seq4 到达（真实：core 在 bind 之后提交，回补页快照不含它）
+    remember("S1", [mk(4)], store.state.bufferCapacity);
+    mocks.logHitsHandlers.at(-1)?.({
+      serial: "S1",
+      window_id: id,
+      total: 5,
+      appended: 1,
+      tail: [mk(4)],
+    });
+    // 此刻已画 0、1、4；2、3 尚待回补页补齐
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 4]);
+
+    // 回补页解析：快照 0..3 必须与在途追加的 seq4 合并，不得把 seq4 冲掉，也不得漏 2、3
+    releaseBind();
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
+    });
+  });
+
+  it("命中空洞（无 overflow 事件）自动按 seq 对账补齐", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1)]);
+    // 模拟 seq 2、3 两批命中在传输中丢失（环里仍有）
+    remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
+    const bindsBefore = mocks.logWindowBind.mock.calls.length;
+    remember("S1", [mk(4)], store.state.bufferCapacity);
+    // 直接投递 seq4 命中：首 seq=4 越过窗口已见末 seq=1 → 空洞，store 应主动回环对账
+    mocks.logHitsHandlers.at(-1)?.({
+      serial: "S1",
+      window_id: id,
+      total: 5,
+      appended: 1,
+      tail: [mk(4)],
+    });
+    await vi.waitFor(() => {
+      expect(mocks.logWindowBind.mock.calls.length).toBeGreaterThan(bindsBefore);
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
+    });
   });
 
   it("掉线：停采集、清镜像，已画出的行保留", async () => {
@@ -1167,6 +1251,8 @@ describe("logStore 多窗口 × 多设备", () => {
     store.setActive(b);
     mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S2", generation: 3, adopted: false });
     await store.startCapture();
+    // A 的回补失败 → 徽章保留（成功则按新语义复位）
+    mocks.logWindowBind.mockRejectedValueOnce(new Error("ipc bind"));
     mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
     await vi.waitFor(() => {
       expect(overflowedOf(store, "S1")).toBe(true);

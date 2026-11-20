@@ -15,6 +15,7 @@ import {
   type FormattedMessage,
 } from "./format";
 import type { ViewRow } from "../stack";
+import { findHeadOverlap } from "../stream/seq";
 
 export type { ContentBar, FormatOptions, FormatRange };
 
@@ -65,13 +66,7 @@ type SyncDiff = {
 
 /** 以 seq 单调为前提求「新批次首行在旧批次里的位置」。找不到即整表替换。 */
 function headOverlap(prev: readonly ViewRow[], next: readonly ViewRow[]): number {
-  const firstSeq = next[0]!.line.seq;
-  for (let k = 0; k < prev.length; k += 1) {
-    if (prev[k]!.line.seq === firstSeq) {
-      return k;
-    }
-  }
-  return -1;
+  return findHeadOverlap(prev, next, (row) => row.line.seq);
 }
 
 /** 计算与旧批次的差分；不可增量时返回 null（调用方 reload）。 */

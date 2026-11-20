@@ -8,6 +8,7 @@
 import { logLineWraps, type LogLine, type LogLineLayout, type SignalKind } from "@yohu/api";
 
 import { extendStored, type ContentBar, type DocMessage, type FormatRange } from "./document";
+import { findHeadOverlap } from "../stream/seq";
 
 export type VisualLine = {
   seq: number;
@@ -123,15 +124,9 @@ function projectMessage(message: DocMessage, rowChars: number, layout: LogLineLa
   return logLineWraps(layout) ? wrapMessage(message, rowChars) : documentLines(message);
 }
 
-/** 头部保留尾部：新批次首行在旧批次的偏移。 */
+/** 头部保留尾部：新批次首行在旧批次的偏移。唯一 seq 对账原语见 `stream/seq`。 */
 function headOverlap(prev: readonly DocMessage[], next: readonly DocMessage[]): number {
-  const firstSeq = next[0]!.seq;
-  for (let k = 0; k < prev.length; k += 1) {
-    if (prev[k]!.seq === firstSeq) {
-      return k;
-    }
-  }
-  return -1;
+  return findHeadOverlap(prev, next, (message) => message.seq);
 }
 
 export class LineBoard {

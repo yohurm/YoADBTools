@@ -257,7 +257,7 @@ describe("panel 派生", () => {
 describe("跟滚抬起只写一处", () => {
   it("会话和视图不再自己或上空面板", () => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const panel = readFileSync(resolve(here, "panel.ts"), "utf8").replace(
+    const panel = readFileSync(resolve(here, "stream/log-window-reducer.ts"), "utf8").replace(
       "return following || !canFreezeFollow(visible);",
       "",
     );
@@ -282,7 +282,7 @@ describe("sessionHasCapture", () => {
 
 describe("没有新行只判一次", () => {
   it("no_lines_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "panel.ts"), "utf8");
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "stream/log-window-reducer.ts"), "utf8");
     const needle = "lines.length " + "=== 0";
     expect(body.split(needle).length - 1).toBe(1);
     expect(body).toContain("noLines(");
@@ -291,7 +291,7 @@ describe("没有新行只判一次", () => {
 
 describe("冻结上限只有一源", () => {
   it("panel 消费 follow-state 的 frozenThroughSeq，不再用已画末行当第二份上限", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "panel.ts"), "utf8");
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "stream/log-window-reducer.ts"), "utf8");
     expect(body).toContain("freezePoint(opts.frozenThroughSeq, after)");
     expect(body).not.toContain("frozenThroughSeq === null ? Number.POSITIVE_INFINITY");
   });

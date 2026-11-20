@@ -1,6 +1,10 @@
 /**
- * 页拉取与代际：`log.window.bind` 换过滤/回补取整页（唯一取页通路）。
- * 只做「向环要页 + 代际作废旧页」，不碰设备投影与跟滚状态。
+ * 页拉取：`log.window.bind` 换过滤/回补取整页（唯一取页通路）。
+ *
+ * 只做「向环要页 + 作废过期页响应」，不碰设备投影与跟滚状态。
+ * 页响应按请求序号去重（后发起的请求胜出）；命中事件是增量，**不得**参与页代际
+ * （见 `panel-projection.applyPage` 的按 seq 对账）。窗口文档的游标由 `panel-projection`
+ * 与 `follow-state` 维护，本层不持文档状态。
  */
 
 import type { LogPage } from "@yohu/api";
@@ -12,7 +16,6 @@ import { sessionCaptureIsLive } from "./session-chrome";
 import { sessionById } from "./session-lifecycle";
 
 export type ViewportPageApi = {
-  bumpPage: (id: number) => number;
   loadPage: (id: number) => Promise<void>;
 };
 
@@ -21,18 +24,13 @@ export type ViewportPageDeps = {
 };
 
 export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): ViewportPageApi {
-  const pageGen = new Map<number, number>();
-
-  function bumpPage(id: number): number {
-    const next = (pageGen.get(id) ?? 0) + 1;
-    pageGen.set(id, next);
-    return next;
-  }
+  const requestSeq = new Map<number, number>();
 
   async function loadPage(id: number): Promise<void> {
     const session = sessionById(state, id);
     if (!session?.serial || !sessionCaptureIsLive(session)) return;
-    const gen = bumpPage(id);
+    const seq = (requestSeq.get(id) ?? 0) + 1;
+    requestSeq.set(id, seq);
     const page = await logWindowBind({
       id: session.id,
       serial: session.serial,
@@ -40,9 +38,9 @@ export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): V
       filter: sessionWire(toSessionFilter(session)),
       from_seq: Math.max(0, session.fromSeq),
     });
-    if (pageGen.get(id) !== gen) return;
+    if (requestSeq.get(id) !== seq) return;
     deps.applyPage(id, page);
   }
 
-  return { bumpPage, loadPage };
+  return { loadPage };
 }

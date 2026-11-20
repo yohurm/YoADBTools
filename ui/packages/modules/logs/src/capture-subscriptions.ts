@@ -1,6 +1,8 @@
 /**
  * 采集事件订阅：settings 变更 / 命中扇出 / 溢出回补 / 进程索引 / 世代状态 / 掉线。
  * 只做「事件 → 调用编排与投影」；不持有 DOM 生命周期（窗口可见性由 View 调 store 动作）。
+ * 命中空洞的判定与补页归文档状态机（`stream/log-window-reducer::applyAppend.gap`）与
+ * 投影装配（`panel-projection.appendToSession`），本层只转发事件，不再自行判断连续性。
  */
 
 import type { SetStoreFunction } from "solid-js/store";
@@ -49,14 +51,18 @@ export function createCaptureSubscriptions(
 
   async function onOverflow(device: string): Promise<void> {
     setOverflowed(state, setState, device, true);
+    let recovered = true;
     for (const session of state.sessions) {
       if (!sessionCaptureIsLive(session) || session.serial !== device) continue;
       try {
         await viewport.loadPage(session.id);
       } catch (e) {
+        recovered = false;
         console.error("log.window.bind 回补失败", e);
       }
     }
+    // 徽章只在「该设备全部在采窗口都完成一次环对账」后才复位；失败保留，等下次回补。
+    if (recovered) setOverflowed(state, setState, device, false);
   }
 
   function onIndex(snapshot: {
@@ -98,7 +104,8 @@ export function createCaptureSubscriptions(
   );
   watch(
     onLogHits((e) => {
-      viewport.bumpPage(e.window_id);
+      // 命中是增量追加；只有跟尾才移动视口。不得推进页代际。
+      // 连续 seq 空洞由 reducer 判定、投影层触发回环对账（见 `applyAppend.gap`）。
       workspace.applyHits(e);
     }),
   );

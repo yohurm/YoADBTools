@@ -12,10 +12,10 @@
  */
 
 import type { SetStoreFunction } from "solid-js/store";
-import { normalizeLevels, type LogHits, type LogLine, type LogPage } from "@yohu/api";
+import { matchesWireFilter, normalizeLevels, type LogHits, type LogLine, type LogPage } from "@yohu/api";
 
 import { rebindIfPackage } from "./device-projection";
-import { toSessionFilter } from "./filter";
+import { sessionWire, toSessionFilter } from "./filter";
 import type { LogUiState, SessionFilterPatch } from "./log-model";
 import {
   applyAppend,
@@ -30,6 +30,7 @@ import {
 import { sessionCaptureIsLive } from "./session-chrome";
 import { sessionAt, sessionIndex, sessionMissing, sessionOffSerial } from "./session-lifecycle";
 import type { ViewRow } from "./stack";
+import { findHeadOverlap } from "./stream/seq";
 
 const DISPLAY_KEYS: readonly (keyof SessionFilterPatch)[] = ["levels", "tagContains", "keyword", "scope"];
 
@@ -58,23 +59,9 @@ export type PanelProjectionApi = {
   setPaused: (id: number, paused: boolean) => Promise<void>;
 };
 
-/**
- * 旧面板头被裁掉的行数：在旧可见行里二分查找新首行 seq（seq 严格递增）。
- * 找到返回下标（0 表示未裁头）；找不到/空返回 -1（非后缀追加，调用方退回全量）。
- */
+/** 旧面板头被裁掉的行数：唯一 seq 对账原语见 `stream/seq`。 */
 function headDropCount(previous: readonly ViewRow[], next: readonly ViewRow[]): number {
-  if (previous.length === 0 || next.length === 0) return -1;
-  const first = next[0]!.line.seq;
-  let lo = 0;
-  let hi = previous.length - 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const seq = previous[mid]!.line.seq;
-    if (seq === first) return mid;
-    if (seq < first) lo = mid + 1;
-    else hi = mid - 1;
-  }
-  return -1;
+  return findHeadOverlap(previous, next, (row) => row.line.seq);
 }
 
 /** 指定区间 [from, to) 的信号行数；只扫被裁头 / 新增的小段，不碰整张 10 万行文档。 */
@@ -190,6 +177,9 @@ export function createPanelProjection(
     if (!applied) return;
     writePanel(idx, applied.visible, applied.pendingCount);
     noteSeq(idx, lines);
+    // 连续游标空洞：本批命中前缺少 seq（丢批/掉线重连）。由 reducer 判定，装配层触发一次
+    // 环对账补齐；`applyPage` 按 seq 对账，不会重复也不会覆盖已画新行。
+    if (applied.gap) void deps.pageRequest(id);
   }
 
   function catchUpSession(id: number): Promise<void> {
@@ -216,6 +206,15 @@ export function createPanelProjection(
     appendToSession(hits.window_id, hits.tail);
   }
 
+  /**
+   * 整页装入 = 「页快照为真前缀 + 快照之后已经画出的新行必须保留」的按 seq 对账。
+   *
+   * `log.window.bind` 的页在**绑定时刻**取 `through = ring.next_seq()`，只覆盖 `seq <= through-1`；
+   * 绑定之后经 `log/hits` 追加、且 `seq >= through` 的行不在页里。命中事件与 invoke 响应在 IPC
+   * 上无序，若盲替换会把这些行冲掉（且不会再发）。因此用页末 seq 作水位：保留已画文档中
+   * `seq > 页末 seq` 且仍满足**当前过滤**的行。换过滤时旧过滤里超出页末的多余行会被过滤掉，
+   * 溢出回补时环里被漏掉的中间行由页补齐——两者都不丢、不重。
+   */
   function applyPage(id: number, page: LogPage): void {
     const idx = sessionIndex(state, id);
     if (sessionMissing(idx)) return;
@@ -226,7 +225,18 @@ export function createPanelProjection(
       narrowDrawn(id);
       return;
     }
-    replacePanel(idx, panelFromLines(page.lines, viewCap()), session.pendingCount);
+    const cap = viewCap();
+    const pageRows = panelFromLines(page.lines, cap);
+    const pageLast = pageRows.at(-1)?.line.seq;
+    let rows: readonly ViewRow[] = pageRows;
+    if (pageLast !== undefined) {
+      const wire = sessionWire(toSessionFilter(session));
+      const kept = session.visible.filter(
+        (row) => row.line.seq > pageLast && matchesWireFilter(row.line, wire),
+      );
+      if (kept.length > 0) rows = trimRows([...pageRows, ...kept], cap);
+    }
+    replacePanel(idx, rows, session.pendingCount);
     noteSeq(idx, page.lines);
   }
 
