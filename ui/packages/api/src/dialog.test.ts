@@ -68,7 +68,7 @@ describe("选择器交出路径只写一处", () => {
     const dialogSrc = readFileSync(join(packages, "api", "src", "dialog.ts"), "utf8");
     const callers = [
       "modules/files/src/FileView.tsx",
-      "modules/logs/src/LogAnalyzerView.tsx",
+      "modules/logs/src/export-action.ts",
       "modules/mirror/src/store.ts",
       "workbench/src/stores/settings-store.ts",
     ].map((name) => readFileSync(join(packages, name), "utf8"));
@@ -95,7 +95,7 @@ describe("选择器失败文案只写一处", () => {
     const views = [
       "modules/files/src/FileView.tsx",
       "workbench/src/settings/SettingsView.tsx",
-      "modules/logs/src/LogAnalyzerView.tsx",
+      "modules/logs/src/export-action.ts",
     ].map((name) => readFileSync(join(packages, name), "utf8"));
     const once = "dialogPickFailed(pick) ? " + "DIALOG_FAILED";
     const banned = "toaster.show(" + "DIALOG_FAILED";

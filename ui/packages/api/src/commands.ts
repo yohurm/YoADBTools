@@ -25,14 +25,10 @@ import type {
   ExportResult,
   GroupRunRequest,
   ImportPreviewDto,
-  LogBatch,
-  LogLatch,
   LogPage,
-  LogPageQuery,
   LogWindowBind,
   PathOpRequest,
   ProcessEntry,
-  ReplayRequest,
   RemoteEntry,
   RenameRequest,
   SerialEvalResult,
@@ -138,8 +134,6 @@ export const logCaptureStop = (serial: string) =>
 export const logCaptureStatus = (serial: string) =>
   invoke<CaptureStatus>("log.capture.status", { serial });
 
-export const logClear = (serial: string) => invoke<void>("log.clear", { serial });
-
 export const logClearDevice = (serial: string) =>
   invoke<void>("log.clearDevice", { serial });
 
@@ -147,11 +141,6 @@ export const logWindowBind = (spec: LogWindowBind) => invoke<LogPage>("log.windo
 
 export const logWindowRelease = (id: number) => invoke<void>("log.window.release", { id });
 
-export const logWindowLatch = (latch: LogLatch) => invoke<LogPage>("log.window.latch", { latch });
-
-export const logPage = (query: LogPageQuery) => invoke<LogPage>("log.page", { query });
-
-export const logReplay = (req: ReplayRequest) => invoke<LogBatch>("log.replay", { req });
 
 export const logExport = (req: ExportRequest) => invoke<ExportResult>("log.export", { req });
 

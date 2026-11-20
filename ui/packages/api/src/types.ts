@@ -42,59 +42,33 @@ export interface LogLine {
   pid: number;
   tid: number;
   uid?: string;
-  /** 对照 LogcatHeader.applicationId。long 头不打印此列；采集缺省，清单 Formatter 用进程索引填 */
-  app?: string;
   level: string;
   tag: string;
   msg: string;
 }
 
-export interface LogBatch {
-  serial: string;
-  from_seq: number;
-  lines: LogLine[];
-  truncated: boolean;
-}
-
-/** 窗口过滤登记。命中索引在环旁边，返回当前页。 */
+/** 窗口过滤登记。命中索引在环旁边，返回当前全部命中。 */
 export interface LogWindowBind {
   id: number;
   serial: string;
   filter: LogFilter;
   from_seq: number;
-  following: boolean;
-  through_seq?: number;
 }
 
-export interface LogLatch {
-  window_id: number;
-  following: boolean;
-}
-
-export interface LogPageQuery {
-  window_id: number;
-  index: number;
-  count: number;
-}
-
-/** 一页命中。`index` 是本页首行在命中索引中的位置。 */
+/** 一次窗口快照。`index` 是首行在命中索引中的位置（登记快照恒为 0）。 */
 export interface LogPage {
   window_id: number;
   serial: string;
-  index: number;
   total: number;
-  signals: number;
-  pending: number;
   lines: LogLine[];
 }
 
-/** 一批窗口命中。钉底时 `tail` 是新增命中；离开底部 `tail` 为空。 */
+/** 一批窗口命中。`tail` 是本批新增命中的正文。 */
 export interface LogHits {
   serial: string;
   window_id: number;
   total: number;
   appended: number;
-  signals: number;
   tail: LogLine[];
 }
 
@@ -118,8 +92,13 @@ export interface ProcessEntry {
   name: string;
 }
 
+/**
+ * 进程索引快照。`generation` **必填**：迟到旧世代不得写进新世代，
+ * 与 `captureState` 同一条「只升不减」规则。
+ */
 export interface ProcessIndexSnapshot {
   serial: string;
+  generation: number;
   entries: ProcessEntry[];
   degraded: boolean;
 }
@@ -224,6 +203,37 @@ export type SettingKey =
  * 例：`SettingValue<"theme"> = Theme`、`SettingValue<"buffer_capacity"> = number`。
  */
 export type SettingValue<K extends SettingKey> = AppSettings[K];
+
+/**
+ * 设置键名常量表。由 `SettingKey` 派生并用 `satisfies` 锁死：
+ * 少一个键、拼错一个键、多一个键都在编译期失败。
+ * 模块只引用本常量，禁止再写 `"buffer_capacity"` 之类字面量。
+ */
+export const SETTING_KEYS = {
+  adb_path: "adb_path",
+  data_root: "data_root",
+  devices_auto_refresh: "devices_auto_refresh",
+  buffer_capacity: "buffer_capacity",
+  clear_device_on_start: "clear_device_on_start",
+  theme: "theme",
+  density: "density",
+  export_default_path: "export_default_path",
+  export_ask_every_time: "export_ask_every_time",
+  log_display_columns: "log_display_columns",
+  log_time_format: "log_time_format",
+  log_color_scheme: "log_color_scheme",
+  log_line_layout: "log_line_layout",
+  mirror_max_size: "mirror_max_size",
+  mirror_video_bit_rate: "mirror_video_bit_rate",
+  mirror_max_fps: "mirror_max_fps",
+  mirror_protocol: "mirror_protocol",
+  mirror_force_forward: "mirror_force_forward",
+  mirror_openh264: "mirror_openh264",
+  terminal_prepend_adb: "terminal_prepend_adb",
+  files_drop_into_folder: "files_drop_into_folder",
+  terminal_time_format: "terminal_time_format",
+  terminal_library_expand: "terminal_library_expand",
+} as const satisfies { readonly [K in SettingKey]: K };
 
 /** 应用身份（`system.info.identity`；常量见 `identity.ts`）。 */
 export interface AppIdentity {
@@ -330,12 +340,6 @@ export interface AdbExecRequest {
   serial: string;
   argv: string[];
   timeout_ms?: number;
-}
-
-export interface ReplayRequest {
-  serial: string;
-  from_seq: number;
-  limit: number;
 }
 
 export interface ExportRequest {
@@ -660,7 +664,6 @@ export type AppEvent =
   | { kind: "devicesChanged"; devices: DeviceInfo[] }
   | { kind: "deviceOffline"; serial: string }
   | { kind: "deviceStatus"; status: DeviceStatus }
-  | { kind: "logBatch"; batch: LogBatch }
   | ({ kind: "logHits" } & LogHits)
   | { kind: "logOverflow"; serial: string; dropped_batches: number }
   | ({ kind: "processIndex" } & ProcessIndexSnapshot)
@@ -668,7 +671,7 @@ export type AppEvent =
   | { kind: "transferProgress" } & TransferProgress
   | { kind: "groupProgress" } & GroupProgress
   | { kind: "taskSummary"; tasks: TaskInfo[] }
-  | { kind: "settingsChanged"; key: string; settings: AppSettings }
+  | { kind: "settingsChanged"; key: SettingKey; settings: AppSettings }
   | {
       kind: "mirrorState";
       serial: string;
@@ -697,7 +700,6 @@ export const EVENT_NAMES = {
   devicesChanged: "devices/changed",
   deviceOffline: "device/offline",
   deviceStatus: "device/status",
-  logLines: "log/lines",
   logHits: "log/hits",
   logOverflow: "log/overflow",
   processIndex: "log/processIndex",

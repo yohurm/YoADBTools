@@ -13,7 +13,6 @@ import {
   clockDisplayLen,
   formatClock,
   formatDateTime,
-  formatDateTimeFromMs,
   formatLogTs,
 } from "./datetime";
 
@@ -68,10 +67,6 @@ describe("datetime（与 domain testdata/datetime.json 同一套向量）", () =
     const text = formatDateTime(c.year, c.month, c.day, c.hour, c.minute, c.second, c.millis);
     expect(text).toBe(c.expect ?? null);
     if (text) expect(text.length).toBe(DATETIME_DISPLAY_LEN);
-  });
-
-  it("formatDateTimeFromMs 是毫秒墙钟形状", () => {
-    expect(formatDateTimeFromMs(Date.now())).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
   });
 
   it.each(fixture.projection)("projection $datetime_millis", (c) => {
