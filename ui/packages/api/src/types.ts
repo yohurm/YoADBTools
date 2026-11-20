@@ -63,6 +63,13 @@ export interface LogPage {
   lines: LogLine[];
 }
 
+/** 从设备环按 seq 取原始行（UI 游标实时拉取，对齐 LogCat 消息环）。 */
+export interface LogRangeRequest {
+  serial: string;
+  from_seq: number;
+  limit: number;
+}
+
 /** 一批窗口命中。`tail` 是本批新增命中的正文。 */
 export interface LogHits {
   serial: string;

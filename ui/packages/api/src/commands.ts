@@ -25,7 +25,9 @@ import type {
   ExportResult,
   GroupRunRequest,
   ImportPreviewDto,
+  LogLine,
   LogPage,
+  LogRangeRequest,
   LogWindowBind,
   PathOpRequest,
   ProcessEntry,
@@ -138,6 +140,9 @@ export const logClearDevice = (serial: string) =>
   invoke<void>("log.clearDevice", { serial });
 
 export const logWindowBind = (spec: LogWindowBind) => invoke<LogPage>("log.window.bind", { spec });
+
+/** 从设备环按 seq 取原始行（UI 游标实时拉取，过滤在 UI 消费端）。 */
+export const logRange = (req: LogRangeRequest) => invoke<LogLine[]>("log.range", { req });
 
 export const logWindowRelease = (id: number) => invoke<void>("log.window.release", { id });
 

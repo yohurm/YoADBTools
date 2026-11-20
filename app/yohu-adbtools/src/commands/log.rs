@@ -23,8 +23,8 @@ use tauri::State;
 use crate::commands::{ipc_adb, ipc_log, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
-    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogPage, LogWindowBind,
-    ProcessEntry,
+    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogLine, LogPage,
+    LogRangeRequest, LogWindowBind, ProcessEntry,
 };
 
 #[tauri::command(rename = "log.capture.start")]
@@ -69,6 +69,14 @@ pub async fn log_clear_device(state: State<'_, AppState>, serial: String) -> Res
 #[tauri::command(rename = "log.window.bind")]
 pub fn log_window_bind(state: State<'_, AppState>, spec: LogWindowBind) -> LogPage {
     state.capture.bind_window(spec)
+}
+
+/// 从设备环按 seq 取原始行（UI 游标实时拉取）。纯内存读，离线可用。
+#[tauri::command(rename = "log.range")]
+pub fn log_range(state: State<'_, AppState>, req: LogRangeRequest) -> Vec<LogLine> {
+    state
+        .capture
+        .snapshot(&req.serial, req.from_seq, req.limit as usize)
 }
 
 #[tauri::command(rename = "log.window.release")]

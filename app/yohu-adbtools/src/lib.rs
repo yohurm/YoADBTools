@@ -383,6 +383,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::log::log_clear_device,
             commands::log::log_window_bind,
             commands::log::log_window_release,
+            commands::log::log_range,
             commands::log::log_export,
             commands::log::log_process_snapshot,
             commands::log::log_package_snapshot,

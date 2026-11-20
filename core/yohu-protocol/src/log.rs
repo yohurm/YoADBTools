@@ -39,6 +39,17 @@ impl Default for LogLine {
     }
 }
 
+/// 从设备环按 seq 取原始行的请求（UI 游标实时拉取，对齐 LogCat 消息环模型）。
+///
+/// `from_seq` 是 UI 已消费到 seq 的下一条（含）；`limit` 单次最多返回条数。
+/// 返回原始 `LogLine`（未过滤），过滤在 UI 消费端（ADR-v6-006）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogRangeRequest {
+    pub serial: String,
+    pub from_seq: u64,
+    pub limit: u32,
+}
+
 /// 窗口过滤登记。命中索引在环旁边重建，返回当前全部可见命中。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogWindowBind {
