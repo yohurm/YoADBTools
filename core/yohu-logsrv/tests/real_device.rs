@@ -385,3 +385,76 @@ async fn real_restart_follow_page_is_tail() {
     drop(service);
     let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
+
+/// 打开采集前设备已有缓冲必须保留（`clear_device_on_start` 默认关的核心行为）：
+/// 先往设备缓冲写唯一标记，再以 `clear_device=false` 开始采集，环里必须收到该标记。
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_start_without_clear_keeps_existing_device_buffer() {
+    let client = Arc::new(AdbClient::new(
+        ToolResolver::new(Some(real_adb()), scratch("res"), scratch("data")),
+        4,
+    ));
+    let Some(serial) = online_device(&client).await else {
+        eprintln!("跳过：无在线设备");
+        return;
+    };
+    let adb = real_adb();
+    let run = |args: &[&str]| -> String {
+        let out = std::process::Command::new(&adb)
+            .arg("-s")
+            .arg(&serial)
+            .args(args)
+            .output()
+            .expect("运行 adb");
+        assert!(
+            out.status.success(),
+            "adb {:?} 失败: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+
+    run(&["logcat", "-c"]);
+    let marker = format!("YOHU_KEEP_{}", std::process::id());
+    run(&["shell", "log", "-t", "YOHU_KEEP", "-p", "i", &marker]);
+    assert!(
+        run(&["logcat", "-d", "-s", "YOHU_KEEP:I"]).contains(&marker),
+        "标记应先存在于设备缓冲"
+    );
+
+    let (tx, rx) = mpsc::channel::<AppEvent>(128);
+    let (_pumped, pump) = spawn_event_pump(rx);
+    let service = CaptureService::new(
+        client,
+        tx,
+        50_000,
+        tokio_util::sync::CancellationToken::new(),
+    );
+    // 不清设备缓冲开始采集：设备里已有的「前面的日志」必须被收进环
+    tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
+        .await
+        .expect("start 超时")
+        .expect("开始采集");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let mut found = false;
+    while tokio::time::Instant::now() < deadline {
+        if snapshot_lines(&service, &serial)
+            .iter()
+            .any(|line| line.msg.contains(&marker))
+        {
+            found = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
+        .await
+        .expect("stop 超时");
+    drop(service);
+    let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
+    assert!(
+        found,
+        "不清缓冲开始采集时，设备已有缓冲（前面的日志）必须进入环"
+    );
+}

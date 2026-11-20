@@ -14,7 +14,7 @@ export const APP_SETTINGS_DEFAULT: AppSettings = {
   data_root: "",
   devices_auto_refresh: true,
   buffer_capacity: 100000,
-  clear_device_on_start: true,
+  clear_device_on_start: false,
   theme: "system",
   density: "comfortable",
   export_default_path: "",
