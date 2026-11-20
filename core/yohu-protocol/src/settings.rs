@@ -88,8 +88,8 @@ pub struct AppSettings {
     /// 设备共享环形缓冲行数（core 环 + UI 镜像 + 可见区同一上限；采集环下次启动生效）
     #[serde(default = "default_buffer_capacity")]
     pub buffer_capacity: usize,
-    /// 开始采集前执行 `adb logcat -c`。默认关：打开日志时保留设备已有缓冲（不吞前面的日志）。
-    #[serde(default)]
+    /// 开始采集前执行 `adb logcat -c`
+    #[serde(default = "crate::default_true")]
     pub clear_device_on_start: bool,
     #[serde(default)]
     pub theme: Theme,
@@ -239,7 +239,7 @@ impl Default for AppSettings {
             data_root: String::new(),
             devices_auto_refresh: crate::default_true(),
             buffer_capacity: default_buffer_capacity(),
-            clear_device_on_start: false,
+            clear_device_on_start: crate::default_true(),
             theme: Theme::default(),
             density: Density::default(),
             export_default_path: String::new(),
@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(s.density, Density::Comfortable);
         assert!(s.devices_auto_refresh);
         assert_eq!(s.buffer_capacity, 100_000);
-        assert!(!s.clear_device_on_start);
+        assert!(s.clear_device_on_start);
         assert!(s.export_ask_every_time);
         assert!(s.export_default_path.is_empty());
         assert_eq!(s.log_display_columns, LogDisplayColumns::default());
