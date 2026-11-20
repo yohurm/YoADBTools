@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
   logProcessSnapshot: vi.fn(),
   logPackageSnapshot: vi.fn(),
   logAppendedHandlers: [] as ((e: { serial: string; last_seq: number }) => void)[],
-  logOverflowHandlers: [] as ((e: { serial: string }) => void)[],
   processIndexHandlers: [] as ((e: unknown) => void)[],
   captureStateHandlers: [] as ((e: { serial: string; generation: number; state: string }) => void)[],
   deviceOfflineHandlers: [] as ((e: { serial: string }) => void)[],
@@ -85,13 +84,6 @@ vi.mock("@yohu/api", async (importOriginal) => {
         if (i >= 0) mocks.logAppendedHandlers.splice(i, 1);
       });
     },
-    onLogOverflow: (h: (e: { serial: string }) => void): Promise<() => void> => {
-      mocks.logOverflowHandlers.push(h);
-      return Promise.resolve(() => {
-        const i = mocks.logOverflowHandlers.indexOf(h);
-        if (i >= 0) mocks.logOverflowHandlers.splice(i, 1);
-      });
-    },
     onProcessIndex: (h: (e: unknown) => void): Promise<() => void> => {
       mocks.processIndexHandlers.push(h);
       return Promise.resolve(() => {
@@ -120,8 +112,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     EVENT_NAMES: {
       devicesChanged: "devices/changed",
       deviceOffline: "device/offline",
-      logHits: "log/hits",
-      logOverflow: "log/overflow",
+      logAppended: "log/appended",
       processIndex: "log/processIndex",
       captureState: "log/captureState",
       transferProgress: "transfer/progress",

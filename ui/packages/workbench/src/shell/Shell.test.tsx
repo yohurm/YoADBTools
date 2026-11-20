@@ -105,8 +105,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     onDevicesChanged: noop,
     onDeviceOffline: noop,
     onDeviceStatus: noop,
-    onLogHits: noop,
-    onLogOverflow: noop,
+    onLogAppended: noop,
     onProcessIndex: noop,
     onCaptureState: noop,
     onTransferProgress: noop,
@@ -128,7 +127,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     EVENT_NAMES: {
       devicesChanged: "devices/changed",
       deviceOffline: "device/offline",
-      logOverflow: "log/overflow",
+      logAppended: "log/appended",
       processIndex: "log/processIndex",
       captureState: "log/captureState",
       transferProgress: "transfer/progress",
