@@ -20,7 +20,7 @@ import { LEVELS, levelKey, normalizeLevels, parseTagFilterNeedles, tagFilterActi
 import { yohuLevelVar } from "./editor/format";
 import { joinTagInput, levelLabel, removeTagNeedle, scopeBadge } from "./filter";
 import { logStore } from "./store";
-import type { LogSessionState } from "./workspace";
+import type { LogSessionState } from "./log-model";
 
 function TagFilterField(props: { session: LogSessionState }) {
   const parsed = (): ReturnType<typeof parseTagFilterNeedles> => parseTagFilterNeedles(props.session.tagContains);

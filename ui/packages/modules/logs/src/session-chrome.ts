@@ -68,12 +68,6 @@ export function sessionTabDot(phase: SessionCapturePhase): { tone: YoTabDotTone 
   return undefined;
 }
 
-export function sessionEmptyWait(phase: SessionCapturePhase): { title: string; description: string } | null {
-  const view = sessionEmptyView(phase, false);
-  if (!sessionEmptyIsWait(view)) return null;
-  return { title: view.title, description: view.description };
-}
-
 export type SessionEmptyView = {
   kind: "idle" | "filtered" | "wait";
   title: string;

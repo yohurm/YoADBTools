@@ -78,10 +78,6 @@ export function documentLines(message: DocMessage): VisualLine[] {
   );
 }
 
-export function clipMessage(message: DocMessage): VisualLine[] {
-  return documentLines(message);
-}
-
 function wrapDocumentLine(text: string, from: number, width: number): { text: string; from: number }[] {
   const w = Math.max(1, Math.floor(width));
   if (text.length === 0) {
@@ -119,8 +115,23 @@ export function documentMaxChars(lines: readonly VisualLine[]): number {
   return max;
 }
 
+function maxCharsOf(lines: readonly VisualLine[]): number {
+  return documentMaxChars(lines);
+}
+
 function projectMessage(message: DocMessage, rowChars: number, layout: LogLineLayout): VisualLine[] {
-  return logLineWraps(layout) ? wrapMessage(message, rowChars) : clipMessage(message);
+  return logLineWraps(layout) ? wrapMessage(message, rowChars) : documentLines(message);
+}
+
+/** 头部保留尾部：新批次首行在旧批次的偏移。 */
+function headOverlap(prev: readonly DocMessage[], next: readonly DocMessage[]): number {
+  const firstSeq = next[0]!.seq;
+  for (let k = 0; k < prev.length; k += 1) {
+    if (prev[k]!.seq === firstSeq) {
+      return k;
+    }
+  }
+  return -1;
 }
 
 export class LineBoard {
@@ -128,6 +139,12 @@ export class LineBoard {
   private rowChars = -1;
   private layout: LogLineLayout = "clip";
   private items: VisualLine[] = EMPTY_VISUAL;
+  private maxCharsValue = 0;
+
+  /** 文档最长可视行宽（运行最大值，增删增量维护，不每次扫全表）。 */
+  maxChars(): number {
+    return this.maxCharsValue;
+  }
 
   project(messages: readonly DocMessage[], rowChars: number, layout: LogLineLayout): VisualLine[] {
     const widthKey = logLineWraps(layout) ? rowChars : 0;
@@ -145,44 +162,64 @@ export class LineBoard {
     if (messages.length === 0) {
       this.messages = messages;
       this.items = EMPTY_VISUAL;
+      this.maxCharsValue = 0;
       return this.items;
     }
-    if (
-      this.messages &&
-      messages.length >= this.messages.length &&
-      this.messages.every((row, i) => row === messages[i])
-    ) {
-      if (messages.length === this.messages.length) {
+    const prev = this.messages;
+    if (prev && prev.length > 0) {
+      const evicted = headOverlap(prev, messages);
+      const keep = evicted >= 0 ? prev.length - evicted : -1;
+      if (
+        evicted >= 0 &&
+        keep > 0 &&
+        keep <= messages.length &&
+        prev[prev.length - 1]!.seq === messages[keep - 1]!.seq
+      ) {
+        const removeCount = evicted > 0 ? this.countVisual(prev, evicted) : 0;
+        const removedLines = evicted > 0 ? this.items.slice(0, removeCount) : EMPTY_VISUAL;
+        const keptItems = evicted > 0 ? this.items.slice(removeCount) : this.items;
+        const oldMax = this.maxCharsValue;
+        if (keep === messages.length) {
+          this.items = keptItems;
+          this.messages = messages;
+          this.refreshMaxAfterDrop(removedLines, oldMax);
+          return this.items;
+        }
+        const tail = messages.slice(keep).flatMap((row) => projectMessage(row, this.rowChars, this.layout));
+        this.items = evicted > 0 ? keptItems.concat(tail) : extendStored(this.items, EMPTY_VISUAL, tail);
         this.messages = messages;
+        this.refreshMaxAfterDrop(removedLines, oldMax);
+        this.maxCharsValue = Math.max(this.maxCharsValue, maxCharsOf(tail));
         return this.items;
       }
-      const tail = messages
-        .slice(this.messages.length)
-        .flatMap((row) => projectMessage(row, this.rowChars, this.layout));
-      this.items = extendStored(this.items, EMPTY_VISUAL, tail);
-      this.messages = messages;
-      return this.items;
-    }
-    if (
-      this.messages &&
-      this.messages.length > messages.length &&
-      messages.every((row, i) => row === this.messages![this.messages!.length - messages.length + i])
-    ) {
-      const drop = this.messages.length - messages.length;
-      let remove = 0;
-      for (let i = 0; i < drop; i += 1) {
-        const seq = this.messages[i]!.seq;
-        while (remove < this.items.length && this.items[remove]!.seq === seq) {
-          remove += 1;
-        }
-      }
-      this.items = this.items.slice(remove);
-      this.messages = messages;
-      return this.items;
     }
     this.items = messages.flatMap((row) => projectMessage(row, this.rowChars, this.layout));
     this.messages = messages;
+    this.maxCharsValue = maxCharsOf(this.items);
     return this.items;
+  }
+
+  /** 旧批次前 n 条消息占多少可视行。 */
+  private countVisual(prev: readonly DocMessage[], n: number): number {
+    let count = 0;
+    for (let i = 0; i < n && count < this.items.length; i += 1) {
+      const seq = prev[i]!.seq;
+      while (count < this.items.length && this.items[count]!.seq === seq) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  /** 头部淘汰后更新最长行：只有丢掉的行曾达到旧最大值时才重算。 */
+  private refreshMaxAfterDrop(removedLines: readonly VisualLine[], oldMax: number): void {
+    if (removedLines.length === 0) {
+      return;
+    }
+    if (maxCharsOf(removedLines) < oldMax) {
+      return;
+    }
+    this.maxCharsValue = maxCharsOf(this.items);
   }
 }
 

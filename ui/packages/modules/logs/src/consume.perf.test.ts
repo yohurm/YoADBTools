@@ -1,5 +1,5 @@
 /**
- * 当前页格式化预算。全文不进界面；一页 80 行过滤加折叠应远小于一批 16ms。
+ * 当前文档一屏的格式化预算。全文不进界面；一次批量过滤加折叠应远小于一批 16ms。
  */
 
 import { describe, expect, it } from "vitest";
@@ -8,7 +8,9 @@ import { LEVELS, matchesWireFilter, type LogLine } from "@yohu/api";
 
 import { sessionWire, type SessionFilter } from "./filter";
 import { collapseStack } from "./stack";
-import { LOG_VIEW_PAGE } from "./viewport";
+
+/** 性能样本宽度：一屏可容纳的行数（不是页宽契约，契约已删）。 */
+const SAMPLE_LINES = 80;
 
 const line = (seq: number): LogLine => ({
   seq,
@@ -31,7 +33,7 @@ const sessionFilter = (over: Partial<SessionFilter>): SessionFilter => ({
 
 describe("日志当前页性能", () => {
   it("一页过滤加折叠低于一批预算", () => {
-    const page = Array.from({ length: LOG_VIEW_PAGE }, (_, seq) => line(seq));
+    const page = Array.from({ length: SAMPLE_LINES }, (_, seq) => line(seq));
     const filters = [
       sessionFilter({ levels: ["W"], keyword: "payload" }),
       sessionFilter({ levels: ["E"] }),

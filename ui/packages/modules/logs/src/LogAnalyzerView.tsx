@@ -1,12 +1,20 @@
 /**
  * 日志分析页壳：设备绑定、页眉、Tab、列表框、导出与对话框。
- * 清单走 editor/{format,document,view}；过滤条 / 复制手势分文件。
+ * 清单走 editor/{format,document,view}；过滤条 / 复制手势 / 复制编舞 / 导出动作 / 视口测量分文件。
  */
 
 import { Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 
 import type { DeviceSession, LogDisplayColumns } from "@yohu/api";
-import { writeClipboard, clipboardFailureText, boundSerial, DEVICE_UNSELECTED, dialogFailureText, dialogPickAccepted, dialogSaveFile, errorText, isCancelledError, logLineWraps, ModuleTitle, systemOpenPath, tagFilterActive } from "@yohu/api";
+import {
+  boundSerial,
+  DEVICE_UNSELECTED,
+  errorText,
+  isCancelledError,
+  logLineWraps,
+  ModuleTitle,
+  tagFilterActive,
+} from "@yohu/api";
 import {
   YoBadge,
   YoButton,
@@ -25,30 +33,27 @@ import {
   attachPanelKeys,
   closeContextMenu,
   createToaster,
+  documentIsHidden,
   openContextMenu,
   type YoSearchControl,
 } from "@yohu/ui";
 
-import {
-  copyHasPayload,
-  LOG_COPY_ALL,
-  LOG_COPY_NONE,
-  serializeLogCopy,
-  type LogCopyScope,
-} from "./copy";
+import { copyHasPayload, LOG_COPY_ALL, LOG_COPY_NONE, type LogCopyScope } from "./copy";
 import { attachLogCopyGestures } from "./copy-gesture";
+import { createCopyController } from "./copy-controller";
 import {
-  DEFAULT_CH_PX,
   DEFAULT_LOG_DISPLAY_COLUMNS,
   EditorView,
-  EMPTY_ROWS,
   TAG_DEFAULT_WIDTH_PX,
+  appNamesRevision,
   logDocTrackTemplate,
+  type EditorViewHandle,
   type FormatOptions,
   type LogDocument,
   type LogMetaColKey,
 } from "./editor";
-import { suggestedExportPath } from "./host-path";
+import { createExportAction } from "./export-action";
+import { effectiveFollowing } from "./panel";
 import {
   LOGS_KEY_BINDINGS,
   LOGS_LIST_SELECTOR,
@@ -62,7 +67,7 @@ import {
   logsKeyIsSelectAll,
   type LogsKeyAction,
 } from "./keys";
-import { dataRowHeight, measureChPx } from "./layout";
+import { dataRowHeight } from "./layout";
 import { LogColumnHeader } from "./LogColumnHeader";
 import { LogFilterBar } from "./LogFilterBar";
 import {
@@ -90,8 +95,9 @@ import {
 } from "./session-chrome";
 import { formatSessionDevice, shortSerial } from "./session-device";
 import type { ViewRow } from "./stack";
-import { deviceSlice, logStore } from "./store";
-import { EXPORT_NEEDS_CAPTURE, sessionHasCapture, type LogSessionState } from "./workspace";
+import { EXPORT_NEEDS_CAPTURE, logStore } from "./store";
+import { useLogViewLayout } from "./use-log-view-layout";
+import type { LogSessionState } from "./log-model";
 import "./logs.css";
 
 function overflowLagBadge() {
@@ -151,23 +157,54 @@ export function LogAnalyzerView(props: DeviceSession) {
   const [renameTarget, setRenameTarget] = createSignal<number | null>(null);
   const [renameText, setRenameText] = createSignal("");
   const [pick, setPick] = createSignal<LogCopyScope>(LOG_COPY_NONE);
-  const [chPx, setChPx] = createSignal(DEFAULT_CH_PX);
-  const [rowChars, setRowChars] = createSignal(0);
   const [listEl, setListEl] = createSignal<HTMLDivElement | null>(null);
-  const [headShift, setHeadShift] = createSignal(0);
-  const [colChars, setColChars] = createSignal<Partial<Record<LogMetaColKey, number>>>({});
+  // 列宽与表头横滑是会话级 store 字段（单源 LogSessionState.colChars / headShift）：
+  // 随会话 id 建/销、切 Tab 各自恢复；关闭会话随会话删除，组件不再持 map、不再手工修剪。
+  const [draftColChars, setDraftColChars] = createSignal<Partial<Record<LogMetaColKey, number>>>({});
+
+  const { chPx, rowChars } = useLogViewLayout({
+    listEl,
+    settings: () => props.settings,
+  });
 
   let keywordRef: YoSearchControl | undefined;
-  let activeDoc: LogDocument | undefined;
+  let activeDoc: LogDocument | null = null;
+  let viewHandle: EditorViewHandle | null | undefined;
+
+  const sessionById = (id: number | null) => logStore.sessionById(id);
+
+  const EMPTY_COL_CHARS: Partial<Record<LogMetaColKey, number>> = {};
+  const committedCols = (id: number | null): Partial<Record<LogMetaColKey, number>> => {
+    const cols = id !== null ? sessionById(id)?.colChars : undefined;
+    return (cols as Partial<Record<LogMetaColKey, number>> | undefined) ?? EMPTY_COL_CHARS;
+  };
+  const headShiftOf = (id: number | null): number => (id !== null ? sessionById(id)?.headShift : 0) ?? 0;
+  const writeColumns = (
+    id: number,
+    patch: { colChars?: Partial<Record<LogMetaColKey, number>>; headShift?: number },
+  ): void => {
+    const view: { colChars?: Record<string, number>; headShift?: number } = {};
+    if (patch.colChars !== undefined) view.colChars = patch.colChars as Record<string, number>;
+    if (patch.headShift !== undefined) view.headShift = patch.headShift;
+    logStore.setColumnView(id, view);
+  };
+
+  // 切会话清拖动草稿；wrap 布局下表头横滑归零。
+  createEffect(() => {
+    logStore.state.activeSessionId;
+    setDraftColChars({});
+  });
+  createEffect(() => {
+    const id = logStore.state.activeSessionId;
+    if (id !== null && logLineWraps(props.settings.log_line_layout) && headShiftOf(id) !== 0) {
+      writeColumns(id, { headShift: 0 });
+    }
+  });
 
   createEffect(() => {
     const serial = boundSerial(props.selectedSerials);
     void logStore.bindSerial(serial);
     untrack(() => logStore.ensureSession());
-  });
-
-  createEffect(() => {
-    logStore.setBufferCapacity(props.settings.buffer_capacity);
   });
 
   createEffect(() => {
@@ -177,14 +214,7 @@ export function LogAnalyzerView(props: DeviceSession) {
     closeContextMenu();
   });
 
-  function sessionById(id: number | null) {
-    return logStore.state.sessions.find((s) => s.id === id);
-  }
-
-  const active = createMemo(() => {
-    const id = logStore.state.activeSessionId;
-    return sessionById(id) ?? null;
-  });
+  const active = createMemo(() => sessionById(logStore.state.activeSessionId) ?? null);
 
   const tabs = createMemo(() =>
     logStore.state.sessions.map((s) => ({
@@ -197,9 +227,10 @@ export function LogAnalyzerView(props: DeviceSession) {
   const capturePhase = (): ReturnType<typeof sessionCapturePhase> =>
     sessionCapturePhase(active() ?? { capturing: false, starting: false });
 
-  const overflowed = createMemo(() => deviceSlice(logStore.state, active()?.serial).overflowed);
+  const overflowed = createMemo(() => logStore.deviceOf(active()?.serial).overflowed);
 
-  const windowSerial = (): string | null => active()?.serial ?? boundSerial(props.selectedSerials);
+  /** 命令目标设备：唯一回落链在 store（显式 serial → 窗口绑定 → 焦点）。 */
+  const windowSerial = (): string | null => logStore.commandSerialOf(logStore.state.activeSessionId);
 
   const windowHasSerial = (): boolean => windowSerial() !== null;
 
@@ -209,6 +240,10 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const showFailure = (failure: string): void => {
     toaster.show(failure, "error");
+  };
+
+  const showSuccess = (message: string): void => {
+    toaster.show(message, "success");
   };
 
   const beginCapture = (): void => {
@@ -226,53 +261,24 @@ export function LogAnalyzerView(props: DeviceSession) {
 
   const formatOpts = createMemo((): FormatOptions => {
     const serial = windowSerial();
-    const names: Record<number, string> = {};
-    for (const entry of deviceSlice(logStore.state, serial).processEntries) {
-      names[entry.pid] = entry.name;
-    }
+    const appNames = logStore.appNamesOf(serial);
     return {
       display: displayColumns(),
       tagWidthPx: TAG_DEFAULT_WIDTH_PX,
       timeFormat: props.settings.log_time_format,
+      layout: props.settings.log_line_layout,
       scheme: props.settings.log_color_scheme,
-      softWrap: logLineWraps(props.settings.log_line_layout),
-      appNames: names,
-      colChars: colChars(),
+      appNames,
+      appNamesKey: appNamesRevision(appNames),
+      colChars: committedCols(logStore.state.activeSessionId),
     };
   });
 
-  createEffect(() => {
-    props.settings.density;
-    const host = listEl();
-    if (host) {
-      setChPx(measureChPx(host));
-    }
-  });
-
-  createEffect(() => {
-    if (logLineWraps(props.settings.log_line_layout)) {
-      setHeadShift(0);
-    }
-  });
-
-  createEffect(() => {
-    if (!logLineWraps(props.settings.log_line_layout)) {
-      setRowChars(0);
-      return;
-    }
-    const host = listEl();
-    const px = chPx();
-    if (!host) {
-      return;
-    }
-    const apply = (): void => {
-      setRowChars(px > 0 ? Math.floor(host.clientWidth / px) : 0);
-    };
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(host);
-    onCleanup(() => ro.disconnect());
-  });
+  /** 表头轨道与列格用「已提交 + 拖动草稿」合成，拖动时只动表头不动文档。 */
+  const headerOpts = createMemo((): FormatOptions => ({
+    ...formatOpts(),
+    colChars: { ...committedCols(logStore.state.activeSessionId), ...draftColChars() },
+  }));
 
   const togglePause = (): void => {
     const id = logStore.state.activeSessionId;
@@ -281,35 +287,13 @@ export function LogAnalyzerView(props: DeviceSession) {
     if (session && sessionCaptureIsLive(session)) logStore.setPaused(id, !session.paused);
   };
 
-  const copyMessages = () =>
-    (activeDoc?.messages ?? []).map((item) => ({ seq: item.seq, text: item.text }));
-
-  const fallbackTextOf = (line?: ViewRow["line"] | null): string | undefined => {
-    const seq = line?.seq;
-    if (seq == null) {
-      return undefined;
-    }
-    return copyMessages().find((item) => item.seq === seq)?.text;
-  };
-
-  const copyText = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): string =>
-    serializeLogCopy({
-      pick: scope,
-      messages: copyMessages(),
-      listRoot: listEl(),
-      selection: typeof window === "undefined" ? null : window.getSelection(),
-      fallbackText: fallbackTextOf(fallbackLine ?? contextLine()),
-    });
-
-  const copySelected = (scope: LogCopyScope = pick(), fallbackLine?: ViewRow["line"] | null): boolean => {
-    const text = copyText(scope, fallbackLine);
-    if (!text) return false;
-    void writeClipboard(text).then((result) => {
-      const failure = clipboardFailureText(result);
-      if (failure) showFailure(failure);
-    });
-    return true;
-  };
+  const copy = createCopyController({
+    activeMessages: () => activeDoc?.messages ?? [],
+    listEl,
+    pick,
+    contextLine,
+    showFailure,
+  });
 
   const openNewSession = (): void => {
     setNewOpen(true);
@@ -353,12 +337,16 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
     if (logsKeyIsSelectAll(action)) {
       setPick(LOG_COPY_ALL);
-      const root = listEl();
-      const host = root?.querySelector(".yohu-logs__view") ?? root;
-      if (host) window.getSelection()?.selectAllChildren(host);
+      viewHandle?.selectAll();
       return;
     }
-    if (logsKeyIsCopy(action)) return copySelected();
+    if (logsKeyIsCopy(action)) return copy.copySelected();
+  };
+
+  /** 页面重新可见/聚焦：把在采窗口追到尾部（IPC 层不再监听 DOM 生命周期）。 */
+  const onVisible = (): void => {
+    if (documentIsHidden()) return;
+    logStore.resumeVisible();
   };
 
   onMount(() => {
@@ -372,11 +360,15 @@ export function LogAnalyzerView(props: DeviceSession) {
       listRoot: listEl,
       pick,
       setPick,
-      copyText: () => copyText(),
+      copyText: () => copy.copyText(),
     });
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
     onCleanup(() => {
       stopKeys();
       stopCopy();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
       closeContextMenu();
     });
   });
@@ -385,40 +377,16 @@ export function LogAnalyzerView(props: DeviceSession) {
     toaster.show(EXPORT_NEEDS_CAPTURE, "info");
   };
 
-  const doExport = async (): Promise<void> => {
-    const session = active();
-    if (!sessionHasCapture(session)) {
-      showExportNeedsCapture();
-      return;
-    }
-    if (props.settings.export_ask_every_time) {
-      const picked = await dialogSaveFile({
-        title: "导出日志",
-        defaultPath: suggestedExportPath(props.settings.export_default_path),
-        filters: [{ name: "文本", extensions: ["txt"] }],
-      });
-      const failure = dialogFailureText(picked);
-      if (failure) showFailure(failure);
-      if (!dialogPickAccepted(picked)) return;
-      await runExport(picked.path);
-      return;
-    }
-    await runExport();
-  };
-
-  const runExport = async (dest?: string): Promise<void> => {
-    try {
-      const path = await logStore.exportSession(dest);
-      if (path) {
-        toaster.show(`已导出: ${path}`, "success");
-        void systemOpenPath(path);
-        return;
-      }
-      showExportNeedsCapture();
-    } catch (e) {
-      showErrorText(e);
-    }
-  };
+  const exportAction = createExportAction({
+    settings: () => props.settings,
+    exportDefaultDir: () => props.exportDefaultDir,
+    active,
+    exportSession: (id: number, dest?: string) => logStore.exportSession(id, dest),
+    showFailure,
+    showErrorText,
+    showExportNeedsCapture,
+    showSuccess,
+  });
 
   const chromeActions = createMemo(() => {
     const session = active();
@@ -478,7 +446,7 @@ export function LogAnalyzerView(props: DeviceSession) {
     }
     if (logsChromeIsExport(id)) {
       return (
-        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void doExport()}>
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void exportAction.doExport()}>
           导出
         </YoButton>
       );
@@ -536,12 +504,12 @@ export function LogAnalyzerView(props: DeviceSession) {
 
         <Show when={active()} keyed>
           {(session) => {
-            const live = () => sessionById(session.id);
-            const sessionPhase = sessionCapturePhase(session);
+            const live = () => sessionById(session.id) ?? session;
+            const phase = (): ReturnType<typeof sessionCapturePhase> => sessionCapturePhase(live());
             return (
             <YoPanel variant="pane" overflow="hidden">
               <LogFilterBar
-                session={session}
+                session={live()}
                 keywordRef={(el) => {
                   keywordRef = el;
                 }}
@@ -551,47 +519,61 @@ export function LogAnalyzerView(props: DeviceSession) {
                 <YoColFrame
                   cellPad="none"
                   tone="document"
-                  template={logDocTrackTemplate(formatOpts(), chPx())}
+                  template={logDocTrackTemplate(headerOpts(), chPx())}
                 >
                   <LogColumnHeader
-                    options={formatOpts()}
+                    options={headerOpts()}
                     chPx={chPx()}
-                    shift={headShift()}
-                    onResize={(key, chars) => setColChars((prev) => ({ ...prev, [key]: chars }))}
-                    onFit={(key) =>
-                      setColChars((prev) => {
-                        const next = { ...prev };
+                    shift={headShiftOf(session.id)}
+                    onResize={(key, chars, resizePhase) => {
+                      if (resizePhase === "end") {
+                        setDraftColChars((draft) => {
+                          const next = { ...draft };
+                          delete next[key];
+                          return next;
+                        });
+                        writeColumns(session.id, {
+                          colChars: { ...committedCols(session.id), [key]: chars },
+                        });
+                      } else {
+                        setDraftColChars((draft) => ({ ...draft, [key]: chars }));
+                      }
+                    }}
+                    onFit={(key) => {
+                      setDraftColChars((draft) => {
+                        const next = { ...draft };
                         delete next[key];
                         return next;
-                      })
-                    }
+                      });
+                      const next = { ...committedCols(session.id) };
+                      delete next[key];
+                      writeColumns(session.id, { colChars: next });
+                    }}
                   />
                   <div
                     class="yohu-logs__list-body"
                     ref={(el) => { setListEl(el); }}
                   >
                   <EditorView
-                    rows={() =>
-                      live()?.visible ?? EMPTY_ROWS
-                    }
+                    rows={() => live().visible}
                     options={formatOpts}
                     layout={() => props.settings.log_line_layout}
                     rowChars={rowChars}
                     chPx={chPx}
                     itemHeight={dataRowHeight()}
-                    onInlineScroll={setHeadShift}
-                    keyword={() =>
-                      live()?.keyword ?? ""
-                    }
-                    following={() =>
-                      Boolean(live()?.following)
-                    }
-                    paused={() =>
-                      Boolean(live()?.paused)
-                    }
-                    docShift={() => live()?.docShift ?? 0}
+                    onInlineScroll={(left) => writeColumns(session.id, { headShift: left })}
+                    keyword={() => live().keyword}
+                    // 有效跟滚单源在 store（`effectiveFollowing` 已含暂停维度）：
+                    // 这里把合成值当 `following` 传，`paused` 恒 false，
+                    // 使 editor 侧 `following && !paused` 成为恒等，不再叠第二层布尔。
+                    following={() => effectiveFollowing(live().following, live().paused)}
+                    paused={() => false}
+                    docShift={() => live().docShift}
                     documentRef={(doc) => {
                       activeDoc = doc;
+                    }}
+                    viewRef={(handle) => {
+                      viewHandle = handle;
                     }}
                     onAtBottomChange={(atBottom) => {
                       if (atBottom) logStore.resumeFollow(session.id);
@@ -604,35 +586,31 @@ export function LogAnalyzerView(props: DeviceSession) {
                         pick: scope,
                         listRoot: listEl(),
                         selection: window.getSelection(),
-                        fallbackText: fallbackTextOf(row.line),
+                        fallbackText: copy.fallbackTextOf(row.line),
                       });
                       openContextMenu(logsRowMenu, {
                         x: event.clientX,
                         y: event.clientY,
                         ctx: {
                           canCopy,
-                          copy: () => copySelected(scope, row.line),
+                          copy: () => copy.copySelected(scope, row.line),
                         },
                       });
                     }}
                   />
-                  <Show
-                    when={
-                      (live()?.visible.length ?? 0) === 0
-                    }
-                  >
+                  <Show when={live().visible.length === 0}>
                     <SessionEmpty
-                      session={session}
+                      session={live()}
                       canStart={windowHasSerial()}
                       onStart={beginCapture}
                     />
                   </Show>
                 </div>
                 </YoColFrame>
-                <Show when={session.pendingCount > 0}>
+                <Show when={live().pendingCount > 0}>
                   <div class="yohu-logs__pending">
                     <YoButton buttonStyle="normal" tone="neutral" onClick={() => logStore.resumeFollow(session.id)}>
-                      {session.pendingCount} 条新日志
+                      {live().pendingCount} 条新日志
                     </YoButton>
                   </div>
                 </Show>
@@ -640,18 +618,16 @@ export function LogAnalyzerView(props: DeviceSession) {
 
               <div class="yohu-logs__status">
                 <span class="yohu-logs__status-capture">
-                  <YoStatusDot
-                    tone={sessionStatusTone(sessionPhase)}
-                  />
-                  {sessionCaptureLabel(sessionPhase)}
+                  <YoStatusDot tone={sessionStatusTone(phase())} />
+                  {sessionCaptureLabel(phase())}
                 </span>
                 <span>
-                  {formatSessionDevice(session.serial, props.devices, props.deviceStatuses)}
+                  {formatSessionDevice(live().serial, props.devices, props.deviceStatuses)}
                 </span>
-                <span>行数 {session.visible.length}</span>
+                <span>行数 {live().visible.length}</span>
                 <YoBadge
-                  text={`信号 ${session.signalCount}`}
-                  tone={session.signalCount > 0 ? "danger" : "neutral"}
+                  text={`信号 ${live().signalCount}`}
+                  tone={live().signalCount > 0 ? "danger" : "neutral"}
                 />
                 <Show when={overflowed()}>
                   {overflowLagBadge()}

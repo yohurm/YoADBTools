@@ -3,7 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { formatMessage, defaultFormatOptions, DEFAULT_LOG_DISPLAY_COLUMNS } from "./format";
+import { formatMessage, DEFAULT_LOG_DISPLAY_COLUMNS } from "./format";
+import { defaultFormatOptions } from "./format-columns";
 import { markupPaintIsInk, markupPaintIsMark, markupPaintIsWash, markupRunsFromRanges, markupWashCells } from "./markup-model";
 import { nameMarkupRuns } from "./markup-policy";
 

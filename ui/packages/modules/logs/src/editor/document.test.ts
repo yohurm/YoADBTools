@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { LogDocument, type DocRow } from "./document";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions, formatParts } from "./format";
+import { LogDocument } from "./document";
+import type { ViewRow } from "../stack";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions } from "./format-columns";
+import { formatParts } from "./format-text";
 
 function line(seq: number, over: Partial<LogLine> = {}): LogLine {
   return {
@@ -21,7 +23,7 @@ function line(seq: number, over: Partial<LogLine> = {}): LogLine {
   };
 }
 
-function row(seq: number, over: Partial<LogLine> = {}): DocRow {
+function row(seq: number, over: Partial<LogLine> = {}): ViewRow {
   return { line: line(seq, over) };
 }
 
@@ -53,16 +55,6 @@ describe("LogDocument", () => {
     const first = doc.messages;
     expect(doc.sync(rows)).toBe(false);
     expect(doc.messages).toBe(first);
-  });
-
-  it("append 延续 previousTag 供 hideDuplicates", () => {
-    const doc = new LogDocument();
-    const dup = { ...options, hideDuplicateTag: true };
-    doc.setOptions(dup);
-    doc.reload([row(1, { tag: "Dup" })]);
-    doc.append([row(2, { tag: "Dup" })]);
-    const tag2 = formatParts(doc.messages[1]!).find((p) => p.kind === "tag");
-    expect(tag2?.text.trim()).toBe("");
   });
 
   it("append 前缀对象不动", () => {
@@ -133,12 +125,12 @@ describe("LogDocument", () => {
     expect(doc.messages[0]).not.toHaveProperty("headerChars");
   });
 
-  it("源文件不存 headerChars，SignalKind 不走 ../signals", () => {
+  it("源文件不存 headerChars，DocRow 复用 ViewRow 模型", () => {
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "document.ts"), "utf-8");
     expect(src).not.toContain("headerChars");
     expect(src).toContain("formatMessage");
-    expect(src).toContain('from "@yohu/api"');
-    expect(src).toContain("SignalKind");
+    expect(src).toContain('from "../stack"');
+    expect(src).toContain("ViewRow");
     expect(src).not.toContain("../signals");
   });
 

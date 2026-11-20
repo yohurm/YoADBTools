@@ -1,6 +1,9 @@
 export {
-  defaultFormatOptions,
+  appNamesRevision,
+  DEFAULT_LOG_DISPLAY_COLUMNS,
   formatColumns,
+  formatLayout,
+  formatWraps,
   headerColumns,
   logChUnit,
   logColPx,
@@ -12,46 +15,38 @@ export {
   formatMessage,
   formatMessages,
   formatOptionsKey,
-  formatParts,
   formatProcessThread,
   formatTag,
   formatAppName,
   appNameOf,
-  headerWidth,
   processThreadStyle,
   tagMaxLength,
   timestampWidth,
-  ALL_LOG_DISPLAY_COLUMNS,
-  DEFAULT_LOG_DISPLAY_COLUMNS,
-  LOGCAT_TAG_SWATCHES,
   LEVEL_FORMAT_WIDTH,
   PROCESS_BOTH_WIDTH,
   PROCESS_PID_WIDTH,
   APP_FORMAT_WIDTH,
   DEFAULT_CH_PX,
   TAG_DEFAULT_WIDTH_PX,
-  type FormatBatchState,
   type FormatOptions,
   type FormattedMessage,
   type FormatRange,
   type LogHeaderColumn,
   type LogMetaColKey,
 } from "./format";
-export { EMPTY_MESSAGES, EMPTY_ROWS, LogDocument, type DocMessage, type DocRow } from "./document";
+export { EMPTY_MESSAGES, EMPTY_ROWS, LogDocument, type DocMessage } from "./document";
 export {
   LineBoard,
-  clipMessage,
   documentLines,
   wrapMessage,
   type VisualLine,
 } from "./board";
-export { EditorView } from "./view";
+export { EditorView, type EditorViewHandle } from "./view";
 export {
   docSelCopyText,
   docPointFromCaret,
   orderDocSel,
   readDocSel,
-  selSlice,
   type DocSel,
   type SelBand,
 } from "./selection";

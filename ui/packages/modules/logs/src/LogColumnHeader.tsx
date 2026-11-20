@@ -19,11 +19,14 @@ import {
   type LogMetaColKey,
 } from "./editor";
 
+/** 拖拽阶段（与 YoColResizer 的 start/move/end 同构）。 */
+type ResizePhase = "start" | "move" | "end";
+
 function LogHeaderCell(props: {
   col: LogHeaderColumn;
   options: FormatOptions;
   chPx: number;
-  onResize: (key: LogMetaColKey, chars: number) => void;
+  onResize: (key: LogMetaColKey, chars: number, phase: ResizePhase) => void;
   onFit: (key: LogMetaColKey) => void;
 }): JSX.Element {
   const widthPx = (): number | undefined =>
@@ -41,13 +44,14 @@ function LogHeaderCell(props: {
       resizeLabel={`调节${props.col.label}列宽`}
       width={widthPx()}
       minWidth={minPx()}
-      onWidthChange={(next) => {
+      onWidthChange={(next, phase) => {
         if (logFieldIsMessage(props.col.key)) {
           return;
         }
         props.onResize(
           props.col.key,
           Math.max(minColChars(props.col.key, props.options), Math.round(next / logChUnit(props.chPx))),
+          phase,
         );
       }}
       onFit={() => {
@@ -65,7 +69,7 @@ export function LogColumnHeader(props: {
   options: FormatOptions;
   chPx: number;
   shift: number;
-  onResize: (key: LogMetaColKey, chars: number) => void;
+  onResize: (key: LogMetaColKey, chars: number, phase: ResizePhase) => void;
   onFit: (key: LogMetaColKey) => void;
 }): JSX.Element {
   const cols = () => headerColumns(props.options);

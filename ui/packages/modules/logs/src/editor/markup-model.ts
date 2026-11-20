@@ -4,7 +4,6 @@
  * 不 import format / document。着色调走 token-tone。
  */
 
-import { washSpanOpen } from "./markup-wash";
 import { tokenToneIsInk, tokenToneIsWash, type TokenTone } from "./token-tone";
 
 export type MarkupInk = { kind: "ink"; color: string };
@@ -42,37 +41,37 @@ export function markupWashCells(
   return cells;
 }
 
-/** Formatter range 的着色面。 */
+/** Formatter range 的着色面。载体键 `--yohu-log-token-*` 与真实 CSS 变量分家。 */
 export type MarkupSourceRange = {
   start: number;
   end: number;
   tone?: TokenTone;
   style?: {
-    "--yohu-log-ink"?: string;
-    "--yohu-log-level-fg"?: string;
-    "--yohu-log-level-bg"?: string;
+    "--yohu-log-token-ink"?: string;
+    "--yohu-log-token-fg"?: string;
+    "--yohu-log-token-bg"?: string;
   };
 };
 
 function paintOf(range: MarkupSourceRange): MarkupPaint | null {
   if (tokenToneIsInk(range.tone)) {
-    const color = range.style?.["--yohu-log-ink"];
+    const color = range.style?.["--yohu-log-token-ink"];
     return color ? { kind: "ink", color } : null;
   }
   if (tokenToneIsWash(range.tone)) {
-    const color = range.style?.["--yohu-log-level-fg"];
-    const background = range.style?.["--yohu-log-level-bg"];
+    const color = range.style?.["--yohu-log-token-fg"];
+    const background = range.style?.["--yohu-log-token-bg"];
     return color && background ? { kind: "wash", color, background } : null;
   }
   return null;
 }
 
-/** Formatter range → 着色 run。plain / 空段不进 Markup。 */
+/** Formatter range → 着色 run。plain / 空段不进 Markup（空段由 wash 几何层统一判一次）。 */
 export function markupRunsFromRanges(ranges: readonly MarkupSourceRange[]): MarkupRun[] {
   const out: MarkupRun[] = [];
   for (const range of ranges) {
     const paint = paintOf(range);
-    if (!paint || !washSpanOpen(range.start, range.end)) {
+    if (!paint) {
       continue;
     }
     out.push({ from: range.start, to: range.end, paint });

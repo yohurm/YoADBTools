@@ -3,45 +3,48 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { formatLogLine, LOG_COLOR_SCHEME_CATALOG, LOG_COLOR_SCHEME_DEFAULT, type LogLine } from "@yohu/api";
+import { LOG_COLOR_SCHEME_CATALOG, LOG_COLOR_SCHEME_DEFAULT, type LogLine } from "@yohu/api";
 
 import {
-  ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_CH_PX,
   DEFAULT_LOG_DISPLAY_COLUMNS,
   TAG_DEFAULT_MAX,
   TAG_DEFAULT_WIDTH_PX,
   appNameOf,
-  contentColor,
-  defaultFormatOptions,
   formatAppName,
   formatColumns,
   formatMessage,
-  formatMessages,
   formatOptionsKey,
-  logcatLevelLetter,
-  formatParts,
   formatProcessThread,
   formatTag,
   formatTimestamp,
   formatUid,
   headerColumns,
-  headerWidth,
-  javaStringHash,
   LEVEL_FORMAT_WIDTH,
   logChUnit,
   logColPx,
   logDocTrackTemplate,
   logFieldLabel,
-  LOGCAT_TAG_SWATCHES,
   PROCESS_BOTH_WIDTH,
   PROCESS_PID_WIDTH,
   processThreadStyle,
   shortenTextWithEllipsis,
   tagMaxLength,
-  tagSwatchIndex,
   timestampWidth,
 } from "./format";
+import { contentColor, javaStringHash, logcatLevelLetter, tagSwatchIndex } from "./format-paint";
+import { LOGCAT_TAG_SWATCHES } from "./markup-tokens";
+import { ALL_LOG_DISPLAY_COLUMNS, defaultFormatOptions, headerWidth } from "./format-columns";
+import { formatParts } from "./format-text";
+
+const formatterDir = dirname(fileURLToPath(import.meta.url));
+
+/** Formatter 层已拆成三文件；源码守卫扫描整层，防止单测随文件拆分而失效。 */
+function formatterSrc(): string {
+  return ["format-columns.ts", "format-paint.ts", "format-text.ts"]
+    .map((name) => readFileSync(resolve(formatterDir, name), "utf8"))
+    .join("\n");
+}
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -75,16 +78,6 @@ describe("官方 Format 分段", () => {
     expect(headerWidth(shown)).toBe(24 + 12 + 24 + 36 + 4);
   });
 
-  it("hideDuplicates 时连续相同 Tag/App 留空列（AS TagFormat / AppNameFormat）", () => {
-    const dup = { ...shown, hideDuplicateTag: true, hideDuplicateApp: true };
-    const a = line({ tag: "Same", pid: 9 });
-    const b = line({ tag: "Same", pid: 9, msg: "b" });
-    const { messages } = formatMessages([a, b], dup);
-    expect(formatParts(messages[0]!).find((p) => p.kind === "tag")?.text.trim()).toBe("Same");
-    expect(formatParts(messages[1]!).find((p) => p.kind === "tag")?.text.trim()).toBe("");
-    expect(formatParts(messages[1]!).find((p) => p.kind === "app")?.text.trim()).toBe("");
-  });
-
   it("FATAL 级别列显示 A（AS LogLevel.ASSERT）", () => {
     expect(logcatLevelLetter("F")).toBe("A");
     const fatal = formatMessage(line({ level: "F" }), shown);
@@ -114,10 +107,11 @@ describe("官方 Format 分段", () => {
     expect(formatUid("shell").length).toBe(9);
   });
 
-  it("formatOptionsKey 含 softWrap 与 colChars，不含 appNames", () => {
+  it("formatOptionsKey 含 layout 与 appNames 版本，不含 colChars", () => {
     expect(formatOptionsKey({ ...all, scheme: "logcat" })).not.toBe(formatOptionsKey(all));
-    expect(formatOptionsKey({ ...all, softWrap: true })).not.toBe(formatOptionsKey(all));
-    expect(formatOptionsKey({ ...all, colChars: { tag: 30 } })).not.toBe(formatOptionsKey(all));
+    expect(formatOptionsKey({ ...all, layout: "wrap" })).not.toBe(formatOptionsKey(all));
+    expect(formatOptionsKey({ ...all, appNamesKey: "9:com.foo" })).not.toBe(formatOptionsKey(all));
+    expect(formatOptionsKey({ ...all, colChars: { tag: 30 } })).toBe(formatOptionsKey(all));
     expect(all).not.toHaveProperty("log_line_layout");
   });
 });
@@ -139,7 +133,7 @@ describe("formatMessage", () => {
   });
 
   it("Soft-Wrap 开不垫悬挂空格", () => {
-    const formatted = formatMessage(line({ msg: "one\ntwo" }), { ...shown, softWrap: true });
+    const formatted = formatMessage(line({ msg: "one\ntwo" }), { ...shown, layout: "wrap" });
     expect(formatted.text.split("\n")[1]).toBe("two");
   });
 
@@ -174,7 +168,8 @@ describe("formatMessage", () => {
     expect(parts.map((part) => part.kind)).toEqual(["ts", "pid", "tag", "app", "level", "msg"]);
     expect(parts.find((part) => part.kind === "pid")?.text).toBe("  100-200   ");
     expect(parts.find((part) => part.kind === "app")?.text.length).toBe(36);
-    expect(formatMessage(line(), shown).text).not.toBe(formatLogLine(line()));
+    // 文档行按官方列宽补齐（导出文本的紧贴格式权威在 core domain，不在 API）。
+    expect(formatMessage(line(), shown).text.length).toBeGreaterThanOrEqual(headerWidth(shown));
   });
 
   it("清单时间按 timeFormat 投影", () => {
@@ -209,7 +204,7 @@ describe("formatMessage", () => {
     expect(head.find((col) => col.key === "msg")?.resizable).toBe(false);
     expect(head.find((col) => col.key === "tag")?.resizable).toBe(true);
     expect(logDocTrackTemplate(shown, 8)).toBe("192px 48px 48px 192px 288px 32px max-content");
-    expect(logDocTrackTemplate({ ...shown, softWrap: true }, 8)).toContain("minmax(0, 1fr)");
+    expect(logDocTrackTemplate({ ...shown, layout: "wrap" }, 8)).toContain("minmax(0, 1fr)");
     const allHead = headerColumns(all);
     expect(allHead.map((col) => col.key)).toEqual(["ts", "uid", "pid", "tid", "tag", "app", "level", "msg"]);
     expect(allHead.find((col) => col.key === "uid")?.label).toBe("UID");
@@ -243,7 +238,7 @@ describe("着色 range", () => {
   });
 
   it("级别色键走 api levelKey，Formatter 不再自折字母", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     expect(src).toContain("levelKey");
     expect(src).not.toContain("function levelSwatch");
     expect(src).not.toContain("parseLevelLetter");
@@ -292,8 +287,8 @@ describe("着色 range", () => {
     expect(d?.tone).toBe("wash");
     expect(d?.box).toBe("line");
     expect(d?.style).toEqual({
-      "--yohu-log-level-fg": "var(--yohu-fg-on)",
-      "--yohu-log-level-bg": "var(--yohu-level-d)",
+      "--yohu-log-token-fg": "var(--yohu-fg-on)",
+      "--yohu-log-token-bg": "var(--yohu-level-d)",
     });
     const dTrail = debug.ranges.filter((range) => range.kind === "level");
     expect(dTrail[1]?.tone).toBeUndefined();
@@ -301,16 +296,16 @@ describe("着色 range", () => {
     const i = info.ranges.find((range) => range.kind === "level" && range.tone);
     expect(i?.tone).toBe("wash");
     expect(i?.style).toEqual({
-      "--yohu-log-level-fg": "var(--yohu-fg-on)",
-      "--yohu-log-level-bg": "var(--yohu-level-i)",
+      "--yohu-log-token-fg": "var(--yohu-fg-on)",
+      "--yohu-log-token-bg": "var(--yohu-level-i)",
     });
     const fatal = formatMessage(line({ level: "F" }), shown);
     const f = fatal.ranges.find((range) => range.kind === "level" && range.tone);
     expect(f?.tone).toBe("wash");
     expect(f?.box).toBe("line");
     expect(f?.style).toEqual({
-      "--yohu-log-level-fg": "var(--yohu-fg-on)",
-      "--yohu-log-level-bg": "var(--yohu-level-f)",
+      "--yohu-log-token-fg": "var(--yohu-fg-on)",
+      "--yohu-log-token-bg": "var(--yohu-level-f)",
     });
   });
 
@@ -326,7 +321,7 @@ describe("着色 range", () => {
     expect(painted.bar).toBe("none");
     expect(painted.ranges.find((range) => range.kind === "pid")?.tone).toBeUndefined();
     expect(painted.ranges.find((range) => range.kind === "tag")?.style).toEqual({
-      "--yohu-log-ink": `var(--yohu-logcat-tag-${tagSwatchIndex("Yohu")})`,
+      "--yohu-log-token-ink": `var(--yohu-logcat-tag-${tagSwatchIndex("Yohu")})`,
     });
   });
 
@@ -345,7 +340,7 @@ describe("列键和探针尺只写一处", () => {
     expect(logChUnit(8)).toBe(8);
     expect(logColPx(24, 8)).toBe(192);
     const root = dirname(fileURLToPath(import.meta.url));
-    const format = readFileSync(resolve(root, "format.ts"), "utf8")
+    const format = formatterSrc()
       .replace('return processThreadIsTid(style) ? "tid" : "pid";', "")
       .replace("return chPx > 0 ? chPx : DEFAULT_CH_PX;", "")
       .replace("return Math.max(1, Math.round(chars * logChUnit(chPx)));", "");
@@ -368,14 +363,14 @@ describe("列键和探针尺只写一处", () => {
 
 describe("末尾补齐只写一处", () => {
   it("pad_end_num_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = "text.pad" + "End(width)";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("padField(");
   });
 
   it("pad_end_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = ".pad" + "End(";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("padField(");
@@ -384,7 +379,7 @@ describe("末尾补齐只写一处", () => {
 
 describe("进程号列宽只写一处", () => {
   it("process_col_chars_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = ", PROCESS_PID" + "_WIDTH)";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("processColChars(");
@@ -393,7 +388,7 @@ describe("进程号列宽只写一处", () => {
 
 describe("时间用户应用列宽只写一处", () => {
   it("meta_col_chars_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const ts = 'colCharsOf(options, "' + 'ts"';
     const uid = 'colCharsOf(options, "' + 'uid"';
     const app = 'colCharsOf(options, "' + 'app"';
@@ -408,7 +403,7 @@ describe("时间用户应用列宽只写一处", () => {
 
 describe("可拖宽表头只写一处", () => {
   it("resizable_header_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = "resizable: " + "true";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("resizableHeader(");
@@ -417,7 +412,7 @@ describe("可拖宽表头只写一处", () => {
 
 describe("消息按列清单走一遍", () => {
   it("message_walks_columns_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     expect(src.split("if (display." + "ts)").length - 1).toBe(1);
     expect(src.split("if (display." + "uid)").length - 1).toBe(1);
     expect(src.split("if (display." + "tag)").length - 1).toBe(1);
@@ -432,7 +427,7 @@ describe("measureChPx 不进 Formatter", () => {
   it("探针在 layout，format 不量 DOM，也不认识 Document / View", () => {
     const layout = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../layout.ts"), "utf-8");
     expect(layout).toContain('className = "yohu-logs__ch-probe"');
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf-8");
+    const src = formatterSrc();
     expect(src).not.toMatch(/function measureChPx/);
     expect(src).not.toContain("document.createElement");
     expect(src).not.toContain("./document");
@@ -449,7 +444,7 @@ describe("measureChPx 不进 Formatter", () => {
 
 describe("累加器打包只写一处", () => {
   it("pack_message_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const bar = "bar: " + "engine.bar";
     const ink = "engine.barInk(" + "line)";
     expect(src.split(bar).length - 1).toBe(1);
@@ -460,7 +455,7 @@ describe("累加器打包只写一处", () => {
 
 describe("标签和应用名显示宽度只写一处", () => {
   it("span_width_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const tag = "Math.max(TAG_MIN_LENGTH, " + "maxLength) + 1";
     const app = "Math.max(APP_MIN_LENGTH, " + "maxLength) + 1";
     const once = "Math.max(min, " + "maxLength) + 1";
@@ -473,7 +468,7 @@ describe("标签和应用名显示宽度只写一处", () => {
 
 describe("缩短之后再补一个空格只写一处", () => {
   it("ellipsis_span_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = '`${shorten' + 'TextWithEllipsis(';
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("ellipsisSpan(");
@@ -482,7 +477,7 @@ describe("缩短之后再补一个空格只写一处", () => {
 
 describe("没有级别键时回落正文色只写一处", () => {
   it("level_ink_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = "return plain" + "MessageInk(kind)";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("levelInk(");
@@ -491,7 +486,7 @@ describe("没有级别键时回落正文色只写一处", () => {
 
 describe("Yohu 级别色变量只写一处", () => {
   it("yohu_level_var_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = "--yohu-level-${" + "key})";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("yohuLevelVar(");
@@ -500,7 +495,7 @@ describe("Yohu 级别色变量只写一处", () => {
 
 describe("Logcat 级别色变量只写一处", () => {
   it("logcat_level_var_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     expect(src.split("--yohu-logcat-level-${" + "key})").length - 1).toBe(0);
     expect(src.split("--yohu-logcat-level-${" + "key}-bg").length - 1).toBe(0);
     expect(src.split("--yohu-logcat-level-${" + "key}").length - 1).toBe(1);
@@ -508,41 +503,11 @@ describe("Logcat 级别色变量只写一处", () => {
   });
 });
 
-describe("可选布尔缺省关只写一处", () => {
-  it("flag_on_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
-    const needle = "?" + "? false";
-    expect(src.split(needle).length - 1).toBe(1);
-    expect(src).toContain("flagOn(");
-  });
-});
-
 describe("布尔收成 0 或 1 只写一处", () => {
   it("bit_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
+    const src = formatterSrc();
     const needle = "Number" + "(";
     expect(src.split(needle).length - 1).toBe(1);
     expect(src).toContain("return " + needle + "value)");
-  });
-});
-
-describe("批次游标只写一处", () => {
-  it("batch_cursor_once", () => {
-    const dir = dirname(fileURLToPath(import.meta.url));
-    const format = readFileSync(resolve(dir, "format.ts"), "utf8");
-    const document = readFileSync(resolve(dir, "document.ts"), "utf8");
-    expect(format.split("previousTag: " + "line.tag").length - 1).toBe(1);
-    expect(document.split("previousTag: " + "last.tag").length - 1).toBe(0);
-    expect(format).toContain("batchCursor(");
-    expect(document).toContain("batchCursor(");
-  });
-});
-
-describe("空白字段只补一次", () => {
-  it("blank_field_once", () => {
-    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "format.ts"), "utf8");
-    const needle = 'padField("' + '", width)';
-    expect(src.split(needle).length - 1).toBe(1);
-    expect(src).toContain("blankField(");
   });
 });
