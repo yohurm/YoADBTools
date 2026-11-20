@@ -146,13 +146,20 @@ export function applyAppend(opts: {
   filter: SessionFilter;
   cap: number;
   pendingCount: number;
+  /**
+   * 只有「全量过滤」（不限级别/Tag/关键字/范围）时命中 seq 才连续，seq 跳跃才等于丢批。
+   * 有过滤时命中 seq 天然离散（中间非命中行的 seq 不出现），不能用 seq 判空洞，
+   * 否则每批都会误报空洞、反复整页回补。默认 true（无过滤判定）。
+   */
+  expectContiguous?: boolean;
 }): ViewApply | null {
   if (opts.paused || !captureStarted(opts.fromSeq)) return null;
   const following = panelFollows(opts.following, opts.visible);
   const after = lastSeqOf(opts.visible, opts.fromSeq);
   const firstSeq = opts.lines.length > 0 ? opts.lines[0]!.seq : undefined;
+  const contiguous = opts.expectContiguous !== false;
   const gap: SeqGap | undefined =
-    firstSeq !== undefined && firstSeq > after + 1 && firstSeq >= opts.fromSeq
+    contiguous && firstSeq !== undefined && firstSeq > after + 1 && firstSeq >= opts.fromSeq
       ? { fromSeq: after + 1, toSeq: firstSeq - 1 }
       : undefined;
   const frozen = freezePoint(opts.frozenThroughSeq, after);

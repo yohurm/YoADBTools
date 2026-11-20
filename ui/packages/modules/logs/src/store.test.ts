@@ -556,6 +556,34 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
   });
 
+  it("后台丢推送后回前台 resumeVisible 从环补齐全部（切换应用场景）", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1)]);
+    // 模拟切到别的应用期间：seq 2..41 的批次全部没送到 UI（丢推送不丢环）
+    remember(
+      "S1",
+      Array.from({ length: 40 }, (_, i) => mk(i + 2)),
+      store.state.bufferCapacity,
+    );
+    remember("S1", [mk(42)], store.state.bufferCapacity);
+    // 回前台只收到最后一拍命中（首 seq 42，前面 40 条缺失）
+    mocks.logHitsHandlers.at(-1)?.({
+      serial: "S1",
+      window_id: id,
+      total: 43,
+      appended: 1,
+      tail: [mk(42)],
+    });
+    // 回到前台：resumeVisible 应对所有在采窗口从环重新对账
+    store.resumeVisible();
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual(
+        Array.from({ length: 43 }, (_, i) => i),
+      );
+    });
+  });
+
   it("溢出回补成功：重新 bind 当前窗口取尾页，且徽章复位", async () => {
     const store = await liveStore();
     push("S1", [mk(0), mk(1)]);
@@ -627,6 +655,22 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     await vi.waitFor(() => {
       expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
     });
+  });
+
+  it("过滤窗口（非全量）命中间隔不误判空洞、不反复整页回补", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    await store.patchFilter(id, { levels: ["E"] });
+    const binds = mocks.logWindowBind.mock.calls.length;
+    push("S1", [
+      mk(0, { level: "I" }),
+      mk(1, { level: "E" }),
+      mk(2, { level: "I" }),
+      mk(3, { level: "E" }),
+    ]);
+    await Promise.resolve();
+    expect(mocks.logWindowBind.mock.calls.length).toBe(binds);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([1, 3]);
   });
 
   it("命中空洞（无 overflow 事件）自动按 seq 对账补齐", async () => {

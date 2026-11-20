@@ -163,6 +163,10 @@ export function createPanelProjection(
     if (following && !session.following) {
       deps.markFollowing(idx);
     }
+    const filter = toSessionFilter(session);
+    // 仅全量过滤时命中 seq 连续，seq 跳跃才代表丢批；有过滤时命中 seq 天然离散。
+    const expectContiguous =
+      filter.levels.length === 0 && !filter.tagContains && !filter.keyword && filter.scope.kind === "all";
     const applied = applyAppend({
       visible: session.visible,
       lines,
@@ -170,7 +174,8 @@ export function createPanelProjection(
       following,
       frozenThroughSeq: session.frozenThroughSeq,
       paused: session.paused,
-      filter: toSessionFilter(session),
+      filter,
+      expectContiguous,
       cap: viewCap(),
       pendingCount: following && !session.following ? 0 : session.pendingCount,
     });
