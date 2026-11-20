@@ -24,8 +24,8 @@ export const onDeviceOffline = (h: (e: Extract<AppEvent, { kind: "deviceOffline"
 export const onDeviceStatus = (h: (e: Extract<AppEvent, { kind: "deviceStatus" }>) => void) =>
   on(EVENT_NAMES.deviceStatus, h);
 
-export const onLogHits = (h: (e: Extract<AppEvent, { kind: "logHits" }>) => void) =>
-  on(EVENT_NAMES.logHits, h);
+export const onLogAppended = (h: (e: Extract<AppEvent, { kind: "logAppended" }>) => void) =>
+  on(EVENT_NAMES.logAppended, h);
 
 export const onProcessIndex = (h: (e: Extract<AppEvent, { kind: "processIndex" }>) => void) =>
   on(EVENT_NAMES.processIndex, h);

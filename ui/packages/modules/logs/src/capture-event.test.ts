@@ -109,12 +109,11 @@ describe("采集停止只记一次", () => {
   });
 });
 
-describe("当前页只向窗口索引要一次", () => {
+describe("当前页只向设备环要一次", () => {
   it("load_page_once", () => {
     const body = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "viewport-page.ts"), "utf8");
-    expect(body.split("async function loadPage").length - 1).toBe(1);
-    expect(body).toContain("logWindowBind(");
-    expect(body).not.toContain("mirrors.of(");
+    expect(body.split("logRange(").length - 1).toBeGreaterThanOrEqual(1);
+    expect(body).not.toContain("logWindowBind(");
   });
 });
 

@@ -19,7 +19,6 @@ import {
   logCaptureStop,
   logPackageSnapshot,
   logProcessSnapshot,
-  logWindowRelease,
   YoLog,
   type ProcessEntry,
 } from "@yohu/api";
@@ -306,7 +305,6 @@ export function createCaptureOrchestrator(
   function closeSession(id: number): void {
     const session = sessionById(state, id);
     const hadHold = session ? sessionHolds(session) : false;
-    void logWindowRelease(id);
     workspace.closeSession(id);
     releaseDeviceIfIdle(session?.serial ?? null, hadHold);
   }

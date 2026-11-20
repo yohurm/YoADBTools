@@ -6,7 +6,7 @@
 import { createStore } from "solid-js/store";
 import { describe, expect, it } from "vitest";
 
-import type { LogLine, LogPage, SignalKind } from "@yohu/api";
+import type { LogLine, SignalKind } from "@yohu/api";
 
 import type { LogUiState } from "./log-model";
 import { signalCountOf } from "./panel";
@@ -40,6 +40,7 @@ function setup(cap: number) {
   const panel = createPanelProjection(state0, setState, {
     viewCap: () => cap,
     pageRequest: async () => undefined,
+    catchUp: async () => undefined,
     markFollowing: () => undefined,
     resetFollowAfterDeviceClear: () => undefined,
   });
@@ -89,24 +90,5 @@ describe("writePanel 信号计数增量 === 全量 signalCountOf(visible)", () =
     expect(session.signalCount).toBe(1);
     expect(session.signalCount).toBe(signalCountOf(session.visible));
     expect(session.docShift).toBe(1);
-  });
-
-  it("整替换态：replacePanel 全量重算，docShift 归零", () => {
-    const { state, panel } = setup(100);
-    panel.writePanel(0, [row("crash"), row(), row("crash")], 0);
-    const session = state.sessions[0]!;
-    expect(session.docShift).toBe(0);
-
-    const id = session.id;
-    const lines: LogLine[] = [
-      nextLine("FATAL EXCEPTION: boom"),
-      nextLine("still running"),
-      nextLine("ANR in com.foo"),
-    ];
-    const page: LogPage = { window_id: id, serial: "S1", total: lines.length, lines };
-    panel.applyPage(id, page);
-    expect(session.signalCount).toBe(2);
-    expect(session.signalCount).toBe(signalCountOf(session.visible));
-    expect(session.docShift).toBe(0);
   });
 });

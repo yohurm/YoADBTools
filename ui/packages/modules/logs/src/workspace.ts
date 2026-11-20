@@ -7,13 +7,13 @@
  */
 
 import type { SetStoreFunction } from "solid-js/store";
-import type { LogLine, LogPage, ProcessEntry } from "@yohu/api";
+import type { LogLine, ProcessEntry } from "@yohu/api";
 
 import { assignDefaultSerial, bindPackageSessions } from "./device-projection";
 import { createFollowState, type FollowStateApi } from "./follow-state";
 import { createPanelProjection } from "./panel-projection";
 import type { LogUiState, SessionFilterPatch } from "./log-model";
-import { captureStarted, SESSION_NEVER_STARTED } from "./panel";
+import { captureStarted, EMPTY_VIEW_ROWS, SESSION_NEVER_STARTED } from "./panel";
 import {
   closeOthers,
   closeSession,
@@ -21,7 +21,10 @@ import {
   duplicateSession,
   ensureSession,
   renameSession,
+  sessionAt,
   sessionById,
+  sessionIndex,
+  sessionMissing,
   setActive,
   setColumnView,
   type ColumnViewPatch,
@@ -62,10 +65,12 @@ export type WorkspaceApi = {
   unsubscribeSession: (id: number) => void;
   bindPackageSessions: (serial: string, entries?: readonly ProcessEntry[]) => void;
   assignDefaultSerial: (serial: string | null) => void;
-  /** 环拉取的一批原始行（未过滤）→ 交给窗口文档过滤/追加（游标随原始末 seq 前进）。 */
-  appendRingLines: (id: number, lines: readonly LogLine[]) => void;
-  applyPage: (id: number, page: LogPage) => void;
+  /** 环拉取的一批原始行（未过滤）→ 交给窗口文档过滤/追加（游标随原始末 seq 前进）。force=重建时越过暂停。 */
+  appendRingLines: (id: number, lines: readonly LogLine[], force?: boolean) => void;
+  /** 重绑前重置环游标并清空可见区（换过滤 / 初始 / 恢复）。 */
+  resetRingCursor: (id: number) => void;
   setPageRequest: (fn: (id: number) => Promise<void>) => void;
+  setCatchUpRequest: (fn: (id: number) => Promise<void>) => void;
   discardView: (id: number) => void;
   flushPanel: (id: number) => void;
   flushDevicePanels: (serial: string) => void;
@@ -86,11 +91,13 @@ export function createWorkspace(
 ): WorkspaceApi {
   const viewCap = (): number => docCap(state.bufferCapacity);
   let pageRequest: (id: number) => Promise<void> = async () => undefined;
+  let catchUpRequest: (id: number) => Promise<void> = async () => undefined;
 
   let follow!: FollowStateApi;
   const panel = createPanelProjection(state, setState, {
     viewCap,
     pageRequest: (id) => pageRequest(id),
+    catchUp: (id) => catchUpRequest(id),
     markFollowing: (idx) => follow.markFollowing(idx),
     resetFollowAfterDeviceClear: (idx) => follow.resetAfterDeviceClear(idx),
   });
@@ -116,14 +123,28 @@ export function createWorkspace(
     bindPackageSessions: (serial, entries) =>
       bindPackageSessions(state, setState, serial, entries, (id) => panel.catchUpSession(id)),
     assignDefaultSerial: (serial) => assignDefaultSerial(state, setState, serial),
-    appendRingLines: (id, lines) => {
+    appendRingLines: (id, lines, force = false) => {
       const session = sessionById(state, id);
-      if (!session || !sessionCaptureIsLive(session) || session.paused) return;
-      panel.appendToSession(id, lines);
+      if (!session || !sessionCaptureIsLive(session)) return;
+      if (session.paused && !force) return;
+      panel.appendToSession(id, lines, force);
     },
-    applyPage: (id, page) => panel.applyPage(id, page),
+    resetRingCursor: (id) => {
+      const idx = sessionIndex(state, id);
+      if (sessionMissing(idx)) return;
+      const session = sessionAt(state, idx);
+      setState("sessions", idx, {
+        visible: EMPTY_VIEW_ROWS,
+        signalCount: 0,
+        docShift: 0,
+        lastSeenSeq: session.fromSeq - 1,
+      });
+    },
     setPageRequest: (fn) => {
       pageRequest = fn;
+    },
+    setCatchUpRequest: (fn) => {
+      catchUpRequest = fn;
     },
     discardView: (id) => follow.discardView(id),
     flushPanel: (id) => panel.flushPanel(id),

@@ -47,22 +47,6 @@ export interface LogLine {
   msg: string;
 }
 
-/** 窗口过滤登记。命中索引在环旁边，返回当前全部命中。 */
-export interface LogWindowBind {
-  id: number;
-  serial: string;
-  filter: LogFilter;
-  from_seq: number;
-}
-
-/** 一次窗口快照。`index` 是首行在命中索引中的位置（登记快照恒为 0）。 */
-export interface LogPage {
-  window_id: number;
-  serial: string;
-  total: number;
-  lines: LogLine[];
-}
-
 /** 从设备环按 seq 取原始行（UI 游标实时拉取，对齐 LogCat 消息环）。 */
 export interface LogRangeRequest {
   serial: string;
@@ -70,12 +54,9 @@ export interface LogRangeRequest {
   limit: number;
 }
 
-/** 一批窗口命中的水位信号（不含正文）。界面据此从设备环按 seq 拉取原始行。 */
-export interface LogHits {
+/** 设备环前进的水位信号（不含正文）。UI 据此从环按 seq 拉取原始行。 */
+export interface LogAppended {
   serial: string;
-  window_id: number;
-  total: number;
-  appended: number;
   last_seq: number;
 }
 
@@ -671,7 +652,7 @@ export type AppEvent =
   | { kind: "devicesChanged"; devices: DeviceInfo[] }
   | { kind: "deviceOffline"; serial: string }
   | { kind: "deviceStatus"; status: DeviceStatus }
-  | ({ kind: "logHits" } & LogHits)
+  | ({ kind: "logAppended" } & LogAppended)
   | ({ kind: "processIndex" } & ProcessIndexSnapshot)
   | { kind: "captureState"; serial: string; generation: number; state: CaptureState }
   | { kind: "transferProgress" } & TransferProgress
@@ -706,7 +687,7 @@ export const EVENT_NAMES = {
   devicesChanged: "devices/changed",
   deviceOffline: "device/offline",
   deviceStatus: "device/status",
-  logHits: "log/hits",
+  logAppended: "log/appended",
   processIndex: "log/processIndex",
   captureState: "log/captureState",
   transferProgress: "transfer/progress",

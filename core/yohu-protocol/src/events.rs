@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogHits, MirrorSessionState,
+    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogAppended, MirrorSessionState,
     ProcessIndexSnapshot, TransferProgress, UpdateProgress,
 };
 
@@ -54,7 +54,7 @@ pub enum AppEvent {
     DeviceStatus {
         status: DeviceStatus,
     },
-    LogHits(LogHits),
+    LogAppended(LogAppended),
     ProcessIndex(ProcessIndexSnapshot),
     CaptureState {
         serial: String,
@@ -109,7 +109,7 @@ pub mod event_names {
     pub const DEVICES_CHANGED: &str = "devices/changed";
     pub const DEVICE_OFFLINE: &str = "device/offline";
     pub const DEVICE_STATUS: &str = "device/status";
-    pub const LOG_HITS: &str = "log/hits";
+    pub const LOG_APPENDED: &str = "log/appended";
     pub const PROCESS_INDEX: &str = "log/processIndex";
     pub const CAPTURE_STATE: &str = "log/captureState";
     pub const TRANSFER_PROGRESS: &str = "transfer/progress";
@@ -130,7 +130,7 @@ impl AppEvent {
             AppEvent::DevicesChanged { .. } => DEVICES_CHANGED,
             AppEvent::DeviceOffline { .. } => DEVICE_OFFLINE,
             AppEvent::DeviceStatus { .. } => DEVICE_STATUS,
-            AppEvent::LogHits(_) => LOG_HITS,
+            AppEvent::LogAppended(_) => LOG_APPENDED,
             AppEvent::ProcessIndex(_) => PROCESS_INDEX,
             AppEvent::CaptureState { .. } => CAPTURE_STATE,
             AppEvent::TransferProgress(_) => TRANSFER_PROGRESS,
@@ -300,7 +300,7 @@ mod tests {
             event_names::DEVICES_CHANGED,
             event_names::DEVICE_OFFLINE,
             event_names::DEVICE_STATUS,
-            event_names::LOG_HITS,
+            event_names::LOG_APPENDED,
             event_names::PROCESS_INDEX,
             event_names::CAPTURE_STATE,
             event_names::TRANSFER_PROGRESS,
@@ -330,7 +330,7 @@ mod tests {
             ("devicesChanged", event_names::DEVICES_CHANGED),
             ("deviceOffline", event_names::DEVICE_OFFLINE),
             ("deviceStatus", event_names::DEVICE_STATUS),
-            ("logHits", event_names::LOG_HITS),
+            ("logAppended", event_names::LOG_APPENDED),
             ("processIndex", event_names::PROCESS_INDEX),
             ("captureState", event_names::CAPTURE_STATE),
             ("transferProgress", event_names::TRANSFER_PROGRESS),

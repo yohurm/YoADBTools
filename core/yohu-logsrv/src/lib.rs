@@ -17,7 +17,6 @@ mod ring_store;
 mod slots;
 mod stack_trace;
 mod task;
-mod windows;
 
 pub use capture::{CaptureService, LogError};
 pub use export::LogExporter;

@@ -8,14 +8,12 @@
 import type { SetStoreFunction } from "solid-js/store";
 import {
   captureStateIsRunning,
-  logRange,
   onCaptureState,
   onDeviceOffline,
-  onLogHits,
+  onLogAppended,
   onProcessIndex,
   onSettingsChanged,
   SETTING_KEYS,
-  type LogLine,
   type ProcessEntry,
 } from "@yohu/api";
 
@@ -27,7 +25,6 @@ import {
 } from "./device-projection";
 import type { LogUiState } from "./log-model";
 import { sessionCaptureIsLive } from "./session-chrome";
-import { sessionById } from "./session-lifecycle";
 import type { CaptureOrchestratorApi } from "./capture-orchestrator";
 import type { ViewportPageApi } from "./viewport-page";
 import type { WorkspaceApi } from "./workspace";
@@ -48,39 +45,8 @@ export function createCaptureSubscriptions(
   setState: SetStoreFunction<LogUiState>,
   deps: CaptureSubscriptionsDeps,
 ): CaptureSubscriptionsApi {
-  const { workspace, orchestrator } = deps;
+  const { workspace, viewport, orchestrator } = deps;
   const pending: Promise<() => void>[] = [];
-
-  /**
-   * 按 seq 游标从设备环把窗口拉齐到 `throughSeq`（含）。原始行由 UI 过滤。
-   * 丢信号只影响延迟：下一次水位更高会一次性补齐；容量内不丢。
-   */
-  async function pullThrough(windowId: number, throughSeq: number): Promise<void> {
-    const session = sessionById(state, windowId);
-    if (!session?.serial || !sessionCaptureIsLive(session) || session.paused) return;
-    let cursor =
-      session.lastSeenSeq >= session.fromSeq ? session.lastSeenSeq + 1 : Math.max(0, session.fromSeq);
-    for (let round = 0; round < 100 && cursor <= throughSeq; round += 1) {
-      const current = sessionById(state, windowId);
-      if (!current?.serial) return;
-      let batch: LogLine[];
-      try {
-        const raw = logRange({ serial: current.serial, from_seq: cursor, limit: 2000 }) as
-          | LogLine[]
-          | Promise<LogLine[]>;
-        batch = Array.isArray(raw) ? raw : await raw;
-      } catch (e) {
-        console.error("log.range 拉取失败", e);
-        return;
-      }
-      if (batch.length === 0) return;
-      workspace.appendRingLines(windowId, batch);
-      const last = batch[batch.length - 1]!.seq;
-      if (last < cursor) return;
-      cursor = last + 1;
-      if (batch.length < 2000) return;
-    }
-  }
 
   function onIndex(snapshot: {
     serial: string;
@@ -120,9 +86,13 @@ export function createCaptureSubscriptions(
     }),
   );
   watch(
-    onLogHits((e) => {
-      // 命中事件只是水位信号：把该窗口从环按 seq 游标拉齐到 last_seq（过滤在 UI）。
-      void pullThrough(e.window_id, e.last_seq);
+    onLogAppended((e) => {
+      // 设备环前进到 last_seq：该设备上每个在采窗口按 seq 游标从环拉齐（过滤在 UI）。
+      for (const session of state.sessions) {
+        if (session.serial !== e.serial) continue;
+        if (!sessionCaptureIsLive(session) || session.paused) continue;
+        void viewport.pullThrough(session.id, e.last_seq);
+      }
     }),
   );
   watch(onProcessIndex((e) => onIndex(e)));

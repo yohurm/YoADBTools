@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::{CaptureService, LogExporter};
-use yohu_protocol::{AppEvent, LogFilter, LogPage, LogWindowBind};
+use yohu_protocol::{AppEvent, LogFilter};
 
 /// 真机「跟尾」用例要求环内历史超过一页（原页宽 80，故至少 81 行）。
 const MIN_PAGE_LINES: usize = 81;
@@ -47,15 +47,6 @@ fn spawn_event_pump(mut rx: mpsc::Receiver<AppEvent>) -> tokio::task::JoinHandle
     })
 }
 
-fn bind_follow(service: &CaptureService, serial: &str) {
-    service.bind_window(LogWindowBind {
-        id: 1,
-        serial: serial.to_string(),
-        filter: LogFilter::default(),
-        from_seq: 0,
-    });
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_capture_stream_batch_and_ring() {
     let client = Arc::new(AdbClient::new(
@@ -76,7 +67,6 @@ async fn real_capture_stream_batch_and_ring() {
         tokio_util::sync::CancellationToken::new(),
     );
 
-    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
         .await
         .expect("start 超时")
@@ -150,7 +140,6 @@ async fn real_capture_with_clear_device() {
     );
 
     // 开采前 logcat -c：start(clear_device=true) 内部执行
-    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, true))
         .await
         .expect("start 超时")
@@ -228,7 +217,6 @@ async fn real_export_filtered_ring_snapshot() {
         tokio_util::sync::CancellationToken::new(),
     );
 
-    bind_follow(&service, &serial);
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
         .await
         .expect("start 超时")
@@ -271,17 +259,6 @@ async fn real_export_filtered_ring_snapshot() {
     let _ = tokio::time::timeout(Duration::from_secs(2), pump).await;
 }
 
-fn assert_follow_tail(page: &LogPage) {
-    let len = page.lines.len() as u64;
-    assert!(len > 0, "跟尾快照应有正文");
-    assert_eq!(len, page.total, "登记快照带上全部命中，滚动不再按页回环");
-    assert_eq!(
-        page.lines.last().map(|line| line.seq),
-        page.lines.iter().map(|line| line.seq).max(),
-        "快照末行是最新一条"
-    );
-}
-
 async fn wait_ring_len(service: &CaptureService, serial: &str, min: usize) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     loop {
@@ -321,14 +298,10 @@ async fn real_restart_follow_page_is_tail() {
         .expect("start 超时")
         .expect("开始采集");
     wait_ring_len(&service, &serial, min).await;
-    let first = service.bind_window(LogWindowBind {
-        id: 7,
-        serial: serial.clone(),
-        filter: LogFilter::default(),
-        from_seq: 0,
-    });
-    assert_follow_tail(&first);
-    eprintln!("[真机] 首次跟尾 total={}", first.total);
+    let first = snapshot_lines(&service, &serial);
+    assert!(first.len() >= min, "首次采集环应达到 {} 行", min);
+    let first_last = first.last().map(|l| l.seq).expect("有行");
+    eprintln!("[真机] 首次环 {} 行，末 seq={}", first.len(), first_last);
 
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
@@ -338,14 +311,9 @@ async fn real_restart_follow_page_is_tail() {
         .expect("再开始超时")
         .expect("再开始");
     wait_ring_len(&service, &serial, min).await;
-    let again = service.bind_window(LogWindowBind {
-        id: 7,
-        serial: serial.clone(),
-        filter: LogFilter::default(),
-        from_seq: 0,
-    });
-    assert_follow_tail(&again);
-    eprintln!("[真机] 停止后再开始跟尾 total={}", again.total);
+    let again = snapshot_lines(&service, &serial);
+    assert!(again.len() >= min, "再开始环应达到 {} 行", min);
+    eprintln!("[真机] 停止后再开始环 {} 行", again.len());
 
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await

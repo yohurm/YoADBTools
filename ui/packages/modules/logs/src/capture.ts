@@ -54,9 +54,11 @@ export function createCapture(
   let bindGen = 0;
 
   const viewport = createViewportPage(state, {
-    applyPage: (id, page) => workspace.applyPage(id, page),
+    resetRingCursor: (id) => workspace.resetRingCursor(id),
+    appendRingLines: (id, lines, force) => workspace.appendRingLines(id, lines, force),
   });
   workspace.setPageRequest(viewport.loadPage);
+  workspace.setCatchUpRequest(viewport.catchUp);
 
   const orchestrator = createCaptureOrchestrator(state, setState, { workspace, viewport });
 
@@ -122,7 +124,7 @@ export function createCapture(
   function catchUpAll(): void {
     for (const session of state.sessions) {
       if (!sessionCaptureIsLive(session)) continue;
-      void viewport.loadPage(session.id);
+      void viewport.catchUp(session.id);
     }
   }
 

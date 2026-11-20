@@ -28,7 +28,6 @@ use crate::limits::{
 use crate::record::LogRecord;
 use crate::ring::{is_system_timestamp, ResumeSkip, RingBuffer};
 use crate::task::AbortOnDrop;
-use crate::windows::WindowBook;
 use yohu_adb::{AdbClient, AdbError};
 
 const LOGCAT_FORMAT: &str = "long,uid,year";
@@ -129,31 +128,18 @@ fn follow_resumes(end: FollowEnd) -> bool {
     matches!(end, FollowEnd::Exited { .. } | FollowEnd::Error)
 }
 
-/// 行的所有权交给环。只有钉底窗口才为这一页克隆正文。
-async fn emit(
-    ring: &RingBuffer,
-    book: &WindowBook,
-    batcher: &Batcher,
-    serial: &str,
-    record: LogRecord,
-) -> Result<(), ()> {
+/// 行的所有权交给环；入环后只向批量器报告水位（seq），界面对窗口自行从环拉取。
+async fn emit(ring: &RingBuffer, batcher: &Batcher, record: LogRecord) -> Result<(), ()> {
     let line = record.into_wire();
-    let prepared = book.prepare(serial, &line);
     let pushed = ring.push(line);
-    let notes = book.commit(serial, pushed.seq, pushed.oldest, prepared, ring);
-    for note in notes {
-        batcher.note(note).await?;
-    }
-    Ok(())
+    batcher.note(pushed.seq).await
 }
 
 /// 续流重复行丢掉；墙钟往前走就清掉跳过集，然后入环。
 async fn admit_line(
     skip: &mut Option<ResumeSkip>,
     ring: &RingBuffer,
-    book: &WindowBook,
     batcher: &Batcher,
-    serial: &str,
     record: LogRecord,
 ) -> Result<(), ()> {
     if skip.as_ref().is_some_and(|known| skip_resume(known, &record)) {
@@ -162,7 +148,7 @@ async fn admit_line(
     if skip.as_ref().is_some_and(|known| advanced_past(known, &record)) {
         *skip = None;
     }
-    emit(ring, book, batcher, serial, record).await
+    emit(ring, batcher, record).await
 }
 
 fn classify(result: &Result<i32, AdbError>, slot_cancelled: bool) -> FollowEnd {
@@ -193,7 +179,6 @@ pub(crate) async fn run_follow(
     adb: Arc<AdbClient>,
     serial: String,
     ring: Arc<RingBuffer>,
-    book: Arc<WindowBook>,
     batcher: Batcher,
     cancel: CancellationToken,
     resume: bool,
@@ -202,9 +187,7 @@ pub(crate) async fn run_follow(
     let since = skip.as_ref().map(|s| s.ts.clone());
     let (line_tx, mut line_rx) = mpsc::channel::<String>(LINE_CHANNEL_CAP);
     let ring_pump = Arc::clone(&ring);
-    let book_pump = Arc::clone(&book);
     let batcher_pump = batcher.clone();
-    let serial_pump = serial.clone();
     let pump = AbortOnDrop::new(tokio::spawn(async move {
         let mut assembler = MessageAssembler::new();
         let mut skip = skip;
@@ -215,7 +198,7 @@ pub(crate) async fn run_follow(
                         break;
                     };
                     for line in assembler.ingest(&raw) {
-                        if admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line)
+                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
                             .await
                             .is_err()
                         {
@@ -225,7 +208,7 @@ pub(crate) async fn run_follow(
                 }
                 _ = tokio::time::sleep(LAST_MESSAGE_DELAY), if assembler.has_pending() => {
                     if let Some(line) = assembler.take() {
-                        if admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line)
+                        if admit_line(&mut skip, &ring_pump, &batcher_pump, line)
                             .await
                             .is_err()
                         {
@@ -236,7 +219,7 @@ pub(crate) async fn run_follow(
             }
         }
         if let Some(line) = assembler.take() {
-            let _ = admit_line(&mut skip, &ring_pump, &book_pump, &batcher_pump, &serial_pump, line).await;
+            let _ = admit_line(&mut skip, &ring_pump, &batcher_pump, line).await;
         }
     }));
 
@@ -281,7 +264,6 @@ pub(crate) async fn supervise_follow(
     adb: Arc<AdbClient>,
     serial: String,
     ring: Arc<RingBuffer>,
-    book: Arc<WindowBook>,
     batcher: Batcher,
     cancel: CancellationToken,
 ) -> FollowEnd {
@@ -293,7 +275,6 @@ pub(crate) async fn supervise_follow(
             Arc::clone(&adb),
             serial.clone(),
             Arc::clone(&ring),
-            Arc::clone(&book),
             batcher.clone(),
             attempt,
             resume,

@@ -1,9 +1,8 @@
 //! 采集服务组合根与 commands 门面。
 //!
 //! 槽位状态机在 [`crate::slots::CaptureSlots`]，环存储在 [`crate::ring_store::RingStore`]，
-//! 窗口命中在 [`crate::windows::WindowBook`]，导出在 [`crate::export::LogExporter`]，
-//! 进程索引在 [`crate::index::ProcessIndexService`]。
-//! `CaptureService` 只做组合与薄转发，不再自己实现环 / 导出 / 窗口索引内部。
+//! 导出在 [`crate::export::LogExporter`]，进程索引在 [`crate::index::ProcessIndexService`]。
+//! `CaptureService` 只做组合与薄转发。实时取数以设备环为唯一源（ADR-v6-049）。
 
 use std::sync::Arc;
 
@@ -13,11 +12,8 @@ use tokio_util::sync::CancellationToken;
 use crate::index::ProcessIndexService;
 use crate::ring_store::RingStore;
 use crate::slots::CaptureSlots;
-use crate::windows::WindowBook;
 use yohu_adb::AdbClient;
-use yohu_protocol::{
-    CaptureStart, CaptureStatus, LogLine, LogPage, LogWindowBind, ProcessEntry,
-};
+use yohu_protocol::{CaptureStart, CaptureStatus, LogLine, ProcessEntry};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogError {
@@ -42,7 +38,6 @@ pub enum LogError {
 pub struct CaptureService {
     slots: Arc<CaptureSlots>,
     rings: Arc<RingStore>,
-    windows: Arc<WindowBook>,
     index: Arc<ProcessIndexService>,
     adb: Arc<AdbClient>,
     /// 应用根取消令牌：短查询（清缓冲 / ps）用它的子令牌。
@@ -57,20 +52,17 @@ impl CaptureService {
         root_cancel: CancellationToken,
     ) -> Arc<Self> {
         let rings = Arc::new(RingStore::new(ring_capacity));
-        let windows = Arc::new(WindowBook::new());
         let index = Arc::new(ProcessIndexService::new(Arc::clone(&adb), sink.clone()));
         let slots = Arc::new(CaptureSlots::new(
             Arc::clone(&adb),
             Arc::clone(&index),
             sink,
-            Arc::clone(&windows),
             Arc::clone(&rings),
             root_cancel.clone(),
         ));
         Arc::new(Self {
             slots,
             rings,
-            windows,
             index,
             adb,
             root_cancel,
@@ -111,17 +103,6 @@ impl CaptureService {
 
     pub fn clear(&self, serial: &str) {
         self.rings.clear(serial);
-        self.windows.clear_serial(serial);
-    }
-
-    pub fn bind_window(&self, spec: LogWindowBind) -> LogPage {
-        // 读路径不建环：未登记的 serial 得到空窗口/空页。
-        let ring = self.rings.try_ring(&spec.serial);
-        self.windows.bind(spec, ring.as_deref())
-    }
-
-    pub fn release_window(&self, id: u64) {
-        self.windows.release(id);
     }
 
     pub async fn clear_device_buffer(&self, serial: &str) -> Result<(), LogError> {
@@ -147,7 +128,7 @@ impl CaptureService {
     }
 
     /// 诊断用公开 API：返回 `seq >= from_seq` 的前 `limit` 条环快照。
-    /// 供集成测试与排障读取采集结果；命令层不经此入口（wire 走窗口快照）。
+    /// 供集成测试、排障与 UI `log.range` 实时拉取读取采集结果。
     pub fn snapshot(&self, serial: &str, from_seq: u64, limit: usize) -> Vec<LogLine> {
         self.rings.snapshot(serial, from_seq, limit)
     }

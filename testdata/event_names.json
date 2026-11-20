@@ -2,7 +2,7 @@
   "devicesChanged": "devices/changed",
   "deviceOffline": "device/offline",
   "deviceStatus": "device/status",
-  "logHits": "log/hits",
+  "logAppended": "log/appended",
   "processIndex": "log/processIndex",
   "captureState": "log/captureState",
   "transferProgress": "transfer/progress",

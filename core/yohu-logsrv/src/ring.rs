@@ -34,10 +34,9 @@ struct State {
     tags: HashMap<String, Arc<str>>,
 }
 
-/// 写入结果。`oldest` 是淘汰后仍在环内的最小 seq。
+/// 写入结果：分配到的 seq。
 pub(crate) struct Pushed {
     pub seq: u64,
-    pub oldest: u64,
 }
 
 /// 环容量至少为 1。钳制的唯一执行点是 [`crate::ring_store::RingStore`]。
@@ -153,42 +152,17 @@ impl RingBuffer {
         });
         state.evict_overflow();
         state.next_seq += 1;
-        let oldest = state.buf.front().map(|l| l.seq).unwrap_or(seq);
-        Pushed { seq, oldest }
+        Pushed { seq }
     }
 
-    /// 按序号取正文。环内序号连续，下标是 `seq - 最旧序号`。
-    pub(crate) fn lines_by_seq(&self, seqs: &[u64]) -> Vec<LogLine> {
-        if seqs.is_empty() {
-            return Vec::new();
-        }
-        let state = self.lock_state();
-        let Some(oldest) = state.buf.front().map(|line| line.seq) else {
-            return Vec::new();
-        };
-        let mut out = Vec::with_capacity(seqs.len());
-        for seq in seqs {
-            let Some(offset) = seq.checked_sub(oldest) else {
-                continue;
-            };
-            let Some(line) = state.buf.get(offset as usize) else {
-                continue;
-            };
-            if line.seq == *seq {
-                out.push(State::to_wire(line));
-            }
-        }
-        out
-    }
-
-    /// 从 `from_seq` 起遍历到 `through`（含），供窗口登记重建索引与导出。
+    /// 从 `from_seq` 起遍历到 `through`（含），供导出扫环。
     ///
     /// 分块快照：每轮锁内只克隆 ≤ [`FOR_EACH_CHUNK`] 条 `LogLine`，解锁后再交给 `visit`，
     /// 再取下一块。这样长时间扫描不会整段持锁，`push` 不必等整段扫完。
     /// 环内序号连续，故用 `cursor = 末条.seq + 1` 推进；块为空或不足一块即结束。
     ///
     /// `through` 是**内部**快照上界（导出先取一次 [`RingBuffer::last_seq`]，窗口登记取
-    /// [`RingBuffer::next_seq`] 的前一位），不是 wire 字段：扫到 `through` 即止，
+    /// [`RingBuffer`] 的 `through` 取 `last_seq` 的前一位，不是 wire 字段：扫到 `through` 即止，
     /// 导出内容因此不随扫描期间的写入速率变化。
     pub(crate) fn for_each_from(&self, from_seq: u64, through: u64, mut visit: impl FnMut(&LogLine)) {
         let mut cursor = from_seq;
@@ -271,12 +245,6 @@ impl RingBuffer {
         state.next_seq.saturating_sub(1)
     }
 
-    /// 下一个将被分配的 seq（= 已分配条数）。窗口登记用它做「已覆盖到哪」的水位：
-    /// 空环为 0，与「首个分配出去的 seq 是 0」严格区分开（`last_seq` 无法区分这两者）。
-    pub(crate) fn next_seq(&self) -> u64 {
-        self.lock_state().next_seq
-    }
-
     /// 工人重启用：最近一条**非空墙钟**的墙钟 + 同一时刻已入环身份，避免 `-T` 含时刻重入。
     ///
     /// 末条可能是系统行（`ts=""`），不能拿它当续流锚点：`-T ""` 会被 logcat 解析成
@@ -337,7 +305,7 @@ mod tests {
         // 传入 seq=999，环仍从 0 开始分配
         let pushed = ring.push(line(999));
         assert_eq!(pushed.seq, 0);
-        let stored = ring.lines_by_seq(&[0]);
+        let stored = ring.snapshot(0, 10);
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].seq, 0, "环内序号由环分配，不继承入参");
     }

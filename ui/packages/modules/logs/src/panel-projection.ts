@@ -12,7 +12,7 @@
  */
 
 import type { SetStoreFunction } from "solid-js/store";
-import { matchesWireFilter, normalizeLevels, type LogLine, type LogPage } from "@yohu/api";
+import { matchesWireFilter, normalizeLevels, type LogLine } from "@yohu/api";
 
 import { rebindIfPackage } from "./device-projection";
 import { sessionWire, toSessionFilter } from "./filter";
@@ -37,6 +37,8 @@ const DISPLAY_KEYS: readonly (keyof SessionFilterPatch)[] = ["levels", "tagConta
 export type PanelProjectionDeps = {
   viewCap: () => number;
   pageRequest: (id: number) => Promise<void>;
+  /** 增量追尾（恢复跟滚/回前台）：从游标拉到环尾，不重置文档。 */
+  catchUp: (id: number) => Promise<void>;
   markFollowing: (idx: number) => void;
   /** 清设备缓冲后的游标与跟滚转移（follow-state 单写：fromSeq / following / frozenThroughSeq）。 */
   resetFollowAfterDeviceClear: (idx: number) => void;
@@ -45,8 +47,7 @@ export type PanelProjectionDeps = {
 export type PanelProjectionApi = {
   clearPanel: (idx: number) => void;
   writePanel: (idx: number, rows: readonly ViewRow[], pendingCount: number) => void;
-  appendToSession: (id: number, lines: readonly LogLine[]) => void;
-  applyPage: (id: number, page: LogPage) => void;
+  appendToSession: (id: number, lines: readonly LogLine[], force?: boolean) => void;
   noteSeq: (idx: number, lines: readonly { seq: number }[]) => void;
   narrowDrawn: (id: number) => void;
   trimPanels: () => void;
@@ -154,12 +155,13 @@ export function createPanelProjection(
     if (last > seen) setState("sessions", idx, { lastSeenSeq: last });
   }
 
-  function appendToSession(id: number, lines: readonly LogLine[]): void {
+  function appendToSession(id: number, lines: readonly LogLine[], force = false): void {
     const idx = sessionIndex(state, id);
     if (sessionMissing(idx)) return;
     const session = sessionAt(state, idx);
+    if (session.paused && !force) return;
     const following = panelFollows(session.following, session.visible);
-    if (following && !session.following) {
+    if (!force && following && !session.following) {
       deps.markFollowing(idx);
     }
     const filter = toSessionFilter(session);
@@ -175,22 +177,20 @@ export function createPanelProjection(
       paused: session.paused,
       filter,
       expectContiguous,
+      allowPaused: force,
       cap: viewCap(),
-      pendingCount: following && !session.following ? 0 : session.pendingCount,
+      pendingCount: force ? session.pendingCount : following && !session.following ? 0 : session.pendingCount,
     });
     if (!applied) return;
     writePanel(idx, applied.visible, applied.pendingCount);
     noteSeq(idx, lines);
-    // 连续游标空洞：本批命中前缺少 seq（丢批/掉线重连）。由 reducer 判定，装配层触发一次
-    // 环对账补齐；`applyPage` 按 seq 对账，不会重复也不会覆盖已画新行。
-    if (applied.gap) void deps.pageRequest(id);
   }
 
   function catchUpSession(id: number): Promise<void> {
     const idx = sessionIndex(state, id);
     if (sessionMissing(idx)) return Promise.resolve();
     if (!sessionCaptureIsLive(sessionAt(state, idx))) return Promise.resolve();
-    return deps.pageRequest(id);
+    return deps.catchUp(id);
   }
 
   function narrowDrawn(id: number): void {
@@ -199,40 +199,6 @@ export function createPanelProjection(
     const session = sessionAt(state, idx);
     const kept = keepMatching(session.visible, toSessionFilter(session));
     replacePanel(idx, panelFromLines(kept, viewCap()), session.pendingCount);
-  }
-
-  /**
-   * 整页装入 = 「页快照为真前缀 + 快照之后已经画出的新行必须保留」的按 seq 对账。
-   *
-   * `log.window.bind` 的页在**绑定时刻**取 `through = ring.next_seq()`，只覆盖 `seq <= through-1`；
-   * 绑定之后经 `log/hits` 追加、且 `seq >= through` 的行不在页里。命中事件与 invoke 响应在 IPC
-   * 上无序，若盲替换会把这些行冲掉（且不会再发）。因此用页末 seq 作水位：保留已画文档中
-   * `seq > 页末 seq` 且仍满足**当前过滤**的行。换过滤时旧过滤里超出页末的多余行会被过滤掉，
-   * 溢出回补时环里被漏掉的中间行由页补齐——两者都不丢、不重。
-   */
-  function applyPage(id: number, page: LogPage): void {
-    const idx = sessionIndex(state, id);
-    if (sessionMissing(idx)) return;
-    const session = sessionAt(state, idx);
-    if (page.lines.length === 0 && page.total === 0 && session.visible.length > 0) {
-      // 环里没有该窗口的命中（镜像被清 / 刚换过滤）：把新过滤应用到已画文档，
-      // 而不是让旧过滤的行留在面板上。仍然是一次整文档替换。
-      narrowDrawn(id);
-      return;
-    }
-    const cap = viewCap();
-    const pageRows = panelFromLines(page.lines, cap);
-    const pageLast = pageRows.at(-1)?.line.seq;
-    let rows: readonly ViewRow[] = pageRows;
-    if (pageLast !== undefined) {
-      const wire = sessionWire(toSessionFilter(session));
-      const kept = session.visible.filter(
-        (row) => row.line.seq > pageLast && matchesWireFilter(row.line, wire),
-      );
-      if (kept.length > 0) rows = trimRows([...pageRows, ...kept], cap);
-    }
-    replacePanel(idx, rows, session.pendingCount);
-    noteSeq(idx, page.lines);
   }
 
   function flushPanel(id: number): void {
@@ -291,14 +257,13 @@ export function createPanelProjection(
     if (sessionMissing(idx)) return;
     if (sessionAt(state, idx).paused === paused) return;
     setState("sessions", idx, { paused });
-    if (!paused) await deps.pageRequest(id);
+    if (!paused) await deps.catchUp(id);
   }
 
   return {
     clearPanel,
     writePanel,
     appendToSession,
-    applyPage,
     noteSeq,
     narrowDrawn,
     trimPanels,

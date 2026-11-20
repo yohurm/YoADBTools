@@ -50,37 +50,12 @@ pub struct LogRangeRequest {
     pub limit: u32,
 }
 
-/// 窗口过滤登记。命中索引在环旁边重建，返回当前全部可见命中。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogWindowBind {
-    pub id: u64,
-    pub serial: String,
-    pub filter: LogFilter,
-    pub from_seq: u64,
-}
-
-/// 一次窗口快照：登记/跟尾时一次装入当前全部可见命中。
-///
-/// 信号计数不在 wire 上：界面按可见行派生（`signalCountOf`），core 不再维护第二份。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogPage {
-    pub window_id: u64,
-    pub serial: String,
-    pub total: u64,
-    pub lines: Vec<LogLine>,
-}
-
-/// 一批窗口命中的**水位信号**（不含正文）。界面据此从设备环按 seq 拉取原始行
+/// 设备环前进的**水位信号**（不含正文）。UI 据此从设备环按 seq 拉取原始行
 /// （`log.range`），过滤在 UI 消费端；推送丢失只影响延迟，下一次水位更高即可补齐。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogHits {
+pub struct LogAppended {
     pub serial: String,
-    pub window_id: u64,
-    /// 本窗口累计命中数（诊断用；不参与补数正确性）
-    pub total: u64,
-    /// 本批新增命中条数（诊断/进度用）
-    pub appended: u32,
-    /// 本窗口命中的最新 seq 水位；UI 把游标拉到它即可补齐
+    /// 该设备环当前最新 seq 水位；UI 把各窗口游标拉到它即可补齐。
     pub last_seq: u64,
 }
 
@@ -228,30 +203,17 @@ mod tests {
         assert_eq!(v["generation"], 7, "世代必须出现在 wire 上");
     }
 
-    /// 信号计数不在 wire 上：core 不再维护第二份（界面从可见行派生）。
+    /// 水位信号不带正文：只有设备与 last_seq。
     #[test]
-    fn log_page_and_hits_carry_no_signal_count() {
-        let page = LogPage {
-            window_id: 1,
+    fn log_appended_carries_only_watermark() {
+        let appended = LogAppended {
             serial: "S".into(),
-            total: 2,
-            lines: Vec::new(),
-        };
-        let hits = LogHits {
-            serial: "S".into(),
-            window_id: 1,
-            total: 2,
-            appended: 1,
             last_seq: 5,
         };
-        for value in [
-            serde_json::to_value(&page).unwrap(),
-            serde_json::to_value(&hits).unwrap(),
-        ] {
-            assert!(
-                value.get("signals").is_none(),
-                "signals 不得回到 wire（唯一源是界面可见行）"
-            );
-        }
+        let value = serde_json::to_value(&appended).unwrap();
+        assert_eq!(value["serial"], "S");
+        assert_eq!(value["last_seq"], 5);
+        assert!(value.get("tail").is_none(), "水位信号不得携带正文");
+        assert!(value.get("signals").is_none());
     }
 }

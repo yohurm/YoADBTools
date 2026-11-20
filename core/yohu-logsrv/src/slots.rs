@@ -1,7 +1,7 @@
 //! 采集槽位状态机：Empty → Starting(gen) → Live(gen) → Stopping(gen) → Empty。
 //!
 //! 唯一持有槽位/世代状态与跟流监督。环由 [`crate::ring_store::RingStore`]、
-//! 窗口命中由 [`crate::windows::WindowBook`] 各自持有；本类型只编排代际资源。
+//! 窗口命中不再在 core：实时取数以设备环为唯一源（ADR-v6-049）；本类型只编排代际资源。
 //! 工人退出不得拆代际资源、不得发 Stopped；Stopped 只来自末 hold 的 stop / 掉线 / 永久失败 / Starting 放弃。
 //! start 仅对 Live **adopt**；Starting/Stopping 等待后再决定。新流才 `ring.clear()`。
 //! 控制面 `CaptureState` 带 generation 且 `send().await` 必达；批次仍 `try_send`。
@@ -25,7 +25,6 @@ use crate::follow::{supervise_follow, FollowEnd};
 use crate::index::ProcessIndexService;
 use crate::ring_store::RingStore;
 use crate::task::join_workers;
-use crate::windows::WindowBook;
 use yohu_adb::AdbClient;
 use yohu_protocol::{AppEvent, CaptureStart, CaptureState};
 
@@ -133,7 +132,6 @@ pub(crate) struct CaptureSlots {
     adb: Arc<AdbClient>,
     index: Arc<ProcessIndexService>,
     sink: mpsc::Sender<AppEvent>,
-    windows: Arc<WindowBook>,
     rings: Arc<RingStore>,
     inner: Mutex<Inner>,
     changed: Notify,
@@ -146,7 +144,6 @@ impl CaptureSlots {
         adb: Arc<AdbClient>,
         index: Arc<ProcessIndexService>,
         sink: mpsc::Sender<AppEvent>,
-        windows: Arc<WindowBook>,
         rings: Arc<RingStore>,
         root_cancel: CancellationToken,
     ) -> Self {
@@ -154,7 +151,6 @@ impl CaptureSlots {
             adb,
             index,
             sink,
-            windows,
             rings,
             inner: Mutex::new(Inner {
                 captures: HashMap::new(),
@@ -334,7 +330,6 @@ impl CaptureSlots {
         // 只有采集侧创建环；容量由 RingStore 单点下推（本处不再写容量）。
         let ring = self.rings.ensure_ring(serial);
         ring.clear();
-        self.windows.clear_serial(serial);
         let (batcher, batch_handle) = Batcher::spawn(
             serial.to_string(),
             self.sink.clone(),
@@ -370,7 +365,6 @@ impl CaptureSlots {
                 adb,
                 serial_owned.clone(),
                 ring,
-                Arc::clone(&slots.windows),
                 batcher,
                 follow_cancel,
             )

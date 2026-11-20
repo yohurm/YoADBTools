@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, LogFilter, LogWindowBind};
+use yohu_protocol::AppEvent;
 
 /// 定位 fake-adb：workspace member 的明文 bin 位于
 /// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
@@ -97,12 +97,6 @@ async fn wait_ring_lines(service: &Arc<CaptureService>, serial: &str, want: usiz
 async fn capture_streams_parses_and_batches() {
     let (service, _rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
 
-    service.bind_window(LogWindowBind {
-        id: 1,
-        serial: "R58M1234A".into(),
-        filter: LogFilter::default(),
-        from_seq: 0,
-    });
     service.start("R58M1234A", false).await.expect("开始采集");
 
     wait_ring_lines(&service, "R58M1234A", 3).await;

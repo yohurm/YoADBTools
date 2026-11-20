@@ -152,8 +152,10 @@ export function applyAppend(opts: {
    * 否则每批都会误报空洞、反复整页回补。默认 true（无过滤判定）。
    */
   expectContiguous?: boolean;
+  /** 重建（换过滤）时可越过暂停把环里已有行装回文档。 */
+  allowPaused?: boolean;
 }): ViewApply | null {
-  if (opts.paused || !captureStarted(opts.fromSeq)) return null;
+  if ((opts.paused && !opts.allowPaused) || !captureStarted(opts.fromSeq)) return null;
   const following = panelFollows(opts.following, opts.visible);
   const after = lastSeqOf(opts.visible, opts.fromSeq);
   const firstSeq = opts.lines.length > 0 ? opts.lines[0]!.seq : undefined;
@@ -178,6 +180,7 @@ export function applyAppend(opts: {
     };
   }
   const visible = appendLines(opts.visible, fresh, opts.cap);
+  if (opts.allowPaused) return { visible, pendingCount: opts.pendingCount };
   if (!following) {
     const arrived = fresh.reduce((acc, line) => acc + (line.seq > frozen ? 1 : 0), 0);
     return {
