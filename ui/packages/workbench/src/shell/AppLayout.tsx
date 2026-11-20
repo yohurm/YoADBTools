@@ -49,6 +49,7 @@ const ModuleView: Component<{ mod: ModuleDescriptor }> = (props) => {
       devices={deviceStore.catalog()}
       deviceStatuses={deviceStore.state.statuses}
       settings={settingsStore.state}
+      exportDefaultDir={settingsStore.resolved.export_default_path}
     />
   );
 };
