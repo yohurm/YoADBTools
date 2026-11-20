@@ -7,7 +7,7 @@
  */
 
 import type { SetStoreFunction } from "solid-js/store";
-import type { LogHits, LogPage, ProcessEntry } from "@yohu/api";
+import type { LogLine, LogPage, ProcessEntry } from "@yohu/api";
 
 import { assignDefaultSerial, bindPackageSessions } from "./device-projection";
 import { createFollowState, type FollowStateApi } from "./follow-state";
@@ -21,11 +21,13 @@ import {
   duplicateSession,
   ensureSession,
   renameSession,
+  sessionById,
   setActive,
   setColumnView,
   type ColumnViewPatch,
 } from "./session-lifecycle";
 import type { SessionScope } from "./filter";
+import { sessionCaptureIsLive } from "./session-chrome";
 import { docCap } from "./viewport";
 
 export type { DeviceUiState, LogSessionState, LogUiState, SessionFilterPatch } from "./log-model";
@@ -60,7 +62,8 @@ export type WorkspaceApi = {
   unsubscribeSession: (id: number) => void;
   bindPackageSessions: (serial: string, entries?: readonly ProcessEntry[]) => void;
   assignDefaultSerial: (serial: string | null) => void;
-  applyHits: (hits: LogHits) => void;
+  /** 环拉取的一批原始行（未过滤）→ 交给窗口文档过滤/追加（游标随原始末 seq 前进）。 */
+  appendRingLines: (id: number, lines: readonly LogLine[]) => void;
   applyPage: (id: number, page: LogPage) => void;
   setPageRequest: (fn: (id: number) => Promise<void>) => void;
   discardView: (id: number) => void;
@@ -113,7 +116,11 @@ export function createWorkspace(
     bindPackageSessions: (serial, entries) =>
       bindPackageSessions(state, setState, serial, entries, (id) => panel.catchUpSession(id)),
     assignDefaultSerial: (serial) => assignDefaultSerial(state, setState, serial),
-    applyHits: (hits) => panel.applyHits(hits),
+    appendRingLines: (id, lines) => {
+      const session = sessionById(state, id);
+      if (!session || !sessionCaptureIsLive(session) || session.paused) return;
+      panel.appendToSession(id, lines);
+    },
     applyPage: (id, page) => panel.applyPage(id, page),
     setPageRequest: (fn) => {
       pageRequest = fn;

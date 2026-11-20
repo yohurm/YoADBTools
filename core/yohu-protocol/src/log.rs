@@ -70,14 +70,18 @@ pub struct LogPage {
     pub lines: Vec<LogLine>,
 }
 
-/// 一批窗口命中。`tail` 是这批新增命中的正文。界面跟尾时钉底，离开底部仍写入文档但不移动视口。
+/// 一批窗口命中的**水位信号**（不含正文）。界面据此从设备环按 seq 拉取原始行
+/// （`log.range`），过滤在 UI 消费端；推送丢失只影响延迟，下一次水位更高即可补齐。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogHits {
     pub serial: String,
     pub window_id: u64,
+    /// 本窗口累计命中数（诊断用；不参与补数正确性）
     pub total: u64,
+    /// 本批新增命中条数（诊断/进度用）
     pub appended: u32,
-    pub tail: Vec<LogLine>,
+    /// 本窗口命中的最新 seq 水位；UI 把游标拉到它即可补齐
+    pub last_seq: u64,
 }
 
 /// 采集状态（wire 上必须带 `generation`，见 [`crate::AppEvent::CaptureState`]）。
@@ -238,7 +242,7 @@ mod tests {
             window_id: 1,
             total: 2,
             appended: 1,
-            tail: Vec::new(),
+            last_seq: 5,
         };
         for value in [
             serde_json::to_value(&page).unwrap(),

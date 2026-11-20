@@ -41,25 +41,10 @@ fn snapshot_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::
     service.snapshot(serial, 0, 50_000)
 }
 
-fn spawn_event_pump(
-    mut rx: mpsc::Receiver<AppEvent>,
-) -> (
-    Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>,
-    tokio::task::JoinHandle<()>,
-) {
-    let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let collected = Arc::clone(&lines);
-    let handle = tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            if let AppEvent::LogHits(hits) = event {
-                collected
-                    .lock()
-                    .expect("event pump")
-                    .extend(hits.tail);
-            }
-        }
-    });
-    (lines, handle)
+fn spawn_event_pump(mut rx: mpsc::Receiver<AppEvent>) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        while rx.recv().await.is_some() {}
+    })
 }
 
 fn bind_follow(service: &CaptureService, serial: &str) {
@@ -69,26 +54,6 @@ fn bind_follow(service: &CaptureService, serial: &str) {
         filter: LogFilter::default(),
         from_seq: 0,
     });
-}
-
-async fn wait_pumped_lines(
-    lines: &Arc<std::sync::Mutex<Vec<yohu_protocol::LogLine>>>,
-    min: usize,
-    timeout: Duration,
-) -> Vec<yohu_protocol::LogLine> {
-    let deadline = tokio::time::Instant::now() + timeout;
-    loop {
-        {
-            let guard = lines.lock().expect("event pump");
-            if guard.len() >= min {
-                return guard.clone();
-            }
-        }
-        if tokio::time::Instant::now() >= deadline {
-            return lines.lock().expect("event pump").clone();
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -103,7 +68,7 @@ async fn real_capture_stream_batch_and_ring() {
     };
 
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -118,7 +83,8 @@ async fn real_capture_stream_batch_and_ring() {
         .expect("开始采集");
     assert!(service.status(&serial).capturing);
 
-    let lines = wait_pumped_lines(&pumped, 5, Duration::from_secs(30)).await;
+    wait_ring_len(&service, &serial, 5).await;
+    let lines = snapshot_lines(&service, &serial);
     assert!(!lines.is_empty(), "真实 logcat 应产出日志记录");
     let ring_lines = snapshot_lines(&service, &serial);
     assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次记录");
@@ -175,7 +141,7 @@ async fn real_capture_with_clear_device() {
         return;
     };
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -189,7 +155,8 @@ async fn real_capture_with_clear_device() {
         .await
         .expect("start 超时")
         .expect("开始采集（先清设备缓冲）");
-    let lines = wait_pumped_lines(&pumped, 3, Duration::from_secs(30)).await;
+    wait_ring_len(&service, &serial, 3).await;
+    let lines = snapshot_lines(&service, &serial);
     assert!(!lines.is_empty(), "清缓冲后仍应采集到新日志");
     eprintln!("[真机] 清缓冲重采 {} 条", lines.len());
 
@@ -216,7 +183,7 @@ async fn real_detach_clears_ring() {
         return;
     };
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (_pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -253,7 +220,7 @@ async fn real_export_filtered_ring_snapshot() {
         return;
     };
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -266,7 +233,8 @@ async fn real_export_filtered_ring_snapshot() {
         .await
         .expect("start 超时")
         .expect("开始采集");
-    let lines = wait_pumped_lines(&pumped, 5, Duration::from_secs(30)).await;
+    wait_ring_len(&service, &serial, 5).await;
+    let lines = snapshot_lines(&service, &serial);
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
         .expect("stop 应在杀进程树后返回");
@@ -339,7 +307,7 @@ async fn real_restart_follow_page_is_tail() {
         return;
     };
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (_pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,
@@ -424,7 +392,7 @@ async fn real_start_without_clear_keeps_existing_device_buffer() {
     );
 
     let (tx, rx) = mpsc::channel::<AppEvent>(128);
-    let (_pumped, pump) = spawn_event_pump(rx);
+    let pump = spawn_event_pump(rx);
     let service = CaptureService::new(
         client,
         tx,

@@ -12,7 +12,7 @@
  */
 
 import type { SetStoreFunction } from "solid-js/store";
-import { matchesWireFilter, normalizeLevels, type LogHits, type LogLine, type LogPage } from "@yohu/api";
+import { matchesWireFilter, normalizeLevels, type LogLine, type LogPage } from "@yohu/api";
 
 import { rebindIfPackage } from "./device-projection";
 import { sessionWire, toSessionFilter } from "./filter";
@@ -46,7 +46,6 @@ export type PanelProjectionApi = {
   clearPanel: (idx: number) => void;
   writePanel: (idx: number, rows: readonly ViewRow[], pendingCount: number) => void;
   appendToSession: (id: number, lines: readonly LogLine[]) => void;
-  applyHits: (hits: LogHits) => void;
   applyPage: (id: number, page: LogPage) => void;
   noteSeq: (idx: number, lines: readonly { seq: number }[]) => void;
   narrowDrawn: (id: number) => void;
@@ -202,15 +201,6 @@ export function createPanelProjection(
     replacePanel(idx, panelFromLines(kept, viewCap()), session.pendingCount);
   }
 
-  function applyHits(hits: LogHits): void {
-    const idx = sessionIndex(state, hits.window_id);
-    if (sessionMissing(idx)) return;
-    const session = sessionAt(state, idx);
-    if (!sessionCaptureIsLive(session)) return;
-    if (session.paused) return;
-    appendToSession(hits.window_id, hits.tail);
-  }
-
   /**
    * 整页装入 = 「页快照为真前缀 + 快照之后已经画出的新行必须保留」的按 seq 对账。
    *
@@ -308,7 +298,6 @@ export function createPanelProjection(
     clearPanel,
     writePanel,
     appendToSession,
-    applyHits,
     applyPage,
     noteSeq,
     narrowDrawn,

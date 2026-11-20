@@ -8,6 +8,7 @@
 import type { SetStoreFunction } from "solid-js/store";
 import {
   captureStateIsRunning,
+  logRange,
   onCaptureState,
   onDeviceOffline,
   onLogHits,
@@ -15,6 +16,7 @@ import {
   onProcessIndex,
   onSettingsChanged,
   SETTING_KEYS,
+  type LogLine,
   type ProcessEntry,
 } from "@yohu/api";
 
@@ -26,6 +28,7 @@ import {
 } from "./device-projection";
 import type { LogUiState } from "./log-model";
 import { sessionCaptureIsLive } from "./session-chrome";
+import { sessionById } from "./session-lifecycle";
 import type { CaptureOrchestratorApi } from "./capture-orchestrator";
 import type { ViewportPageApi } from "./viewport-page";
 import type { WorkspaceApi } from "./workspace";
@@ -63,6 +66,37 @@ export function createCaptureSubscriptions(
     }
     // 徽章只在「该设备全部在采窗口都完成一次环对账」后才复位；失败保留，等下次回补。
     if (recovered) setOverflowed(state, setState, device, false);
+  }
+
+  /**
+   * 按 seq 游标从设备环把窗口拉齐到 `throughSeq`（含）。原始行由 UI 过滤。
+   * 丢信号只影响延迟：下一次水位更高会一次性补齐；容量内不丢。
+   */
+  async function pullThrough(windowId: number, throughSeq: number): Promise<void> {
+    const session = sessionById(state, windowId);
+    if (!session?.serial || !sessionCaptureIsLive(session) || session.paused) return;
+    let cursor =
+      session.lastSeenSeq >= session.fromSeq ? session.lastSeenSeq + 1 : Math.max(0, session.fromSeq);
+    for (let round = 0; round < 100 && cursor <= throughSeq; round += 1) {
+      const current = sessionById(state, windowId);
+      if (!current?.serial) return;
+      let batch: LogLine[];
+      try {
+        const raw = logRange({ serial: current.serial, from_seq: cursor, limit: 2000 }) as
+          | LogLine[]
+          | Promise<LogLine[]>;
+        batch = Array.isArray(raw) ? raw : await raw;
+      } catch (e) {
+        console.error("log.range 拉取失败", e);
+        return;
+      }
+      if (batch.length === 0) return;
+      workspace.appendRingLines(windowId, batch);
+      const last = batch[batch.length - 1]!.seq;
+      if (last < cursor) return;
+      cursor = last + 1;
+      if (batch.length < 2000) return;
+    }
   }
 
   function onIndex(snapshot: {
@@ -104,9 +138,8 @@ export function createCaptureSubscriptions(
   );
   watch(
     onLogHits((e) => {
-      // 命中是增量追加；只有跟尾才移动视口。不得推进页代际。
-      // 连续 seq 空洞由 reducer 判定、投影层触发回环对账（见 `applyAppend.gap`）。
-      workspace.applyHits(e);
+      // 命中事件只是水位信号：把该窗口从环按 seq 游标拉齐到 last_seq（过滤在 UI）。
+      void pullThrough(e.window_id, e.last_seq);
     }),
   );
   watch(onLogOverflow((e) => void onOverflow(e.serial)));

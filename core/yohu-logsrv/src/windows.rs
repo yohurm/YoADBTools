@@ -204,11 +204,10 @@ impl WindowBook {
             }
             window.hits.push_back(seq);
             let total = window.hits.len() as u64;
-            let line = body_of(&mut body, ring, seq).cloned();
             notes.push(HitNote {
                 window_id: window.id,
                 total,
-                line,
+                seq,
             });
         }
         notes

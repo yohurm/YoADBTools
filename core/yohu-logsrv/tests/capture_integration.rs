@@ -93,26 +93,9 @@ async fn wait_ring_lines(service: &Arc<CaptureService>, serial: &str, want: usiz
     }
 }
 
-async fn collect_lines(
-    rx: &mut mpsc::Receiver<AppEvent>,
-    want: usize,
-) -> Vec<yohu_protocol::LogLine> {
-    let mut lines = Vec::new();
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
-    while lines.len() < want && tokio::time::Instant::now() < deadline {
-        match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
-            Ok(Some(AppEvent::LogHits(hits))) => lines.extend(hits.tail),
-            Ok(Some(_)) => {}
-            Ok(None) => break,
-            Err(_) => {}
-        }
-    }
-    lines
-}
-
 #[tokio::test]
 async fn capture_streams_parses_and_batches() {
-    let (service, mut rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
+    let (service, _rx) = build_service(isolated_fake_adb(THREE_LINES_SCRIPT));
 
     service.bind_window(LogWindowBind {
         id: 1,
@@ -122,8 +105,9 @@ async fn capture_streams_parses_and_batches() {
     });
     service.start("R58M1234A", false).await.expect("开始采集");
 
-    let lines = collect_lines(&mut rx, 3).await;
-    assert_eq!(lines.len(), 3, "应收到 3 条批量事件");
+    wait_ring_lines(&service, "R58M1234A", 3).await;
+    let lines = snapshot_lines(&service, "R58M1234A");
+    assert_eq!(lines.len(), 3, "环里应有 3 条记录");
     assert_eq!(lines[0].seq, 0);
     assert_eq!(lines[0].pid, 1234);
     assert_eq!(lines[0].uid.as_deref(), Some("1000"));

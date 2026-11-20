@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logCaptureStatus: vi.fn(),
   logClearDevice: vi.fn(),
   logWindowBind: vi.fn(),
+  logRange: vi.fn(),
   logWindowRelease: vi.fn(),
   logExport: vi.fn(),
   logProcessSnapshot: vi.fn(),
@@ -62,6 +63,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logCaptureStatus: (...a: unknown[]) => mocks.logCaptureStatus(...a),
     logClearDevice: (...a: unknown[]) => mocks.logClearDevice(...a),
     logWindowBind: (...a: unknown[]) => mocks.logWindowBind(...a),
+    logRange: (...a: unknown[]) => mocks.logRange(...a),
     logWindowRelease: (...a: unknown[]) => mocks.logWindowRelease(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
@@ -208,13 +210,11 @@ async function liveStore(): Promise<LogStoreApi> {
 const push = (serial: string, lines: LogLine[]): void => {
   const store = liveStores.at(-1);
   remember(serial, lines, store?.state.bufferCapacity ?? 10_000);
-  if (!store) return;
+  if (!store || lines.length === 0) return;
+  const last = lines[lines.length - 1]!.seq;
   for (const session of store.state.sessions) {
     if (session.serial !== serial || !session.capturing) continue;
     const wire = sessionWire(toSessionFilter(session));
-    const fresh = lines.filter(
-      (line) => line.seq >= Math.max(0, session.fromSeq) && matchesWireFilter(line, wire),
-    );
     const indexed = (rings.get(serial) ?? []).filter(
       (line) => line.seq >= Math.max(0, session.fromSeq) && matchesWireFilter(line, wire),
     );
@@ -222,8 +222,8 @@ const push = (serial: string, lines: LogLine[]): void => {
       serial,
       window_id: session.id,
       total: indexed.length,
-      appended: fresh.length,
-      tail: session.paused ? [] : fresh,
+      appended: indexed.length,
+      last_seq: last,
     });
   }
 };
@@ -239,11 +239,17 @@ beforeEach(() => {
   mocks.logCaptureStop.mockReset();
   mocks.logCaptureStatus.mockReset();
   mocks.logWindowBind.mockReset();
+  mocks.logRange.mockReset();
   mocks.logWindowRelease.mockReset();
   mocks.logExport.mockReset();
   mocks.logProcessSnapshot.mockReset();
   mocks.logPackageSnapshot.mockReset();
   mocks.logWindowBind.mockImplementation(async (spec: LogWindowBind) => pageFor(spec));
+  // UI 实时从环拉取：mock 直接按 from_seq 返回环中剩余原始行（同步数组，便于用例断言）
+  mocks.logRange.mockImplementation(
+    (req: { serial: string; from_seq: number; limit: number }) =>
+      (rings.get(req.serial) ?? []).filter((line) => line.seq >= req.from_seq).slice(0, req.limit),
+  );
   mocks.logWindowRelease.mockResolvedValue(undefined);
   mocks.logExport.mockResolvedValue({ path: "x.txt", lines: 0 });
   mocks.logProcessSnapshot.mockResolvedValue([]);
@@ -567,13 +573,13 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       store.state.bufferCapacity,
     );
     remember("S1", [mk(42)], store.state.bufferCapacity);
-    // 回前台只收到最后一拍命中（首 seq 42，前面 40 条缺失）
+    // 回前台只收到最后一拍水位（到 seq 42，前面 2..41 未单独送信号）
     mocks.logHitsHandlers.at(-1)?.({
       serial: "S1",
       window_id: id,
       total: 43,
       appended: 1,
-      tail: [mk(42)],
+      last_seq: 42,
     });
     // 回到前台：resumeVisible 应对所有在采窗口从环重新对账
     store.resumeVisible();
@@ -616,15 +622,14 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([2, 3]);
   });
 
-  it("溢出回补遇上并发命中：回补页不得整页作废，环里被漏掉的行必须补回（不丢行）", async () => {
+  it("环拉取遇上在途整页回补：不丢行、不重复", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
-    // 已画 seq 0、1
     push("S1", [mk(0), mk(1)]);
-    // 模拟 seq 2、3 的 log/hits 批次在传输中丢失（环里仍有）
+    // 环里已有 2、3，但信号尚未送达
     remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
 
-    // 让溢出回补的 bind 延迟解析，并在「绑定时刻」抓取快照（只含 0..3，不含后续新行）
+    // 溢出触发的整页 bind 延迟解析（模拟在途页）
     let releaseBind!: () => void;
     let snapshot: LogPage | undefined;
     mocks.logWindowBind.mockImplementationOnce((spec: LogWindowBind) => {
@@ -633,24 +638,23 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
         releaseBind = () => resolve(snapshot!);
       });
     });
-
-    // 触发溢出回补（loadPage 进入等待）
     mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
     await vi.waitFor(() => expect(releaseBind).toBeDefined());
 
-    // 回补在途期间：新命中 seq4 到达（真实：core 在 bind 之后提交，回补页快照不含它）
+    // 在途期间又来一条 seq4 的水位：UI 从环按游标补齐 2、3、4
     remember("S1", [mk(4)], store.state.bufferCapacity);
     mocks.logHitsHandlers.at(-1)?.({
       serial: "S1",
       window_id: id,
       total: 5,
       appended: 1,
-      tail: [mk(4)],
+      last_seq: 4,
     });
-    // 此刻已画 0、1、4；2、3 尚待回补页补齐
-    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 4]);
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
+    });
 
-    // 回补页解析：快照 0..3 必须与在途追加的 seq4 合并，不得把 seq4 冲掉，也不得漏 2、3
+    // 迟到的整页 bind 解析后仍不得丢行/重复
     releaseBind();
     await vi.waitFor(() => {
       expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
@@ -673,26 +677,26 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([1, 3]);
   });
 
-  it("命中空洞（无 overflow 事件）自动按 seq 对账补齐", async () => {
+  it("丢批后下一次水位一次性从环补齐（无需整页 bind）", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
     push("S1", [mk(0), mk(1)]);
-    // 模拟 seq 2、3 两批命中在传输中丢失（环里仍有）
+    // seq 2、3 的信号丢失，环里仍在
     remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
     const bindsBefore = mocks.logWindowBind.mock.calls.length;
     remember("S1", [mk(4)], store.state.bufferCapacity);
-    // 直接投递 seq4 命中：首 seq=4 越过窗口已见末 seq=1 → 空洞，store 应主动回环对账
+    // 只收到水位 last_seq=4：UI 应从环把 2、3、4 一次补齐
     mocks.logHitsHandlers.at(-1)?.({
       serial: "S1",
       window_id: id,
       total: 5,
       appended: 1,
-      tail: [mk(4)],
+      last_seq: 4,
     });
     await vi.waitFor(() => {
-      expect(mocks.logWindowBind.mock.calls.length).toBeGreaterThan(bindsBefore);
       expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
     });
+    expect(mocks.logWindowBind.mock.calls.length).toBe(bindsBefore);
   });
 
   it("掉线：停采集、清镜像，已画出的行保留", async () => {
@@ -1526,7 +1530,7 @@ describe("logStore 设置联动", () => {
       window_id: store.state.sessions[0]?.id ?? 0,
       total: 1,
       appended: 1,
-      tail: [mk(99)],
+      last_seq: 99,
     });
     expect(store.state.sessions[0]?.visible ?? []).toHaveLength(0);
   });

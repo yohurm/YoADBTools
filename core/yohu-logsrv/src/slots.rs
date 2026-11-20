@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, Notify};
 use tokio_util::sync::CancellationToken;
 
-use crate::batch::{Batcher, BATCH_FLUSH_INTERVAL, BATCH_MAX_BYTES, BATCH_MAX_LINES};
+use crate::batch::{Batcher, BATCH_FLUSH_INTERVAL, BATCH_MAX_LINES};
 use crate::capture::LogError;
 use crate::follow::{supervise_follow, FollowEnd};
 use crate::index::ProcessIndexService;
@@ -340,7 +340,6 @@ impl CaptureSlots {
             self.sink.clone(),
             BATCH_FLUSH_INTERVAL,
             BATCH_MAX_LINES,
-            BATCH_MAX_BYTES,
             cancel.clone(),
         );
         // 槽位可能在启动期间被 stop 取消：批量器句柄无法挂回则立即收敛。

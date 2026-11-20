@@ -70,13 +70,13 @@ export interface LogRangeRequest {
   limit: number;
 }
 
-/** 一批窗口命中。`tail` 是本批新增命中的正文。 */
+/** 一批窗口命中的水位信号（不含正文）。界面据此从设备环按 seq 拉取原始行。 */
 export interface LogHits {
   serial: string;
   window_id: number;
   total: number;
   appended: number;
-  tail: LogLine[];
+  last_seq: number;
 }
 
 export type CaptureState = "running" | "stopped";
