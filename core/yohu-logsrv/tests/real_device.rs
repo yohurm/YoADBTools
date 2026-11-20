@@ -11,8 +11,11 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use yohu_adb::{AdbClient, ToolResolver};
-use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, LogFilter, LogPage, LogWindowBind, ReplayRequest, LOG_PAGE_LINES};
+use yohu_logsrv::{CaptureService, LogExporter};
+use yohu_protocol::{AppEvent, LogFilter, LogPage, LogWindowBind};
+
+/// 真机「跟尾」用例要求环内历史超过一页（原页宽 80，故至少 81 行）。
+const MIN_PAGE_LINES: usize = 81;
 
 fn real_adb() -> PathBuf {
     yohu_adb::repo_sidecar_adb()
@@ -34,14 +37,8 @@ async fn online_device(client: &AdbClient) -> Option<String> {
         .map(|d| d.serial)
 }
 
-fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
-    service
-        .replay(ReplayRequest {
-            serial: serial.to_string(),
-            from_seq: 0,
-            limit: 50_000,
-        })
-        .lines
+fn snapshot_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
+    service.snapshot(serial, 0, 50_000)
 }
 
 fn spawn_event_pump(
@@ -71,8 +68,6 @@ fn bind_follow(service: &CaptureService, serial: &str) {
         serial: serial.to_string(),
         filter: LogFilter::default(),
         from_seq: 0,
-        following: true,
-        through_seq: None,
     });
 }
 
@@ -121,11 +116,11 @@ async fn real_capture_stream_batch_and_ring() {
         .await
         .expect("start 超时")
         .expect("开始采集");
-    assert!(service.is_capturing(&serial));
+    assert!(service.status(&serial).capturing);
 
     let lines = wait_pumped_lines(&pumped, 5, Duration::from_secs(30)).await;
     assert!(!lines.is_empty(), "真实 logcat 应产出日志记录");
-    let ring_lines = replay_lines(&service, &serial);
+    let ring_lines = snapshot_lines(&service, &serial);
     assert!(ring_lines.len() >= lines.len(), "环形缓冲应含全部批次记录");
     let sample = lines
         .iter()
@@ -160,9 +155,9 @@ async fn real_capture_stream_batch_and_ring() {
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
         .expect("stop 应在杀进程树后返回");
-    assert!(!service.is_capturing(&serial));
+    assert!(!service.status(&serial).capturing);
     assert!(
-        !replay_lines(&service, &serial).is_empty(),
+        !snapshot_lines(&service, &serial).is_empty(),
         "停止后缓冲保留"
     );
     drop(service);
@@ -203,7 +198,7 @@ async fn real_capture_with_clear_device() {
         .expect("stop 应在杀进程树后返回");
     service.clear(&serial);
     assert!(
-        replay_lines(&service, &serial).is_empty(),
+        snapshot_lines(&service, &serial).is_empty(),
         "clear 后缓冲为空"
     );
     drop(service);
@@ -237,9 +232,9 @@ async fn real_detach_clears_ring() {
     tokio::time::timeout(Duration::from_secs(15), service.detach_device(&serial))
         .await
         .expect("detach 应在杀进程树后返回，不能握着 logcat 管道死等");
-    assert!(!service.is_capturing(&serial));
+    assert!(!service.status(&serial).capturing);
     assert!(
-        replay_lines(&service, &serial).is_empty(),
+        snapshot_lines(&service, &serial).is_empty(),
         "切换/掉线清缓冲（防串设备）"
     );
     drop(service);
@@ -283,11 +278,21 @@ async fn real_export_filtered_ring_snapshot() {
         std::thread::current().id()
     ));
     let out = root.join("out.txt");
-    let result = service
-        .export(&serial, 0, &LogFilter::default(), Some(&out), None)
-        .expect("导出环快照");
+    let ring = service.ring_store();
+    let result = LogExporter::export(
+        ring.as_ref(),
+        &serial,
+        0,
+        &LogFilter::default(),
+        Some(&out),
+        None,
+    )
+    .expect("导出环快照");
     let content = std::fs::read_to_string(&result.path).expect("读导出文件");
-    assert_eq!(content.lines().count() as u64, result.lines);
+    assert!(
+        content.lines().count() as u64 >= result.lines,
+        "导出物理行数应覆盖记录数（多行正文会更多）"
+    );
     assert!(
         result.lines >= lines.len() as u64,
         "导出条数应覆盖已收到的批次"
@@ -301,7 +306,6 @@ async fn real_export_filtered_ring_snapshot() {
 fn assert_follow_tail(page: &LogPage) {
     let len = page.lines.len() as u64;
     assert!(len > 0, "跟尾快照应有正文");
-    assert_eq!(page.index, 0, "登记快照从命中起点装入文档");
     assert_eq!(len, page.total, "登记快照带上全部命中，滚动不再按页回环");
     assert_eq!(
         page.lines.last().map(|line| line.seq),
@@ -313,7 +317,7 @@ fn assert_follow_tail(page: &LogPage) {
 async fn wait_ring_len(service: &CaptureService, serial: &str, min: usize) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     loop {
-        let n = replay_lines(service, serial).len();
+        let n = snapshot_lines(service, serial).len();
         if n >= min {
             return;
         }
@@ -342,7 +346,7 @@ async fn real_restart_follow_page_is_tail() {
         50_000,
         tokio_util::sync::CancellationToken::new(),
     );
-    let min = LOG_PAGE_LINES as usize + 1;
+    let min = MIN_PAGE_LINES;
 
     tokio::time::timeout(Duration::from_secs(20), service.start(&serial, false))
         .await
@@ -354,14 +358,9 @@ async fn real_restart_follow_page_is_tail() {
         serial: serial.clone(),
         filter: LogFilter::default(),
         from_seq: 0,
-        following: true,
-        through_seq: None,
     });
     assert_follow_tail(&first);
-    eprintln!(
-        "[真机] 首次跟尾 index={} total={}",
-        first.index, first.total
-    );
+    eprintln!("[真机] 首次跟尾 total={}", first.total);
 
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await
@@ -376,14 +375,9 @@ async fn real_restart_follow_page_is_tail() {
         serial: serial.clone(),
         filter: LogFilter::default(),
         from_seq: 0,
-        following: true,
-        through_seq: None,
     });
     assert_follow_tail(&again);
-    eprintln!(
-        "[真机] 停止后再开始跟尾 index={} total={}",
-        again.index, again.total
-    );
+    eprintln!("[真机] 停止后再开始跟尾 total={}", again.total);
 
     tokio::time::timeout(Duration::from_secs(15), service.stop(&serial))
         .await

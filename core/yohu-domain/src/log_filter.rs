@@ -6,13 +6,23 @@
 use yohu_protocol::{LogFilter, LogLine, LogScope};
 
 /// 级别字母表（V→F）。与 testdata/log_levels.json、UI `LEVELS` 同一份；禁止再写第三份。
+///
+/// 这是 wire `LogLine.level` 合法集合的**唯一来源**（另加解析失败/未知优先级的 `'?'`）。
+/// AS 的 Assert 优先级在解析层归一为 `'F'`，不进本表：否则过滤层不认它，
+/// 会出现「core 写入一个领域层不认的级别」。
 pub const LOG_LEVEL_LETTERS: [char; 6] = ['V', 'D', 'I', 'W', 'E', 'F'];
+
+/// 单字符级别字母（大小写不敏感）是否属于 [`LOG_LEVEL_LETTERS`]。
+/// 给解析层用：避免为了查表把单个 `char` 包成 `String`。
+pub fn is_log_level_char(c: char) -> bool {
+    LOG_LEVEL_LETTERS.contains(&c.to_ascii_uppercase())
+}
 
 /// 单字符级别 token（大小写不敏感）是否属于 [`LOG_LEVEL_LETTERS`]。
 pub fn is_log_level_letter(token: &str) -> bool {
     let mut chars = token.chars();
     match (chars.next(), chars.next()) {
-        (Some(c), None) => LOG_LEVEL_LETTERS.contains(&c.to_ascii_uppercase()),
+        (Some(c), None) => is_log_level_char(c),
         _ => false,
     }
 }
@@ -204,9 +214,23 @@ mod tests {
             assert!(is_log_level_letter(
                 &letter.to_ascii_lowercase().to_string()
             ));
+            assert!(is_log_level_char(*letter));
+            assert!(is_log_level_char(letter.to_ascii_lowercase()));
         }
         assert!(!is_log_level_letter(""));
         assert!(!is_log_level_letter("VV"));
         assert!(!is_log_level_letter("?"));
+    }
+
+    /// Assert（`A`）不属于级别词汇表：解析层必须把它归一为 `F`，
+    /// 用户输入里的 `A` 也不得被当成合法级别（`normalize_log_levels` 丢弃它）。
+    #[test]
+    fn assert_letter_is_outside_the_vocabulary() {
+        assert!(!LOG_LEVEL_LETTERS.contains(&'A'));
+        assert!(!is_log_level_char('A'));
+        assert!(!is_log_level_char('a'));
+        assert_eq!(normalize_log_levels(["A"]), Vec::<char>::new());
+        assert_eq!(normalize_log_levels(["A", "F"]), vec!['F']);
+        assert_eq!(normalize_log_levels(["v", "E"]), vec!['V', 'E']);
     }
 }

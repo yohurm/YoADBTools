@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
-use yohu_protocol::{AppEvent, LogFilter, LogWindowBind, ReplayRequest};
+use yohu_protocol::{AppEvent, LogFilter, LogWindowBind};
 
 /// 定位 fake-adb：workspace member 的明文 bin 位于
 /// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
@@ -82,19 +82,13 @@ const TICK_FOREVER_SCRIPT: &str = r#"{
     "logcat_forever": true
 }"#;
 
-fn replay_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
-    service
-        .replay(ReplayRequest {
-            serial: serial.to_string(),
-            from_seq: 0,
-            limit: 10_000,
-        })
-        .lines
+fn snapshot_lines(service: &CaptureService, serial: &str) -> Vec<yohu_protocol::LogLine> {
+    service.snapshot(serial, 0, 10_000)
 }
 
 async fn wait_ring_lines(service: &Arc<CaptureService>, serial: &str, want: usize) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
-    while replay_lines(service, serial).len() < want && tokio::time::Instant::now() < deadline {
+    while snapshot_lines(service, serial).len() < want && tokio::time::Instant::now() < deadline {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
 }
@@ -125,8 +119,6 @@ async fn capture_streams_parses_and_batches() {
         serial: "R58M1234A".into(),
         filter: LogFilter::default(),
         from_seq: 0,
-        following: true,
-        through_seq: None,
     });
     service.start("R58M1234A", false).await.expect("开始采集");
 
@@ -142,7 +134,7 @@ async fn capture_streams_parses_and_batches() {
     assert_eq!(lines[2].pid, 9999);
 
     // 流自然结束后工人会重启：环保留、槽位仍 Live
-    let kept = replay_lines(&service, "R58M1234A");
+    let kept = snapshot_lines(&service, "R58M1234A");
     assert_eq!(kept.len(), 3);
     assert_eq!(service.status("R58M1234A").last_seq, 2);
 
@@ -156,13 +148,13 @@ async fn stop_keeps_ring_and_clear_empties() {
     service.start("R58M1234A", false).await.expect("开始采集");
     wait_ring_lines(&service, "R58M1234A", 1).await;
     service.stop("R58M1234A").await;
-    assert!(!service.is_capturing("R58M1234A"));
+    assert!(!service.status("R58M1234A").capturing);
 
-    let kept = replay_lines(&service, "R58M1234A");
+    let kept = snapshot_lines(&service, "R58M1234A");
     assert!(!kept.is_empty(), "停止后缓冲保留（可继续过滤重放）");
 
     service.clear("R58M1234A");
-    assert!(replay_lines(&service, "R58M1234A").is_empty());
+    assert!(snapshot_lines(&service, "R58M1234A").is_empty());
 }
 
 #[tokio::test]
@@ -170,7 +162,7 @@ async fn start_while_live_adopts_same_generation() {
     let (service, _rx) = build_service(isolated_fake_adb(TICK_FOREVER_SCRIPT));
     let first = service.start("R58M1234A", false).await.expect("首次开始");
     assert!(!first.adopted);
-    assert!(service.is_capturing("R58M1234A"));
+    assert!(service.status("R58M1234A").capturing);
 
     let second = service
         .start("R58M1234A", false)
@@ -178,7 +170,7 @@ async fn start_while_live_adopts_same_generation() {
         .expect("二次开始应 adopt");
     assert!(second.adopted);
     assert_eq!(second.generation, first.generation);
-    assert!(service.is_capturing("R58M1234A"));
+    assert!(service.status("R58M1234A").capturing);
     let status = service.status("R58M1234A");
     assert!(status.capturing);
     assert_eq!(status.generation, first.generation);
@@ -196,7 +188,7 @@ async fn concurrent_start_during_starting_shares_one_generation() {
     let second = second.expect("start b");
     assert_eq!(first.generation, second.generation);
     assert_ne!(first.adopted, second.adopted, "恰好一路新流，另一路 adopt");
-    assert!(service.is_capturing("R58M1234A"));
+    assert!(service.status("R58M1234A").capturing);
     service.stop("R58M1234A").await;
 }
 
@@ -206,7 +198,7 @@ async fn stop_during_start_releases_slot_and_allows_restart() {
     let starter = Arc::clone(&service);
     let start = tokio::spawn(async move { starter.start("R58M1234A", false).await });
     let deadline = tokio::time::Instant::now() + Duration::from_secs(4);
-    while !service.is_capturing("R58M1234A")
+    while !service.status("R58M1234A").capturing
         && !start.is_finished()
         && tokio::time::Instant::now() < deadline
     {
@@ -214,7 +206,7 @@ async fn stop_during_start_releases_slot_and_allows_restart() {
     }
     service.stop("R58M1234A").await;
     let _ = start.await.expect("start join");
-    assert!(!service.is_capturing("R58M1234A"));
+    assert!(!service.status("R58M1234A").capturing);
     let status = service.status("R58M1234A");
     assert!(!status.capturing);
     assert!(
@@ -240,7 +232,7 @@ async fn start_during_stop_waits_then_opens_new_generation() {
     let service_stop = Arc::clone(&service);
     let stop = tokio::spawn(async move { service_stop.stop("R58M1234A").await });
     let deadline = tokio::time::Instant::now() + Duration::from_secs(4);
-    while service.is_capturing("R58M1234A") && tokio::time::Instant::now() < deadline {
+    while service.status("R58M1234A").capturing && tokio::time::Instant::now() < deadline {
         tokio::time::sleep(Duration::from_millis(5)).await;
     }
     let second = service
@@ -251,7 +243,7 @@ async fn start_during_stop_waits_then_opens_new_generation() {
 
     assert!(!second.adopted);
     assert_ne!(second.generation, first.generation);
-    assert!(service.is_capturing("R58M1234A"));
+    assert!(service.status("R58M1234A").capturing);
 
     let mut saw_stop_then_run = false;
     let mut stopped = false;
@@ -288,11 +280,11 @@ async fn follow_exit_keeps_slot_live_and_start_adopts() {
     wait_ring_lines(&service, "R58M1234A", 3).await;
     tokio::time::sleep(Duration::from_millis(400)).await;
     assert!(
-        service.is_capturing("R58M1234A"),
+        service.status("R58M1234A").capturing,
         "跟流工人退出不得释放槽位"
     );
     assert_eq!(
-        replay_lines(&service, "R58M1234A").len(),
+        snapshot_lines(&service, "R58M1234A").len(),
         3,
         "同世代重启不得把 dump 再写入环"
     );
@@ -342,7 +334,7 @@ async fn device_offline_stream_ends_with_state_stopped() {
     let mut saw_stopped = false;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(12);
     while tokio::time::Instant::now() < deadline {
-        if !service.is_capturing("R58M1234A") {
+        if !service.status("R58M1234A").capturing {
             while let Ok(event) = rx.try_recv() {
                 if matches!(
                     event,
@@ -369,12 +361,12 @@ async fn device_offline_stream_ends_with_state_stopped() {
         }
     }
     assert!(
-        saw_stopped || !service.is_capturing("R58M1234A"),
+        saw_stopped || !service.status("R58M1234A").capturing,
         "掉线后应发出 Stopped 或释放槽位"
     );
 
     // 缓冲保留（掉线由 app 层决定是否清空）
-    assert!(!replay_lines(&service, "R58M1234A").is_empty());
+    assert!(!snapshot_lines(&service, "R58M1234A").is_empty());
     service.stop("R58M1234A").await;
 }
 
@@ -386,11 +378,14 @@ async fn cancel_stops_long_running_stream() {
 
     service.start("R58M1234A", false).await.expect("开始采集");
     wait_ring_lines(&service, "R58M1234A", 1).await;
-    assert!(service.is_capturing("R58M1234A"));
+    assert!(service.status("R58M1234A").capturing);
 
     service.stop("R58M1234A").await;
-    assert!(!service.is_capturing("R58M1234A"), "取消后采集应停止");
-    assert!(!replay_lines(&service, "R58M1234A").is_empty());
+    assert!(
+        !service.status("R58M1234A").capturing,
+        "取消后采集应停止"
+    );
+    assert!(!snapshot_lines(&service, "R58M1234A").is_empty());
 }
 
 #[tokio::test]
@@ -400,9 +395,9 @@ async fn detach_device_stops_and_clears() {
     wait_ring_lines(&service, "R58M1234A", 1).await;
 
     service.detach_device("R58M1234A").await;
-    assert!(!service.is_capturing("R58M1234A"));
+    assert!(!service.status("R58M1234A").capturing);
     assert!(
-        replay_lines(&service, "R58M1234A").is_empty(),
+        snapshot_lines(&service, "R58M1234A").is_empty(),
         "切换/掉线清缓冲（防串设备）"
     );
 }
@@ -423,9 +418,9 @@ async fn package_snapshot_reads_pm_list() {
     let exe = isolated_fake_adb(
         r#"{ "packages": "package:com.idle.app\npackage:com.yohu.app\npackage:com.android.systemui\n" }"#,
     );
-    let (service, _rx) = build_service(exe);
-    let names = service
-        .package_snapshot("R58M1234A")
+    let client = AdbClient::new(tool(exe), 4);
+    let names = client
+        .list_packages("R58M1234A", CancellationToken::new())
         .await
         .expect("packages");
     assert_eq!(
@@ -446,7 +441,7 @@ async fn start_clear_device_fails_when_logcat_c_unavailable() {
         .start("R58M1234A", true)
         .await
         .expect_err("logcat -c 失败必须失败返回");
-    assert!(!service.is_capturing("R58M1234A"));
+    assert!(!service.status("R58M1234A").capturing);
     match err {
         yohu_logsrv::LogError::Adb(_) | yohu_logsrv::LogError::Cancelled => {}
         other => panic!("unexpected error: {other}"),

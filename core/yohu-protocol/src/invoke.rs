@@ -15,14 +15,6 @@ pub struct AdbExecRequest {
     pub timeout_ms: Option<u64>,
 }
 
-/// `log.replay` 请求：从环按 seq 回补，不过滤（窗口过滤在 UI 消费端）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ReplayRequest {
-    pub serial: String,
-    pub from_seq: u64,
-    pub limit: u32,
-}
-
 /// `log.export` 请求：当前窗口过滤条件下的环快照，写一份 txt。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExportRequest {

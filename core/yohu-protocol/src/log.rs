@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// 一条已解析的 logd 记录（对照 AS `LogcatMessage`）。
 ///
 /// `seq` 由 core 的共享环形缓冲单调分配（设备内递增），
-/// 是 UI 回补（`log.replay`）与溢出检测（`log.overflow`）的锚点。
+/// 是溢出检测（`log.overflow`）与页投影的锚点。
 /// `msg` 可含硬 `\n`（一条记录的多行正文），不是 adb 物理行。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogLine {
@@ -17,10 +17,8 @@ pub struct LogLine {
     /// AOSP `FORMAT_LONG`+`uid` 的 UID（`%5s:` / `%5d:`）：数字或短名；未开 uid 为 None
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
-    /// 应用/进程名（对照 `LogcatHeader.applicationId`）。long 头不打印此列；采集为 None，清单 Formatter 用进程索引填 AppName
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub app: Option<String>,
-    /// 级别字母：V/D/I/W/E/F；解析失败时为 '?'
+    /// 级别字母：`V/D/I/W/E/F`（Assert 归一为 `F`）；解析失败或未知优先级为 `'?'`。
+    /// 合法集合的唯一来源是 `yohu_domain::LOG_LEVEL_LETTERS`。
     pub level: char,
     pub tag: String,
     pub msg: String,
@@ -34,7 +32,6 @@ impl Default for LogLine {
             pid: 0,
             tid: 0,
             uid: None,
-            app: None,
             level: '?',
             tag: String::new(),
             msg: String::new(),
@@ -42,46 +39,23 @@ impl Default for LogLine {
     }
 }
 
-/// `log.page` 显式取页时的默认行数。窗口文档本身按 `buffer_capacity` 驻留，不按这一页裁。
-pub const LOG_PAGE_LINES: u32 = 80;
-
-/// 窗口过滤登记。命中索引在环旁边重建，返回当前页。
+/// 窗口过滤登记。命中索引在环旁边重建，返回当前全部可见命中。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogWindowBind {
     pub id: u64,
     pub serial: String,
     pub filter: LogFilter,
     pub from_seq: u64,
-    pub following: bool,
-    /// 离开底部时的可见末序号。页不超过它，其后计入 `pending`。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub through_seq: Option<u64>,
 }
 
-/// 跟尾闩。松开后命中通知不再带正文。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogLatch {
-    pub window_id: u64,
-    pub following: bool,
-}
-
-/// `log.page`：按命中下标取一页。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogPageQuery {
-    pub window_id: u64,
-    pub index: u64,
-    pub count: u32,
-}
-
-/// 一页命中。`index` 是本页首行在命中索引中的位置。
+/// 一次窗口快照：登记/跟尾时一次装入当前全部可见命中。
+///
+/// 信号计数不在 wire 上：界面按可见行派生（`signalCountOf`），core 不再维护第二份。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogPage {
     pub window_id: u64,
     pub serial: String,
-    pub index: u64,
     pub total: u64,
-    pub signals: u32,
-    pub pending: u32,
     pub lines: Vec<LogLine>,
 }
 
@@ -92,20 +66,7 @@ pub struct LogHits {
     pub window_id: u64,
     pub total: u64,
     pub appended: u32,
-    pub signals: u32,
     pub tail: Vec<LogLine>,
-}
-
-/// 一个批量推送（ADR-v6-007：100–200ms 聚合，禁逐行）。
-///
-/// `from_seq` = 本批首行的 seq；`truncated` 表示本批之后环内仍有更新行。
-/// 清单不再靠它灌全文；导出旁路与 `log.replay` 仍用这份快照。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogBatch {
-    pub serial: String,
-    pub from_seq: u64,
-    pub lines: Vec<LogLine>,
-    pub truncated: bool,
 }
 
 /// 采集状态（wire 上必须带 `generation`，见 [`crate::AppEvent::CaptureState`]）。
@@ -125,7 +86,8 @@ pub struct CaptureStart {
 }
 
 /// `log.capture.status`：UI 对账用。`capturing` = Starting | Live（Stopping 视为未采集）。
-/// Empty 时 `generation` 为该 serial **最后一次槽位世代**（从未采过为 0），不是永远 0。
+/// `generation` 是该 serial 的槽位世代：Empty 时为最后一次世代，从未采过为 0。
+/// 世代由全局发号器分配，**只在同一 serial 内可比**（不可跨设备比较先后）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureStatus {
     pub serial: String,
@@ -143,9 +105,13 @@ pub struct ProcessEntry {
 }
 
 /// 进程索引快照。
+///
+/// `generation` **必填**（无 serde 缺省）：迟到的旧世代快照不得写进新世代，
+/// 与 [`crate::AppEvent::CaptureState`] 同一条「只升不减」规则。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessIndexSnapshot {
     pub serial: String,
+    pub generation: u64,
     pub entries: Vec<ProcessEntry>,
     /// 本次刷新失败（降级为「仅 PID 模式」）
     pub degraded: bool,
@@ -227,5 +193,50 @@ mod tests {
 
         let empty = serde_json::to_value(LogFilter::default()).unwrap();
         assert!(empty.get("levels").is_none());
+    }
+
+    /// 进程索引快照必须携带世代：缺字段反序列化失败（不得回落成「当前世代」）。
+    #[test]
+    fn process_index_snapshot_requires_generation() {
+        let missing = serde_json::from_str::<ProcessIndexSnapshot>(
+            r#"{"serial":"S","entries":[],"degraded":false}"#,
+        );
+        assert!(missing.is_err(), "缺 generation 的快照必须被拒绝");
+
+        let ok: ProcessIndexSnapshot = serde_json::from_str(
+            r#"{"serial":"S","generation":7,"entries":[{"pid":1,"name":"a"}],"degraded":false}"#,
+        )
+        .expect("带世代应可解析");
+        assert_eq!(ok.generation, 7);
+
+        let v = serde_json::to_value(&ok).expect("serialize");
+        assert_eq!(v["generation"], 7, "世代必须出现在 wire 上");
+    }
+
+    /// 信号计数不在 wire 上：core 不再维护第二份（界面从可见行派生）。
+    #[test]
+    fn log_page_and_hits_carry_no_signal_count() {
+        let page = LogPage {
+            window_id: 1,
+            serial: "S".into(),
+            total: 2,
+            lines: Vec::new(),
+        };
+        let hits = LogHits {
+            serial: "S".into(),
+            window_id: 1,
+            total: 2,
+            appended: 1,
+            tail: Vec::new(),
+        };
+        for value in [
+            serde_json::to_value(&page).unwrap(),
+            serde_json::to_value(&hits).unwrap(),
+        ] {
+            assert!(
+                value.get("signals").is_none(),
+                "signals 不得回到 wire（唯一源是界面可见行）"
+            );
+        }
     }
 }

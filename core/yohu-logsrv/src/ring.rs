@@ -4,20 +4,23 @@
 //! - 设备切换/掉线 → `clear()`（防串设备）
 //! - 导出/重放永远基于本缓冲快照（与推送通道状态无关 → 数据不丢）
 //! - 过滤不在本环：导出在 `export` 调 domain `log_filter_matches`
+//!
+//! 容量**不**由本类型持有：唯一 owner 是 [`crate::ring_store::RingStore`]，
+//! 它在 `set_capacity` 里向所有已存在环下推。本类型只保留一份只读镜像供 `push` 淘汰用，
+//! 并以 `debug_assert` 锁住「镜像 == store 容量」。
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use yohu_protocol::LogLine;
 
-/// 环内一行。Tag / App 驻留，消息正文只存一份。
+/// 环内一行。Tag 驻留，消息正文只存一份。
 struct StoredLine {
     seq: u64,
     ts: String,
     pid: u32,
     tid: u32,
     uid: Option<String>,
-    app: Option<Arc<str>>,
     level: char,
     tag: Arc<str>,
     msg: String,
@@ -26,9 +29,9 @@ struct StoredLine {
 struct State {
     buf: VecDeque<StoredLine>,
     next_seq: u64,
+    /// 只读镜像：唯一写入点是 [`RingBuffer::install_capacity`]（由 `RingStore` 调用）。
     capacity: usize,
     tags: HashMap<String, Arc<str>>,
-    apps: HashMap<String, Arc<str>>,
 }
 
 /// 写入结果。`oldest` 是淘汰后仍在环内的最小 seq。
@@ -37,10 +40,13 @@ pub(crate) struct Pushed {
     pub oldest: u64,
 }
 
-/// 环容量至少为 1。采集服务存的也是这一把。
+/// 环容量至少为 1。钳制的唯一执行点是 [`crate::ring_store::RingStore`]。
 pub(crate) fn ring_capacity(capacity: usize) -> usize {
     capacity.max(1)
 }
+
+/// `for_each_from` 的分块快照大小：每轮锁内最多克隆这么多条行。
+const FOR_EACH_CHUNK: usize = 512;
 
 impl State {
     fn evict_overflow(&mut self) {
@@ -65,7 +71,6 @@ impl State {
             pid: line.pid,
             tid: line.tid,
             uid: line.uid.clone(),
-            app: line.app.as_ref().map(|s| s.to_string()),
             level: line.level,
             tag: line.tag.to_string(),
             msg: line.msg.clone(),
@@ -89,6 +94,11 @@ pub(crate) struct ResumeSkip {
     pub identities: Vec<(u32, u32, String, String)>,
 }
 
+/// 系统行（`--------- beginning of …`）的墙钟是空串：它不是时间，不参与续流比较。
+pub(crate) fn is_system_timestamp(ts: &str) -> bool {
+    ts.is_empty()
+}
+
 /// 设备级共享环形缓冲。
 pub(crate) struct RingBuffer {
     inner: Mutex<State>,
@@ -99,40 +109,44 @@ impl RingBuffer {
         self.inner.lock().expect("ring lock poisoned")
     }
 
+    /// 只在 [`crate::ring_store::RingStore`] 内创建：容量已由 store 钳制。
     pub(crate) fn new(capacity: usize) -> Self {
-        let capacity = ring_capacity(capacity);
+        debug_assert!(capacity >= 1, "容量钳制归 RingStore：传入 {capacity}");
         Self {
             inner: Mutex::new(State {
                 buf: VecDeque::with_capacity(capacity),
                 next_seq: 0,
                 capacity,
                 tags: HashMap::new(),
-                apps: HashMap::new(),
             }),
         }
     }
 
-    /// 下次写入起生效；已超出的旧记录立即从头部淘汰。
-    pub(crate) fn set_capacity(&self, capacity: usize) {
-        let capacity = ring_capacity(capacity);
+    /// 由 [`crate::ring_store::RingStore`] 下推容量。已超出的旧记录立即从头部淘汰。
+    ///
+    /// 本方法不是公开写入口：`RingBuffer` 不自持可写容量，避免出现「store 一个值、
+    /// 每个环各一个值」的三处容量。
+    pub(crate) fn install_capacity(&self, capacity: usize) {
+        debug_assert!(capacity >= 1, "容量钳制归 RingStore：传入 {capacity}");
         let mut state = self.lock_state();
         state.capacity = capacity;
         state.evict_overflow();
     }
 
-    /// 写入一条 logd 记录（分配 seq）。所有权留在环内，Tag / App 驻留。
+    /// 写入一条 logd 记录（分配 seq）。所有权留在环内，Tag 驻留。
+    ///
+    /// **序号唯一源是本环**：传入行里的 `seq` 只是占位（[`crate::record::UNASSIGNED_SEQ`]），
+    /// 一律被这里分配的序号覆盖。任何入环前自带的序号都不生效。
     pub(crate) fn push(&self, line: LogLine) -> Pushed {
         let mut state = self.lock_state();
         let seq = state.next_seq;
         let tag = State::intern(&mut state.tags, line.tag);
-        let app = line.app.map(|value| State::intern(&mut state.apps, value));
         state.buf.push_back(StoredLine {
             seq,
             ts: line.ts,
             pid: line.pid,
             tid: line.tid,
             uid: line.uid,
-            app,
             level: line.level,
             tag,
             msg: line.msg,
@@ -167,12 +181,52 @@ impl RingBuffer {
         out
     }
 
-    /// 从 `from_seq` 起遍历，供窗口登记重建索引。回调里的行是临时线拷贝。
-    pub(crate) fn for_each_from(&self, from_seq: u64, mut visit: impl FnMut(&LogLine)) {
-        let state = self.lock_state();
-        for line in state.buf.iter().filter(|line| from_seq <= line.seq) {
-            let wire = State::to_wire(line);
-            visit(&wire);
+    /// 从 `from_seq` 起遍历到 `through`（含），供窗口登记重建索引与导出。
+    ///
+    /// 分块快照：每轮锁内只克隆 ≤ [`FOR_EACH_CHUNK`] 条 `LogLine`，解锁后再交给 `visit`，
+    /// 再取下一块。这样长时间扫描不会整段持锁，`push` 不必等整段扫完。
+    /// 环内序号连续，故用 `cursor = 末条.seq + 1` 推进；块为空或不足一块即结束。
+    ///
+    /// `through` 是**内部**快照上界（导出先取一次 [`RingBuffer::last_seq`]，窗口登记取
+    /// [`RingBuffer::next_seq`] 的前一位），不是 wire 字段：扫到 `through` 即止，
+    /// 导出内容因此不随扫描期间的写入速率变化。
+    pub(crate) fn for_each_from(&self, from_seq: u64, through: u64, mut visit: impl FnMut(&LogLine)) {
+        let mut cursor = from_seq;
+        loop {
+            let chunk: Vec<LogLine> = {
+                let state = self.lock_state();
+                let Some(front) = state.buf.front().map(|line| line.seq) else {
+                    break;
+                };
+                // 快照上界早于最旧存活行：本快照的行已被全部淘汰，不得再往新行上溢出。
+                if through < front {
+                    break;
+                }
+                // VecDeque 内序号连续：直接按 `seq - front.seq` 取下标窗口，O(chunk) 而非重扫前缀。
+                let start = cursor.saturating_sub(front) as usize;
+                // 快照上界：越过 `through` 的行不属于本次快照。
+                let window = through.saturating_sub(front).saturating_add(1) as usize;
+                let end = start
+                    .saturating_add(FOR_EACH_CHUNK)
+                    .min(window)
+                    .min(state.buf.len());
+                if start >= end {
+                    break;
+                }
+                state.buf.range(start..end).map(State::to_wire).collect()
+            };
+            let Some(last) = chunk.last() else {
+                break;
+            };
+            let next = last.seq.saturating_add(1);
+            let full = chunk.len() == FOR_EACH_CHUNK;
+            for line in &chunk {
+                visit(line);
+            }
+            if !full {
+                break;
+            }
+            cursor = next;
         }
     }
 
@@ -194,18 +248,6 @@ impl RingBuffer {
         state.lines_from(from_seq, limit)
     }
 
-    /// 从 `from_seq` 取至多 `limit` 条记录；`truncated` 表示环内还有更大 seq。
-    pub(crate) fn snapshot_page(&self, from_seq: u64, limit: usize) -> (Vec<LogLine>, bool) {
-        let state = self.lock_state();
-        let lines = state.lines_from(from_seq, limit);
-        let ring_last = state.buf.back().map(|l| l.seq);
-        let truncated = match (lines.last(), ring_last) {
-            (Some(last), Some(newest)) => last.seq < newest,
-            _ => false,
-        };
-        (lines, truncated)
-    }
-
     /// 清空缓冲（用户清空 / 设备切换 / 掉线）。
     pub(crate) fn clear(&self) {
         let mut state = self.lock_state();
@@ -223,16 +265,29 @@ impl RingBuffer {
         self.len() == 0
     }
 
-    /// 当前已分配的最大 seq（UI 判断滞后量的参考）。
+    /// 当前已分配的最大 seq（UI 判断滞后量的参考）。空环为 0（`next_seq` 的饱和下界）。
     pub(crate) fn last_seq(&self) -> u64 {
         let state = self.lock_state();
         state.next_seq.saturating_sub(1)
     }
 
-    /// 工人重启用：末条墙钟 + 同一时刻已入环身份，避免 `-T` 含时刻重入。
+    /// 下一个将被分配的 seq（= 已分配条数）。窗口登记用它做「已覆盖到哪」的水位：
+    /// 空环为 0，与「首个分配出去的 seq 是 0」严格区分开（`last_seq` 无法区分这两者）。
+    pub(crate) fn next_seq(&self) -> u64 {
+        self.lock_state().next_seq
+    }
+
+    /// 工人重启用：最近一条**非空墙钟**的墙钟 + 同一时刻已入环身份，避免 `-T` 含时刻重入。
+    ///
+    /// 末条可能是系统行（`ts=""`），不能拿它当续流锚点：`-T ""` 会被 logcat 解析成
+    /// 非法值并回落 `tail_lines=1`（掉行）。这里只认最近一条非空 `ts` 的记录。
     pub(crate) fn resume_skip(&self) -> Option<ResumeSkip> {
         let state = self.lock_state();
-        let last = state.buf.back()?;
+        let last = state
+            .buf
+            .iter()
+            .rev()
+            .find(|l| !is_system_timestamp(&l.ts))?;
         let ts = last.ts.clone();
         let identities = state
             .buf
@@ -243,7 +298,8 @@ impl RingBuffer {
         Some(ResumeSkip { ts, identities })
     }
 
-    #[cfg(test)]
+    /// 只读镜像：唯一 owner 是 [`crate::ring_store::RingStore::capacity`]。
+    /// 供 `RingStore::set_capacity` 的 `debug_assert` 与测试读取。
     pub(crate) fn capacity(&self) -> usize {
         self.lock_state().capacity
     }
@@ -274,6 +330,18 @@ mod tests {
         assert_eq!(ring.last_seq(), 1);
     }
 
+    /// 序号唯一源是环：入环前自带的 `seq` 一律被覆盖（占位值不参与分配）。
+    #[test]
+    fn ring_overrides_any_preassigned_seq() {
+        let ring = RingBuffer::new(10);
+        // 传入 seq=999，环仍从 0 开始分配
+        let pushed = ring.push(line(999));
+        assert_eq!(pushed.seq, 0);
+        let stored = ring.lines_by_seq(&[0]);
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].seq, 0, "环内序号由环分配，不继承入参");
+    }
+
     #[test]
     fn evicts_oldest_beyond_capacity() {
         let ring = RingBuffer::new(3);
@@ -287,17 +355,94 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_from_seq_and_page() {
+    fn snapshot_from_seq() {
         let ring = RingBuffer::new(10);
         for _ in 0..5 {
             ring.push(line(0));
         }
         let from_two = ring.snapshot(2, 10);
         assert_eq!(from_two.len(), 3);
+        assert_eq!(from_two[0].seq, 2);
+    }
 
-        let (page, truncated) = ring.snapshot_page(0, 2);
-        assert_eq!(page.len(), 2);
-        assert!(truncated);
+    /// 分块遍历跨多个块仍返回全部行且顺序正确（覆盖 >512 条，强制多轮快照）。
+    #[test]
+    fn for_each_from_chunks_whole_ring_in_order() {
+        const N: u64 = 5_000;
+        assert!(N as usize > FOR_EACH_CHUNK, "必须跨块");
+        let ring = RingBuffer::new(N as usize);
+        for i in 0..N {
+            ring.push(line(i));
+        }
+        let mut seqs = Vec::with_capacity(N as usize);
+        ring.for_each_from(0, ring.last_seq(), |line| seqs.push(line.seq));
+        assert_eq!(seqs.len(), N as usize, "分块遍历不得漏行");
+        assert!(
+            seqs.windows(2).all(|w| w[1] == w[0] + 1),
+            "分块遍历顺序必须连续递增"
+        );
+        assert_eq!(seqs.first().copied(), Some(0));
+        assert_eq!(seqs.last().copied(), Some(N - 1));
+
+        let mut tail = Vec::new();
+        ring.for_each_from(N - 3, ring.last_seq(), |line| tail.push(line.seq));
+        assert_eq!(tail, vec![N - 3, N - 2, N - 1], "from_seq 必须生效");
+    }
+
+    /// `through` 是快照上界：扫描期间新入环的行不得进入本次遍历（导出边界固定）。
+    #[test]
+    fn for_each_from_stops_at_through_snapshot_bound() {
+        let ring = RingBuffer::new(100);
+        for i in 0..10 {
+            ring.push(line(i));
+        }
+        let through = ring.last_seq();
+        assert_eq!(through, 9);
+
+        let mut seen = Vec::new();
+        ring.for_each_from(0, through, |row| {
+            seen.push(row.seq);
+            // 扫描过程中继续写入：超出 `through` 的行不得被本次遍历看到
+            if row.seq == 2 {
+                for i in 10..40 {
+                    ring.push(line(i));
+                }
+            }
+        });
+        assert_eq!(seen, (0..=9).collect::<Vec<u64>>(), "上界之后的行不得进入快照");
+
+        // 新的一次遍历（重新取 through）能看到全部
+        let mut all = Vec::new();
+        ring.for_each_from(0, ring.last_seq(), |line| all.push(line.seq));
+        assert_eq!(all.len(), 40);
+        assert_eq!(all.last().copied(), Some(39));
+    }
+
+    /// 快照的行在扫描期间被**全部淘汰**：遍历必须停下，不得把新行溢出进本次快照。
+    #[test]
+    fn for_each_from_stops_when_snapshot_rows_are_evicted() {
+        // 容量 4：写 4 行后取 through，扫描期间再写 8 行把旧行全部挤出
+        let ring = RingBuffer::new(4);
+        for i in 0..4 {
+            ring.push(line(i));
+        }
+        let through = ring.last_seq();
+        assert_eq!(through, 3);
+
+        let mut seen = Vec::new();
+        ring.for_each_from(0, through, |row| {
+            seen.push(row.seq);
+            if row.seq == 0 {
+                for i in 4..12 {
+                    ring.push(line(i));
+                }
+            }
+        });
+        assert!(
+            seen.iter().all(|seq| *seq <= through),
+            "不得越过快照上界（实测 {seen:?}）"
+        );
+        assert!(!seen.is_empty(), "首块仍应可读到");
     }
 
     #[test]
@@ -311,19 +456,20 @@ mod tests {
 
     #[test]
     fn capacity_below_one_is_one() {
-        assert_eq!(RingBuffer::new(0).capacity(), 1);
-        let ring = RingBuffer::new(4);
-        ring.set_capacity(0);
+        assert_eq!(ring_capacity(0), 1);
+        assert_eq!(ring_capacity(4), 4);
+        // RingStore 钳制后下推：环只接收已钳制的值
+        let ring = RingBuffer::new(ring_capacity(0));
         assert_eq!(ring.capacity(), 1);
     }
 
     #[test]
-    fn set_capacity_trims_oldest() {
+    fn install_capacity_trims_oldest() {
         let ring = RingBuffer::new(5);
         for _ in 0..5 {
             ring.push(line(0));
         }
-        ring.set_capacity(2);
+        ring.install_capacity(2);
         assert_eq!(ring.capacity(), 2);
         assert_eq!(ring.len(), 2);
         let snap = ring.snapshot(0, 10);
@@ -358,6 +504,37 @@ mod tests {
     }
 
     #[test]
+    fn resume_skip_ignores_trailing_system_line() {
+        let ring = RingBuffer::new(10);
+        ring.push(LogLine {
+            ts: "2026-01-01 00:00:01.000".into(),
+            pid: 2,
+            tid: 2,
+            tag: "B".into(),
+            msg: "new".into(),
+            ..LogLine::default()
+        });
+        // 末条系统行 ts 为空：不得当续流锚点
+        ring.push(LogLine {
+            msg: "--------- beginning of main".into(),
+            ..LogLine::default()
+        });
+        let skip = ring.resume_skip().expect("应取最近非空 ts");
+        assert_eq!(skip.ts, "2026-01-01 00:00:01.000");
+        assert_eq!(skip.identities, vec![(2, 2, "B".into(), "new".into())]);
+    }
+
+    #[test]
+    fn resume_skip_none_when_only_system_lines() {
+        let ring = RingBuffer::new(10);
+        ring.push(LogLine {
+            msg: "--------- beginning of main".into(),
+            ..LogLine::default()
+        });
+        assert!(ring.resume_skip().is_none());
+    }
+
+    #[test]
     fn repeated_tag_is_one_arc() {
         let ring = RingBuffer::new(10);
         let a = ring
@@ -375,18 +552,5 @@ mod tests {
             })
             .seq;
         assert!(ring.tag_ptr_eq(a, b));
-    }
-
-    #[test]
-    fn capture_lock_sentence_once() {
-        let owner_line = "self.inner.lock().expect(\"capture lock poisoned\")";
-        let needle = "capture lock poisoned";
-        let src = include_str!("capture.rs");
-        let scanned = match src.split_once("mod tests") {
-            Some((body, tests)) => format!("{body}{}", tests.replace(needle, "")),
-            None => src.to_string(),
-        };
-        let scanned = scanned.replacen(owner_line, "", 1);
-        assert!(!scanned.contains(needle), "{needle}");
     }
 }

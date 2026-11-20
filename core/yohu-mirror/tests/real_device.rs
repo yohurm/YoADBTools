@@ -441,8 +441,8 @@ async fn real_mirror_missing_server_errors() {
             .failed
             .as_deref()
             .unwrap_or("")
-            .contains("scrcpy-server"),
-        "错误应提到 scrcpy-server: {:?}",
+            .contains("投屏组件"),
+        "错误应是 MirrorError::ServerMissing 的公开句（缺少投屏组件）: {:?}",
         stream.failed
     );
     eprintln!("[真机] 缺 server 失败文案: {:?}", stream.failed);
