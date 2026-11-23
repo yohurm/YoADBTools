@@ -42,12 +42,46 @@ impl Default for LogLine {
 /// 从设备环按 seq 取原始行的请求（UI 游标实时拉取，对齐 LogCat 消息环模型）。
 ///
 /// `from_seq` 是 UI 已消费到 seq 的下一条（含）；`limit` 单次最多返回条数。
-/// 返回原始 `LogLine`（未过滤），过滤在 UI 消费端（ADR-v6-006）。
+/// 返回原始 `LogLine`（未过滤），导出/诊断用。实时文档走 [`LogQueryRequest`]。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogRangeRequest {
     pub serial: String,
     pub from_seq: u64,
     pub limit: u32,
+}
+
+/// 视口分页方向（ADR-v6-050）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogQueryDirection {
+    /// 从 `from_seq` 向 `to_seq` 取最早 `limit` 条命中。
+    Forward,
+    /// 从 `from_seq` 向 `to_seq` 取最晚 `limit` 条命中（结果仍按 seq 升序返回）。
+    Backward,
+}
+
+/// core 侧过滤分页请求（ADR-v6-050）：UI 只持视口，过滤与分页在 core 执行。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogQueryRequest {
+    pub serial: String,
+    pub filter: LogFilter,
+    /// 游标下界（含）。
+    pub from_seq: u64,
+    /// 快照上界（含）；调用方通常传当前 `ring_last_seq`。
+    pub to_seq: u64,
+    pub limit: u32,
+    pub direction: LogQueryDirection,
+}
+
+/// 过滤分页结果。`lines` 始终按 seq 升序（便于 UI 窗口拼接）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogQueryPage {
+    pub serial: String,
+    pub lines: Vec<LogLine>,
+    /// 该方向是否还有更多命中。
+    pub has_more: bool,
+    pub ring_first_seq: u64,
+    pub ring_last_seq: u64,
 }
 
 /// 设备环前进的**水位信号**（不含正文）。UI 据此从设备环按 seq 拉取原始行

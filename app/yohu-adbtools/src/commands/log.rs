@@ -22,8 +22,8 @@ use tauri::State;
 use crate::commands::{ipc_adb, ipc_log, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
-    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogRangeRequest,
-    ProcessEntry,
+    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, IpcErrorCode, LogQueryPage,
+    LogQueryRequest, LogRangeRequest, ProcessEntry,
 };
 
 #[tauri::command(rename = "log.capture.start")]
@@ -88,6 +88,21 @@ pub async fn log_range(
     .await
     .unwrap_or_default();
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// core 侧过滤分页（ADR-v6-050）：UI 只持视口，过滤/分页在 core。纯内存读，离线可用。
+#[tauri::command(rename = "log.query")]
+pub async fn log_query(
+    state: State<'_, AppState>,
+    req: LogQueryRequest,
+) -> Result<LogQueryPage, IpcError> {
+    let capture = std::sync::Arc::clone(&state.capture);
+    tauri::async_runtime::spawn_blocking(move || capture.query(req))
+        .await
+        .map_err(|e| IpcError {
+            code: IpcErrorCode::Internal,
+            message: format!("log.query 任务失败: {e}"),
+        })
 }
 
 /// 导出环快照。`ExportResult.lines` 是过滤后实际写出的条数，原样回给调用方提示。

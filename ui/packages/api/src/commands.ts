@@ -25,7 +25,8 @@ import type {
   ExportResult,
   GroupRunRequest,
   ImportPreviewDto,
-  LogLine,
+  LogQueryPage,
+  LogQueryRequest,
   LogRangeRequest,
   PathOpRequest,
   ProcessEntry,
@@ -138,6 +139,9 @@ export const logClearDevice = (serial: string) =>
   invoke<void>("log.clearDevice", { serial });
 
 export const logRange = (req: LogRangeRequest) => invoke<ArrayBuffer>("log.range", { req });
+
+/** core 侧过滤分页（ADR-v6-050）。 */
+export const logQuery = (req: LogQueryRequest) => invoke<LogQueryPage>("log.query", { req });
 
 
 export const logExport = (req: ExportRequest) => invoke<ExportResult>("log.export", { req });

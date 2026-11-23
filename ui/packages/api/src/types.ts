@@ -60,6 +60,28 @@ export interface LogAppended {
   last_seq: number;
 }
 
+/** core 侧过滤分页方向（ADR-v6-050）。 */
+export type LogQueryDirection = "forward" | "backward";
+
+/** core 侧过滤分页请求：UI 只持视口，过滤/分页在 core 执行。 */
+export interface LogQueryRequest {
+  serial: string;
+  filter: LogFilter;
+  from_seq: number;
+  to_seq: number;
+  limit: number;
+  direction: LogQueryDirection;
+}
+
+/** 过滤分页结果，`lines` 始终按 seq 升序。 */
+export interface LogQueryPage {
+  serial: string;
+  lines: LogLine[];
+  has_more: boolean;
+  ring_first_seq: number;
+  ring_last_seq: number;
+}
+
 export type CaptureState = "running" | "stopped";
 
 export interface CaptureStart {

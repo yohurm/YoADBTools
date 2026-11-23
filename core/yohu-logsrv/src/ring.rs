@@ -12,7 +12,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use yohu_protocol::LogLine;
+use yohu_protocol::{LogFilter, LogLine};
 
 /// 环内一行。Tag 驻留，消息/时间戳用 `Arc<str>`：快照克隆只做原子自增，正文不复制。
 #[derive(Clone)]
@@ -356,6 +356,130 @@ impl RingBuffer {
         State::encode_rows(&self.snapshot_stored(from_seq, limit))
     }
 
+    /// 环边界：`(first_seq, last_seq)`；空环为 `(0, 0)`。
+    pub(crate) fn bounds(&self) -> (u64, u64) {
+        let state = self.lock_state();
+        let first = state.buf.front().map(|l| l.seq).unwrap_or(0);
+        (first, state.next_seq.saturating_sub(1))
+    }
+
+    /// core 侧过滤分页（ADR-v6-050）：在环上按 `log_filter_matches` 过滤，
+    /// `forward` 取最早 `limit` 条命中，`backward` 取最晚 `limit` 条命中（结果升序）。
+    /// 返回 `(lines, has_more)`。
+    pub(crate) fn query_filtered(
+        &self,
+        filter: &LogFilter,
+        from_seq: u64,
+        to_seq: u64,
+        limit: usize,
+        backward: bool,
+    ) -> (Vec<LogLine>, bool) {
+        if limit == 0 {
+            return (Vec::new(), false);
+        }
+        let (_, last) = self.bounds();
+        if backward {
+            // backward：from_seq 是上界，to_seq 是下界。
+            self.query_backward(filter, from_seq.min(last), to_seq, limit)
+        } else {
+            self.query_forward(filter, from_seq, to_seq.min(last), limit)
+        }
+    }
+
+    fn query_forward(
+        &self,
+        filter: &LogFilter,
+        from_seq: u64,
+        hi: u64,
+        limit: usize,
+    ) -> (Vec<LogLine>, bool) {
+        let mut out: Vec<LogLine> = Vec::with_capacity(limit);
+        let mut cursor = from_seq;
+        let mut has_more = false;
+        'outer: loop {
+            let chunk = self.snapshot_stored(cursor, SNAPSHOT_CHUNK);
+            if chunk.is_empty() {
+                break;
+            }
+            for line in &chunk {
+                if line.seq > hi {
+                    break 'outer;
+                }
+                let wire = State::to_wire(line);
+                if yohu_domain::log_filter_matches(filter, &wire) {
+                    if out.len() == limit {
+                        has_more = true;
+                        break 'outer;
+                    }
+                    out.push(wire);
+                }
+            }
+            if chunk.len() < SNAPSHOT_CHUNK {
+                break;
+            }
+            let next = chunk.last().map(|l| l.seq.saturating_add(1)).unwrap_or(cursor);
+            if next <= cursor || next > hi {
+                break;
+            }
+            cursor = next;
+        }
+        (out, has_more)
+    }
+
+    fn query_backward(
+        &self,
+        filter: &LogFilter,
+        start: u64,
+        lo: u64,
+        limit: usize,
+    ) -> (Vec<LogLine>, bool) {
+        let mut out: Vec<LogLine> = Vec::with_capacity(limit);
+        let mut has_more = false;
+        let mut end_excl = start.saturating_add(1);
+        'outer: loop {
+            if end_excl == 0 {
+                break;
+            }
+            let (chunk_begin, chunk): (u64, Vec<StoredLine>) = {
+                let state = self.lock_state();
+                let Some(front) = state.buf.front().map(|l| l.seq) else {
+                    break;
+                };
+                if end_excl <= front {
+                    break;
+                }
+                let end_idx = (end_excl - front) as usize;
+                let begin_idx = end_idx.saturating_sub(SNAPSHOT_CHUNK);
+                (
+                    front + begin_idx as u64,
+                    state.buf.range(begin_idx..end_idx).cloned().collect(),
+                )
+            };
+            if chunk.is_empty() {
+                break;
+            }
+            for line in chunk.iter().rev() {
+                if line.seq < lo {
+                    break 'outer;
+                }
+                let wire = State::to_wire(line);
+                if yohu_domain::log_filter_matches(filter, &wire) {
+                    if out.len() == limit {
+                        has_more = true;
+                        break 'outer;
+                    }
+                    out.push(wire);
+                }
+            }
+            if chunk.len() < SNAPSHOT_CHUNK {
+                break;
+            }
+            end_excl = chunk_begin;
+        }
+        out.reverse();
+        (out, has_more)
+    }
+
     /// 清空缓冲（用户清空 / 设备切换 / 掉线）。
     pub(crate) fn clear(&self) {
         let mut state = self.lock_state();
@@ -442,6 +566,36 @@ mod tests {
         let stored = ring.snapshot(0, 10);
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].seq, 0, "环内序号由环分配，不继承入参");
+    }
+
+    #[test]
+    fn query_filtered_forward_backward() {
+        let ring = RingBuffer::new(100);
+        for i in 0..10u32 {
+            ring.push(LogLine {
+                seq: 0,
+                ts: format!("ts{i}"),
+                pid: i,
+                tid: 1,
+                uid: None,
+                level: if i % 2 == 1 { 'E' } else { 'I' },
+                tag: "T".into(),
+                msg: format!("m{i}"),
+            });
+        }
+        let filter = LogFilter {
+            levels: vec!['E'],
+            ..Default::default()
+        };
+        let (fwd, more) = ring.query_filtered(&filter, 0, 9, 2, false);
+        assert_eq!(fwd.iter().map(|l| l.seq).collect::<Vec<_>>(), vec![1, 3]);
+        assert!(more, "forward 还有更多命中");
+        let (fwd2, _) = ring.query_filtered(&filter, 4, 9, 2, false);
+        assert_eq!(fwd2.iter().map(|l| l.seq).collect::<Vec<_>>(), vec![5, 7]);
+        let (bwd, more_b) = ring.query_filtered(&filter, 9, 0, 2, true);
+        assert_eq!(bwd.iter().map(|l| l.seq).collect::<Vec<_>>(), vec![7, 9]);
+        assert!(more_b, "backward 还有更多命中");
+        assert_eq!(ring.bounds(), (0, 9));
     }
 
     #[test]

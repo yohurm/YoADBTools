@@ -13,7 +13,10 @@ use crate::index::ProcessIndexService;
 use crate::ring_store::RingStore;
 use crate::slots::CaptureSlots;
 use yohu_adb::AdbClient;
-use yohu_protocol::{CaptureStart, CaptureStatus, LogLine, ProcessEntry};
+use yohu_protocol::{
+    CaptureStart, CaptureStatus, LogLine, LogQueryDirection, LogQueryPage, LogQueryRequest,
+    ProcessEntry,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogError {
@@ -136,6 +139,26 @@ impl CaptureService {
     /// 列式二进制环快照（P0-3：UI `log.range` 走此路径，跳过 JSON 逐行对象）。
     pub fn range_bytes(&self, serial: &str, from_seq: u64, limit: usize) -> Vec<u8> {
         self.rings.range_bytes(serial, from_seq, limit)
+    }
+
+    /// core 侧过滤分页（ADR-v6-050）：UI 只持视口，过滤与分页在 core 执行。
+    pub fn query(&self, req: LogQueryRequest) -> LogQueryPage {
+        let (first, last) = self.rings.bounds(&req.serial);
+        let (lines, has_more) = self.rings.query(
+            &req.serial,
+            &req.filter,
+            req.from_seq,
+            req.to_seq.min(last),
+            req.limit as usize,
+            req.direction == LogQueryDirection::Backward,
+        );
+        LogQueryPage {
+            serial: req.serial,
+            lines,
+            has_more,
+            ring_first_seq: first,
+            ring_last_seq: last,
+        }
     }
 }
 

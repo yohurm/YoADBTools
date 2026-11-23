@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use yohu_protocol::LogLine;
+use yohu_protocol::{LogFilter, LogLine};
 
 use crate::ring::{ring_capacity, RingBuffer};
 
@@ -101,6 +101,29 @@ impl RingStore {
                 out.extend_from_slice(&0u32.to_le_bytes());
                 out
             }
+        }
+    }
+
+    /// 环边界 `(first_seq, last_seq)`；未登记返回 `(0,0)`。
+    pub(crate) fn bounds(&self, serial: &str) -> (u64, u64) {
+        self.try_ring(serial)
+            .map(|ring| ring.bounds())
+            .unwrap_or((0, 0))
+    }
+
+    /// core 侧过滤分页（ADR-v6-050）。
+    pub(crate) fn query(
+        &self,
+        serial: &str,
+        filter: &LogFilter,
+        from_seq: u64,
+        to_seq: u64,
+        limit: usize,
+        backward: bool,
+    ) -> (Vec<LogLine>, bool) {
+        match self.try_ring(serial) {
+            Some(ring) => ring.query_filtered(filter, from_seq, to_seq, limit, backward),
+            None => (Vec::new(), false),
         }
     }
 }
