@@ -109,10 +109,11 @@ describe("采集停止只记一次", () => {
   });
 });
 
-describe("当前页只向设备环要一次", () => {
+describe("视口只走 core 过滤分页", () => {
   it("load_page_once", () => {
     const body = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "viewport-page.ts"), "utf8");
-    expect(body.split("logRange(").length - 1).toBeGreaterThanOrEqual(1);
+    expect(body.split("logQuery(").length - 1).toBeGreaterThanOrEqual(1);
+    expect(body).not.toContain("logRange(");
     expect(body).not.toContain("logWindowBind(");
   });
 });

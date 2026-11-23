@@ -113,6 +113,7 @@ export function EditorView(props: {
   paused: Accessor<boolean>;
   docShift: Accessor<number>;
   onAtBottomChange: (atBottom: boolean) => void;
+  onAtTopChange?: (atTop: boolean) => void;
   onRowContextMenu: (row: { line: LogLine }, event: MouseEvent) => void;
   /** attach / detach 成对：onCleanup 回传 null，父级据此拒绝复制。 */
   documentRef?: (doc: LogDocument | null) => void;
@@ -187,6 +188,7 @@ export function EditorView(props: {
           }}
           docShift={props.docShift}
           onAtBottomChange={props.onAtBottomChange}
+          onAtTopChange={props.onAtTopChange}
           ariaLabel="日志列表"
           onOffset={(_, inline) => props.onInlineScroll?.(inline)}
           onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}

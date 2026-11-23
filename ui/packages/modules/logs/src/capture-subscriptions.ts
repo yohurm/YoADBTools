@@ -8,15 +8,12 @@
 import type { SetStoreFunction } from "solid-js/store";
 import {
   captureStateIsRunning,
-  decodeLogRange,
-  logRange,
   onCaptureState,
   onDeviceOffline,
   onLogAppended,
   onProcessIndex,
   onSettingsChanged,
   SETTING_KEYS,
-  type LogLine,
   type ProcessEntry,
 } from "@yohu/api";
 
@@ -48,66 +45,13 @@ export function createCaptureSubscriptions(
   setState: SetStoreFunction<LogUiState>,
   deps: CaptureSubscriptionsDeps,
 ): CaptureSubscriptionsApi {
-  const { workspace, orchestrator } = deps;
+  const { workspace, viewport, orchestrator } = deps;
   const pending: Promise<() => void>[] = [];
 
-  // 每设备一条拉取泵：一个设备一次只发一趟 log.range，拉到的同一批原始行分发给该设备
-  // 所有在采窗口（各自过滤）。这样窗口数 N 不再放大 IPC/环克隆成本（ADR-v6-049 修订）。
-  const DEV_PULL_BATCH = 5000;
-  type DevPull = { busy: boolean; target: number };
-  const devPulls = new Map<string, DevPull>();
-  const sessionCursor = (s: { lastSeenSeq: number; fromSeq: number }): number =>
-    s.lastSeenSeq >= s.fromSeq ? s.lastSeenSeq + 1 : Math.max(0, s.fromSeq);
   const liveWindowSessions = (serial: string) =>
     state.sessions.filter(
       (s) => s.serial === serial && sessionCaptureIsLive(s) && !s.paused && s.fromSeq >= 0,
     );
-  async function pumpDevice(serial: string, st: DevPull): Promise<void> {
-    const collected: LogLine[] = [];
-    try {
-      for (let round = 0; round < 200; round += 1) {
-        const sessions = liveWindowSessions(serial);
-        if (sessions.length === 0) break;
-        const target = st.target;
-        const min = Math.min(...sessions.map(sessionCursor));
-        if (min > target) break;
-        let batch: LogLine[];
-        try {
-          const raw = logRange({ serial, from_seq: min, limit: DEV_PULL_BATCH }) as
-            | ArrayBuffer
-            | LogLine[]
-            | Promise<ArrayBuffer | LogLine[]>;
-          const got = Array.isArray(raw) ? raw : await raw;
-          batch = Array.isArray(got) ? got : decodeLogRange(got);
-        } catch (e) {
-          console.error("log.range 拉取失败", e);
-          break;
-        }
-        if (batch.length === 0) break;
-        for (const line of batch) collected.push(line);
-        const last = batch[batch.length - 1]!.seq;
-        if (last < min) break;
-        if (batch.length < DEV_PULL_BATCH && st.target <= target) break;
-      }
-      // 一批拉取只做一次文档提交（避免每个 5k 分块一次 setState/整数组复制）。
-      if (collected.length > 0) {
-        for (const s of liveWindowSessions(serial)) workspace.appendRingLines(s.id, collected);
-      }
-    } finally {
-      st.busy = false;
-    }
-  }
-  function scheduleDevice(serial: string, target: number): void {
-    let st = devPulls.get(serial);
-    if (!st) {
-      st = { busy: false, target: 0 };
-      devPulls.set(serial, st);
-    }
-    st.target = Math.max(st.target, target);
-    if (st.busy) return; // 单飞：在途泵会读到更高 target 继续追
-    st.busy = true;
-    void pumpDevice(serial, st);
-  }
 
   function onIndex(snapshot: {
     serial: string;
@@ -148,8 +92,10 @@ export function createCaptureSubscriptions(
   );
   watch(
     onLogAppended((e) => {
-      // 设备环前进到 last_seq：该设备只发一趟拉取，结果分发给所有在采窗口（过滤在 UI）。
-      scheduleDevice(e.serial, e.last_seq);
+      // 水位前进：该设备每个在采窗口各自向 core 追一页（core 侧过滤，UI 只持视口）。
+      for (const session of liveWindowSessions(e.serial)) {
+        void viewport.catchUp(session.id);
+      }
     }),
   );
   watch(onProcessIndex((e) => onIndex(e)));

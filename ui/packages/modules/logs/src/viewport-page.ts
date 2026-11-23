@@ -1,104 +1,114 @@
 /**
- * 环形缓冲拉取（LogCat 对齐，ADR-v6-049）：窗口文档一律从设备环按 seq 游标拉取，
- * 过滤在 UI 消费端。`loadPage`（重绑：换过滤/初始/恢复）重置游标后把环里已有行拉齐；
- * `pullThrough` 增量拉到给定水位。推送只是信号，丢信号由下一次水位或兜底 tick 补齐。
+ * 视口分页（ADR-v6-050）：UI 只持视口窗口，过滤与分页由 core `log.query` 执行。
+ *
+ * - `loadPage`：换过滤 / 首次开始 / 恢复 → 从环尾 `backward` 取一窗命中作为新窗口。
+ * - `catchUp`：实时水位 → `forward` 取窗口游标之后的命中；积压超过一窗则回退为取环尾一窗。
+ * - `loadOlder` / `loadNewer`：滚动分页（向前/向后）。
  */
 
-import type { LogLine } from "@yohu/api";
-import { decodeLogRange, logRange } from "@yohu/api";
+import { logQuery, type LogFilter, type LogQueryPage, type LogQueryRequest } from "@yohu/api";
 
+import { sessionWire, toSessionFilter } from "./filter";
 import type { LogUiState } from "./log-model";
 import { sessionCaptureIsLive } from "./session-chrome";
 import { sessionById } from "./session-lifecycle";
+import { docCap } from "./viewport";
 
-const PULL_BATCH = 5000;
+const PAGE = 500;
 
 export type ViewportPageApi = {
-  /** 重绑（换过滤 / 首次开始）：重置游标并拉齐环里已有的行（可越过暂停）。 */
   loadPage: (id: number) => Promise<void>;
-  /** 增量追赶：从当前游标拉到给定水位（不重置、不越过暂停）。 */
-  pullThrough: (id: number, throughSeq: number) => Promise<void>;
-  /** 追尾：把该窗口从游标拉到环尾（恢复跟滚 / 回前台）。 */
   catchUp: (id: number) => Promise<void>;
+  loadOlder: (id: number) => Promise<void>;
+  loadNewer: (id: number) => Promise<void>;
 };
 
 export type ViewportPageDeps = {
   resetRingCursor: (id: number) => void;
-  appendRingLines: (id: number, lines: readonly LogLine[], force?: boolean) => void;
-  /** 环已空（设备缓冲被清）但文档已有行：只按新过滤重筛已画行，不清空。 */
+  setLastSeen: (id: number, seq: number) => void;
+  appendRingLines: (id: number, lines: readonly import("@yohu/api").LogLine[], force?: boolean) => void;
+  prependWindow: (id: number, lines: readonly import("@yohu/api").LogLine[]) => void;
+  firstSeqOf: (id: number) => number | null;
+  lastSeqOf: (id: number) => number | null;
   narrowVisible: (id: number) => void;
 };
 
+function filterOf(session: Parameters<typeof toSessionFilter>[0]): LogFilter {
+  return sessionWire(toSessionFilter(session));
+}
+
+function pageFromQuery(req: LogQueryRequest): LogQueryPage | Promise<LogQueryPage> {
+  return logQuery(req) as LogQueryPage | Promise<LogQueryPage>;
+}
+
 export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): ViewportPageApi {
-  async function pull(id: number, throughSeq: number, force: boolean): Promise<void> {
-    // 未开始采集（fromSeq = SESSION_NEVER_STARTED）不拉：否则 applyAppend 拒绝后游标不前进，
-    // 每轮都拿同一批 → 热循环。这是防止 UI 卡死的硬边界。
-    const probe = sessionById(state, id);
-    if (!probe || probe.fromSeq < 0) return;
-    for (let round = 0; round < 50; round += 1) {
-      const session = sessionById(state, id);
-      if (!session?.serial || !sessionCaptureIsLive(session)) return;
-      if (session.paused && !force) return;
-      const before = session.lastSeenSeq;
-      const cursor =
-        session.lastSeenSeq >= session.fromSeq
-          ? session.lastSeenSeq + 1
-          : Math.max(0, session.fromSeq);
-      if (cursor > throughSeq) return;
-      let batch: LogLine[];
-      try {
-        const raw = logRange({ serial: session.serial, from_seq: cursor, limit: PULL_BATCH }) as
-          | ArrayBuffer
-          | LogLine[]
-          | Promise<ArrayBuffer | LogLine[]>;
-        const got = Array.isArray(raw) ? raw : await raw;
-        batch = Array.isArray(got) ? got : decodeLogRange(got);
-      } catch (e) {
-        console.error("log.range 拉取失败", e);
-        return;
-      }
-      if (batch.length === 0) return;
-      deps.appendRingLines(id, batch, force);
-      // 游标没有前进说明本批被消费端拒绝（例如并发重置/暂停）：立即停，绝不空转重拉。
-      const after = sessionById(state, id)?.lastSeenSeq ?? before;
-      if (after <= before) return;
-      const last = batch[batch.length - 1]!.seq;
-      if (last < cursor) return;
-      if (batch.length < PULL_BATCH || last >= throughSeq) return;
-    }
+  async function pageOf(req: LogQueryRequest): Promise<LogQueryPage> {
+    const raw = pageFromQuery(req);
+    return "then" in (raw as object) ? await (raw as Promise<LogQueryPage>) : (raw as LogQueryPage);
+  }
+  /** 同步 mock（测试）返回对象；生产返回 Promise。保持同步路径可被同步断言。 */
+  function pageSync(req: LogQueryRequest): LogQueryPage | Promise<LogQueryPage> {
+    return pageFromQuery(req);
+  }
+
+  function baseReq(id: number, direction: LogQueryRequest["direction"], from_seq: number, to_seq: number, limit: number): LogQueryRequest | null {
+    const session = sessionById(state, id);
+    if (!session?.serial || !sessionCaptureIsLive(session) || session.fromSeq < 0) return null;
+    return { serial: session.serial, filter: filterOf(session), from_seq, to_seq, limit, direction };
   }
 
   async function loadPage(id: number): Promise<void> {
-    const session = sessionById(state, id);
-    if (!session?.serial || !sessionCaptureIsLive(session) || session.fromSeq < 0) return;
-    // 环若已空（设备缓冲被清 / 竞态），保留已画文档并按新过滤重筛，绝不把界面冲空。
-    let hasRing = false;
-    try {
-      const probe = logRange({ serial: session.serial, from_seq: 0, limit: 1 }) as
-        | ArrayBuffer
-        | LogLine[]
-        | Promise<ArrayBuffer | LogLine[]>;
-      const got = Array.isArray(probe) ? probe : await probe;
-      hasRing = (Array.isArray(got) ? got : decodeLogRange(got)).length > 0;
-    } catch (e) {
-      console.error("log.range 探测失败", e);
-      return;
-    }
-    if (!hasRing) {
+    const req = baseReq(id, "backward", Number.MAX_SAFE_INTEGER, 0, docCap(state.bufferCapacity));
+    if (!req) return;
+    const raw = pageSync(req);
+    const page = "then" in (raw as object) ? await (raw as Promise<LogQueryPage>) : (raw as LogQueryPage);
+    if (page.ring_last_seq === 0 && page.ring_first_seq === 0 && page.lines.length === 0) {
+      // 环已空（设备缓冲被清）：保留已画窗口并按新过滤重筛，不冲空。
       deps.narrowVisible(id);
       return;
     }
     deps.resetRingCursor(id);
-    await pull(id, Number.MAX_SAFE_INTEGER, true);
-  }
-
-  async function pullThrough(id: number, throughSeq: number): Promise<void> {
-    await pull(id, throughSeq, false);
+    deps.setLastSeen(id, page.ring_last_seq);
+    if (page.lines.length > 0) deps.appendRingLines(id, page.lines, true);
   }
 
   async function catchUp(id: number): Promise<void> {
-    await pull(id, Number.MAX_SAFE_INTEGER, false);
+    const session = sessionById(state, id);
+    if (!session) return;
+    const cap = docCap(state.bufferCapacity);
+    const from = Math.max(0, session.lastSeenSeq + 1);
+    const req = baseReq(id, "forward", from, Number.MAX_SAFE_INTEGER, cap);
+    if (!req) return;
+    const rawCatch = pageSync(req);
+    const page = "then" in (rawCatch as object) ? await (rawCatch as Promise<LogQueryPage>) : (rawCatch as LogQueryPage);
+    if (page.has_more) {
+      // 积压超过一窗：直接取环尾一窗（视口只需最近内容）。
+      await loadPage(id);
+      return;
+    }
+    deps.setLastSeen(id, page.ring_last_seq);
+    if (page.lines.length > 0) deps.appendRingLines(id, page.lines, false);
   }
 
-  return { loadPage, pullThrough, catchUp };
+  async function loadOlder(id: number): Promise<void> {
+    const first = deps.firstSeqOf(id);
+    if (first === null || first <= 0) return;
+    const req = baseReq(id, "backward", first - 1, 0, PAGE);
+    if (!req) return;
+    const rawOlder = pageSync(req);
+    const page = "then" in (rawOlder as object) ? await (rawOlder as Promise<LogQueryPage>) : (rawOlder as LogQueryPage);
+    if (page.lines.length > 0) deps.prependWindow(id, page.lines);
+  }
+
+  async function loadNewer(id: number): Promise<void> {
+    const last = deps.lastSeqOf(id);
+    if (last === null) return;
+    const req = baseReq(id, "forward", last + 1, Number.MAX_SAFE_INTEGER, PAGE);
+    if (!req) return;
+    const rawNewer = pageSync(req);
+    const page = "then" in (rawNewer as object) ? await (rawNewer as Promise<LogQueryPage>) : (rawNewer as LogQueryPage);
+    if (page.lines.length > 0) deps.appendRingLines(id, page.lines, false);
+  }
+
+  return { loadPage, catchUp, loadOlder, loadNewer };
 }

@@ -40,6 +40,10 @@ export type CaptureApi = {
   detachFollow: (id: number) => void;
   /** View 在 visibilitychange / focus 且页面可见时调用：把所有在采窗口的页追到尾部。 */
   resumeVisible: () => void;
+  /** 视口向上滚动：向 core 取上一页命中前插。 */
+  loadOlder: (id: number) => Promise<void>;
+  /** 视口向下滚动：向 core 取下一页命中追加。 */
+  loadNewer: (id: number) => Promise<void>;
   serial: () => string | null;
   /** 命令目标的唯一回落链（View 不再自算）。 */
   commandSerialOf: (sessionId: number | null, explicit?: string | null) => string | null;
@@ -55,7 +59,11 @@ export function createCapture(
 
   const viewport = createViewportPage(state, {
     resetRingCursor: (id) => workspace.resetRingCursor(id),
+    setLastSeen: (id, seq) => workspace.setLastSeen(id, seq),
     appendRingLines: (id, lines, force) => workspace.appendRingLines(id, lines, force),
+    prependWindow: (id, lines) => workspace.prependWindow(id, lines),
+    firstSeqOf: (id) => workspace.firstSeqOf(id),
+    lastSeqOf: (id) => workspace.lastSeqOf(id),
     narrowVisible: (id) => workspace.narrowVisible(id),
   });
   workspace.setPageRequest(viewport.loadPage);
@@ -146,6 +154,8 @@ export function createCapture(
       workspace.detachFollow(id);
     },
     resumeVisible: catchUpAll,
+    loadOlder: (id: number): Promise<void> => viewport.loadOlder(id),
+    loadNewer: (id: number): Promise<void> => viewport.loadNewer(id),
     serial,
     commandSerialOf: orchestrator.commandSerialOf,
     dispose: subscriptions.dispose,

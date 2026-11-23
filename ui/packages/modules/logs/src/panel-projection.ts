@@ -50,6 +50,7 @@ export type PanelProjectionApi = {
   appendToSession: (id: number, lines: readonly LogLine[], force?: boolean) => void;
   noteSeq: (idx: number, lines: readonly { seq: number }[]) => void;
   narrowDrawn: (id: number) => void;
+  prependWindow: (id: number, lines: readonly LogLine[]) => void;
   trimPanels: () => void;
   flushPanel: (id: number) => void;
   flushDevicePanels: (serial: string) => void;
@@ -197,6 +198,16 @@ export function createPanelProjection(
     return deps.catchUp(id);
   }
 
+  function prependWindow(id: number, lines: readonly LogLine[]): void {
+    const idx = sessionIndex(state, id);
+    if (sessionMissing(idx)) return;
+    const session = sessionAt(state, idx);
+    const cap = viewCap();
+    const older = panelFromLines(lines, cap);
+    const rows = [...older, ...session.visible].slice(0, cap);
+    replacePanel(idx, rows, session.pendingCount);
+  }
+
   function narrowDrawn(id: number): void {
     const idx = sessionIndex(state, id);
     if (sessionMissing(idx)) return;
@@ -270,6 +281,7 @@ export function createPanelProjection(
     appendToSession,
     noteSeq,
     narrowDrawn,
+    prependWindow,
     trimPanels,
     flushPanel,
     flushDevicePanels,

@@ -42,7 +42,7 @@ export interface LogSessionState {
   pendingCount: number;
   /** 当前可见面板上的信号行，由 visible 派生，禁止累计已裁掉的行 */
   signalCount: number;
-  /** 过滤后的窗口文档，上限 bufferCapacity。滚动比例唯一来源是它的长度。 */
+  /** 视口窗口行（core 已过滤），上限 `WINDOW_MAX`（ADR-v6-050）；滚动比例来源是它的长度。 */
   visible: readonly ViewRow[];
   /** 从文档头裁掉的行数。视口用它把滚动偏移退回同样的行；整文档替换时归零。 */
   docShift: number;

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logCaptureStatus: vi.fn(),
   logClearDevice: vi.fn(),
   logRange: vi.fn(),
+  logQuery: vi.fn(),
   logExport: vi.fn(),
   logProcessSnapshot: vi.fn(),
   logPackageSnapshot: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logCaptureStatus: (...a: unknown[]) => mocks.logCaptureStatus(...a),
     logClearDevice: (...a: unknown[]) => mocks.logClearDevice(...a),
     logRange: (...a: unknown[]) => mocks.logRange(...a),
+    logQuery: (...a: unknown[]) => mocks.logQuery(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
     logPackageSnapshot: (...a: unknown[]) => mocks.logPackageSnapshot(...a),
@@ -212,6 +214,35 @@ beforeEach(() => {
   mocks.logCaptureStop.mockReset();
   mocks.logCaptureStatus.mockReset();
   mocks.logRange.mockReset();
+  mocks.logQuery.mockReset();
+  mocks.logQuery.mockImplementation(
+    (req: {
+      serial: string;
+      filter: Parameters<typeof matchesWireFilter>[1];
+      from_seq: number;
+      to_seq: number;
+      limit: number;
+      direction: "forward" | "backward";
+    }) => {
+      const all = rings.get(req.serial) ?? [];
+      const first = all[0]?.seq ?? 0;
+      const last = all[all.length - 1]?.seq ?? 0;
+      const lo = req.direction === "backward" ? req.to_seq : req.from_seq;
+      const hi = req.direction === "backward" ? req.from_seq : req.to_seq;
+      const matched = all.filter(
+        (line) => line.seq >= lo && line.seq <= hi && matchesWireFilter(line, req.filter),
+      );
+      const lines =
+        req.direction === "backward" ? matched.slice(-req.limit) : matched.slice(0, req.limit);
+      return {
+        serial: req.serial,
+        lines,
+        has_more: matched.length > lines.length,
+        ring_first_seq: first,
+        ring_last_seq: last,
+      };
+    },
+  );
   mocks.logExport.mockReset();
   mocks.logProcessSnapshot.mockReset();
   mocks.logPackageSnapshot.mockReset();

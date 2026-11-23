@@ -127,6 +127,8 @@ export interface YoVirtualListProps<T> {
    * 程序化滚底不会误报离开。
    */
   onAtBottomChange?: (atBottom: boolean) => void;
+  /** 触顶变化：用于分页向更早命中继续取页（ADR-v6-050）。 */
+  onAtTopChange?: (atTop: boolean) => void;
   /** 当前选中行 key（提供即开启单选选择模式；null = 未选中） */
   selectedKey?: Accessor<string | number | null>;
   /** 多选 key 集（提供则优先于 selectedKey，listbox 为多选） */
@@ -218,6 +220,7 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
   let isAutoScrolling = false;
   let autoScrollReset = 0;
   let lastAtBottom = true;
+  let lastAtTop = true;
   let slotCache: number[] = [];
   let scrollerHandle: YoScrollerHandle | undefined;
   let inner: HTMLDivElement | undefined;
@@ -744,6 +747,11 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
     const view = container?.clientHeight ?? viewportHeight();
     const viewRows = indexViewRows(view, height);
     const first = indexFromOffset(block, height);
+    const atTop = first <= 0;
+    if (atTop !== lastAtTop) {
+      lastAtTop = atTop;
+      props.onAtTopChange?.(atTop);
+    }
     const atTail = indexAtTail(first, viewRows, scale.total);
     const follow = props.autoScrollToBottom?.() ?? false;
     if (follow && !atTail) {

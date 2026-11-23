@@ -71,6 +71,12 @@ export type WorkspaceApi = {
   resetRingCursor: (id: number) => void;
   /** 环空时按新过滤重筛已画行，不清空（避免换 PID 过滤把界面冲空）。 */
   narrowVisible: (id: number) => void;
+  /** 视口窗口：设置已消费到的环水位（视口分页用）。 */
+  setLastSeen: (id: number, seq: number) => void;
+  /** 视口窗口：把上一页命中前插（向上滚动）。 */
+  prependWindow: (id: number, lines: readonly LogLine[]) => void;
+  firstSeqOf: (id: number) => number | null;
+  lastSeqOf: (id: number) => number | null;
   setPageRequest: (fn: (id: number) => Promise<void>) => void;
   setCatchUpRequest: (fn: (id: number) => Promise<void>) => void;
   discardView: (id: number) => void;
@@ -144,6 +150,21 @@ export function createWorkspace(
       });
     },
     narrowVisible: (id) => panel.narrowDrawn(id),
+    setLastSeen: (id, seq) => {
+      const idx = sessionIndex(state, id);
+      if (sessionMissing(idx)) return;
+      const seen = state.sessions[idx]?.lastSeenSeq ?? SESSION_NEVER_STARTED;
+      if (seq > seen) setState("sessions", idx, { lastSeenSeq: seq });
+    },
+    prependWindow: (id, lines) => panel.prependWindow(id, lines),
+    firstSeqOf: (id) => {
+      const s = sessionById(state, id);
+      return s?.visible[0]?.line.seq ?? null;
+    },
+    lastSeqOf: (id) => {
+      const s = sessionById(state, id);
+      return s?.visible[s.visible.length - 1]?.line.seq ?? null;
+    },
     setPageRequest: (fn) => {
       pageRequest = fn;
     },

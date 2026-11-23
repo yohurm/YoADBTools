@@ -576,8 +576,15 @@ export function LogAnalyzerView(props: DeviceSession) {
                       viewHandle = handle;
                     }}
                     onAtBottomChange={(atBottom) => {
-                      if (atBottom) logStore.resumeFollow(session.id);
-                      else logStore.detachFollow(session.id);
+                      if (atBottom) {
+                        void logStore.loadNewer(session.id);
+                        logStore.resumeFollow(session.id);
+                      } else {
+                        logStore.detachFollow(session.id);
+                      }
+                    }}
+                    onAtTopChange={(atTop) => {
+                      if (atTop) void logStore.loadOlder(session.id);
                     }}
                     onRowContextMenu={(row, event) => {
                       setContextLine(row.line);
