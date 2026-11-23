@@ -69,6 +69,8 @@ export type WorkspaceApi = {
   appendRingLines: (id: number, lines: readonly LogLine[], force?: boolean) => void;
   /** 重绑前重置环游标并清空可见区（换过滤 / 初始 / 恢复）。 */
   resetRingCursor: (id: number) => void;
+  /** 环空时按新过滤重筛已画行，不清空（避免换 PID 过滤把界面冲空）。 */
+  narrowVisible: (id: number) => void;
   setPageRequest: (fn: (id: number) => Promise<void>) => void;
   setCatchUpRequest: (fn: (id: number) => Promise<void>) => void;
   discardView: (id: number) => void;
@@ -121,7 +123,8 @@ export function createWorkspace(
     catchUpSession: (id) => panel.catchUpSession(id),
     unsubscribeSession: (id) => follow.unsubscribeSession(id),
     bindPackageSessions: (serial, entries) =>
-      bindPackageSessions(state, setState, serial, entries, (id) => panel.catchUpSession(id)),
+      // 包名 PidSet 变化=过滤变化：必须从环重绑（重建可见区），否则已拉过但被筛掉的行补不回。
+      bindPackageSessions(state, setState, serial, entries, (id) => pageRequest(id)),
     assignDefaultSerial: (serial) => assignDefaultSerial(state, setState, serial),
     appendRingLines: (id, lines, force = false) => {
       const session = sessionById(state, id);
@@ -140,6 +143,7 @@ export function createWorkspace(
         lastSeenSeq: session.fromSeq - 1,
       });
     },
+    narrowVisible: (id) => panel.narrowDrawn(id),
     setPageRequest: (fn) => {
       pageRequest = fn;
     },

@@ -67,11 +67,22 @@ pub async fn log_clear_device(state: State<'_, AppState>, serial: String) -> Res
 }
 
 /// 从设备环按 seq 取原始行（UI 游标实时拉取）。纯内存读，离线可用。
+///
+/// **异步 + 阻塞线程池**：快照需克隆整段 `LogLine` 并序列化，不能在 Tauri 主线程做，
+/// 否则高频拉取会把 UI 事件循环压死（本次“开发窗口卡死”的架构根因之一）。
 #[tauri::command(rename = "log.range")]
-pub fn log_range(state: State<'_, AppState>, req: LogRangeRequest) -> Vec<LogLine> {
-    state
-        .capture
-        .snapshot(&req.serial, req.from_seq, req.limit as usize)
+pub async fn log_range(
+    state: State<'_, AppState>,
+    req: LogRangeRequest,
+) -> Result<Vec<LogLine>, IpcError> {
+    let capture = std::sync::Arc::clone(&state.capture);
+    let serial = req.serial;
+    let from_seq = req.from_seq;
+    let limit = req.limit as usize;
+    let lines = tauri::async_runtime::spawn_blocking(move || capture.snapshot(&serial, from_seq, limit))
+        .await
+        .unwrap_or_default();
+    Ok(lines)
 }
 
 /// 导出环快照。`ExportResult.lines` 是过滤后实际写出的条数，原样回给调用方提示。

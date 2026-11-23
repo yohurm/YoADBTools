@@ -56,6 +56,7 @@ export function createCapture(
   const viewport = createViewportPage(state, {
     resetRingCursor: (id) => workspace.resetRingCursor(id),
     appendRingLines: (id, lines, force) => workspace.appendRingLines(id, lines, force),
+    narrowVisible: (id) => workspace.narrowVisible(id),
   });
   workspace.setPageRequest(viewport.loadPage);
   workspace.setCatchUpRequest(viewport.catchUp);

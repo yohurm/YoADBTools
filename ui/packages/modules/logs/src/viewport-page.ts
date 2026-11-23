@@ -25,14 +25,21 @@ export type ViewportPageApi = {
 export type ViewportPageDeps = {
   resetRingCursor: (id: number) => void;
   appendRingLines: (id: number, lines: readonly LogLine[], force?: boolean) => void;
+  /** 环已空（设备缓冲被清）但文档已有行：只按新过滤重筛已画行，不清空。 */
+  narrowVisible: (id: number) => void;
 };
 
 export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): ViewportPageApi {
   async function pull(id: number, throughSeq: number, force: boolean): Promise<void> {
-    for (let round = 0; round < 200; round += 1) {
+    // 未开始采集（fromSeq = SESSION_NEVER_STARTED）不拉：否则 applyAppend 拒绝后游标不前进，
+    // 每轮都拿同一批 → 热循环。这是防止 UI 卡死的硬边界。
+    const probe = sessionById(state, id);
+    if (!probe || probe.fromSeq < 0) return;
+    for (let round = 0; round < 50; round += 1) {
       const session = sessionById(state, id);
       if (!session?.serial || !sessionCaptureIsLive(session)) return;
       if (session.paused && !force) return;
+      const before = session.lastSeenSeq;
       const cursor =
         session.lastSeenSeq >= session.fromSeq
           ? session.lastSeenSeq + 1
@@ -50,6 +57,9 @@ export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): V
       }
       if (batch.length === 0) return;
       deps.appendRingLines(id, batch, force);
+      // 游标没有前进说明本批被消费端拒绝（例如并发重置/暂停）：立即停，绝不空转重拉。
+      const after = sessionById(state, id)?.lastSeenSeq ?? before;
+      if (after <= before) return;
       const last = batch[batch.length - 1]!.seq;
       if (last < cursor) return;
       if (batch.length < PULL_BATCH || last >= throughSeq) return;
@@ -58,7 +68,22 @@ export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): V
 
   async function loadPage(id: number): Promise<void> {
     const session = sessionById(state, id);
-    if (!session?.serial || !sessionCaptureIsLive(session)) return;
+    if (!session?.serial || !sessionCaptureIsLive(session) || session.fromSeq < 0) return;
+    // 环若已空（设备缓冲被清 / 竞态），保留已画文档并按新过滤重筛，绝不把界面冲空。
+    let hasRing = false;
+    try {
+      const probe = logRange({ serial: session.serial, from_seq: 0, limit: 1 }) as
+        | LogLine[]
+        | Promise<LogLine[]>;
+      hasRing = (Array.isArray(probe) ? probe : await probe).length > 0;
+    } catch (e) {
+      console.error("log.range 探测失败", e);
+      return;
+    }
+    if (!hasRing) {
+      deps.narrowVisible(id);
+      return;
+    }
     deps.resetRingCursor(id);
     await pull(id, Number.MAX_SAFE_INTEGER, true);
   }

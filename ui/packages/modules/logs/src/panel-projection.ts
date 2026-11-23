@@ -181,7 +181,11 @@ export function createPanelProjection(
       cap: viewCap(),
       pendingCount: force ? session.pendingCount : following && !session.following ? 0 : session.pendingCount,
     });
-    if (!applied) return;
+    if (!applied) {
+      // 消费端拒绝本批（未开始/暂停）但已开始采集的窗口仍要推进游标，避免拉取方空转重拉。
+      if (!session.paused && session.fromSeq >= 0) noteSeq(idx, lines);
+      return;
+    }
     writePanel(idx, applied.visible, applied.pendingCount);
     noteSeq(idx, lines);
   }
