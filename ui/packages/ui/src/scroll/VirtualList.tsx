@@ -719,8 +719,9 @@ export function YoVirtualList<T>(props: YoVirtualListProps<T>): JSX.Element {
       moveLine(indexTailOffset(virtualTotalHeight(scale.total, height), view));
       return;
     }
-    if (lineCovers() && delta > 0) {
+    if (lineCovers() && delta !== 0) {
       lineSeenAt = at;
+      // 正值=头部被裁，向上补偿；负值=向上分页前插，向下补偿保持视口锚点。
       moveLine(Math.max(0, scrollerHandle.offset() - delta * height));
     }
     const max = indexTailOffset(virtualTotalHeight(scale.total, height), view);

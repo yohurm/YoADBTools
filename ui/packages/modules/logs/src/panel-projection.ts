@@ -206,6 +206,8 @@ export function createPanelProjection(
     const older = panelFromLines(lines, cap);
     const rows = [...older, ...session.visible].slice(0, cap);
     replacePanel(idx, rows, session.pendingCount);
+    // 向上分页前插：docShift 减，视图按行高向下补偿，保持原视口锚点。
+    setState("sessions", idx, { docShift: session.docShift - older.length });
   }
 
   function narrowDrawn(id: number): void {

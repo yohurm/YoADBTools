@@ -91,4 +91,15 @@ describe("writePanel 信号计数增量 === 全量 signalCountOf(visible)", () =
     expect(session.signalCount).toBe(signalCountOf(session.visible));
     expect(session.docShift).toBe(1);
   });
+
+  it("向上分页前插：可见区前插，docShift 负补偿保持视口锚点", () => {
+    const { state, panel } = setup(100);
+    panel.writePanel(0, [row(), row()], 0);
+    const id = state.sessions[0]!.id;
+    panel.prependWindow(id, [nextLine("older1"), nextLine("older2")]);
+    const session = state.sessions[0]!;
+    expect(session.visible).toHaveLength(4);
+    expect(session.visible[0]!.line.msg).toBe("older1");
+    expect(session.docShift).toBe(-2);
+  });
 });
