@@ -11,8 +11,7 @@
 //! | `log.packageSnapshot` | 必须在线 | 要跑 `pm list packages` |
 //! | `log.capture.stop` | 离线可用 | 掉线也必须能收口（收口是本层职责） |
 //! | `log.capture.status` | 离线可用 | 对账入口，掉线后 UI 仍需读世代 |
-//! | `log.window.bind` | 离线可用 | 纯内存环读取，不碰设备 |
-//! | `log.window.release` | 离线可用 | 纯内存登记释放 |
+//! | `log.range` | 离线可用 | 纯内存环读取（列式二进制帧，ADR-v6-049），不碰设备 |
 //! | `log.export` | 离线可用 | 导出的是本机环快照，不碰设备 |
 //! | `log.clear` | 离线可用 | 诊断入口：只清本机环与窗口索引，不发 `logcat -c` |
 //!
@@ -23,7 +22,7 @@ use tauri::State;
 use crate::commands::{ipc_adb, ipc_log, ipc_session};
 use crate::state::AppState;
 use yohu_protocol::{
-    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogLine, LogRangeRequest,
+    CaptureStart, CaptureStatus, ExportRequest, ExportResult, IpcError, LogRangeRequest,
     ProcessEntry,
 };
 
@@ -68,21 +67,27 @@ pub async fn log_clear_device(state: State<'_, AppState>, serial: String) -> Res
 
 /// 从设备环按 seq 取原始行（UI 游标实时拉取）。纯内存读，离线可用。
 ///
-/// **异步 + 阻塞线程池**：快照需克隆整段 `LogLine` 并序列化，不能在 Tauri 主线程做，
-/// 否则高频拉取会把 UI 事件循环压死（本次“开发窗口卡死”的架构根因之一）。
+/// **列式二进制帧（ADR-v6-049 数据面优化 / P0-3）**：返回 `tauri::ipc::Response`（原始字节
+/// → JS `ArrayBuffer`），前端 `@yohu/api` 的 `decodeLogRange` 按同一布局解码；每行不再重复
+/// 字段名、不做 JSON 语法解析。编码逻辑在 `yohu-logsrv::ring::encode_rows`。
+///
+/// **异步 + 阻塞线程池**：快照切片 + 列式编码不能在 Tauri 主线程做，
+/// 否则高频拉取会把 UI 事件循环压死（“开发窗口卡死”的架构根因之一）。
 #[tauri::command(rename = "log.range")]
 pub async fn log_range(
     state: State<'_, AppState>,
     req: LogRangeRequest,
-) -> Result<Vec<LogLine>, IpcError> {
+) -> Result<tauri::ipc::Response, IpcError> {
     let capture = std::sync::Arc::clone(&state.capture);
     let serial = req.serial;
     let from_seq = req.from_seq;
     let limit = req.limit as usize;
-    let lines = tauri::async_runtime::spawn_blocking(move || capture.snapshot(&serial, from_seq, limit))
-        .await
-        .unwrap_or_default();
-    Ok(lines)
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        capture.range_bytes(&serial, from_seq, limit)
+    })
+    .await
+    .unwrap_or_default();
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 /// 导出环快照。`ExportResult.lines` 是过滤后实际写出的条数，原样回给调用方提示。

@@ -8,6 +8,7 @@
 import type { SetStoreFunction } from "solid-js/store";
 import {
   captureStateIsRunning,
+  decodeLogRange,
   logRange,
   onCaptureState,
   onDeviceOffline,
@@ -62,28 +63,35 @@ export function createCaptureSubscriptions(
       (s) => s.serial === serial && sessionCaptureIsLive(s) && !s.paused && s.fromSeq >= 0,
     );
   async function pumpDevice(serial: string, st: DevPull): Promise<void> {
+    const collected: LogLine[] = [];
     try {
       for (let round = 0; round < 200; round += 1) {
         const sessions = liveWindowSessions(serial);
-        if (sessions.length === 0) return;
+        if (sessions.length === 0) break;
         const target = st.target;
         const min = Math.min(...sessions.map(sessionCursor));
-        if (min > target) return;
+        if (min > target) break;
         let batch: LogLine[];
         try {
           const raw = logRange({ serial, from_seq: min, limit: DEV_PULL_BATCH }) as
+            | ArrayBuffer
             | LogLine[]
-            | Promise<LogLine[]>;
-          batch = Array.isArray(raw) ? raw : await raw;
+            | Promise<ArrayBuffer | LogLine[]>;
+          const got = Array.isArray(raw) ? raw : await raw;
+          batch = Array.isArray(got) ? got : decodeLogRange(got);
         } catch (e) {
           console.error("log.range 拉取失败", e);
-          return;
+          break;
         }
-        if (batch.length === 0) return;
-        for (const s of liveWindowSessions(serial)) workspace.appendRingLines(s.id, batch);
+        if (batch.length === 0) break;
+        for (const line of batch) collected.push(line);
         const last = batch[batch.length - 1]!.seq;
-        if (last < min) return;
-        if (batch.length < DEV_PULL_BATCH && st.target <= target) return;
+        if (last < min) break;
+        if (batch.length < DEV_PULL_BATCH && st.target <= target) break;
+      }
+      // 一批拉取只做一次文档提交（避免每个 5k 分块一次 setState/整数组复制）。
+      if (collected.length > 0) {
+        for (const s of liveWindowSessions(serial)) workspace.appendRingLines(s.id, collected);
       }
     } finally {
       st.busy = false;

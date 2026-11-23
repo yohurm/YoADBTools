@@ -132,6 +132,11 @@ impl CaptureService {
     pub fn snapshot(&self, serial: &str, from_seq: u64, limit: usize) -> Vec<LogLine> {
         self.rings.snapshot(serial, from_seq, limit)
     }
+
+    /// 列式二进制环快照（P0-3：UI `log.range` 走此路径，跳过 JSON 逐行对象）。
+    pub fn range_bytes(&self, serial: &str, from_seq: u64, limit: usize) -> Vec<u8> {
+        self.rings.range_bytes(serial, from_seq, limit)
+    }
 }
 
 #[cfg(test)]

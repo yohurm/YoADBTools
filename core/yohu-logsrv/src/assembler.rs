@@ -28,7 +28,12 @@ impl MessageAssembler {
     }
 
     pub(crate) fn ingest(&mut self, raw: &str) -> Vec<LogRecord> {
-        let line = raw.replace('\r', "");
+        // 绝大多数行不含 `\r`：借用原文，避免每行无条件新建 String（P1-2）。
+        let line: std::borrow::Cow<'_, str> = if raw.contains('\r') {
+            std::borrow::Cow::Owned(raw.replace('\r', ""))
+        } else {
+            std::borrow::Cow::Borrowed(raw)
+        };
         if is_system_line(&line) {
             return vec![system_message(&line)];
         }
@@ -41,7 +46,7 @@ impl MessageAssembler {
             return out;
         }
         if self.header.is_some() {
-            self.body.push(line);
+            self.body.push(line.into_owned());
         }
         Vec::new()
     }

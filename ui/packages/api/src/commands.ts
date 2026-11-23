@@ -137,7 +137,7 @@ export const logCaptureStatus = (serial: string) =>
 export const logClearDevice = (serial: string) =>
   invoke<void>("log.clearDevice", { serial });
 
-export const logRange = (req: LogRangeRequest) => invoke<LogLine[]>("log.range", { req });
+export const logRange = (req: LogRangeRequest) => invoke<ArrayBuffer>("log.range", { req });
 
 
 export const logExport = (req: ExportRequest) => invoke<ExportResult>("log.export", { req });

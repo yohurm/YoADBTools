@@ -6,6 +6,7 @@ export * from "./path-input";
 export * from "./safety";
 export * from "./host-path";
 export * from "./log-filter";
+export * from "./log-range";
 export * from "./log-bind";
 export * from "./log-color-scheme";
 export * from "./log-display-columns";

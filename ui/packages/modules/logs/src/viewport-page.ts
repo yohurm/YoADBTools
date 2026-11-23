@@ -5,7 +5,7 @@
  */
 
 import type { LogLine } from "@yohu/api";
-import { logRange } from "@yohu/api";
+import { decodeLogRange, logRange } from "@yohu/api";
 
 import type { LogUiState } from "./log-model";
 import { sessionCaptureIsLive } from "./session-chrome";
@@ -48,9 +48,11 @@ export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): V
       let batch: LogLine[];
       try {
         const raw = logRange({ serial: session.serial, from_seq: cursor, limit: PULL_BATCH }) as
+          | ArrayBuffer
           | LogLine[]
-          | Promise<LogLine[]>;
-        batch = Array.isArray(raw) ? raw : await raw;
+          | Promise<ArrayBuffer | LogLine[]>;
+        const got = Array.isArray(raw) ? raw : await raw;
+        batch = Array.isArray(got) ? got : decodeLogRange(got);
       } catch (e) {
         console.error("log.range 拉取失败", e);
         return;
@@ -73,9 +75,11 @@ export function createViewportPage(state: LogUiState, deps: ViewportPageDeps): V
     let hasRing = false;
     try {
       const probe = logRange({ serial: session.serial, from_seq: 0, limit: 1 }) as
+        | ArrayBuffer
         | LogLine[]
-        | Promise<LogLine[]>;
-      hasRing = (Array.isArray(probe) ? probe : await probe).length > 0;
+        | Promise<ArrayBuffer | LogLine[]>;
+      const got = Array.isArray(probe) ? probe : await probe;
+      hasRing = (Array.isArray(got) ? got : decodeLogRange(got)).length > 0;
     } catch (e) {
       console.error("log.range 探测失败", e);
       return;

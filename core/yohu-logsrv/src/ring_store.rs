@@ -90,6 +90,19 @@ impl RingStore {
             None => Vec::new(),
         }
     }
+
+    /// 列式二进制快照（P0-3，UI `log.range`）。
+    pub(crate) fn range_bytes(&self, serial: &str, from_seq: u64, limit: usize) -> Vec<u8> {
+        match self.try_ring(serial) {
+            Some(ring) => ring.encode_range(from_seq, limit),
+            None => {
+                let mut out = Vec::with_capacity(8);
+                out.extend_from_slice(&0u32.to_le_bytes());
+                out.extend_from_slice(&0u32.to_le_bytes());
+                out
+            }
+        }
+    }
 }
 
 #[cfg(test)]
