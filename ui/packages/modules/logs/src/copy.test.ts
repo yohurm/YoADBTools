@@ -17,14 +17,10 @@ import {
   serializeLogCopy,
   textOffsetInDoc,
 } from "./copy";
-import {
-  ALL_LOG_DISPLAY_COLUMNS,
-  defaultFormatOptions,
-  formatMessage,
-  formatParts,
-  headerWidth,
-  wrapMessage,
-} from "./editor";
+import { formatMessage } from "./editor/format";
+import { ALL_LOG_DISPLAY_COLUMNS, defaultFormatOptions, headerWidth } from "./editor/format-columns";
+import { formatParts } from "./editor/format-text";
+import { wrapMessage } from "./editor";
 
 const options = defaultFormatOptions(ALL_LOG_DISPLAY_COLUMNS, "yohu");
 

@@ -15,14 +15,15 @@
 | [youi.md](youi.md) | `@yohu/ui`（对外名 YoUI） |
 | [workbench.md](workbench.md) | `@yohu/workbench` + `apps/shell` |
 | [modules/](modules/) | terminal / files / logs / mirror / [download](modules/download.md) / [textparsing](modules/textparsing.md) / update / **device** / [device-wireless（方案）](modules/device-wireless.md) |
-| [adr/](adr/) | ADR-v6-001～041 |
+| [adr/](adr/) | ADR-v6-001～050 |
 | [UI设计系统-v6.md](UI设计系统-v6.md) | token / 密度 / 主题 |
 | [动画系统-v6.md](动画系统-v6.md) | 动效（ADR-v6-017） |
 | [右键菜单-v6.md](右键菜单-v6.md) | 右键引擎（ADR-v6-019） |
 | [文件传输-v6.md](文件传输-v6.md) | 上下载 / 拖入拖出 / 进度 / 清单 / YoToast 传输通知 |
 | [文件拖拽-v6.md](文件拖拽-v6.md) | Explorer 拖出协议细节（ADR-v6-018）；作业入口以传输文为准 |
+| [../reviews/](../reviews/) | 架构审查 / 全量复审记录（六段式） |
 
-旧入口 [`架构设计-v6.md`](架构设计-v6.md) 仅为跳转页，正文已拆到上表。
+架构审查与复审记录见 [../reviews/](../reviews/)；ADR 索引见 [adr/README.md](adr/README.md)。
 
 ## 依赖方向（硬规则）
 

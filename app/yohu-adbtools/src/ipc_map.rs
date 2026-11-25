@@ -18,13 +18,10 @@ use crate::mirror_present::PresentError;
 use crate::settings_store::SettingsStoreError;
 use crate::terminal_eval::TerminalEvalError;
 
-/// core 错误 → IPC 错误（前端按 code 处理）。
-pub fn ipc(e: impl std::fmt::Display) -> IpcError {
-    IpcError {
-        code: IpcErrorCode::Internal,
-        message: e.to_string(),
-    }
-}
+/// ADB 传输层 IO 失败的分类句。OS 原文只进 tracing，不进 IPC（错误只分类）。
+const ADB_IO_FAILED: &str = "设备 IO 失败";
+/// 打开系统路径失败的分类句（`system.openPath`）。
+const OPEN_PATH_FAILED: &str = "无法打开路径";
 
 fn adb_code(e: &AdbError) -> IpcErrorCode {
     match e {
@@ -43,12 +40,38 @@ fn adb_code(e: &AdbError) -> IpcErrorCode {
 }
 
 /// ADB 错误 → IPC 错误（保留语义码）。目录里的 `Arc<AdbError>` 也走这一份。
+///
+/// `message` 一律来自分类句表：`BadExit` 只给退出码（stderr 只进 tracing），
+/// `Io` 只给固定句（OS 原文只进 tracing），其余变体取领域/宿主已声明的分类句。
+/// 不存在「任意 `Display` 兜底」的入口。
 pub fn ipc_adb(e: &AdbError) -> IpcError {
+    let message = match e {
+        AdbError::BadExit { exit_code, stderr } => {
+            tracing::warn!(exit_code, stderr = %stderr.trim(), "ADB 命令失败");
+            format!("ADB 命令失败(退出码 {exit_code})")
+        }
+        AdbError::Io(err) => {
+            tracing::warn!(error = %err, "ADB 传输 IO 失败");
+            ADB_IO_FAILED.to_string()
+        }
+        // 以下分类句由领域/宿主声明，是本层的唯一文案来源（不是邻层任意 Display）。
+        AdbError::DeviceOffline(serial) => yohu_domain::device_offline_text(serial),
+        AdbError::NotOnline(serial) => yohu_domain::device_not_online_text(serial),
+        AdbError::ToolUnavailable => yohu_domain::TOOL_UNAVAILABLE.to_string(),
+        AdbError::CandidatesFailed => yohu_domain::CANDIDATES_FAILED.to_string(),
+        AdbError::UnsupportedShell => yohu_domain::UNSUPPORTED_SHELL.to_string(),
+        AdbError::Cancelled => yohu_runtime::TASK_CANCELLED.to_string(),
+        AdbError::Timeout => yohu_runtime::EXEC_TIMEOUT.to_string(),
+        AdbError::Truncated => yohu_runtime::CAPTURE_TRUNCATED.to_string(),
+        AdbError::PumpPanic => yohu_runtime::PUMP_PANIC.to_string(),
+        AdbError::Shell(fault) => fault.to_string(),
+    };
     IpcError {
         code: adb_code(e),
-        message: e.to_string(),
+        message,
     }
 }
+
 
 /// 设备目录扫描错误 → IPC。
 pub fn ipc_catalog(e: CatalogError) -> IpcError {
@@ -61,12 +84,19 @@ pub fn ipc_catalog(e: CatalogError) -> IpcError {
     }
 }
 
-/// 构造一个简单 IPC 错误。
-pub fn ipc_code(code: IpcErrorCode, message: impl Into<String>) -> IpcError {
+/// 构造一个已分类的 IPC 错误。`message` 必须是分类句（常量或领域 Display 的固定句），
+/// 不接受任意 `Display` 原样转发。
+pub(crate) fn ipc_code(code: IpcErrorCode, message: impl Into<String>) -> IpcError {
     IpcError {
         code,
         message: message.into(),
     }
+}
+
+/// 打开系统路径失败 → IPC。OS 原文只进 tracing。
+pub(crate) fn ipc_open_path(err: &std::io::Error) -> IpcError {
+    tracing::warn!(error = %err, "打开系统路径失败");
+    ipc_code(IpcErrorCode::Internal, OPEN_PATH_FAILED)
 }
 
 pub fn ipc_library(error: LibraryError) -> IpcError {
@@ -76,7 +106,7 @@ pub fn ipc_library(error: LibraryError) -> IpcError {
 pub fn ipc_library_store(e: LibraryStoreError) -> IpcError {
     match e {
         LibraryStoreError::Library(lib) => ipc_library(lib),
-        LibraryStoreError::Io => ipc(LibraryStoreError::Io),
+        LibraryStoreError::Io => ipc_code(IpcErrorCode::Internal, LibraryStoreError::Io.to_string()),
         LibraryStoreError::EmptyPaths => ipc_library(LibraryError::EmptyImportPaths),
         LibraryStoreError::NotJson => ipc_library(LibraryError::ImportPathsNotJson),
         LibraryStoreError::NotALibrary => ipc_library(LibraryError::NotALibrary),
@@ -157,7 +187,12 @@ pub fn ipc_log(e: LogError) -> IpcError {
     match e {
         LogError::Cancelled => ipc_code(IpcErrorCode::Cancelled, e.to_string()),
         LogError::Adb(adb) => ipc_adb(&adb),
-        LogError::Io(_) | LogError::ExportStamp | LogError::ExportDir => ipc(e),
+        LogError::WindowNotRegistered => ipc_code(IpcErrorCode::NotFound, e.to_string()),
+        LogError::ExportDir => ipc_code(IpcErrorCode::Internal, e.to_string()),
+        LogError::ExportStamp => ipc_code(IpcErrorCode::Internal, e.to_string()),
+        LogError::ExportIo { .. } | LogError::ExportJoin => {
+            ipc_code(IpcErrorCode::Internal, "日志导出失败")
+        }
     }
 }
 
@@ -216,7 +251,9 @@ pub fn ipc_eval(e: TerminalEvalError) -> IpcError {
         TerminalEvalError::Library(lib) => ipc_library(lib),
         TerminalEvalError::CommandNotFound(_) => ipc_code(IpcErrorCode::NotFound, e.to_string()),
         TerminalEvalError::EmptyCommand => ipc_code(IpcErrorCode::InvalidArgs, e.to_string()),
-        TerminalEvalError::JoinPanic | TerminalEvalError::JoinCancelled => ipc(e),
+        TerminalEvalError::JoinPanic | TerminalEvalError::JoinCancelled => {
+            ipc_code(IpcErrorCode::Internal, e.to_string())
+        }
     }
 }
 
@@ -391,6 +428,99 @@ mod tests {
         assert_eq!(e.code, IpcErrorCode::AdbError);
         assert_eq!(e.message, "投屏设备命令失败(退出码 1)");
         assert!(!e.message.contains("Permission denied"));
+    }
+
+    #[test]
+    fn log_window_not_registered_is_not_found() {
+        let e = ipc_log(LogError::WindowNotRegistered);
+        assert_eq!(e.code, IpcErrorCode::NotFound);
+        assert_eq!(e.message, "日志窗口未登记");
+    }
+
+    #[test]
+    fn log_export_io_is_fixed_sentence_without_os_text() {
+        let e = ipc_log(LogError::ExportIo {
+            path: "C:/secret/out.txt".into(),
+        });
+        assert_eq!(e.code, IpcErrorCode::Internal);
+        assert_eq!(e.message, "日志导出失败");
+        assert!(!e.message.contains("C:/secret"));
+        let join = ipc_log(LogError::ExportJoin);
+        assert_eq!(join.message, "日志导出失败");
+    }
+
+    #[test]
+    fn adb_bad_exit_strips_stderr() {
+        let e = ipc_adb(&AdbError::BadExit {
+            exit_code: 2,
+            stderr: "ls: /secret: Permission denied".into(),
+        });
+        assert_eq!(e.code, IpcErrorCode::AdbError);
+        assert_eq!(e.message, "ADB 命令失败(退出码 2)");
+        assert!(!e.message.contains("Permission denied"));
+    }
+
+    /// P1-1：`AdbError::Io` 不得把 OS 原文交给 UI，只给固定分类句。
+    #[test]
+    fn adb_io_is_a_fixed_sentence_without_os_text() {
+        let e = ipc_adb(&AdbError::Io(std::io::Error::other(
+            "C:/secret/path: Access is denied",
+        )));
+        assert_eq!(e.code, IpcErrorCode::Internal);
+        assert_eq!(e.message, ADB_IO_FAILED);
+        assert!(!e.message.contains("secret"));
+        assert!(!e.message.contains("denied"));
+        assert!(!e.message.contains("IO 错误"), "不得走邻层 Display 兜底");
+    }
+
+    /// `ipc_adb` 的每一类都只给已声明的分类句（无任意 Display 入口）。
+    #[test]
+    fn every_adb_class_keeps_its_own_sentence() {
+        assert_eq!(
+            ipc_adb(&AdbError::Timeout).message,
+            yohu_runtime::EXEC_TIMEOUT
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::Cancelled).message,
+            yohu_runtime::TASK_CANCELLED
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::Truncated).message,
+            yohu_runtime::CAPTURE_TRUNCATED
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::PumpPanic).message,
+            yohu_runtime::PUMP_PANIC
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::ToolUnavailable).message,
+            yohu_domain::TOOL_UNAVAILABLE
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::CandidatesFailed).message,
+            yohu_domain::CANDIDATES_FAILED
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::UnsupportedShell).message,
+            yohu_domain::UNSUPPORTED_SHELL
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::DeviceOffline("S1".into())).message,
+            yohu_domain::device_offline_text("S1")
+        );
+        assert_eq!(
+            ipc_adb(&AdbError::NotOnline("S1".into())).message,
+            yohu_domain::device_not_online_text("S1")
+        );
+    }
+
+    /// `system.openPath` 失败不带 OS 原文。
+    #[test]
+    fn open_path_failure_is_a_fixed_sentence() {
+        let e = ipc_open_path(&std::io::Error::other("E:/secret: not found"));
+        assert_eq!(e.code, IpcErrorCode::Internal);
+        assert_eq!(e.message, OPEN_PATH_FAILED);
+        assert!(!e.message.contains("secret"));
     }
 
     #[test]

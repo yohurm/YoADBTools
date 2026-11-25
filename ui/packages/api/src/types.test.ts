@@ -243,27 +243,29 @@ describe("wire 契约：与 yohu-protocol serde 输出一致", () => {
 
   it("AppEvent 内部 tag 为 camelCase kind", () => {
     const event: AppEvent = {
-      kind: "logOverflow",
+      kind: "logAppended",
       serial: "s1",
-      dropped_batches: 2,
+      last_seq: 9,
     };
     expect(JSON.parse(JSON.stringify(event))).toEqual({
-      kind: "logOverflow",
+      kind: "logAppended",
       serial: "s1",
-      dropped_batches: 2,
+      last_seq: 9,
     });
   });
 
-  it("processIndex 事件负载与新类型变体平铺一致", () => {
+  it("processIndex 事件负载带世代（迟到旧世代可丢）", () => {
     const event: AppEvent = {
       kind: "processIndex",
       serial: "s1",
+      generation: 3,
       entries: [{ pid: 123, name: "com.foo" }],
       degraded: false,
     };
     expect(JSON.parse(JSON.stringify(event))).toEqual({
       kind: "processIndex",
       serial: "s1",
+      generation: 3,
       entries: [{ pid: 123, name: "com.foo" }],
       degraded: false,
     });

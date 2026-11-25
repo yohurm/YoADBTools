@@ -1,5 +1,5 @@
-//! 壳装配上限：事件队列、应用日志环、投屏空闲拍、截图等待、呈现节拍。
-//! 禁止在 lib / PresentHost / 呈现线程再写散落数字。
+//! 壳装配上限：事件队列、应用日志环、投屏空闲拍、截图等待、呈现节拍、任务终态回收。
+//! 禁止在 lib / PresentHost / 呈现线程 / tasks 再写散落数字。
 
 use std::time::Duration;
 
@@ -29,6 +29,10 @@ pub const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(5);
 /// 引导 HWND / `Gpu::new` 的初始边长（首帧 layout 到达前占位，勿与 `MIRROR_MIN_LAYOUT_PX` 混用）。
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const PRESENT_BOOTSTRAP_PX: u32 = 16;
+/// 任务中心终态保留时长。超过即从列表回收（UI 不承担回收）。
+pub const TASK_FINISHED_RETENTION: Duration = Duration::from_secs(60);
+/// 任务中心终态保留条数上限（与保留时长先到先回收）。
+pub const TASK_RETENTION_MAX: usize = 64;
 
 #[cfg(test)]
 mod tests {
@@ -46,5 +50,11 @@ mod tests {
         assert_eq!(PRESENT_BEAT, Duration::from_secs(1));
         assert_eq!(SCREENSHOT_TIMEOUT, Duration::from_secs(5));
         assert_eq!(PRESENT_BOOTSTRAP_PX, 16);
+    }
+
+    #[test]
+    fn task_retention_is_bounded_and_named() {
+        assert_eq!(TASK_FINISHED_RETENTION, Duration::from_secs(60));
+        assert_eq!(TASK_RETENTION_MAX, 64);
     }
 }

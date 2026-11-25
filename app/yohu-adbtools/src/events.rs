@@ -1,11 +1,14 @@
 //! 事件分发：core 事件 → Tauri emit（事件名由 AppEvent::name() 决定）。
+//!
+//! 分发器只做三件事：分派收口、按变体不开口、emit。采集收口进 `capture_runs`（用
+//! generation），投屏收口/文案在 `mirror_sessions` / `mirror_present`，用户文案不在
+//! 事件层合成。诊断 tracing 归产生侧（`mirror_sessions::on_state`），本层不按变体开洞。
 
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
 use crate::state::AppState;
-use yohu_mirror::content_size_usable;
-use yohu_protocol::{AppEvent, CaptureState, MirrorSessionState};
+use yohu_protocol::{AppEvent, CaptureState};
 
 /// 启动分发循环（app 层唯一的事件出口）。
 ///
@@ -18,175 +21,63 @@ pub fn spawn_dispatcher(
     tauri::async_runtime::spawn(async move {
         let mut rx = rx;
         while let Some(mut event) = rx.recv().await {
-            if let AppEvent::CaptureState {
-                serial,
-                state: CaptureState::Stopped,
-                ..
-            } = &event
-            {
-                // 采集结束是任务中心收口的唯一入口（commands / 掉线只 stop，不另调 finish）。
-                if let Some(app_state) = app.try_state::<AppState>() {
-                    crate::capture_runs::finish(&app_state, serial);
-                }
-            }
-            if let AppEvent::MirrorPainted {
-                serial,
-                generation,
-                painted_fps,
-            } = &event
-            {
-                if let Some(app_state) = app.try_state::<AppState>() {
-                    app_state
-                        .present
-                        .note_painted(serial, *generation, *painted_fps);
-                }
-            }
-            if let AppEvent::MirrorState {
-                serial,
-                state,
-                width,
-                height,
-                error,
-                hole_title,
-                hole_body,
-                ..
-            } = &mut event
-            {
-                if let Some(app_state) = app.try_state::<AppState>() {
-                    match state {
-                        MirrorSessionState::Stopped | MirrorSessionState::Failed => {
-                            app_state.present.unbind(serial);
-                            crate::mirror_sessions::finish(&app_state, serial);
-                        }
-                        MirrorSessionState::Live if content_size_usable(*width, *height) => {
-                            app_state.present.adopt_content(serial, *width, *height);
-                        }
-                        _ => {}
+            let app_state = app.try_state::<AppState>();
+            match &mut event {
+                AppEvent::CaptureState {
+                    serial,
+                    generation,
+                    state: CaptureState::Stopped,
+                } => {
+                    if let Some(state) = &app_state {
+                        crate::capture_runs::finish(state, serial, *generation);
                     }
                 }
-                let native = cfg!(any(windows, target_os = "macos"));
-                let failed = matches!(state, MirrorSessionState::Failed);
-                if let Some((title, body)) = crate::mirror_present::session_failure_hole(
-                    native,
-                    failed,
-                    error.as_deref().unwrap_or(""),
-                ) {
-                    *hole_title = Some(title.to_string());
-                    *hole_body = Some(body);
+                AppEvent::MirrorPainted {
+                    serial,
+                    generation,
+                    painted_fps,
+                } => {
+                    if let Some(state) = &app_state {
+                        crate::mirror_sessions::on_painted(
+                            state,
+                            serial,
+                            *generation,
+                            *painted_fps,
+                        );
+                    }
                 }
+                AppEvent::MirrorState {
+                    serial,
+                    generation,
+                    state,
+                    width,
+                    height,
+                    error,
+                    hole_title,
+                    hole_body,
+                    ..
+                } => {
+                    if let Some(host) = &app_state {
+                        if let Some((title, body)) = crate::mirror_sessions::on_state(
+                            host,
+                            serial,
+                            *generation,
+                            *state,
+                            *width,
+                            *height,
+                            error.as_deref(),
+                        ) {
+                            *hole_title = Some(title);
+                            *hole_body = Some(body);
+                        }
+                    }
+                }
+                _ => {}
             }
             let name = event.name();
-            if matches!(&event, AppEvent::MirrorState { .. }) {
-                tracing::info!(name, "emit mirror/state");
-            }
             if let Err(e) = app.emit(name, &event) {
                 tracing::warn!(name, error = %e, "事件 emit 失败");
             }
         }
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use yohu_domain::LogLevel;
-
-    #[test]
-    fn app_log_words_come_from_the_level() {
-        assert_eq!(
-            crate::yolog::parse_level(LogLevel::Warn.as_str()),
-            LogLevel::Warn
-        );
-        assert_eq!(
-            crate::yolog::parse_level(LogLevel::Error.as_str()),
-            LogLevel::Error
-        );
-        assert_eq!(
-            crate::yolog::parse_level(LogLevel::Info.as_str()),
-            LogLevel::Info
-        );
-        assert_eq!(crate::yolog::parse_level("nope"), LogLevel::Info);
-        let src = include_str!("yolog.rs");
-        assert!(!src.contains("\"warn\""));
-        assert!(!src.contains("\"error\""));
-        assert!(!src.contains("\"info\""));
-    }
-
-    fn strip_owner_line(src: &str, needle: &str) -> String {
-        let mut dropped = false;
-        src.lines()
-            .filter(|line| {
-                if !dropped && line.contains(needle) {
-                    dropped = true;
-                    false
-                } else {
-                    true
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    #[test]
-    fn command_outcome_is_settled_once() {
-        let needle = "into_eval_result()";
-        let owner = include_str!("terminal_eval.rs");
-        let rest = strip_owner_line(owner, needle);
-        assert!(
-            !rest.contains(needle),
-            "{needle} remains in terminal_eval after the owner line"
-        );
-        let others = [
-            include_str!("browse_runs.rs"),
-            include_str!("capture_runs.rs"),
-            include_str!("library_store.rs"),
-            include_str!("update_runs.rs"),
-            include_str!("settings_store.rs"),
-            include_str!("ipc_update.rs"),
-            include_str!("group_runs.rs"),
-            include_str!("tasks.rs"),
-        ];
-        for src in others {
-            assert!(!src.contains(needle), "{needle} rewritten outside the owner");
-        }
-    }
-
-    #[test]
-    fn transfer_lock_sentence_once() {
-        let src = include_str!("transfer_runs.rs");
-        let production = src
-            .split_once("mod tests")
-            .map(|(head, _)| head)
-            .unwrap_or(src);
-        assert_eq!(production.matches("transfer lock poisoned").count(), 1);
-    }
-
-    #[test]
-    fn update_cancel_lock_sentence_once() {
-        let src = include_str!("update_runs.rs");
-        let production = src
-            .split_once("mod tests")
-            .map(|(head, _)| head)
-            .unwrap_or(src);
-        assert_eq!(production.matches("update cancel lock poisoned").count(), 1);
-    }
-
-    #[test]
-    fn mirror_task_lock_sentence_once() {
-        let src = include_str!("mirror_sessions.rs");
-        let production = src
-            .split_once("mod tests")
-            .map(|(head, _)| head)
-            .unwrap_or(src);
-        assert_eq!(production.matches("mirror task lock poisoned").count(), 1);
-    }
-
-    #[test]
-    fn capture_task_lock_sentence_once() {
-        let src = include_str!("capture_runs.rs");
-        let production = src
-            .split_once("mod tests")
-            .map(|(head, _)| head)
-            .unwrap_or(src);
-        assert_eq!(production.matches("capture lock poisoned").count(), 1);
-    }
 }

@@ -21,4 +21,9 @@ export interface DeviceSession {
   deviceStatuses: Record<string, DeviceStatus>;
   /** 应用设置快照（与设置页同一 settingsStore 投影） */
   settings: AppSettings;
+  /**
+   * 日志导出建议目录的唯一解析值（core `system.info` 已解析：设置值优先，空则 `paths.exports_dir()`）。
+   * 模块的保存框建议名直接消费本值，禁止再自算第二套目录。
+   */
+  exportDefaultDir: string;
 }

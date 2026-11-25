@@ -5,17 +5,26 @@
 import { defineContextMenu } from "@yohu/ui";
 
 import { createKindTitle } from "./create-kind";
+import { RENAME_TITLE } from "./rename";
 
-export type FilesListMenuAction = "new-file" | "new-dir" | "download" | "copy" | "delete";
+export type FilesListMenuAction =
+  | "new-file"
+  | "new-dir"
+  | "download"
+  | "copy"
+  | "rename"
+  | "delete";
 
 export interface FilesListMenuCtx {
   canDownload: boolean;
   canDelete: boolean;
   canCopy: boolean;
+  canRename: boolean;
   newFile: () => void;
   newDir: () => void;
   download: () => void;
   copy: () => void;
+  rename: () => void;
   remove: () => void;
 }
 
@@ -26,6 +35,7 @@ export const filesListMenu = defineContextMenu<FilesListMenuCtx, FilesListMenuAc
     { id: "new-dir", label: createKindTitle("dir") },
     { id: "download", label: "下载", disabled: !ctx.canDownload },
     { id: "copy", label: "复制路径", disabled: !ctx.canCopy },
+    { id: "rename", label: RENAME_TITLE, disabled: !ctx.canRename },
     { id: "delete", label: "删除", danger: true, disabled: !ctx.canDelete },
   ],
   onSelect: (id, ctx) => {
@@ -41,6 +51,9 @@ export const filesListMenu = defineContextMenu<FilesListMenuCtx, FilesListMenuAc
         return;
       case "copy":
         ctx.copy();
+        return;
+      case "rename":
+        ctx.rename();
         return;
       case "delete":
         ctx.remove();

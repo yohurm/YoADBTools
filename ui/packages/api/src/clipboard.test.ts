@@ -20,7 +20,7 @@ describe("writeClipboard", () => {
 
   it("文件、日志、命令管理不再自己调剪贴板", () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../modules");
-    for (const file of ["files/src/FileView.tsx", "logs/src/LogAnalyzerView.tsx", "terminal/src/CommandManager.tsx"]) {
+    for (const file of ["files/src/FileView.tsx", "logs/src/copy-controller.ts", "terminal/src/CommandManager.tsx"]) {
       const text = readFileSync(resolve(root, file), "utf8");
       expect(text).toContain("writeClipboard");
       expect(text).not.toContain("navigator.clipboard");
@@ -36,7 +36,7 @@ describe("剪贴板失败文案只写一处", () => {
     const root = resolve(here, "../../modules");
     const views = [
       "files/src/FileView.tsx",
-      "logs/src/LogAnalyzerView.tsx",
+      "logs/src/copy-controller.ts",
       "terminal/src/CommandManager.tsx",
     ].map((name) => readFileSync(resolve(root, name), "utf8"));
     const once = "return result.ok ? undefined : " + "result.reason";

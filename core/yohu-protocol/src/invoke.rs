@@ -15,14 +15,6 @@ pub struct AdbExecRequest {
     pub timeout_ms: Option<u64>,
 }
 
-/// `log.replay` 请求：从环按 seq 回补，不过滤（窗口过滤在 UI 消费端）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ReplayRequest {
-    pub serial: String,
-    pub from_seq: u64,
-    pub limit: u32,
-}
-
 /// `log.export` 请求：当前窗口过滤条件下的环快照，写一份 txt。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExportRequest {
@@ -46,6 +38,16 @@ pub struct ExportResult {
 pub struct PathOpRequest {
     pub serial: String,
     pub path: String,
+}
+
+/// `files.rename` 请求。只给新条目名，落点由 core 拼在同目录，不是跨目录移动。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RenameRequest {
+    pub serial: String,
+    /// 源（设备绝对路径）
+    pub path: String,
+    /// 新条目名（不含分隔符）
+    pub name: String,
 }
 
 /// `files.push/pull` 请求。方向由命令名决定；id 由壳发号，不进 DTO。

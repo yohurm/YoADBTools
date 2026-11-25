@@ -214,10 +214,16 @@ jobs:
           # 与应用内 DEFAULT_REPO 一致（ADR-v6-022/044）；GitHub 重命名后会跳到当前仓。
           # 若需强制写当前仓 slug，可加：--owner … --repo …
 
+          # 优先使用仓库内策展的 Release 说明（docs/releases/<tag>.md），没有则自动生成。
+          notes_arg=(--generate-notes)
+          if [[ -f "docs/releases/${tag}.md" ]]; then
+            notes_arg=(--notes-file "docs/releases/${tag}.md")
+          fi
+
           gh release create "$tag" \
             "release-out/$(basename "$win")" \
             "release-out/$(basename "$deb")" \
             "release-out/$(basename "$dmg")" \
             release-out/update-manifest.json \
-            --generate-notes \
+            "${notes_arg[@]}" \
             --title "$tag"

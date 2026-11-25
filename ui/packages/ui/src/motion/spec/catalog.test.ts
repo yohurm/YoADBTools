@@ -9,7 +9,6 @@ const REQUIRED_RECIPES = [
   "collapse",
   "panel",
   "fill",
-  "preview",
   "inline-end",
   "send-aim",
   "swap",

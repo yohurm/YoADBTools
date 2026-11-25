@@ -49,8 +49,8 @@ pub use log_bind::{
     pid_set_of, rebind_pids, to_wire_filter, FilterScopeInput, PidBinding, HISTORY_PID_CAP,
 };
 pub use log_filter::{
-    is_log_level_letter, log_filter_matches, normalize_log_levels, parse_tag_needles,
-    tag_filter_active, LOG_LEVEL_LETTERS,
+    is_log_level_char, is_log_level_letter, log_filter_matches, normalize_log_levels,
+    parse_tag_needles, tag_filter_active, LOG_LEVEL_LETTERS,
 };
 pub use log_format::format_log_line;
 pub use log_signal::{scan_signal, SignalHit, SignalKind};

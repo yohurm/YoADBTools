@@ -1,19 +1,19 @@
 /**
- * 日志模块门面：工作区 + 窗口扇出 + 采集客户端。只依赖 @yohu/api。
- * 焦点由 View 经 bindSerial 注入默认设备；过滤定义在消费端，命中索引在环旁边（ADR-v6-041）。
- * 显示面板只由 workspace 写入当前页。
- * close / resumeFollow 以 capture 为准（先停采 / 再要尾页）。
+ * 日志模块门面：只装配 workspace + capture，并暴露 View 需要的契约（state + 动作 + 选择器）。
+ * 内部 workspace.* 操作不经门面；过滤定义在消费端，命中索引在环旁边（ADR-v6-041）。
+ * 选择器（deviceOf / appNamesOf / sessionById / commandSerialOf）是 View 读设备/会话切片的唯一出口。
  */
 
 import { createStore } from "solid-js/store";
 import { APP_SETTINGS_DEFAULT } from "@yohu/api";
 
 import { createCapture } from "./capture";
-import { createIngest } from "./ingest";
+import { appNamesOf, deviceSlice } from "./device-projection";
+import { sessionById } from "./session-lifecycle";
 import { createWorkspace, type LogSessionState, type LogUiState } from "./workspace";
 
 export type { DeviceUiState, LogSessionState } from "./workspace";
-export { deviceSlice, SYSTEM_SESSION_TITLE } from "./workspace";
+export { SYSTEM_SESSION_TITLE, EXPORT_NEEDS_CAPTURE } from "./workspace";
 
 export function createLogStore() {
   const [state, setState] = createStore<LogUiState>({
@@ -25,8 +25,7 @@ export function createLogStore() {
   });
 
   const workspace = createWorkspace(state, setState);
-  const ingest = createIngest(workspace);
-  const capture = createCapture(state, setState, workspace, ingest);
+  const capture = createCapture(state, setState, workspace);
 
   return {
     state,
@@ -35,16 +34,12 @@ export function createLogStore() {
     renameSession: workspace.renameSession,
     duplicateSession: workspace.duplicateSession,
     setActive: workspace.setActive,
+    setColumnView: workspace.setColumnView,
     patchFilter: workspace.patchFilter,
     setPaused: workspace.setPaused,
-    trimPanels: workspace.trimPanels,
-    catchUpSession: workspace.catchUpSession,
-    bindPackageSessions: workspace.bindPackageSessions,
-    assignDefaultSerial: workspace.assignDefaultSerial,
-    discardView: workspace.discardView,
-    flushPanel: workspace.flushPanel,
-    flushDevicePanels: workspace.flushDevicePanels,
-    setFollowing: workspace.setFollowing,
+    sessionById: (id: number | null) => sessionById(state, id),
+    deviceOf: (serial: string | null | undefined) => deviceSlice(state, serial),
+    appNamesOf: (serial: string | null) => appNamesOf(state, serial),
     ...capture,
   };
 }

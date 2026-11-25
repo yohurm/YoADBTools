@@ -17,7 +17,7 @@
 
 Yohu ADB Tools（产品名 `YohuAdbTools`）把设备扫描、命令终端、文件管理、日志分析和投屏显示收进同一个工作台。核心用 Rust，窗口与 IPC 走 Tauri 2，界面是 TypeScript + SolidJS 与自研组件库 YoUI。
 
-当前版本 **0.1.3**。交付 **Windows 10/11 x64**、**macOS 12+** 与 **Linux**（x64 / arm64，WebKitGTK 4.1）。投屏像素与文件拖出在 Linux 上仍是预留能力。
+当前版本 **0.1.4**。交付 **Windows 10/11 x64**、**macOS 12+** 与 **Linux**（x64 / arm64，WebKitGTK 4.1）。Linux 投屏已可用（VA-API 或按需下载的 OpenH264 软解）；文件拖出仍只支持 Windows 与 macOS。
 
 ## 功能
 
@@ -27,7 +27,7 @@ Yohu ADB Tools（产品名 `YohuAdbTools`）把设备扫描、命令终端、文
 | **命令终端** | 命令库与命令组、多设备并行、组内串行；占位符 `{0}{1}`；统一输入/输出块；命令管理窗口深拷贝编辑、保存全量提交 |
 | **文件管理** | 浏览、上传/下载（可取消）、删除、新建；路径由 core 侧安全根强制校验（`/sdcard`、`/storage`，拒绝 `..`） |
 | **日志分析** | 每设备一路 logcat；多窗口 Tab（按包名 / PID）；级别、Tag、关键字过滤；暂停与滚动挂起；导出 txt |
-| **投屏显示** | 官方 scrcpy-server 4.1 + 自写客户端；系统硬解呈现（Windows Media Foundation / macOS VideoToolbox）。Linux 预留 VA-API，启动投屏会得到明确的未实现错误，不用 FFmpeg 填 |
+| **投屏显示** | 官方 scrcpy-server 4.1 + 自写客户端；系统硬解呈现（Windows Media Foundation / macOS VideoToolbox）。Linux 有 H.264 VLD 时走 VA-API，否则用设置里按需下载的 Cisco OpenH264 软解画进 GTK 子窗口（二进制不进安装包，不用 FFmpeg 填） |
 | **设置与更新** | ADB 路径、主题、密度、缓冲容量等；Windows 可应用内下载 NSIS 覆盖安装；macOS 打开 DMG；Linux 打开 `.deb` |
 
 ## 技术栈

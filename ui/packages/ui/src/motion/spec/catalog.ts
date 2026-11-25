@@ -35,15 +35,15 @@ export const MotionCatalog = {
   collapse: {
     name: "collapse",
     engine: "implicit",
-    spec: "spatialLocal",
-    properties: ["grid-template-rows"],
+    spec: ["spatialLocal", "spatialPanel"],
+    properties: ["grid-template-rows", "grid-template-columns"],
     interruptible: true,
   },
   panel: {
     name: "panel",
     engine: "implicit",
-    spec: ["spatialStretch", "effectsEnter", "effectsExit"],
-    properties: ["grid-template-rows", "opacity", "transform"],
+    spec: ["spatialStretch", "spatialPanel", "effectsEnter", "effectsExit"],
+    properties: ["grid-template-rows", "grid-template-columns", "opacity", "transform"],
     interruptible: true,
   },
   fill: {
@@ -51,13 +51,6 @@ export const MotionCatalog = {
     engine: "implicit",
     spec: "spatialLocal",
     properties: ["grid-template-rows"],
-    interruptible: true,
-  },
-  preview: {
-    name: "preview",
-    engine: "implicit",
-    spec: "spatialPanel",
-    properties: ["grid-template-columns"],
     interruptible: true,
   },
   "inline-end": {

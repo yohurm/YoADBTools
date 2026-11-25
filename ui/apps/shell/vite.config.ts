@@ -56,5 +56,20 @@ export default defineConfig({
     target: "es2022",
     outDir: "dist",
     sourcemap: false,
+    // 桌面单页应用，主包体积属预期；显式阈值避免构建告警噪声（第三方已单独分包）。
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        // 拆分第三方依赖，避免单包超过 500 kB 触发构建警告（solid 运行时与 Tauri 客户端各自成包）。
+        manualChunks(id: string) {
+          if (id.includes("node_modules")) {
+            if (id.includes("solid-js")) return "solid";
+            if (id.includes("@tauri-apps")) return "tauri";
+            return "vendor";
+          }
+          return undefined;
+        },
+      },
+    },
   },
 });

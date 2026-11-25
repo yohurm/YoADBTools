@@ -65,3 +65,48 @@
   flex: 1;
   min-height: 0;
 }
+
+/*
+ * 轴 inline：同一套 0fr↔1fr 换到列向，裁宽度。行程走 spatialPanel。
+ * 行向让位 1fr，否则高度跟着宽度一起塌。
+ * 宿主在父级 flex 里 hug，列宽由 `__content` 里那扇锁宽窗格撑出来；
+ * 窗格贴 inline-end，从分隔线一侧被裁，禁止随槽变窄折行压扁。
+ * 放在 panel 段之后：inline 的 transition 要压过 block panel 那根。
+ */
+.yohu-collapse[data-axis="inline"] {
+  grid-template-rows: 1fr;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns var(--yohu-motion-spatial-panel);
+}
+
+.yohu-collapse[data-axis="inline"][data-open="true"] {
+  grid-template-columns: 1fr;
+}
+
+.yohu-collapse[data-axis="inline"] .yohu-collapse__inner {
+  min-width: 0;
+}
+
+/* `__inner` 是块容器，`__content` 不吃 stretch；inline 轴要它撑满块向，
+ * 否则侧栏窗格只抱住内容高（block 轴那笔 flex:1 归 fill 配方，不在这）。 */
+.yohu-collapse[data-axis="inline"] .yohu-collapse__content {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 100%;
+}
+
+/* inline + panel：宽度 ∥ 内容淡出右移，同一拍。透明度仍走 effects。 */
+.yohu-collapse[data-axis="inline"][data-recipe="panel"] .yohu-collapse__content {
+  transform: translateX(var(--yohu-space-sm));
+  transition:
+    opacity var(--yohu-motion-effects-exit),
+    transform var(--yohu-motion-spatial-panel);
+}
+
+.yohu-collapse[data-axis="inline"][data-recipe="panel"][data-open="true"] .yohu-collapse__content {
+  transform: translateX(0);
+  transition:
+    opacity var(--yohu-motion-effects-enter),
+    transform var(--yohu-motion-spatial-panel);
+}

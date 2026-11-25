@@ -4,6 +4,7 @@
  */
 
 import type { NamedMarkupRun } from "./markup-policy";
+import { MARKUP_HIGHLIGHT_ORDER, markupBucketReserved } from "./markup-tokens";
 import { washSpanOpen } from "./markup-wash";
 
 type HighlightLike = {
@@ -22,6 +23,7 @@ type HighlightMap = {
 type HighlightBucket = { highlight: HighlightLike };
 
 const buckets = new Map<string, HighlightBucket>();
+let seeded = false;
 
 function engine(): { Highlight: HighlightCtor; highlights: HighlightMap } | null {
   const ctor = (globalThis as { Highlight?: HighlightCtor }).Highlight;
@@ -32,11 +34,25 @@ function engine(): { Highlight: HighlightCtor; highlights: HighlightMap } | null
   return { Highlight: ctor, highlights };
 }
 
+/** 首次使用时按固定名单登记，锁定绘制先后（wash 底先、mark 关键字后）。 */
+function seedBuckets(api: { Highlight: HighlightCtor; highlights: HighlightMap }): void {
+  if (seeded) {
+    return;
+  }
+  seeded = true;
+  for (const name of MARKUP_HIGHLIGHT_ORDER) {
+    const highlight = new api.Highlight();
+    api.highlights.set(name, highlight);
+    buckets.set(name, { highlight });
+  }
+}
+
 function bucket(name: string): HighlightBucket | null {
   const api = engine();
   if (!api) {
     return null;
   }
+  seedBuckets(api);
   const existing = buckets.get(name);
   if (existing) {
     return existing;
@@ -55,6 +71,9 @@ function release(name: string, range: AbstractRange): void {
   }
   current.highlight.delete(range);
   if (current.highlight.size > 0) {
+    return;
+  }
+  if (markupBucketReserved(name)) {
     return;
   }
   engine()?.highlights.delete(name);

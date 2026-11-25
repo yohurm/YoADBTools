@@ -4,7 +4,7 @@
 
 import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
-import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, YoToaster, createToaster, type YoChromeAction } from "@yohu/ui";
+import { YoBadge, YoButton, YoChrome, YoPage, YoPanel, YoToaster, createToaster } from "@yohu/ui";
 import {
   errorText,
   ModuleTitle,
@@ -23,6 +23,12 @@ import { importCommitCount, importCommitSummary } from "./import-selection";
 import { importBlockedByManager } from "./import-guard";
 import { commandManagerStore } from "./manager/store";
 import { terminalStore } from "./store";
+import {
+  terminalChromeActions,
+  terminalChromeIsCancel,
+  terminalChromeIsLibrary,
+  type TerminalChromeAction,
+} from "./terminal-chrome-actions";
 import "./terminal.css";
 
 export function TerminalView(props: DeviceSession) {
@@ -54,37 +60,31 @@ export function TerminalView(props: DeviceSession) {
   const running = (): boolean => terminalStore.busy();
   const canCancel = (): boolean => terminalStore.session.activeRunId !== null;
 
-  const chromeActions = createMemo((): YoChromeAction[] => {
-    const items: YoChromeAction[] = [
-      {
-        key: "clear",
-        node: (
-          <YoButton buttonStyle="normal" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!terminalStore.hasLines()}>
-            清屏
-          </YoButton>
-        ),
-      },
-    ];
-    if (canCancel()) {
-      items.push({
-        key: "cancel",
-        node: (
-          <YoButton buttonStyle="normal" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
-            取消
-          </YoButton>
-        ),
-      });
+  const chromeActions = createMemo((): TerminalChromeAction[] =>
+    terminalChromeActions({ cancellable: canCancel() }),
+  );
+
+  const chromeAction = (id: TerminalChromeAction) => {
+    if (terminalChromeIsCancel(id)) {
+      return (
+        <YoButton buttonStyle="normal" tone="neutral" onClick={() => void terminalStore.cancelGroup()}>
+          取消
+        </YoButton>
+      );
     }
-    items.push({
-      key: "library",
-      node: (
+    if (terminalChromeIsLibrary(id)) {
+      return (
         <YoButton buttonStyle="normal" tone="neutral" onClick={() => commandManagerStore.open(terminalStore.library)}>
           命令管理
         </YoButton>
-      ),
-    });
-    return items;
-  });
+      );
+    }
+    return (
+      <YoButton buttonStyle="normal" tone="neutral" onClick={() => terminalStore.clearResults()} disabled={!terminalStore.hasLines()}>
+        清屏
+      </YoButton>
+    );
+  };
 
   const showErrorText = (error: unknown): void => {
     toaster.show(errorText(error), "error");
@@ -128,7 +128,7 @@ export function TerminalView(props: DeviceSession) {
       <YoChrome
         title={ModuleTitle.Terminal}
         leading={props.selectedLabel ? <YoBadge text={props.selectedLabel} tone="neutral" /> : undefined}
-        actions={chromeActions()}
+        actions={chromeActions().map((id) => ({ key: id, node: chromeAction(id) }))}
       />
 
       <div class="yohu-terminal__body">

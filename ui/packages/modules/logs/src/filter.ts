@@ -97,7 +97,10 @@ export function removeTagNeedle(raw: string, tag: string): string {
   );
 }
 
-/** 会话形状投影成 wire 过滤器。投影用 `@yohu/api` 的 `toWireFilter`，逐行只走 `matchesWireFilter`。 */
+/**
+ * 会话形状投影成 wire 过滤器。投影用 `@yohu/api` 的 `toWireFilter`，逐行只走 `matchesWireFilter`。
+ * `pidSet` 在 `toSessionFilter` 里算一次，本地匹配与 IPC 侧共用同一份（不再二次 `pidSetOf`）。
+ */
 export function sessionWire(f: SessionFilter): LogFilter {
   return toWireFilter({
     levels: f.levels,
@@ -108,6 +111,7 @@ export function sessionWire(f: SessionFilter): LogFilter {
   });
 }
 
+/** 会话 → 过滤形状。`pidSet` 只在此算一次，供本地匹配与 `sessionWire` 共用。 */
 export function toSessionFilter(input: {
   levels: readonly string[];
   tagContains: string;

@@ -63,14 +63,38 @@ export function serializeLogCopy(opts: {
   selection: Selection | null;
   fallbackText?: string;
 }): string {
+  return resolveLogCopy(opts).text;
+}
+
+/** 复制的分类结果：全选 / 选区 / 回退行 / 无载荷 / 选区失效。 */
+export type CopyOutcomeKind = "all" | "selection" | "fallback" | "none" | "stale";
+export type CopyOutcome = { kind: CopyOutcomeKind; text: string };
+
+/** 失效选区提示（行被裁掉后选区引用落空）。 */
+export const STALE_SELECTION_TEXT = "选区已失效（相关行已滚出窗口），请重新选择";
+
+/**
+ * 一次判定：分类 + 载荷。选区存在但切片为空（行已裁掉）判 stale，上层据此提示，
+ * 不再静默返回空串。
+ */
+export function resolveLogCopy(opts: {
+  pick: LogCopyScope;
+  messages: readonly CopyMessage[];
+  listRoot: ParentNode | null;
+  selection: Selection | null;
+  fallbackText?: string;
+}): CopyOutcome {
   if (copyScopeIsAll(opts.pick)) {
-    return opts.messages.map((item) => item.text).join("\n");
+    return { kind: "all", text: opts.messages.map((item) => item.text).join("\n") };
   }
-  const fromSelection = documentCopyText(opts.listRoot, opts.selection, opts.messages);
-  if (fromSelection) {
-    return fromSelection;
+  if (readDocSel(opts.listRoot, opts.selection)) {
+    const text = documentCopyText(opts.listRoot, opts.selection, opts.messages);
+    return text ? { kind: "selection", text } : { kind: "stale", text: "" };
   }
-  return opts.fallbackText ?? "";
+  if (opts.fallbackText) {
+    return { kind: "fallback", text: opts.fallbackText };
+  }
+  return { kind: "none", text: "" };
 }
 
 export function applyCopyEvent(event: ClipboardEvent, text: string): boolean {

@@ -30,7 +30,7 @@ import {
 } from "@yohu/ui";
 
 import type { SessionScope } from "./filter";
-import { NEW_SESSION_DIALOG_HEIGHT } from "./layout";
+import { newSessionDialogHeight } from "./layout";
 import {
   newSessionIsPackage,
   newSessionModeOf,
@@ -143,7 +143,7 @@ export function NewSessionDialog(props: {
     );
   };
 
-  const deviceSlice = () => logStore.state.devices[deviceSerial()];
+  const deviceSlice = () => logStore.deviceOf(deviceSerial());
 
   const processEntries = createMemo(
     () => sliceList(deviceSlice()?.processEntries),
@@ -268,7 +268,7 @@ export function NewSessionDialog(props: {
     <YoDialog
       open={props.open}
       title="新建日志窗口"
-      height={NEW_SESSION_DIALOG_HEIGHT}
+      height={newSessionDialogHeight()}
       bodyOverflow="hidden"
       onClose={props.onClose}
       footer={

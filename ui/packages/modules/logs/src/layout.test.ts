@@ -4,12 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { Density } from "@yohu/ui";
 import {
-  ALL_LOG_DISPLAY_COLUMNS,
   DEFAULT_LOG_DISPLAY_COLUMNS,
-  defaultFormatOptions,
   formatColumns,
-  headerWidth,
-} from "./editor";
+} from "./editor/format";
+import { ALL_LOG_DISPLAY_COLUMNS, defaultFormatOptions, headerWidth } from "./editor/format-columns";
 import { dataRowHeight } from "./layout";
 import { logsChromeActions } from "./logs-chrome-actions";
 
@@ -200,7 +198,9 @@ describe("日志显示列", () => {
     const filter = load("LogFilterBar.tsx");
     const editorView = load("editor/view.tsx");
     const editorBoard = load("editor/board.ts");
-    const formatter = load("editor/format.ts");
+    const formatter = ["format-columns.ts", "format-paint.ts", "format-text.ts"]
+      .map((name) => load(`editor/${name}`))
+      .join("\n");
     const documentSrc = load("editor/document.ts");
     expect(view).toContain('overflow="hidden"');
     expect(view).toContain('variant="pane"');
@@ -218,7 +218,7 @@ describe("日志显示列", () => {
     expect(logsCss).not.toContain(".yohu-logs__table");
     expect(view).toContain('cellPad="none"');
     expect(view).toContain('tone="document"');
-    expect(view).toContain("logDocTrackTemplate(formatOpts(), chPx())");
+    expect(view).toContain("logDocTrackTemplate(headerOpts(), chPx())");
     expect(view).not.toContain("formatHeader");
     expect(view).not.toContain("yohu-logs__head-line");
     expect(view).toContain("onInlineScroll");
@@ -232,7 +232,7 @@ describe("日志显示列", () => {
     expect(header).toContain("YoColHead");
     expect(header).toContain("yohu-logs__head");
     expect(logsCss).not.toContain(".yohu-scroller");
-    expect(view).toContain("setColChars");
+    expect(view).toContain("writeColumns");
     expect(view).toContain("actions={");
     expect(view).toContain("logs-chrome-actions");
     expect(view).toContain("logsChromeActions");
@@ -272,11 +272,11 @@ describe("日志显示列", () => {
     expect(view).not.toContain("__body");
     expect(filter).toContain("scopeBadge");
     const scopeSrc = loadSrc("filter.ts");
-    const workspace = loadSrc("workspace.ts");
+    const deviceProj = loadSrc("device-projection.ts");
     expect(scopeSrc).toContain("scopeIsPackage");
-    expect(workspace).toContain("scopeIsPackage");
-    expect(workspace).not.toContain('kind === "package"');
-    expect(workspace).not.toContain('kind !== "package"');
+    expect(deviceProj).toContain("scopeIsPackage");
+    expect(deviceProj).not.toContain('kind === "package"');
+    expect(deviceProj).not.toContain('kind !== "package"');
     const scopeBody = scopeSrc.replace('return scope.kind === "package"', "");
     expect(scopeBody).not.toContain('kind === "package"');
     expect(filter).not.toContain('return "System"');
@@ -288,7 +288,7 @@ describe("日志显示列", () => {
     expect(filter.split("var(--" + "yohu-level-").length - 1).toBe(0);
     expect(filter).not.toContain("YoButton");
     expect(view).toContain("action=");
-    expect(view).toContain("text={`信号 ${session.signalCount}`}");
+    expect(view).toContain("text={`信号 ${live().signalCount}`}");
     expect(view).toContain("EditorView");
     expect(view).not.toContain("YoVirtualList");
     expect(editorView).toContain("YoVirtualList");
@@ -301,8 +301,9 @@ describe("日志显示列", () => {
     expect(editorView).not.toContain("data-box={props.range.box");
     expect(editorView).not.toContain("selectionchange");
     expect(editorView).not.toContain("pickAll");
-    expect(view).toContain("selectAllChildren");
-    expect(view).toContain('querySelector(".yohu-logs__view")');
+    expect(editorView).toContain("selectAllChildren");
+    expect(view).toContain("viewRef");
+    expect(view).not.toContain('querySelector(".yohu-logs__view")');
     expect(view).not.toContain("yohu-virtual-list__inner");
     expect(load("copy-gesture.ts")).toContain("copyScopeIsAll(opts.pick())");
     expect(load("copy-gesture.ts")).not.toContain('kind === "all"');
@@ -317,13 +318,13 @@ describe("日志显示列", () => {
     expect(editorView).toContain("LineBoard");
     expect(editorView).not.toContain("clipMessage");
     expect(editorView).not.toContain("wrapMessage");
-    expect(editorBoard).toContain("clipMessage");
+    expect(editorBoard).not.toContain("clipMessage");
     expect(editorBoard).toContain("wrapMessage");
     expect(editorBoard).not.toContain("formatMessage");
     expect(editorView).toContain("data-layout");
     expect(editorView).not.toContain("log_line_layout");
     expect(formatter).not.toContain("log_line_layout");
-    expect(formatter).toContain("softWrap");
+    expect(formatter).toContain("formatWraps");
     expect(formatter).not.toContain("clipMessage");
     expect(formatter).not.toContain("wrapMessage");
     expect(documentSrc).not.toContain("log_line_layout");
@@ -351,7 +352,7 @@ describe("日志显示列", () => {
     expect(editorView).toContain("chPx");
     expect(view).not.toContain("onInlineOffset");
     expect(view).toContain("chPx={chPx}");
-    expect(view).toContain("softWrap");
+    expect(view).toContain("log_line_layout");
     expect(logsCss).not.toMatch(/\.yohu-logs__row\s*\{[^}]*pre-wrap/);
     expect(view).toContain("onCreated={beginCapture}");
     expect(view).toContain("onCleanup(() => toaster.destroy())");

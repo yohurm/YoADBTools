@@ -5,23 +5,19 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LogHits, LogLine, LogPage, LogWindowBind } from "@yohu/api";
+import type { LogLine } from "@yohu/api";
 
 const mocks = vi.hoisted(() => ({
   logCaptureStart: vi.fn(),
   logCaptureStop: vi.fn(),
   logCaptureStatus: vi.fn(),
   logClearDevice: vi.fn(),
-  logReplay: vi.fn(),
-  logWindowBind: vi.fn(),
-  logWindowRelease: vi.fn(),
-  logWindowLatch: vi.fn(),
-  logPage: vi.fn(),
+  logRange: vi.fn(),
+  logQuery: vi.fn(),
   logExport: vi.fn(),
   logProcessSnapshot: vi.fn(),
   logPackageSnapshot: vi.fn(),
-  logHitsHandlers: [] as ((e: LogHits) => void)[],
-  logOverflowHandlers: [] as ((e: { serial: string }) => void)[],
+  logAppendedHandlers: [] as ((e: { serial: string; last_seq: number }) => void)[],
   processIndexHandlers: [] as ((e: unknown) => void)[],
   captureStateHandlers: [] as ((e: { serial: string; generation: number; state: string }) => void)[],
   deviceOfflineHandlers: [] as ((e: { serial: string }) => void)[],
@@ -64,11 +60,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logCaptureStop: (...a: unknown[]) => mocks.logCaptureStop(...a),
     logCaptureStatus: (...a: unknown[]) => mocks.logCaptureStatus(...a),
     logClearDevice: (...a: unknown[]) => mocks.logClearDevice(...a),
-    logReplay: (...a: unknown[]) => mocks.logReplay(...a),
-    logWindowBind: (...a: unknown[]) => mocks.logWindowBind(...a),
-    logWindowRelease: (...a: unknown[]) => mocks.logWindowRelease(...a),
-    logWindowLatch: (...a: unknown[]) => mocks.logWindowLatch(...a),
-    logPage: (...a: unknown[]) => mocks.logPage(...a),
+    logRange: (...a: unknown[]) => mocks.logRange(...a),
+    logQuery: (...a: unknown[]) => mocks.logQuery(...a),
     logExport: (...a: unknown[]) => mocks.logExport(...a),
     logProcessSnapshot: (...a: unknown[]) => mocks.logProcessSnapshot(...a),
     logPackageSnapshot: (...a: unknown[]) => mocks.logPackageSnapshot(...a),
@@ -86,18 +79,11 @@ vi.mock("@yohu/api", async (importOriginal) => {
         if (i >= 0) mocks.deviceOfflineHandlers.splice(i, 1);
       });
     },
-    onLogHits: (h: (e: LogHits) => void): Promise<() => void> => {
-      mocks.logHitsHandlers.push(h);
+    onLogAppended: (h: (e: { serial: string; last_seq: number }) => void): Promise<() => void> => {
+      mocks.logAppendedHandlers.push(h);
       return Promise.resolve(() => {
-        const i = mocks.logHitsHandlers.indexOf(h);
-        if (i >= 0) mocks.logHitsHandlers.splice(i, 1);
-      });
-    },
-    onLogOverflow: (h: (e: { serial: string }) => void): Promise<() => void> => {
-      mocks.logOverflowHandlers.push(h);
-      return Promise.resolve(() => {
-        const i = mocks.logOverflowHandlers.indexOf(h);
-        if (i >= 0) mocks.logOverflowHandlers.splice(i, 1);
+        const i = mocks.logAppendedHandlers.indexOf(h);
+        if (i >= 0) mocks.logAppendedHandlers.splice(i, 1);
       });
     },
     onProcessIndex: (h: (e: unknown) => void): Promise<() => void> => {
@@ -128,9 +114,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     EVENT_NAMES: {
       devicesChanged: "devices/changed",
       deviceOffline: "device/offline",
-      logLines: "log/lines",
-      logHits: "log/hits",
-      logOverflow: "log/overflow",
+      logAppended: "log/appended",
       processIndex: "log/processIndex",
       captureState: "log/captureState",
       transferProgress: "transfer/progress",
@@ -141,8 +125,9 @@ vi.mock("@yohu/api", async (importOriginal) => {
   };
 });
 
-import { matchesWireFilter, pidSetOf, scanSignal, toWireFilter } from "@yohu/api";
+import { matchesWireFilter, pidSetOf } from "@yohu/api";
 import { createLogStore, SYSTEM_SESSION_TITLE } from "./store";
+import { sessionWire, toSessionFilter } from "./filter";
 import type { LogStoreApi } from "./store";
 
 const liveStores: LogStoreApi[] = [];
@@ -169,36 +154,17 @@ function remember(serial: string, lines: LogLine[], cap: number): void {
   rings.set(serial, next.length > cap ? next.slice(next.length - cap) : next);
 }
 
-function signalsOf(lines: readonly LogLine[]): number {
-  return lines.reduce((count, line) => count + (scanSignal(line) ? 1 : 0), 0);
-}
-
-function pageFor(spec: LogWindowBind): LogPage {
-  const rows = (rings.get(spec.serial) ?? []).filter(
-    (line) => line.seq >= spec.from_seq && matchesWireFilter(line, spec.filter),
-  );
-  const eligible =
-    spec.following || spec.through_seq === undefined
-      ? rows
-      : rows.filter((line) => line.seq <= (spec.through_seq ?? line.seq));
-  return {
-    window_id: spec.id,
-    serial: spec.serial,
-    index: 0,
-    total: rows.length,
-    signals: signalsOf(rows),
-    pending: rows.length - eligible.length,
-    lines: eligible,
-  };
-}
-
 function track(store: LogStoreApi): LogStoreApi {
   liveStores.push(store);
   return store;
 }
 
+const appendedByStore = new WeakMap<LogStoreApi, (e: { serial: string; last_seq: number }) => void>();
+
 function wiredStore(): LogStoreApi {
   const store = track(createLogStore());
+  const handler = mocks.logAppendedHandlers.at(-1);
+  if (handler) appendedByStore.set(store, handler);
   void store.bindSerial("S1");
   store.ensureSession();
   return store;
@@ -225,25 +191,10 @@ async function liveStore(): Promise<LogStoreApi> {
 const push = (serial: string, lines: LogLine[]): void => {
   const store = liveStores.at(-1);
   remember(serial, lines, store?.state.bufferCapacity ?? 10_000);
-  if (!store) return;
-  for (const session of store.state.sessions) {
-    if (session.serial !== serial || !session.capturing) continue;
-    const wire = toWireFilter(session);
-    const fresh = lines.filter(
-      (line) => line.seq >= Math.max(0, session.fromSeq) && matchesWireFilter(line, wire),
-    );
-    const indexed = (rings.get(serial) ?? []).filter(
-      (line) => line.seq >= Math.max(0, session.fromSeq) && matchesWireFilter(line, wire),
-    );
-    mocks.logHitsHandlers.at(-1)?.({
-      serial,
-      window_id: session.id,
-      total: indexed.length,
-      appended: fresh.length,
-      signals: signalsOf(indexed),
-      tail: session.paused ? [] : fresh,
-    });
-  }
+  if (!store || lines.length === 0) return;
+  const last = lines[lines.length - 1]!.seq;
+  // 水位信号是每设备的：只发一条，store 自己给该设备各在采窗口拉环。
+  appendedByStore.get(store)?.({ serial, last_seq: last });
 };
 
 afterEach(() => {
@@ -253,38 +204,53 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  mocks.logAppendedHandlers.length = 0;
+  mocks.processIndexHandlers.length = 0;
+  mocks.captureStateHandlers.length = 0;
+  mocks.deviceOfflineHandlers.length = 0;
+  mocks.devicesChangedHandlers.length = 0;
+  mocks.settingsChangedHandlers.length = 0;
   mocks.logCaptureStart.mockReset();
   mocks.logCaptureStop.mockReset();
   mocks.logCaptureStatus.mockReset();
-  mocks.logReplay.mockReset();
-  mocks.logWindowBind.mockReset();
-  mocks.logWindowRelease.mockReset();
-  mocks.logWindowLatch.mockReset();
-  mocks.logPage.mockReset();
+  mocks.logRange.mockReset();
+  mocks.logQuery.mockReset();
+  mocks.logQuery.mockImplementation(
+    (req: {
+      serial: string;
+      filter: Parameters<typeof matchesWireFilter>[1];
+      from_seq: number;
+      to_seq: number;
+      limit: number;
+      direction: "forward" | "backward";
+    }) => {
+      const all = rings.get(req.serial) ?? [];
+      const first = all[0]?.seq ?? 0;
+      const last = all[all.length - 1]?.seq ?? 0;
+      const lo = req.direction === "backward" ? req.to_seq : req.from_seq;
+      const hi = req.direction === "backward" ? req.from_seq : req.to_seq;
+      const matched = all.filter(
+        (line) => line.seq >= lo && line.seq <= hi && matchesWireFilter(line, req.filter),
+      );
+      const lines =
+        req.direction === "backward" ? matched.slice(-req.limit) : matched.slice(0, req.limit);
+      return {
+        serial: req.serial,
+        lines,
+        has_more: matched.length > lines.length,
+        ring_first_seq: first,
+        ring_last_seq: last,
+      };
+    },
+  );
   mocks.logExport.mockReset();
   mocks.logProcessSnapshot.mockReset();
   mocks.logPackageSnapshot.mockReset();
-  mocks.logReplay.mockResolvedValue({ serial: "S1", from_seq: 0, lines: [], truncated: false });
-  mocks.logWindowBind.mockImplementation(async (spec: LogWindowBind) => pageFor(spec));
-  mocks.logWindowRelease.mockResolvedValue(undefined);
-  mocks.logWindowLatch.mockResolvedValue({
-    window_id: 0,
-    serial: "",
-    index: 0,
-    total: 0,
-    signals: 0,
-    pending: 0,
-    lines: [],
-  });
-  mocks.logPage.mockResolvedValue({
-    window_id: 0,
-    serial: "",
-    index: 0,
-    total: 0,
-    signals: 0,
-    pending: 0,
-    lines: [],
-  });
+  // UI 实时从环拉取：mock 直接按 from_seq 返回环中剩余原始行（同步数组，便于用例断言）
+  mocks.logRange.mockImplementation(
+    (req: { serial: string; from_seq: number; limit: number }) =>
+      (rings.get(req.serial) ?? []).filter((line) => line.seq >= req.from_seq).slice(0, req.limit),
+  );
   mocks.logExport.mockResolvedValue({ path: "x.txt", lines: 0 });
   mocks.logProcessSnapshot.mockResolvedValue([]);
   mocks.logPackageSnapshot.mockResolvedValue([]);
@@ -301,7 +267,6 @@ beforeEach(() => {
     serial,
     capturing: true,
     generation: 0,
-    last_seq: 0,
   }));
 });
 
@@ -488,7 +453,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.following).toBe(true);
   });
 
-  it("新流 flush 后强制跟滚：停跟滚再开采集，快照进可见区而不是 pending", async () => {
+  it("新流 flush 后从环重新拉取：快照进可见区而不是 pending", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
     push("S1", [mk(0), mk(1)]);
@@ -496,16 +461,8 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.following).toBe(false);
     await store.stopCapture();
     mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S1", generation: 3, adopted: false });
-    mocks.logWindowBind.mockResolvedValueOnce({
-      window_id: id,
-      serial: "S1",
-      index: 0,
-      total: 3,
-      signals: 0,
-      pending: 0,
-      lines: [mk(0), mk(1), mk(2)],
-    });
     await store.startCapture();
+    push("S1", [mk(0), mk(1), mk(2)]);
     expect(store.state.sessions[0]!.id).toBe(id);
     expect(store.state.sessions[0]!.following).toBe(true);
     expect(store.state.sessions[0]!.frozenThroughSeq).toBeNull();
@@ -591,24 +548,86 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["kept", "paused"]);
   });
 
-  it("过滤变严只从已有面板筛掉，镜像为空不得冲成空列表", async () => {
+  it("过滤变严后按当前过滤从环重建可见区", async () => {
     const store = await liveStore();
     const id = store.state.sessions[0]!.id;
     push("S1", [mk(0, { level: "I", msg: "info" }), mk(1, { level: "E", msg: "err" })]);
-    rings.delete("S1");
     await store.patchFilter(id, { levels: ["E"] });
     expect(store.state.sessions[0]!.visible.map((r) => r.line.msg)).toEqual(["err"]);
   });
 
-  it("溢出回补：log.replay from_seq = lastSeq+1", async () => {
+  it("后台丢推送后回前台 resumeVisible 从环补齐全部（切换应用场景）", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1)]);
+    // 模拟切到别的应用期间：seq 2..41 的批次全部没送到 UI（丢推送不丢环）
+    remember(
+      "S1",
+      Array.from({ length: 40 }, (_, i) => mk(i + 2)),
+      store.state.bufferCapacity,
+    );
+    remember("S1", [mk(42)], store.state.bufferCapacity);
+    // 回前台只收到最后一拍水位（到 seq 42，前面 2..41 未单独送信号）
+    appendedByStore.get(store)?.({
+      serial: "S1",
+      last_seq: 42,
+    });
+    // 回到前台：resumeVisible 应对所有在采窗口从环重新对账
+    store.resumeVisible();
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual(
+        Array.from({ length: 43 }, (_, i) => i),
+      );
+    });
+  });
+
+  it("容量口径：文档是缓存，重绑后只显示环仍持有的行（已被环淘汰的行不再显示）", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0), mk(1), mk(2), mk(3)]);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3]);
+    // 环按容量淘汰了 0、1，只剩 2、3
+    rings.set("S1", [mk(2), mk(3)]);
+    await store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([2, 3]);
+  });
+
+  it("环拉取遇上在途重绑：不丢行、不重复", async () => {
     const store = await liveStore();
     push("S1", [mk(0), mk(1)]);
-    const binds = mocks.logWindowBind.mock.calls.length;
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
+    remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
+    // 回前台触发重绑（loadPage）与增量水位并发；两者都从环按 seq 拉取，结果一致
+    store.resumeVisible();
+    remember("S1", [mk(4)], store.state.bufferCapacity);
+    appendedByStore.get(store)?.({ serial: "S1", last_seq: 4 });
     await vi.waitFor(() => {
-      expect(mocks.logWindowBind.mock.calls.length).toBeGreaterThan(binds);
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
     });
-    expect(overflowedOf(store, "S1")).toBe(true);
+  });
+
+  it("过滤窗口（非全量）命中间隔不误判空洞、不反复整页回补", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    await store.patchFilter(id, { levels: ["E"] });
+    push("S1", [
+      mk(0, { level: "I" }),
+      mk(1, { level: "E" }),
+      mk(2, { level: "I" }),
+      mk(3, { level: "E" }),
+    ]);
+    await Promise.resolve();
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([1, 3]);
+  });
+
+  it("丢批后下一次水位一次性从环补齐", async () => {
+    const store = await liveStore();
+    push("S1", [mk(0), mk(1)]);
+    remember("S1", [mk(2), mk(3)], store.state.bufferCapacity);
+    remember("S1", [mk(4)], store.state.bufferCapacity);
+    appendedByStore.get(store)?.({ serial: "S1", last_seq: 4 });
+    await vi.waitFor(() => {
+      expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 3, 4]);
+    });
   });
 
   it("掉线：停采集、清镜像，已画出的行保留", async () => {
@@ -646,7 +665,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(session.visible).toHaveLength(100);
     expect(session.visible[0]?.line.msg).toBe("n0");
     expect(session.visible.at(-1)?.line.msg).toBe("n99");
-    expect(session.pageIndex).toBe(0);
   });
 
   it("startCapture/stopCapture 走 IPC 并同步窗口状态", async () => {
@@ -674,29 +692,12 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     await store.stopCapture();
   });
 
-  it("startCapture 经 log.window.bind 填入当前页（事件丢失兜底）", async () => {
-    const line = mk(3, { msg: "from-replay" });
-    mocks.logWindowBind.mockResolvedValueOnce({
-      window_id: 1,
-      serial: "S1",
-      index: 0,
-      total: 1,
-      signals: 0,
-      pending: 0,
-      lines: [line],
-    });
+  it("exportSession 显式接窗口 id，把该窗口过滤交给 log.export 并回读条数", async () => {
     const store = wiredStore();
     await store.startCapture();
-    expect(mocks.logWindowBind).toHaveBeenCalled();
-    expect(store.state.sessions[0]!.visible[0]!.line.msg).toBe("from-replay");
-    await store.stopCapture();
-  });
-
-  it("exportSession 把当前窗口过滤交给 log.export", async () => {
-    const store = wiredStore();
-    await store.startCapture();
-    mocks.logExport.mockResolvedValueOnce({ path: "D:\\out.txt", lines: 1 });
-    await store.exportSession("D:\\out.txt");
+    mocks.logExport.mockResolvedValueOnce({ path: "D:\\out.txt", lines: 7 });
+    const id = store.state.sessions[0]!.id;
+    const result = await store.exportSession(id, "D:\\out.txt");
     expect(mocks.logExport).toHaveBeenCalledWith(
       expect.objectContaining({
         serial: "S1",
@@ -705,11 +706,13 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
         filter: expect.objectContaining({ scope: { kind: "all" } }),
       }),
     );
+    expect(result).toEqual({ path: "D:\\out.txt", lines: 7 });
   });
 
   it("exportSession 从未采集的窗口返回 null 且不发 IPC", async () => {
     const store = wiredStore();
-    const result = await store.exportSession();
+    const id = store.state.sessions[0]!.id;
+    const result = await store.exportSession(id);
     expect(result).toBeNull();
     expect(mocks.logExport).not.toHaveBeenCalled();
   });
@@ -749,7 +752,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       serial: "S1",
       capturing: true,
       generation: 7,
-      last_seq: 3,
     });
     await store.bindSerial("S1");
     expect(mocks.logCaptureStop).not.toHaveBeenCalled();
@@ -776,7 +778,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       serial: "S1",
       capturing: false,
       generation: 0,
-      last_seq: 0,
     });
     await store.startCapture();
     expect(mocks.logCaptureStart).toHaveBeenCalledWith("S1");
@@ -793,7 +794,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       serial: "S1",
       capturing: false,
       generation: 1,
-      last_seq: 0,
     });
     await store.startCapture();
     expect(store.state.sessions[0]!.capturing).toBe(false);
@@ -810,7 +810,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       serial: "S1",
       capturing: false,
       generation: 1,
-      last_seq: 0,
     });
     await store.startCapture();
     expect(store.state.sessions.find((s) => s.id === other)!.capturing).toBe(false);
@@ -932,7 +931,6 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
       serial: "S1",
       capturing: true,
       generation: 1,
-      last_seq: 0,
     });
     await store.startCapture();
     expect(store.state.sessions[0]!.fromSeq).toBe(0);
@@ -975,6 +973,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     ]);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -993,6 +992,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     ]);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1016,6 +1016,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     expect(store.state.sessions.find((s) => s.id === id)!.visible).toHaveLength(0);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 42, name: "com.foo" }],
       degraded: false,
     });
@@ -1030,6 +1031,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     store.setActive(id);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1039,6 +1041,7 @@ describe("logStore 批量事件管线（消费端过滤，ADR-v6-006）", () => 
     rings.delete("S1");
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 99, name: "com.foo" }],
       degraded: false,
     });
@@ -1082,6 +1085,7 @@ describe("logStore 多窗口 × 多设备", () => {
     store.setActive(pkg);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1095,6 +1099,7 @@ describe("logStore 多窗口 × 多设备", () => {
     push("S1", [mk(2, { pid: 10, msg: "after-stop" })]);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1160,6 +1165,7 @@ describe("logStore 多窗口 × 多设备", () => {
     store.setActive(a);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1169,6 +1175,7 @@ describe("logStore 多窗口 × 多设备", () => {
     store.setActive(b);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S2",
+      generation: 1,
       entries: [{ pid: 99, name: "com.bar" }],
       degraded: false,
     });
@@ -1183,6 +1190,7 @@ describe("logStore 多窗口 × 多设备", () => {
     const a = store.createSession({ kind: "package", pkg: "com.foo", includeChild: true }, "com.foo", "S1");
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [
         { pid: 10, name: "com.foo" },
         { pid: 11, name: "com.foo:svc" },
@@ -1192,25 +1200,12 @@ describe("logStore 多窗口 × 多设备", () => {
     store.createSession({ kind: "all" }, "B", "S2");
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S2",
+      generation: 1,
       entries: [{ pid: 50, name: "com.foo" }],
       degraded: false,
     });
     store.patchFilter(a, { tagContains: "x" });
     expect(pidSetOf(store.state.sessions.find((s) => s.id === a)!.binding).sort((x, y) => x - y)).toEqual([10, 11]);
-  });
-
-  it("overflowed 按设备：A 溢出不影响正在看 B 的窗口", async () => {
-    const store = wiredStore();
-    await store.startCapture();
-    const b = store.createSession({ kind: "all" }, "B", "S2");
-    store.setActive(b);
-    mocks.logCaptureStart.mockResolvedValueOnce({ serial: "S2", generation: 3, adopted: false });
-    await store.startCapture();
-    mocks.logOverflowHandlers.at(-1)?.({ serial: "S1" });
-    await vi.waitFor(() => {
-      expect(overflowedOf(store, "S1")).toBe(true);
-    });
-    expect(overflowedOf(store, "S2")).toBe(false);
   });
 
   it("不同设备 start 互不等待同一把闸门", async () => {
@@ -1338,7 +1333,6 @@ describe("logStore 窗口 hold 引用", () => {
       serial: "S1",
       capturing: true,
       generation: 1,
-      last_seq: 0,
     });
     await store.startCapture();
     expect(store.state.sessions[0]!.capturing).toBe(true);
@@ -1366,6 +1360,7 @@ describe("logStore 设置联动", () => {
     store.setActive(id);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1378,6 +1373,7 @@ describe("logStore 设置联动", () => {
     expect(cleared.fromSeq).toBeGreaterThan(1);
     mocks.processIndexHandlers.at(-1)?.({
       serial: "S1",
+      generation: 1,
       entries: [{ pid: 10, name: "com.foo" }],
       degraded: false,
     });
@@ -1425,18 +1421,135 @@ describe("logStore 设置联动", () => {
   it("dispose 卸掉本实例订阅，不再吃后续批次", async () => {
     const store = wiredStore();
     store.dispose();
-    const before = mocks.logHitsHandlers.length;
+    const before = mocks.logAppendedHandlers.length;
     await Promise.resolve();
-    expect(mocks.logHitsHandlers.length).toBeLessThan(before);
-    const leftover = mocks.logHitsHandlers.at(-1);
+    expect(mocks.logAppendedHandlers.length).toBeLessThan(before);
+    const leftover = mocks.logAppendedHandlers.at(-1);
     leftover?.({
       serial: "S1",
-      window_id: store.state.sessions[0]?.id ?? 0,
-      total: 1,
-      appended: 1,
-      signals: 0,
-      tail: [mk(99)],
+      last_seq: 99,
     });
     expect(store.state.sessions[0]?.visible ?? []).toHaveLength(0);
+  });
+});
+
+describe("世代 / 采集相 / 冻结上限单源", () => {
+  it("status 对账不把世代写小：迟到旧 status 被 raiseDeviceGen 拒", async () => {
+    const store = track(createLogStore());
+    await store.bindSerial("S1");
+    store.ensureSession();
+    await store.startCapture();
+    expect(generationOf(store, "S1")).toBe(1);
+    // 后续 captureState 抬到 5，再回一次 generation=2 的 status。
+    mocks.captureStateHandlers.at(-1)?.({ serial: "S1", generation: 5, state: "running" });
+    expect(generationOf(store, "S1")).toBe(5);
+    mocks.logCaptureStatus.mockResolvedValueOnce({ serial: "S1", capturing: true, generation: 2 });
+    await store.bindSerial("S1");
+    expect(generationOf(store, "S1")).toBe(5);
+  });
+
+  it("stop 后 status 世代的迟到写不入（只升不减）", async () => {
+    const store = await liveStore();
+    mocks.captureStateHandlers.at(-1)?.({ serial: "S1", generation: 9, state: "running" });
+    expect(generationOf(store, "S1")).toBe(9);
+    mocks.logCaptureStatus.mockResolvedValueOnce({ serial: "S1", capturing: false, generation: 3 });
+    await store.stopCapture();
+    expect(generationOf(store, "S1")).toBe(9);
+  });
+
+  it("清设备缓冲后 pendingCount / signalCount / docShift 归零，fromSeq 回 0", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [
+      mk(0, { level: "E", tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }),
+      mk(1, { msg: "x" }),
+    ]);
+    store.detachFollow(id);
+    push("S1", [mk(2, { msg: "y" })]);
+    expect(store.state.sessions[0]!.pendingCount).toBeGreaterThan(0);
+    await store.clearDevice();
+    const session = store.state.sessions[0]!;
+    expect(session.visible).toHaveLength(0);
+    expect(session.pendingCount).toBe(0);
+    expect(session.signalCount).toBe(0);
+    expect(session.docShift).toBe(0);
+    expect(session.fromSeq).toBe(0);
+    expect(session.following).toBe(true);
+    expect(session.frozenThroughSeq).toBeNull();
+  });
+
+  it("scope 切走后 binding 清空，不留第二份 pidSet", async () => {
+    const store = await liveStore();
+    const id = store.createSession({ kind: "package", pkg: "com.foo", includeChild: false }, "com.foo");
+    store.setActive(id);
+    mocks.processIndexHandlers.at(-1)?.({
+      serial: "S1",
+      generation: 1,
+      entries: [{ pid: 10, name: "com.foo" }],
+      degraded: false,
+    });
+    await store.startCapture();
+    expect(pidSetOf(store.state.sessions.find((s) => s.id === id)!.binding)).toEqual([10]);
+    store.patchFilter(id, { scope: { kind: "all" } });
+    expect(pidSetOf(store.state.sessions.find((s) => s.id === id)!.binding)).toEqual([]);
+  });
+
+  it("docShift：整文档替换归零，追加裁头累加", async () => {
+    const store = await liveStore();
+    store.setBufferCapacity(2);
+    push("S1", [mk(0), mk(1)]);
+    push("S1", [mk(2)]);
+    expect(store.state.sessions[0]!.visible.map((r) => r.line.seq)).toEqual([1, 2]);
+    expect(store.state.sessions[0]!.docShift).toBe(1);
+    const id = store.state.sessions[0]!.id;
+    await store.patchFilter(id, { keyword: "" });
+    expect(store.state.sessions[0]!.docShift).toBe(0);
+  });
+
+  it("冻结后新到的行按 frozenThroughSeq 记账：冻结点之前的回补不计 pending", async () => {
+    const store = await liveStore();
+    const id = store.state.sessions[0]!.id;
+    push("S1", [mk(0)]);
+    store.detachFollow(id);
+    expect(store.state.sessions[0]!.frozenThroughSeq).toBe(0);
+    // 冻结点之后新到的行 → pending +1
+    push("S1", [mk(1)]);
+    expect(store.state.sessions[0]!.pendingCount).toBe(1);
+  });
+});
+
+describe("logStore 会话列视图（colChars / headShift 单源）", () => {
+  it("写列宽/横滑进会话自身字段，切会话各自独立", () => {
+    const store = wiredStore();
+    const first = store.state.activeSessionId!;
+    const second = store.createSession({ kind: "all" }, "T2", "S1");
+    store.setColumnView(first, { colChars: { tag: 30 }, headShift: 12 });
+    store.setColumnView(second, { colChars: { app: 40 } });
+
+    store.setActive(first);
+    const a = store.sessionById(first)!;
+    expect(a.colChars).toEqual({ tag: 30 });
+    expect(a.headShift).toBe(12);
+
+    store.setActive(second);
+    const b = store.sessionById(second)!;
+    expect(b.colChars).toEqual({ app: 40 });
+    expect(b.headShift).toBe(0);
+  });
+
+  it("关闭会话即随会话删除列视图，不残留", () => {
+    const store = wiredStore();
+    const first = store.state.activeSessionId!;
+    store.setColumnView(first, { colChars: { pid: 20 }, headShift: 4 });
+    store.closeSession(first);
+    expect(store.sessionById(first)).toBeUndefined();
+    const remaining = store.state.sessions[0]!;
+    expect(remaining.colChars).toEqual({});
+    expect(remaining.headShift).toBe(0);
+  });
+
+  it("未会话 id 写入静默忽略，不抛错", () => {
+    const store = wiredStore();
+    expect(() => store.setColumnView(999_999, { headShift: 3 })).not.toThrow();
   });
 });

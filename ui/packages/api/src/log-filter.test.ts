@@ -6,12 +6,10 @@ import { describe, expect, it } from "vitest";
 import type { LogFilter, LogLine } from "./types";
 import {
   LEVELS,
-  isLogLevelLetter,
-  logFilterMatches,
+  levelKey,
   matchesWireFilter,
   normalizeLevels,
   parseLevelLetter,
-  levelKey,
 } from "./log-filter";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -23,17 +21,16 @@ describe("LEVELS（与 domain testdata/log_levels.json 同一套向量）", () =
   it("字母表一致", () => {
     expect(letters).toEqual([...LEVELS]);
   });
-  it.each(letters)("isLogLevelLetter %s", (letter) => {
-    expect(isLogLevelLetter(letter)).toBe(true);
-    expect(isLogLevelLetter(letter.toLowerCase())).toBe(true);
+  it.each(letters)("parseLevelLetter %s", (letter) => {
     expect(parseLevelLetter(letter)).toBe(letter);
+    expect(parseLevelLetter(letter.toLowerCase())).toBe(letter);
     expect(levelKey(letter)).toBe(letter.toLowerCase());
     expect(levelKey(letter.toLowerCase())).toBe(letter.toLowerCase());
   });
   it("拒绝空、多字符、未知", () => {
-    expect(isLogLevelLetter("")).toBe(false);
-    expect(isLogLevelLetter("VV")).toBe(false);
-    expect(isLogLevelLetter("?")).toBe(false);
+    expect(parseLevelLetter("")).toBeNull();
+    expect(parseLevelLetter("VV")).toBeNull();
+    expect(parseLevelLetter("?")).toBeNull();
     expect(levelKey("")).toBeNull();
     expect(levelKey("VV")).toBeNull();
     expect(levelKey("?")).toBeNull();
@@ -58,13 +55,21 @@ describe("ASCII 折叠只写一次", () => {
   });
 });
 
-describe("logFilterMatches（与 domain testdata/log_filter.json 同一套向量）", () => {
+describe("matchesWireFilter（与 domain testdata/log_filter.json 同一套向量）", () => {
   const fixture = JSON.parse(
     readFileSync(resolve(root, "../../../../core/yohu-domain/testdata/log_filter.json"), "utf8"),
   ) as { line: LogLine; filter: LogFilter; expect: boolean }[];
 
   it.each(fixture)("case %#", (c) => {
-    expect(logFilterMatches(c.filter, c.line)).toBe(c.expect);
     expect(matchesWireFilter(c.line, c.filter)).toBe(c.expect);
+  });
+});
+
+describe("匹配内核只有一把", () => {
+  it("导出面不留第二个名字（参数序相反的同源函数已删除）", () => {
+    const owner = readFileSync(resolve(root, "log-filter.ts"), "utf8");
+    expect(owner).not.toContain("export function logFilterMatches");
+    expect(owner).not.toContain("export function levelAllowed");
+    expect(owner).not.toContain("export function isLogLevelLetter");
   });
 });

@@ -2,29 +2,22 @@
  * Document：对照 AS DocumentAppender。
  * 只尾部追加 / 环裁 / 改选项重载。文本来自官方 Format 分段，本层不垫列、不折行。
  * Soft-Wrap 已在 Formatter 写入（关 hang / 开裸 \\n）。本层只存 Document.text。
- * 格式化只走 Formatter；LogLine / SignalKind 从 @yohu/api 引入。
+ * 格式化只走 Formatter；LogLine / SignalKind 经 ViewRow 模型引入。
  */
 
-import type { LogLine, SignalKind } from "@yohu/api";
-
 import {
-  batchCursor,
+  formatColCharsKey,
   formatMessages,
   formatOptionsKey,
   type ContentBar,
-  type FormatBatchState,
   type FormatOptions,
   type FormatRange,
   type FormattedMessage,
 } from "./format";
+import type { ViewRow } from "../stack";
+import { findHeadOverlap } from "../stream/seq";
 
 export type { ContentBar, FormatOptions, FormatRange };
-
-export type DocRow = {
-  line: LogLine;
-  signal?: SignalKind;
-  collapsedAfter?: number;
-};
 
 export type DocMessage = {
   seq: number;
@@ -32,27 +25,19 @@ export type DocMessage = {
   ranges: readonly FormatRange[];
   bar: ContentBar;
   barInk?: string;
-  signal?: SignalKind;
+  signal?: ViewRow["signal"];
   collapsedAfter?: number;
-  line: LogLine;
+  line: ViewRow["line"];
 };
 
 export const EMPTY_MESSAGES: DocMessage[] = [];
-export const EMPTY_ROWS: DocRow[] = [];
+export const EMPTY_ROWS: ViewRow[] = [];
 
 export function extendStored<T>(current: readonly T[], empty: readonly T[], next: T[]): T[] {
   return current === empty ? next : current.concat(next);
 }
 
-function duplicateSeed(items: readonly DocMessage[]): FormatBatchState {
-  const last = items.at(-1)?.line;
-  if (!last) {
-    return {};
-  }
-  return batchCursor(last);
-}
-
-function toDocMessage(row: DocRow, formatted: FormattedMessage): DocMessage {
+function toDocMessage(row: ViewRow, formatted: FormattedMessage): DocMessage {
   return {
     seq: row.line.seq,
     text: formatted.text,
@@ -65,70 +50,51 @@ function toDocMessage(row: DocRow, formatted: FormattedMessage): DocMessage {
   };
 }
 
-function paintRows(rows: readonly DocRow[], options: FormatOptions, seed: FormatBatchState = {}): DocMessage[] {
-  const { messages } = formatMessages(
+function paintRows(rows: readonly ViewRow[], options: FormatOptions): DocMessage[] {
+  const messages = formatMessages(
     rows.map((row) => row.line),
     options,
-    seed,
   );
   return messages.map((formatted, index) => toDocMessage(rows[index]!, formatted));
 }
 
-function prefixLen(prev: readonly DocRow[], next: readonly DocRow[]): number {
-  if (next.length < prev.length) {
-    return -1;
-  }
-  for (let i = 0; i < prev.length; i += 1) {
-    if (prev[i] !== next[i]) {
-      return -1;
-    }
-  }
-  return prev.length;
+/** 下一批相对上一批的尾部重排：丢掉头部 k 行、保留重合尾部、追加新尾。 */
+type SyncDiff = {
+  evicted: number;
+  tailStart: number;
+};
+
+/** 以 seq 单调为前提求「新批次首行在旧批次里的位置」。找不到即整表替换。 */
+function headOverlap(prev: readonly ViewRow[], next: readonly ViewRow[]): number {
+  return findHeadOverlap(prev, next, (row) => row.line.seq);
 }
 
-function suffixOffset(prev: readonly DocRow[], next: readonly DocRow[]): number {
-  if (prev.length <= next.length) {
-    return -1;
+/** 计算与旧批次的差分；不可增量时返回 null（调用方 reload）。 */
+function syncDiff(prev: readonly ViewRow[], next: readonly ViewRow[]): SyncDiff | null {
+  const evicted = headOverlap(prev, next);
+  if (evicted < 0) {
+    return null;
   }
-  const offset = prev.length - next.length;
-  for (let i = 0; i < next.length; i += 1) {
-    if (next[i] !== prev[i + offset]) {
-      return -1;
-    }
+  const keep = prev.length - evicted;
+  if (keep > next.length) {
+    return null;
   }
-  return offset;
+  if (keep > 0 && prev[prev.length - 1]!.line.seq !== next[keep - 1]!.line.seq) {
+    return null;
+  }
+  return { evicted, tailStart: keep };
 }
 
-function overlapLen(prev: readonly DocRow[], next: readonly DocRow[]): number {
-  const max = Math.min(prev.length, next.length);
-  for (let n = max; n > 0; n -= 1) {
-    let ok = true;
-    for (let i = 0; i < n; i += 1) {
-      if (prev[prev.length - n + i] !== next[i]) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      return n;
-    }
-  }
-  return 0;
-}
-
-function rowsEmpty(rows: readonly DocRow[]): boolean {
+function rowsEmpty(rows: readonly ViewRow[]): boolean {
   return rows.length === 0;
 }
 
 export class LogDocument {
   private opts: FormatOptions | null = null;
   private key = "";
-  private source: readonly DocRow[] = EMPTY_ROWS;
+  private colKey = "";
+  private source: readonly ViewRow[] = EMPTY_ROWS;
   private items: DocMessage[] = EMPTY_MESSAGES;
-
-  get options(): FormatOptions | null {
-    return this.opts;
-  }
 
   get messages(): readonly DocMessage[] {
     return this.items;
@@ -136,12 +102,23 @@ export class LogDocument {
 
   setOptions(next: FormatOptions): boolean {
     const key = formatOptionsKey(next);
+    const colKey = formatColCharsKey(next);
     if (this.opts && key === this.key) {
       this.opts = next;
-      return false;
+      if (colKey === this.colKey) {
+        return false;
+      }
+      // 列宽提交（拖宽抬起）只重排一次；拖动过程不写 colChars。
+      this.colKey = colKey;
+      if (this.sourceEmpty()) {
+        return false;
+      }
+      this.reload(this.source);
+      return true;
     }
     this.opts = next;
     this.key = key;
+    this.colKey = colKey;
     if (this.sourceEmpty()) {
       return false;
     }
@@ -149,11 +126,11 @@ export class LogDocument {
     return true;
   }
 
-  append(rows: readonly DocRow[]): boolean {
+  append(rows: readonly ViewRow[]): boolean {
     if (!this.opts || rowsEmpty(rows)) {
       return false;
     }
-    const painted = paintRows(rows, this.opts!, duplicateSeed(this.items));
+    const painted = paintRows(rows, this.opts);
     this.source = this.source === EMPTY_ROWS ? rows.slice() : [...this.source, ...rows];
     this.items = extendStored(this.items, EMPTY_MESSAGES, painted);
     return true;
@@ -172,11 +149,11 @@ export class LogDocument {
     return true;
   }
 
-  reload(rows: readonly DocRow[]): boolean {
+  reload(rows: readonly ViewRow[]): boolean {
     if (!this.opts) {
       this.source = rows;
       this.items = EMPTY_MESSAGES;
-      return rowsEmpty(rows) && this.items === EMPTY_MESSAGES ? false : true;
+      return !rowsEmpty(rows);
     }
     if (rowsEmpty(rows)) {
       const changed = this.items !== EMPTY_MESSAGES;
@@ -184,12 +161,15 @@ export class LogDocument {
       return changed;
     }
     this.source = rows;
-    this.items = paintRows(rows, this.opts!);
+    this.items = paintRows(rows, this.opts);
     return true;
   }
 
-  /** 按 panel 行差分 adopt / append / evict / reload。无突变返回 false。 */
-  sync(rows: readonly DocRow[]): boolean {
+  /**
+   * 按 panel 行差分 adopt / append / evict / reload。无突变返回 false。
+   * 差分以 seq 单调定位头部淘汰，避免稳态环裁时每批 O(n) 身份比较。
+   */
+  sync(rows: readonly ViewRow[]): boolean {
     if (!this.opts) {
       this.source = rows;
       return false;
@@ -203,39 +183,27 @@ export class LogDocument {
     if (this.sourceEmpty()) {
       return this.reload(rows);
     }
-    const prefixed = prefixLen(this.source, rows);
-    if (prefixed >= 0) {
-      if (prefixed === rows.length) {
-        this.source = rows;
-        return false;
-      }
-      const changed = this.append(rows.slice(prefixed));
-      this.source = rows;
-      return changed;
+    const diff = syncDiff(this.source, rows);
+    if (!diff) {
+      return this.reload(rows);
     }
-    const evicted = suffixOffset(this.source, rows);
+    const { evicted, tailStart } = diff;
     if (evicted > 0) {
-      const changed = this.evictFront(evicted);
-      this.source = rowsEmpty(rows) ? EMPTY_ROWS : rows;
-      return changed;
+      this.evictFront(evicted);
     }
-    const overlap = overlapLen(this.source, rows);
-    if (overlap > 0) {
-      this.evictFront(this.source.length - overlap);
-      const tail = rows.slice(overlap);
-      if (tail.length > 0) {
-        this.append(tail);
-      }
-      this.source = rows;
-      return true;
+    const tail = rows.slice(tailStart);
+    if (tail.length > 0) {
+      this.append(tail);
     }
-    return this.reload(rows);
+    this.source = rows;
+    return evicted > 0 || tail.length > 0;
   }
 
   clear(): void {
     this.blankStored();
     this.opts = null;
     this.key = "";
+    this.colKey = "";
   }
 
   private sourceEmpty(): boolean {

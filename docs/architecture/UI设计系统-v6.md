@@ -1,9 +1,11 @@
 # Yohu ADB Tools v6 — UI 设计系统规范（UI 打磨单一事实源）
 
-> **状态：** v3.139（2026-10-09，短下拉钮按文案撑开）
+> **状态：** v3.140（2026-10-13，文件预览栏归 Collapse inline 轴）
 
 > **调研依据：** HarmonyOS 开发者文档设计规范（本地 `HarmonyOS-Developer-docs`：`设计/设计指南/针对多设备设计/电脑/{设计概述,应用设计,窗口框架}`、`通用设计基础/{布局,视觉风格/文本排版,间隔参数}`、`应用 UX 体验标准/电脑应用 UX 体验标准`，提炼见 `docs/architecture/harmonyos-design-notes.md`）、Evil Martians《Devs in mind 2025》、Fluent 2（密度/排版）、Mirafold（语义 token 体系）、Kobalte（无头可及性交互模型）、业界日志/控制台/表格面板（Android Studio Logcat、VS Code Output/Debug Console、Chrome DevTools Console、lnav、PostHog 日志、AG Grid / MUI Data Grid）、路径栏对照 Windows 资源管理器地址栏（分段 hug，空白槽不是展示）、Files App Omnibar + Chromium 输入选区（见 YoAgentDocs `desktop--address-edit-focus`；实现单源 `@yohu/ui` `address-field-model` / `YoAddressField`）。  
 > **执行载体：** `@yohu/ui`（YoUI；token 单源 + 组件）+ `@yohu/workbench`（壳）+ `@yohu/modules/*`。所有改动必须同步更新本文件。
+>
+> **v3.140 变更（文件预览栏归 Collapse inline 轴）：** 收起预览不再是页栅自持的 `grid-template-columns` 过渡（配方 `preview` 已退役），改走 `YoCollapse axis=inline recipe=panel flex=hug`：同一套 0fr/1fr 折叠换到列向，`inert` / `aria-hidden` / `traveling()` / 减动效一并由引擎接管，模块不再手接。窗格宽度锁在消费者自己的坞（`.yohu-files__preview-dock` = `page-gap + preview`）上、贴 inline-end，槽收窄只裁切，窗格不折行——旧实现里 `.yohu-files__preview` 的锁宽被 `.yohu-panel[data-variant="pane"]` 的 `flex:1 1 auto; min-width:0` 压掉，才会把文本上下挤压。内容同拍淡出右移（`spatialPanel` ∥ effects）。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)、[modules/files.md](modules/files.md)。
 >
 > **v3.139 变更（短下拉钮按文案撑开）：** `YoSelect` 菜单宽至少等于触发钮，左对齐。短胶囊按最长选项撑开，超过 `Layout.MenuMax` 才省略。宽字段仍与钮两侧对齐。见 [youi.md](youi.md)。
 >
@@ -169,7 +171,7 @@
 > **v3.17 变更（侧栏槽位插值）：** 收起不再 `display:none`。已被 v3.18 撤回「槽高跟宽同拍」。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)。
 > **v3.16 变更（侧栏共享容器）：** 公开 `YoRail`。当时 `data-rail` 是宽度意图、`data-phase` 单属性编排；现意图/宽度拍走 `data-rail`，文案走 `data-stream`，`data-phase` 只记行程。行标题与列宽同一拍淡入淡出（鸿蒙四类元素 + 不新建容器）；关流强制列表开，开流跟用户折叠，与文案流同一拍。撤回「等 width 再 display」与 `spatialPanelSoft`。见 [动画系统-v6.md](动画系统-v6.md)、[youi.md](youi.md)、[workbench.md](workbench.md)。
 > **v3.15 变更（效率列表 + 地址铬升库）：** 新增 `YoStatusDot` / `YoDivider` / `YoSubheader` / `YoListItem` / `YoDescriptionList` / `YoAddressField`。侧栏导航/设备行走 ListItem，状态点走 StatusDot，分组走 Subheader + Divider。设置/终端/设备列表滚轴走 `YoScroller`（钉底 `handle.scrollToEnd`，禁止 `scrollHeight`）。文件地址铬升到 `.yohu-address*`，模块只留路径行+上级。预览元数据走 DescriptionList。见 [youi.md](youi.md)。
-> **v3.14 变更（侧栏 width 轨）：** 图标轨仍是 232↔48 双态。空间行程改到轨自己的 `width`（配方 `rail`）；工作行 flex（轨不收缩，主列吃剩余）。禁止再插值带 `minmax` 的页栅列。当时 `data-rail` 是宽度意图、`data-presentation` 是文案相位；现页栅/轨 `data-rail`=宽度意图，文案走 `data-stream`。文件预览另走配方 `preview`。见 [动画系统-v6.md](动画系统-v6.md)、[workbench.md](workbench.md)。
+> **v3.14 变更（侧栏 width 轨）：** 图标轨仍是 232↔48 双态。空间行程改到轨自己的 `width`（配方 `rail`）；工作行 flex（轨不收缩，主列吃剩余）。禁止再插值带 `minmax` 的页栅列。当时 `data-rail` 是宽度意图、`data-presentation` 是文案相位；现页栅/轨 `data-rail`=宽度意图，文案走 `data-stream`。文件预览走 `YoCollapse axis=inline`（同一套折叠，换到列向）。见 [动画系统-v6.md](动画系统-v6.md)、[workbench.md](workbench.md)。
 > **v3.13 变更（清单行盒 / 投放框解耦）：** 行盒 `list-row/` 只画格子。投放框独立为 `list-frame/` 叠加层（Explorer/Finder/VS Code：框不是行描边），`YoCorner` 直角环，缩进躲开面板 clip。见 [youi.md](youi.md)、[modules/files.md](modules/files.md)、[文件传输-v6.md](文件传输-v6.md)。
 > **v3.12 变更（侧栏图标轨）：** 壳侧栏是常驻双态轨，不是抽屉。展开 `--yohu-layout-shell-nav`（232，设备卡 + 图标与标题）；收起 `--yohu-layout-shell-nav-icons`（48，与标题栏三键同一热区）。当时文案离散切态，顺序拍（展开先宽、落地再出文案）；现宽/槽/卡高/文案同一拍 `spatialRail`（v3.21），禁止先水平再垂直。图标留在起边槽。禁止把展开内容锁 232 再裁到 0，禁止 `inert` 整栏。列插值已由 v3.14 改为轨 `width`。见 [动画系统-v6.md](动画系统-v6.md)、[workbench.md](workbench.md)。
 > **v3.11 变更（清单行铬独立模块）：** Family B 行盒从 VirtualList/chip 拆出 `list-row/`（直角通栏 hairline、选中底）。投放框已由 v3.13 拆到 `list-frame/`。`YoVirtualList` 只组合行盒与 `hotKey`，不再挂 `yohu-interactive` / `focus-ring`。禁止模块 `--drop`。见 [youi.md](youi.md)、[modules/files.md](modules/files.md)、[文件传输-v6.md](文件传输-v6.md)。

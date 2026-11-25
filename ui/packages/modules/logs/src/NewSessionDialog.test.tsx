@@ -24,11 +24,8 @@ vi.mock("@yohu/api", async (importOriginal) => {
     logCaptureStop: vi.fn(async () => undefined),
     logCaptureStatus: vi.fn(async () => ({ capturing: false, generation: 0 })),
     logClearDevice: vi.fn(async () => undefined),
-    logReplay: vi.fn(async () => ({ serial: "", from_seq: 0, lines: [] })),
     logExport: vi.fn(),
-    onLogBatch: unlisten,
-    onLogHits: unlisten,
-    onLogOverflow: unlisten,
+    onLogAppended: unlisten,
     onProcessIndex: unlisten,
     onCaptureState: unlisten,
     onDeviceOffline: unlisten,
@@ -163,7 +160,7 @@ describe("NewSessionDialog create path", () => {
 describe("当前设备切片", () => {
   it("同一序列号只读一次设备切片", () => {
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "NewSessionDialog.tsx"), "utf8");
-    const needle = "devices[" + "deviceSerial()]";
+    const needle = "logStore.deviceOf(" + "deviceSerial())";
     expect(source.split(needle).length - 1).toBe(1);
     expect(source.split("deviceSlice()").length - 1).toBe(3);
     expect(source).toContain("sliceList(deviceSlice()?.processEntries)");

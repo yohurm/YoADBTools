@@ -6,7 +6,7 @@ describe("rail.css 契约", () => {
   it("一拍 spatial-rail，槽 :not([data-open]) 管字，禁止 display:none", () => {
     const css = loadMotionCss();
     const rail = css.slice(css.indexOf(".yohu-recipe-rail"));
-    const block = rail.slice(0, rail.indexOf(".yohu-recipe-preview"));
+    const block = rail.slice(0, rail.indexOf(".yohu-reveal"));
     expect(block).toContain("var(--yohu-motion-spatial-rail)");
     expect(block).toContain(".yohu-rail-slot:not([data-open]) .yohu-rail-slot__content");
     expect(block).toContain("width var(--yohu-motion-spatial-rail)");

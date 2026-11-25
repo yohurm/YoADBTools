@@ -23,7 +23,8 @@ pub async fn set(
     let updated = state.settings.set(key, value)?;
 
     if key == SettingKey::BufferCapacity {
-        state.capture.set_ring_capacity(updated.buffer_capacity);
+        // 唯一壳侧写点：容量策略在 `capture_runs::apply_buffer_capacity`。
+        crate::capture_runs::apply_buffer_capacity(state, updated.buffer_capacity);
     }
 
     if key == SettingKey::MirrorOpenh264 {

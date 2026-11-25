@@ -2,12 +2,12 @@
 
 use tauri::State;
 
-use crate::commands::ipc;
+use crate::ipc_map::ipc_open_path;
 use crate::state::AppState;
 use yohu_protocol::{AppIdentity, IpcError, SystemInfo};
 use yohu_runtime::open_path;
 
-/// `system.info`：关于/诊断信息。
+/// `system.info`：关于/诊断信息。`paths.exports_dir` 是日志导出的默认目录（单点）。
 #[tauri::command(rename = "system.info")]
 pub fn system_info(state: State<'_, AppState>) -> Result<SystemInfo, IpcError> {
     let adb_path = state
@@ -24,10 +24,10 @@ pub fn system_info(state: State<'_, AppState>) -> Result<SystemInfo, IpcError> {
     })
 }
 
-/// `system.openPath`：用系统文件管理器打开目录，或选中文件。
+/// `system.openPath`：用系统文件管理器打开目录，或选中文件。OS 原文只进 tracing。
 #[tauri::command(rename = "system.openPath")]
 pub fn system_open_path(path: String) -> Result<(), IpcError> {
-    open_path(std::path::Path::new(&path)).map_err(ipc)
+    open_path(std::path::Path::new(&path)).map_err(|e| ipc_open_path(&e))
 }
 
 /// `system.reportError`：前端全局错误上报（应用操作日志）。

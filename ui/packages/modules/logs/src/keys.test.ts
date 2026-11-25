@@ -113,13 +113,14 @@ describe("日志快捷键只在 keys 判定", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
     const needle = "toaster.show(EXPORT_NEEDS_CAPTURE, " + '"info")';
     expect(view.split(needle).length - 1).toBe(1);
-    expect(view).toContain("showExportNeedsCapture(");
+    expect(view).toContain("showExportNeedsCapture");
   });
 
   it("session_by_id_once", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
-    const needle = "sessions." + "find(";
+    const needle = "logStore." + "sessionById";
     expect(view.split(needle).length - 1).toBe(1);
+    expect(view).not.toContain("sessions." + "find(");
     expect(view).toContain("sessionById(");
   });
 });
@@ -131,9 +132,11 @@ describe("keyed 回调按 id 再读收成 live", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
     const needle = "sessionById(" + "session.id)";
     expect(view.split(needle).length - 1).toBe(1);
-    expect(view.split("live()").length - 1).toBe(6);
-    expect(view).toContain("session={session}");
-    expect(view).toContain("visible ?? EMPTY_ROWS");
+    expect(view).toContain("const live = () => sessionById(session.id)");
+    // keyed 快照只作为初值，全部读取都走 live()。
+    expect(view).toContain("session={live()}");
+    expect(view).not.toContain("session={session}");
+    expect(view).toContain("rows={() => live().visible}");
   });
 });
 
@@ -142,25 +145,27 @@ describe("keyed 回调采集阶段只判一次", () => {
 
   it("session_capture_phase_once", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
-    const needle = "sessionCapturePhase(" + "session)";
+    const needle = "sessionCapturePhase(" + "live())";
     expect(view.split(needle).length - 1).toBe(1);
-    expect(view).toContain("sessionStatusTone(sessionPhase)");
-    expect(view).toContain("sessionCaptureLabel(sessionPhase)");
+    expect(view).toContain("sessionStatusTone(phase())");
+    expect(view).toContain("sessionCaptureLabel(phase())");
     expect(view).toContain("sessionCapturePhase(props.session)");
     expect(view).toContain("sessionCapturePhase(s)");
   });
 });
 
-describe("formatOpts 窗口序列号只走 windowSerial", () => {
+describe("formatOpts 窗口序列号只走 store 回落链", () => {
   const root = dirname(fileURLToPath(import.meta.url));
 
-  it("format_opts_serial_is_window_serial", () => {
+  it("format_opts_serial_is_command_serial", () => {
     const view = readFileSync(join(root, "LogAnalyzerView.tsx"), "utf8");
     const needle = "active()?.serial " + "?? windowSerial()";
     expect(view.split(needle).length - 1).toBe(0);
     expect(view).toContain("const serial = windowSerial()");
-    expect(view).toContain("active()?.serial ?? boundSerial(props.selectedSerials)");
-    expect(view).toContain("deviceSlice(logStore.state, active()?.serial)");
+    // 回落链唯一 owner 在 store（commandSerialOf），View 不再自算三级回落。
+    expect(view).toContain("logStore.commandSerialOf(logStore.state.activeSessionId)");
+    expect(view).not.toContain("active()?.serial ?? boundSerial(props.selectedSerials)");
+    expect(view).toContain("logStore.deviceOf(active()?.serial)");
   });
 });
 
@@ -178,6 +183,6 @@ describe("失败提示只写一次", () => {
     const view = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "LogAnalyzerView.tsx"), "utf8");
     const needle = "toaster.show(failure, " + '"error")';
     expect(view.split(needle).length - 1).toBe(1);
-    expect(view).toContain("showFailure(");
+    expect(view).toContain("showFailure");
   });
 });

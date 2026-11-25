@@ -25,15 +25,13 @@ import type {
   ExportResult,
   GroupRunRequest,
   ImportPreviewDto,
-  LogBatch,
-  LogLatch,
-  LogPage,
-  LogPageQuery,
-  LogWindowBind,
+  LogQueryPage,
+  LogQueryRequest,
+  LogRangeRequest,
   PathOpRequest,
   ProcessEntry,
-  ReplayRequest,
   RemoteEntry,
+  RenameRequest,
   SerialEvalResult,
   SettingKey,
   SettingValue,
@@ -122,6 +120,8 @@ export const filesMkdir = (req: PathOpRequest) => invoke<void>("files.mkdir", { 
 
 export const filesCreate = (req: PathOpRequest) => invoke<void>("files.create", { req });
 
+export const filesRename = (req: RenameRequest) => invoke<void>("files.rename", { req });
+
 export const filesDragOut = (req: DragOutRequest) => invoke<void>("files.dragOut", { req });
 
 // ===== log =====
@@ -135,20 +135,14 @@ export const logCaptureStop = (serial: string) =>
 export const logCaptureStatus = (serial: string) =>
   invoke<CaptureStatus>("log.capture.status", { serial });
 
-export const logClear = (serial: string) => invoke<void>("log.clear", { serial });
-
 export const logClearDevice = (serial: string) =>
   invoke<void>("log.clearDevice", { serial });
 
-export const logWindowBind = (spec: LogWindowBind) => invoke<LogPage>("log.window.bind", { spec });
+export const logRange = (req: LogRangeRequest) => invoke<ArrayBuffer>("log.range", { req });
 
-export const logWindowRelease = (id: number) => invoke<void>("log.window.release", { id });
+/** core 侧过滤分页（ADR-v6-050）。 */
+export const logQuery = (req: LogQueryRequest) => invoke<LogQueryPage>("log.query", { req });
 
-export const logWindowLatch = (latch: LogLatch) => invoke<LogPage>("log.window.latch", { latch });
-
-export const logPage = (query: LogPageQuery) => invoke<LogPage>("log.page", { query });
-
-export const logReplay = (req: ReplayRequest) => invoke<LogBatch>("log.replay", { req });
 
 export const logExport = (req: ExportRequest) => invoke<ExportResult>("log.export", { req });
 

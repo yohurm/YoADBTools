@@ -8,6 +8,9 @@ import { DEFAULT_BROWSE_ROOT, type BrowseAttach, type RemoteEntry } from "@yohu/
 const mocks = vi.hoisted(() => ({
   filesList: vi.fn(async (_serial: string, _path: string, _generation: number): Promise<RemoteEntry[]> => []),
   filesDelete: vi.fn(async (_req: { serial: string; path: string }): Promise<void> => undefined),
+  filesRename: vi.fn(
+    async (_req: { serial: string; path: string; name: string }): Promise<void> => undefined,
+  ),
   filesSessionAttach: vi.fn(async (serial: string): Promise<BrowseAttach> => ({
     serial,
     generation: 1,
@@ -22,6 +25,7 @@ vi.mock("@yohu/api", async (importOriginal) => {
     ...actual,
     filesList: mocks.filesList,
     filesDelete: mocks.filesDelete,
+    filesRename: mocks.filesRename,
     filesSessionAttach: mocks.filesSessionAttach,
     filesSessionDetach: mocks.filesSessionDetach,
   };
@@ -45,6 +49,8 @@ beforeEach(() => {
   mocks.filesList.mockResolvedValue([]);
   mocks.filesDelete.mockReset();
   mocks.filesDelete.mockResolvedValue(undefined);
+  mocks.filesRename.mockReset();
+  mocks.filesRename.mockResolvedValue(undefined);
   mocks.filesSessionAttach.mockReset();
   mocks.filesSessionAttach.mockImplementation(async (serial: string) => ({
     serial,
@@ -333,6 +339,34 @@ describe("删除后以 list 为准", () => {
     await vi.waitFor(() => expect(store.session.path).toBe("/sdcard"));
     await store.mkdir("..");
     expect(store.session.error).toBe("条目名非法: ..");
+  });
+
+  it("rename 只交源路径与新条目名，落点由 core 拼", async () => {
+    mocks.filesList.mockResolvedValue([fileEntry("a.txt"), fileEntry("b.txt")]);
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.entries).toHaveLength(2));
+    await store.rename("a.txt", "  c.txt  ");
+    expect(mocks.filesRename).toHaveBeenCalledWith({
+      serial: "S1",
+      path: "/sdcard/a.txt",
+      name: "c.txt",
+    });
+    expect(mocks.filesList.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("rename 落点已存在时把 core 的句子写回 session", async () => {
+    mocks.filesList.mockResolvedValue([fileEntry("a.txt"), fileEntry("b.txt")]);
+    const store = createListingStore();
+    store.bindSerial("S1");
+    await vi.waitFor(() => expect(store.entries).toHaveLength(2));
+    mocks.filesRename.mockRejectedValue({
+      code: "invalid_args",
+      message: "路径已存在: /storage/emulated/0/b.txt",
+    });
+    await store.rename("a.txt", "b.txt");
+    expect(store.session.error).toBe("路径已存在: /storage/emulated/0/b.txt");
+    expect(store.entries.map((e) => e.name)).toEqual(["a.txt", "b.txt"]);
   });
 });
 

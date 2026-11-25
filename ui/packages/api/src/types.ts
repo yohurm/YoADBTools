@@ -42,60 +42,44 @@ export interface LogLine {
   pid: number;
   tid: number;
   uid?: string;
-  /** 对照 LogcatHeader.applicationId。long 头不打印此列；采集缺省，清单 Formatter 用进程索引填 */
-  app?: string;
   level: string;
   tag: string;
   msg: string;
 }
 
-export interface LogBatch {
+/** 从设备环按 seq 取原始行（UI 游标实时拉取，对齐 LogCat 消息环）。 */
+export interface LogRangeRequest {
   serial: string;
   from_seq: number;
-  lines: LogLine[];
-  truncated: boolean;
+  limit: number;
 }
 
-/** 窗口过滤登记。命中索引在环旁边，返回当前页。 */
-export interface LogWindowBind {
-  id: number;
+/** 设备环前进的水位信号（不含正文）。UI 据此从环按 seq 拉取原始行。 */
+export interface LogAppended {
+  serial: string;
+  last_seq: number;
+}
+
+/** core 侧过滤分页方向（ADR-v6-050）。 */
+export type LogQueryDirection = "forward" | "backward";
+
+/** core 侧过滤分页请求：UI 只持视口，过滤/分页在 core 执行。 */
+export interface LogQueryRequest {
   serial: string;
   filter: LogFilter;
   from_seq: number;
-  following: boolean;
-  through_seq?: number;
+  to_seq: number;
+  limit: number;
+  direction: LogQueryDirection;
 }
 
-export interface LogLatch {
-  window_id: number;
-  following: boolean;
-}
-
-export interface LogPageQuery {
-  window_id: number;
-  index: number;
-  count: number;
-}
-
-/** 一页命中。`index` 是本页首行在命中索引中的位置。 */
-export interface LogPage {
-  window_id: number;
+/** 过滤分页结果，`lines` 始终按 seq 升序。 */
+export interface LogQueryPage {
   serial: string;
-  index: number;
-  total: number;
-  signals: number;
-  pending: number;
   lines: LogLine[];
-}
-
-/** 一批窗口命中。钉底时 `tail` 是新增命中；离开底部 `tail` 为空。 */
-export interface LogHits {
-  serial: string;
-  window_id: number;
-  total: number;
-  appended: number;
-  signals: number;
-  tail: LogLine[];
+  has_more: boolean;
+  ring_first_seq: number;
+  ring_last_seq: number;
 }
 
 export type CaptureState = "running" | "stopped";
@@ -118,8 +102,13 @@ export interface ProcessEntry {
   name: string;
 }
 
+/**
+ * 进程索引快照。`generation` **必填**：迟到旧世代不得写进新世代，
+ * 与 `captureState` 同一条「只升不减」规则。
+ */
 export interface ProcessIndexSnapshot {
   serial: string;
+  generation: number;
   entries: ProcessEntry[];
   degraded: boolean;
 }
@@ -224,6 +213,37 @@ export type SettingKey =
  * 例：`SettingValue<"theme"> = Theme`、`SettingValue<"buffer_capacity"> = number`。
  */
 export type SettingValue<K extends SettingKey> = AppSettings[K];
+
+/**
+ * 设置键名常量表。由 `SettingKey` 派生并用 `satisfies` 锁死：
+ * 少一个键、拼错一个键、多一个键都在编译期失败。
+ * 模块只引用本常量，禁止再写 `"buffer_capacity"` 之类字面量。
+ */
+export const SETTING_KEYS = {
+  adb_path: "adb_path",
+  data_root: "data_root",
+  devices_auto_refresh: "devices_auto_refresh",
+  buffer_capacity: "buffer_capacity",
+  clear_device_on_start: "clear_device_on_start",
+  theme: "theme",
+  density: "density",
+  export_default_path: "export_default_path",
+  export_ask_every_time: "export_ask_every_time",
+  log_display_columns: "log_display_columns",
+  log_time_format: "log_time_format",
+  log_color_scheme: "log_color_scheme",
+  log_line_layout: "log_line_layout",
+  mirror_max_size: "mirror_max_size",
+  mirror_video_bit_rate: "mirror_video_bit_rate",
+  mirror_max_fps: "mirror_max_fps",
+  mirror_protocol: "mirror_protocol",
+  mirror_force_forward: "mirror_force_forward",
+  mirror_openh264: "mirror_openh264",
+  terminal_prepend_adb: "terminal_prepend_adb",
+  files_drop_into_folder: "files_drop_into_folder",
+  terminal_time_format: "terminal_time_format",
+  terminal_library_expand: "terminal_library_expand",
+} as const satisfies { readonly [K in SettingKey]: K };
 
 /** 应用身份（`system.info.identity`；常量见 `identity.ts`）。 */
 export interface AppIdentity {
@@ -332,12 +352,6 @@ export interface AdbExecRequest {
   timeout_ms?: number;
 }
 
-export interface ReplayRequest {
-  serial: string;
-  from_seq: number;
-  limit: number;
-}
-
 export interface ExportRequest {
   serial: string;
   from_seq: number;
@@ -353,6 +367,13 @@ export interface ExportResult {
 export interface PathOpRequest {
   serial: string;
   path: string;
+}
+
+/** `files.rename`：只给新条目名，落点由 core 拼在同目录，不是跨目录移动。 */
+export interface RenameRequest {
+  serial: string;
+  path: string;
+  name: string;
 }
 
 export interface TransferRequest {
@@ -653,15 +674,13 @@ export type AppEvent =
   | { kind: "devicesChanged"; devices: DeviceInfo[] }
   | { kind: "deviceOffline"; serial: string }
   | { kind: "deviceStatus"; status: DeviceStatus }
-  | { kind: "logBatch"; batch: LogBatch }
-  | ({ kind: "logHits" } & LogHits)
-  | { kind: "logOverflow"; serial: string; dropped_batches: number }
+  | ({ kind: "logAppended" } & LogAppended)
   | ({ kind: "processIndex" } & ProcessIndexSnapshot)
   | { kind: "captureState"; serial: string; generation: number; state: CaptureState }
   | { kind: "transferProgress" } & TransferProgress
   | { kind: "groupProgress" } & GroupProgress
   | { kind: "taskSummary"; tasks: TaskInfo[] }
-  | { kind: "settingsChanged"; key: string; settings: AppSettings }
+  | { kind: "settingsChanged"; key: SettingKey; settings: AppSettings }
   | {
       kind: "mirrorState";
       serial: string;
@@ -690,9 +709,7 @@ export const EVENT_NAMES = {
   devicesChanged: "devices/changed",
   deviceOffline: "device/offline",
   deviceStatus: "device/status",
-  logLines: "log/lines",
-  logHits: "log/hits",
-  logOverflow: "log/overflow",
+  logAppended: "log/appended",
   processIndex: "log/processIndex",
   captureState: "log/captureState",
   transferProgress: "transfer/progress",

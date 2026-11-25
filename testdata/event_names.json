@@ -1,0 +1,16 @@
+{
+  "devicesChanged": "devices/changed",
+  "deviceOffline": "device/offline",
+  "deviceStatus": "device/status",
+  "logAppended": "log/appended",
+  "processIndex": "log/processIndex",
+  "captureState": "log/captureState",
+  "transferProgress": "transfer/progress",
+  "groupProgress": "group/progress",
+  "taskSummary": "task/summary",
+  "settingsChanged": "settings/changed",
+  "mirrorState": "mirror/state",
+  "mirrorPresent": "mirror/present",
+  "mirrorPainted": "mirror/painted",
+  "updateProgress": "update/progress"
+}

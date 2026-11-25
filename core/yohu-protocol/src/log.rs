@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// 一条已解析的 logd 记录（对照 AS `LogcatMessage`）。
 ///
 /// `seq` 由 core 的共享环形缓冲单调分配（设备内递增），
-/// 是 UI 回补（`log.replay`）与溢出检测（`log.overflow`）的锚点。
+/// 是溢出检测（`log.overflow`）与页投影的锚点。
 /// `msg` 可含硬 `\n`（一条记录的多行正文），不是 adb 物理行。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LogLine {
@@ -17,10 +17,8 @@ pub struct LogLine {
     /// AOSP `FORMAT_LONG`+`uid` 的 UID（`%5s:` / `%5d:`）：数字或短名；未开 uid 为 None
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
-    /// 应用/进程名（对照 `LogcatHeader.applicationId`）。long 头不打印此列；采集为 None，清单 Formatter 用进程索引填 AppName
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub app: Option<String>,
-    /// 级别字母：V/D/I/W/E/F；解析失败时为 '?'
+    /// 级别字母：`V/D/I/W/E/F`（Assert 归一为 `F`）；解析失败或未知优先级为 `'?'`。
+    /// 合法集合的唯一来源是 `yohu_domain::LOG_LEVEL_LETTERS`。
     pub level: char,
     pub tag: String,
     pub msg: String,
@@ -34,7 +32,6 @@ impl Default for LogLine {
             pid: 0,
             tid: 0,
             uid: None,
-            app: None,
             level: '?',
             tag: String::new(),
             msg: String::new(),
@@ -42,70 +39,58 @@ impl Default for LogLine {
     }
 }
 
-/// `log.page` 显式取页时的默认行数。窗口文档本身按 `buffer_capacity` 驻留，不按这一页裁。
-pub const LOG_PAGE_LINES: u32 = 80;
-
-/// 窗口过滤登记。命中索引在环旁边重建，返回当前页。
+/// 从设备环按 seq 取原始行的请求（UI 游标实时拉取，对齐 LogCat 消息环模型）。
+///
+/// `from_seq` 是 UI 已消费到 seq 的下一条（含）；`limit` 单次最多返回条数。
+/// 返回原始 `LogLine`（未过滤），导出/诊断用。实时文档走 [`LogQueryRequest`]。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogWindowBind {
-    pub id: u64,
+pub struct LogRangeRequest {
+    pub serial: String,
+    pub from_seq: u64,
+    pub limit: u32,
+}
+
+/// 视口分页方向（ADR-v6-050）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogQueryDirection {
+    /// 从 `from_seq` 向 `to_seq` 取最早 `limit` 条命中。
+    Forward,
+    /// 从 `from_seq` 向 `to_seq` 取最晚 `limit` 条命中（结果仍按 seq 升序返回）。
+    Backward,
+}
+
+/// core 侧过滤分页请求（ADR-v6-050）：UI 只持视口，过滤与分页在 core 执行。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogQueryRequest {
     pub serial: String,
     pub filter: LogFilter,
+    /// 游标下界（含）。
     pub from_seq: u64,
-    pub following: bool,
-    /// 离开底部时的可见末序号。页不超过它，其后计入 `pending`。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub through_seq: Option<u64>,
+    /// 快照上界（含）；调用方通常传当前 `ring_last_seq`。
+    pub to_seq: u64,
+    pub limit: u32,
+    pub direction: LogQueryDirection,
 }
 
-/// 跟尾闩。松开后命中通知不再带正文。
+/// 过滤分页结果。`lines` 始终按 seq 升序（便于 UI 窗口拼接）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogLatch {
-    pub window_id: u64,
-    pub following: bool,
-}
-
-/// `log.page`：按命中下标取一页。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogPageQuery {
-    pub window_id: u64,
-    pub index: u64,
-    pub count: u32,
-}
-
-/// 一页命中。`index` 是本页首行在命中索引中的位置。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogPage {
-    pub window_id: u64,
+pub struct LogQueryPage {
     pub serial: String,
-    pub index: u64,
-    pub total: u64,
-    pub signals: u32,
-    pub pending: u32,
     pub lines: Vec<LogLine>,
+    /// 该方向是否还有更多命中。
+    pub has_more: bool,
+    pub ring_first_seq: u64,
+    pub ring_last_seq: u64,
 }
 
-/// 一批窗口命中。`tail` 是这批新增命中的正文。界面跟尾时钉底，离开底部仍写入文档但不移动视口。
+/// 设备环前进的**水位信号**（不含正文）。UI 据此从设备环按 seq 拉取原始行
+/// （`log.range`），过滤在 UI 消费端；推送丢失只影响延迟，下一次水位更高即可补齐。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogHits {
+pub struct LogAppended {
     pub serial: String,
-    pub window_id: u64,
-    pub total: u64,
-    pub appended: u32,
-    pub signals: u32,
-    pub tail: Vec<LogLine>,
-}
-
-/// 一个批量推送（ADR-v6-007：100–200ms 聚合，禁逐行）。
-///
-/// `from_seq` = 本批首行的 seq；`truncated` 表示本批之后环内仍有更新行。
-/// 清单不再靠它灌全文；导出旁路与 `log.replay` 仍用这份快照。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogBatch {
-    pub serial: String,
-    pub from_seq: u64,
-    pub lines: Vec<LogLine>,
-    pub truncated: bool,
+    /// 该设备环当前最新 seq 水位；UI 把各窗口游标拉到它即可补齐。
+    pub last_seq: u64,
 }
 
 /// 采集状态（wire 上必须带 `generation`，见 [`crate::AppEvent::CaptureState`]）。
@@ -125,7 +110,8 @@ pub struct CaptureStart {
 }
 
 /// `log.capture.status`：UI 对账用。`capturing` = Starting | Live（Stopping 视为未采集）。
-/// Empty 时 `generation` 为该 serial **最后一次槽位世代**（从未采过为 0），不是永远 0。
+/// `generation` 是该 serial 的槽位世代：Empty 时为最后一次世代，从未采过为 0。
+/// 世代由全局发号器分配，**只在同一 serial 内可比**（不可跨设备比较先后）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureStatus {
     pub serial: String,
@@ -143,9 +129,13 @@ pub struct ProcessEntry {
 }
 
 /// 进程索引快照。
+///
+/// `generation` **必填**（无 serde 缺省）：迟到的旧世代快照不得写进新世代，
+/// 与 [`crate::AppEvent::CaptureState`] 同一条「只升不减」规则。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessIndexSnapshot {
     pub serial: String,
+    pub generation: u64,
     pub entries: Vec<ProcessEntry>,
     /// 本次刷新失败（降级为「仅 PID 模式」）
     pub degraded: bool,
@@ -227,5 +217,37 @@ mod tests {
 
         let empty = serde_json::to_value(LogFilter::default()).unwrap();
         assert!(empty.get("levels").is_none());
+    }
+
+    /// 进程索引快照必须携带世代：缺字段反序列化失败（不得回落成「当前世代」）。
+    #[test]
+    fn process_index_snapshot_requires_generation() {
+        let missing = serde_json::from_str::<ProcessIndexSnapshot>(
+            r#"{"serial":"S","entries":[],"degraded":false}"#,
+        );
+        assert!(missing.is_err(), "缺 generation 的快照必须被拒绝");
+
+        let ok: ProcessIndexSnapshot = serde_json::from_str(
+            r#"{"serial":"S","generation":7,"entries":[{"pid":1,"name":"a"}],"degraded":false}"#,
+        )
+        .expect("带世代应可解析");
+        assert_eq!(ok.generation, 7);
+
+        let v = serde_json::to_value(&ok).expect("serialize");
+        assert_eq!(v["generation"], 7, "世代必须出现在 wire 上");
+    }
+
+    /// 水位信号不带正文：只有设备与 last_seq。
+    #[test]
+    fn log_appended_carries_only_watermark() {
+        let appended = LogAppended {
+            serial: "S".into(),
+            last_seq: 5,
+        };
+        let value = serde_json::to_value(&appended).unwrap();
+        assert_eq!(value["serial"], "S");
+        assert_eq!(value["last_seq"], 5);
+        assert!(value.get("tail").is_none(), "水位信号不得携带正文");
+        assert!(value.get("signals").is_none());
     }
 }

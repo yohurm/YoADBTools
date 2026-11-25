@@ -120,6 +120,9 @@ function flattenLogcatTags(families: readonly (readonly string[])[]): string[] {
 export const LogcatTagLight = flattenLogcatTags(LogcatTagFamilyLight);
 export const LogcatTagDark = flattenLogcatTags(LogcatTagFamilyDark);
 
+/** 官方 Tag 色板档数单源：族 16 × 阶 5 = 80。日志模块直接 import，禁止本地再写 `80`。 */
+export const LOGCAT_TAG_SWATCHES = LogcatTagLight.length;
+
 /** 排出 `--yohu-logcat-*`。主题生成器只展开，不在 emit-theme 再写官方变量名。 */
 export function logcatThemeVars(
   messages: typeof LogcatMessageLight,

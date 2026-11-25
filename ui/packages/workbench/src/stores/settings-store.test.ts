@@ -111,6 +111,29 @@ describe("settingsStore.load", () => {
   });
 });
 
+describe("resolved.export_default_path 与 core default_export_dir 同源", () => {
+  beforeEach(() => {
+    mocks.systemInfo.mockReset();
+  });
+
+  it("设置为空 → 回落 paths.exports_dir（core 空串回落语义）", async () => {
+    mocks.systemInfo.mockResolvedValue(completeInfo());
+    const store = createSettingsStore();
+    await store.load();
+    expect(store.resolved.export_default_path).toBe(EXPORTS_DIR);
+  });
+
+  it("设置非空 → 用设置值（core 设置优先语义）", async () => {
+    const custom = "D:\\custom\\exports";
+    mocks.systemInfo.mockResolvedValue(
+      completeInfo({ settings: { ...APP_SETTINGS_DEFAULT, export_default_path: custom } }),
+    );
+    const store = createSettingsStore();
+    await store.load();
+    expect(store.resolved.export_default_path).toBe(custom);
+  });
+});
+
 function productionSources(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

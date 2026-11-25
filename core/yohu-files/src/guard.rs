@@ -45,6 +45,18 @@ pub(crate) fn normalize_mut(safety: &SafetyRoot, path: &str) -> Result<RemotePat
     Ok(normalized)
 }
 
+/// 重命名落点：同目录换名。落点由 core 拼，不接受调用方给的目标路径。
+pub(crate) fn sibling_rename(
+    safety: &SafetyRoot,
+    source: &RemotePath,
+    name: &str,
+) -> Result<RemotePath, FileError> {
+    validate_entry_name(name).map_err(from_path_error)?;
+    let parent =
+        parent_of(source.as_str()).ok_or_else(|| FileError::Path(source.as_str().to_string()))?;
+    normalize_mut(safety, &join_path(&parent, name))
+}
+
 /// 对规范路径做安全根复核。
 pub(crate) fn recheck_resolved(
     safety: &SafetyRoot,
@@ -91,6 +103,9 @@ pub(crate) fn join_canonical(resolved: &str, remainder: &[String]) -> Result<Str
 }
 
 /// 设备端 realpath 复核。运输错误 / 无法解析失败；不存在则走最近已存在祖先。
+///
+/// `readlink -f` 对「只有末段不存在」的路径仍退出 0 并打印规范路径，所以本函数答不了
+/// 「落点是否已占用」。那是 [`crate::FileMutator`] 用 `ls -d` 单独问的。
 pub(crate) async fn resolve_and_recheck(
     adb: &AdbClient,
     safety: &SafetyRoot,
@@ -196,6 +211,40 @@ mod tests {
             normalize_mut(&safety, "/sdcard/."),
             Err(FileError::OutsideRoot(_))
         ));
+    }
+
+    #[test]
+    fn sibling_rename_stays_in_the_same_directory() {
+        let safety = SafetyRoot::default();
+        let source = normalize_mut(&safety, "/sdcard/DCIM/old.jpg").unwrap();
+        assert_eq!(
+            sibling_rename(&safety, &source, "new.jpg")
+                .unwrap()
+                .as_str(),
+            "/sdcard/DCIM/new.jpg"
+        );
+        let at_root = normalize_mut(&safety, "/sdcard/old.txt").unwrap();
+        assert_eq!(
+            sibling_rename(&safety, &at_root, "new.txt")
+                .unwrap()
+                .as_str(),
+            "/sdcard/new.txt"
+        );
+    }
+
+    #[test]
+    fn sibling_rename_rejects_name_that_is_not_one_entry() {
+        let safety = SafetyRoot::default();
+        let source = normalize_mut(&safety, "/sdcard/DCIM/old.jpg").unwrap();
+        for name in ["", "  ", ".", "..", "sub/new.jpg", "..\\new.jpg"] {
+            assert!(
+                matches!(
+                    sibling_rename(&safety, &source, name),
+                    Err(FileError::InvalidName(_))
+                ),
+                "应拒绝条目名 {name:?}"
+            );
+        }
     }
 
     #[test]

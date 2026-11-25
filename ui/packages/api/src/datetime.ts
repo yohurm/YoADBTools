@@ -129,11 +129,6 @@ export function formatClock(
   }
 }
 
-/** 本地墙钟完整形状（日志 / 规范化）。 */
-export function formatDateTimeFromMs(ms: number): string {
-  return formatClockFromMs(ms, "datetime_millis");
-}
-
 /** 显示形状对应的字段字符数。 */
 export function clockDisplayLen(format: TerminalTimeFormat): number {
   switch (format) {

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { ProcessEntry } from "./types";
 import {
   emptyBinding,
+  HISTORY_PID_CAP,
   pidSetOf,
   rebindPids,
   toWireFilter,
@@ -17,7 +18,14 @@ const testdata = resolve(
   "../../../../core/yohu-domain/testdata/log_bind.json",
 );
 
+const domainSource = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../core/yohu-domain/src/log_bind.rs",
+);
+
 type Fixture = {
+  /** 产品默认历史 PID 上限（`default_cap`）。缺键时由 Rust 常量兜底锁。 */
+  default_cap?: number;
   rebind: {
     prev: PidBinding;
     index: ProcessEntry[];
@@ -49,7 +57,22 @@ type Fixture = {
 
 const fixture = JSON.parse(readFileSync(testdata, "utf8")) as Fixture;
 
+/** `yohu-domain::HISTORY_PID_CAP` 的唯一来源。只读解析，不改 core。 */
+function domainHistoryPidCap(): number {
+  const match = /pub const HISTORY_PID_CAP: usize = (\d+);/.exec(readFileSync(domainSource, "utf8"));
+  if (!match) throw new Error("core/yohu-domain/src/log_bind.rs 缺 HISTORY_PID_CAP 常量");
+  return Number(match[1]);
+}
+
 describe("log-bind（与 domain testdata/log_bind.json 同一套向量）", () => {
+  it("默认历史 PID 上限受 fixture / Rust 常量双端锁", () => {
+    const cap = domainHistoryPidCap();
+    expect(HISTORY_PID_CAP).toBe(cap);
+    if (fixture.default_cap !== undefined) {
+      expect(HISTORY_PID_CAP).toBe(fixture.default_cap);
+    }
+  });
+
   it.each(fixture.rebind)("rebind $pkg child=$include_child", (c) => {
     const got = rebindPids(c.prev, c.index, c.pkg, c.include_child);
     expect(got.current).toEqual(c.current);

@@ -21,10 +21,6 @@ export function levelKey(level: string): LevelKey | null {
   return letter ? (letter.toLowerCase() as LevelKey) : null;
 }
 
-export function isLogLevelLetter(token: string): boolean {
-  return parseLevelLetter(token) !== null;
-}
-
 /** 只保留 LEVELS，去重并按 V→F。空 = 不限级别。 */
 export function normalizeLevels(input: readonly string[]): LevelLetter[] {
   const seen = new Set<LevelLetter>();
@@ -138,7 +134,8 @@ export function containsAsciiIgnoreCase(haystack: string, needle: string): boole
   return indexOfAsciiIgnoreCase(haystack, needle) >= 0;
 }
 
-export function levelAllowed(lineLevel: string, selected: readonly string[]): boolean {
+/** 级别判定只服务本文件；导出面只留 `matchesWireFilter` 一把。 */
+function levelAllowed(lineLevel: string, selected: readonly string[]): boolean {
   if (selected.length === 0) return true;
   const letter = parseLevelLetter(lineLevel);
   if (!letter) return false;
@@ -158,16 +155,12 @@ function scopeMatches(line: LogLine, scope: LogScope): boolean {
   }
 }
 
-/** 与 yohu-domain::log_filter_matches 同一语义。 */
-export function logFilterMatches(filter: LogFilter, line: LogLine): boolean {
+/** 与 yohu-domain::log_filter_matches 同一语义。匹配内核唯一入口。 */
+export function matchesWireFilter(line: LogLine, filter: LogFilter): boolean {
   if (!levelAllowed(line.level, filter.levels ?? [])) return false;
   if (filter.tag_contains !== undefined && !tagAllowed(line.tag, filter.tag_contains)) return false;
   if (filter.message_contains && !containsAsciiIgnoreCase(line.msg, filter.message_contains)) {
     return false;
   }
   return scopeMatches(line, filter.scope);
-}
-
-export function matchesWireFilter(line: LogLine, filter: LogFilter): boolean {
-  return logFilterMatches(filter, line);
 }

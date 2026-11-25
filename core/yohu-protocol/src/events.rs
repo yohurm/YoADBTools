@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogBatch, LogHits, MirrorSessionState,
+    AppSettings, CaptureState, DeviceInfo, DeviceStatus, LogAppended, MirrorSessionState,
     ProcessIndexSnapshot, TransferProgress, UpdateProgress,
 };
 
@@ -54,12 +54,7 @@ pub enum AppEvent {
     DeviceStatus {
         status: DeviceStatus,
     },
-    LogBatch(LogBatchPayload),
-    LogHits(LogHits),
-    LogOverflow {
-        serial: String,
-        dropped_batches: u64,
-    },
+    LogAppended(LogAppended),
     ProcessIndex(ProcessIndexSnapshot),
     CaptureState {
         serial: String,
@@ -107,12 +102,6 @@ pub enum AppEvent {
     UpdateProgress(UpdateProgress),
 }
 
-/// `LogBatch` 包装（内部 tag 枚举需要 struct 变体承载）。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LogBatchPayload {
-    pub batch: LogBatch,
-}
-
 /// 事件名常量（emit / listen 共用，禁止散落字符串字面量）。
 ///
 /// Tauri 2.9+ 事件名只允许字母数字和 `-` `/` `:` `_`，**禁止点号**。
@@ -120,9 +109,7 @@ pub mod event_names {
     pub const DEVICES_CHANGED: &str = "devices/changed";
     pub const DEVICE_OFFLINE: &str = "device/offline";
     pub const DEVICE_STATUS: &str = "device/status";
-    pub const LOG_LINES: &str = "log/lines";
-    pub const LOG_HITS: &str = "log/hits";
-    pub const LOG_OVERFLOW: &str = "log/overflow";
+    pub const LOG_APPENDED: &str = "log/appended";
     pub const PROCESS_INDEX: &str = "log/processIndex";
     pub const CAPTURE_STATE: &str = "log/captureState";
     pub const TRANSFER_PROGRESS: &str = "transfer/progress";
@@ -143,9 +130,7 @@ impl AppEvent {
             AppEvent::DevicesChanged { .. } => DEVICES_CHANGED,
             AppEvent::DeviceOffline { .. } => DEVICE_OFFLINE,
             AppEvent::DeviceStatus { .. } => DEVICE_STATUS,
-            AppEvent::LogBatch(_) => LOG_LINES,
-            AppEvent::LogHits(_) => LOG_HITS,
-            AppEvent::LogOverflow { .. } => LOG_OVERFLOW,
+            AppEvent::LogAppended(_) => LOG_APPENDED,
             AppEvent::ProcessIndex(_) => PROCESS_INDEX,
             AppEvent::CaptureState { .. } => CAPTURE_STATE,
             AppEvent::TransferProgress(_) => TRANSFER_PROGRESS,
@@ -163,7 +148,7 @@ impl AppEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AppSettings, CaptureState, LogBatch};
+    use crate::{AppSettings, CaptureState};
 
     #[test]
     fn group_progress_keeps_empty_message() {
@@ -204,22 +189,6 @@ mod tests {
         assert_eq!(v["status"]["night"], true);
         assert_eq!(v["status"]["battery_pct"], 80);
         assert_eq!(event.name(), event_names::DEVICE_STATUS);
-    }
-
-    #[test]
-    fn log_batch_event_json_has_kind_and_batch() {
-        let event = AppEvent::LogBatch(LogBatchPayload {
-            batch: LogBatch {
-                serial: "s1".into(),
-                from_seq: 1,
-                lines: vec![],
-                truncated: false,
-            },
-        });
-        let v = serde_json::to_value(&event).expect("serialize");
-        assert_eq!(v["kind"], "logBatch");
-        assert_eq!(v["batch"]["serial"], "s1");
-        assert_eq!(v["batch"]["from_seq"], 1);
     }
 
     #[test]
@@ -331,8 +300,7 @@ mod tests {
             event_names::DEVICES_CHANGED,
             event_names::DEVICE_OFFLINE,
             event_names::DEVICE_STATUS,
-            event_names::LOG_LINES,
-            event_names::LOG_OVERFLOW,
+            event_names::LOG_APPENDED,
             event_names::PROCESS_INDEX,
             event_names::CAPTURE_STATE,
             event_names::TRANSFER_PROGRESS,
@@ -348,6 +316,42 @@ mod tests {
                 name.chars()
                     .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '/' | ':' | '_')),
                 "Tauri 2.9 禁止点号事件名: {name}"
+            );
+        }
+    }
+
+    /// 事件名常量与共享 fixture 双端锁：15 项逐一相等，无缺失/多余。
+    #[test]
+    fn event_names_match_fixture() {
+        let raw = include_str!("../../../testdata/event_names.json");
+        let fixture: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(raw).expect("fixture json");
+        let expected: [(&str, &str); 14] = [
+            ("devicesChanged", event_names::DEVICES_CHANGED),
+            ("deviceOffline", event_names::DEVICE_OFFLINE),
+            ("deviceStatus", event_names::DEVICE_STATUS),
+            ("logAppended", event_names::LOG_APPENDED),
+            ("processIndex", event_names::PROCESS_INDEX),
+            ("captureState", event_names::CAPTURE_STATE),
+            ("transferProgress", event_names::TRANSFER_PROGRESS),
+            ("groupProgress", event_names::GROUP_PROGRESS),
+            ("taskSummary", event_names::TASK_SUMMARY),
+            ("settingsChanged", event_names::SETTINGS_CHANGED),
+            ("mirrorState", event_names::MIRROR_STATE),
+            ("mirrorPresent", event_names::MIRROR_PRESENT),
+            ("mirrorPainted", event_names::MIRROR_PAINTED),
+            ("updateProgress", event_names::UPDATE_PROGRESS),
+        ];
+        assert_eq!(
+            fixture.len(),
+            expected.len(),
+            "fixture 项数与常量表不一致（不得缺失或多余）"
+        );
+        for (kind, value) in expected {
+            assert_eq!(
+                fixture.get(kind).map(String::as_str),
+                Some(value),
+                "事件常量 {kind} 与 fixture 不一致"
             );
         }
     }

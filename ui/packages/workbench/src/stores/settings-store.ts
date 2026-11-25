@@ -62,6 +62,14 @@ function reportedName(info: SystemInfo): string {
   return info.identity.display_name;
 }
 
+/**
+ * 日志导出目录唯一解析：设置值非空优先，空串回落 `paths.exports_dir()`。
+ * 与 core `capture_runs::default_export_dir` 同源；`resolved.export_default_path` 存解析后的有效值。
+ */
+function effectiveExportDir(settings: AppSettings, exportsDir: string): string {
+  return settings.export_default_path !== "" ? settings.export_default_path : exportsDir;
+}
+
 export function createSettingsStore() {
   const [state, setState] = createStore<AppSettings>({ ...APP_SETTINGS_DEFAULT });
   const [resolved, setResolved] = createStore({ ...EMPTY_RESOLVED });
@@ -85,7 +93,7 @@ export function createSettingsStore() {
       setResolved({
         adb_path: adbPath,
         data_root: info.paths.data_root,
-        export_default_path: info.paths.exports_dir,
+        export_default_path: effectiveExportDir(loaded, info.paths.exports_dir),
       });
       applyAppearance(loaded);
       const name = reportedName(info);
@@ -103,6 +111,7 @@ export function createSettingsStore() {
     try {
       const updated = await settingsSet(key, wireSettingValue(key, value) as SettingValue<SettingKey>);
       setState(updated);
+      setResolved("export_default_path", effectiveExportDir(updated, paths.exports_dir));
       applyAppearance(updated);
       YoLog.info(settingsChannel(), "已保存", { key, value });
     } catch (e) {
@@ -199,6 +208,7 @@ export function createSettingsStore() {
   // 模块也可 settings.set（IPC）；壳投影必须跟 settings/changed，禁止出现双份真相。
   void onSettingsChanged((e) => {
     setState(e.settings);
+    setResolved("export_default_path", effectiveExportDir(e.settings, paths.exports_dir));
     applyAppearance(e.settings);
   });
 

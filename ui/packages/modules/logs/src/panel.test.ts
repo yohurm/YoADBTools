@@ -9,21 +9,18 @@ import {
   applyAppend,
   canFreezeFollow,
   EMPTY_VIEW_ROWS,
+  effectiveFollowing,
+  freezePoint,
   isFreshLine,
   keepMatching,
   lastSeqOf,
-  mirrorCoversRange,
   nextDiscardFromSeq,
   panelFollows,
   panelFromLines,
-  projectWindow,
   captureStarted,
-  selectHits,
   seqBefore,
   signalCountOf,
-  splitHitsForFreeze,
   trimRows,
-  viewCeiling,
 } from "./panel";
 import type { SessionFilter } from "./filter";
 import { collapseStack } from "./stack";
@@ -63,6 +60,12 @@ describe("panel 游标", () => {
     expect(panelFollows(true, [])).toBe(true);
     expect(panelFollows(false, collapseStack([line(0)]))).toBe(false);
     expect(isFreshLine(1, 0, 2)).toBe(false);
+    expect(freezePoint(null, 7)).toBe(7);
+    expect(freezePoint(3, 7)).toBe(7);
+    expect(freezePoint(9, 7)).toBe(9);
+    expect(effectiveFollowing(true, false)).toBe(true);
+    expect(effectiveFollowing(true, true)).toBe(false);
+    expect(effectiveFollowing(false, false)).toBe(false);
   });
 
   it("清空把 fromSeq 推过已见与镜像末 seq", () => {
@@ -70,19 +73,6 @@ describe("panel 游标", () => {
     expect(nextDiscardFromSeq(0, undefined, 9)).toBe(10);
     expect(nextDiscardFromSeq(3, 1, 1)).toBe(3);
     expect(nextDiscardFromSeq(-1, 4, 9)).toBe(-1);
-  });
-
-  it("镜像覆盖：有行且末 seq 仍在游标范围内", () => {
-    expect(mirrorCoversRange(3, 9, 0)).toBe(true);
-    expect(mirrorCoversRange(3, 9, 10)).toBe(false);
-    expect(mirrorCoversRange(0, 9, 0)).toBe(false);
-    expect(mirrorCoversRange(3, 9, -1)).toBe(false);
-  });
-
-  it("跟滚无 ceiling；冻结用 frozenThroughSeq", () => {
-    expect(viewCeiling(true, 4)).toBeNull();
-    expect(viewCeiling(false, 4)).toBe(4);
-    expect(viewCeiling(false, null)).toBeNull();
   });
 });
 
@@ -97,6 +87,7 @@ describe("panel 选择", () => {
         lines: [],
         fromSeq: 0,
         following: true,
+        frozenThroughSeq: null,
         paused: false,
         filter: all,
         cap: 10,
@@ -109,6 +100,7 @@ describe("panel 选择", () => {
         lines: [],
         fromSeq: 0,
         following: true,
+        frozenThroughSeq: null,
         paused: false,
         filter: all,
         cap: 10,
@@ -122,90 +114,9 @@ describe("panel 选择", () => {
     expect(keepMatching(rows, { ...all, levels: ["E"] }).map((l) => l.seq)).toEqual([1]);
   });
 
-  it("splitHitsForFreeze：跟滚全进面板；冻结则 ceiling 以外计 pending", () => {
-    const hits = [line(0), line(1), line(2)];
-    expect(splitHitsForFreeze(hits, null).pending).toBe(0);
-    expect(splitHitsForFreeze(hits, null).forPanel.map((l) => l.seq)).toEqual([0, 1, 2]);
-    const frozen = splitHitsForFreeze(hits, 1);
-    expect(frozen.forPanel.map((l) => l.seq)).toEqual([0, 1]);
-    expect(frozen.pending).toBe(1);
-  });
-
-  it("selectHits 丢弃 fromSeq 之前的行", () => {
-    const { forPanel, pending } = selectHits([line(0), line(1), line(2)], 1, null, all);
-    expect(forPanel.map((l) => l.seq)).toEqual([1, 2]);
-    expect(pending).toBe(0);
-  });
-
   it("空投影同一引用", () => {
-    expect(panelFromLines([], 8).visible).toBe(EMPTY_VIEW_ROWS);
-    expect(panelFromLines([], 100).visible).toBe(EMPTY_VIEW_ROWS);
-    expect(selectHits([line(0)], -1, null, all).forPanel).toBe(
-      selectHits([line(9)], -2, 0, all).forPanel,
-    );
-    expect(
-      projectWindow({
-        drawn: collapseStack([line(0)]),
-        source: [line(1)],
-        sourceCoversRange: true,
-        fromSeq: -1,
-        following: true,
-        frozenThroughSeq: null,
-        filter: all,
-        cap: 100,
-        pendingCount: 0,
-      }).visible,
-    ).toBe(EMPTY_VIEW_ROWS);
-  });
-});
-
-describe("projectWindow", () => {
-  it("镜像覆盖时按游标全量投影，不保留已画但已失效的行", () => {
-    const drawn = collapseStack([line(0, { msg: "old" })]);
-    const next = projectWindow({
-      drawn,
-      source: [line(1, { msg: "a" }), line(2, { msg: "b" })],
-      sourceCoversRange: true,
-      fromSeq: 1,
-      following: true,
-      frozenThroughSeq: null,
-      filter: all,
-      cap: 100,
-      pendingCount: 0,
-    });
-    expect(next.visible.map((r) => r.line.msg)).toEqual(["a", "b"]);
-  });
-
-  it("镜像覆盖时放松过滤从源补回中间行", () => {
-    const next = projectWindow({
-      drawn: collapseStack([line(1, { msg: "hello" })]),
-      source: [line(0, { msg: "a" }), line(1, { msg: "hello" }), line(2, { msg: "c" })],
-      sourceCoversRange: true,
-      fromSeq: 0,
-      following: true,
-      frozenThroughSeq: null,
-      filter: all,
-      cap: 100,
-      pendingCount: 0,
-    });
-    expect(next.visible.map((r) => r.line.msg)).toEqual(["a", "hello", "c"]);
-  });
-
-  it("镜像不覆盖时只收窄已画行，不冲成空", () => {
-    const drawn = collapseStack([line(0, { level: "I" }), line(1, { level: "E" })]);
-    const next = projectWindow({
-      drawn,
-      source: [],
-      sourceCoversRange: false,
-      fromSeq: 0,
-      following: true,
-      frozenThroughSeq: null,
-      filter: { ...all, levels: ["E"] },
-      cap: 100,
-      pendingCount: 3,
-    });
-    expect(next.visible.map((r) => r.line.seq)).toEqual([1]);
-    expect(next.pendingCount).toBe(3);
+    expect(panelFromLines([], 8)).toBe(EMPTY_VIEW_ROWS);
+    expect(panelFromLines([], 100)).toBe(EMPTY_VIEW_ROWS);
   });
 });
 
@@ -216,6 +127,7 @@ describe("applyAppend", () => {
       lines: [line(1), line(2)],
       fromSeq: 0,
       following: true,
+      frozenThroughSeq: null,
       paused: false,
       filter: all,
       cap: 2,
@@ -231,6 +143,7 @@ describe("applyAppend", () => {
       lines: [line(0), line(1)],
       fromSeq: 0,
       following: false,
+      frozenThroughSeq: null,
       paused: false,
       filter: all,
       cap: 100,
@@ -246,6 +159,7 @@ describe("applyAppend", () => {
       lines: [line(1)],
       fromSeq: 0,
       following: false,
+      frozenThroughSeq: 0,
       paused: false,
       filter: all,
       cap: 100,
@@ -255,6 +169,22 @@ describe("applyAppend", () => {
     expect(next?.pendingCount).toBe(3);
   });
 
+  it("冻结点之前的回补不入 pending，只有冻结点之后新到的才计数", () => {
+    const next = applyAppend({
+      visible: collapseStack([line(0)]),
+      lines: [line(1), line(2), line(5)],
+      fromSeq: 0,
+      following: false,
+      frozenThroughSeq: 2,
+      paused: false,
+      filter: all,
+      cap: 100,
+      pendingCount: 4,
+    });
+    expect(next?.visible.map((r) => r.line.seq)).toEqual([0, 1, 2, 5]);
+    expect(next?.pendingCount).toBe(5);
+  });
+
   it("暂停或未订阅不写面板", () => {
     expect(
       applyAppend({
@@ -262,6 +192,7 @@ describe("applyAppend", () => {
         lines: [line(0)],
         fromSeq: 0,
         following: true,
+        frozenThroughSeq: null,
         paused: true,
         filter: all,
         cap: 100,
@@ -274,6 +205,7 @@ describe("applyAppend", () => {
         lines: [line(0)],
         fromSeq: -1,
         following: true,
+        frozenThroughSeq: null,
         paused: false,
         filter: all,
         cap: 100,
@@ -288,6 +220,7 @@ describe("applyAppend", () => {
       lines: [line(0), line(1), line(5)],
       fromSeq: 5,
       following: true,
+      frozenThroughSeq: null,
       paused: false,
       filter: all,
       cap: 100,
@@ -298,17 +231,17 @@ describe("applyAppend", () => {
 });
 
 describe("panel 派生", () => {
-  it("panelFromLines 折叠并计数信号", () => {
-    const { visible, signalCount } = panelFromLines(
+  it("panelFromLines 折叠行；信号计数由 signalCountOf 单点派生", () => {
+    const visible = panelFromLines(
       [line(0, { level: "E", tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" })],
       100,
     );
     expect(visible).toHaveLength(1);
-    expect(signalCount).toBe(1);
+    expect(signalCountOf(visible)).toBe(1);
   });
 
   it("信号计数跟裁剪后的可见行，不累计已滚出的崩溃", () => {
-    const { visible, signalCount } = panelFromLines(
+    const visible = panelFromLines(
       [
         line(0, { level: "E", tag: "AndroidRuntime", msg: "FATAL EXCEPTION: main" }),
         line(1, { msg: "ok" }),
@@ -317,7 +250,6 @@ describe("panel 派生", () => {
       2,
     );
     expect(visible.map((r) => r.line.seq)).toEqual([1, 2]);
-    expect(signalCount).toBe(0);
     expect(signalCountOf(visible)).toBe(0);
   });
 });
@@ -325,7 +257,7 @@ describe("panel 派生", () => {
 describe("跟滚抬起只写一处", () => {
   it("会话和视图不再自己或上空面板", () => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const panel = readFileSync(resolve(here, "panel.ts"), "utf8").replace(
+    const panel = readFileSync(resolve(here, "stream/log-window-reducer.ts"), "utf8").replace(
       "return following || !canFreezeFollow(visible);",
       "",
     );
@@ -350,21 +282,17 @@ describe("sessionHasCapture", () => {
 
 describe("没有新行只判一次", () => {
   it("no_lines_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "panel.ts"), "utf8");
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "stream/log-window-reducer.ts"), "utf8");
     const needle = "lines.length " + "=== 0";
     expect(body.split(needle).length - 1).toBe(1);
     expect(body).toContain("noLines(");
   });
 });
 
-describe("当前页不超过一屏", () => {
-  it("page_cap_once", () => {
-    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "viewport.ts"), "utf8");
-    const cap = "Math.min(buffer, " + "LOG_VIEW_PAGE)";
-    const floor = "Math.max(1, " + "bufferCapacity)";
-    expect(body.split(cap).length - 1).toBe(1);
-    expect(body.split(floor).length - 1).toBe(2);
-    expect(body).toContain("export function pageCap");
-    expect(body).toContain("export function docCap");
+describe("冻结上限只有一源", () => {
+  it("panel 消费 follow-state 的 frozenThroughSeq，不再用已画末行当第二份上限", () => {
+    const body = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "stream/log-window-reducer.ts"), "utf8");
+    expect(body).toContain("freezePoint(opts.frozenThroughSeq, after)");
+    expect(body).not.toContain("frozenThroughSeq === null ? Number.POSITIVE_INFINITY");
   });
 });

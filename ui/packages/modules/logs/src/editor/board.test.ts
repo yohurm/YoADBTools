@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { LogLine } from "@yohu/api";
 
-import { LineBoard, clipMessage, documentLines, documentMaxChars, wrapMessage } from "./board";
+import { LineBoard, documentLines, documentMaxChars, wrapMessage } from "./board";
 import { LogDocument } from "./document";
-import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions, headerWidth } from "./format";
+import { DEFAULT_LOG_DISPLAY_COLUMNS, defaultFormatOptions, headerWidth } from "./format-columns";
 
 function line(over: Partial<LogLine> = {}): LogLine {
   return {
@@ -20,7 +20,7 @@ function line(over: Partial<LogLine> = {}): LogLine {
 }
 
 const clipOpts = defaultFormatOptions(DEFAULT_LOG_DISPLAY_COLUMNS, "yohu");
-const wrapOpts = { ...clipOpts, softWrap: true };
+const wrapOpts = { ...clipOpts, layout: "wrap" as const };
 
 function formatted(over: Partial<LogLine> = {}, softWrap = false) {
   const doc = new LogDocument();
@@ -32,7 +32,7 @@ function formatted(over: Partial<LogLine> = {}, softWrap = false) {
 describe("documentLines / clip", () => {
   it("无硬换行时一行，文本等于逻辑文档", () => {
     const message = formatted({ msg: "hello world now and then again" });
-    const visuals = clipMessage(message);
+    const visuals = documentLines(message);
     expect(visuals).toHaveLength(1);
     expect(visuals[0]?.text).toBe(message.text);
   });
@@ -119,7 +119,7 @@ describe("LineBoard", () => {
 
   it("wash 行盒写在 range.box=line 上，不是第二层 ch 带", () => {
     const message = formatted({ level: "F", msg: "fatal" });
-    const visuals = clipMessage(message);
+    const visuals = documentLines(message);
     const boxes = visuals[0]!.ranges.filter((range) => range.box === "line");
     expect(boxes.length).toBeGreaterThan(0);
     expect(boxes.every((range) => range.end > range.start)).toBe(true);
@@ -136,7 +136,7 @@ describe("Board 不回调 Formatter", () => {
     expect(src).not.toMatch(/\bformatMessage\b/);
     expect(src).toContain("from \"./document\"");
     expect(src).not.toContain("from \"./format\"");
-    expect(src).toContain("clipMessage");
+    expect(src).not.toContain("clipMessage");
     expect(src).toContain("wrapMessage");
     expect(src).toContain("documentLines");
     expect(src).toContain("LineBoard");

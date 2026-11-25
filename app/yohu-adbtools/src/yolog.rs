@@ -20,3 +20,24 @@ pub fn parse_level(level: &str) -> LogLevel {
         LogLevel::Info
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_log_words_come_from_the_level() {
+        assert_eq!(parse_level(LogLevel::Warn.as_str()), LogLevel::Warn);
+        assert_eq!(parse_level(LogLevel::Error.as_str()), LogLevel::Error);
+        assert_eq!(parse_level(LogLevel::Info.as_str()), LogLevel::Info);
+        assert_eq!(parse_level("nope"), LogLevel::Info);
+        let src = include_str!("yolog.rs");
+        let production = src
+            .split_once("mod tests")
+            .map(|(head, _)| head)
+            .unwrap_or(src);
+        assert!(!production.contains("\"warn\""));
+        assert!(!production.contains("\"error\""));
+        assert!(!production.contains("\"info\""));
+    }
+}

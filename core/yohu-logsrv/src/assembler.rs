@@ -3,10 +3,11 @@
 //! AOSP 在消息后打印 `\n\n`。记录结束只由下一条头（或空闲 flush / 流结束）判定；
 //! 中间空行算正文，`trim_end` 去掉记录尾部分隔空行。头之前的正文丢弃。
 //! `--------- beginning of` 作为系统消息立即发出（不冲刷未闭合的上一条记录，与 AS 一致）。
-
-use yohu_protocol::LogLine;
+//!
+//! 栈展开只产出纯帧文本；「这一行是补出来的」不进正文（见 [`crate::stack_trace`]）。
 
 use crate::parse::{is_system_line, parse_long_header, system_message, LogcatHeader};
+use crate::record::LogRecord;
 use crate::stack_trace::expand_stack_trace_lines;
 
 pub(crate) struct MessageAssembler {
@@ -26,8 +27,13 @@ impl MessageAssembler {
         self.header.is_some() && !self.body.is_empty()
     }
 
-    pub(crate) fn ingest(&mut self, raw: &str) -> Vec<LogLine> {
-        let line = raw.replace('\r', "");
+    pub(crate) fn ingest(&mut self, raw: &str) -> Vec<LogRecord> {
+        // 绝大多数行不含 `\r`：借用原文，避免每行无条件新建 String（P1-2）。
+        let line: std::borrow::Cow<'_, str> = if raw.contains('\r') {
+            std::borrow::Cow::Owned(raw.replace('\r', ""))
+        } else {
+            std::borrow::Cow::Borrowed(raw)
+        };
         if is_system_line(&line) {
             return vec![system_message(&line)];
         }
@@ -40,23 +46,23 @@ impl MessageAssembler {
             return out;
         }
         if self.header.is_some() {
-            self.body.push(line);
+            self.body.push(line.into_owned());
         }
         Vec::new()
     }
 
-    pub(crate) fn take(&mut self) -> Option<LogLine> {
+    pub(crate) fn take(&mut self) -> Option<LogRecord> {
         self.flush()
     }
 
-    fn flush(&mut self) -> Option<LogLine> {
+    fn flush(&mut self) -> Option<LogRecord> {
         if !self.has_pending() {
             return None;
         }
         let header = self.header.take()?;
         let expanded = expand_stack_trace_lines(&std::mem::take(&mut self.body));
         let msg = join_body(expanded);
-        Some(LogLine {
+        Some(LogRecord {
             ts: header.ts,
             pid: header.pid,
             tid: header.tid,
@@ -64,14 +70,23 @@ impl MessageAssembler {
             level: header.level,
             tag: header.tag,
             msg,
-            ..LogLine::default()
         })
     }
 }
 
+/// 一次容量预留拼完全部正文，末尾裁掉记录分隔空行（不整串 `trim_end` 再拷一份）。
 fn join_body(lines: Vec<String>) -> String {
-    let joined = lines.join("\n");
-    joined.trim_end().to_string()
+    let total: usize = lines.iter().map(String::len).sum::<usize>() + lines.len().saturating_sub(1);
+    let mut joined = String::with_capacity(total);
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            joined.push('\n');
+        }
+        joined.push_str(line);
+    }
+    let trimmed = joined.trim_end().len();
+    joined.truncate(trimmed);
+    joined
 }
 
 #[cfg(test)]
@@ -185,6 +200,34 @@ mod tests {
         assert!(asm.has_pending());
     }
 
+    /// 折叠栈展开后，记录正文必须是纯帧文本：标记不进 `msg`，导出/复制/关键字匹配不受污染。
+    #[test]
+    fn expanded_stack_frames_keep_message_text_clean() {
+        let mut asm = MessageAssembler::new();
+        asm.ingest("[ 2026-01-02 03:04:05.678  1: 2 E/AndroidRuntime ]");
+        asm.ingest("FATAL EXCEPTION: main");
+        asm.ingest("at com.foo.A.method(A.java:1)");
+        asm.ingest("Caused by: java.lang.IllegalStateException");
+        asm.ingest("... 1 more");
+        let record = asm.take().expect("flush");
+
+        assert!(!record.msg.contains('\u{00A0}'), "NBSP 不得进入正文");
+        assert_eq!(
+            record.msg,
+            "FATAL EXCEPTION: main\nat com.foo.A.method(A.java:1)\nCaused by: java.lang.IllegalStateException\nat com.foo.A.method(A.java:1)"
+        );
+        // 关键字匹配必须能命中补出来的帧（NBSP 会让它失配）
+        let probe = yohu_protocol::LogLine {
+            msg: record.msg.clone(),
+            ..yohu_protocol::LogLine::default()
+        };
+        let filter = yohu_protocol::LogFilter {
+            message_contains: Some("com.foo.A.method".into()),
+            ..Default::default()
+        };
+        assert!(yohu_domain::log_filter_matches(&filter, &probe));
+    }
+
     #[test]
     fn as_fixture_multiple_complete_messages() {
         let mut asm = MessageAssembler::new();
@@ -263,96 +306,31 @@ Message 3
     }
 
     #[test]
-    fn header_clock_facts_stay_with_their_owners() {
-        let src = include_str!("parse.rs");
-        assert!(!src.contains("fn is_zone_token"));
-        assert!(!src.contains("b'+' | b'-'"));
-        assert!(!src.contains("fn is_ymd"));
-        assert!(!src.contains("'V' | 'D' | 'I' | 'W' | 'E' | 'F'"));
-    }
-
-    fn without_fn(src: &str, name: &str) -> String {
-        let marker = format!("fn {name}");
-        let mut kept = String::new();
-        let mut body = String::new();
-        let mut dropping = false;
-        let mut depth = 0i32;
-        let mut seen_brace = false;
-        for line in src.lines() {
-            if !dropping && line.contains(&marker) {
-                dropping = true;
-                depth = 0;
-                seen_brace = false;
-                body.clear();
-            }
-            if dropping {
-                body.push_str(line);
-                body.push('\n');
-                depth += line.matches('{').count() as i32;
-                depth -= line.matches('}').count() as i32;
-                if line.contains('{') {
-                    seen_brace = true;
-                }
-                if seen_brace && depth <= 0 {
-                    dropping = false;
-                }
-                continue;
-            }
-            kept.push_str(line);
-            kept.push('\n');
-        }
-        let _ = body;
-        kept
-    }
-
-    fn fn_text(src: &str, name: &str) -> String {
-        let marker = format!("fn {name}");
-        let mut body = String::new();
-        let mut dropping = false;
-        let mut depth = 0i32;
-        let mut seen_brace = false;
-        for line in src.lines() {
-            if !dropping && line.contains(&marker) {
-                dropping = true;
-                depth = 0;
-                seen_brace = false;
-            }
-            if dropping {
-                body.push_str(line);
-                body.push('\n');
-                depth += line.matches('{').count() as i32;
-                depth -= line.matches('}').count() as i32;
-                if line.contains('{') {
-                    seen_brace = true;
-                }
-                if seen_brace && depth <= 0 {
-                    break;
-                }
-            }
-        }
-        assert!(body.contains(&marker), "{name}");
-        body
+    fn header_with_slash_tag_closes_previous_record() {
+        let mut asm = MessageAssembler::new();
+        asm.ingest("[ 2026-11-19 08:43:09.000  1000: 123: 456 I/First ]");
+        asm.ingest("first body");
+        let done = asm.ingest("[ 2026-11-19 08:43:09.100  1000: 123: 457 I/OkHttp/4.9.0 ]");
+        assert_eq!(done.len(), 1, "带 / 的 Tag 头必须闭合上一条，不得被当正文");
+        assert_eq!(done[0].tag, "First");
+        assert_eq!(done[0].msg, "first body");
+        assert!(!done[0].msg.contains("OkHttp"), "上一条正文不得吞下下一条头");
+        asm.ingest("second body");
+        let second = asm.take().expect("second");
+        assert_eq!(second.tag, "OkHttp/4.9.0");
+        assert_eq!(second.msg, "second body");
     }
 
     #[test]
-    fn cut_log_parse_and_follow_stay_with_owner() {
-        let src = include_str!("parse.rs");
-        let ymd = fn_text(src, "take_ymd");
-        let md = fn_text(src, "take_md");
-        assert!(!ymd.contains("split_once"));
-        assert!(!ymd.contains("trim_start"));
-        assert!(!md.contains("split_once"));
-        assert!(!md.contains("trim_start"));
-        let digits = without_fn(src, "all_ascii_digits");
-        assert!(!digits.contains("is_ascii_digit"));
-
-        let follow = without_fn(include_str!("follow.rs"), "admit_line");
-        assert!(!follow.contains("skip_resume(known"));
-        assert!(!follow.contains("line.ts != known.ts"));
-        assert!(!include_str!("follow.rs").contains("skip_resume(s, &line)"));
-        assert!(!include_str!("follow.rs").contains("line.ts != s.ts"));
-
-        let stack = without_fn(include_str!("stack_trace.rs"), "stack_prefix");
-        assert!(!stack.contains("trim_start()"));
+    fn join_body_capacity_matches_actual_length() {
+        for lines in [
+            vec!["a".to_string()],
+            vec!["a".to_string(), "bb".to_string()],
+            vec!["a".to_string(), String::new(), "ccc".to_string()],
+            vec!["trailing".to_string(), String::new(), String::new()],
+        ] {
+            let expected: String = lines.join("\n").trim_end().to_string();
+            assert_eq!(join_body(lines), expected);
+        }
     }
 }

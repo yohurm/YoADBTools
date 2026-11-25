@@ -9,6 +9,7 @@ import {
   YoBadge,
   YoButton,
   YoChrome,
+  YoCollapse,
   YoEmptyState,
   YoIconButton,
   YoPage,
@@ -16,7 +17,6 @@ import {
   YoToaster,
   attachPanelKeys,
   closeContextMenu,
-  closedAttr,
   createToaster,
   openContextMenu,
   panelHotEdge,
@@ -27,6 +27,7 @@ import { CreateDialog, type CreateDialogApi } from "./CreateDialog";
 import { DeleteDialog, type DeleteDialogApi } from "./DeleteDialog";
 import { FileTable } from "./FileTable";
 import { PreviewPane } from "./PreviewPane";
+import { RenameDialog, type RenameDialogApi } from "./RenameDialog";
 import { TransferToasts } from "./TransferToasts";
 import { createDropSession } from "./drop-session";
 import {
@@ -59,9 +60,11 @@ export function FileView(props: DeviceSession) {
   let addressSlot: YoAddressFieldApi | undefined;
   let deleteDialog: DeleteDialogApi | undefined;
   let createDialog: CreateDialogApi | undefined;
+  let renameDialog: RenameDialogApi | undefined;
 
   const focusedSerial = (): string | null => boundSerial(props.selectedSerials);
   const singleListedFile = (): ReturnType<typeof listingStore.singleFile> => listingStore.singleFile();
+  const singleListedEntry = (): ReturnType<typeof listingStore.singleEntry> => listingStore.singleEntry();
   const previewShown = (): boolean => listingStore.ui.previewOpen;
   const showFailure = (failure: string | undefined): void => {
     if (failure) toaster.show(failure, "error");
@@ -72,7 +75,7 @@ export function FileView(props: DeviceSession) {
     listEl: () => listEl,
     listOffset: () => listOffset,
     hasDevice: () => Boolean(focusedSerial()),
-    blocked: () => Boolean(deleteDialog?.isOpen() || createDialog?.isOpen()),
+    blocked: () => Boolean(deleteDialog?.isOpen() || createDialog?.isOpen() || renameDialog?.isOpen()),
     intoFolder: () => props.settings.files_drop_into_folder,
     entries: () => listingStore.entries,
     onCommit: (paths, dirName) => {
@@ -155,6 +158,11 @@ export function FileView(props: DeviceSession) {
     deleteDialog?.ask([...listingStore.selectionNames()]);
   };
 
+  const askRenameSelection = (): void => {
+    const entry = singleListedEntry();
+    if (entry) renameDialog?.ask(entry.name);
+  };
+
   const refreshListing = (): void => {
     void listingStore.refresh();
   };
@@ -211,10 +219,12 @@ export function FileView(props: DeviceSession) {
         canDownload: singleListedFile() !== undefined,
         canDelete: selected,
         canCopy: selected,
+        canRename: singleListedEntry() !== undefined,
         newFile: () => createDialog?.open("file"),
         newDir: () => createDialog?.open("dir"),
         download: startDownload,
         copy: copySelected,
+        rename: askRenameSelection,
         remove: () => askDeleteSelection(),
       },
     });
@@ -262,10 +272,7 @@ export function FileView(props: DeviceSession) {
         ]}
       />
 
-      <div
-        class="yohu-files__stage yohu-recipe-preview"
-        classList={{ "yohu-files__stage--preview-collapsed": !previewShown() }}
-      >
+      <div class="yohu-files__stage">
         <div class="yohu-files__explorer" data-drop="files">
           <YoPanel
             variant="pane"
@@ -287,13 +294,18 @@ export function FileView(props: DeviceSession) {
             </Show>
           </YoPanel>
         </div>
-        <div class="yohu-files__preview-slot" data-drop="ignore" inert={closedAttr(previewShown())}>
-          <PreviewPane />
+        <div class="yohu-files__preview-slot" data-drop="ignore">
+          <YoCollapse open={previewShown()} axis="inline" recipe="panel" flex="hug">
+            <div class="yohu-files__preview-dock">
+              <PreviewPane />
+            </div>
+          </YoCollapse>
         </div>
       </div>
       <div data-drop="ignore">
         <DeleteDialog api={(api) => { deleteDialog = api; }} />
         <CreateDialog api={(api) => { createDialog = api; }} />
+        <RenameDialog api={(api) => { renameDialog = api; }} />
       </div>
       <TransferToasts toaster={toaster} />
       <YoToaster toaster={toaster} />

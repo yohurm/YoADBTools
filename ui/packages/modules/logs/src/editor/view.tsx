@@ -22,13 +22,19 @@ import { logLineWraps, type LogLine, type LogLineLayout } from "@yohu/api";
 import { YoVirtualList } from "@yohu/ui";
 
 import { keywordRangesInWindows } from "../highlight";
-import { documentMaxChars, LineBoard, visualRowKey, type VisualLine } from "./board";
-import { EMPTY_MESSAGES, LogDocument, type DocRow, type FormatOptions } from "./document";
+import { LineBoard, visualRowKey, type VisualLine } from "./board";
+import { EMPTY_MESSAGES, LogDocument, type FormatOptions } from "./document";
+import type { ViewRow } from "../stack";
 import "./markup.css";
 import { markupRunsFromRanges, markupWashCells } from "./markup-model";
 import { MARKUP_MARK_NAME, nameMarkupRuns } from "./markup-policy";
 import { bindMarkupRuns } from "./markup-registry";
 import { bindWashPaint } from "./markup-wash";
+
+/** 父级通过句柄操作编辑器，不点内部 class。 */
+export type EditorViewHandle = {
+  selectAll: () => void;
+};
 
 const ViewBind = createContext<{
   keyword: Accessor<string>;
@@ -75,7 +81,6 @@ function VisualRow(props: { item: VisualLine; index: number }) {
     <div
       class="yohu-logs__cols yohu-logs__row"
       data-seq={String(item().seq)}
-      data-wrap={String(item().wrapIndex)}
       data-doc-from={String(item().docFrom)}
       data-bar={item().bar}
       style={
@@ -96,7 +101,7 @@ function VisualRow(props: { item: VisualLine; index: number }) {
 }
 
 export function EditorView(props: {
-  rows: Accessor<readonly DocRow[]>;
+  rows: Accessor<readonly ViewRow[]>;
   options: Accessor<FormatOptions>;
   layout: Accessor<LogLineLayout>;
   rowChars: Accessor<number>;
@@ -108,16 +113,32 @@ export function EditorView(props: {
   paused: Accessor<boolean>;
   docShift: Accessor<number>;
   onAtBottomChange: (atBottom: boolean) => void;
+  onAtTopChange?: (atTop: boolean) => void;
   onRowContextMenu: (row: { line: LogLine }, event: MouseEvent) => void;
-  documentRef?: (doc: LogDocument) => void;
+  /** attach / detach 成对：onCleanup 回传 null，父级据此拒绝复制。 */
+  documentRef?: (doc: LogDocument | null) => void;
+  /** 视图句柄：父级用 selectAll()，不再 querySelector 内部 class。 */
+  viewRef?: (handle: EditorViewHandle | null) => void;
 }) {
   const logDoc = new LogDocument();
   const board = new LineBoard();
   const [rev, setRev] = createSignal(0);
+  let viewEl: HTMLDivElement | undefined;
   onMount(() => {
     props.documentRef?.(logDoc);
+    if (viewEl) {
+      props.viewRef?.({
+        selectAll: () => {
+          if (viewEl) {
+            window.getSelection()?.selectAllChildren(viewEl);
+          }
+        },
+      });
+    }
   });
   onCleanup(() => {
+    props.documentRef?.(null);
+    props.viewRef?.(null);
     logDoc.clear();
   });
 
@@ -146,14 +167,14 @@ export function EditorView(props: {
     if (!(px > 0)) {
       return 0;
     }
-    return Math.ceil((documentMaxChars(items()) + 1) * px);
+    return Math.ceil((board.maxChars() + 1) * px);
   });
 
   return (
     <ViewBind.Provider
       value={{ keyword: props.keyword }}
     >
-      <div class="yohu-logs__view" data-layout={props.layout()}>
+      <div class="yohu-logs__view" data-layout={props.layout()} ref={(el) => { viewEl = el; }}>
         <YoVirtualList<VisualLine>
           items={items}
           itemHeight={props.itemHeight}
@@ -161,12 +182,13 @@ export function EditorView(props: {
           contentWidth={contentWidth}
           autoScrollToBottom={() => props.following() && !props.paused()}
           lineScale={() => {
-            const total = props.rows().length;
+            const total = items().length;
             if (total <= 0) return undefined;
             return { total, at: 0 };
           }}
           docShift={props.docShift}
           onAtBottomChange={props.onAtBottomChange}
+          onAtTopChange={props.onAtTopChange}
           ariaLabel="日志列表"
           onOffset={(_, inline) => props.onInlineScroll?.(inline)}
           onRowContextMenu={(row, _key, event) => props.onRowContextMenu(row, event)}

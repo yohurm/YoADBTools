@@ -166,9 +166,9 @@
   box-sizing: border-box;
   height: 100%;
   white-space: inherit;
+  font-family: var(--yohu-font-mono);
   font-kerning: none;
   font-variant-ligatures: none;
-  font-variant-numeric: normal;
   font-feature-settings: "kern" 0, "liga" 0, "calt" 0;
   background-image: var(--yohu-wash-image, none);
   background-repeat: no-repeat;

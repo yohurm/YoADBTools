@@ -9,10 +9,15 @@ mod capture;
 mod export;
 mod follow;
 mod index;
+mod limits;
 mod parse;
+mod record;
 mod ring;
+mod ring_store;
+mod slots;
 mod stack_trace;
 mod task;
-mod windows;
 
 pub use capture::{CaptureService, LogError};
+pub use export::LogExporter;
+pub use ring_store::RingStore;
