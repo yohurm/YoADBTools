@@ -10,14 +10,8 @@ use tokio_util::sync::CancellationToken;
 use yohu_adb::{AdbClient, ToolResolver};
 
 fn fake_adb_src() -> PathBuf {
-    let mut p = std::env::current_exe().expect("测试进程路径");
-    p.pop(); // deps/
-    p.pop(); // debug/ | release/
-    let plain = p.join(yohu_runtime::host_bin_name("fake-adb"));
-    if plain.is_file() {
-        return plain;
-    }
-    panic!("先执行 cargo build --workspace（fake-adb 明文 bin）");
+    yohu_runtime::workspace_bin_path("fake-adb")
+        .expect("先执行 cargo build --workspace（fake-adb 明文 bin）")
 }
 
 fn install_fake_adb(dir: &std::path::Path, dest_name: &str, script: &str) -> PathBuf {

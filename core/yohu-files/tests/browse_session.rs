@@ -11,15 +11,8 @@ use yohu_files::{FileBrowser, FileError};
 use yohu_protocol::DragOutItem;
 
 fn fake_adb_src() -> PathBuf {
-    let mut p = std::env::current_exe().expect("测试进程路径");
-    p.pop();
-    p.pop();
-    let plain = p.join(yohu_runtime::host_bin_name("fake-adb"));
-    assert!(
-        plain.is_file(),
-        "先执行 cargo build --workspace（fake-adb 明文 bin）"
-    );
-    plain
+    yohu_runtime::workspace_bin_path("fake-adb")
+        .expect("先执行 cargo build --workspace（fake-adb 明文 bin）")
 }
 
 fn isolated_fake_adb(script: &str) -> PathBuf {
