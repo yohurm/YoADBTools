@@ -15,19 +15,11 @@ use yohu_adb::{AdbClient, ToolResolver};
 use yohu_logsrv::CaptureService;
 use yohu_protocol::AppEvent;
 
-/// 定位 fake-adb：workspace member 的明文 bin 位于
-/// `target/<profile>/fake-adb`（Windows 带 `.exe`；`cargo build --workspace` 产出）。
+/// 定位 fake-adb：workspace `target` 下 member 的明文 bin（Windows 带 `.exe`；
+/// `cargo build --workspace` 产出）。不依赖测试进程位于 `deps/` 的假设。
 fn fake_adb_src() -> PathBuf {
-    let mut profile = std::env::current_exe().expect("测试进程路径");
-    profile.pop(); // deps/
-    profile.pop(); // debug/ | release/
-    let exe = profile.join(yohu_runtime::host_bin_name("fake-adb"));
-    assert!(
-        exe.is_file(),
-        "找不到 {} — 请先执行 cargo build --workspace（集成测试依赖明文 bin）",
-        exe.display()
-    );
-    exe
+    yohu_runtime::workspace_bin_path("fake-adb")
+        .expect("找不到 fake-adb — 请先执行 cargo build --workspace（集成测试依赖明文 bin）")
 }
 
 /// 为每个测试建立隔离的 fake adb（exe 副本 + 同名 json 脚本）。

@@ -14,6 +14,80 @@ pub fn host_bin_name(stem: &str) -> String {
     }
 }
 
+/// 定位 workspace `target` 下某个 member 的明文二进制（集成测试 fixture 用）。
+///
+/// 兼容 Cargo 的常见产物布局：
+/// - `target/<profile>/<bin>`
+/// - `target/<triple>/<profile>/<bin>`（指定 `--target` 时）
+/// - `target/<profile>/build/<pkg>/<hash>/out/<bin>`（构建目录布局）
+///
+/// 找不到时返回 `None`，调用方自行决定报错。
+pub fn workspace_bin_path(stem: &str) -> Option<PathBuf> {
+    let name = host_bin_name(stem);
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR")); // core/yohu-runtime
+    let root = manifest.parent()?.parent()?;
+    let target = match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(dir) => {
+            let p = PathBuf::from(dir);
+            if p.is_absolute() {
+                p
+            } else {
+                root.join(p)
+            }
+        }
+        None => root.join("target"),
+    };
+
+    for profile in ["debug", "release"] {
+        let base = target.join(profile);
+        let direct = base.join(&name);
+        if direct.is_file() {
+            return Some(direct);
+        }
+        // 多目标三元组目录：target/<triple>/<profile>/<bin>
+        if let Ok(entries) = std::fs::read_dir(&target) {
+            for entry in entries.flatten() {
+                let candidate = entry.path().join(profile).join(&name);
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+        }
+        // 兜底：在 profile 目录内按名字有限深度搜索（跳过增量缓存）。
+        if let Some(found) = find_named_file(&base, std::ffi::OsStr::new(&name), 8) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn find_named_file(dir: &Path, name: &std::ffi::OsStr, depth: usize) -> Option<PathBuf> {
+    if depth == 0 {
+        return None;
+    }
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_file() {
+            if path.file_name() == Some(name) {
+                return Some(path);
+            }
+        } else if file_type.is_dir() {
+            let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+            if matches!(dir_name, "incremental" | ".fingerprint") {
+                continue;
+            }
+            if let Some(found) = find_named_file(&path, name, depth - 1) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
 /// 确保路径对当前用户可执行（Unix `+x`；Windows 无操作）。
 pub fn ensure_executable(path: &Path) -> std::io::Result<()> {
     #[cfg(unix)]

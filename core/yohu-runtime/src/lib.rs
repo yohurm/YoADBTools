@@ -9,6 +9,7 @@ pub mod process;
 
 pub use os_paths::{
     app_data_root, app_install_root, ensure_executable, host_bin_name, open_path, open_url,
+    workspace_bin_path,
 };
 pub use persist::{atomic_write, backup_corrupt};
 pub use process::{

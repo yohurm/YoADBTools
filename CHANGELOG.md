@@ -40,6 +40,7 @@
 - Linux 投屏舞台铬与占用卡片对齐 Windows（按同一曲线插值、圆角层）。
 - 文件列表失败进入 fault 相位；Linux 投屏绑定失败画进画面洞。
 - NSIS 安装包嵌入资源管理器可显示的图标。
+- 集成测试 fixture 的 `fake-adb` 定位改为在 workspace `target` 内按名字查找，兼容 Cargo 构建目录布局，三端 CI 的 Rust 测试恢复通过。
 - macOS / Windows 不再编译 Linux 呈现档；三端 CI 按同一套事实编译；兼容 Rust 1.99 / TypeScript 5.9 与 Windows 换行。
 
 ### 测试
